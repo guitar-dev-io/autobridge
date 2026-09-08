@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">AutoBridge</string>
+    <string name="accessibility_description">Allows parked-only touch forwarding from the car display to the phone.</string>
+</resources>

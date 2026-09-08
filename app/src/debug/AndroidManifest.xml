@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+      DHU-only compatibility override.
+
+      Android Auto on the connected Android 16 development phone discovers this service but does
+      not hold androidx.car.app.BIND_CAR_APP, so the platform rejects the bind before CarAppService
+      code runs. Remove the permission gate only from debug APKs installed through ADB. The main
+      (and therefore release) manifest keeps the standard BIND_CAR_APP protection.
+    -->
+    <application>
+        <service
+            android:name=".mirror.ProjectionService"
+            android:exported="false"
+            android:foregroundServiceType="mediaProjection" />
+
+        <service
+            android:name=".media.MediaPlaybackService"
+            android:exported="true"
+            android:foregroundServiceType="mediaPlayback" />
+
+        <service
+            android:name=".car.AutoBridgeCarAppService"
+            tools:remove="android:permission" />
+    </application>
+</manifest>
