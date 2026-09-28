@@ -20,6 +20,9 @@ object CarBrowserRuntime {
     fun renderer(context: Context): CarWebRenderer =
         renderer ?: CarWebRenderer(context).also { renderer = it }
 
+    /** The renderer if one exists, without creating it; diagnostics must not start a browser. */
+    fun rendererOrNull(): CarWebRenderer? = renderer
+
     /** Tears the renderer down. Called when the car session ends, never when a screen is popped. */
     fun release() {
         renderer?.destroy()

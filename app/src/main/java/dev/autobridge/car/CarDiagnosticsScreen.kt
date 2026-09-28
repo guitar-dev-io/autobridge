@@ -51,6 +51,18 @@ class CarDiagnosticsScreen(carContext: CarContext) : Screen(carContext) {
             )
             .addItem(
                 Row.Builder()
+                    .setTitle("Audio")
+                    .addText("Focus, route, volume, session and web audio state")
+                    .setBrowsable(true)
+                    .setOnClickListener {
+                        CarNavigation.open(screenManager, "CarAudioDiagnosticsScreen") {
+                            CarAudioDiagnosticsScreen(carContext)
+                        }
+                    }
+                    .build()
+            )
+            .addItem(
+                Row.Builder()
                     .setTitle("Refresh")
                     .addText("Re-read live diagnostics")
                     .setOnClickListener { invalidate() }
