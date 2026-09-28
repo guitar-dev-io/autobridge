@@ -1,5 +1,3 @@
-# DHU and device scenarios
-
 Updated: 2026-09-08
 
 JVM tests prove pure policy, resolver, transform, and state logic. They do not prove Android Auto host behavior, actual surface pixels, MediaProjection consent, speed callbacks, media routing, or input injection. Run these scenarios with a DHU/emulator first and a real head unit only after the safety path is understood.
@@ -24,7 +22,18 @@ Enable Android Auto developer mode/unknown sources as required by the local DHU.
 - Set mock state to `UNKNOWN`: mirror/video/browser/touch/Quick Apps remain blocked.
 - Return to `PARKED`: explicitly restart/restore only through the documented user flow.
 
-## Production speed gate
+## Self-drawn renderer matrix
+
+Repeat the LAB mirror flow with `SELF_DRAWN` selected before requesting consent:
+
+- verify diagnostics record `self_drawn_capture_created` and `self_drawn_surface_attached`;
+- verify visible pixels for FIT, FILL, STRETCH, and ONE_TO_ONE, including safe insets and visible-area clipping;
+- verify touch lands on the same phone content that is displayed, especially FILL crop edges and rotation;
+- record frame counters, measured FPS, last latency, CPU/battery impact, and any ImageReader color/order issue;
+- resize/reconnect the car surface and confirm stale generations do not draw into the replacement;
+- test protected/DRM content separately and record blank output as a platform boundary, not a bypass target.
+
+SELF_DRAWN is not by itself evidence of screen-off survival: its source is still the phone default display. On a device that passes the separate panel-only capability probe, test panel-off behavior independently. `OWN_CONTENT` is expected to be rejected/fallback because a dedicated app-display implementation does not exist.
 
 With `personalDebug` or a release-like build on a supported host:
 
@@ -48,6 +57,7 @@ A DHU configuration that returns unavailable `CarValue` data cannot prove the pr
 
 - With `PARKED` and Accessibility enabled, test tap, scroll/fling, long press, pinch, Back, Home, and Recents.
 - With Shizuku granted, bind the user service and test tap/swipe/keyevent; kill/disconnect the service and confirm the backend becomes unavailable and Accessibility can be selected where supported.
+- If the service reports panel-power or `REAL_TOUCH` capability, record the capability probe and device/API details. The current Android Auto surface callbacks do not provide raw pointer IDs/actions, so do not convert `onScale` into a claimed raw-touch test; the raw router/sink remains a separate host-transport boundary.
 - Tap visible letterbox bars and outside reported visible bounds; no phone gesture should be dispatched.
 - Repeat while `MOVING`/`UNKNOWN`; all input must be denied.
 
@@ -61,10 +71,57 @@ A DHU configuration that returns unavailable `CarValue` data cannot prove the pr
 
 ## Diagnostics and screen power
 
-- Verify the developer screen refreshes structured logs, mirror events, reconnect count, current transform/rotation, and latency/uptime values.
+- Verify the developer screen refreshes structured logs, mirror events, reconnect count, current transform/rotation, and lifecycle/frame diagnostics. In SELF_DRAWN, check captured/dropped/rendered counts, measured FPS, and last latency.
 - Confirm the event ring can be cleared without resetting active uptime.
-- With the current AUTO_MIRROR pipeline, turning the phone screen off may pause/blacken the car image. Do not record this as a regression or claim screen-off survival; own-content rendering is deferred.
+- Without the privileged setting, turning the phone screen off may pause/blacken the car image because AUTO_MIRROR and SELF_DRAWN capture the default display; record this as the expected unsupported/default behavior.
+- On a device whose Shizuku service reports display-power capability, enable `Panel off on auto-dim` explicitly, wait for the configured timeout, and verify whether the physical panel turns off without locking/sleeping the device while the car surface remains usable. Record Android/OEM/API results; a failure must fall back to public dimming.
+- Stop the projection, trigger `MOVING`/`UNKNOWN`, disconnect the Shizuku service, and confirm panel power is restored and any active real-touch stream is canceled before teardown.
+- `OWN_CONTENT` remains unavailable regardless of the panel-power result; do not generalize a supported-device observation into a dedicated app-display claim.
 
 ## Evidence record
 
 For every host run save APK flavor/build type, phone/Android version, Android Auto/DHU version, host connection type, surface width/height/DPI, speed callback status/value, Logcat, and screenshots. A scenario is `PARTIAL` until its platform-specific observation is recorded.
+
+## Phone display controls (2026-09-10; pending device verification)
+
+1. Start a permitted mirror while parked; enable Prevent Sleep and a 15-second
+   auto-dim delay. After idle, verify phone dimming and continuous car pixels.
+2. Enable Panel off on auto-dim with Shizuku available. Use Dim phone now from
+   the car control panel. Wait longer than the phone system screen timeout;
+   verify the car image continues and car gestures do not wake the phone panel.
+3. Use Restore phone screen. Verify the panel returns and the idle timer restarts.
+4. Repeat without a panel-power backend: the result should be dimming, not a
+   false panel-off success. Turn both idle settings off, manually dim and restore,
+   then verify no AutoBridge screen wake lock remains using dumpsys power.
+5. Stop mirroring/disconnect after panel-off. Verify restoration and wake-lock
+   release. If restoration fails, reconnect Shizuku and use Restore phone screen;
+   verify the UI does not claim success until the backend accepts restoration.
+6. With no active mirror or an unknown/moving vehicle state, verify Dim phone now
+   is rejected; restoration must remain available.
+
+## Browser toolbar inspired by the supplied Fermata reference (pending host verification)
+
+- Open Browser while parked on portrait and landscape surfaces. Verify the dark toolbar has back, forward, reload, address, save bookmark, and menu controls with no speed overlay covering the page. Toolbar drawing and touch zones scale together within the host's stable area.
+- Enter a URL or query through the address field. Follow a link, then use back/forward. Back with no page history stays in the browser; the host Back action exits the screen.
+- Save the current page with the star. Open Menu → Bookmarks, select it, and verify it opens in the same browser with history retained. Save more than four pages and verify bookmark pagination.
+- Use Menu → Home, Desktop mode, and Fullscreen. The fullscreen handle restores the toolbar without reloading. Check touch coordinates after a surface resize and fullscreen transition.
+- Check the phone remote's loading indicator while a page loads and after completion.
+- Verify ordinary web content and video separately. This remains an off-screen WebView drawn to a software Canvas; matching toolbar appearance does not establish Fermata-equivalent video playback or hardware-composited/DRM support.
+
+## Shared phone / Android Auto browser (pending device verification)
+
+- On the phone, choose OPEN BROWSER without capture consent. Verify the compact dark toolbar has back/forward/reload, editable URL, bookmark and menu controls, and the keyboard does not cover the focused address.
+- Use the same URL/search, bookmark set, and Desktop preference from either display. A newly created browser starts at the last completed HTTPS page; an already open browser retains its own history.
+- From the phone menu, send the current page to Android Auto, or receive the active car browser page. With no car session, verify a connection message rather than a crash. These are explicit URL transfers, not live page/scroll/video synchronization.
+- Rotate the phone, background/resume, and toggle fullscreen. Verify page history is restored and the fullscreen handle restores the toolbar. Check the blocked view when browser policy denies use.
+- Start Mirror separately and open the phone browser to see the same phone pixels on the car. Opening the native car browser stops projection as before.
+
+## Compact Home inspired by the supplied Fermata Xtream image
+
+- Open Home and verify Browser, Mirror, YouTube, Media, Apps, More in that order. Tiles use original monochrome artwork with dark rounded backgrounds and thin outlines. Titles remain host-rendered beneath the artwork; the image border is not a border around the entire host tile.
+- Verify More opens Agent, Recent, Driving, and Settings, with Back returning to Home. Verify the Settings speed-permission action still works.
+- Test portrait/landscape and Car API below/above 8: request SMALL grid items on API 8+, use ICON images on older hosts, and use legacy headers below API 7. Android Auto controls columns, full tile borders, header height, text size and spacing; a fixed 3-by-2 layout is not promised.
+- Verify the YouTube shortcut opens https://m.youtube.com in the browser. This shortcut does not add video-rendering capabilities.
+- No device was connected during implementation; on-car visual and input checks remain pending.
+
+Reference: https://github.com/malebuffy/Fermata-Xtream (visual reference only; no upstream code/assets copied). Grid sizing: https://developer.android.com/reference/androidx/car/app/model/GridTemplate.Builder#setItemSize(int).

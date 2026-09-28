@@ -13,6 +13,10 @@ object ContentAddress {
         else uri.toASCIIString()
     }.getOrNull()
 
+    /** Generic web search, used by the phone home's voice button. */
+    fun webSearch(query: String): String =
+        "https://www.google.com/search?q=" + URLEncoder.encode(query.trim(), "UTF-8")
+
     fun youtubeSearch(query: String): String =
         "https://m.youtube.com/results?search_query=" + URLEncoder.encode(query.trim(), "UTF-8")
 }

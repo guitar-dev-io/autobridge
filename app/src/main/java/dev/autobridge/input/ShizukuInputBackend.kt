@@ -11,13 +11,14 @@ import dev.autobridge.core.policy.FeaturePolicy
 import rikka.shizuku.Shizuku
 
 /**
- * Privileged touch backend bound through a Shizuku user service. It reports its narrower gesture
- * set so PINCH can fall back to Accessibility rather than failing silently.
+ * Privileged backend bound through a Shizuku user service. Basic shell `input` gestures remain
+ * separate from the optional panel-power and real pointer capabilities, which are reported only
+ * after the remote service probes its hidden APIs successfully.
  */
 object ShizukuInputBackend : InputBackend {
     private const val TAG = "AutoBridgeShizuku"
     const val REQUEST_CODE = 9100
-    private const val SERVICE_VERSION = 1
+    private const val SERVICE_VERSION = 2
 
     @Volatile
     private var remote: IShizukuTouchService? = null
@@ -30,7 +31,7 @@ object ShizukuInputBackend : InputBackend {
         Log.w(TAG, "Shizuku touch service binder died")
     }
 
-    override val capabilities: Set<InputCapability> = setOf(
+    private val basicCapabilities = setOf(
         InputCapability.TAP,
         InputCapability.LONG_PRESS,
         InputCapability.SWIPE,
@@ -40,6 +41,12 @@ object ShizukuInputBackend : InputBackend {
         InputCapability.HOME,
         InputCapability.RECENTS
     )
+
+    override val capabilities: Set<InputCapability>
+        get() = buildSet {
+            addAll(basicCapabilities)
+            if (isRealTouchAvailable) add(InputCapability.REAL_TOUCH)
+        }
 
     private fun userServiceArgs(context: Context) = Shizuku.UserServiceArgs(
         ComponentName(context.packageName, ShizukuTouchService::class.java.name)
@@ -63,7 +70,7 @@ object ShizukuInputBackend : InputBackend {
                 }
             remoteBinder = binder
             remote = IShizukuTouchService.Stub.asInterface(binder)
-            Log.i(TAG, "Shizuku touch service connected: ${remote != null}")
+            Log.i(TAG, "Shizuku privileged service connected: ${remote != null}")
         }
 
         override fun onServiceDisconnected(name: ComponentName) {
@@ -79,6 +86,16 @@ object ShizukuInputBackend : InputBackend {
             FeaturePolicy.app.isAvailable(Feature.SHIZUKU) &&
             isPermissionGranted && remote != null
 
+    val isPanelPowerAvailable: Boolean
+        get() = remote != null && invokeRemote("display power capability") {
+            it.isDisplayPowerControlAvailable()
+        }
+
+    val isRealTouchAvailable: Boolean
+        get() = remote != null && invokeRemote("real touch capability") {
+            it.isRealTouchAvailable()
+        }
+
     fun requestPermission() {
         if (Shizuku.pingBinder() && !isPermissionGranted) Shizuku.requestPermission(REQUEST_CODE)
     }
@@ -90,9 +107,27 @@ object ShizukuInputBackend : InputBackend {
     }
 
     fun unbind(context: Context) {
+        // Cleanup happens before dropping the binder so a service teardown cannot leave the panel
+        // off or a pointer stream held down.
+        restorePanelPower()
+        cancelRealTouch()
         clearRemote("explicit unbind")
         runCatching { Shizuku.unbindUserService(userServiceArgs(context), connection, true) }
             .onFailure { Log.w(TAG, "unbindUserService failed", it) }
+    }
+
+    fun setPanelPower(on: Boolean): Boolean {
+        if (!isPermissionGranted || !FeaturePolicy.app.isAvailable(Feature.SHIZUKU)) return false
+        return invokeRemote("set panel power=$on") { it.setDisplayPower(on) }
+    }
+
+    /** Cleanup operation intentionally bypasses the normal TOUCH policy gate. */
+    fun restorePanelPower(): Boolean = invokeRemote("restore panel power") {
+        it.setDisplayPower(true)
+    }
+
+    fun cancelRealTouch(): Boolean = invokeRemote("cancel real touch") {
+        it.touchCancel()
     }
 
     private fun clearRemote(reason: String) {
@@ -100,12 +135,15 @@ object ShizukuInputBackend : InputBackend {
         remote = null
         remoteBinder = null
         if (binder != null) runCatching { binder.unlinkToDeath(deathRecipient, 0) }
-        Log.d(TAG, "Shizuku touch remote cleared: $reason")
+        Log.d(TAG, "Shizuku privileged remote cleared: $reason")
     }
 
     private fun allowed(): Boolean = FeaturePolicy.app.isAvailable(Feature.TOUCH)
 
-    private inline fun invokeRemote(operation: String, call: (IShizukuTouchService) -> Boolean): Boolean {
+    private inline fun invokeRemote(
+        operation: String,
+        call: (IShizukuTouchService) -> Boolean
+    ): Boolean {
         val service = remote ?: return false
         return runCatching { call(service) }.onFailure {
             clearRemote("$operation failed")
@@ -133,6 +171,31 @@ object ShizukuInputBackend : InputBackend {
 
     override suspend fun longPress(x: Float, y: Float, durationMs: Long): Boolean =
         swipe(x, y, x, y, durationMs)
+
+    override suspend fun touchDown(pointerId: Int, x: Float, y: Float): Boolean {
+        if (!allowed() || !isRealTouchAvailable) return false
+        return invokeRemote("touch down") { it.touchDown(pointerId, x.toInt(), y.toInt()) }
+    }
+
+    override suspend fun touchMove(pointerIds: IntArray, xs: FloatArray, ys: FloatArray): Boolean {
+        if (!allowed() || !isRealTouchAvailable ||
+            pointerIds.size != xs.size || pointerIds.size != ys.size
+        ) return false
+        return invokeRemote("touch move") {
+            it.touchMove(
+                pointerIds,
+                xs.map(Float::toInt).toIntArray(),
+                ys.map(Float::toInt).toIntArray()
+            )
+        }
+    }
+
+    override suspend fun touchUp(pointerId: Int, x: Float, y: Float): Boolean {
+        if (!allowed() || !isRealTouchAvailable) return false
+        return invokeRemote("touch up") { it.touchUp(pointerId, x.toInt(), y.toInt()) }
+    }
+
+    override suspend fun touchCancel(): Boolean = cancelRealTouch()
 
     override suspend fun back(): Boolean = keyevent(4)
     override suspend fun home(): Boolean = keyevent(3)

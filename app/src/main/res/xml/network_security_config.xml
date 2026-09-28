@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  IPTV providers still serve player_api.php, get.php and the streams themselves over plain http,
+  so an Xtream account the user pastes in would otherwise fail to load at all. Cleartext is
+  permitted for those user-entered hosts; certificate validation for https hosts is untouched.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

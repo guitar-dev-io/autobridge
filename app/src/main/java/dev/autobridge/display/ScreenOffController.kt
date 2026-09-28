@@ -1,50 +1,60 @@
 package dev.autobridge.display
 
+import dev.autobridge.input.ShizukuInputBackend
+
 /**
- * V0.6 experiment: keeping the car mirror alive while the phone's own screen is off.
+ * Pipeline and screen-off capability model.
  *
- * The honest platform constraint: `MirrorCoordinator` uses `VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR`,
- * which mirrors the phone's *default* display. When the phone screen turns off, the default
- * display stops composing real content, so an AUTO_MIRROR virtual display goes black too — the
- * mirror does not survive screen-off on this pipeline. Making it survive requires either:
- *   1. a self-drawn capture pipeline (ImageReader + Canvas) that reads frames independent of the
- *      default display's power state — the same deferred pipeline FILL/STRETCH and per-frame FPS
- *      need (see [dev.autobridge.input.DisplayTransform] / [MirrorDiagnostics]); or
- *   2. launching the mirrored app onto a dedicated *own-content* VirtualDisplay instead of
- *      auto-mirroring the physical one (see [PerAppDisplayController]).
- *
- * Rather than pretend to force the screen off (which needs a DeviceAdmin `lockNow()` or root and
- * has real safety implications in a vehicle), this controller exposes the *policy decision* as
- * pure, testable logic: given the current [PipelineMode], can the mirror survive the phone screen
- * turning off? [MirrorCoordinator] and the UI use this to tell the user the truth instead of
- * silently showing a black head-unit screen.
+ * `OWN_CONTENT` remains a dedicated app-display marker and is intentionally unavailable. The
+ * privileged panel-off capability is separate: it can turn only the physical panel off through a
+ * Shizuku/root-style backend while AUTO_MIRROR or SELF_DRAWN continues using the existing source.
  */
 object ScreenOffController {
-
-    /** How the mirror pixels are produced. Only [OWN_CONTENT] is independent of the phone's screen power. */
     enum class PipelineMode {
-        /** Current default: OS zero-copy mirror of the physical display (dies when the phone screen sleeps). */
+        /** Current default: OS zero-copy mirror of the physical display. */
         AUTO_MIRROR,
 
-        /** A dedicated own-content virtual display the app draws into (survives screen-off). */
+        /** ImageReader + Canvas output; transform/FPS are app-controlled. */
+        SELF_DRAWN,
+
+        /** Dedicated own-content virtual display; not implemented in this build. */
         OWN_CONTENT
     }
 
     @Volatile
     var pipelineMode: PipelineMode = PipelineMode.AUTO_MIRROR
 
-    /**
-     * Whether the car mirror can keep displaying content after the phone screen turns off, for the
-     * given [mode]. Pure so it's unit-testable and so callers can warn the user up front.
-     */
+    fun isAvailable(mode: PipelineMode = pipelineMode): Boolean =
+        mode != PipelineMode.OWN_CONTENT
+
+    /** Only a dedicated own-content display can make the source independent of panel power. */
     fun survivesScreenOff(mode: PipelineMode = pipelineMode): Boolean =
         mode == PipelineMode.OWN_CONTENT
 
-    /** Human-readable explanation for the status/overlay UI. */
+    /** True only after the connected Shizuku user service passes its reflection capability probe. */
+    fun panelOffAvailable(): Boolean = ShizukuInputBackend.isPanelPowerAvailable
+
+    fun panelOffStatusLabel(): String = if (panelOffAvailable()) {
+        "privileged panel-off ready (Shizuku/root; opt-in)"
+    } else {
+        "privileged panel-off unavailable; public dim fallback"
+    }
+
+    /** Human-readable explanation for the selected mirror pipeline. */
     fun statusLabel(mode: PipelineMode = pipelineMode): String = when (mode) {
         PipelineMode.AUTO_MIRROR ->
-            "screen-off: mirror pauses (AUTO_MIRROR follows phone display power)"
+            if (panelOffAvailable()) {
+                "screen-off: optional privileged panel-off; source is still AUTO_MIRROR"
+            } else {
+                "screen-off: mirror pauses (AUTO_MIRROR follows phone display power)"
+            }
+        PipelineMode.SELF_DRAWN ->
+            if (panelOffAvailable()) {
+                "screen-off: optional privileged panel-off; capture source remains default display"
+            } else {
+                "screen-off: not guaranteed (self-drawn capture follows source display power)"
+            }
         PipelineMode.OWN_CONTENT ->
-            "screen-off: mirror continues (own-content display)"
+            "screen-off: continues with dedicated own-content display (not available in this build)"
     }
 }

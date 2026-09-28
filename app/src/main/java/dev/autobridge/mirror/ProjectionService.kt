@@ -85,6 +85,15 @@ class ProjectionService : Service() {
             }
         }
 
+        fun onMirrorBindingFailed(context: Context, message: String) {
+            if (sessionState == SessionState.IDLE) return
+            markError(IllegalStateException(message))
+            ScreenPowerController.stop()
+            MirrorSettings.preferredFps = null
+            MirrorCoordinator.stopProjection()
+            context.stopService(Intent(context, ProjectionService::class.java))
+        }
+
         fun start(context: Context, resultCode: Int, data: Intent): Boolean {
             pendingDisconnectStop?.let(mainHandler::removeCallbacks)
             pendingDisconnectStop = null
@@ -109,6 +118,7 @@ class ProjectionService : Service() {
             pendingDisconnectStop?.let(mainHandler::removeCallbacks)
             pendingDisconnectStop = null
             ScreenPowerController.stop()
+            MirrorSettings.preferredFps = null
             context.stopService(Intent(context, ProjectionService::class.java))
             sessionState = SessionState.IDLE
             lastErrorMessage = null
@@ -191,16 +201,24 @@ class ProjectionService : Service() {
                 if (projection !== newProjection) return
                 StructuredLog.i(TAG, "MediaProjection stopped by system/user")
                 projection = null
+                MirrorSettings.preferredFps = null
+                ScreenPowerController.stop()
                 MirrorCoordinator.stopProjection()
                 ShizukuInputBackend.unbind(this@ProjectionService)
                 restoreRotationAfterProjectionStop()
-                markIdle()
+                if (sessionState != SessionState.ERROR) markIdle()
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
             }
         }, null)
 
-        MirrorCoordinator.attachProjection(newProjection)
+        val projectionAttached = MirrorCoordinator.attachProjection(this, newProjection)
+        if (!projectionAttached) {
+            markError(IllegalStateException("Could not create the mirror virtual display"))
+            StructuredLog.e(TAG, "Projection attached but mirror virtual display creation failed")
+            stopProjectionAndSelf()
+            return
+        }
         if (ShizukuInputBackend.isPermissionGranted) ShizukuInputBackend.bind(this)
         OrientationMonitor.start(this)
         ScreenPowerController.start(
@@ -209,7 +227,7 @@ class ProjectionService : Service() {
             autoDimDelay = MirrorSettings.autoDimDelay
         )
         markReady()
-        if (MirrorCoordinator.isCarSurfaceReady) {
+        if (MirrorCoordinator.isMirroring) {
             QuickAppLauncher.autoLaunchLastSession(this)
         }
         StructuredLog.i(TAG, "MediaProjection session ready")
@@ -261,6 +279,11 @@ class ProjectionService : Service() {
         val old = projection
         projection = null
         ScreenPowerController.stop()
+        // Restore privileged state before dropping the Shizuku binder. This is deliberately
+        // repeated after ScreenPowerController.stop() so a raw pointer stream cannot remain held
+        // if a backend teardown races with projection cleanup.
+        ShizukuInputBackend.restorePanelPower()
+        ShizukuInputBackend.cancelRealTouch()
         pendingDisconnectStop?.let(mainHandler::removeCallbacks)
         pendingDisconnectStop = null
         MirrorCoordinator.stopProjection()
@@ -276,6 +299,7 @@ class ProjectionService : Service() {
     }
 
     private fun stopProjectionAndSelf() {
+        MirrorSettings.preferredFps = null
         releaseProjection()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()

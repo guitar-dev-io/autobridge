@@ -9,6 +9,8 @@ enum class InputCapability {
     SCROLL,
     FLING,
     PINCH,
+    /** Privileged pointer-id/action stream; not the synthetic Accessibility pinch. */
+    REAL_TOUCH,
     BACK,
     HOME,
     RECENTS
@@ -40,6 +42,12 @@ interface InputBackend {
         gesture: PinchGeometry.TwoFingerGesture,
         durationMs: Long = 200
     ): Boolean = false
+
+    /** A real pointer stream is optional and is only implemented by a privileged backend. */
+    suspend fun touchDown(pointerId: Int, x: Float, y: Float): Boolean = false
+    suspend fun touchMove(pointerIds: IntArray, xs: FloatArray, ys: FloatArray): Boolean = false
+    suspend fun touchUp(pointerId: Int, x: Float, y: Float): Boolean = false
+    suspend fun touchCancel(): Boolean = false
 
     suspend fun back(): Boolean = false
     suspend fun home(): Boolean = false

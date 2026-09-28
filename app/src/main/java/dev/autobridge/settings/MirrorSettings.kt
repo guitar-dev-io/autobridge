@@ -27,6 +27,14 @@ object MirrorSettings {
     @Volatile
     var autoDimDelay: AutoDimDelay = AutoDimDelay.OFF
 
+    /** Opt-in ScreenOnAuto-style panel-only power-off when auto-dim fires. */
+    @Volatile
+    var screenOffOnAutoDim: Boolean = false
+
+    /** Opt-in privileged pointer injection when a raw pointer source is available. */
+    @Volatile
+    var realTouchEnabled: Boolean = false
+
     @Volatile
     var stopOnDisconnect: Boolean = false
 
@@ -35,4 +43,8 @@ object MirrorSettings {
 
     @Volatile
     var autoStartMirror: Boolean = false
+
+    /** Active per-app FPS target; null falls back to the vehicle profile/default renderer rate. */
+    @Volatile
+    var preferredFps: Int? = null
 }

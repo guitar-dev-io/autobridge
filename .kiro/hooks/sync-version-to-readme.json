@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Sync version to README",
+      "trigger": "PostFileSave",
+      "description": "When app/build.gradle.kts is saved, sync versionName/versionCode into README.md.",
+      "matcher": "app/build\\.gradle\\.kts$",
+      "action": {
+        "type": "command",
+        "command": "bash scripts/sync-version.sh"
+      }
+    }
+  ]
+}

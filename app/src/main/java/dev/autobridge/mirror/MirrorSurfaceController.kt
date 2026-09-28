@@ -31,8 +31,8 @@ class MirrorSurfaceController(
     private val _state = MutableStateFlow(SurfaceState())
     val state: StateFlow<SurfaceState> = _state.asStateFlow()
 
-    fun onSurfaceAvailable(container: SurfaceContainer) {
-        val surface = container.surface ?: return
+    fun onSurfaceAvailable(container: SurfaceContainer): Boolean {
+        val surface = container.surface ?: return false
         val old = _state.value
         val changed = old.isAvailable &&
             (old.surface !== surface || old.width != container.width || old.height != container.height || old.dpi != container.dpi)
@@ -48,12 +48,39 @@ class MirrorSurfaceController(
         _state.value = next
         configureTransform(next)
         Log.i(TAG, "surface ${next.lifecycle} ${next.width}x${next.height} dpi=${next.dpi}")
-        MirrorCoordinator.attachCarSurface(surface, container.width, container.height, container.dpi)
+        return MirrorCoordinator.attachCarSurface(surface, container.width, container.height, container.dpi)
     }
 
-    fun onSurfaceDestroyed(container: SurfaceContainer) {
+    fun onSurfaceDestroyed(container: SurfaceContainer): Boolean {
         val current = _state.value
-        MirrorCoordinator.detachCarSurface(container.surface)
+        val destroyedSurface = container.surface
+        if (destroyedSurface == null) {
+            // Android Auto emits a destroy without a surface handle when the driver switches apps.
+            // Detach the currently-tracked surface so the projection can rebind cleanly on the next
+            // onSurfaceAvailable, instead of leaving a stale surface attached that never renders.
+            if (current.surface == null) {
+                Log.w(TAG, "Ignoring surface destroy without an identity")
+                return false
+            }
+            Log.i(TAG, "Surface destroy without identity; detaching tracked surface for rebind")
+            MirrorCoordinator.detachCarSurface(current.surface)
+            DisplayTransform.resetSurfaceState()
+            _state.value = current.copy(
+                lifecycle = SurfaceLifecycle.DESTROYED,
+                surface = null,
+                width = 0,
+                height = 0,
+                dpi = 0,
+                visibleBounds = null,
+                generation = current.generation + 1
+            )
+            return true
+        }
+        if (current.surface !== destroyedSurface) {
+            Log.w(TAG, "Ignoring stale surface destroy callback")
+            return false
+        }
+        MirrorCoordinator.detachCarSurface(destroyedSurface)
         DisplayTransform.resetSurfaceState()
         _state.value = current.copy(
             lifecycle = SurfaceLifecycle.DESTROYED,
@@ -65,6 +92,7 @@ class MirrorSurfaceController(
             generation = current.generation + 1
         )
         Log.i(TAG, "surface destroyed generation=${_state.value.generation}")
+        return true
     }
 
     fun clear() {

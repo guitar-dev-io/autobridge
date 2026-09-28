@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.session.MediaController
@@ -49,6 +50,20 @@ class MediaPlaybackClient(private val context: Context) {
     val hasPrevious: Boolean
         get() = controller?.hasPreviousMediaItem() == true
 
+    /** Current track title from the session metadata, or null when nothing is loaded. */
+    val currentTitle: String?
+        get() = controller?.mediaMetadata?.title?.toString()?.takeIf { it.isNotBlank() }
+
+    /** Current track artist/subtitle from the session metadata, or null. */
+    val currentArtist: String?
+        get() = controller?.mediaMetadata?.let { metadata ->
+            (metadata.artist ?: metadata.albumArtist ?: metadata.subtitle)?.toString()?.takeIf { it.isNotBlank() }
+        }
+
+    /** Embedded album artwork bytes when the session exposes them, or null. */
+    val currentArtworkData: ByteArray?
+        get() = controller?.mediaMetadata?.artworkData
+
     fun connect(onConnected: () -> Unit = {}, onError: () -> Unit = {}) {
         disconnect()
         connectionState = ConnectionState.CONNECTING
@@ -77,10 +92,12 @@ class MediaPlaybackClient(private val context: Context) {
     }
 
     /** Plays a single source. [uri] may be an http(s) URL, a bare local path, or a file/content URI. */
-    fun play(uri: String) {
+    fun play(uri: String, title: String? = null) {
         if (!FeaturePolicy.app.isAvailable(Feature.MEDIA)) return
         val mediaController = controller ?: return
-        val item = buildMediaItem(uri) ?: return
+        val source = buildMediaItem(uri) ?: return
+        val item = if (title.isNullOrBlank()) source else source.buildUpon()
+            .setMediaMetadata(MediaMetadata.Builder().setTitle(title).build()).build()
         mediaController.setMediaItem(item)
         mediaController.prepare()
         mediaController.play()

@@ -1,12 +1,16 @@
 package dev.autobridge.mirror
 
+import android.content.Context
 import android.media.projection.MediaProjection
 import android.view.Surface
 import dev.autobridge.core.model.RotationMode
 import dev.autobridge.core.model.ScaleMode
 
 /** Request used by an engine implementation to begin a consented projection session. */
-data class MirrorStartRequest(val projection: MediaProjection)
+data class MirrorStartRequest(
+    val projection: MediaProjection,
+    val context: Context? = null
+)
 
 /**
  * Rendering lifecycle abstraction. The current AutoMirrorEngine keeps the low-latency OS-owned
@@ -34,8 +38,7 @@ class AutoMirrorEngine : MirrorEngine {
     )
 
     override suspend fun start(request: MirrorStartRequest): Boolean {
-        MirrorCoordinator.attachProjection(request.projection)
-        return MirrorCoordinator.isProjectionReady
+        return MirrorCoordinator.attachProjection(request.context, request.projection)
     }
 
     override suspend fun stop() {
@@ -43,8 +46,8 @@ class AutoMirrorEngine : MirrorEngine {
     }
 
     override suspend fun attachSurface(surface: Surface, width: Int, height: Int, dpi: Int): Boolean {
-        MirrorCoordinator.attachCarSurface(surface, width, height, dpi)
-        return MirrorCoordinator.isCarSurfaceReady
+        val attached = MirrorCoordinator.attachCarSurface(surface, width, height, dpi)
+        return attached && MirrorCoordinator.isCarSurfaceReady
     }
 
     override suspend fun detachSurface(surface: Surface?) {

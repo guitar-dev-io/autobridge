@@ -1,9 +1,17 @@
 package dev.autobridge.entertainment
 
+import dev.autobridge.browser.BrowserUserAgentCodec
 import org.junit.Assert.*
 import org.junit.Test
 
 class ContentAddressTest {
+    @Test
+    fun customUserAgentRejectsBlankControlCharactersAndOversizedValues() {
+        assertEquals("Example/1.0", BrowserUserAgentCodec.normalizeCustom("  Example/1.0  "))
+        assertEquals(null, BrowserUserAgentCodec.normalizeCustom("   "))
+        assertEquals(null, BrowserUserAgentCodec.normalizeCustom("Example\nInjected"))
+        assertEquals(null, BrowserUserAgentCodec.normalizeCustom("x".repeat(513)))
+    }
     @Test fun normalizesBareHostAndPreservesStreamQuery() {
         assertEquals("https://example.com/live.m3u8?token=a%2Fb", ContentAddress.https(" example.com/live.m3u8?token=a%2Fb "))
     }

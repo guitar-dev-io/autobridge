@@ -17,6 +17,19 @@
     <uses-permission android:name="androidx.car.app.NAVIGATION_TEMPLATES" />
     <uses-permission android:name="com.google.android.gms.permission.CAR_SPEED" />
 
+    <!-- Optional GPS speed fallback for the speed display (best-value selection: CAR > GPS > OBD).
+         Requested at runtime only when the user opts into GPS speed; not required for the app. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!-- Read-only access for the Folders, Playlists and Gallery sections. Requested at runtime
+         when the user opens one of those sections; the app works without them otherwise. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
     <queries>
         <intent>
             <action android:name="android.intent.action.MAIN" />
@@ -29,77 +42,66 @@
         </intent>
     </queries>
 
-    <application
-        android:allowBackup="true"
-        android:label="AutoBridge"
-        android:supportsRtl="true"
-        android:theme="@style/AppTheme">
+    <!-- IPTV portals and set-top playlists are overwhelmingly plain http, so cleartext has to be
+         permitted for user-entered hosts. The network security config keeps that explicit and
+         reviewable instead of hiding it behind a blanket attribute. -->
+    <application android:networkSecurityConfig="@xml/network_security_config" android:allowBackup="true" android:icon="@drawable/ic_autobridge_launcher" android:label="AutoBridge" android:roundIcon="@drawable/ic_autobridge_launcher" android:supportsRtl="true" android:theme="@style/AppTheme">
 
-        <meta-data
-            android:name="com.google.android.gms.car.application"
-            android:resource="@xml/automotive_app_desc" />
-        <meta-data
-            android:name="androidx.car.app.theme"
-            android:resource="@style/CarAppTheme" />
-        <meta-data
-            android:name="androidx.car.app.minCarApiLevel"
-            android:value="3" />
+        <meta-data android:name="com.google.android.gms.car.application" android:resource="@xml/automotive_app_desc" />
+        <meta-data android:name="androidx.car.app.theme" android:resource="@style/CarAppTheme" />
+        <meta-data android:name="androidx.car.app.minCarApiLevel" android:value="3" />
 
-        <activity android:name=".entertainment.EntertainmentActivity" android:exported="false" />
+        <!-- configChanges: rotation and density changes are handled in-process so the WebView is
+             not destroyed and rebuilt from saved state on every configuration change.
+             adjustResize: the IME inset is applied to the content container only (see
+             BrowserActivity), so the keyboard never moves the toolbar or the page under it. -->
+        <activity android:name=".browser.BrowserActivity" android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation|density|uiMode|fontScale"
+            android:windowSoftInputMode="adjustResize" />
 
-        <activity
-            android:name=".MainActivity"
-            android:exported="true">
+        <activity android:name=".entertainment.EntertainmentActivity" android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- TV, Radio, Folders, Playlists, Gallery and Favorites for the phone home grid. -->
+        <activity android:name=".library.LibraryActivity" android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- Phone playback for library/IPTV content. configChanges: rotation is handled in-process
+             so the video SurfaceView is not torn down and re-created on every orientation change,
+             which would drop the decoder attachment mid-stream. -->
+        <activity android:name=".library.PlayerActivity" android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation|density|uiMode|fontScale" />
+
+        <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
-        <service
-            android:name=".mirror.ProjectionService"
-            android:exported="false"
-            android:foregroundServiceType="mediaProjection" />
+        <service android:name=".mirror.ProjectionService" android:exported="false" android:foregroundServiceType="mediaProjection" />
 
         <!-- Exported so Android Auto / system media controllers can bind, per Media3's own
              MediaSessionService pattern. Access control is enforced per-controller inside
              MediaSession (see MediaPlaybackService), not by a manifest permission — a custom
              permission here would also block the legitimate system controllers this needs to
              stay reachable to. -->
-        <service
-            android:name=".media.MediaPlaybackService"
-            android:exported="true"
-            android:foregroundServiceType="mediaPlayback"
-            tools:ignore="ExportedService">
+        <service android:name=".media.MediaPlaybackService" android:exported="true" android:foregroundServiceType="mediaPlayback" tools:ignore="ExportedService">
             <intent-filter>
                 <action android:name="androidx.media3.session.MediaSessionService" />
             </intent-filter>
         </service>
 
-        <service
-            android:name=".input.AutoBridgeAccessibilityService"
-            android:exported="true"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+        <service android:name=".input.AutoBridgeAccessibilityService" android:exported="true" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter>
                 <action android:name="android.accessibilityservice.AccessibilityService" />
             </intent-filter>
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/accessibility_service_config" />
+            <meta-data android:name="android.accessibilityservice" android:resource="@xml/accessibility_service_config" />
         </service>
 
-        <provider
-            android:name="rikka.shizuku.ShizukuProvider"
-            android:authorities="${applicationId}.shizuku"
-            android:multiprocess="false"
-            android:enabled="true"
-            android:exported="true"
-            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+        <provider android:name="rikka.shizuku.ShizukuProvider" android:authorities="${applicationId}.shizuku" android:multiprocess="false" android:enabled="true" android:exported="true" android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
 
-        <service
-            android:name=".car.AutoBridgeCarAppService"
-            android:exported="true"
-            android:permission="androidx.car.app.BIND_CAR_APP">
+        <service android:name=".car.AutoBridgeCarAppService" android:exported="true">
             <intent-filter>
                 <action android:name="androidx.car.app.CarAppService" />
                 <category android:name="androidx.car.app.category.NAVIGATION" />

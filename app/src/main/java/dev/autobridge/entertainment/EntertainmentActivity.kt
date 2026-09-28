@@ -4,11 +4,15 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
 import android.graphics.Color
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.os.Bundle
 import android.speech.RecognizerIntent
 import android.view.SurfaceView
 import android.view.View
 import android.view.WindowManager
+import android.webkit.PermissionRequest
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
@@ -16,6 +20,8 @@ import android.webkit.WebViewClient
 import android.widget.*
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import dev.autobridge.browser.BrowserDefaults
+import dev.autobridge.browser.FullscreenVideoController
 import dev.autobridge.core.policy.FeaturePolicy
 import dev.autobridge.media.MediaPlaybackClient
 import dev.autobridge.safety.ParkingStateStore
@@ -24,14 +30,30 @@ import dev.autobridge.safety.ParkingStateStore
 class EntertainmentActivity : Activity() {
     companion object {
         const val EXTRA_BROWSER_MODE = "dev.autobridge.extra.BROWSER_MODE"
+
+        /**
+         * Direct playback request from the library/IPTV screens. Unlike the `intent.data` path,
+         * these accept http, file and content URIs, because IPTV portals and on-device media are
+         * routinely not https. The kind is the name of a [ContentKind]; it is required so a radio
+         * stream is never promoted to the video surface just because of its file extension.
+         */
+        const val EXTRA_SOURCE_URL = "dev.autobridge.extra.SOURCE_URL"
+        const val EXTRA_SOURCE_KIND = "dev.autobridge.extra.SOURCE_KIND"
+        const val EXTRA_SOURCE_TITLE = "dev.autobridge.extra.SOURCE_TITLE"
     }
 
     private val browserMode by lazy { intent.getBooleanExtra(EXTRA_BROWSER_MODE, false) }
     private val prefs by lazy { getSharedPreferences("entertainment", MODE_PRIVATE) }
+    private val audioManager by lazy { getSystemService(AUDIO_SERVICE) as AudioManager }
+    private var audioFocusRequest: AudioFocusRequest? = null
     private lateinit var client: MediaPlaybackClient
     private lateinit var browser: WebView
     private lateinit var video: SurfaceView
+    private lateinit var fullscreenController: FullscreenVideoController
     private lateinit var emptyState: TextView
+
+    /** Holds the WebView/video stack; the IME inset is applied here, never to the whole root. */
+    private var contentContainer: android.widget.FrameLayout? = null
     private lateinit var status: TextView
     private lateinit var address: EditText
     private var source = ""
@@ -39,6 +61,9 @@ class EntertainmentActivity : Activity() {
     private var resumed = false
     private var wasAllowed = false
     private var pendingSource: Pair<String, ContentKind>? = null
+
+    /** Display title for a source handed in by the library screens; cleared once playback starts. */
+    private var pendingTitle: String? = null
     private val parkingListener: (ParkingStateStore.State) -> Unit = { runOnUiThread { enforceParking() } }
     private val playerListener = object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) {
@@ -48,6 +73,13 @@ class EntertainmentActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (browserMode) {
+            startActivity(Intent(this, dev.autobridge.browser.BrowserActivity::class.java).apply {
+                data = intent.data
+            })
+            finish()
+            return
+        }
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         client = MediaPlaybackClient(this)
         val root = LinearLayout(this).apply {
@@ -56,16 +88,18 @@ class EntertainmentActivity : Activity() {
             setBackgroundColor(Color.rgb(16, 19, 25))
         }
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
-            val bars = insets.getInsets(
-                androidx.core.view.WindowInsetsCompat.Type.systemBars() or
-                    androidx.core.view.WindowInsetsCompat.Type.ime()
-            )
+            val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            val ime = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.ime())
+            // System bars pad the root; the IME pads only the content container below. Folding the
+            // IME inset into the root's bottom padding made the keyboard shrink the WebView (it has
+            // weight 1), so the page reflowed and jumped every time the keyboard opened.
             view.setPadding(
                 bars.left + 12.dp(),
                 bars.top + 12.dp(),
                 bars.right + 12.dp(),
                 bars.bottom + 8.dp()
             )
+            contentContainer?.setPadding(0, 0, 0, ime.bottom)
             insets
         }
         status = TextView(this).apply { setTextColor(Color.WHITE); textSize = 15f }
@@ -121,8 +155,27 @@ class EntertainmentActivity : Activity() {
             settings.domStorageEnabled = true
             settings.allowFileAccess = false
             settings.allowContentAccess = false
-            settings.mediaPlaybackRequiresUserGesture = true
-            webChromeClient = WebChromeClient()
+            // Allow tapping play directly from the car screen without a second gesture on the phone.
+            settings.mediaPlaybackRequiresUserGesture = false
+            // Share the same browser identity selected from the Android Auto browser.
+            settings.useWideViewPort = true
+            settings.loadWithOverviewMode = true
+            settings.userAgentString = dev.autobridge.browser.BrowserUserAgentStore.resolve(
+                this@EntertainmentActivity,
+                android.webkit.WebSettings.getDefaultUserAgent(this@EntertainmentActivity)
+            )
+            BrowserDefaults.configureDebugTools()
+            webChromeClient = object : WebChromeClient() {
+                // Lets a page's own navigator.requestMediaKeySystemAccess() (Widevine EME) reach
+                // Android's normal MediaDrm stack; only the protected-media resource is granted.
+                override fun onPermissionRequest(request: PermissionRequest) =
+                    BrowserDefaults.grantProtectedMediaPermission(request)
+
+                override fun onShowCustomView(view: View, callback: CustomViewCallback) =
+                    fullscreenController.show(view, callback) {}
+
+                override fun onHideCustomView() = fullscreenController.hide()
+            }
             webViewClient = object : WebViewClient() {
                 override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean =
                     !FeaturePolicy.app.isAvailable(ContentKind.WEB.requiredFeature) ||
@@ -163,6 +216,8 @@ YouTube · TV · Web
             addView(browser, FrameLayout.LayoutParams(-1, -1))
             addView(video, FrameLayout.LayoutParams(-1, -1))
         }
+        contentContainer = content
+        fullscreenController = FullscreenVideoController(this, content)
         root.addView(content, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(root)
 
@@ -171,6 +226,24 @@ YouTube · TV · Web
             savedInstanceState?.getString("kind"),
             savedInstanceState?.getBoolean("stream") == true
         )
+        // A car screen can hand us a URL to open directly (intent data). Validate it and queue it
+        // as the pending source so it opens as soon as the surface/player is ready.
+        if (savedInstanceState == null) {
+            val requested = intent?.getStringExtra(EXTRA_SOURCE_URL)?.trim().orEmpty()
+            if (requested.isNotEmpty()) {
+                pendingTitle = intent?.getStringExtra(EXTRA_SOURCE_TITLE)?.takeIf { it.isNotBlank() }
+                address.setText(requested)
+                val kind = decodeKind(intent?.getStringExtra(EXTRA_SOURCE_KIND), false)
+                pendingSource = requested to kind
+            } else intent?.data?.toString()?.let { incoming ->
+                val validated = ContentAddress.https(incoming)
+                if (validated != null) {
+                    address.setText(validated)
+                    val kind = ContentKindResolver.classify(validated) ?: ContentKind.WEB
+                    pendingSource = validated to kind
+                }
+            }
+        }
         client.connect(onConnected = {
             client.player?.addListener(playerListener)
             if (resumed) {
@@ -241,7 +314,8 @@ YouTube · TV · Web
         persist()
         enforceParking()
         if (needsPlayer) {
-            client.play(url)
+            client.play(url, pendingTitle)
+            pendingTitle = null
             client.player?.seekTo(position.coerceAtLeast(0L))
         } else {
             browser.loadUrl(url)
@@ -394,9 +468,31 @@ YouTube · TV · Web
         }
     }
 
+    private fun requestAudioFocus() {
+        if (audioFocusRequest != null) return
+        val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MOVIE)
+                    .build()
+            )
+            .setOnAudioFocusChangeListener { }
+            .build()
+        audioFocusRequest = request
+        audioManager.requestAudioFocus(request)
+    }
+
+    private fun abandonAudioFocus() {
+        audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
+        audioFocusRequest = null
+    }
+
     override fun onResume() {
         super.onResume()
+        if (!::browser.isInitialized) return
         resumed = true
+        requestAudioFocus()
         if (::browser.isInitialized) enforceParking()
         pendingSource?.let { (url, kind) ->
             if ((kind == ContentKind.WEB) || client.player != null) {
@@ -408,8 +504,15 @@ YouTube · TV · Web
 
     override fun onPause() {
         resumed = false
-        enforceParking()
+        abandonAudioFocus()
+        if (::browser.isInitialized) enforceParking()
         super.onPause()
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        if (::fullscreenController.isInitialized && fullscreenController.onBackPressed()) return
+        super.onBackPressed()
     }
 
     override fun onSaveInstanceState(out: Bundle) {
@@ -420,6 +523,8 @@ YouTube · TV · Web
     }
 
     override fun onDestroy() {
+        if (!::browser.isInitialized) { super.onDestroy(); return }
+        abandonAudioFocus()
         ParkingStateStore.removeListener(parkingListener)
         client.player?.removeListener(playerListener)
         client.player?.clearVideoSurfaceView(video)

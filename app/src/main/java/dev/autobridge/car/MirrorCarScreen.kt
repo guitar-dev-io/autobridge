@@ -27,7 +27,11 @@ import dev.autobridge.input.TouchRouter
 import dev.autobridge.apps.QuickAppLauncher
 import dev.autobridge.mirror.CarSurfaceManager
 import dev.autobridge.mirror.MirrorCoordinator
+import dev.autobridge.mirror.MirrorSurfaceOwnership
 import dev.autobridge.mirror.ProjectionService
+import dev.autobridge.remote.AutoBridgeStateRepository
+import dev.autobridge.remote.MirrorStatus
+import dev.autobridge.remote.RemoteScreen
 import dev.autobridge.settings.MirrorSettings
 
 class MirrorCarScreen(carContext: CarContext) : Screen(carContext), SurfaceCallback {
@@ -42,45 +46,56 @@ class MirrorCarScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
 
     /** Region of the surface actually visible to the driver. */
     private var visibleArea: Rect? = null
-    private var autoLaunchAttemptedForSurface = false
 
     private val vehicleStateSession = VehicleStateSession.acquire(carContext) {
         // Strong safety behavior: stop the projection and leave the car app as soon as motion is detected.
         ProjectionService.stop(carContext)
         carContext.finishCarApp()
     }
+    private val speedSubscription = dev.autobridge.speed.SpeedManager.acquire(carContext)
 
     init {
         Log.i(TAG, "Creating MirrorCarScreen")
+        MirrorSurfaceOwnership.claim(this)
         appManager.setSurfaceCallback(this)
         Log.i(TAG, "Surface callback registered")
 
         lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onStart(owner: LifecycleOwner) {
+                // Publish mirror status so the Mobile Remote reflects the car screen in real time.
+                AutoBridgeStateRepository.setMirrorStatus(
+                    if (MirrorCoordinator.isMirroring) MirrorStatus.ACTIVE else MirrorStatus.READY
+                )
+            }
+
+            override fun onStop(owner: LifecycleOwner) {
+                if (AutoBridgeStateRepository.current.currentScreen == RemoteScreen.MIRROR) {
+                    AutoBridgeStateRepository.setCurrentScreen(RemoteScreen.HOME)
+                }
+            }
+
             override fun onDestroy(owner: LifecycleOwner) {
                 vehicleStateSession.close()
+                speedSubscription.close()
+                if (!MirrorSurfaceOwnership.release(this@MirrorCarScreen)) return
                 appManager.setSurfaceCallback(null)
                 surfaceManager.clear()
                 ProjectionService.onCarSurfaceDisconnected(carContext)
+                AutoBridgeStateRepository.setMirrorStatus(MirrorStatus.INACTIVE)
             }
         })
     }
 
     override fun onGetTemplate(): Template {
         Log.i(TAG, "Building NavigationTemplate")
-        // NavigationTemplate's main ActionStrip allows at most 4 actions, so the nav controls
-        // (Back / Home / Recents) plus Stop fill it exactly.
+        // Keep the live phone image clear. Phone navigation and Stop remain in the Controls panel.
         val topActions = ActionStrip.Builder()
-            .addAction(navAction("Back", R.drawable.ic_car_back, InputBackend.SystemAction.BACK))
-            .addAction(navAction("Home", R.drawable.ic_car_home, InputBackend.SystemAction.HOME))
-            .addAction(navAction("Recents", R.drawable.ic_car_recents, InputBackend.SystemAction.RECENTS))
+            .addAction(Action.BACK)
             .addAction(
                 Action.Builder()
-                    .setIcon(carIcon(R.drawable.ic_car_stop))
-                    .setTitle("Stop")
-                    .setOnClickListener {
-                        ProjectionService.stop(carContext)
-                        carContext.finishCarApp()
-                    }
+                    .setIcon(carIcon(R.drawable.ic_car_panel))
+                    .setTitle("Controls")
+                    .setOnClickListener { openControls() }
                     .build()
             )
             .build()
@@ -107,6 +122,7 @@ class MirrorCarScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
             .build()
 
         val mapActions = ActionStrip.Builder()
+            .apply { speedAction()?.let { addAction(it) } }
             .addAction(safetyAction)
             .addAction(panelAction())
             .addAction(Action.PAN)
@@ -121,21 +137,37 @@ class MirrorCarScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
     private fun panelAction(): Action =
         Action.Builder()
             .setIcon(carIcon(R.drawable.ic_car_panel))
-            .setOnClickListener {
-                screenManager.push(
-                    MirrorControlScreen(carContext) {
-                        vehicleStateSession.requestPermission { granted ->
-                            CarToast.makeText(
-                                carContext,
-                                if (granted) "Speed safety enabled" else "Speed permission denied",
-                                CarToast.LENGTH_SHORT
-                            ).show()
-                            invalidate()
-                        }
-                    }
-                )
-            }
+            .setOnClickListener { openControls() }
             .build()
+
+    private fun openControls() {
+        screenManager.push(
+            MirrorControlScreen(carContext) {
+                vehicleStateSession.requestPermission { granted ->
+                    CarToast.makeText(
+                        carContext,
+                        if (granted) "Speed safety enabled" else "Speed permission denied",
+                        CarToast.LENGTH_SHORT
+                    ).show()
+                    invalidate()
+                }
+            }
+        )
+    }
+
+    /**
+     * Read-only speed readout in the map action strip (e.g. "72 km/h"). Non-invasive: the live
+     * mirror surface is OS-owned, so the speed is shown as a strip action rather than drawn over the
+     * pixels. Returns null when no valid reading exists so the strip stays clean.
+     */
+    private fun speedAction(): Action? {
+        val sample = dev.autobridge.speed.SpeedManager.speed.value
+        if (!sample.valid) return null
+        return Action.Builder()
+            .setTitle("${sample.kmh.toInt()} km/h")
+            .setOnClickListener { invalidate() }
+            .build()
+    }
 
     private fun carIcon(@DrawableRes resourceId: Int): CarIcon =
         CarIcon.Builder(IconCompat.createWithResource(carContext, resourceId)).build()
@@ -153,6 +185,7 @@ class MirrorCarScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
             .setIcon(carIcon(iconResourceId))
             .setTitle(title)
             .setOnClickListener {
+                ScreenPowerController.userActivity()
                 if (!FeaturePolicy.app.isAvailable(Feature.TOUCH)) {
                     CarToast.makeText(
                         carContext,
@@ -172,23 +205,28 @@ class MirrorCarScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
             .build()
 
     override fun onSurfaceAvailable(surfaceContainer: SurfaceContainer) {
+        if (!MirrorSurfaceOwnership.isOwner(this)) return
         val surface = surfaceContainer.surface ?: return
         ProjectionService.onCarSurfaceConnected()
         surfaceWidth = surfaceContainer.width
         surfaceHeight = surfaceContainer.height
         Log.i(TAG, "Surface ${surfaceWidth}x${surfaceHeight} dpi=${surfaceContainer.dpi}")
-        surfaceManager.onSurfaceAvailable(surfaceContainer)
-        if (!autoLaunchAttemptedForSurface &&
-            MirrorSettings.autoLaunchLastApp &&
-            MirrorCoordinator.isProjectionReady
-        ) {
-            autoLaunchAttemptedForSurface = true
+        val attached = surfaceManager.onSurfaceAvailable(surfaceContainer)
+        if (!attached) {
+            ProjectionService.onMirrorBindingFailed(
+                carContext,
+                "Android Auto mirror surface could not be attached"
+            )
+            return
+        }
+        if (MirrorSettings.autoLaunchLastApp && MirrorCoordinator.isMirroring) {
             QuickAppLauncher.autoLaunchLastSession(carContext)
         }
     }
 
     override fun onSurfaceDestroyed(surfaceContainer: SurfaceContainer) {
-        surfaceManager.onSurfaceDestroyed(surfaceContainer)
+        if (!MirrorSurfaceOwnership.isOwner(this)) return
+        if (!surfaceManager.onSurfaceDestroyed(surfaceContainer)) return
         ProjectionService.onCarSurfaceDisconnected(carContext)
         surfaceWidth = 0
         surfaceHeight = 0
@@ -196,12 +234,14 @@ class MirrorCarScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
     }
 
     override fun onVisibleAreaChanged(visibleArea: Rect) {
+        if (!MirrorSurfaceOwnership.isOwner(this)) return
         Log.i(TAG, "Visible area changed to $visibleArea")
         this.visibleArea = visibleArea
         surfaceManager.onVisibleAreaChanged(visibleArea)
     }
 
     override fun onClick(x: Float, y: Float) {
+        if (!MirrorSurfaceOwnership.isOwner(this)) return
         ScreenPowerController.userActivity()
         if (!FeaturePolicy.app.isAvailable(Feature.TOUCH)) {
             CarToast.makeText(
@@ -224,18 +264,21 @@ class MirrorCarScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
     }
 
     override fun onScale(focusX: Float, focusY: Float, scaleFactor: Float) {
+        if (!MirrorSurfaceOwnership.isOwner(this)) return
         ScreenPowerController.userActivity()
         if (!FeaturePolicy.app.isAvailable(Feature.TOUCH)) return
         TouchRouter.pinch(carContext, focusX, focusY, surfaceWidth, surfaceHeight, scaleFactor)
     }
 
     override fun onScroll(distanceX: Float, distanceY: Float) {
+        if (!MirrorSurfaceOwnership.isOwner(this)) return
         ScreenPowerController.userActivity()
         if (!FeaturePolicy.app.isAvailable(Feature.TOUCH)) return
         TouchRouter.scroll(carContext, distanceX, distanceY)
     }
 
     override fun onFling(velocityX: Float, velocityY: Float) {
+        if (!MirrorSurfaceOwnership.isOwner(this)) return
         ScreenPowerController.userActivity()
         if (!FeaturePolicy.app.isAvailable(Feature.TOUCH)) return
         TouchRouter.scroll(carContext, velocityX / 8f, velocityY / 8f)

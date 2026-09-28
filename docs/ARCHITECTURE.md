@@ -19,12 +19,12 @@ MediaProjection
         v
 MirrorCoordinator (process-global projection/surface owner)
         |
-        | VirtualDisplay + VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR
-        v
-Android Auto Surface <---- MirrorSurfaceController / SurfaceState
+        +--> AUTO_MIRROR: VirtualDisplay --> Android Auto Surface
+        |
+        +--> SELF_DRAWN: VirtualDisplay --> ImageReader --> RenderPlan/Canvas --> Surface
         ^                                      |
         |                                      v
-MirrorCarScreen / CarApp host             DisplayTransform
+MirrorSurfaceController / SurfaceState       DisplayTransform
         |
         +--> TouchRouter --> Accessibility or Shizuku
 
@@ -74,12 +74,44 @@ The projection and car surface have independent lifetimes:
 
 ## Geometry and input
 
-`DisplayTransform` resolves viewport, safe insets, host visible bounds, rendered bounds, rotation, and touch offsets. `TouchRouter` maps car callbacks through this model and resolves the phone's default display. The pure geometry exists for FIT/FILL/STRETCH/ONE_TO_ONE, but direct AUTO_MIRROR currently produces OS-owned FIT output. See [`INPUT_SYSTEM.md`](INPUT_SYSTEM.md).
+`DisplayTransform` resolves viewport, safe insets, host visible bounds, rendered bounds, rotation, and touch offsets. `TouchRouter` maps car callbacks through this model and resolves the phone's default display. AUTO_MIRROR keeps OS-owned FIT output; SELF_DRAWN uses the same resolved geometry in `RenderPlan` for actual FIT/FILL/STRETCH/ONE_TO_ONE Canvas output. See [`INPUT_SYSTEM.md`](INPUT_SYSTEM.md) and [`MIRROR_ENGINE.md`](MIRROR_ENGINE.md).
+
+## Browser layout contract
+
+Both browser presentations use an **overlay** model: the page fills the whole viewport and chrome is
+composited on top of it. Only three things may re-measure the page — the car surface changing size,
+the host reporting a materially different stable area, and a device configuration change. Toolbar
+show/hide, fullscreen, drawer and tab switcher change opacity and nothing else.
+
+```text
+car surface                              phone window
++------------------------------+         +------------------------------+
+| toolbar overlay (fade)       |         | chromeBar overlay (status    |
+| drawer / tab overlay (fade)  |         |   bar inset applied here)    |
+| WebView page (full viewport) |         | WebView page (full viewport, |
++------------------------------+         |   IME inset applied here)    |
+                                         +------------------------------+
+```
+
+- `BrowserViewport` deliberately has no chrome-height parameter; page size cannot depend on chrome.
+- `AutoUiSizes` is the only source of chrome sizing. Values are authored in dp and resolved through
+  the *panel's own* density (`SurfaceContainer.getDpi() / 160`), never through its pixel width.
+  Icon visual size and touch target are separate fields.
+- `BrowserChromeLayout` produces the rectangles that drawing and hit testing both read, so a control
+  cannot be drawn in one place and tapped in another.
+- `ChromeVisibility` is a clock-injected state machine; transitions are opacity only.
+- `CarBrowserRuntime` owns one `CarWebRenderer` per car session, so pushing a screen never recreates
+  the WebView. It is released by `AutoBridgeSession.onDestroy`, never by a screen being popped.
+- `ViewportDebug` traces every geometry event with the same fields, so an unexpected reflow can be
+  attributed rather than guessed at.
 
 ## Feature layers
 
 - `apps`: installed apps, Quick Apps, profiles, Smart Mode, launch/rotation cleanup;
 - `media`: Media3 player/session, source resolver, controller authorization;
+- `browser`: shared browser logic for both presentations — page identity/navigation
+  (`BrowserDefaults`), User-Agent, viewport/chrome geometry, sizing tokens, tabs, downloads,
+  and the car surface renderer;
 - `entertainment`: HTTPS WebView, local picker, audio/video surface, content-kind policy;
 - `display`: orientation, surface profile, diagnostics, screen-off/per-app boundaries;
 - `safety`: CAR_SPEED, LAB mock, movement/timeout behavior;
@@ -87,7 +119,7 @@ The projection and car surface have independent lifetimes:
 
 ## Why direct AUTO_MIRROR remains
 
-The phone and Android Auto surface are on the same device, so direct output avoids an unnecessary encoder/transport/decoder chain. The trade-off is explicit: the OS owns final composition, FIT behavior, and dependence on the default display's power state. A self-drawn pipeline would be a deliberate next architecture step, not a hidden implementation detail.
+The phone and Android Auto surface are on the same device, so direct AUTO_MIRROR avoids an unnecessary encoder/transport/decoder chain. SELF_DRAWN is available when app-controlled geometry/FPS is worth the copy/draw cost. The trade-offs remain explicit: AUTO_MIRROR owns final composition and FIT behavior; SELF_DRAWN still depends on the default display as its capture source and cannot promise screen-off survival.
 
 ## Platform/distribution boundary
 

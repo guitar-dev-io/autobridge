@@ -5,9 +5,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
@@ -17,6 +19,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.font.FontWeight
 import dev.autobridge.core.model.Feature
 import dev.autobridge.core.model.RuntimeContext
 import dev.autobridge.core.model.VehicleState
@@ -51,27 +54,35 @@ fun PhoneControlCenter(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 4.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                text = "CONTROL CENTER",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary
+                text = "Your drive, connected.",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = "Everything you need, within reach.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                ControlButton("Apps", onOpenApps, modifier = Modifier.weight(1f))
-                ControlButton("Profiles", onOpenProfiles, modifier = Modifier.weight(1f))
+                ControlButton("Apps", "Your shortcuts", "01", onOpenApps, modifier = Modifier.weight(1f))
+                ControlButton("Profiles", "Make it yours", "02", onOpenProfiles, modifier = Modifier.weight(1f))
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                ControlButton("Touch", onOpenTouch, modifier = Modifier.weight(1f))
+                ControlButton("Touch", "Input controls", "03", onOpenTouch, modifier = Modifier.weight(1f))
                 ControlButton(
                     "Developer",
+                    "Tools & diagnostics",
+                    "04",
                     onOpenDeveloper,
                     enabled = developerAllowed,
                     modifier = Modifier.weight(1f)
@@ -80,15 +91,30 @@ fun PhoneControlCenter(
             Button(
                 onClick = onStartMirror,
                 enabled = mirrorAllowed,
-                modifier = Modifier.fillMaxWidth()
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)
             ) {
                 Text(if (mirrorAllowed) "Start mirror" else FeaturePolicy.app.denialMessage(Feature.MIRROR, runtime))
             }
-            Text(
-                text = "${runtime.mode} • ${runtime.environment} • ${vehicleLabel(runtime)}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = vehicleLabel(runtime),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = if (runtime.vehicleState == VehicleState.PARKED) Color(0xff79dfbb)
+                            else MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "${runtime.mode} • ${runtime.environment}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
     }
 }
@@ -96,16 +122,38 @@ fun PhoneControlCenter(
 @Composable
 private fun ControlButton(
     label: String,
+    subtitle: String,
+    number: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true
 ) {
-    OutlinedButton(
+    Surface(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        modifier = modifier.heightIn(min = 124.dp)
     ) {
-        Text(label)
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                text = number,
+                style = MaterialTheme.typography.labelSmall,
+                color = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else 0.5f)
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else 0.5f)
+            )
+        }
     }
 }
 
@@ -123,7 +171,8 @@ fun AutoBridgePhoneTheme(content: @Composable () -> Unit) {
             onPrimary = Color.White,
             surface = Color(0xff0d2029),
             onSurface = Color(0xfff1f6fb),
-            onSurfaceVariant = Color(0xff8ea5b5)
+            onSurfaceVariant = Color(0xffa0b4c2),
+            outlineVariant = Color(0xff1f3a47)
         ),
         content = content
     )

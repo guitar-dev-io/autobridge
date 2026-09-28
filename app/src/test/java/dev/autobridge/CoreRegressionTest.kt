@@ -24,11 +24,13 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class CoreRegressionTest {
-    @Test fun zeroIsParked() {
-        listOf(0f, -0f).forEach { assertEquals(State.PARKED, SpeedPolicy.classify(it)) }
+    @Test fun zeroAndSensorNoiseAreParked() {
+        listOf(0f, -0f, 0.001f, -0.001f, 0.049f, -0.049f).forEach {
+            assertEquals(State.PARKED, SpeedPolicy.classify(it))
+        }
     }
-    @Test fun creepingAndReverseAreMoving() {
-        listOf(0.001f, -0.001f, 0.3f, -25f).forEach { assertEquals(State.MOVING, SpeedPolicy.classify(it)) }
+    @Test fun atOrAboveEpsilonIsMoving() {
+        listOf(0.05f, -0.05f, 0.3f, -25f).forEach { assertEquals(State.MOVING, SpeedPolicy.classify(it)) }
     }
     @Test fun invalidSpeedIsUnknown() {
         listOf(null, Float.NaN, Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY).forEach {
@@ -303,6 +305,24 @@ class CoreRegressionTest {
         assertTrue(
             ScreenOffController.statusLabel(ScreenOffController.PipelineMode.OWN_CONTENT).contains("continues")
         )
+    }
+
+    @Test fun selfDrawnPipelineIsAvailableButDoesNotPromiseScreenOff() {
+        assertTrue(ScreenOffController.isAvailable(ScreenOffController.PipelineMode.SELF_DRAWN))
+        assertFalse(ScreenOffController.isAvailable(ScreenOffController.PipelineMode.OWN_CONTENT))
+        assertFalse(ScreenOffController.survivesScreenOff(ScreenOffController.PipelineMode.SELF_DRAWN))
+    }
+
+    @Test fun frameDiagnosticsSeparatesCapturedDroppedAndRendered() {
+        MirrorDiagnostics.resetFrameStats()
+        MirrorDiagnostics.recordFrameCaptured()
+        MirrorDiagnostics.recordFrameDropped()
+        MirrorDiagnostics.recordFrameRendered(latencyMs = 24L, nowMs = 1_000L)
+        val stats = MirrorDiagnostics.frameStats()
+        assertEquals(1L, stats.captured)
+        assertEquals(1L, stats.dropped)
+        assertEquals(1L, stats.rendered)
+        assertEquals(24L, stats.lastLatencyMs)
     }
 
     @Test fun perAppLaunchRequiresParkedAndNonDefaultDisplay() {

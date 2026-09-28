@@ -198,3 +198,52 @@ class AppProfileRegressionTest {
         assertTrue(policy.isAvailable(Feature.MEDIA, personalMoving))
     }
 }
+
+/**
+ * Regression: the Applications screen's Quick Apps chip restyled itself but the list kept showing
+ * every installed app, so the filter was a dead control.
+ */
+class AppListFilterTest {
+    private val apps = listOf(
+        dev.autobridge.apps.InstalledApp("com.example.maps", "Maps"),
+        dev.autobridge.apps.InstalledApp("com.example.music", "Music"),
+        dev.autobridge.apps.InstalledApp("com.other.notes", "Notes"),
+    )
+    private val quick = setOf("com.example.maps")
+
+    @org.junit.Test fun quickOnlyKeepsOnlyQuickApps() {
+        val shown = dev.autobridge.apps.AppListFilter.apply(apps, quick, quickOnly = true, query = "")
+        org.junit.Assert.assertEquals(listOf("Maps"), shown.map { it.label })
+    }
+
+    @org.junit.Test fun allAppsKeepsEverything() {
+        val shown = dev.autobridge.apps.AppListFilter.apply(apps, quick, quickOnly = false, query = "")
+        org.junit.Assert.assertEquals(3, shown.size)
+    }
+
+    @org.junit.Test fun searchMatchesLabelOrPackageAndIsCaseInsensitive() {
+        org.junit.Assert.assertEquals(
+            listOf("Music"),
+            dev.autobridge.apps.AppListFilter.apply(apps, quick, false, "mUs").map { it.label }
+        )
+        org.junit.Assert.assertEquals(
+            listOf("Notes"),
+            dev.autobridge.apps.AppListFilter.apply(apps, quick, false, "com.other").map { it.label }
+        )
+    }
+
+    @org.junit.Test fun searchAppliesWithinTheQuickAppsScope() {
+        org.junit.Assert.assertTrue(
+            dev.autobridge.apps.AppListFilter.apply(apps, quick, quickOnly = true, query = "Music").isEmpty()
+        )
+    }
+
+    @org.junit.Test fun emptyMessageExplainsWhyTheListIsEmpty() {
+        org.junit.Assert.assertTrue(
+            dev.autobridge.apps.AppListFilter.emptyMessage(false, "zz", true).contains("zz")
+        )
+        org.junit.Assert.assertTrue(
+            dev.autobridge.apps.AppListFilter.emptyMessage(true, "", false).contains("☆")
+        )
+    }
+}

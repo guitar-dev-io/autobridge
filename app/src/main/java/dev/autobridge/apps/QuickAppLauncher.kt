@@ -93,6 +93,7 @@ object QuickAppLauncher {
         launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         return runCatching {
             context.startActivity(launchIntent)
+            MirrorSettings.preferredFps = profile.preferredFps
             // Keep the renderer/input geometry on the same profile boundary. AUTO_MIRROR still
             // reports unsupported requested scales while using FIT for the actual output.
             MirrorCoordinator.setScaleMode(profile.scaleMode)

@@ -1,12 +1,16 @@
 package dev.autobridge.car
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
+import androidx.car.app.model.CarIcon
 import androidx.car.app.model.Header
 import androidx.car.app.model.ItemList
 import androidx.car.app.model.ListTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
+import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import dev.autobridge.media.MediaPlaybackClient
@@ -33,14 +37,14 @@ class CarMediaScreen(carContext: CarContext) : Screen(carContext) {
             MediaPlaybackClient.ConnectionState.DISCONNECTED -> "Session disconnected"
         }
         val canControl = mediaPlayback.isConnected
+        val nowPlayingRow = Row.Builder()
+            .setTitle(mediaPlayback.currentTitle ?: "AutoBridge Media")
+            .addText(nowPlayingSubtitle(state, connection))
+            .setEnabled(false)
+            .apply { artworkIcon()?.let { setImage(it) } }
+            .build()
         val list = ItemList.Builder()
-            .addItem(
-                Row.Builder()
-                    .setTitle("AutoBridge Media")
-                    .addText("$state • $connection")
-                    .setEnabled(false)
-                    .build()
-            )
+            .addItem(nowPlayingRow)
             .addItem(
                 Row.Builder()
                     .setTitle("Play sample playlist")
@@ -107,6 +111,23 @@ class CarMediaScreen(carContext: CarContext) : Screen(carContext) {
             )
             .setSingleList(list)
             .build()
+    }
+
+    private fun nowPlayingSubtitle(state: String, connection: String): String {
+        val artist = mediaPlayback.currentArtist
+        return when {
+            mediaPlayback.currentTitle != null && artist != null -> "$artist • $state"
+            mediaPlayback.currentTitle != null -> state
+            else -> "$state • $connection"
+        }
+    }
+
+    private fun artworkIcon(): CarIcon? {
+        val data = mediaPlayback.currentArtworkData ?: return null
+        val bitmap: Bitmap = runCatching {
+            BitmapFactory.decodeByteArray(data, 0, data.size)
+        }.getOrNull() ?: return null
+        return CarIcon.Builder(IconCompat.createWithBitmap(bitmap)).build()
     }
 
     private fun samplePlaylist(): List<String> = listOf(

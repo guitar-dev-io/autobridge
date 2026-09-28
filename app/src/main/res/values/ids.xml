@@ -1,0 +1,5 @@
+<resources>
+    <!-- Tag slot used by ImageLoader to detect a recycled ImageView before applying a decode.
+         View.setTag(int, Object) requires an application resource id, not an arbitrary int. -->
+    <item name="autobridge_image_tag" type="id" />
+</resources>

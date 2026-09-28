@@ -5,10 +5,15 @@ import dev.autobridge.core.model.Environment
 import dev.autobridge.entertainment.ContentKind
 import dev.autobridge.entertainment.ContentKindResolver
 import dev.autobridge.display.MirrorDiagnostics
+import dev.autobridge.display.ScreenOffController
+import dev.autobridge.input.InputCapability
+import dev.autobridge.input.ShizukuInputBackend
 import dev.autobridge.input.ShizukuInputCommand
+import dev.autobridge.input.ShizukuRealTouchController
 import dev.autobridge.media.MediaControllerAuthorization
 import dev.autobridge.mirror.ReconnectTracker
 import dev.autobridge.safety.DevModeEvaluator
+import dev.autobridge.settings.MirrorSettings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -84,6 +89,33 @@ class RuntimeBoundaryTest {
             listOf("swipe", "1", "2", "3", "4", "250"),
             ShizukuInputCommand.args("swipe", "1", "2", "3", "4", "250")
         )
+    }
+
+    @Test
+    fun privilegedCapabilitiesFailClosedWithoutRemoteService() {
+        assertFalse(ShizukuInputBackend.isPanelPowerAvailable)
+        assertFalse(ShizukuInputBackend.isRealTouchAvailable)
+        assertFalse(InputCapability.REAL_TOUCH in ShizukuInputBackend.capabilities)
+        assertEquals("Real-touch injection unavailable", dev.autobridge.input.TouchRouter.rawTouchStatusLabel())
+    }
+
+    @Test
+    fun privilegedSettingsDefaultToDisabled() {
+        assertFalse(MirrorSettings.screenOffOnAutoDim)
+        assertFalse(MirrorSettings.realTouchEnabled)
+        assertFalse(ScreenOffController.isAvailable(ScreenOffController.PipelineMode.OWN_CONTENT))
+    }
+
+    @Test
+    fun rawPointerValidationRejectsUnsafeRequestsBeforeInjection() {
+        assertFalse(ShizukuRealTouchController.touchDown(-1, 0, 0))
+        assertFalse(ShizukuRealTouchController.touchDown(32, 0, 0))
+        assertFalse(ShizukuRealTouchController.touchDown(0, -1, 0))
+        assertFalse(ShizukuRealTouchController.touchDown(0, 10_001, 0))
+        assertFalse(ShizukuRealTouchController.touchMove(intArrayOf(), intArrayOf(), intArrayOf()))
+        assertFalse(ShizukuRealTouchController.touchMove(intArrayOf(0), intArrayOf(), intArrayOf()))
+        assertFalse(ShizukuRealTouchController.touchUp(0, 0, 0))
+        assertTrue(ShizukuRealTouchController.touchCancel())
     }
 
     @Test

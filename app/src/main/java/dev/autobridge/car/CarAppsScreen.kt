@@ -1,67 +1,107 @@
 package dev.autobridge.car
 
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
 import androidx.car.app.CarContext
 import androidx.car.app.CarToast
 import androidx.car.app.Screen
+import androidx.car.app.model.Action
+import androidx.car.app.model.CarIcon
+import androidx.car.app.model.GridItem
+import androidx.car.app.model.GridTemplate
 import androidx.car.app.model.Header
 import androidx.car.app.model.ItemList
-import androidx.car.app.model.ListTemplate
-import androidx.car.app.model.Row
 import androidx.car.app.model.Template
+import androidx.core.graphics.drawable.IconCompat
+import dev.autobridge.apps.InstalledApp
 import dev.autobridge.apps.InstalledAppRepository
 import dev.autobridge.apps.QuickAppLauncher
 import dev.autobridge.apps.QuickAppsStore
 import dev.autobridge.core.model.Feature
 import dev.autobridge.core.policy.FeaturePolicy
 
-/** Parked-only car-native launcher for the phone's configured Quick Apps. */
+/** Car-native launcher for the phone's configured Quick Apps, rendered as an icon grid. */
 class CarAppsScreen(carContext: CarContext) : Screen(carContext) {
+    private companion object {
+        // Android Auto hosts cap grids around 24 items; keep well within that.
+        const val MAX_APPS = 24
+        const val ICON_SIZE_PX = 128
+    }
+
     override fun onGetTemplate(): Template {
         val allApps = InstalledAppRepository.listLaunchableApps(carContext)
         QuickAppsStore.syncFavorites(carContext, allApps)
-        val apps = QuickAppsStore.enabledInstalledApps(carContext, allApps).take(24)
-        val list = ItemList.Builder()
+        val apps = QuickAppsStore.enabledInstalledApps(carContext, allApps).take(MAX_APPS)
+
+        val grid = ItemList.Builder()
         if (apps.isEmpty()) {
-            list.addItem(
-                Row.Builder()
-                    .setTitle("No Quick Apps configured")
-                    .addText("Enable apps from AutoBridge on the phone")
-                    .setEnabled(false)
+            grid.addItem(
+                GridItem.Builder()
+                    .setTitle("No Quick Apps")
+                    .setText("Enable apps on the phone")
+                    .setImage(fallbackIcon())
                     .build()
             )
         } else {
             apps.forEach { app ->
-                list.addItem(
-                    Row.Builder()
+                grid.addItem(
+                    GridItem.Builder()
                         .setTitle(app.label)
-                        .addText("Quick App • parked only")
-                        .setOnClickListener {
-                            if (!FeaturePolicy.app.isAvailable(Feature.QUICK_APPS)) {
-                                CarToast.makeText(
-                                    carContext,
-                                    FeaturePolicy.app.denialMessage(Feature.QUICK_APPS),
-                                    CarToast.LENGTH_SHORT
-                                ).show()
-                            } else if (!QuickAppLauncher.launch(carContext, app.packageName)) {
-                                CarToast.makeText(
-                                    carContext,
-                                    "Could not launch ${app.label}",
-                                    CarToast.LENGTH_SHORT
-                                ).show()
-                            }
-                        }
+                        .setImage(appIcon(app))
+                        .setOnClickListener { launch(app) }
                         .build()
                 )
             }
         }
-        return ListTemplate.Builder()
+
+        return GridTemplate.Builder()
             .setHeader(
                 Header.Builder()
                     .setTitle("Quick Apps")
-                    .setStartHeaderAction(androidx.car.app.model.Action.BACK)
+                    .setStartHeaderAction(Action.BACK)
                     .build()
             )
-            .setSingleList(list.build())
+            .setSingleList(grid.build())
             .build()
+    }
+
+    private fun launch(app: InstalledApp) {
+        if (!FeaturePolicy.app.isAvailable(Feature.QUICK_APPS)) {
+            CarToast.makeText(
+                carContext,
+                FeaturePolicy.app.denialMessage(Feature.QUICK_APPS),
+                CarToast.LENGTH_SHORT
+            ).show()
+            return
+        }
+        if (!QuickAppLauncher.launch(carContext, app.packageName)) {
+            CarToast.makeText(carContext, "Could not launch ${app.label}", CarToast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun appIcon(app: InstalledApp): CarIcon {
+        val drawable = runCatching {
+            carContext.packageManager.getApplicationIcon(app.packageName)
+        }.getOrNull()
+        val bitmap = drawable?.let { toBitmap(it) } ?: return fallbackIcon()
+        return CarIcon.Builder(IconCompat.createWithBitmap(bitmap)).build()
+    }
+
+    private fun fallbackIcon(): CarIcon =
+        CarIcon.Builder(
+            IconCompat.createWithResource(carContext, android.R.drawable.sym_def_app_icon)
+        ).build()
+
+    private fun toBitmap(drawable: Drawable): Bitmap {
+        if (drawable is BitmapDrawable && drawable.bitmap != null) {
+            return Bitmap.createScaledBitmap(drawable.bitmap, ICON_SIZE_PX, ICON_SIZE_PX, true)
+        }
+        val bitmap = Bitmap.createBitmap(ICON_SIZE_PX, ICON_SIZE_PX, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        drawable.setBounds(0, 0, canvas.width, canvas.height)
+        drawable.draw(canvas)
+        return bitmap
     }
 }

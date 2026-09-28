@@ -3,7 +3,9 @@ package dev.autobridge.settings
 import android.content.Context
 import androidx.core.content.edit
 import dev.autobridge.display.ScreenOffController
+import dev.autobridge.display.StructuredLog
 import dev.autobridge.display.SurfaceProfile
+import dev.autobridge.mirror.MirrorCoordinator
 
 /**
  * App-wide preferences that must survive process death and app restarts, following the same
@@ -22,6 +24,8 @@ object SettingsStore {
     private const val KEY_SCREEN_OFF_MODE = "screen_off_pipeline_mode"
     private const val KEY_PREVENT_SCREEN_SLEEP = "prevent_screen_sleep"
     private const val KEY_AUTO_DIM_DELAY_SECONDS = "auto_dim_delay_seconds"
+    private const val KEY_SCREEN_OFF_ON_AUTO_DIM = "screen_off_on_auto_dim"
+    private const val KEY_REAL_TOUCH_ENABLED = "real_touch_enabled"
     private const val KEY_STOP_ON_DISCONNECT = "stop_on_disconnect"
     private const val KEY_AUTO_LAUNCH_LAST_APP = "auto_launch_last_app"
     private const val KEY_AUTO_START_MIRROR = "auto_start_mirror"
@@ -30,11 +34,33 @@ object SettingsStore {
     fun restore(context: Context) {
         val prefs = prefs(context)
         SurfaceProfile.active = SettingsCodec.surfaceProfile(prefs.getString(KEY_SURFACE_PROFILE, null))
-        ScreenOffController.pipelineMode =
-            SettingsCodec.screenOffMode(prefs.getString(KEY_SCREEN_OFF_MODE, null))
+        val restoredPipeline = SettingsCodec.screenOffMode(prefs.getString(KEY_SCREEN_OFF_MODE, null))
+        val normalizedPipeline = if (ScreenOffController.isAvailable(restoredPipeline)) {
+            restoredPipeline
+        } else {
+            StructuredLog.w(
+                "AutoBridgeSettings",
+                "Persisted ${restoredPipeline.name} pipeline is unavailable; falling back to AUTO_MIRROR"
+            )
+            ScreenOffController.PipelineMode.AUTO_MIRROR
+        }
+        val appliedPipeline = MirrorCoordinator.setPipelineMode(normalizedPipeline)
+        if (!appliedPipeline && MirrorCoordinator.isProjectionReady) {
+            StructuredLog.w(
+                "AutoBridgeSettings",
+                "Keeping active ${MirrorCoordinator.activePipelineMode.name} pipeline during restore"
+            )
+        }
+        if (normalizedPipeline != restoredPipeline) {
+            prefs.edit { putString(KEY_SCREEN_OFF_MODE, normalizedPipeline.name) }
+        }
         MirrorSettings.preventScreenSleep = prefs.getBoolean(KEY_PREVENT_SCREEN_SLEEP, false)
         MirrorSettings.autoDimDelay =
             AutoDimDelay.fromSeconds(prefs.getInt(KEY_AUTO_DIM_DELAY_SECONDS, 0))
+        MirrorSettings.screenOffOnAutoDim =
+            prefs.getBoolean(KEY_SCREEN_OFF_ON_AUTO_DIM, false)
+        MirrorSettings.realTouchEnabled =
+            prefs.getBoolean(KEY_REAL_TOUCH_ENABLED, false)
         MirrorSettings.stopOnDisconnect = prefs.getBoolean(KEY_STOP_ON_DISCONNECT, false)
         MirrorSettings.autoLaunchLastApp = prefs.getBoolean(KEY_AUTO_LAUNCH_LAST_APP, false)
         MirrorSettings.autoStartMirror = prefs.getBoolean(KEY_AUTO_START_MIRROR, false)
@@ -45,6 +71,15 @@ object SettingsStore {
     }
 
     fun persistScreenOffMode(context: Context, mode: ScreenOffController.PipelineMode) {
+        if (!ScreenOffController.isAvailable(mode)) {
+            StructuredLog.w(
+                "AutoBridgeSettings",
+                "Refusing unavailable ${mode.name} pipeline; keep current mode"
+            )
+            return
+        }
+        // Runtime mutation belongs to MirrorCoordinator.setPipelineMode(), which rejects changes
+        // while a projection is active. This method only persists an already-approved value.
         prefs(context).edit { putString(KEY_SCREEN_OFF_MODE, mode.name) }
     }
 
@@ -56,6 +91,16 @@ object SettingsStore {
     fun persistAutoDimDelay(context: Context, delay: AutoDimDelay) {
         MirrorSettings.autoDimDelay = delay
         prefs(context).edit { putInt(KEY_AUTO_DIM_DELAY_SECONDS, delay.seconds) }
+    }
+
+    fun persistScreenOffOnAutoDim(context: Context, enabled: Boolean) {
+        MirrorSettings.screenOffOnAutoDim = enabled
+        prefs(context).edit { putBoolean(KEY_SCREEN_OFF_ON_AUTO_DIM, enabled) }
+    }
+
+    fun persistRealTouchEnabled(context: Context, enabled: Boolean) {
+        MirrorSettings.realTouchEnabled = enabled
+        prefs(context).edit { putBoolean(KEY_REAL_TOUCH_ENABLED, enabled) }
     }
 
     fun persistStopOnDisconnect(context: Context, enabled: Boolean) {
