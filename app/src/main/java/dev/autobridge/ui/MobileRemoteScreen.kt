@@ -57,17 +57,25 @@ import dev.autobridge.remote.RemoteScreen
 import dev.autobridge.remote.RemoteSettingsStore
 import dev.autobridge.remote.TextInjectionController
 
-private val AccentGreen = Color(0xff2ee879)
-private val AccentAmber = Color(0xffffbf5f)
-private val CardColor = Color(0xff0d2029)
-private val CardAltColor = Color(0xff122b37)
-private val BorderColor = Color(0xff1f3a47)
+// Every colour here comes from ComposeTokens, which mirrors AutoBridgeDesign, so this screen sits
+// on the same surface stack as the launcher, the library and the player.
+private val AccentGreen = ComposeTokens.Ok
+private val CardColor = ComposeTokens.Surface
+private val CardAltColor = ComposeTokens.SurfaceRaised
+private val Accent = ComposeTokens.Accent
+private val TextPrimary = ComposeTokens.Text
+private val TextMuted = ComposeTokens.TextMuted
 
 /**
  * Tabs of the Mobile Remote (spec §18). Hosted by MainActivity so it slots into the existing phone
  * navigation without replacing it.
  */
-enum class RemoteTab { HOME, REMOTE, COMMANDS, SETTINGS }
+enum class RemoteTab(val label: String) {
+    HOME("Status"),
+    REMOTE("Control"),
+    COMMANDS("History"),
+    SETTINGS("Options")
+}
 
 /**
  * The AutoBridge Mobile Remote. Everything the user does here flows through the SAME
@@ -82,8 +90,15 @@ fun MobileRemoteScreen(
 ) {
     val state by AutoBridgeStateRepository.state.collectAsState()
 
-    Column(Modifier.fillMaxSize().background(Color(0xff07131b))) {
+    Column(Modifier.fillMaxSize().background(ComposeTokens.Ink)) {
         RemoteHeader(state.androidAutoConnected, onSettings = { onSelectTab(RemoteTab.SETTINGS) })
+
+        // These are sub-tabs of the Remote feature, not app-level destinations. They used to be a
+        // second bottom bar, which stacked directly on top of MainActivity's global navigation:
+        // two bars, both starting with "Home / Remote", meaning different things. As a segmented
+        // control under the header the hierarchy reads correctly and the content gets its height
+        // back.
+        RemoteTabStrip(tab, onSelectTab)
 
         Box(Modifier.weight(1f)) {
             when (tab) {
@@ -93,8 +108,6 @@ fun MobileRemoteScreen(
                 RemoteTab.SETTINGS -> SettingsTabContent(context)
             }
         }
-
-        RemoteBottomNav(tab, onSelectTab)
     }
 }
 
@@ -105,12 +118,12 @@ private fun RemoteHeader(connected: Boolean, onSettings: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(Modifier.weight(1f)) {
-            Text("AutoBridge", color = Color(0xfff1f6fb), fontSize = 22.sp, fontWeight = FontWeight.Bold)
-            Text("Your Car. Smarter.", color = Color(0xff8ea5b5), fontSize = 13.sp)
+            Text("AutoBridge", color = TextPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Text("Your Car. Smarter.", color = TextMuted, fontSize = 13.sp)
         }
-        TextButton(onClick = onSettings) { Text("⚙", fontSize = 20.sp, color = Color(0xff159cff)) }
+        TextButton(onClick = onSettings) { Text("⚙", fontSize = 20.sp, color = Accent) }
     }
-    val statusColor = if (connected) AccentGreen else Color(0xff8ea5b5)
+    val statusColor = if (connected) AccentGreen else TextMuted
     val statusText = if (connected) "● Connected to Car · Android Auto Active" else "○ Android Auto not connected"
     Text(
         statusText,
@@ -126,7 +139,8 @@ private fun RemoteHeader(connected: Boolean, onSettings: () -> Unit) {
 private fun HomeTabContent(state: dev.autobridge.remote.AutoBridgeState) {
     val scroll = rememberScrollState()
     Column(
-        Modifier.fillMaxSize().verticalScrollCompat(scroll).padding(16.dp),
+        Modifier.fillMaxSize().verticalScrollCompat(scroll)
+            .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         SectionLabel("CONNECTION")
@@ -143,7 +157,7 @@ private fun HomeTabContent(state: dev.autobridge.remote.AutoBridgeState) {
 @Composable
 private fun CurrentStatusCard(state: dev.autobridge.remote.AutoBridgeState) {
     Card {
-        Text(state.currentStatusLabel(), color = Color(0xff159cff), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+        Text(state.currentStatusLabel(), color = Accent, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
         val detail = when (state.currentScreen) {
             RemoteScreen.BROWSER -> state.currentUrl ?: state.browserTitle ?: "—"
             RemoteScreen.MIRROR -> state.mirrorStatus.name
@@ -154,7 +168,7 @@ private fun CurrentStatusCard(state: dev.autobridge.remote.AutoBridgeState) {
             RemoteScreen.AGENT -> if (state.agentReady) "Ready" else "Busy"
             else -> if (state.androidAutoConnected) "Idle" else "Not connected"
         }
-        Text(detail, color = Color(0xff8ea5b5), fontSize = 13.sp)
+        Text(detail, color = TextMuted, fontSize = 13.sp)
     }
 }
 
@@ -179,15 +193,16 @@ private fun RemoteTabContent(context: android.content.Context, state: dev.autobr
 
     val scroll = rememberScrollState()
     Column(
-        Modifier.fillMaxSize().verticalScrollCompat(scroll).padding(16.dp),
+        Modifier.fillMaxSize().verticalScrollCompat(scroll)
+            .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        SectionLabel("พิมพ์คำสั่งหรือข้อความ")
+        SectionLabel("COMMAND OR TEXT")
         Row(verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
                 value = commandText,
                 onValueChange = { commandText = it },
-                placeholder = { Text("เปิด google.com", color = Color(0xff5f7787)) },
+                placeholder = { Text("open google.com", color = TextMuted) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = {
@@ -196,13 +211,13 @@ private fun RemoteTabContent(context: android.content.Context, state: dev.autobr
                 modifier = Modifier.weight(1f)
             )
             IconButton(onClick = { submitCommand(commandText); commandText = "" }) {
-                Text("➤", fontSize = 20.sp, color = Color(0xff159cff))
+                Text("➤", fontSize = 20.sp, color = Accent)
             }
         }
 
         lastResult?.let { ResultBanner(it) }
 
-        SectionLabel("คำสั่งด่วน")
+        SectionLabel("QUICK COMMANDS")
         // Quick commands laid out in rows of 4, all routed through the same bus.
         quickCommands.chunked(4).forEach { rowItems ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -221,16 +236,16 @@ private fun RemoteTabContent(context: android.content.Context, state: dev.autobr
             }
         }
 
-        SectionLabel("สถานะปัจจุบัน")
+        SectionLabel("CURRENT SCREEN")
         CurrentStatusCard(state)
 
-        SectionLabel("ส่งข้อความไปยังหน้าจอรถ")
+        SectionLabel("SEND TEXT TO THE CAR")
         Card {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 OutlinedTextField(
                     value = sendText,
                     onValueChange = { sendText = it },
-                    placeholder = { Text("ภูสอยดาว", color = Color(0xff5f7787)) },
+                    placeholder = { Text("Type text to send", color = TextMuted) },
                     singleLine = true,
                     modifier = Modifier.weight(1f)
                 )
@@ -247,14 +262,14 @@ private fun RemoteTabContent(context: android.content.Context, state: dev.autobr
                         )
                     )
                     sendText = ""
-                }) { Text("Send", color = Color(0xff159cff)) }
+                }) { Text("Send", color = Accent) }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(
                     checked = settings.autoSubmitText,
                     onCheckedChange = { RemoteSettingsStore.update(context) { s -> s.copy(autoSubmitText = it) } }
                 )
-                Text("ส่งแล้วกด Enter อัตโนมัติ", color = Color(0xff8ea5b5), fontSize = 13.sp)
+                Text("Press Enter automatically after sending", color = TextMuted, fontSize = 13.sp)
             }
         }
     }
@@ -270,14 +285,14 @@ private fun submitCommand(text: String) {
 @Composable
 private fun ResultBanner(result: CommandResult) {
     val ok = result.status == CommandStatus.SUCCESS
-    Surface(color = if (ok) Color(0xff10331f) else Color(0xff3a1414), shape = RoundedCornerShape(12.dp)) {
+    Surface(color = CardAltColor, shape = RoundedCornerShape(12.dp)) {
         Column(Modifier.fillMaxWidth().padding(12.dp)) {
             Text(
-                if (ok) "✓ คำสั่งสำเร็จ" else "✕ ไม่สามารถทำคำสั่งได้",
-                color = if (ok) AccentGreen else Color(0xffff8a8a),
+                if (ok) "Command sent" else "Command failed",
+                color = if (ok) AccentGreen else ComposeTokens.Danger,
                 fontWeight = FontWeight.SemiBold
             )
-            Text(result.message, color = Color(0xffc7d6e0), fontSize = 13.sp)
+            Text(result.message, color = TextMuted, fontSize = 13.sp)
         }
     }
 }
@@ -289,17 +304,18 @@ private fun CommandsTabContent(context: android.content.Context) {
     val history by CommandHistoryStore.entries.collectAsState()
     val scroll = rememberScrollState()
     Column(
-        Modifier.fillMaxSize().verticalScrollCompat(scroll).padding(16.dp),
+        Modifier.fillMaxSize().verticalScrollCompat(scroll)
+            .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            SectionLabel("Recent Commands", Modifier.weight(1f))
+            SectionLabel("RECENT COMMANDS", Modifier.weight(1f))
             TextButton(onClick = { CommandHistoryStore.clear(context) }) {
-                Text("Clear", color = Color(0xff159cff))
+                Text("Clear", color = Accent)
             }
         }
         if (history.isEmpty()) {
-            Text("ยังไม่มีคำสั่งล่าสุด", color = Color(0xff8ea5b5), fontSize = 13.sp)
+            Text("No commands yet.", color = TextMuted, fontSize = 13.sp)
         }
         history.forEach { entry ->
             Card(onClick = {
@@ -309,14 +325,14 @@ private fun CommandsTabContent(context: android.content.Context) {
                 )
             }) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(if (entry.success) "✓" else "✕", color = if (entry.success) AccentGreen else Color(0xffff8a8a))
+                    Text(if (entry.success) "✓" else "✕", color = if (entry.success) AccentGreen else ComposeTokens.Danger)
                     Text(
                         entry.label,
-                        color = Color(0xfff1f6fb),
+                        color = TextPrimary,
                         fontSize = 14.sp,
                         modifier = Modifier.padding(start = 10.dp).weight(1f)
                     )
-                    Text(formatTime(entry.timestamp), color = Color(0xff8ea5b5), fontSize = 12.sp)
+                    Text(formatTime(entry.timestamp), color = TextMuted, fontSize = 12.sp)
                 }
             }
         }
@@ -330,10 +346,11 @@ private fun SettingsTabContent(context: android.content.Context) {
     val settings by RemoteSettingsStore.settings.collectAsState()
     val scroll = rememberScrollState()
     Column(
-        Modifier.fillMaxSize().verticalScrollCompat(scroll).padding(16.dp),
+        Modifier.fillMaxSize().verticalScrollCompat(scroll)
+            .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        SectionLabel("AutoBridge Remote Settings")
+        SectionLabel("REMOTE OPTIONS")
         ToggleRow("Show command confirmation", settings.showConfirmation) {
             RemoteSettingsStore.update(context) { s -> s.copy(showConfirmation = it) }
         }
@@ -357,28 +374,41 @@ private fun SettingsTabContent(context: android.content.Context) {
 
 /* ----------------------------- SHARED WIDGETS ----------------------------- */
 
+/** Segmented control for the Remote's own tabs, sitting directly under the header. */
 @Composable
-private fun RemoteBottomNav(tab: RemoteTab, onSelect: (RemoteTab) -> Unit) {
+private fun RemoteTabStrip(tab: RemoteTab, onSelect: (RemoteTab) -> Unit) {
     Row(
-        Modifier.fillMaxWidth().background(Color(0xff091a23)).padding(vertical = 6.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .background(CardColor, RoundedCornerShape(14.dp))
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        NavItem("⌂", "Home", tab == RemoteTab.HOME) { onSelect(RemoteTab.HOME) }
-        NavItem("➤", "Remote", tab == RemoteTab.REMOTE) { onSelect(RemoteTab.REMOTE) }
-        NavItem("≣", "Commands", tab == RemoteTab.COMMANDS) { onSelect(RemoteTab.COMMANDS) }
-        NavItem("⚙", "Settings", tab == RemoteTab.SETTINGS) { onSelect(RemoteTab.SETTINGS) }
+        RemoteTab.entries.forEach { entry ->
+            TabChip(entry.label, tab == entry, Modifier.weight(1f)) { onSelect(entry) }
+        }
     }
 }
 
 @Composable
-private fun NavItem(icon: String, label: String, active: Boolean, onClick: () -> Unit) {
-    val color = if (active) Color(0xff159cff) else Color(0xff8ea5b5)
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.width(72.dp).clickableCompat(onClick).padding(vertical = 4.dp)
+private fun TabChip(label: String, active: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Box(
+        modifier
+            .background(
+                if (active) Accent else Color.Transparent,
+                RoundedCornerShape(11.dp)
+            )
+            .clickableCompat(onClick)
+            .padding(vertical = 9.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Text(icon, color = color, fontSize = 18.sp)
-        Text(label, color = color, fontSize = 11.sp, fontWeight = if (active) FontWeight.Bold else FontWeight.Normal)
+        Text(
+            label,
+            color = if (active) ComposeTokens.Ink else TextMuted,
+            fontSize = 13.sp,
+            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal
+        )
     }
 }
 
@@ -395,30 +425,36 @@ private fun QuickCard(icon: String, label: String, modifier: Modifier = Modifier
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Text(icon, fontSize = 22.sp)
-            Text(label, color = Color(0xfff1f6fb), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            Text(icon, fontSize = 20.sp, color = Accent)
+            Text(
+                label,
+                color = TextPrimary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.padding(top = 6.dp)
+            )
         }
     }
 }
 
 @Composable
 private fun SectionLabel(text: String, modifier: Modifier = Modifier) {
-    Text(text, color = Color(0xff8ea5b5), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = modifier)
+    Text(text, color = TextMuted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = modifier)
 }
 
 @Composable
 private fun StatusLine(label: String, value: String, ok: Boolean) {
     Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(if (ok) "●" else "○", color = if (ok) AccentGreen else Color(0xff8ea5b5))
-        Text(label, color = Color(0xfff1f6fb), fontSize = 14.sp, modifier = Modifier.padding(start = 8.dp).weight(1f))
-        Text(value, color = Color(0xff8ea5b5), fontSize = 13.sp)
+        Text(if (ok) "●" else "○", color = if (ok) AccentGreen else TextMuted)
+        Text(label, color = TextPrimary, fontSize = 14.sp, modifier = Modifier.padding(start = 8.dp).weight(1f))
+        Text(value, color = TextMuted, fontSize = 13.sp)
     }
 }
 
 @Composable
 private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, color = Color(0xfff1f6fb), fontSize = 14.sp, modifier = Modifier.weight(1f))
+        Text(label, color = TextPrimary, fontSize = 14.sp, modifier = Modifier.weight(1f))
         Checkbox(checked = checked, onCheckedChange = onChange)
     }
 }

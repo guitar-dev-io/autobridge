@@ -5,6 +5,9 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.RectF
+import dev.autobridge.core.model.Insets
 import dev.autobridge.input.DisplayTransform
 import dev.autobridge.input.DisplayTransformInfo
 
@@ -21,7 +24,9 @@ data class RenderPlan(
     val sourceHeight: Int,
     val outputWidth: Int,
     val outputHeight: Int,
-    val transform: DisplayTransformInfo
+    val transform: DisplayTransformInfo,
+    /** Corner radius, in car-surface pixels, of the [transform] viewport's card clip. 0 = square. */
+    val cardCornerRadiusPx: Float = 0f
 ) {
     val isValid: Boolean
         get() = sourceWidth > 0 && sourceHeight > 0 && outputWidth > 0 && outputHeight > 0 &&
@@ -64,7 +69,18 @@ data class RenderPlan(
 
         val saveCount = canvas.save()
         val viewport = transform.viewportBounds
-        canvas.clipRect(viewport.left, viewport.top, viewport.right, viewport.bottom)
+        if (cardCornerRadiusPx > 0f) {
+            val path = Path().apply {
+                addRoundRect(
+                    RectF(viewport.left, viewport.top, viewport.right, viewport.bottom),
+                    cardCornerRadiusPx, cardCornerRadiusPx,
+                    Path.Direction.CW
+                )
+            }
+            canvas.clipPath(path)
+        } else {
+            canvas.clipRect(viewport.left, viewport.top, viewport.right, viewport.bottom)
+        }
         canvas.drawBitmap(bitmap, matrix, paint)
         canvas.restoreToCount(saveCount)
     }
@@ -75,13 +91,16 @@ data class RenderPlan(
             outputWidth: Int,
             outputHeight: Int,
             sourceWidth: Int,
-            sourceHeight: Int
+            sourceHeight: Int,
+            cardMargin: Insets = DisplayTransform.cardMargin,
+            cardCornerRadiusPx: Float = 0f
         ): RenderPlan? {
             val transform = DisplayTransform.resolve(
                 carWidth = outputWidth,
                 carHeight = outputHeight,
                 phoneWidth = sourceWidth,
-                phoneHeight = sourceHeight
+                phoneHeight = sourceHeight,
+                cardMargin = cardMargin
             ) ?: return null
             return RenderPlan(
                 surfaceGeneration = surfaceGeneration,
@@ -89,7 +108,8 @@ data class RenderPlan(
                 sourceHeight = sourceHeight,
                 outputWidth = outputWidth,
                 outputHeight = outputHeight,
-                transform = transform
+                transform = transform,
+                cardCornerRadiusPx = cardCornerRadiusPx
             ).takeIf { it.isValid }
         }
     }

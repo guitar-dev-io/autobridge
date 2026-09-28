@@ -36,6 +36,15 @@ class AutoUiSizes private constructor(
         const val HANDLE_HEIGHT_DP = 18f
 
         /**
+         * Fermata-style floating card: the page sits inset from every surface edge with rounded
+         * corners rather than filling it edge to edge. Matches the margin/radius used by the
+         * SELF_DRAWN mirror card ([dev.autobridge.mirror.SelfDrawnMirrorEngine]) so both
+         * presentations read as the same "floating panel" look.
+         */
+        const val CARD_MARGIN_DP = 20f
+        const val CARD_CORNER_RADIUS_DP = 16f
+
+        /**
          * Density is clamped so an implausible value reported by a head unit cannot scale the whole
          * chrome away. 1.0 covers a 160dpi unit; 3.0 covers the densest realistic panel.
          */
@@ -88,6 +97,8 @@ class AutoUiSizes private constructor(
     val cornerRadius: Float get() = dp(CORNER_RADIUS_DP)
     val edgeReveal: Float get() = dp(EDGE_REVEAL_DP)
     val handleHeight: Float get() = dp(HANDLE_HEIGHT_DP)
+    val cardMargin: Float get() = dp(CARD_MARGIN_DP)
+    val cardCornerRadius: Float get() = dp(CARD_CORNER_RADIUS_DP)
 
     /**
      * Toolbar height for a viewport [availableHeight] px tall. Bounded above by the content-first

@@ -89,7 +89,7 @@ object AutoBridgeDesign {
         subtitle: String? = null,
         onBack: (() -> Unit)? = null,
         chip: String? = null,
-        actions: List<Pair<String, () -> Unit>> = emptyList()
+        actions: List<HeaderAction> = emptyList()
     ): View {
         val row = LinearLayout(context).apply {
             gravity = Gravity.CENTER_VERTICAL
@@ -125,19 +125,31 @@ object AutoBridgeDesign {
 
         if (!chip.isNullOrBlank()) row.addView(statusChip(context, chip),
             LinearLayout.LayoutParams(-2, context.dp(32)).apply { marginEnd = context.dp(8) })
-        // The last action is the primary one and gets the filled treatment; earlier ones are
-        // quiet circles, so a screen can offer both a menu and a microphone without competing.
-        actions.forEachIndexed { index, (glyph, handler) ->
-            val primary = index == actions.lastIndex
+        // Only an action that asks to be primary gets the filled treatment; an overflow menu stays
+        // a quiet circle so it does not read as the thing to press on the screen.
+        actions.forEachIndexed { index, action ->
             row.addView(
-                glyphButton(context, glyph, if (primary) 18f else 20f, filled = primary) { handler() },
+                glyphButton(
+                    context,
+                    action.glyph,
+                    if (action.filled) 18f else 20f,
+                    filled = action.filled,
+                    onClick = action.onClick
+                ),
                 LinearLayout.LayoutParams(context.dp(42), context.dp(42)).apply {
-                    if (!primary) marginEnd = context.dp(6)
+                    if (index != actions.lastIndex) marginEnd = context.dp(6)
                 }
             )
         }
         return row
     }
+
+    /** One trailing header button. [filled] marks the screen's primary action. */
+    data class HeaderAction(
+        val glyph: String,
+        val onClick: () -> Unit,
+        val filled: Boolean = false
+    )
 
     /** A live-state pill: a small accent dot plus one short label. */
     fun statusChip(context: Context, label: String): View = LinearLayout(context).apply {
@@ -262,6 +274,7 @@ object AutoBridgeDesign {
         accent: Int,
         artworkUrl: String? = null,
         badgeText: String? = null,
+        badgeIcon: Int = 0,
         trailing: String? = null,
         onTrailing: (() -> Unit)? = null,
         onClick: () -> Unit
@@ -285,7 +298,15 @@ object AutoBridgeDesign {
             setTextColor(accent)
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
         }
-        artwork.addView(initial, FrameLayout.LayoutParams(-1, -1))
+        if (badgeIcon != 0) {
+            artwork.addView(ImageView(context).apply {
+                setImageResource(badgeIcon)
+                setColorFilter(accent)
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }, FrameLayout.LayoutParams(context.dp(22), context.dp(22), Gravity.CENTER))
+        } else {
+            artwork.addView(initial, FrameLayout.LayoutParams(-1, -1))
+        }
         if (!artworkUrl.isNullOrBlank()) {
             val image = ImageView(context).apply {
                 scaleType = ImageView.ScaleType.CENTER_CROP

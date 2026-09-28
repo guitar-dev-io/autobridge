@@ -106,6 +106,9 @@ dependencies {
     implementation("androidx.car.app:app-projected:1.7.0")
     // WebViewCompat.getCurrentWebViewPackage() for the DRM/WebView diagnostics screen.
     implementation("androidx.webkit:webkit:1.16.0")
+    // Custom Tabs for provider sign-in pages that block embedded WebView login; shares Chrome's
+    // cookie jar so an already-signed-in Chrome session skips the credential prompt entirely.
+    implementation("androidx.browser:browser:1.8.0")
     implementation("dev.rikka.shizuku:api:13.1.5")
     implementation("dev.rikka.shizuku:provider:13.1.5")
     implementation("androidx.media3:media3-exoplayer:1.11.0")

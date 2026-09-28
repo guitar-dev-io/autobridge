@@ -152,3 +152,50 @@ class RuntimeBoundaryTest {
         ReconnectTracker.reset()
     }
 }
+
+/**
+ * Regression: opening a destination that was already on the car stack pushed a second copy, so
+ * moving between screens that are reachable from several places built up stacks like
+ * Browser -> Media -> Browser and Back walked through screens the user had already left.
+ */
+class ScreenStackTrackerTest {
+    private val tracker = dev.autobridge.car.ScreenStackTracker()
+
+    @org.junit.Test fun aMarkerIsPresentOnlyWhileItsScreenIs() {
+        org.junit.Assert.assertFalse(tracker.contains("Browser"))
+        tracker.pushed("Browser")
+        org.junit.Assert.assertTrue(tracker.contains("Browser"))
+        tracker.removed("Browser")
+        org.junit.Assert.assertFalse(tracker.contains("Browser"))
+    }
+
+    @org.junit.Test fun pushingTheSameMarkerTwiceDoesNotDuplicateIt() {
+        tracker.pushed("Media")
+        tracker.pushed("Media")
+        org.junit.Assert.assertEquals(listOf("Media"), tracker.markers)
+    }
+
+    @org.junit.Test fun returningToAnOpenScreenDropsEverythingAboveIt() {
+        listOf("Browser", "Media", "NowPlaying").forEach(tracker::pushed)
+        org.junit.Assert.assertTrue(tracker.returnedTo("Browser"))
+        org.junit.Assert.assertEquals(listOf("Browser"), tracker.markers)
+    }
+
+    @org.junit.Test fun returningToTheTopScreenLeavesTheStackAlone() {
+        listOf("Browser", "Media").forEach(tracker::pushed)
+        org.junit.Assert.assertTrue(tracker.returnedTo("Media"))
+        org.junit.Assert.assertEquals(listOf("Browser", "Media"), tracker.markers)
+    }
+
+    @org.junit.Test fun returningToAScreenThatIsNotOpenReportsSoAndChangesNothing() {
+        tracker.pushed("Browser")
+        org.junit.Assert.assertFalse(tracker.returnedTo("Settings"))
+        org.junit.Assert.assertEquals(listOf("Browser"), tracker.markers)
+    }
+
+    @org.junit.Test fun aScreenPoppedFromTheMiddleIsForgotten() {
+        listOf("Browser", "Media", "NowPlaying").forEach(tracker::pushed)
+        tracker.removed("Media")
+        org.junit.Assert.assertEquals(listOf("Browser", "NowPlaying"), tracker.markers)
+    }
+}

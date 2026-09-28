@@ -61,7 +61,7 @@ class CarLauncherScreen(carContext: CarContext) : Screen(carContext) {
                     .addEndHeaderAction(
                         Action.Builder()
                             .setTitle("All apps")
-                            .setOnClickListener { screenManager.push(CarAppsScreen(carContext)) }
+                            .setOnClickListener { CarNavigation.open(screenManager, "CarAppsScreen") { CarAppsScreen(carContext) } }
                             .build()
                     )
                     .build()
@@ -72,16 +72,16 @@ class CarLauncherScreen(carContext: CarContext) : Screen(carContext) {
 
     private fun builtinShortcuts(): List<Shortcut> = listOf(
         Shortcut("Now Playing", dev.autobridge.R.drawable.ic_car_panel) {
-            screenManager.push(CarNowPlayingScreen(carContext))
+            CarNavigation.open(screenManager, "CarNowPlayingScreen") { CarNowPlayingScreen(carContext) }
         },
         Shortcut("Media", dev.autobridge.R.drawable.ic_car_panel) {
-            screenManager.push(CarMediaLibraryScreen(carContext))
+            CarNavigation.open(screenManager, "CarMediaLibraryScreen") { CarMediaLibraryScreen(carContext) }
         },
         Shortcut("Web / Video", dev.autobridge.R.drawable.ic_car_panel) {
-            screenManager.push(CarWebScreen(carContext))
+            CarNavigation.open(screenManager, "CarWebScreen") { CarWebScreen(carContext) }
         },
         Shortcut("Mirror", dev.autobridge.R.drawable.ic_car_home) {
-            screenManager.push(MirrorCarScreen(carContext))
+            CarNavigation.open(screenManager, "MirrorCarScreen") { MirrorCarScreen(carContext) }
         }
     )
 

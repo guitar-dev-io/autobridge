@@ -84,7 +84,7 @@ class CarMediaCenterScreen(carContext: CarContext) : Screen(carContext) {
                 .setTitle("Now Playing")
                 .addText(nowPlayingSubtitle(connected))
                 .setBrowsable(true)
-                .setOnClickListener { screenManager.push(CarNowPlayingScreen(carContext)) }
+                .setOnClickListener { CarNavigation.open(screenManager, "CarNowPlayingScreen") { CarNowPlayingScreen(carContext) } }
                 .build()
         )
         audioLibrary.forEach { track ->
@@ -101,7 +101,7 @@ class CarMediaCenterScreen(carContext: CarContext) : Screen(carContext) {
                                 RecentActivityStore.Kind.MEDIA, track.title, "Music", track.uri
                             )
                         )
-                        screenManager.push(CarNowPlayingScreen(carContext))
+                        CarNavigation.open(screenManager, "CarNowPlayingScreen") { CarNowPlayingScreen(carContext) }
                     }
                     .build()
             )
@@ -161,7 +161,7 @@ class CarMediaCenterScreen(carContext: CarContext) : Screen(carContext) {
                     .setTitle("Open in Browser")
                     .addText("For web players (YouTube, etc.)")
                     .setBrowsable(true)
-                    .setOnClickListener { screenManager.push(CarBrowserScreen(carContext)) }
+                    .setOnClickListener { CarNavigation.open(screenManager, "CarBrowserScreen") { CarBrowserScreen(carContext) } }
                     .build()
             )
             .build()

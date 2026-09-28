@@ -45,9 +45,14 @@ object PhoneLauncherUi {
             subtitle = subtitle,
             onBack = home,
             chip = statusChip,
-            // The overflow menu always stays reachable; a screen-specific action (the home
-            // microphone) is added after it and becomes the primary button.
-            actions = listOfNotNull("≡" to menu, headerAction)
+            // The overflow menu always stays reachable but stays quiet; a screen-specific action
+            // (the home microphone) is the primary one.
+            actions = listOfNotNull(
+                AutoBridgeDesign.HeaderAction("≡", menu),
+                headerAction?.let { (glyph, handler) ->
+                    AutoBridgeDesign.HeaderAction(glyph, handler, filled = true)
+                }
+            )
         )
 
         val body = AutoBridgeDesign.body(context)
@@ -86,6 +91,7 @@ object PhoneLauncherUi {
                     subtitle = entry.caption,
                     accent = entry.accent,
                     badgeText = entry.title.trim().take(1),
+                    badgeIcon = entry.icon,
                     trailing = "›",
                     onClick = entry.open
                 )

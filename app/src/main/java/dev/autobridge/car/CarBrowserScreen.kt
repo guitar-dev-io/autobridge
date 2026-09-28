@@ -167,11 +167,22 @@ class CarBrowserScreen(carContext: CarContext) :
                     .addText("Park the vehicle to browse websites.").build()
             ).build()
         ).setHeader(Header.Builder().setTitle("Browser").setStartHeaderAction(Action.BACK).build()).build()
-        // Keep the host exit action and PAN support; browser actions live in the canvas toolbar and
-        // drawer so the host strip stays a single, uncluttered row.
-        // PAN is required for SurfaceCallback scroll gestures, including in fullscreen.
+        // No dedicated back button: the on-canvas hamburger menu (☰, already drawn by the renderer
+        // in its own toolbar) is the single entry point into browser navigation — Home, Bookmarks,
+        // History, Settings, etc. This host strip only needs a fallback trigger for the same menu
+        // plus PAN support for SurfaceCallback scroll gestures, including in fullscreen.
         return NavigationTemplate.Builder()
-            .setActionStrip(ActionStrip.Builder().addAction(Action.BACK).build())
+            .setActionStrip(
+                ActionStrip.Builder()
+                    .addAction(
+                        Action.Builder()
+                            .setIcon(carIcon(dev.autobridge.R.drawable.ic_car_panel))
+                            .setTitle("Menu")
+                            .setOnClickListener { renderer.openDrawer() }
+                            .build()
+                    )
+                    .build()
+            )
             .setMapActionStrip(ActionStrip.Builder().addAction(Action.PAN).build())
             .build()
     }
@@ -208,7 +219,7 @@ class CarBrowserScreen(carContext: CarContext) :
 
     override fun openAgent() {
         // Real Agent surface (ask/search/control), not the User-Agent settings.
-        screenManager.push(CarAgentScreen(carContext))
+        CarNavigation.open(screenManager, "CarAgentScreen") { CarAgentScreen(carContext) }
     }
 
     override fun openDownloads() {
@@ -216,15 +227,15 @@ class CarBrowserScreen(carContext: CarContext) :
     }
 
     override fun openMediaCenter() {
-        screenManager.push(CarMediaCenterScreen(carContext))
+        CarNavigation.open(screenManager, "CarMediaCenterScreen") { CarMediaCenterScreen(carContext) }
     }
 
     override fun openNowPlaying() {
-        screenManager.push(CarNowPlayingScreen(carContext))
+        CarNavigation.open(screenManager, "CarNowPlayingScreen") { CarNowPlayingScreen(carContext) }
     }
 
     override fun openMediaLibrary() {
-        screenManager.push(CarMediaLibraryScreen(carContext))
+        CarNavigation.open(screenManager, "CarMediaLibraryScreen") { CarMediaLibraryScreen(carContext) }
     }
 
     override fun openSettings() {
@@ -242,7 +253,7 @@ class CarBrowserScreen(carContext: CarContext) :
     }
 
     override fun openDiagnostics() {
-        screenManager.push(CarDiagnosticsScreen(carContext))
+        CarNavigation.open(screenManager, "CarDiagnosticsScreen") { CarDiagnosticsScreen(carContext) }
     }
 
     override fun showMessage(text: String) {
@@ -303,6 +314,11 @@ class CarBrowserScreen(carContext: CarContext) :
         // renderer applies its own epsilon so only a material change reaches the page.
         renderer.setStableArea(stableArea)
     }
+
+    private fun carIcon(@androidx.annotation.DrawableRes resourceId: Int): androidx.car.app.model.CarIcon =
+        androidx.car.app.model.CarIcon.Builder(
+            androidx.core.graphics.drawable.IconCompat.createWithResource(carContext, resourceId)
+        ).build()
 
     override fun onClick(x: Float, y: Float) {
         // Gated: this fires on every tap, which is useful while diagnosing input routing and pure

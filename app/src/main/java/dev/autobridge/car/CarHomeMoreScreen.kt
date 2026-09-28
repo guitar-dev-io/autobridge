@@ -19,15 +19,15 @@ class CarHomeMoreScreen(carContext: CarContext, private val requestSafety: () ->
         }
         // Media Center is reached from here rather than the home grid, which now leads with the
         // content sections shared with the phone launcher.
-        item("Media Center") { screenManager.push(CarMediaCenterScreen(carContext)) }
-        item("Manage bookmarks") { screenManager.push(CarBookmarksScreen(carContext)) }
-        item("Agent") { screenManager.push(CarAgentScreen(carContext)) }
-        item("Recent") { screenManager.push(CarRecentScreen(carContext)) }
+        item("Media Center") { CarNavigation.open(screenManager, "CarMediaCenterScreen") { CarMediaCenterScreen(carContext) } }
+        item("Manage bookmarks") { CarNavigation.open(screenManager, "CarBookmarksScreen") { CarBookmarksScreen(carContext) } }
+        item("Agent") { CarNavigation.open(screenManager, "CarAgentScreen") { CarAgentScreen(carContext) } }
+        item("Recent") { CarNavigation.open(screenManager, "CarRecentScreen") { CarRecentScreen(carContext) } }
         item("Driving") {
             UiModeStore.setDriving(true)
             screenManager.push(CarDrivingModeScreen(carContext))
         }
-        item("Settings") { screenManager.push(CarSettingsScreen(carContext, requestSafety)) }
+        item("Settings") { CarNavigation.open(screenManager, "CarSettingsScreen") { CarSettingsScreen(carContext, requestSafety) } }
         val template = ListTemplate.Builder().setSingleList(items.build())
         if (carContext.carAppApiLevel >= 7) {
             template.setHeader(Header.Builder().setTitle("More").setStartHeaderAction(Action.BACK).build())

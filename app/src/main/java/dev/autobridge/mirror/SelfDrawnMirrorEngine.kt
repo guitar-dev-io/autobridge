@@ -21,12 +21,15 @@ import android.util.Log
 import android.view.Display
 import android.view.Surface
 import android.view.WindowManager
+import dev.autobridge.core.model.Insets
 import dev.autobridge.core.model.RotationMode
 import dev.autobridge.core.model.ScaleMode
 import dev.autobridge.core.model.Size
 import dev.autobridge.core.state.RuntimeContextStore
 import dev.autobridge.display.MirrorDiagnostics
+import dev.autobridge.input.DisplayTransform
 import dev.autobridge.settings.MirrorSettings
+import kotlin.math.roundToInt
 
 /**
  * App-owned output renderer for geometry and frame-rate control.
@@ -43,6 +46,18 @@ class SelfDrawnMirrorEngine(
         private const val TAG = "AutoBridgeSelfDrawn"
         private const val MAX_IMAGES = 2
         private const val DEFAULT_DPI = 160
+
+        /**
+         * Fermata-style floating card: the mirrored phone image sits inset from every edge of the
+         * car surface with rounded corners, rather than filling it edge to edge. Authored in dp so
+         * the card reads the same physical size on every head unit; converted to px per surface
+         * from its reported dpi, the same basis [dev.autobridge.browser.AutoUiSizes] uses.
+         */
+        private const val CARD_MARGIN_DP = 20f
+        private const val CARD_CORNER_RADIUS_DP = 16f
+
+        private fun dpToPx(dp: Float, dpi: Int): Float =
+            dp * (dpi.takeIf { it > 0 } ?: DEFAULT_DPI) / 160f
     }
 
     private val appContext = context.applicationContext
@@ -148,6 +163,8 @@ class SelfDrawnMirrorEngine(
             output = OutputTarget(surface, width, height, dpi, generation)
             renderScheduled = false
         }
+        val margin = dpToPx(CARD_MARGIN_DP, dpi).roundToInt()
+        DisplayTransform.setCardMargin(Insets(left = margin, top = margin, right = margin, bottom = margin))
         MirrorDiagnostics.record("self_drawn_surface_attached")
         scheduleRender()
         return true
@@ -163,6 +180,7 @@ class SelfDrawnMirrorEngine(
                 }
             }
         }
+        DisplayTransform.setCardMargin(Insets.ZERO)
         MirrorDiagnostics.record("self_drawn_surface_detached")
     }
 
@@ -197,6 +215,7 @@ class SelfDrawnMirrorEngine(
         runCatching { resources.virtualDisplay?.release() }
         resources.captureThread?.quitSafely()
         resources.renderThread?.quitSafely()
+        DisplayTransform.setCardMargin(Insets.ZERO)
         MirrorDiagnostics.record("self_drawn_stopped")
     }
 
@@ -320,7 +339,8 @@ class SelfDrawnMirrorEngine(
             outputWidth = target.width,
             outputHeight = target.height,
             sourceWidth = source.width,
-            sourceHeight = source.height
+            sourceHeight = source.height,
+            cardCornerRadiusPx = dpToPx(CARD_CORNER_RADIUS_DP, target.dpi)
         ) ?: run {
             MirrorDiagnostics.recordFrameDropped()
             return

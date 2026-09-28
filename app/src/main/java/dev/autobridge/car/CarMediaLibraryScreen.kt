@@ -77,7 +77,7 @@ class CarMediaLibraryScreen(carContext: CarContext, private val videoOnly: Boole
                     .setTitle("Now Playing")
                     .addText(nowPlayingSubtitle(connected))
                     .setBrowsable(true)
-                    .setOnClickListener { screenManager.push(CarNowPlayingScreen(carContext)) }
+                    .setOnClickListener { CarNavigation.open(screenManager, "CarNowPlayingScreen") { CarNowPlayingScreen(carContext) } }
                     .build()
             )
             .build()
@@ -115,7 +115,7 @@ class CarMediaLibraryScreen(carContext: CarContext, private val videoOnly: Boole
                     screenManager.push(CarVideoScreen(carContext, track.uri, track.title))
                 } else {
                     mediaPlayback.play(track.uri, track.title)
-                    screenManager.push(CarNowPlayingScreen(carContext))
+                    CarNavigation.open(screenManager, "CarNowPlayingScreen") { CarNowPlayingScreen(carContext) }
                 }
             }
             .build()

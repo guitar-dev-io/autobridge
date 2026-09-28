@@ -161,7 +161,7 @@ class CarLibraryScreen(
             return
         }
         mediaPlayback.playPlaylist(items.map { it.uri }, index)
-        screenManager.push(CarNowPlayingScreen(carContext))
+        CarNavigation.open(screenManager, "CarNowPlayingScreen") { CarNowPlayingScreen(carContext) }
     }
 
     private fun subtitle(item: LocalMediaRepository.Item): String {

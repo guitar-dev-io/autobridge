@@ -32,6 +32,8 @@ class AutoBridgeSession : Session(), CarScreenController.Host {
                 // The browser renderer outlives individual screens on purpose, so the session is
                 // the only correct place to tear its WebView down.
                 CarBrowserRuntime.release()
+                // The stack goes away with the session; its marker bookkeeping must go with it.
+                CarNavigation.reset()
             }
         })
     }
@@ -55,7 +57,9 @@ class AutoBridgeSession : Session(), CarScreenController.Host {
 
     override fun pushBrowser(): CarScreenController.BrowserTarget {
         val browser = CarBrowserScreen(carContext)
-        carContext.mainExecutor.execute { screens.push(browser) }
+        carContext.mainExecutor.execute {
+            CarNavigation.open(screens, "CarBrowserScreen") { browser }
+        }
         return browser
     }
 

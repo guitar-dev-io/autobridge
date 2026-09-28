@@ -61,6 +61,9 @@ class BrowserActivity : Activity() {
     private lateinit var blocked: TextView
     private lateinit var loadError: TextView
     private lateinit var content: FrameLayout
+
+    /** The window root, held so entering fullscreen can re-request the page's top inset. */
+    private lateinit var root: FrameLayout
     private lateinit var fullscreenController: FullscreenVideoController
     private var fullscreen = false
     private var pendingUrl: String? = null
@@ -82,7 +85,7 @@ class BrowserActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val root = FrameLayout(this).apply { setBackgroundColor(BrowserTheme.background) }
+        root = FrameLayout(this).apply { setBackgroundColor(BrowserTheme.background) }
 
         content = FrameLayout(this)
         web = createWebView()
@@ -154,7 +157,16 @@ class BrowserActivity : Activity() {
             val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
             chromeBar.setPadding(bars.left, bars.top, bars.right, 0)
             handle.setPadding(bars.left, bars.top, bars.right, 0)
-            content.setPadding(bars.left, 0, bars.right, maxOf(bars.bottom, ime.bottom))
+            // The chrome is an overlay on top of the page, so the page has to start below both the
+            // status bar and the toolbar. Leaving its top inset at 0 let a site's own sticky header
+            // render into the status bar, so the clock sat on top of the page's title.
+            val chromeHeight = if (fullscreen) 0 else sizes.dpInt(AutoUiSizes.TOOLBAR_HEIGHT_DP)
+            content.setPadding(
+                bars.left,
+                bars.top + chromeHeight,
+                bars.right,
+                maxOf(bars.bottom, ime.bottom)
+            )
             ViewportDebug.logWindow(
                 event = if (ime.bottom > 0) ViewportDebug.Event.KEYBOARD else ViewportDebug.Event.LAYOUT,
                 widthPx = root.width, heightPx = root.height,
@@ -226,6 +238,11 @@ class BrowserActivity : Activity() {
             background = GradientDrawable().apply {
                 setColor(BrowserTheme.addressPillBackground)
                 cornerRadius = sizes.cornerRadius
+            }
+            setOnFocusChangeListener { _, hasFocus ->
+                // Editing needs the real URL; reading only needs the part that identifies the page.
+                setText(if (hasFocus) web.url.orEmpty() else displayUrl(web.url.orEmpty()))
+                if (hasFocus) setSelection(text.length)
             }
             setOnEditorActionListener { _, action, event ->
                 if (action == EditorInfo.IME_ACTION_GO ||
@@ -320,7 +337,7 @@ class BrowserActivity : Activity() {
         if (!allowed()) { toast(FeaturePolicy.app.denialMessage(Feature.BROWSER)); return }
         if (input.isNotBlank()) {
             val url = BrowserDefaults.resolve(input)
-            address.setText(url)
+            address.setText(if (address.hasFocus()) url else displayUrl(url))
             web.loadUrl(url)
         }
     }
@@ -328,19 +345,35 @@ class BrowserActivity : Activity() {
     private fun updateNavigation() {
         stopReload.text = if (web.progress < 100) "×" else "↻"
         stopReload.contentDescription = if (web.progress < 100) "Stop loading" else "Reload"
-        if (!address.hasFocus()) address.setText(web.url.orEmpty())
+        if (!address.hasFocus()) address.setText(displayUrl(web.url.orEmpty()))
     }
 
     /**
      * Chrome-only transition. The WebView is neither resized nor re-created, so entering and
      * leaving fullscreen cannot reload the page or move its scroll position.
      */
+    /**
+     * What the address pill shows while it is not being edited: the site, the way every phone
+     * browser shows it. Five toolbar buttons leave the pill about a third of the width, so a full
+     * search URL rendered as "https://www.goo" — visually truncated at the one part of the address
+     * that identifies nothing. The host always fits; focusing the field restores the real URL for
+     * editing.
+     */
+    private fun displayUrl(url: String): String {
+        if (url.isBlank()) return ""
+        val host = runCatching { android.net.Uri.parse(url).host }.getOrNull()
+        return host?.removePrefix("www.")?.takeIf { it.isNotBlank() }
+            ?: BrowserDisplayUrl.compact(url, max = 32)
+    }
+
     private fun setFullscreen(enabled: Boolean) {
         fullscreen = enabled
-        menuButton.visibility = if (enabled) View.GONE else View.VISIBLE
+        menuButton.visibility = if (enabled) View.VISIBLE else View.GONE
         chromeBar.visibility = if (enabled) View.GONE else View.VISIBLE
         handle.visibility = if (enabled) View.VISIBLE else View.GONE
         fullscreenButton.contentDescription = if (enabled) "Exit fullscreen" else "Fullscreen"
+        // The page's top inset depends on whether the toolbar is showing, so recompute it.
+        ViewCompat.requestApplyInsets(root)
         ViewportDebug.logWindow(
             event = ViewportDebug.Event.FULLSCREEN,
             widthPx = web.width, heightPx = web.height,
@@ -501,14 +534,16 @@ class BrowserActivity : Activity() {
 
     /**
      * Google/Microsoft/Apple block sign-in inside any embedded WebView (anti-phishing policy); the
-     * only correct handling is to hand off to the real external browser, never a user-agent workaround.
+     * only correct handling is to hand off to a real browser surface, never a user-agent workaround.
+     * Opened as a Custom Tab (shares Chrome's cookie jar) rather than a full external browser
+     * switch, so a device already signed in to Chrome skips the credential prompt entirely.
      */
     private fun promptExternalSignIn(url: String) {
         AlertDialog.Builder(this)
-            .setTitle("ต้องเข้าสู่ระบบผ่านเบราว์เซอร์ภายนอก")
+            .setTitle("เข้าสู่ระบบ")
             .setMessage("เพื่อความปลอดภัย ผู้ให้บริการนี้ไม่อนุญาตให้ล็อกอินในเบราว์เซอร์ที่ฝังอยู่ในแอปอื่น")
-            .setPositiveButton("เปิดเบราว์เซอร์ภายนอก") { _, _ ->
-                if (!BrowserLauncher.openUrl(this, url)) toast("เปิดเบราว์เซอร์ไม่ได้")
+            .setPositiveButton("เข้าสู่ระบบ") { _, _ ->
+                if (!BrowserLauncher.openSignIn(this, url)) toast("เปิดเบราว์เซอร์ไม่ได้")
             }
             .setNegativeButton("ยกเลิก", null)
             .show()

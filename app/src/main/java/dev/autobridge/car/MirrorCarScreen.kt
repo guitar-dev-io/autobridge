@@ -89,8 +89,9 @@ class MirrorCarScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
     override fun onGetTemplate(): Template {
         Log.i(TAG, "Building NavigationTemplate")
         // Keep the live phone image clear. Phone navigation and Stop remain in the Controls panel.
+        // No dedicated back button: "Controls" is the single hamburger-style entry point into the
+        // menu (Apps, Media, Settings, Stop mirroring), matching the reference head-unit layout.
         val topActions = ActionStrip.Builder()
-            .addAction(Action.BACK)
             .addAction(
                 Action.Builder()
                     .setIcon(carIcon(R.drawable.ic_car_panel))

@@ -85,6 +85,58 @@ pauses video but lets audio continue, matching the car.
 `EntertainmentActivity` keeps its existing role (browser/YouTube entry and the developer-facing
 address field) and gained `EXTRA_SOURCE_URL`/`_KIND`/`_TITLE` for direct playback requests.
 
+## Remote and browser
+
+These two screens predate the design language and were the worst offenders, so both were brought
+onto it.
+
+### Remote
+
+`MobileRemoteScreen` is the Compose slice. It drew **its own bottom navigation**, which stacked
+directly on top of `MainActivity`'s global bottom navigation: two bars, both starting with
+"Home / Remote", meaning different things, eating about 130px between them and clipping the last
+card. Its four entries are sub-tabs of the Remote feature, not app destinations, so they are now a
+segmented control under the header and the global bar is the only bottom bar.
+
+Also fixed there: the private teal-navy palette now resolves to `ComposeTokens` (which mirrors
+`AutoBridgeDesign`, so `AutoBridgePhoneTheme` and the view-based screens agree); the quick-command
+icons were half colour emoji and half flat glyphs — colour emoji ignore the accent tint, so the set
+is now monochrome and tinted, with stored legacy emoji normalised on load; and the screen mixed
+Thai and English labels, which is now English throughout like the rest of the app.
+
+### Browser
+
+`BrowserActivity` applied the status-bar inset to its toolbar but left the page's top inset at 0,
+so a site's own sticky header rendered into the status bar — the clock sat on top of the page
+title. The page now starts below both the status bar and the toolbar that overlays it, and
+`setFullscreen` re-requests insets because the toolbar's presence changes that offset.
+
+The address pill showed the raw URL. Five toolbar buttons leave it about a third of the width, so a
+search result read as `https://www.goo` — truncated at the one part of the address that identifies
+nothing. Unfocused it now shows the host (`google.com`); focusing restores the real URL to edit.
+
+The floating `☰` was visible exactly when the toolbar (which already has a `☰`) was showing, and
+hidden in fullscreen — the one state with no other way to reach the menu. That is inverted.
+
+### Apps and Settings
+
+`screenHeader` — shared by Applications, Profiles, Devices, Debug and Mirror settings — drew a
+small-caps eyebrow above the title next to a bare `←`. It now delegates to
+`AutoBridgeDesign.header`, so all five legacy screens get the same circular back button, title and
+caption as the rest of the app.
+
+On Applications, the Quick Apps / All apps chips differed only by a slightly lighter surface, which
+is not a legible selected state; the selected chip is now a filled accent pill, matching the
+Remote's segmented control.
+
+On Settings, every row rendered its first letter in the badge — "M / T / A / C / D" reads as
+placeholder text, not iconography — so `contentRow` gained an optional `badgeIcon` and the entries
+pass real icons.
+
+Header actions also became explicit about primacy. They used to render the *last* action filled,
+so a screen whose only action was the overflow menu showed it as a loud accent disc. An action now
+opts into `filled`, and the overflow menu never does.
+
 ## Permissions
 
 Rendering never requests a permission. `requestPermissions` can deliver its result synchronously —
@@ -104,6 +156,9 @@ On a Xiaomi 13T Pro (`23078PND5G`, Android 16, MIUI):
 - The TV section's empty state and its "+ Xtream"/"+ M3U" pills render and are tappable.
 - The Folders permission state renders with the Folders accent and does not request on render;
   the crash buffer is clean after the fix.
+- Remote: one bottom bar, segmented sub-tabs, tinted monochrome quick-command icons.
+- Browser: status bar clear of page content, address pill reading `google.com`, no duplicate menu.
+- Applications: design header, filled selected chip. Settings: real row icons, quiet overflow menu.
 - Not verified: a live Xtream portal, playback in `PlayerActivity`, artwork loading against real
-  logo URLs, the now-playing bar with an active session, and the Gallery/Playlists lists with
-  media permission granted.
+  logo URLs, the now-playing bar with an active session, the Gallery/Playlists lists with media
+  permission granted, and the browser's fullscreen state (toolbar hidden, floating menu shown).

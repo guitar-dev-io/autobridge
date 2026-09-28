@@ -154,6 +154,16 @@ object DisplayTransform {
     @Volatile
     private var activeSafeInsets: Insets = Insets.ZERO
 
+    /**
+     * Visual card margin applied on top of [activeSafeInsets], used only by the SELF_DRAWN
+     * pipeline to render the mirrored phone as an inset rounded card (Fermata-style) rather than a
+     * full-bleed image. AUTO_MIRROR never sets this: its pixels are placed by the OS directly onto
+     * the surface with no margin, so a nonzero value here would desync touch mapping from what is
+     * actually drawn. [SelfDrawnMirrorEngine] is solely responsible for setting/clearing it.
+     */
+    @Volatile
+    private var activeCardMargin: Insets = Insets.ZERO
+
     @Volatile
     private var activeTouchOffsetX: Float = 0f
 
@@ -180,6 +190,14 @@ object DisplayTransform {
         activeSafeInsets = insets
     }
 
+    /** Sets/clears the SELF_DRAWN card margin. See [activeCardMargin]. */
+    fun setCardMargin(insets: Insets) {
+        activeCardMargin = insets
+    }
+
+    /** Current card margin, so renderer and touch mapping share one source of truth. */
+    val cardMargin: Insets get() = activeCardMargin
+
     fun setTouchOffsets(x: Float, y: Float) {
         activeTouchOffsetX = x.takeIf { it.isFinite() } ?: 0f
         activeTouchOffsetY = y.takeIf { it.isFinite() } ?: 0f
@@ -188,6 +206,7 @@ object DisplayTransform {
     fun resetSurfaceState() {
         activeVisibleBounds = null
         activeSafeInsets = Insets.ZERO
+        activeCardMargin = Insets.ZERO
         activeTouchOffsetX = 0f
         activeTouchOffsetY = 0f
     }
@@ -200,6 +219,7 @@ object DisplayTransform {
         profile: DisplayProfile = activeProfile,
         rotationMode: RotationMode = activeRotationMode,
         safeInsets: Insets = activeSafeInsets,
+        cardMargin: Insets = activeCardMargin,
         visibleBounds: ContentBounds? = activeVisibleBounds,
         touchOffsetX: Float = activeTouchOffsetX,
         touchOffsetY: Float = activeTouchOffsetY
@@ -207,10 +227,10 @@ object DisplayTransform {
         if (carWidth <= 0 || carHeight <= 0 || phoneWidth <= 0 || phoneHeight <= 0) return null
         val full = ContentBounds.surface(carWidth, carHeight) ?: return null
         val insetViewport = ContentBounds(
-            left = safeInsets.left.toFloat(),
-            top = safeInsets.top.toFloat(),
-            right = carWidth - safeInsets.right.toFloat(),
-            bottom = carHeight - safeInsets.bottom.toFloat()
+            left = safeInsets.left.toFloat() + cardMargin.left.toFloat(),
+            top = safeInsets.top.toFloat() + cardMargin.top.toFloat(),
+            right = carWidth - safeInsets.right.toFloat() - cardMargin.right.toFloat(),
+            bottom = carHeight - safeInsets.bottom.toFloat() - cardMargin.bottom.toFloat()
         ).intersect(full) ?: return null
         val viewport = visibleBounds?.let { insetViewport.intersect(it) } ?: insetViewport
         if (!viewport.isValid) return null

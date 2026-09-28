@@ -1966,6 +1966,12 @@ class MainActivity : androidx.activity.ComponentActivity() {
     /** The home screen's now-playing bar, kept across re-renders so its ticker is not restarted. */
     private var homeMiniPlayer: dev.autobridge.ui.MiniPlayer? = null
     private var currentScreen = PhoneScreen.HOME
+
+    /**
+     * False until the first screen has actually been built. Without it the re-entry guard below
+     * would swallow the initial render, because currentScreen already starts at HOME.
+     */
+    private var screenRendered = false
     private var selectedApp: InstalledApp? = null
     private var appsFavoritesOnly = true
     private var appSearchQuery = ""
@@ -2091,6 +2097,12 @@ class MainActivity : androidx.activity.ComponentActivity() {
         } else {
             requested
         }
+        // Re-selecting the destination already on screen is a no-op rather than a rebuild: tapping
+        // the active bottom-bar tab used to discard the Applications search term and the scroll
+        // position and hand back an identical screen. PROFILE is exempt because which app it shows
+        // is state, so the same destination can still need a rebuild.
+        if (screenRendered && target == currentScreen && target != PhoneScreen.PROFILE) return
+        screenRendered = true
         currentScreen = target
         homeConnectionView = null
         developerLogView = null
@@ -2294,10 +2306,10 @@ class MainActivity : androidx.activity.ComponentActivity() {
     }
 
     private fun buildSettingsMenu(): View {
-        fun item(title: String, caption: String, action: () -> Unit) =
+        fun item(title: String, caption: String, icon: Int, action: () -> Unit) =
             dev.autobridge.ui.PhoneLauncherUi.Entry(
                 title = title,
-                icon = 0,
+                icon = icon,
                 caption = caption,
                 accent = dev.autobridge.ui.AutoBridgeDesign.ACCENT_SYSTEM,
                 open = action
@@ -2306,20 +2318,22 @@ class MainActivity : androidx.activity.ComponentActivity() {
             context = this,
             title = "Settings",
             entries = listOf(
-                item("Mirror & display", "Renderer, rotation, screen power") {
+                item("Mirror & display", "Renderer, rotation, screen power", R.drawable.ic_tile_mirror) {
                     showPhoneScreen(PhoneScreen.MIRROR_SETTINGS)
                 },
-                item("Touch control", "Input backend and permissions") { openTouchSettings() },
-                item("App profiles", "Per-app scale, rotation and audio") {
+                item("Touch control", "Input backend and permissions", R.drawable.ic_tile_touch) {
+                    openTouchSettings()
+                },
+                item("App profiles", "Per-app scale, rotation and audio", R.drawable.ic_tile_apps) {
                     showPhoneScreen(PhoneScreen.PROFILES)
                 },
                 // Applications, Connected devices and Remote control are deliberately absent:
                 // the bottom navigation already has an Apps, Devices and Remote tab, so repeating
                 // them here only made this list longer without adding a destination.
-                item("Control Center", "Mirror, browser and session actions") {
+                item("Control Center", "Mirror, browser and session actions", R.drawable.ic_tile_remote) {
                     showPhoneScreen(PhoneScreen.CONTROL_CENTER)
                 },
-                item("Debug", "Logs, diagnostics and mirror events") {
+                item("Debug", "Logs, diagnostics and mirror events", R.drawable.ic_tile_debug) {
                     showPhoneScreen(PhoneScreen.DEVELOPER)
                 }
             ),
@@ -2937,46 +2951,26 @@ class MainActivity : androidx.activity.ComponentActivity() {
         addView(content)
     }
 
-    private fun screenHeader(title: String, subtitle: String, back: (() -> Unit)? = null, action: Pair<String, () -> Unit>? = null): View {
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, 0, 0, dp(16))
-            
-            if (back != null) {
-                addView(TextView(context).apply {
-                    text = "← "
-                    textSize = 18f
-                    setTextColor(COLOR_ACCENT)
-                    setOnClickListener { back() }
-                })
-            }
-            
-            val titles = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
-            titles.addView(TextView(context).apply {
-                text = subtitle
-                textSize = 10f
-                setTextColor(COLOR_MUTED)
-                typeface = Typeface.DEFAULT_BOLD
-            })
-            titles.addView(TextView(context).apply {
-                text = title
-                textSize = 20f
-                setTextColor(COLOR_TEXT)
-                typeface = Typeface.DEFAULT_BOLD
-            })
-            addView(titles, LinearLayout.LayoutParams(0, -2, 1f))
-
-            if (action != null) {
-                addView(TextView(context).apply {
-                    text = action.first
-                    textSize = 18f
-                    setTextColor(COLOR_ACCENT)
-                    setOnClickListener { action.second() }
-                })
-            }
-        }
-    }
+    /**
+     * Header for the legacy phone screens (Applications, Profiles, Devices, Debug, Mirror
+     * settings). It delegates to [dev.autobridge.ui.AutoBridgeDesign.header] so those screens get
+     * the same circular back button, title and quiet caption as the launcher, the library and the
+     * player, instead of their own small-caps eyebrow above a bare arrow.
+     */
+    private fun screenHeader(
+        title: String,
+        subtitle: String,
+        back: (() -> Unit)? = null,
+        action: Pair<String, () -> Unit>? = null
+    ): View = dev.autobridge.ui.AutoBridgeDesign.header(
+        context = this,
+        title = title,
+        subtitle = subtitle,
+        onBack = back,
+        actions = action?.let {
+            listOf(dev.autobridge.ui.AutoBridgeDesign.HeaderAction(it.first, it.second))
+        } ?: emptyList()
+    )
 
     private fun sectionLabel(text: String) = TextView(this).apply {
         this.text = text
@@ -3179,13 +3173,24 @@ class MainActivity : androidx.activity.ComponentActivity() {
         }
     }
 
+    /**
+     * Quick Apps / All apps chips. The selected one used to differ only by a slightly lighter
+     * surface, which is not a legible selected state; it is now a filled accent pill, matching the
+     * segmented control on the Remote screen.
+     */
     private fun styleFilter(view: TextView, title: String, active: Boolean) {
         view.apply {
             text = title
             gravity = Gravity.CENTER
-            textSize = 12f
-            setTextColor(if (active) COLOR_TEXT else COLOR_MUTED)
-            background = roundedBackground(if (active) COLOR_SURFACE_ALT else COLOR_SURFACE, COLOR_BORDER)
+            textSize = 13f
+            setTypeface(null, if (active) Typeface.BOLD else Typeface.NORMAL)
+            setTextColor(if (active) dev.autobridge.ui.AutoBridgeDesign.INK else COLOR_MUTED)
+            background = dev.autobridge.ui.AutoBridgeDesign.surface(
+                this@MainActivity,
+                if (active) COLOR_ACCENT else COLOR_SURFACE,
+                18,
+                if (active) COLOR_ACCENT else COLOR_BORDER
+            )
             setPadding(0, dp(8), 0, dp(8))
         }
     }

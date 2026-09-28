@@ -43,7 +43,7 @@ class CarMirrorIntroScreen(carContext: CarContext) : Screen(carContext) {
             .setTitle("Quality")
             .addText("High (1080p)")
             .setOnClickListener {
-                screenManager.push(CarSettingsScreen(carContext) {})
+                CarNavigation.open(screenManager, "CarSettingsScreen") { CarSettingsScreen(carContext) {} }
             }
             .build()
 
@@ -82,7 +82,7 @@ class CarMirrorIntroScreen(carContext: CarContext) : Screen(carContext) {
                 CarToast.LENGTH_LONG
             ).show()
         }
-        screenManager.push(MirrorCarScreen(carContext))
+        CarNavigation.open(screenManager, "MirrorCarScreen") { MirrorCarScreen(carContext) }
     }
 
     private fun statusTitle(): String = when {

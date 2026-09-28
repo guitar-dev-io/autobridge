@@ -28,16 +28,16 @@ class CarDrivingModeScreen(carContext: CarContext) : Screen(carContext) {
     override fun onGetTemplate(): Template {
         val tiles = listOf(
             Tile("Browser", dev.autobridge.R.drawable.ic_car_panel) {
-                screenManager.push(CarBrowserScreen(carContext))
+                CarNavigation.open(screenManager, "CarBrowserScreen") { CarBrowserScreen(carContext) }
             },
             Tile("Mirror", dev.autobridge.R.drawable.ic_car_home) {
-                screenManager.push(MirrorCarScreen(carContext))
+                CarNavigation.open(screenManager, "MirrorCarScreen") { MirrorCarScreen(carContext) }
             },
             Tile("Media", dev.autobridge.R.drawable.ic_car_panel) {
-                screenManager.push(CarMediaCenterScreen(carContext))
+                CarNavigation.open(screenManager, "CarMediaCenterScreen") { CarMediaCenterScreen(carContext) }
             },
             Tile("Agent", dev.autobridge.R.drawable.ic_car_panel) {
-                screenManager.push(CarAgentScreen(carContext))
+                CarNavigation.open(screenManager, "CarAgentScreen") { CarAgentScreen(carContext) }
             },
             Tile("Resume", dev.autobridge.R.drawable.ic_car_panel) {
                 AgentCommandRouter.execute(
@@ -46,7 +46,7 @@ class CarDrivingModeScreen(carContext: CarContext) : Screen(carContext) {
                 )
             },
             Tile("Recent", dev.autobridge.R.drawable.ic_car_panel) {
-                screenManager.push(CarRecentScreen(carContext))
+                CarNavigation.open(screenManager, "CarRecentScreen") { CarRecentScreen(carContext) }
             }
         )
 

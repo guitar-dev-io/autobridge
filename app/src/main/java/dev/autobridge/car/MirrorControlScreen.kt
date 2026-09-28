@@ -58,13 +58,13 @@
 //                invalidate()
 //            })
 //            .addItem(navigationRow("Apps", "Open parked-only quick apps") {
-//                screenManager.push(CarAppsScreen(carContext))
+//                CarNavigation.open(screenManager, "CarAppsScreen") { CarAppsScreen(carContext) }
 //            })
 //            .addItem(navigationRow("Media", "Playlists and MediaSession controls") {
-//                screenManager.push(CarMediaScreen(carContext))
+//                CarNavigation.open(screenManager, "CarMediaScreen") { CarMediaScreen(carContext) }
 //            })
 //            .addItem(navigationRow("Settings", "Mirror, touch and safety settings") {
-//                screenManager.push(CarSettingsScreen(carContext, onSafetyRequested))
+//                CarNavigation.open(screenManager, "CarSettingsScreen") { CarSettingsScreen(carContext, onSafetyRequested) }
 //            })
 //            .addItem(systemActionRow("Phone Back", InputBackend.SystemAction.BACK))
 //            .addItem(systemActionRow("Phone Home", InputBackend.SystemAction.HOME))
@@ -201,13 +201,13 @@ class MirrorControlScreen(
                 invalidate()
             })
             .addItem(navigationRow("Apps", "Open quick apps") {
-                screenManager.push(CarAppsScreen(carContext))
+                CarNavigation.open(screenManager, "CarAppsScreen") { CarAppsScreen(carContext) }
             })
             .addItem(navigationRow("Media", "Playlists and MediaSession controls") {
-                screenManager.push(CarMediaScreen(carContext))
+                CarNavigation.open(screenManager, "CarMediaScreen") { CarMediaScreen(carContext) }
             })
             .addItem(navigationRow("Settings", "Mirror, touch and safety settings") {
-                screenManager.push(CarSettingsScreen(carContext, onSafetyRequested))
+                CarNavigation.open(screenManager, "CarSettingsScreen") { CarSettingsScreen(carContext, onSafetyRequested) }
             })
             .addItem(systemActionRow("Phone Back", InputBackend.SystemAction.BACK))
             .addItem(systemActionRow("Phone Home", InputBackend.SystemAction.HOME))

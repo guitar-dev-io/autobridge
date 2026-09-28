@@ -178,7 +178,7 @@ class CarSettingsScreen(
                 Row.Builder()
                     .setTitle("Diagnostics")
                     .addText("Live FPS, uptime, reconnects and frame stats")
-                    .setOnClickListener { screenManager.push(CarDiagnosticsScreen(carContext)) }
+                    .setOnClickListener { CarNavigation.open(screenManager, "CarDiagnosticsScreen") { CarDiagnosticsScreen(carContext) } }
                     .build()
             )
             .addItem(

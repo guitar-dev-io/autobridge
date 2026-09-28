@@ -58,7 +58,7 @@ class CarQuickLaunchScreen(carContext: CarContext, private val manage: Boolean =
                             addEndHeaderAction(
                                 Action.Builder()
                                     .setTitle("Edit")
-                                    .setOnClickListener { screenManager.push(CarQuickLaunchScreen(carContext, manage = true)) }
+                                    .setOnClickListener { CarNavigation.open(screenManager, "CarQuickLaunchScreen") { CarQuickLaunchScreen(carContext, manage = true) } }
                                     .build()
                             )
                         }

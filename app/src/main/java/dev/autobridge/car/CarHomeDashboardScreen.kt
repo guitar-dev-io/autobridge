@@ -62,7 +62,10 @@ class CarHomeDashboardScreen(
             grid.addItem(
                 GridItem.Builder()
                     .setTitle(section.title)
-                    .setImage(DashboardArtwork.icon(artwork(section), compact = true), GridItem.IMAGE_TYPE_ICON)
+                    // IMAGE_TYPE_ICON tells the host to tint the bitmap as a monochrome mask, which
+                    // flattens this custom multi-color glyph+card artwork into a blank tinted square.
+                    // IMAGE_TYPE_LARGE preserves the actual pixel colors.
+                    .setImage(DashboardArtwork.icon(artwork(section), compact = true), GridItem.IMAGE_TYPE_LARGE)
                     .setOnClickListener { open(section) }
                     .build()
             )
@@ -75,7 +78,7 @@ class CarHomeDashboardScreen(
                         if (hasMore) DashboardArtwork.Kind.MORE else DashboardArtwork.Kind.SETTINGS,
                         compact = true
                     ),
-                    GridItem.IMAGE_TYPE_ICON
+                    GridItem.IMAGE_TYPE_LARGE
                 )
                 .setOnClickListener {
                     if (hasMore) screenManager.push(CarHomeDashboardScreen(carContext, page + 1))
@@ -127,12 +130,11 @@ class CarHomeDashboardScreen(
             section == dev.autobridge.library.HomeSection.RADIO ->
                 screenManager.push(CarIptvSourcesScreen(carContext, dev.autobridge.iptv.IptvKind.RADIO))
             url != null -> {
-                val browser = CarBrowserScreen(carContext)
-                browser.openUrl(url)
-                screenManager.push(browser)
+                dev.autobridge.browser.CarBrowserRuntime.renderer(carContext).load(url)
+                CarNavigation.open(screenManager, "CarBrowserScreen") { CarBrowserScreen(carContext) }
             }
             section == dev.autobridge.library.HomeSection.WEB ->
-                screenManager.push(CarBrowserScreen(carContext))
+                CarNavigation.open(screenManager, "CarBrowserScreen") { CarBrowserScreen(carContext) }
             section == dev.autobridge.library.HomeSection.FOLDERS ->
                 screenManager.push(CarLibraryScreen(carContext, CarLibraryScreen.Mode.FOLDERS))
             section == dev.autobridge.library.HomeSection.PLAYLISTS ->
@@ -144,8 +146,8 @@ class CarHomeDashboardScreen(
             section == dev.autobridge.library.HomeSection.MIRROR ->
                 screenManager.push(CarMirrorIntroScreen(carContext))
             section == dev.autobridge.library.HomeSection.APPS ->
-                screenManager.push(CarQuickLaunchScreen(carContext))
-            else -> screenManager.push(CarSettingsScreen(carContext, ::requestSafety))
+                CarNavigation.open(screenManager, "CarQuickLaunchScreen") { CarQuickLaunchScreen(carContext) }
+            else -> CarNavigation.open(screenManager, "CarSettingsScreen") { CarSettingsScreen(carContext, ::requestSafety) }
         }
     }
 

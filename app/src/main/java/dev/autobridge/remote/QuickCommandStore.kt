@@ -73,16 +73,27 @@ object QuickCommandStore {
         prefs(context).edit { putBoolean(KEY_SEEDED, true) }
         if (load(context).isNotEmpty()) return
         val defaults = listOf(
-            QuickCommand("qc_browser", "Browser", "🌐", CommandType.OPEN_BROWSER, null, 0),
+            // Monochrome glyphs only: colour emoji ignore the accent tint, so a mixed set rendered
+            // as four full-colour pictures next to four flat symbols.
+            QuickCommand("qc_browser", "Browser", "◉", CommandType.OPEN_BROWSER, null, 0),
             QuickCommand("qc_youtube", "YouTube", "▶", CommandType.OPEN_URL, "https://m.youtube.com", 1),
-            QuickCommand("qc_maps", "Maps", "🗺", CommandType.OPEN_URL, "https://maps.google.com", 2),
-            QuickCommand("qc_spotify", "Spotify", "🎵", CommandType.OPEN_URL, "https://open.spotify.com", 3),
-            QuickCommand("qc_mirror", "Mirror", "📱", CommandType.OPEN_MIRROR, null, 4),
+            QuickCommand("qc_maps", "Maps", "◈", CommandType.OPEN_URL, "https://maps.google.com", 2),
+            QuickCommand("qc_spotify", "Spotify", "♪", CommandType.OPEN_URL, "https://open.spotify.com", 3),
+            QuickCommand("qc_mirror", "Mirror", "▭", CommandType.OPEN_MIRROR, null, 4),
             QuickCommand("qc_fullscreen", "Fullscreen", "⛶", CommandType.ENTER_FULLSCREEN, null, 5),
             QuickCommand("qc_reload", "Reload", "↻", CommandType.RELOAD, null, 6),
             QuickCommand("qc_agent", "Agent", "✦", CommandType.OPEN_AGENT, null, 7)
         )
         persist(context, defaults)
+    }
+
+    /** Maps icons persisted before the monochrome set onto their current glyph. */
+    private fun normalizeIcon(icon: String): String = when (icon) {
+        "\uD83C\uDF10" -> "◉" // globe
+        "\uD83D\uDDFA", "\uD83D\uDDFA\uFE0F" -> "◈" // map
+        "\uD83C\uDFB5" -> "♪" // musical note
+        "\uD83D\uDCF1" -> "▭" // mobile phone
+        else -> icon
     }
 
     private fun commit(context: Context, items: List<QuickCommand>) {
@@ -102,7 +113,7 @@ object QuickCommandStore {
                 QuickCommand(
                     id = obj.optString("id").takeIf { it.isNotBlank() } ?: return@mapNotNull null,
                     label = obj.optString("label"),
-                    icon = obj.optString("icon"),
+                    icon = normalizeIcon(obj.optString("icon")),
                     type = type,
                     payload = obj.optString("payload").takeIf { it.isNotBlank() },
                     sortOrder = obj.optInt("order", index)

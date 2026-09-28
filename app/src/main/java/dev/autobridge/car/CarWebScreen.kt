@@ -53,7 +53,7 @@ class CarWebScreen(carContext: CarContext) : Screen(carContext) {
                         Action.Builder()
                             .setTitle("Manage")
                             .setBackgroundColor(CarColor.BLUE)
-                            .setOnClickListener { screenManager.push(CarBookmarksScreen(carContext)) }
+                            .setOnClickListener { CarNavigation.open(screenManager, "CarBookmarksScreen") { CarBookmarksScreen(carContext) } }
                             .build()
                     )
                     .build()
@@ -63,7 +63,10 @@ class CarWebScreen(carContext: CarContext) : Screen(carContext) {
     }
 
     private fun openUrl(url: String) {
-        screenManager.push(CarBrowserScreen(carContext).apply { openUrl(url) })
+        // The renderer is session-scoped, so loading through it works whether the browser screen is
+        // about to be created or is already open further down the stack.
+        dev.autobridge.browser.CarBrowserRuntime.renderer(carContext).load(url)
+        CarNavigation.open(screenManager, "CarBrowserScreen") { CarBrowserScreen(carContext) }
     }
 
     private fun displayHost(url: String): String =

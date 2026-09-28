@@ -1009,9 +1009,22 @@ class CarWebRenderer(context: Context) {
         if (width <= 0 || height <= 0) return
         val area = stableArea
         sizes = AutoUiSizes.forCarSurface(surfaceDpi)
+        // Fermata-style floating card: the whole toolbar+page rect sits inset from the stable area
+        // by a fixed margin, drawn with rounded corners in drawFrame(). Shrinking it here (rather
+        // than adding a separate "card rect") means every consumer of `viewport` — hit testing,
+        // touch mapping, the drawer — automatically operates on the inset card with no extra state.
+        val margin = sizes.cardMargin.roundToInt()
+        val areaLeft = area?.left ?: 0
+        val areaTop = area?.top ?: 0
+        val areaRight = area?.right ?: width
+        val areaBottom = area?.bottom ?: height
+        val cardLeft = areaLeft + margin
+        val cardTop = areaTop + margin
+        val cardRight = (areaRight - margin).coerceAtLeast(cardLeft + 1)
+        val cardBottom = (areaBottom - margin).coerceAtLeast(cardTop + 1)
         val next = BrowserViewport.create(
             width, height, webViewDensity, sizes.density,
-            area?.left ?: 0, area?.top ?: 0, area?.right ?: width, area?.bottom ?: height
+            cardLeft, cardTop, cardRight, cardBottom
         )
         val geometryUnchanged = next == viewport && view.width == next.webWidth
         viewport = next
@@ -1071,11 +1084,23 @@ class CarWebRenderer(context: Context) {
         val canvas: Canvas = runCatching { activeSurface.lockCanvas(null) }.getOrNull() ?: return
         try {
             canvas.drawColor(BrowserTheme.background)
+            // Fermata-style floating card: everything for this frame — page, drawer/tab overlays,
+            // toolbar, handle — is clipped to one rounded rect so the corners read as a single
+            // panel rather than a rounded page with a square toolbar stitched on top of it.
+            val cardOuterSave = canvas.save()
+            val cardPath = android.graphics.Path().apply {
+                addRoundRect(
+                    RectF(
+                        viewport.left.toFloat(), viewport.top.toFloat(),
+                        (viewport.left + viewport.width).toFloat(), (viewport.top + viewport.height).toFloat()
+                    ),
+                    sizes.cardCornerRadius, sizes.cardCornerRadius,
+                    android.graphics.Path.Direction.CW
+                )
+            }
+            canvas.clipPath(cardPath)
+
             canvas.save()
-            canvas.clipRect(
-                viewport.left, viewport.top,
-                viewport.left + viewport.width, viewport.top + viewport.height
-            )
             canvas.translate(viewport.left.toFloat(), viewport.top.toFloat())
             canvas.drawColor(Color.WHITE)
             if (loadError != null) {
@@ -1097,6 +1122,7 @@ class CarWebRenderer(context: Context) {
             }
             val alpha = visibility.alphaAt(nowMs)
             if (alpha > 0.01f) drawToolbar(canvas, alpha) else drawHandle(canvas)
+            canvas.restoreToCount(cardOuterSave)
         } catch (error: RuntimeException) {
             Log.w(TAG, "WebView draw to car surface failed", error)
         } finally {

@@ -165,15 +165,42 @@ private fun vehicleLabel(runtime: RuntimeContext): String = when (runtime.vehicl
 
 @Composable
 fun AutoBridgePhoneTheme(content: @Composable () -> Unit) {
+    // Mirrors AutoBridgeDesign so the Compose slices sit on the same surface stack as the rest of
+    // the phone app instead of their own teal-navy palette.
     MaterialTheme(
         colorScheme = darkColorScheme(
-            primary = Color(0xff159cff),
-            onPrimary = Color.White,
-            surface = Color(0xff0d2029),
-            onSurface = Color(0xfff1f6fb),
-            onSurfaceVariant = Color(0xffa0b4c2),
-            outlineVariant = Color(0xff1f3a47)
+            primary = ComposeTokens.Accent,
+            onPrimary = ComposeTokens.Ink,
+            background = ComposeTokens.Ink,
+            onBackground = ComposeTokens.Text,
+            surface = ComposeTokens.Surface,
+            onSurface = ComposeTokens.Text,
+            surfaceVariant = ComposeTokens.SurfaceRaised,
+            onSurfaceVariant = ComposeTokens.TextMuted,
+            outline = ComposeTokens.Hairline,
+            outlineVariant = ComposeTokens.Hairline
         ),
         content = content
     )
+}
+
+/**
+ * `AutoBridgeDesign`'s tokens as Compose colours.
+ *
+ * The design system is written against Android views (the app is mostly programmatic Views), so
+ * this is the one place the same values are restated for the Compose slices. Keeping them here
+ * rather than inline in each composable means a token change lands everywhere at once.
+ */
+object ComposeTokens {
+    val Ink = Color(AutoBridgeDesign.INK)
+    val Surface = Color(AutoBridgeDesign.SURFACE)
+    val SurfaceRaised = Color(AutoBridgeDesign.SURFACE_RAISED)
+    val Hairline = Color(AutoBridgeDesign.HAIRLINE)
+    val Text = Color(AutoBridgeDesign.TEXT)
+    val TextMuted = Color(AutoBridgeDesign.TEXT_MUTED)
+    val Accent = Color(AutoBridgeDesign.ACCENT)
+    val AccentSoft = Color(AutoBridgeDesign.ACCENT_SOFT)
+    val Danger = Color(AutoBridgeDesign.DANGER)
+    val Ok = Color(AutoBridgeDesign.ACCENT_FILES)
+    val Warn = Color(AutoBridgeDesign.ACCENT_RADIO)
 }
