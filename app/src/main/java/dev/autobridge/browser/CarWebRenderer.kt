@@ -126,7 +126,7 @@ class CarWebRenderer(context: Context) {
     }
 
     /** Which full-surface overlay is currently composited over the page. */
-    private enum class Overlay { NONE, DRAWER, TABS }
+    private enum class Overlay { NONE, DRAWER, DRAWER_MORE, TABS }
 
     /**
      * Exposes the scroll extents so page scrolling can be bounded.
@@ -189,6 +189,32 @@ class CarWebRenderer(context: Context) {
 
 
     private val webViewDensity: Float get() = appContext.resources.displayMetrics.density
+
+    /**
+     * Page audio under native control.
+     *
+     * This surface held no audio focus at all, so a page's video kept playing over a navigation
+     * prompt and over another app's music: nothing here ever told the system it was making sound.
+     */
+    private val webAudio = dev.autobridge.audio.WebAudioBridge { webView }
+    private val audioEnvironment by lazy { dev.autobridge.audio.AudioEnvironment(appContext) }
+    private val audioFocus by lazy {
+        dev.autobridge.audio.AudioFocusController(
+            context = appContext,
+            environment = audioEnvironment,
+            onAction = { webAudio.apply(it) }
+        )
+    }
+
+    /** Current audio focus state, for the diagnostics screen. */
+    val audioFocusState: dev.autobridge.audio.AudioFocusState get() = audioFocus.state
+
+    /** A snapshot of the system audio state this surface plays into. */
+    fun audioSnapshot(): dev.autobridge.audio.AudioSnapshot = audioEnvironment.snapshot(audioFocus.state)
+
+    /** Reads what the page is playing, for the media session and diagnostics. */
+    fun readWebMediaStatus(onResult: (dev.autobridge.audio.WebMediaStatus) -> Unit) =
+        webAudio.readState(onResult)
 
     var onFindResult: ((activeMatch: Int, matchCount: Int) -> Unit)? = null
 
@@ -348,6 +374,10 @@ class CarWebRenderer(context: Context) {
                 firstStart -> load(tabs.active?.url ?: currentUrl)
                 else -> Log.i(TAG, "Surface re-attached ${width}x$height, keeping current page")
             }
+            // Hold focus while this surface is live, so page audio participates in ducking and
+            // pauses for calls instead of talking over them.
+            audioFocus.isPlaying = true
+            audioFocus.request()
             mainHandler.removeCallbacks(frameRunnable)
             mainHandler.post(frameRunnable)
         }
@@ -372,6 +402,8 @@ class CarWebRenderer(context: Context) {
     fun stop() {
         runOnMain {
             running = false
+            audioFocus.isPlaying = false
+            audioFocus.abandon()
             mainHandler.removeCallbacks(frameRunnable)
             surface = null
             saveActiveTabState()
@@ -650,12 +682,20 @@ class CarWebRenderer(context: Context) {
             handleTabOverlayClick(x, y)
             return@runOnMain
         }
-        val drawerPanel = drawer?.panel.takeIf { overlay == Overlay.DRAWER }
-        if (overlay == Overlay.DRAWER) {
+        val drawerPanel = drawer?.panel.takeIf { overlay == Overlay.DRAWER || overlay == Overlay.DRAWER_MORE }
+        if (overlay == Overlay.DRAWER || overlay == Overlay.DRAWER_MORE) {
             val row = drawer?.rowAt(x, y)
             if (row != null) {
-                closeDrawer()
-                performDrawerAction(row.item.action)
+                when (row.item.action) {
+                    // These two switch which list is drawn instead of closing the drawer, so the
+                    // drawer stays open across the "More" round trip.
+                    DrawerAction.MORE -> openDrawerMore()
+                    DrawerAction.BACK_TO_MENU -> openDrawer()
+                    else -> {
+                        closeDrawer()
+                        performDrawerAction(row.item.action)
+                    }
+                }
                 return@runOnMain
             }
             if (drawerPanel?.contains(x, y) != true) {
@@ -735,7 +775,7 @@ class CarWebRenderer(context: Context) {
     fun scrollBy(distanceX: Float, distanceY: Float) = runOnMain {
         val now = SystemClock.uptimeMillis()
         visibility.onInteraction(now)
-        if (overlay == Overlay.DRAWER) {
+        if (overlay == Overlay.DRAWER || overlay == Overlay.DRAWER_MORE) {
             val model = drawer ?: return@runOnMain
             drawerScroll = (drawerScroll + distanceY).coerceIn(0f, model.maxScroll)
             rebuildDrawer()
@@ -797,6 +837,14 @@ class CarWebRenderer(context: Context) {
         trace(ViewportDebug.Event.DRAWER, "open=true")
     }
 
+    /** Switches the open drawer to the secondary "More" list without closing it. */
+    private fun openDrawerMore() {
+        drawerScroll = 0f
+        overlay = Overlay.DRAWER_MORE
+        rebuildDrawer()
+        trace(ViewportDebug.Event.DRAWER, "open=true more=true")
+    }
+
     fun closeDrawer() = runOnMain {
         if (overlay == Overlay.NONE) return@runOnMain
         overlay = Overlay.NONE
@@ -811,15 +859,13 @@ class CarWebRenderer(context: Context) {
     }
 
     private fun rebuildDrawer() {
-        drawer = BrowserDrawerModel.create(
-            sizes,
-            viewport,
-            BrowserDrawerModel.sectionsFor(
-                tabCount = tabCount,
-                isDesktop = BrowserUserAgentStore.mode(appContext) == BrowserUserAgentMode.DESKTOP,
-            ),
-            drawerScroll
-        )
+        val isDesktop = BrowserUserAgentStore.mode(appContext) == BrowserUserAgentMode.DESKTOP
+        val sections = if (overlay == Overlay.DRAWER_MORE) {
+            BrowserDrawerModel.moreSectionsFor(isDesktop = isDesktop)
+        } else {
+            BrowserDrawerModel.sectionsFor(tabCount = tabCount, isDesktop = isDesktop)
+        }
+        drawer = BrowserDrawerModel.create(sizes, viewport, sections, drawerScroll)
     }
 
     private fun performDrawerAction(action: DrawerAction) {
@@ -860,6 +906,9 @@ class CarWebRenderer(context: Context) {
                 target?.showMessage("ล้างข้อมูลการท่องเว็บแล้ว")
             }
             DrawerAction.DIAGNOSTICS -> target?.openDiagnostics()
+            // Handled directly in onSurfaceClick before performDrawerAction is called, since both
+            // switch the open drawer's list rather than performing a browser action.
+            DrawerAction.MORE, DrawerAction.BACK_TO_MENU -> Unit
         }
         host?.onBrowserStateChanged()
     }
@@ -1029,7 +1078,7 @@ class CarWebRenderer(context: Context) {
         val geometryUnchanged = next == viewport && view.width == next.webWidth
         viewport = next
         chrome = BrowserChromeLayout.create(sizes, viewport)
-        if (overlay == Overlay.DRAWER) rebuildDrawer()
+        if (overlay == Overlay.DRAWER || overlay == Overlay.DRAWER_MORE) rebuildDrawer()
         if (geometryUnchanged) {
             trace(event, "reflow=skipped")
             return
@@ -1116,12 +1165,15 @@ class CarWebRenderer(context: Context) {
             canvas.restore()
 
             when (overlay) {
-                Overlay.DRAWER -> drawDrawer(canvas)
+                Overlay.DRAWER, Overlay.DRAWER_MORE -> drawDrawer(canvas)
                 Overlay.TABS -> drawTabSwitcher(canvas)
                 Overlay.NONE -> Unit
             }
+            // No grab-handle graphic while chrome is hidden: the page fills the surface with
+            // nothing floating over it. The edge-reveal band ([BrowserChromeLayout.edgeReveal])
+            // still recalls the toolbar on a swipe/tap; it is simply never drawn.
             val alpha = visibility.alphaAt(nowMs)
-            if (alpha > 0.01f) drawToolbar(canvas, alpha) else drawHandle(canvas)
+            if (alpha > 0.01f) drawToolbar(canvas, alpha)
             canvas.restoreToCount(cardOuterSave)
         } catch (error: RuntimeException) {
             Log.w(TAG, "WebView draw to car surface failed", error)

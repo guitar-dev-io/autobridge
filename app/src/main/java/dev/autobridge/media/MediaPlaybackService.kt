@@ -46,8 +46,21 @@ class MediaPlaybackService : MediaSessionService() {
         val mediaSourceFactory = DefaultMediaSourceFactory(DefaultDataSource.Factory(this))
         val exoPlayer = ExoPlayer.Builder(this)
             .setMediaSourceFactory(mediaSourceFactory)
-            .setAudioAttributes(AudioAttributes.DEFAULT, true)
+            // Stated rather than defaulted: USAGE_MEDIA with CONTENT_TYPE_MUSIC is what tells the
+            // car's audio policy this is media and may be ducked for a navigation prompt, instead
+            // of being treated as an unclassified stream. The second argument hands focus handling
+            // to Media3, which pauses on a transient loss and resumes afterwards.
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(C.USAGE_MEDIA)
+                    .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                    .build(),
+                /* handleAudioFocus = */ true
+            )
             .setHandleAudioBecomingNoisy(true)
+            // Keeps the session's reported position moving while paused, so the car's progress bar
+            // and the phone UI agree.
+            .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
         player = exoPlayer
         ParkingStateStore.addListener(parkingListener)

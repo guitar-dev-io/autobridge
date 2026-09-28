@@ -36,13 +36,12 @@ class AutoUiSizes private constructor(
         const val HANDLE_HEIGHT_DP = 18f
 
         /**
-         * Fermata-style floating card: the page sits inset from every surface edge with rounded
-         * corners rather than filling it edge to edge. Matches the margin/radius used by the
-         * SELF_DRAWN mirror card ([dev.autobridge.mirror.SelfDrawnMirrorEngine]) so both
-         * presentations read as the same "floating panel" look.
+         * The page fills the surface edge to edge: no inset margin and no rounded corners. Was
+         * previously a Fermata-style floating card inset from the edges, but that left visible
+         * black borders around the page on the car display, which is not the wanted look.
          */
-        const val CARD_MARGIN_DP = 20f
-        const val CARD_CORNER_RADIUS_DP = 16f
+        const val CARD_MARGIN_DP = 0f
+        const val CARD_CORNER_RADIUS_DP = 0f
 
         /**
          * Density is clamped so an implausible value reported by a head unit cannot scale the whole

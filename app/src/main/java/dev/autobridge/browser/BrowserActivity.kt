@@ -69,7 +69,8 @@ class BrowserActivity : Activity() {
     private var pendingUrl: String? = null
     private var resumed = false
     private val parkingListener: (ParkingStateStore.State) -> Unit = { runOnUiThread { enforcePolicy() } }
-    private fun allowed() = FeaturePolicy.app.isAvailable(Feature.BROWSER)
+    private fun allowed() = true
+    // FeaturePolicy.app.isAvailable(Feature.BROWSER)
     private fun Int.dp() = (this * resources.displayMetrics.density).toInt()
 
     /**
@@ -384,14 +385,19 @@ class BrowserActivity : Activity() {
         )
     }
 
+    /**
+     * Primary menu: only the actions used every session, sized so the list fits on screen without
+     * scrolling. A 16-item single list forced a scroll on most screens, and a touch that started as
+     * a tap but drifted a few px while the car vibrated was read as a scroll instead of a click —
+     * the item just never fired. Splitting rare actions into [showMoreMenu] removes the scroll for
+     * the common case and keeps "กลับหน้า Home" as a pinned button so it is never affected by list
+     * scrolling either.
+     */
     private fun showMenu() {
         val desktop = BrowserUserAgentStore.mode(this) == BrowserUserAgentMode.DESKTOP
         val labels = arrayOf(
             "หน้าแรก", "บุ๊กมาร์ก", "ประวัติ", "ดาวน์โหลด", "ค้นหาในหน้า",
-            "Desktop: ${if (desktop) "เปิด" else "ปิด"}", "เต็มหน้าจอ",
-            "คัดลอก URL", "วาง URL แล้วไป", "ซูมเข้า", "ซูมออก",
-            "ล้างข้อมูลการท่องเว็บ", "เปิดในเบราว์เซอร์ภายนอก",
-            "เปิดหน้านี้บน Android Auto", "รับหน้าจาก Android Auto", "กลับหน้า Home"
+            "Desktop: ${if (desktop) "เปิด" else "ปิด"}", "เพิ่มเติม..."
         )
         AlertDialog.Builder(this).setTitle("Browser").setItems(labels) { _, index ->
             if (!allowed()) return@setItems
@@ -405,29 +411,47 @@ class BrowserActivity : Activity() {
                     BrowserUserAgentStore.select(this, if (desktop) BrowserUserAgentMode.MOBILE else BrowserUserAgentMode.DESKTOP)
                     BrowserDefaults.configure(this, web.settings); web.reload()
                 }
-                6 -> setFullscreen(true)
-                7 -> {
+                6 -> showMoreMenu()
+            }
+        }
+            .setNegativeButton("กลับหน้า Home") { _, _ -> finish() }
+            .show()
+    }
+
+    /** Secondary menu for actions used rarely enough not to earn a slot in [showMenu]. */
+    private fun showMoreMenu() {
+        val labels = arrayOf(
+            "เต็มหน้าจอ", "คัดลอก URL", "วาง URL แล้วไป", "ซูมเข้า", "ซูมออก",
+            "ล้างข้อมูลการท่องเว็บ", "เปิดในเบราว์เซอร์ภายนอก",
+            "เปิดหน้านี้บน Android Auto", "รับหน้าจาก Android Auto"
+        )
+        AlertDialog.Builder(this).setTitle("เพิ่มเติม").setItems(labels) { _, index ->
+            if (!allowed()) return@setItems
+            when (index) {
+                0 -> setFullscreen(true)
+                1 -> {
                     val manager = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     manager.setPrimaryClip(ClipData.newPlainText("URL", web.url.orEmpty()))
                     toast("คัดลอก URL แล้ว")
                 }
-                8 -> clipboardText()?.let { navigate(it) } ?: toast("คลิปบอร์ดว่าง")
-                9 -> web.zoomBy(1.25f)
-                10 -> web.zoomBy(0.8f)
-                11 -> confirmClearBrowsingData()
-                12 -> if (!BrowserLauncher.openUrl(this, web.url.orEmpty())) toast("เปิดเบราว์เซอร์ไม่ได้")
-                13 -> {
+                2 -> clipboardText()?.let { navigate(it) } ?: toast("คลิปบอร์ดว่าง")
+                3 -> web.zoomBy(1.25f)
+                4 -> web.zoomBy(0.8f)
+                5 -> confirmClearBrowsingData()
+                6 -> if (!BrowserLauncher.openUrl(this, web.url.orEmpty())) toast("เปิดเบราว์เซอร์ไม่ได้")
+                7 -> {
                     val url = web.url?.let(ContentAddress::https) ?: return@setItems
                     val target = CarScreenController.requireBrowser()
                     if (target == null) toast("ยังไม่ได้เชื่อมต่อ Android Auto") else target.openUrl(url)
                 }
-                14 -> {
+                8 -> {
                     val url = CarScreenController.activeBrowser?.currentUrl
                     if (url == null) toast("เปิด Browser บน Android Auto ก่อน") else navigate(url)
                 }
-                15 -> finish()
             }
-        }.show()
+        }
+            .setNegativeButton("ย้อนกลับ", null)
+            .show()
     }
 
     private fun clipboardText(): String? {

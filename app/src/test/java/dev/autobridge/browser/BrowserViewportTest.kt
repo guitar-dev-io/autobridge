@@ -415,19 +415,35 @@ class BrowserDrawerModelTest {
     /**
      * Regression: the paste row used to be hidden unless a clipboard probe succeeded. On a car
      * surface that probe is always refused (the app is not focused on the phone), so the row never
-     * appeared. It is now unconditional and reports failure when tapped.
+     * appeared. It is now unconditional and reports failure when tapped. It now lives in the
+     * "More" list rather than the primary one.
      */
     @Test fun pasteRowIsAlwaysOfferedRegardlessOfClipboardReadability() {
         listOf(true, false).forEach { desktop ->
-            val actions = BrowserDrawerModel.sectionsFor(tabCount = 1, isDesktop = desktop)
+            val actions = BrowserDrawerModel.moreSectionsFor(isDesktop = desktop)
                 .flatMap { it.items }.map { it.action }
             assertTrue(actions.contains(DrawerAction.PASTE_AND_GO))
         }
     }
 
-    @Test fun everyDrawerActionHasExactlyOneRow() {
+    /**
+     * The primary list is the one drawn by default and must stay short enough to fit without
+     * scrolling on the smallest supported head unit, so a drifting tap can never be misread as a
+     * scroll instead of a click on a common action.
+     */
+    @Test fun primaryDrawerListStaysShort() {
         val actions = BrowserDrawerModel.sectionsFor(tabCount = 1, isDesktop = true)
             .flatMap { it.items }.map { it.action }
+        assertTrue(actions.size <= 12)
+        assertTrue(actions.contains(DrawerAction.MORE))
+    }
+
+    @Test fun everyDrawerActionHasExactlyOneRowAcrossBothLists() {
+        val primary = BrowserDrawerModel.sectionsFor(tabCount = 1, isDesktop = true)
+            .flatMap { it.items }.map { it.action }
+        val more = BrowserDrawerModel.moreSectionsFor(isDesktop = true)
+            .flatMap { it.items }.map { it.action }
+        val actions = primary + more
         assertEquals(actions.size, actions.toSet().size)
         assertEquals(DrawerAction.entries.toSet(), actions.toSet())
     }

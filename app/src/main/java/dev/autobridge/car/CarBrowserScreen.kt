@@ -167,22 +167,13 @@ class CarBrowserScreen(carContext: CarContext) :
                     .addText("Park the vehicle to browse websites.").build()
             ).build()
         ).setHeader(Header.Builder().setTitle("Browser").setStartHeaderAction(Action.BACK).build()).build()
-        // No dedicated back button: the on-canvas hamburger menu (☰, already drawn by the renderer
-        // in its own toolbar) is the single entry point into browser navigation — Home, Bookmarks,
-        // History, Settings, etc. This host strip only needs a fallback trigger for the same menu
-        // plus PAN support for SurfaceCallback scroll gestures, including in fullscreen.
+        // No dedicated back button and no second menu button: the on-canvas hamburger menu (☰,
+        // already drawn by the renderer in its own toolbar) is the single entry point into browser
+        // navigation — Home, Bookmarks, History, Settings, etc. Action.APP_ICON is a non-interactive
+        // filler; the host requires a non-empty action strip, but nothing here should compete with
+        // the canvas hamburger for the same job.
         return NavigationTemplate.Builder()
-            .setActionStrip(
-                ActionStrip.Builder()
-                    .addAction(
-                        Action.Builder()
-                            .setIcon(carIcon(dev.autobridge.R.drawable.ic_car_panel))
-                            .setTitle("Menu")
-                            .setOnClickListener { renderer.openDrawer() }
-                            .build()
-                    )
-                    .build()
-            )
+            .setActionStrip(ActionStrip.Builder().addAction(Action.APP_ICON).build())
             .setMapActionStrip(ActionStrip.Builder().addAction(Action.PAN).build())
             .build()
     }
@@ -314,11 +305,6 @@ class CarBrowserScreen(carContext: CarContext) :
         // renderer applies its own epsilon so only a material change reaches the page.
         renderer.setStableArea(stableArea)
     }
-
-    private fun carIcon(@androidx.annotation.DrawableRes resourceId: Int): androidx.car.app.model.CarIcon =
-        androidx.car.app.model.CarIcon.Builder(
-            androidx.core.graphics.drawable.IconCompat.createWithResource(carContext, resourceId)
-        ).build()
 
     override fun onClick(x: Float, y: Float) {
         // Gated: this fires on every tap, which is useful while diagnosing input routing and pure

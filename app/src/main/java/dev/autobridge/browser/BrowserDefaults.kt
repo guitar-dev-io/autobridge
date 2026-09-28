@@ -18,11 +18,14 @@ object BrowserDefaults {
 
     const val HOME = "https://www.google.com/"
 
-    // Identity providers that intentionally block sign-in inside any embedded WebView (anti-phishing
-    // policy, not something a user-agent tweak can or should work around). Both browser presentations
-    // intercept these hosts and hand off to the real external browser instead of hitting the block page.
+    // Identity providers that block sign-in inside any embedded WebView by checking for the "; wv)"
+    // token Android's WebView adds to its default user-agent (anti-phishing policy). BrowserUserAgentStore
+    // strips that token from the mobile UA (the same technique the Fermata Auto project uses for its
+    // YouTube tab — see AndreyPavlenko/Fermata's FermataWebView.UserAgent), which lets accounts.google.com
+    // complete sign-in inside this WebView instead of bouncing out. Apple/Microsoft haven't been verified
+    // against the same technique, so they still hand off to a real external browser.
     private val externalSignInHosts = setOf(
-        "accounts.google.com", "appleid.apple.com", "login.microsoftonline.com", "login.live.com"
+        "appleid.apple.com", "login.microsoftonline.com", "login.live.com"
     )
 
     fun isExternalSignInHost(url: String): Boolean =

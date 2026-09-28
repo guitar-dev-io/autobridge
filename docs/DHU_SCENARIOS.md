@@ -125,3 +125,49 @@ For every host run save APK flavor/build type, phone/Android version, Android Au
 - No device was connected during implementation; on-car visual and input checks remain pending.
 
 Reference: https://github.com/malebuffy/Fermata-Xtream (visual reference only; no upstream code/assets copied). Grid sizing: https://developer.android.com/reference/androidx/car/app/model/GridTemplate.Builder#setItemSize(int).
+
+## DHU run 2026-09-29 (Xiaomi 13T Pro, Android 16, DHU 2.0 mac-arm64)
+
+Transport: AOA over direct USB (`desktop-head-unit -u <serial>`). ADB port forwarding was not
+needed. Protocol 1.7, TLS negotiated, `AutoBridgeCarAppService` bound and a 800x400 virtual display
+created.
+
+### Verified working
+
+| Area | Result |
+|---|---|
+| Car app binds and creates its session | `AutoBridgeCarSession: onCreateScreen` on every connect |
+| Home dashboard | Renders the shared `HomeSection` tiles on the head unit |
+| Grid pagination | The host reported a grid content limit of 12 in one session and 6 in another; the tile list adapted both times, and "More" led to the remaining sections |
+| `CarHomeMoreScreen` | Media Center, Manage bookmarks, Agent, Recent, Driving, Settings all listed |
+| Media Center | TabTemplate renders Music / Video / Streaming after the two fixes below |
+| Browser on the car surface | `CarWebRenderer` drew Google and YouTube Music, including the drawer, at 800x400 |
+
+### Bugs found on the head unit and fixed
+
+1. **Media Center crashed the car app.** `TabTemplate.Builder.setHeaderAction(Action.BACK)` throws
+   `IllegalArgumentException: Missing required action types: APP_ICON`. Only `APP_ICON` is allowed
+   there. Fixed; the host draws its own back affordance.
+2. **Media Center crashed again, one layer down.** With the header fixed, `Tab.Builder` without an
+   icon throws `IllegalStateException: A icon must be set for the tab`. Each tab now carries the
+   same `DashboardArtwork` icon its dashboard tile uses.
+3. **Two tiles labelled "Settings" on the last dashboard page.** The trailing tile fell back to the
+   label "Settings" when there was nothing more to page to, while still opening the overflow list —
+   right next to the real Settings tile. It is now always "More".
+
+### Observed, not a defect
+
+- "Resume last session" was enabled in this install (it defaults to off). On connect it pushes the
+  last screen — here the browser — on top of Home, so the dashboard is visible for a moment and
+  then covered. Dashboard taps during that window do nothing, which reads as an unresponsive grid.
+- Reinstalling the APK while the projection session is live leaves the car app in an ANR
+  ("AutoBridge ไม่ตอบสนอง"). A force-stop and relaunch recovers it. Install with the app stopped.
+- Tab icons render as plain light squares at tab size: `DashboardArtwork`'s compact form draws a
+  dark card with a white glyph, and the host tints the whole bitmap. Cosmetic only.
+
+### Not verified in this run
+
+- TV / Radio browsing past the section entry point: no Xtream account or M3U playlist is
+  configured, so only the empty state and the "Open on phone" action exist to test.
+- Folders / Playlists / Gallery on the car: the phone has not granted media permission.
+- Favorites, Now Playing, Mirror, and the speed/parked gate (`restrict all`, `speed`).

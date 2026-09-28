@@ -72,12 +72,11 @@ class CarHomeDashboardScreen(
         }
         grid.addItem(
             GridItem.Builder()
-                .setTitle(if (hasMore) "More" else "Settings")
+                // Always "More": the last page already carries its own Settings tile, and a second
+                // tile with the same label going somewhere else is just a trap.
+                .setTitle("More")
                 .setImage(
-                    DashboardArtwork.icon(
-                        if (hasMore) DashboardArtwork.Kind.MORE else DashboardArtwork.Kind.SETTINGS,
-                        compact = true
-                    ),
+                    DashboardArtwork.icon(DashboardArtwork.Kind.MORE, compact = true),
                     GridItem.IMAGE_TYPE_LARGE
                 )
                 .setOnClickListener {

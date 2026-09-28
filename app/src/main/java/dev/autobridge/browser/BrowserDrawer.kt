@@ -11,6 +11,10 @@ enum class DrawerAction {
     ADDRESS_KEYBOARD, COPY_URL, PASTE_AND_GO, FIND_IN_PAGE, AGENT,
     TOGGLE_DESKTOP, ZOOM_IN, ZOOM_OUT, RELOAD, HOME,
     BOOKMARK_PAGE, OPEN_EXTERNAL, SETTINGS, CLEAR_DATA, DIAGNOSTICS,
+    /** Opens the secondary "More" drawer list; see [BrowserDrawerModel.moreSectionsFor]. */
+    MORE,
+    /** Returns from the "More" list to the primary drawer list. */
+    BACK_TO_MENU,
 }
 
 /** A tappable drawer row. */
@@ -61,6 +65,12 @@ class BrowserDrawerModel private constructor(
             tabCount: Int,
             isDesktop: Boolean,
         ): List<DrawerSection> = listOf(
+            // Only the rows used every session live in the always-visible list. The previous
+            // 4-section / 20-row layout forced scrolling on most head units, and a tap that
+            // drifted a few px while scrolling was read as a scroll gesture instead of a click —
+            // the row simply never fired. Everything else moved to a "More" row that opens
+            // [moreSectionsFor], reachable from the same drawer without adding scroll to the
+            // common case.
             DrawerSection(
                 "Browser",
                 listOf(
@@ -70,6 +80,33 @@ class BrowserDrawerModel private constructor(
                     DrawerItem(DrawerAction.BOOKMARKS, "Bookmarks", "☆"),
                     DrawerItem(DrawerAction.HISTORY, "History", "↺"),
                     DrawerItem(DrawerAction.DOWNLOADS, "Downloads", "↓"),
+                )
+            ),
+            DrawerSection(
+                "Tools",
+                listOf(
+                    DrawerItem(DrawerAction.ADDRESS_KEYBOARD, "Keyboard / address", "⌨"),
+                    DrawerItem(DrawerAction.FIND_IN_PAGE, "Find in page", "⌕"),
+                    DrawerItem(
+                        DrawerAction.TOGGLE_DESKTOP, "Desktop site", "□",
+                        if (isDesktop) "On" else "Off"
+                    ),
+                    DrawerItem(DrawerAction.RELOAD, "Reload", "↻"),
+                    DrawerItem(DrawerAction.MORE, "More", "⋯"),
+                )
+            ),
+        )
+
+        /**
+         * Rows that used to live in the drawer's Media/Tools/Settings sections, now reached via the
+         * "More" row instead of always being on screen. [DrawerAction.MORE] itself is omitted here
+         * on purpose: it belongs only to the primary list, so tapping it always goes forward.
+         */
+        fun moreSectionsFor(isDesktop: Boolean): List<DrawerSection> = listOf(
+            DrawerSection(
+                "More",
+                listOf(
+                    DrawerItem(DrawerAction.BACK_TO_MENU, "Back", "‹"),
                 )
             ),
             DrawerSection(
@@ -83,8 +120,6 @@ class BrowserDrawerModel private constructor(
             DrawerSection(
                 "Tools",
                 listOf(
-                    DrawerItem(DrawerAction.ADDRESS_KEYBOARD, "Keyboard / address", "⌨"),
-                    DrawerItem(DrawerAction.FIND_IN_PAGE, "Find in page", "⌕"),
                     DrawerItem(DrawerAction.AGENT, "Agent", "❖"),
                     DrawerItem(DrawerAction.COPY_URL, "Copy URL", "⧉"),
                     // Always offered. Probing the clipboard to decide whether to show this row
@@ -94,13 +129,8 @@ class BrowserDrawerModel private constructor(
                     // paste is therefore decided when the row is tapped.
                     DrawerItem(DrawerAction.PASTE_AND_GO, "Paste & go", "⎘"),
                     DrawerItem(DrawerAction.BOOKMARK_PAGE, "Bookmark page", "★"),
-                    DrawerItem(
-                        DrawerAction.TOGGLE_DESKTOP, "Desktop site", "□",
-                        if (isDesktop) "On" else "Off"
-                    ),
                     DrawerItem(DrawerAction.ZOOM_IN, "Zoom in", "+"),
                     DrawerItem(DrawerAction.ZOOM_OUT, "Zoom out", "−"),
-                    DrawerItem(DrawerAction.RELOAD, "Reload", "↻"),
                 )
             ),
             DrawerSection(

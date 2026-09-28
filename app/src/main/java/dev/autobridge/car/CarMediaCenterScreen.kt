@@ -57,18 +57,30 @@ class CarMediaCenterScreen(carContext: CarContext) : Screen(carContext) {
                 }
             }
         )
-            .setHeaderAction(Action.BACK)
-            .addTab(tab("Music", TAB_MUSIC))
-            .addTab(tab("Video", TAB_VIDEO))
-            .addTab(tab("Streaming", TAB_STREAMING))
+            // TabTemplate accepts only APP_ICON here: ActionsConstraints rejects BACK with
+            // "Missing required action types: APP_ICON", which crashed the app the moment Media
+            // Center was opened on the head unit. The host draws its own back affordance.
+            .setHeaderAction(Action.APP_ICON)
+            .addTab(tab("Music", TAB_MUSIC, DashboardArtwork.Kind.MEDIA))
+            .addTab(tab("Video", TAB_VIDEO, DashboardArtwork.Kind.YOUTUBE))
+            .addTab(tab("Streaming", TAB_STREAMING, DashboardArtwork.Kind.BROWSER))
             .setActiveTabContentId(activeTab)
             .setTabContents(TabContents.Builder(contentFor(activeTab)).build())
 
         return builder.build()
     }
 
-    private fun tab(title: String, contentId: String): Tab =
-        Tab.Builder().setTitle(title).setContentId(contentId).build()
+    /**
+     * TabTemplate requires an icon on every tab — building one without it throws
+     * "A icon must be set for the tab" and takes the whole car app down. The artwork is the same
+     * set the dashboard tiles use, so the tabs match the grid they were reached from.
+     */
+    private fun tab(title: String, contentId: String, artwork: DashboardArtwork.Kind): Tab =
+        Tab.Builder()
+            .setTitle(title)
+            .setContentId(contentId)
+            .setIcon(DashboardArtwork.icon(artwork, compact = true))
+            .build()
 
     private fun contentFor(tabId: String): Template = when (tabId) {
         TAB_VIDEO -> videoTemplate()
