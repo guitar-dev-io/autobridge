@@ -402,8 +402,17 @@ class CarWebRenderer(context: Context) {
     fun stop() {
         runOnMain {
             running = false
-            audioFocus.isPlaying = false
-            audioFocus.abandon()
+            // Focus is deliberately NOT dropped here. The surface detaches whenever a car template
+            // is pushed over the browser — the drawer's own screens, settings, diagnostics — while
+            // the page keeps playing. Abandoning focus then would leave the app audible with no
+            // claim to the output, so it would neither duck for a prompt nor pause for a call.
+            // It is released when nothing is playing, and unconditionally in destroy().
+            webAudio.readState { status ->
+                if (!status.playing) {
+                    audioFocus.isPlaying = false
+                    audioFocus.abandon()
+                }
+            }
             mainHandler.removeCallbacks(frameRunnable)
             surface = null
             saveActiveTabState()
@@ -416,6 +425,8 @@ class CarWebRenderer(context: Context) {
     fun destroy() {
         runOnMain {
             running = false
+            audioFocus.isPlaying = false
+            audioFocus.abandon()
             mainHandler.removeCallbacks(frameRunnable)
             mainHandler.removeCallbacks(applyStableArea)
             surface = null

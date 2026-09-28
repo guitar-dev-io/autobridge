@@ -27,6 +27,20 @@ class CarAudioDiagnosticsScreen(carContext: CarContext) : Screen(carContext) {
     /** Filled asynchronously by the WebView; null until the page has answered once. */
     private var webStatusLine: String? = null
 
+    init {
+        // Without connecting, the client always reports INACTIVE and the row would say the session
+        // is down when it is simply unobserved.
+        lifecycle.addObserver(object : androidx.lifecycle.DefaultLifecycleObserver {
+            override fun onStart(owner: androidx.lifecycle.LifecycleOwner) {
+                mediaClient.connect(onConnected = { carContext.mainExecutor.execute { invalidate() } })
+            }
+
+            override fun onStop(owner: androidx.lifecycle.LifecycleOwner) {
+                mediaClient.disconnect()
+            }
+        })
+    }
+
     override fun onGetTemplate(): Template {
         val renderer = CarBrowserRuntime.rendererOrNull()
         val focus = renderer?.audioFocusState ?: AudioFocusState.NONE
