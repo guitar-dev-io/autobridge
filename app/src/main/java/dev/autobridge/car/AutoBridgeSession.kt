@@ -40,6 +40,7 @@ class AutoBridgeSession : Session(), CarScreenController.Host {
 
     override fun onCreateScreen(intent: Intent): Screen {
         Log.i(TAG, "onCreateScreen action=${intent.action} data=${intent.data}")
+        dev.autobridge.display.StructuredLog.i(TAG, "onCreateScreen action=${intent.action}")
         // The combined home is content-bearing on connect (clock, now-playing, vehicle state) and
         // links to the grid launcher, media library and web surfaces, so the head unit is never a
         // blank screen. Back from any child returns here.
@@ -47,6 +48,7 @@ class AutoBridgeSession : Session(), CarScreenController.Host {
             CarHomeDashboardScreen(carContext)
         } catch (error: Throwable) {
             Log.e(TAG, "Unable to create CarHomeDashboardScreen", error)
+            dev.autobridge.display.StructuredLog.e(TAG, "CarHomeDashboardScreen failed: ${error.message}")
             throw error
         }
     }

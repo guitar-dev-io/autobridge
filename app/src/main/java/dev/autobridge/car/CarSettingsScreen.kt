@@ -183,6 +183,13 @@ class CarSettingsScreen(
             )
             .addItem(
                 Row.Builder()
+                    .setTitle("App Log")
+                    .addText("Recent events, including where a screen failed to open")
+                    .setOnClickListener { CarNavigation.open(screenManager, "CarLogScreen") { CarLogScreen(carContext) } }
+                    .build()
+            )
+            .addItem(
+                Row.Builder()
                     .setTitle("Speed safety")
                     .addText(vehicleLabel())
                     .setOnClickListener { onSafetyRequested() }

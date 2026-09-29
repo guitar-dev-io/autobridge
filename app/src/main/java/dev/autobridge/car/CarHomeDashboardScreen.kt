@@ -122,6 +122,7 @@ class CarHomeDashboardScreen(
         }
 
     private fun open(section: dev.autobridge.library.HomeSection) {
+        dev.autobridge.display.StructuredLog.i("CarHome", "tapped -> ${section.name}")
         val url = section.webUrl
         when {
             section == dev.autobridge.library.HomeSection.TV ->

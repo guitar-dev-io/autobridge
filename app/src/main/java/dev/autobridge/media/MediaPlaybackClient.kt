@@ -94,8 +94,8 @@ class MediaPlaybackClient(private val context: Context) {
     /** Plays a single source. [uri] may be an http(s) URL, a bare local path, or a file/content URI. */
     fun play(uri: String, title: String? = null) {
         if (!FeaturePolicy.app.isAvailable(Feature.MEDIA)) return
-        val mediaController = controller ?: return
-        val source = buildMediaItem(uri) ?: return
+        val mediaController = controller ?: return dropped("no controller yet")
+        val source = buildMediaItem(uri) ?: return dropped("unusable source")
         val item = if (title.isNullOrBlank()) source else source.buildUpon()
             .setMediaMetadata(MediaMetadata.Builder().setTitle(title).build()).build()
         mediaController.setMediaItem(item)
@@ -116,6 +116,11 @@ class MediaPlaybackClient(private val context: Context) {
         mediaController.setMediaItems(items, safeIndex, 0L)
         mediaController.prepare()
         mediaController.play()
+    }
+
+    /** A command that cannot be delivered is a fault worth seeing, not silence. */
+    private fun dropped(reason: String) {
+        android.util.Log.w("MediaPlaybackClient", "Playback command dropped: $reason")
     }
 
     fun next() {

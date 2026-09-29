@@ -4,6 +4,7 @@ import androidx.car.app.Screen
 import androidx.car.app.ScreenManager
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
+import dev.autobridge.display.StructuredLog
 
 /**
  * Bookkeeping for which single-instance screens are currently on the car back stack.
@@ -64,15 +65,19 @@ object CarNavigation {
      */
     fun open(screenManager: ScreenManager, marker: String, create: () -> Screen) {
         if (tracker.returnedTo(marker)) {
+            StructuredLog.i("CarNav", "return -> $marker")
             screenManager.popTo(marker)
             return
         }
-        val screen = create()
+        val screen = runCatching { create() }.onFailure {
+            StructuredLog.e("CarNav", "open failed -> $marker: ${it.message}")
+        }.getOrThrow()
         screen.marker = marker
         screen.lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onDestroy(owner: LifecycleOwner) = tracker.removed(marker)
         })
         tracker.pushed(marker)
+        StructuredLog.i("CarNav", "open -> $marker")
         screenManager.push(screen)
     }
 
