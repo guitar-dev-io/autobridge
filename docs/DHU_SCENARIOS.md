@@ -167,7 +167,101 @@ created.
 
 ### Not verified in this run
 
-- TV / Radio browsing past the section entry point: no Xtream account or M3U playlist is
-  configured, so only the empty state and the "Open on phone" action exist to test.
 - Folders / Playlists / Gallery on the car: the phone has not granted media permission.
-- Favorites, Now Playing, Mirror, and the speed/parked gate (`restrict all`, `speed`).
+- Mirror.
+
+## DHU run 2026-09-29b — IPTV end to end (same phone, same DHU)
+
+The gap left by the previous run was the whole IPTV path, which needs a real playlist. Two public
+ones were used, both added through the app's own "+ M3U" dialog rather than by writing preferences:
+
+| Source | URL | Content |
+|---|---|---|
+| Thai Free TV | `https://iptv-org.github.io/iptv/countries/th.m3u` | 78 live channels, 13 groups |
+| Thai Radio | `https://de1.api.radio-browser.info/m3u/stations/bycountry/thailand` | 134 stations, no groups |
+
+No Xtream portal was tested: that needs a paid account. The Xtream URL/credential forms stay covered
+by `IptvParsingTest`.
+
+### Verified on the head unit
+
+| Step | Result |
+|---|---|
+| TV → source → categories | 78 entries • 13 categories, counts matching the file exactly |
+| Category → entries | Rows render, Thai script included |
+| Play a live channel | 3HD played full-screen video on the car surface |
+| Radio → source → All | 134 stations listed |
+| Play a station | Audio played, Now Playing showed title and Pause/Next |
+| Favorites | A channel starred on the phone appeared under "Channels", next to the web bookmarks, and played |
+| Recently played | Populated from both surfaces |
+
+### Bugs found and fixed
+
+4. **Every IPTV channel opened a dead player.** `PlayerActivity.render()` runs before the media
+   session controller has connected, and `MediaPlaybackClient.play()` silently drops a command
+   issued with no controller. `render()` still set `started = true`, so the real start from
+   `onConnected` was skipped and the screen sat at 00:00 forever. `startPlayback()` now waits for
+   the controller, and a dropped command is logged instead of vanishing.
+5. **A failed stream looked identical to one still loading.** `onPlayerError` showed a notice that
+   the 500 ms `render()` tick immediately painted over with the (black, empty) video view. The
+   failure is now held in state, and the play button retries it — `resume()` alone cannot recover
+   from an error, because ExoPlayer needs a fresh `prepare()`.
+6. **A live channel was drawn as a 27-second clip.** Live HLS reports the length of its sliding
+   window, so `duration <= 0` is not what makes a stream live; 3HD showed a scrub bar and no LIVE
+   badge. The badge now follows `Player.isCurrentMediaItemLive`.
+7. **A Radio playlist was filtered down to almost nothing.** `loadPlaylist` ran an audio-word
+   heuristic over any source filed under Radio. Real station names — "88 nice peak", "90.5 Delight",
+   "97qfm" — match none of it. The heuristic now applies only to an Xtream portal playlist, which
+   genuinely mixes TV and radio in one URL.
+8. **"1 sources", "1 entries", "1 categories".** Counts are now pluralised.
+
+### Observed, not a defect
+
+- Roughly a third of the free channels fail with `ERROR_CODE_IO_BAD_HTTP_STATUS` (ALTV, Amarin TV).
+  These are dead or geo-restricted public streams, not a client fault — the app now says so and
+  offers a retry.
+- `keycode back` does nothing while the DHU is in touch mode; the on-screen back arrow pops
+  normally. A DHU input-mode artifact.
+
+### The parked gate does not engage, by construction
+
+With `restrict all` and `speed 60` applied, video kept playing full-screen on the head unit. That is
+what this tree is currently written to do:
+
+- `FeaturePolicy.decide()` copies the runtime context to `vehicleState = PARKED` before evaluating.
+- `RuntimeContextStore` and `MockVehicleStateProvider` publish `PARKED` unconditionally; the real
+  `SpeedGate` / `VehicleStateProviderFactory` wiring is commented out.
+- `build.gradle.kts` sets `DHU_TEST_MODE = true` for release as well as debug.
+
+So no gate can fire regardless of what the head unit reports. The five failing unit tests
+(`AppProfileRegressionTest` ×3, `CoreRegressionTest` ×2) are the assertions for exactly this
+behaviour and have been failing since before these changes. Restoring the gate is a deliberate
+decision, not something to patch in passing.
+
+## Driving a real drag (page scroll) on the head unit
+
+`CarWebRenderer.scrollBy` / `fling` are reached only through `SurfaceCallback.onScroll` /
+`onFling`, which the Android Auto host raises from a genuine touch drag. Producing one is harder
+than it looks, and two obvious routes are dead ends — both tested, not assumed:
+
+- **DHU has no drag command.** Its `help` lists exactly one touch command, `tap`. There is no
+  `swipe`, `move`, `drag` or `touch down/up`, so no scripted DHU input can scroll a page.
+- **`adb shell input -d <display>` does not reach the template host.** The host's displays
+  (`CarAppService`, `TemplateCarFragment`, `GhostActivityDisplay:…TemplateNavigationService`) accept
+  the command silently and nothing happens — no dispatch log, no app reaction. The custom surface is
+  not on those displays' input channels; it is a `Surface` the host hands the app, and touch arrives
+  by IPC, not by display input.
+
+What does work is a **real mouse drag inside the DHU window**, which DHU turns into touch
+down/move/up on the wire. Two things make that reliable:
+
+- DHU is an SDL app, so the Accessibility API cannot enumerate its windows: `System Events` reports
+  `count of windows = 0` and `set frontmost` fails. Find and capture it through CoreGraphics
+  instead — `CGWindowListCopyWindowInfo` gives its window id and bounds, and
+  `screencapture -l <id>` captures it even when it is occluded.
+- DHU launched detached (`nohup`, or piped from a `tail` fifo) renders and answers `screenshot`, but
+  has **no on-screen window**, so no mouse input can reach it. It must be launched from a GUI
+  terminal session.
+- With Stage Manager enabled, activating any other app moves DHU off-stage and the drag lands on
+  whatever replaced it. Confirm DHU is on-screen via the CoreGraphics list immediately before each
+  gesture; a capture that shows another app's content means the gesture was not delivered.
