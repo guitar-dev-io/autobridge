@@ -96,6 +96,9 @@ class PlayerActivity : Activity() {
     private lateinit var liveBadge: View
 
     private var started = false
+
+    /** Set when the session reports a playback error; cleared when playback actually starts. */
+    private var failure: String? = null
     private var scrubbing = false
     private var surfaceAttached = false
 
@@ -115,10 +118,20 @@ class PlayerActivity : Activity() {
     private val parkingListener: (ParkingStateStore.State) -> Unit = { runOnUiThread { render() } }
     private val playerListener = object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) {
-            runOnUiThread { showNotice("Playback failed: ${error.errorCodeName}") }
+            runOnUiThread {
+                // The notice has to survive render(), which runs twice a second from the ticker
+                // and used to restore the (black, empty) video view over the message instantly.
+                // A dead IPTV channel therefore looked identical to one that simply had not
+                // started yet.
+                failure = "Playback failed: ${error.errorCodeName}. Tap play to retry."
+                render()
+            }
         }
 
-        override fun onIsPlayingChanged(isPlaying: Boolean) = runOnUiThread { render() }
+        override fun onIsPlayingChanged(isPlaying: Boolean) = runOnUiThread {
+            if (isPlaying) failure = null
+            render()
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -279,7 +292,9 @@ class PlayerActivity : Activity() {
         control("⏮", 16f, 48) { playback.previous() }
         control("−10", 13f, 48) { seekBy(-SEEK_STEP_MS) }
         toggle = AutoBridgeDesign.glyphButton(this, "▶", 22f, filled = true) {
-            if (playback.isPlaying) playback.pause() else playback.resume()
+            // After an error the player needs a new prepare(); resume() alone would do nothing,
+            // leaving the only visible control dead for the rest of the screen's life.
+            if (failure != null) retry() else if (playback.isPlaying) playback.pause() else playback.resume()
             render()
         }
         row.addView(toggle, LinearLayout.LayoutParams(dp(64), dp(64)).apply {
@@ -295,16 +310,31 @@ class PlayerActivity : Activity() {
 
     private fun startPlayback() {
         if (started) return
+        // render() runs while the session controller is still connecting, and MediaPlaybackClient
+        // drops a play() issued before it arrives. Flipping `started` on that dropped attempt
+        // suppressed the real one from onConnected, so every IPTV channel opened a player screen
+        // that sat at 00:00 with nothing loaded. Wait for the controller instead.
+        if (!playback.isConnected) return
         if (!FeaturePolicy.app.isAvailable(kind.requiredFeature)) {
             showNotice(FeaturePolicy.app.denialMessage(kind.requiredFeature))
             return
         }
         started = true
+        failure = null
         if (queue.size > 1 && kind == ContentKind.AUDIO) {
             playback.playPlaylist(queue, queueIndex)
         } else {
             playback.play(url, title)
         }
+    }
+
+    /** Re-issues the original request after a failure. */
+    private fun retry() {
+        if (url.isEmpty()) return
+        started = false
+        failure = null
+        notice.visibility = View.GONE
+        startPlayback()
     }
 
     private fun seekBy(deltaMs: Long) {
@@ -324,7 +354,11 @@ class PlayerActivity : Activity() {
             FeaturePolicy.app.isAvailable(Feature.VIDEO) &&
             ParkingStateStore.isParked
 
-        if (kind == ContentKind.VIDEO && !videoAllowed) {
+        val failed = failure
+        if (failed != null) {
+            detachSurface()
+            showNotice(failed)
+        } else if (kind == ContentKind.VIDEO && !videoAllowed) {
             detachSurface()
             video.visibility = View.GONE
             artworkPanel.visibility = View.GONE
@@ -358,7 +392,10 @@ class PlayerActivity : Activity() {
 
         val duration = player?.duration ?: 0L
         val position = player?.currentPosition ?: 0L
-        val live = duration <= 0L
+        // A live HLS channel does report a duration — the length of its sliding window — so an
+        // unknown duration alone is not what makes a stream live. Thai channel 3HD came through
+        // as a 27-second clip with a scrub bar and no LIVE badge. The player knows the difference.
+        val live = player?.isCurrentMediaItemLive == true || duration <= 0L
         liveBadge.visibility = if (live) View.VISIBLE else View.GONE
         scrubber.isEnabled = !live
         elapsed.text = if (live) "" else formatTime(position)
