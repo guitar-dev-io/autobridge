@@ -8,6 +8,10 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Only so the ACL_CONNECTED broadcast is delivered: from Android 12 it is permission
+         protected, and the media auto-start option would otherwise be a switch that does nothing.
+         No device is read and nothing is scanned for. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <!-- Special permission: granted via ACTION_MANAGE_WRITE_SETTINGS, used only for the
          per-app force-landscape profile (QuickAppLauncher). -->
     <uses-permission android:name="android.permission.WRITE_SETTINGS" />
@@ -71,6 +75,14 @@
              which would drop the decoder attachment mid-stream. -->
         <activity android:name=".library.PlayerActivity" android:exported="false"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation|density|uiMode|fontScale" />
+
+        <!-- Brings the media session up when a car connects; inert unless the option is on. -->
+        <receiver android:name=".media.MediaAutoStart$BluetoothReceiver" android:exported="true"
+            tools:ignore="ExportedReceiver">
+            <intent-filter>
+                <action android:name="android.bluetooth.device.action.ACL_CONNECTED" />
+            </intent-filter>
+        </receiver>
 
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
