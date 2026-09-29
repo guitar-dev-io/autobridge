@@ -21,6 +21,11 @@ enum class ChromeZone {
     EDGE_REVEAL,
     /** Anywhere over an open drawer that is not an item — closes it. */
     DRAWER_SCRIM,
+    /**
+     * The floating control button. Unlike [MENU] it does not live on the auto-hiding toolbar, so
+     * the menu is always one tap away instead of two (recall the chrome, then hit a toolbar icon).
+     */
+    FAB,
 }
 
 /** One toolbar button: where it can be tapped, and how large its glyph is drawn. */
@@ -45,6 +50,7 @@ class BrowserChromeLayout private constructor(
     val address: Box,
     val handle: Box,
     val edgeReveal: Box,
+    val fab: Box,
 ) {
     companion object {
         fun create(sizes: AutoUiSizes, viewport: BrowserViewport): BrowserChromeLayout {
@@ -101,7 +107,20 @@ class BrowserChromeLayout private constructor(
             // intercept taps meant for the page.
             val edgeReveal = Box(left, top, right, top + sizes.edgeReveal)
 
-            return BrowserChromeLayout(sizes, viewport, toolbar, slots, addressBox, handle, edgeReveal)
+            // Bottom-trailing corner: far from the toolbar it duplicates, and the part of the page
+            // least likely to hold a control the user meant to press. Bounded against the surface
+            // so it cannot dominate a short panel.
+            val bottom = top + viewport.height
+            val fabSize = sizes.fabSize.coerceAtMost(minOf(viewport.width, viewport.height) * 0.22f)
+            val fabMargin = sizes.fabMargin
+            val fab = Box(
+                right - fabMargin - fabSize, bottom - fabMargin - fabSize,
+                right - fabMargin, bottom - fabMargin
+            )
+
+            return BrowserChromeLayout(
+                sizes, viewport, toolbar, slots, addressBox, handle, edgeReveal, fab
+            )
         }
     }
 
@@ -118,6 +137,9 @@ class BrowserChromeLayout private constructor(
             // outside it dismisses. The page underneath never sees these taps.
             return if (drawer.contains(x, y)) ChromeZone.NONE else ChromeZone.DRAWER_SCRIM
         }
+        // Checked before the toolbar and before the page: the floating button is the one control
+        // that is available in every chrome state, which is the whole reason it exists.
+        if (fab.contains(x, y)) return ChromeZone.FAB
         if (chromeVisible) {
             slots.firstOrNull { it.bounds.contains(x, y) }?.let { return it.zone }
             if (toolbar.contains(x, y)) {

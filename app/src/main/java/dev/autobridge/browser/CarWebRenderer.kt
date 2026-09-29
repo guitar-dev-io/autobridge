@@ -739,6 +739,7 @@ class CarWebRenderer(context: Context) {
             ChromeZone.ADDRESS -> { visibility.onInteraction(now); host?.openAddressInput() }
             ChromeZone.FULLSCREEN -> toggleFullscreen()
             ChromeZone.MENU -> openDrawer()
+            ChromeZone.FAB -> { visibility.onInteraction(now); openDrawer() }
             ChromeZone.HANDLE, ChromeZone.EDGE_REVEAL -> {
                 // Recalling chrome must not also leave fullscreen: the page keeps every pixel it
                 // has, the toolbar simply fades back in over it.
@@ -1207,12 +1208,29 @@ class CarWebRenderer(context: Context) {
             // still recalls the toolbar on a swipe/tap; it is simply never drawn.
             val alpha = visibility.alphaAt(nowMs)
             if (alpha > 0.01f) drawToolbar(canvas, alpha)
+            // Drawn last and at full opacity regardless of the chrome fade: an always-available
+            // control that faded with the toolbar would be the same two-step it replaces. It is
+            // hidden only while an overlay already owns the surface.
+            if (overlay == Overlay.NONE) drawFab(canvas)
             canvas.restoreToCount(cardOuterSave)
         } catch (error: RuntimeException) {
             Log.w(TAG, "WebView draw to car surface failed", error)
         } finally {
             runCatching { activeSurface.unlockCanvasAndPost(canvas) }
         }
+    }
+
+    /** The floating control button: one large, always-present target that opens the menu. */
+    private fun drawFab(canvas: Canvas) {
+        val box = chrome.fab
+        val radius = minOf(box.width, box.height) / 2f
+        toolbarPaint.color = BrowserTheme.toolbarBackground
+        toolbarPaint.alpha = 235
+        canvas.drawCircle(box.centerX, box.centerY, radius, toolbarPaint)
+        toolbarPaint.alpha = 255
+        glyphPaint.color = BrowserTheme.iconEnabled
+        glyphPaint.textSize = radius * 0.95f
+        canvas.drawText("\u2630", box.centerX, box.centerY + radius * 0.34f, glyphPaint)
     }
 
     /**
@@ -1332,7 +1350,7 @@ class CarWebRenderer(context: Context) {
 
     private fun drawDrawer(canvas: Canvas) {
         val model = drawer ?: return
-        // Scrim over the page so the drawer reads as a layer, without moving anything beneath it.
+        // Scrim over the page so the sheet reads as a layer, without moving anything beneath it.
         toolbarPaint.color = BrowserTheme.scrim
         canvas.drawRect(
             viewport.left.toFloat(), viewport.top.toFloat(),
@@ -1340,8 +1358,9 @@ class CarWebRenderer(context: Context) {
             toolbarPaint
         )
         val panel = model.panel
+        val radius = sizes.cornerRadius
         toolbarPaint.color = BrowserTheme.drawerBackground
-        canvas.drawRect(panel.left, panel.top, panel.right, panel.bottom, toolbarPaint)
+        canvas.drawRoundRect(panel.left, panel.top, panel.right, panel.bottom, radius, radius, toolbarPaint)
 
         canvas.save()
         canvas.clipRect(panel.left, model.headerBottom, panel.right, panel.bottom)
@@ -1351,45 +1370,65 @@ class CarWebRenderer(context: Context) {
                 detailPaint.textSize = sizes.iconSmall * 0.7f
                 canvas.drawText(
                     section.uppercase(),
-                    panel.left + sizes.horizontalPadding * 1.5f,
-                    row.bounds.top - sizes.contentGap, detailPaint
+                    row.bounds.left,
+                    row.bounds.top - sizes.contentGap * 0.8f, detailPaint
                 )
             }
+            val tile = row.bounds
+            // Each entry is a filled tile, so the whole rectangle reads as the button it already
+            // was for hit testing — the old list drew only text, leaving the target invisible.
+            toolbarPaint.color = BrowserTheme.toolbarBackground
+            canvas.drawRoundRect(tile.left, tile.top, tile.right, tile.bottom, radius, radius, toolbarPaint)
+
             glyphPaint.color = BrowserTheme.iconEnabled
-            glyphPaint.textSize = sizes.iconMedium * 0.85f
+            glyphPaint.textSize = sizes.iconLarge
             canvas.drawText(
-                row.item.glyph,
-                panel.left + sizes.horizontalPadding * 1.5f + sizes.iconMedium / 2f,
-                row.bounds.centerY + sizes.iconMedium * 0.3f, glyphPaint
+                row.item.glyph, tile.centerX,
+                tile.top + tile.height * 0.44f + sizes.iconLarge * 0.35f, glyphPaint
             )
+
             titlePaint.color = BrowserTheme.textPrimary
-            titlePaint.textSize = sizes.iconSmall * 0.95f
-            canvas.drawText(
-                row.item.label,
-                panel.left + sizes.horizontalPadding * 2f + sizes.iconMedium * 1.6f,
-                row.bounds.centerY + sizes.iconSmall * 0.33f, titlePaint
-            )
+            titlePaint.textAlign = Paint.Align.CENTER
+            titlePaint.textSize = sizes.iconSmall * 0.8f
+            val label = TextUtils.ellipsize(
+                row.item.label, TextPaint(titlePaint),
+                tile.width - sizes.contentGap, TextUtils.TruncateAt.END
+            ).toString()
+            canvas.drawText(label, tile.centerX, tile.bottom - tile.height * 0.16f, titlePaint)
+
             if (row.item.value.isNotBlank()) {
                 detailPaint.color = BrowserTheme.accent
-                detailPaint.textSize = sizes.iconSmall * 0.85f
+                detailPaint.textSize = sizes.iconSmall * 0.8f
                 val width = detailPaint.measureText(row.item.value)
                 canvas.drawText(
                     row.item.value,
-                    panel.right - sizes.horizontalPadding * 1.5f - width,
-                    row.bounds.centerY + sizes.iconSmall * 0.3f, detailPaint
+                    tile.right - sizes.contentGap - width,
+                    tile.top + sizes.contentGap + sizes.iconSmall * 0.7f, detailPaint
                 )
             }
         }
         canvas.restore()
+        titlePaint.textAlign = Paint.Align.LEFT
 
-        // Drawer header sits flush with the toolbar so the two read as one chrome layer.
+        // Sheet header, drawn after the tiles so anything scrolled up is clipped beneath it.
         toolbarPaint.color = BrowserTheme.toolbarBackground
-        canvas.drawRect(panel.left, panel.top, panel.right, model.headerBottom, toolbarPaint)
+        canvas.drawRoundRect(
+            panel.left, panel.top, panel.right, model.headerBottom + radius, radius, radius, toolbarPaint
+        )
+        canvas.drawRect(panel.left, model.headerBottom - radius, panel.right, model.headerBottom, toolbarPaint)
         titlePaint.color = BrowserTheme.textPrimary
         titlePaint.textSize = sizes.iconMedium * 0.8f
         canvas.drawText(
             "AutoBridge", panel.left + sizes.horizontalPadding * 1.5f,
             (panel.top + model.headerBottom) / 2f + sizes.iconMedium * 0.28f, titlePaint
+        )
+        detailPaint.color = BrowserTheme.textSecondary
+        detailPaint.textSize = sizes.iconSmall * 0.75f
+        val hint = "แตะนอกกรอบเพื่อปิด"
+        canvas.drawText(
+            hint,
+            panel.right - sizes.horizontalPadding * 1.5f - detailPaint.measureText(hint),
+            (panel.top + model.headerBottom) / 2f + sizes.iconSmall * 0.28f, detailPaint
         )
     }
 

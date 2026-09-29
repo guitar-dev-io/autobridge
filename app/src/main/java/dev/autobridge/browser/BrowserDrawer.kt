@@ -40,9 +40,13 @@ data class DrawerRow(val item: DrawerItem, val bounds: Box, val sectionTitle: St
  * Content and geometry for the navigation drawer.
  *
  * The drawer is an **overlay**: it is composited over the page and never reduces the viewport the
- * WebView is laid out against. A side panel that pushes content would change the page's width on
- * every open and close, reflowing the site — the exact class of movement this work removes. That
+ * WebView is laid out against. A panel that pushes content would change the page's width on every
+ * open and close, reflowing the site — the exact class of movement this work removes. That
  * trade-off is taken deliberately on every screen size, including wide ones.
+ *
+ * Entries are laid out as a **grid of tiles**, not a list of rows, so each one is a large target
+ * rather than the 46dp minimum. The column count follows the available width, so the same section
+ * list fits an 800x480 panel and a 1080p one without a second layout.
  *
  * Geometry is pure data so it can be asserted at each supported head unit resolution in a JVM test.
  */
@@ -150,19 +154,34 @@ class BrowserDrawerModel private constructor(
             sections: List<DrawerSection>,
             scrollOffset: Float = 0f,
         ): BrowserDrawerModel {
-            val width = sizes.drawerWidth(viewport.width)
-            val left = viewport.left.toFloat()
-            val top = viewport.top.toFloat()
-            val bottom = top + viewport.height
-            val panel = Box(left, top, left + width, bottom)
+            // A centred sheet rather than a side strip. The strip had to be narrow enough to leave
+            // the page visible, which capped every entry at a one-line 46dp row — the smallest
+            // target a finger can reliably hit even at rest. Using the full width instead lets the
+            // same entries be tiles several times that area, and the page is covered either way
+            // while the menu is open.
+            val margin = sizes.contentGap * 2f
+            val left = viewport.left + margin
+            val right = viewport.left + viewport.width - margin
+            val top = viewport.top + margin
+            val bottom = viewport.top + viewport.height - margin
+            val panel = Box(left, top, right, bottom)
 
-            val rowHeight = sizes.touchTarget
+            val gap = sizes.menuTileGap
+            val innerLeft = left + sizes.horizontalPadding
+            val innerWidth = (right - sizes.horizontalPadding) - innerLeft
+            val columns = sizes.menuColumns(innerWidth)
+            val tileWidth = (innerWidth - gap * (columns - 1)) / columns
+            val tileHeight = sizes.menuTileHeight
             val headerHeight = sizes.dp(26f)
             val headerBottom = top + sizes.toolbarHeight(viewport.height)
 
-            // Content is measured first so the scroll offset can be clamped before any row is placed.
-            val measured = sections.sumOf { headerHeight.toDouble() + it.items.size * rowHeight }.toFloat()
-            val visible = (bottom - headerBottom - sizes.contentGap).coerceAtLeast(rowHeight)
+            fun rowsIn(section: DrawerSection) = (section.items.size + columns - 1) / columns
+
+            // Content is measured first so the scroll offset can be clamped before any tile is placed.
+            val measured = sections.sumOf {
+                headerHeight.toDouble() + rowsIn(it) * (tileHeight + gap).toDouble()
+            }.toFloat()
+            val visible = (bottom - headerBottom - sizes.contentGap).coerceAtLeast(tileHeight)
             val maxScroll = (measured - visible).coerceAtLeast(0f)
             val offset = scrollOffset.coerceIn(0f, maxScroll)
 
@@ -171,13 +190,16 @@ class BrowserDrawerModel private constructor(
             sections.forEach { section ->
                 cursor += headerHeight
                 section.items.forEachIndexed { index, item ->
+                    val column = index % columns
+                    val rowTop = cursor + (index / columns) * (tileHeight + gap)
+                    val tileLeft = innerLeft + column * (tileWidth + gap)
                     rows += DrawerRow(
                         item,
-                        Box(left, cursor, left + width, cursor + rowHeight),
+                        Box(tileLeft, rowTop, tileLeft + tileWidth, rowTop + tileHeight),
                         section.title.takeIf { index == 0 }
                     )
-                    cursor += rowHeight
                 }
+                cursor += rowsIn(section) * (tileHeight + gap)
             }
             return BrowserDrawerModel(
                 sizes, panel, sections, rows, headerBottom, measured, visible, offset

@@ -189,6 +189,45 @@ class BrowserChromeLayoutTest {
         }
     }
 
+    /**
+     * The floating button exists so the menu is never two taps away. It must therefore answer in
+     * both chrome states — the hidden state is the one that used to cost an extra tap on a 28dp
+     * reveal band before the 46dp toolbar icon could even be aimed at.
+     */
+    @Test fun floatingButtonOpensTheMenuInEitherChromeState() {
+        HEAD_UNITS.forEach { (width, height, dpi) ->
+            val layout = layoutFor(width, height, dpi)
+            val x = layout.fab.centerX
+            val y = layout.fab.centerY
+            assertEquals(ChromeZone.FAB, layout.hitTest(x, y, chromeVisible = false, drawer = null))
+            assertEquals(ChromeZone.FAB, layout.hitTest(x, y, chromeVisible = true, drawer = null))
+        }
+    }
+
+    @Test fun floatingButtonStaysInsideTheViewportAndClearOfTheToolbar() {
+        HEAD_UNITS.forEach { (width, height, dpi) ->
+            val sizes = AutoUiSizes.forCarSurface(dpi)
+            val viewport = BrowserViewport.create(width, height, 3f, sizes.density)
+            val layout = layoutFor(width, height, dpi)
+            assertTrue(layout.fab.left >= viewport.left.toFloat())
+            assertTrue(layout.fab.right <= viewport.left + viewport.width.toFloat())
+            assertTrue(layout.fab.bottom <= viewport.top + viewport.height.toFloat())
+            // Never overlaps the toolbar it duplicates, so neither can steal the other's taps.
+            assertTrue(layout.fab.top >= layout.toolbar.bottom)
+            assertTrue(layout.fab.width >= sizes.touchTarget * 0.9f)
+        }
+    }
+
+    /** An open drawer owns every tap, including the one the floating button would otherwise take. */
+    @Test fun anOpenDrawerTakesPrecedenceOverTheFloatingButton() {
+        val layout = layoutFor(1024, 600, 160)
+        val whole = Box(0f, 0f, 1f, 1f)
+        assertEquals(
+            ChromeZone.DRAWER_SCRIM,
+            layout.hitTest(layout.fab.centerX, layout.fab.centerY, chromeVisible = false, drawer = whole)
+        )
+    }
+
     @Test fun hiddenChromeLeavesPageTapsAloneOutsideTheEdgeBand() {
         val layout = layoutFor(1024, 600, 160)
         // A tap in the middle of the page must reach the page, not a hidden control.
@@ -385,11 +424,56 @@ class BrowserDrawerModelTest {
             val sizes = AutoUiSizes.forCarSurface(dpi)
             val viewport = BrowserViewport.create(width, height, 3f, sizes.density)
             val model = modelFor(width, height, dpi)
-            // The drawer sits inside the same viewport; the page geometry is untouched by it.
-            assertEquals(viewport.left.toFloat(), model.panel.left, 0.01f)
+            // The sheet sits inside the same viewport; the page geometry is untouched by it.
+            assertTrue(model.panel.left >= viewport.left.toFloat())
+            assertTrue(model.panel.top >= viewport.top.toFloat())
             assertTrue(model.panel.right <= viewport.left + viewport.width.toFloat())
-            assertEquals(viewport.height.toFloat(), model.panel.height, 0.01f)
+            assertTrue(model.panel.bottom <= viewport.top + viewport.height.toFloat())
         }
+    }
+
+    /**
+     * The point of the grid: an entry is a real button, not a minimum-height text row. 46dp square
+     * is the smallest target a finger hits reliably at rest, which is the wrong size for a control
+     * used while the car is moving, so a tile must be comfortably larger than that.
+     */
+    @Test fun everyTileIsLargerThanTheBareMinimumTouchTarget() {
+        HEAD_UNITS.forEach { (width, height, dpi) ->
+            val sizes = AutoUiSizes.forCarSurface(dpi)
+            val minimum = sizes.touchTarget * sizes.touchTarget
+            modelFor(width, height, dpi).rows.forEach { row ->
+                assertTrue(
+                    "tile ${row.item.label} too small at ${width}x$height",
+                    row.bounds.width * row.bounds.height >= minimum * 1.5f
+                )
+                assertTrue(row.bounds.height >= sizes.touchTarget)
+            }
+        }
+    }
+
+    @Test fun tilesInTheSameRowDoNotOverlap() {
+        HEAD_UNITS.forEach { (width, height, dpi) ->
+            val rows = modelFor(width, height, dpi).rows
+            rows.forEachIndexed { index, row ->
+                rows.drop(index + 1).forEach { other ->
+                    val overlaps = row.bounds.left < other.bounds.right &&
+                        other.bounds.left < row.bounds.right &&
+                        row.bounds.top < other.bounds.bottom &&
+                        other.bounds.top < row.bounds.bottom
+                    assertTrue("${row.item.label} overlaps ${other.item.label}", !overlaps)
+                }
+            }
+        }
+    }
+
+    @Test fun columnCountFollowsWidthAndStaysBounded() {
+        val narrow = AutoUiSizes.forCarSurface(160)
+        assertEquals(AutoUiSizes.MENU_COLUMNS_MIN, narrow.menuColumns(10f))
+        assertEquals(AutoUiSizes.MENU_COLUMNS_MAX, narrow.menuColumns(100_000f))
+        // A denser panel of the same physical width gets the same number of columns, because the
+        // tile width is authored in dp — the "enlarged tablet UI" rule applied to the menu.
+        val dense = AutoUiSizes.forCarSurface(320)
+        assertEquals(narrow.menuColumns(800f), dense.menuColumns(1600f))
     }
 
     @Test fun everyRowIsTappableAtItsOwnCentre() {

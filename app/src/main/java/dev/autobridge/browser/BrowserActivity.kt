@@ -113,7 +113,7 @@ class BrowserActivity : Activity() {
             isFocusable = true
             background = GradientDrawable().apply {
                 setColor(0xE6101113.toInt())
-                cornerRadius = sizes.touchTarget / 2f
+                cornerRadius = sizes.fabSize / 2f
                 setStroke(1.dp(), 0xFF526FA6.toInt())
             }
             setOnClickListener { showMenu() }
@@ -121,12 +121,12 @@ class BrowserActivity : Activity() {
         content.addView(
             menuButton,
             FrameLayout.LayoutParams(
-                sizes.dpInt(AutoUiSizes.TOUCH_TARGET_DP),
-                sizes.dpInt(AutoUiSizes.TOUCH_TARGET_DP),
+                sizes.dpInt(AutoUiSizes.FAB_SIZE_DP),
+                sizes.dpInt(AutoUiSizes.FAB_SIZE_DP),
                 Gravity.BOTTOM or Gravity.END
             ).apply {
-                rightMargin = sizes.dpInt(AutoUiSizes.HORIZONTAL_PADDING_DP)
-                bottomMargin = sizes.dpInt(AutoUiSizes.HORIZONTAL_PADDING_DP)
+                rightMargin = sizes.dpInt(AutoUiSizes.FAB_MARGIN_DP)
+                bottomMargin = sizes.dpInt(AutoUiSizes.FAB_MARGIN_DP)
             }
         )
         root.addView(content, FrameLayout.LayoutParams(-1, -1))
@@ -393,65 +393,144 @@ class BrowserActivity : Activity() {
      * the common case and keeps "กลับหน้า Home" as a pinned button so it is never affected by list
      * scrolling either.
      */
+    /** One tappable tile in a menu sheet. */
+    private data class MenuEntry(val glyph: String, val label: String, val run: () -> Unit)
+
+    /**
+     * Renders a menu as a grid of tiles rather than a list of text rows.
+     *
+     * A row in an `AlertDialog.setItems` list is about 48dp tall and spans the dialog, so the only
+     * thing distinguishing one entry from the next is where the text sits — there is no visible
+     * target, and a touch that drifts a few px reads as a scroll and never fires. A tile is a drawn
+     * button with an icon, roughly four times the area, and the grid puts every entry on screen at
+     * once so there is nothing to scroll past. This is the same model the car surface uses, so the
+     * two menus now look and behave alike.
+     */
+    private fun showActionGrid(
+        title: String,
+        entries: List<MenuEntry>,
+        closeLabel: String,
+        onClose: () -> Unit,
+    ) {
+        val columns = if (resources.configuration.screenWidthDp >= 600) 4 else 3
+        val gap = sizes.dpInt(AutoUiSizes.MENU_TILE_GAP_DP) / 2
+        val grid = GridLayout(this).apply {
+            columnCount = columns
+            setPadding(gap, gap, gap, gap)
+        }
+        var dialog: AlertDialog? = null
+        entries.forEach { entry ->
+            val tile = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                background = GradientDrawable().apply {
+                    setColor(BrowserTheme.toolbarBackground)
+                    cornerRadius = sizes.cornerRadius
+                }
+                isClickable = true
+                isFocusable = true
+                contentDescription = entry.label
+                setOnClickListener {
+                    dialog?.dismiss()
+                    if (allowed()) entry.run()
+                }
+                addView(TextView(context).apply {
+                    text = entry.glyph
+                    textSize = iconSp(AutoUiSizes.ICON_LARGE_DP)
+                    gravity = Gravity.CENTER
+                    setTextColor(BrowserTheme.iconEnabled)
+                })
+                addView(TextView(context).apply {
+                    text = entry.label
+                    textSize = iconSp(AutoUiSizes.ICON_SMALL_DP * 0.7f)
+                    gravity = Gravity.CENTER
+                    maxLines = 2
+                    setTextColor(BrowserTheme.textPrimary)
+                })
+            }
+            grid.addView(
+                tile,
+                GridLayout.LayoutParams().apply {
+                    width = 0
+                    height = sizes.dpInt(AutoUiSizes.MENU_TILE_HEIGHT_DP)
+                    columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
+                    setMargins(gap, gap, gap, gap)
+                }
+            )
+        }
+        dialog = AlertDialog.Builder(this)
+            .setTitle(title)
+            .setView(ScrollView(this).apply { addView(grid) })
+            .setNegativeButton(closeLabel) { _, _ -> onClose() }
+            .create()
+        dialog.show()
+    }
+
+    /**
+     * Primary menu: only the actions used every session, so the grid fits without scrolling.
+     * Rarely used actions live in [showMoreMenu]; "กลับหน้า Home" stays a pinned button so it is
+     * never affected by the sheet's own scrolling.
+     */
     private fun showMenu() {
         val desktop = BrowserUserAgentStore.mode(this) == BrowserUserAgentMode.DESKTOP
-        val labels = arrayOf(
-            "หน้าแรก", "บุ๊กมาร์ก", "ประวัติ", "ดาวน์โหลด", "ค้นหาในหน้า",
-            "Desktop: ${if (desktop) "เปิด" else "ปิด"}", "เพิ่มเติม..."
-        )
-        AlertDialog.Builder(this).setTitle("Browser").setItems(labels) { _, index ->
-            if (!allowed()) return@setItems
-            when (index) {
-                0 -> navigate(BrowserDefaults.HOME)
-                1 -> showBookmarks()
-                2 -> showHistory()
-                3 -> showDownloads()
-                4 -> showFindInPage()
-                5 -> {
-                    BrowserUserAgentStore.select(this, if (desktop) BrowserUserAgentMode.MOBILE else BrowserUserAgentMode.DESKTOP)
-                    BrowserDefaults.configure(this, web.settings); web.reload()
-                }
-                6 -> showMoreMenu()
-            }
-        }
-            .setNegativeButton("กลับหน้า Home") { _, _ -> finish() }
-            .show()
+        showActionGrid(
+            "Browser",
+            listOf(
+                MenuEntry("\u2302", "หน้าแรก") { navigate(BrowserDefaults.HOME) },
+                MenuEntry("\u2606", "บุ๊กมาร์ก") { showBookmarks() },
+                MenuEntry("\u21ba", "ประวัติ") { showHistory() },
+                MenuEntry("\u2193", "ดาวน์โหลด") { showDownloads() },
+                MenuEntry("\u2315", "ค้นหาในหน้า") { showFindInPage() },
+                MenuEntry("\u25a1", "Desktop: ${if (desktop) "เปิด" else "ปิด"}") {
+                    BrowserUserAgentStore.select(
+                        this,
+                        if (desktop) BrowserUserAgentMode.MOBILE else BrowserUserAgentMode.DESKTOP
+                    )
+                    BrowserDefaults.configure(this, web.settings)
+                    web.reload()
+                },
+                MenuEntry("\u22ef", "เพิ่มเติม") { showMoreMenu() },
+            ),
+            "กลับหน้า Home"
+        ) { finish() }
     }
 
     /** Secondary menu for actions used rarely enough not to earn a slot in [showMenu]. */
     private fun showMoreMenu() {
-        val labels = arrayOf(
-            "เต็มหน้าจอ", "คัดลอก URL", "วาง URL แล้วไป", "ซูมเข้า", "ซูมออก",
-            "ล้างข้อมูลการท่องเว็บ", "เปิดในเบราว์เซอร์ภายนอก",
-            "เปิดหน้านี้บน Android Auto", "รับหน้าจาก Android Auto"
-        )
-        AlertDialog.Builder(this).setTitle("เพิ่มเติม").setItems(labels) { _, index ->
-            if (!allowed()) return@setItems
-            when (index) {
-                0 -> setFullscreen(true)
-                1 -> {
+        showActionGrid(
+            "เพิ่มเติม",
+            listOf(
+                MenuEntry("\u26f6", "เต็มหน้าจอ") { setFullscreen(true) },
+                MenuEntry("\u29c9", "คัดลอก URL") {
                     val manager = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     manager.setPrimaryClip(ClipData.newPlainText("URL", web.url.orEmpty()))
                     toast("คัดลอก URL แล้ว")
-                }
-                2 -> clipboardText()?.let { navigate(it) } ?: toast("คลิปบอร์ดว่าง")
-                3 -> web.zoomBy(1.25f)
-                4 -> web.zoomBy(0.8f)
-                5 -> confirmClearBrowsingData()
-                6 -> if (!BrowserLauncher.openUrl(this, web.url.orEmpty())) toast("เปิดเบราว์เซอร์ไม่ได้")
-                7 -> {
-                    val url = web.url?.let(ContentAddress::https) ?: return@setItems
+                },
+                MenuEntry("\u2398", "วาง URL แล้วไป") {
+                    clipboardText()?.let { navigate(it) } ?: toast("คลิปบอร์ดว่าง")
+                },
+                MenuEntry("+", "ซูมเข้า") { web.zoomBy(1.25f) },
+                MenuEntry("\u2212", "ซูมออก") { web.zoomBy(0.8f) },
+                MenuEntry("\u2327", "ล้างข้อมูล") { confirmClearBrowsingData() },
+                MenuEntry("\u2197", "เบราว์เซอร์ภายนอก") {
+                    if (!BrowserLauncher.openUrl(this, web.url.orEmpty())) toast("เปิดเบราว์เซอร์ไม่ได้")
+                },
+                MenuEntry("\u25b6", "ส่งไป Android Auto") {
+                    val url = web.url?.let(ContentAddress::https)
                     val target = CarScreenController.requireBrowser()
-                    if (target == null) toast("ยังไม่ได้เชื่อมต่อ Android Auto") else target.openUrl(url)
-                }
-                8 -> {
+                    when {
+                        url == null -> Unit
+                        target == null -> toast("ยังไม่ได้เชื่อมต่อ Android Auto")
+                        else -> target.openUrl(url)
+                    }
+                },
+                MenuEntry("\u2199", "รับจาก Android Auto") {
                     val url = CarScreenController.activeBrowser?.currentUrl
                     if (url == null) toast("เปิด Browser บน Android Auto ก่อน") else navigate(url)
-                }
-            }
-        }
-            .setNegativeButton("ย้อนกลับ", null)
-            .show()
+                },
+            ),
+            "ย้อนกลับ"
+        ) { }
     }
 
     private fun clipboardText(): String? {

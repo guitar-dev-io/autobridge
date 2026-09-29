@@ -36,6 +36,28 @@ class AutoUiSizes private constructor(
         const val HANDLE_HEIGHT_DP = 18f
 
         /**
+         * Menu tiles. A menu entry is a whole button rather than a text row: a 46dp row is the
+         * minimum a finger can hit at rest, which is the wrong target for a control used in a
+         * moving car. A tile of this size is roughly four times the area and still fits its label
+         * on one line.
+         */
+        const val MENU_TILE_WIDTH_DP = 104f
+        const val MENU_TILE_HEIGHT_DP = 78f
+        const val MENU_TILE_GAP_DP = 10f
+
+        /** Column count is derived from the available width, never fixed, and bounded both ways. */
+        const val MENU_COLUMNS_MIN = 2
+        const val MENU_COLUMNS_MAX = 5
+
+        /**
+         * The floating control button. It stays reachable over the page so opening the menu never
+         * requires first recalling an auto-hidden toolbar — two taps, one of them on a 28dp strip,
+         * became one tap on a 56dp circle.
+         */
+        const val FAB_SIZE_DP = 56f
+        const val FAB_MARGIN_DP = 14f
+
+        /**
          * The page fills the surface edge to edge: no inset margin and no rounded corners. Was
          * previously a Fermata-style floating card inset from the edges, but that left visible
          * black borders around the page on the car display, which is not the wanted look.
@@ -98,6 +120,20 @@ class AutoUiSizes private constructor(
     val handleHeight: Float get() = dp(HANDLE_HEIGHT_DP)
     val cardMargin: Float get() = dp(CARD_MARGIN_DP)
     val cardCornerRadius: Float get() = dp(CARD_CORNER_RADIUS_DP)
+    val menuTileHeight: Float get() = dp(MENU_TILE_HEIGHT_DP)
+    val menuTileGap: Float get() = dp(MENU_TILE_GAP_DP)
+    val fabSize: Float get() = dp(FAB_SIZE_DP)
+    val fabMargin: Float get() = dp(FAB_MARGIN_DP)
+
+    /**
+     * How many tiles fit across [availableWidth] px. Derived from the tile's authored dp width so
+     * a denser panel does not silently get more, narrower columns.
+     */
+    fun menuColumns(availableWidth: Float): Int {
+        if (availableWidth <= 0f) return MENU_COLUMNS_MIN
+        val fit = ((availableWidth + menuTileGap) / (dp(MENU_TILE_WIDTH_DP) + menuTileGap)).toInt()
+        return fit.coerceIn(MENU_COLUMNS_MIN, MENU_COLUMNS_MAX)
+    }
 
     /**
      * Toolbar height for a viewport [availableHeight] px tall. Bounded above by the content-first
