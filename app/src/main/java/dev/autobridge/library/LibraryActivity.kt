@@ -8,12 +8,16 @@ import android.os.Bundle
 import android.view.View
 import android.widget.EditText
 import android.widget.LinearLayout
+import dev.autobridge.entertainment.ContentKind
+import dev.autobridge.entertainment.EntertainmentActivity
 import dev.autobridge.entertainment.WebBookmarkStore
 import dev.autobridge.iptv.IptvCatalog
 import dev.autobridge.iptv.IptvCatalogData
+import dev.autobridge.iptv.IptvDirectory
 import dev.autobridge.iptv.IptvEntry
 import dev.autobridge.iptv.IptvHistoryStore
 import dev.autobridge.iptv.IptvKind
+import dev.autobridge.iptv.IptvPlayback
 import dev.autobridge.iptv.IptvSource
 import dev.autobridge.iptv.IptvSourceStore
 import dev.autobridge.iptv.IptvSourceType
@@ -195,6 +199,10 @@ class LibraryActivity : Activity() {
         )
     }
 
+    /** "1 entry" / "13 categories": a count the user reads, not a template with an s stuck on. */
+    private fun plural(count: Int, singular: String, plural: String = singular + "s"): String =
+        "$count " + if (count == 1) singular else plural
+
     // ----- IPTV: sources -> categories -> entries -----
 
     private fun showSources() = push {
@@ -228,16 +236,17 @@ class LibraryActivity : Activity() {
 
         render(
             title = section.title,
-            subtitle = if (sources.isEmpty()) "No source configured" else "${sources.size} sources",
+            subtitle = if (sources.isEmpty()) "No source configured" else plural(sources.size, "source"),
             rows = rows,
             empty = AutoBridgeDesign.emptyState(
                 context = this,
                 title = "No ${section.title} source yet",
-                message = "Add an Xtream Codes account or an M3U playlist to start browsing channels.",
-                action = "Add Xtream account" to { addSource(IptvSourceType.XTREAM) },
+                message = "Pick a free public list, or add your own Xtream account or M3U playlist.",
+                action = "Browse public lists" to { addFromDirectory() },
                 accent = accent
             ),
             actions = listOf(
+                "Public lists" to { addFromDirectory() },
                 "+ Xtream" to { addSource(IptvSourceType.XTREAM) },
                 "+ M3U" to { addSource(IptvSourceType.M3U) }
             )
@@ -249,7 +258,7 @@ class LibraryActivity : Activity() {
         val cached = IptvCatalog.cached(source.id)
         return when {
             IptvCatalog.isLoading(source.id) -> "$type • loading…"
-            cached != null -> "$type • ${cached.entries.size} entries"
+            cached != null -> "$type • " + plural(cached.entries.size, "entry", "entries")
             else -> "$type • ${hostOf(source.url)}"
         }
     }
@@ -275,7 +284,7 @@ class LibraryActivity : Activity() {
             AutoBridgeDesign.contentRow(
                 context = this,
                 title = category.name,
-                subtitle = "${category.count} entries",
+                subtitle = plural(category.count, "entry", "entries"),
                 accent = accent,
                 trailing = "›",
                 onClick = { showEntries(source, data, category.id, category.name) }
@@ -283,7 +292,8 @@ class LibraryActivity : Activity() {
         }
         render(
             title = source.name,
-            subtitle = "${data.entries.size} entries • ${data.categories.size} categories",
+            subtitle = plural(data.entries.size, "entry", "entries") + " • " +
+                plural(data.categories.size, "category", "categories"),
             rows = rows,
             empty = AutoBridgeDesign.emptyState(
                 this, "Nothing here", "This source returned no categories."
@@ -321,11 +331,19 @@ class LibraryActivity : Activity() {
             val filtered = if (query.isBlank()) all else {
                 all.filter { it.title.contains(query, ignoreCase = true) }
             }
+            val shown = filtered.take(MAX_VISIBLE_ENTRIES)
+            val counted = if (query.isBlank()) plural(all.size, "entry", "entries")
+            else "${filtered.size} of ${all.size} match \"$query\""
             render(
                 title = categoryName,
-                subtitle = if (query.isBlank()) "${all.size} entries"
-                else "${filtered.size} of ${all.size} match \"$query\"",
-                rows = filtered.take(MAX_VISIBLE_ENTRIES).map { entryRow(source, it) },
+                // A country-grouped public playlist puts thousands of channels in "All". Saying
+                // "2080 entries" above 300 rows is a miscount the user has no way to notice.
+                subtitle = if (shown.size < filtered.size) {
+                    "$counted • showing first ${shown.size}, search to narrow"
+                } else {
+                    counted
+                },
+                rows = shown.map { entryRow(source, it) },
                 empty = AutoBridgeDesign.emptyState(
                     this, "No matches", "Nothing in this category matches that search."
                 ),
@@ -349,6 +367,7 @@ class LibraryActivity : Activity() {
             title = entry.title,
             subtitle = listOfNotNull(
                 entry.subtitle.takeIf { it.isNotBlank() },
+                "Opens in browser".takeIf { entry.isWebPage },
                 "Catch-up".takeIf { entry.supportsCatchup }
             ).joinToString(" • "),
             accent = accent,
@@ -375,12 +394,30 @@ class LibraryActivity : Activity() {
             return
         }
         IptvHistoryStore.recordPlayback(this, source, entry)
+        if (entry.isWebPage) {
+            openWebChannel(entry.url, entry.title)
+            return
+        }
         play(
             url = entry.url,
             title = entry.title,
             subtitle = entry.subtitle,
             artwork = entry.logo,
             video = source.kind != IptvKind.RADIO
+        )
+    }
+
+    /**
+     * A channel whose playlist entry points at a YouTube or Twitch page, not a stream. The player
+     * can only fail on those, so the page is handed to the browser surface, which applies its own
+     * parked/browser policy gate.
+     */
+    private fun openWebChannel(url: String, title: String) {
+        startActivity(
+            Intent(this, EntertainmentActivity::class.java)
+                .putExtra(EntertainmentActivity.EXTRA_SOURCE_URL, url)
+                .putExtra(EntertainmentActivity.EXTRA_SOURCE_KIND, ContentKind.WEB.name)
+                .putExtra(EntertainmentActivity.EXTRA_SOURCE_TITLE, title)
         )
     }
 
@@ -423,7 +460,11 @@ class LibraryActivity : Activity() {
                     subtitle = item.type.name.lowercase().replaceFirstChar { it.uppercase() },
                     accent = accent,
                     onClick = {
-                        play(item.url, item.title, video = item.kind != IptvKind.RADIO)
+                        if (item.playback == IptvPlayback.WEB_PAGE) {
+                            openWebChannel(item.url, item.title)
+                        } else {
+                            play(item.url, item.title, video = item.kind != IptvKind.RADIO)
+                        }
                     }
                 )
             },
@@ -447,12 +488,65 @@ class LibraryActivity : Activity() {
                         openSource(source)
                     }
                     1 -> addSource(source.type, source)
-                    else -> {
-                        IptvSourceStore.remove(this, source.id)
-                        refresh()
-                    }
+                    else -> confirmDelete(source)
                 }
             }
+            .show()
+    }
+
+    /**
+     * Deleting a source is permanent — a built-in default that is removed stays removed — so it is
+     * confirmed once. Nothing is lost for good: every public list is still in the picker.
+     */
+    private fun confirmDelete(source: IptvSource) {
+        AlertDialog.Builder(this)
+            .setTitle("Remove ${source.name}?")
+            .setMessage(
+                if (IptvDirectory.list(iptvKind).any { it.url == source.url }) {
+                    "This is one of the built-in public lists. It will not come back on its own, " +
+                        "but you can add it again from \"Public lists\"."
+                } else {
+                    "The source is removed from this device. Channels you favourited stay."
+                }
+            )
+            .setPositiveButton("Remove") { _, _ ->
+                IptvSourceStore.remove(this, source.id)
+                refresh()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    /**
+     * One-tap add for the public lists in [IptvDirectory].
+     *
+     * The picker only fills in the address the user would otherwise type: the source is an
+     * ordinary M3U entry afterwards, editable and removable like any other. A list already added
+     * is shown as such rather than added twice.
+     */
+    private fun addFromDirectory() {
+        val offers = IptvDirectory.list(iptvKind)
+        if (offers.isEmpty()) {
+            alert("No public lists", "There is no built-in list for this section.")
+            return
+        }
+        val existing = IptvSourceStore.list(this).map { it.url }.toSet()
+        val labels = offers.map { offer ->
+            val suffix = if (offer.url in existing) " (already added)" else ""
+            offer.name + "\n" + offer.note + suffix
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Free public lists")
+            .setItems(labels.toTypedArray()) { _, index ->
+                val offer = offers[index]
+                if (offer.url in existing) {
+                    alert(offer.name, "This list is already one of your sources.")
+                    return@setItems
+                }
+                IptvSourceStore.save(this, IptvDirectory.toSource(offer, IptvSourceStore.newId()))
+                refresh()
+            }
+            .setNegativeButton("Cancel", null)
             .show()
     }
 

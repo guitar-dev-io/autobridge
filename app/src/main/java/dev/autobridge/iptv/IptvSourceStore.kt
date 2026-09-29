@@ -11,19 +11,56 @@ import org.json.JSONObject
  * Credentials live in the app's private SharedPreferences, exactly like the existing bookmark and
  * profile stores. They are never logged and never leave the device except as part of the stream
  * URLs the user's own provider requires.
+ *
+ * The public lists [IptvDirectory] marks as defaults are created on first read, so TV and Radio
+ * have channels before anything is configured. They are ordinary sources afterwards: editable,
+ * and removable for good — see [seedDefaults].
  */
 object IptvSourceStore {
     private const val PREFS_NAME = "autobridge_iptv_sources"
     private const val KEY_ITEMS = "sources"
+    private const val KEY_SEEDED = "seeded_defaults"
 
     fun list(context: Context, kind: IptvKind? = null): List<IptvSource> {
+        seedDefaults(context)
+        val parsed = stored(context)
+        return if (kind == null) parsed else parsed.filter { it.kind == kind }
+    }
+
+    /**
+     * Creates the default public lists that have never been created before.
+     *
+     * The URLs seeded so far are remembered, not just the fact that seeding ran. That is what makes
+     * "delete" mean delete: a removed default is gone from the source list but still recorded as
+     * seeded, so no later read brings it back — while a default introduced by a future version,
+     * recorded nowhere yet, still arrives. Writing the sources before the marker keeps a crash in
+     * between harmless: the next pass sees them already present and only writes the marker.
+     */
+    @Synchronized
+    private fun seedDefaults(context: Context) {
+        val prefs = prefs(context)
+        val seededUrls = prefs.getStringSet(KEY_SEEDED, null).orEmpty()
+        if (IptvDirectory.defaults().all { it.url in seededUrls }) return
+
+        val existing = stored(context)
+        val pending = IptvDirectory.pendingDefaults(
+            seededUrls = seededUrls,
+            existingUrls = existing.map { it.url }.toSet()
+        )
+        if (pending.isNotEmpty()) {
+            persist(context, existing + pending.map { IptvDirectory.toSource(it, newId()) })
+        }
+        prefs.edit { putStringSet(KEY_SEEDED, seededUrls + IptvDirectory.defaults().map { it.url }) }
+    }
+
+    /** The stored sources, without the default-seeding pass [list] performs. */
+    private fun stored(context: Context): List<IptvSource> {
         val raw = prefs(context).getString(KEY_ITEMS, null).orEmpty()
         if (raw.isBlank()) return emptyList()
-        val parsed = runCatching {
+        return runCatching {
             val array = JSONArray(raw)
             (0 until array.length()).mapNotNull { index -> decode(array.optJSONObject(index)) }
         }.getOrDefault(emptyList())
-        return if (kind == null) parsed else parsed.filter { it.kind == kind }
     }
 
     fun find(context: Context, id: String): IptvSource? = list(context).firstOrNull { it.id == id }

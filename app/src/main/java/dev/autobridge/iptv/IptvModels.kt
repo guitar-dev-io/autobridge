@@ -34,6 +34,12 @@ data class IptvCategory(val id: String, val name: String, val count: Int = 0)
 enum class IptvEntryType { LIVE, MOVIE, SERIES }
 
 /**
+ * How an entry's address has to be opened. Curated playlists point some channels at a YouTube or
+ * Twitch page rather than a stream, and a media player cannot do anything with those.
+ */
+enum class IptvPlayback { STREAM, WEB_PAGE }
+
+/**
  * One playable catalog entry. [url] is already a direct stream address, so playback never needs
  * the portal again. [seriesId] is set for series folders whose episodes load on demand.
  */
@@ -46,10 +52,12 @@ data class IptvEntry(
     val logo: String = "",
     val subtitle: String = "",
     val seriesId: String = "",
-    val catchupDays: Int = 0
+    val catchupDays: Int = 0,
+    val playback: IptvPlayback = IptvPlayback.STREAM
 ) {
     val isSeriesFolder: Boolean get() = type == IptvEntryType.SERIES && url.isEmpty()
     val supportsCatchup: Boolean get() = type == IptvEntryType.LIVE && catchupDays > 0
+    val isWebPage: Boolean get() = playback == IptvPlayback.WEB_PAGE
 }
 
 /** A loaded source: its categories and every entry, already resolved to playable URLs. */

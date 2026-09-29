@@ -13,12 +13,14 @@ import androidx.car.app.model.Row
 import androidx.car.app.model.Template
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
+import dev.autobridge.browser.CarBrowserRuntime
 import dev.autobridge.core.state.RecentActivityStore
 import dev.autobridge.iptv.IptvCatalog
 import dev.autobridge.iptv.IptvCatalogData
 import dev.autobridge.iptv.IptvEntry
 import dev.autobridge.iptv.IptvHistoryStore
 import dev.autobridge.iptv.IptvKind
+import dev.autobridge.iptv.IptvPlayback
 import dev.autobridge.iptv.IptvSource
 import dev.autobridge.iptv.IptvSourceStore
 import dev.autobridge.library.LibraryActivity
@@ -45,7 +47,8 @@ class CarIptvSourcesScreen(
         val sources = IptvSourceStore.list(carContext, kind)
         if (sources.isEmpty()) {
             return MessageTemplate.Builder(
-                "No $title source yet.\nAdd an Xtream account or an M3U playlist on the phone."
+                "No $title source yet.\nPick a free public list, or add an Xtream account or an " +
+                    "M3U playlist, on the phone."
             )
                 .setHeader(Header.Builder().setTitle(title).setStartHeaderAction(Action.BACK).build())
                 .addAction(
@@ -195,6 +198,7 @@ class CarIptvEntriesScreen(
                     .addText(
                         listOfNotNull(
                             entry.subtitle.takeIf { it.isNotBlank() },
+                            "Opens in browser".takeIf { entry.isWebPage },
                             "Favourite".takeIf { favorite },
                             "Catch-up".takeIf { entry.supportsCatchup }
                         ).joinToString(" • ").ifBlank { "Tap to play" }
@@ -238,7 +242,9 @@ class CarIptvEntriesScreen(
             return
         }
         IptvHistoryStore.recordPlayback(carContext, source, entry)
-        CarIptvPlayback.play(this, carContext, mediaPlayback, entry.title, entry.url, source.kind)
+        CarIptvPlayback.play(
+            this, carContext, mediaPlayback, entry.title, entry.url, source.kind, entry.playback
+        )
     }
 }
 
@@ -263,7 +269,8 @@ class CarIptvRecentScreen(carContext: CarContext, private val kind: IptvKind) : 
                     .addText(item.type.name.lowercase().replaceFirstChar { it.uppercase() })
                     .setOnClickListener {
                         CarIptvPlayback.play(
-                            this, carContext, mediaPlayback, item.title, item.url, item.kind
+                            this, carContext, mediaPlayback, item.title, item.url, item.kind,
+                            item.playback
                         )
                     }
                     .build()
@@ -281,6 +288,9 @@ class CarIptvRecentScreen(carContext: CarContext, private val kind: IptvKind) : 
 /**
  * One playback entry point for every IPTV car screen: radio stays on the MediaSession so audio
  * survives further browsing, while TV takes over the car surface through [CarVideoScreen].
+ *
+ * A channel whose playlist entry is a YouTube or Twitch page takes a third route — the car browser
+ * — because no media player can open a watch page. The browser keeps its own parked-state gate.
  */
 internal object CarIptvPlayback {
     fun play(
@@ -289,10 +299,15 @@ internal object CarIptvPlayback {
         mediaPlayback: MediaPlaybackClient,
         title: String,
         url: String,
-        kind: IptvKind
+        kind: IptvKind,
+        playback: IptvPlayback = IptvPlayback.STREAM
     ) {
         if (url.isBlank()) {
             CarToast.makeText(carContext, "This entry has no stream address", CarToast.LENGTH_SHORT).show()
+            return
+        }
+        if (playback == IptvPlayback.WEB_PAGE) {
+            openInCarBrowser(screen, carContext, url, title, kind)
             return
         }
         RecentActivityStore.record(
@@ -312,5 +327,25 @@ internal object CarIptvPlayback {
         } else {
             screens.push(CarVideoScreen(carContext, url, title))
         }
+    }
+
+    private fun openInCarBrowser(
+        screen: Screen,
+        carContext: CarContext,
+        url: String,
+        title: String,
+        kind: IptvKind
+    ) {
+        RecentActivityStore.record(
+            carContext,
+            RecentActivityStore.Entry(
+                RecentActivityStore.Kind.BROWSER, title,
+                if (kind == IptvKind.RADIO) "Radio" else "TV", url
+            )
+        )
+        // The renderer is session-scoped, so loading through it works whether the browser screen is
+        // about to be created or is already open further down the stack.
+        CarBrowserRuntime.renderer(carContext).load(url)
+        CarNavigation.open(screen.screenManager, "CarBrowserScreen") { CarBrowserScreen(carContext) }
     }
 }

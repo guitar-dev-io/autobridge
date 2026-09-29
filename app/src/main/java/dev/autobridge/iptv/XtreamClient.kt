@@ -24,7 +24,8 @@ internal object XtreamClient {
     /** Loads a whole source into categories + playable entries. Throws on unrecoverable failure. */
     fun load(source: IptvSource): IptvCatalogData = when (source.type) {
         IptvSourceType.XTREAM -> loadXtream(source)
-        IptvSourceType.M3U -> loadPlaylist(source.url, source.kind)
+        // A playlist the user filed under Radio is taken at its word: no audio heuristic.
+        IptvSourceType.M3U -> loadPlaylist(source.url, keepOnlyRadio = false)
     }
 
     /** Episodes for one series folder, loaded on demand (`get_series_info`). */
@@ -69,7 +70,9 @@ internal object XtreamClient {
         api.exceptionOrNull()?.let { Log.w(TAG, "player_api.php unavailable, using get.php", it) }
         val fromApi = api.getOrNull()
         if (fromApi != null && fromApi.entries.isNotEmpty()) return fromApi
-        return loadPlaylist(credentials.playlistUrl(), source.kind)
+        // One portal playlist carries live TV, radio, movies and series together, so the Radio
+        // grid does need the audio heuristic here.
+        return loadPlaylist(credentials.playlistUrl(), keepOnlyRadio = source.kind == IptvKind.RADIO)
     }
 
     private fun loadXtreamApi(source: IptvSource, credentials: XtreamCredentials): IptvCatalogData {
@@ -146,19 +149,28 @@ internal object XtreamClient {
         }
     }
 
-    private fun loadPlaylist(url: String, kind: IptvKind): IptvCatalogData {
+    private fun loadPlaylist(url: String, keepOnlyRadio: Boolean): IptvCatalogData {
         val channels = M3uParser.parse(fetch(url))
         val entries = channels.mapIndexed { index, channel ->
+            // Curated lists carry their notes in the display name and their warnings in the URL;
+            // both are read here so the row can say "YouTube · Geo-blocked" instead of failing
+            // inside the player with a parse error.
+            val label = IptvPlaylistConventions.label(channel.name)
+            val webPage = IptvPlaylistConventions.isWebPage(channel.url)
             IptvEntry(
                 id = "m3u:$index",
-                title = channel.name,
+                title = label.title,
                 categoryId = channel.group.ifBlank { IptvCatalogData.ALL_CATEGORY_ID },
                 type = IptvEntryType.LIVE,
                 url = channel.url,
                 logo = channel.logo,
-                subtitle = channel.group
+                subtitle = (listOf(channel.group) + label.hints)
+                    .filter { it.isNotBlank() }
+                    // Same separator the rows themselves use, so a row never mixes two.
+                    .joinToString(" • "),
+                playback = if (webPage) IptvPlayback.WEB_PAGE else IptvPlayback.STREAM
             )
-        }.let { if (kind == IptvKind.RADIO) it.filter(::looksLikeRadio) else it }
+        }.let { if (keepOnlyRadio) it.filter(::looksLikeRadio) else it }
 
         val categories = entries.map { it.categoryId }.distinct()
             .filter { it != IptvCatalogData.ALL_CATEGORY_ID }
@@ -167,9 +179,13 @@ internal object XtreamClient {
     }
 
     /**
-     * Radio playlists are usually plain M3U with no stream-type field, so audio entries are
-     * identified by their group/name wording or an audio file extension. The user can still add
-     * the same playlist as a TV source when the guess is too narrow.
+     * Separates audio from video inside a mixed portal playlist, by group/name wording or an audio
+     * file extension.
+     *
+     * The guess is far too narrow to run over a playlist the user chose themselves: a real station
+     * list from radio-browser contains "88 nice peak", "90.5 Delight" and "97qfm", none of which
+     * match, so filtering a user-added Radio playlist emptied most of it. It is therefore applied
+     * only where one URL genuinely mixes both kinds — an Xtream portal's m3u_plus playlist.
      */
     private fun looksLikeRadio(entry: IptvEntry): Boolean {
         val haystack = (entry.title + " " + entry.subtitle).lowercase()
