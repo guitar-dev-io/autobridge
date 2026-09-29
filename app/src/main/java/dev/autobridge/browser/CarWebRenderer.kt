@@ -22,6 +22,7 @@ import android.text.TextUtils
 import android.util.Log
 import android.view.MotionEvent
 import android.view.Surface
+import androidx.annotation.VisibleForTesting
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.CookieManager
@@ -781,6 +782,23 @@ class CarWebRenderer(context: Context) {
         view.scrollTo(nextX, nextY)
         return true
     }
+
+    /**
+     * The live page offset and its bounds, for instrumented tests.
+     *
+     * The clamp arithmetic is covered by `PageScrollTest` on the JVM; what cannot be checked there
+     * is the wiring — that [scrollPageBy] reads the WebView's real extents and that no scroll path
+     * can leave the offset outside them. Reading that back needs the actual WebView, so this is the
+     * one seam the on-device test uses. Null until a surface has started the renderer.
+     */
+    @VisibleForTesting
+    internal fun pageScrollState(): PageScrollState? = webView?.let {
+        PageScrollState(x = it.scrollX, y = it.scrollY, maxX = it.maxScrollX, maxY = it.maxScrollY)
+    }
+
+    /** Snapshot of [pageScrollState]. */
+    @VisibleForTesting
+    internal data class PageScrollState(val x: Int, val y: Int, val maxX: Int, val maxY: Int)
 
     /** Scrolls the page content, or the open overlay, by the given car-surface delta. */
     fun scrollBy(distanceX: Float, distanceY: Float) = runOnMain {

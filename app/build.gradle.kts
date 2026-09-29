@@ -34,6 +34,10 @@ android {
         targetSdk = 36
         versionCode = 8
         versionName = "0.3.5"
+        // The faults that actually reach a head unit — viewport geometry, scroll bounds, WebView
+        // state — only reproduce against a real WebView, so this module needs on-device tests as
+        // well as JVM ones.
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     flavorDimensions += "mode"
@@ -94,6 +98,10 @@ kotlin {
 
 dependencies {
     testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test:core:1.6.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
     // Compose BOM pinned to the last release line compatible with AGP 8.13.2 / compileSdk 36.
     // Compose 1.12+ (BOM 2026.06.01) requires compileSdk 37 and AGP 9.1.0+, so it is not used here.
     val composeBom = platform("androidx.compose:compose-bom:2025.06.01")
