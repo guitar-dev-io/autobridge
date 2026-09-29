@@ -974,6 +974,10 @@ class CarWebRenderer(context: Context) {
     // ------------------------------------------------------------------ WebView
 
     private fun createWebView(): ScrollableWebView = ScrollableWebView(appContext).apply {
+        // The car WebView is off-screen and drawn to a Surface, so it is the one presentation that
+        // cannot be inspected by looking at it. Debug builds expose it over chrome://inspect for the
+        // same reason the phone activities do; release builds are untouched.
+        BrowserDefaults.configureDebugTools()
         BrowserDefaults.configure(appContext, settings)
         setDownloadListener(
             BrowserDownloads.listener(appContext) { message ->
