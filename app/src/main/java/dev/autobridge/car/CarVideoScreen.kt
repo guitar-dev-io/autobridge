@@ -19,10 +19,13 @@ import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.media3.common.Player
+import androidx.media3.common.VideoSize
 import dev.autobridge.R
 import dev.autobridge.core.model.Feature
 import dev.autobridge.core.policy.FeaturePolicy
+import dev.autobridge.display.StructuredLog
 import dev.autobridge.media.MediaPlaybackClient
+import dev.autobridge.media.VideoOutputGeometry
 import dev.autobridge.mirror.MirrorSurfaceOwnership
 import dev.autobridge.mirror.ProjectionService
 import dev.autobridge.safety.ParkingStateStore
@@ -36,6 +39,8 @@ class CarVideoScreen(
     private val appManager = carContext.getCarService(AppManager::class.java)
     private val media = MediaPlaybackClient(carContext)
     private var surface: Surface? = null
+    private var surfaceWidth = 0
+    private var surfaceHeight = 0
     private var active = false
     private var started = false
     private var failure: String? = null
@@ -43,6 +48,14 @@ class CarVideoScreen(
         override fun onEvents(player: Player, events: Player.Events) {
             player.playerError?.let { failure = "Unable to play this source. Return to the library and try another video." }
             invalidate()
+        }
+
+        /** Pairs with the surface size in the log, so a stretched picture can be read off the two. */
+        override fun onVideoSizeChanged(videoSize: VideoSize) {
+            StructuredLog.i(
+                "CAR_VIDEO",
+                "videoSize ${videoSize.width}x${videoSize.height} par=${videoSize.pixelWidthHeightRatio}"
+            )
         }
     }
     private val parkingListener: (ParkingStateStore.State) -> Unit = {
@@ -101,6 +114,9 @@ class CarVideoScreen(
             return
         }
         player.setVideoSurface(output)
+        // Published after the surface, never before: the player letterboxes into this size, and the
+        // renderer discards an output resolution that arrives while it still has no surface.
+        VideoOutputGeometry.set(surfaceWidth, surfaceHeight)
         if (!started) {
             started = true
             media.play(uri, title)
@@ -109,6 +125,7 @@ class CarVideoScreen(
 
     private fun detach() {
         val output = surface ?: return
+        VideoOutputGeometry.clear()
         media.player?.let { player ->
             if (player.isCommandAvailable(Player.COMMAND_SET_VIDEO_SURFACE)) player.clearVideoSurface(output)
         }
@@ -119,6 +136,11 @@ class CarVideoScreen(
         if (!active || !MirrorSurfaceOwnership.isOwner(this)) return
         detach()
         surface = surfaceContainer.surface
+        surfaceWidth = surfaceContainer.width
+        surfaceHeight = surfaceContainer.height
+        // The head unit picks this size, and it is what decides how much letterboxing the picture
+        // gets, so it is recorded rather than inferred from a photo of the screen.
+        StructuredLog.i("CAR_VIDEO", "surface ${surfaceWidth}x$surfaceHeight dpi=${surfaceContainer.dpi}")
         attach()
     }
 

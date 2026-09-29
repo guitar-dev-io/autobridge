@@ -124,5 +124,8 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer-dash:1.11.0")
     implementation("androidx.media3:media3-common:1.11.0")
     implementation("androidx.media3:media3-session:1.11.0")
+    // Presentation (letterboxing) for the car surface. media3-exoplayer does not depend on the
+    // effect module, so setVideoEffects() needs it declared here, at the same version.
+    implementation("androidx.media3:media3-effect:1.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 }
