@@ -76,6 +76,9 @@
         <activity android:name=".library.PlayerActivity" android:exported="false"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation|density|uiMode|fontScale" />
 
+        <!-- Step-by-step permissions and car-connection options. -->
+        <activity android:name=".mirror.MirrorSetupActivity" android:exported="false" />
+
         <!-- Brings the media session up when a car connects; inert unless the option is on. -->
         <receiver android:name=".media.MediaAutoStart$BluetoothReceiver" android:exported="true"
             tools:ignore="ExportedReceiver">

@@ -2333,6 +2333,9 @@ class MainActivity : androidx.activity.ComponentActivity() {
                 item("Control Center", "Mirror, browser and session actions", R.drawable.ic_tile_remote) {
                     showPhoneScreen(PhoneScreen.CONTROL_CENTER)
                 },
+                item("Car setup", "Permissions, in order, and Bluetooth start", R.drawable.ic_tile_mirror) {
+                    startActivity(dev.autobridge.mirror.MirrorSetupActivity.intent(this))
+                },
                 item("Debug", "Logs, diagnostics and mirror events", R.drawable.ic_tile_debug) {
                     showPhoneScreen(PhoneScreen.DEVELOPER)
                 }
@@ -2905,14 +2908,51 @@ class MainActivity : androidx.activity.ComponentActivity() {
     private fun buildDeveloperScreen(): View {
         val content = screenContent()
         content.addView(screenHeader("Developer Tools", "LAB & DIAGNOSTICS", back = { showPhoneScreen(PhoneScreen.HOME) }))
+
+        content.addView(sectionLabel("APP LOG"))
         val logView = TextView(this).apply {
             developerLogView = this
             textSize = 12f
             setTextColor(COLOR_TEXT)
             setPadding(dp(12), dp(12), dp(12), dp(12))
             background = roundedBackground(COLOR_SURFACE, COLOR_BORDER)
+            text = StructuredLog.format(limit = 30).ifEmpty { "No log entries yet" }
         }
         addCard(content, logView, top = 4)
+
+        val logActions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        logActions.addView(
+            actionCard("COPY LOG") { copyDiagnosticsToClipboard() },
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(6) }
+        )
+        logActions.addView(
+            actionCard("REFRESH") { refreshStatus() },
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginStart = dp(6)
+                marginEnd = dp(6)
+            }
+        )
+        logActions.addView(
+            actionCard("CLEAR", destructive = true) {
+                StructuredLog.clear()
+                MirrorDiagnostics.clearEvents()
+                refreshStatus()
+            },
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(6) }
+        )
+        addCard(content, logActions, top = 8)
+
+        content.addView(sectionLabel("MIRROR EVENTS"))
+        val mirrorEventsView = TextView(this).apply {
+            developerMirrorEventsView = this
+            textSize = 12f
+            setTextColor(COLOR_TEXT)
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+            background = roundedBackground(COLOR_SURFACE, COLOR_BORDER)
+            text = MirrorDiagnostics.format(limit = 30).ifEmpty { "No mirror events yet" }
+        }
+        addCard(content, mirrorEventsView, top = 4)
+
         content.addView(sectionLabel("WEBVIEW / DRM"))
         val drmView = TextView(this).apply {
             text = dev.autobridge.browser.WebDrmDiagnostics.collect(this@MainActivity).formatted()
@@ -3267,6 +3307,36 @@ class MainActivity : androidx.activity.ComponentActivity() {
         val ctx = RuntimeContextStore.context.value
         val statusText = "Mode: ${ctx.mode.name}\nVehicle: REAL_CAR (Parked)\nConnection: ${if (ctx.connected) "Active" else "Ready"}"
         homeConnectionView?.text = statusText
+        developerLogView?.text = StructuredLog.format(limit = 30).ifEmpty { "No log entries yet" }
+        developerMirrorEventsView?.text = MirrorDiagnostics.format(limit = 30).ifEmpty { "No mirror events yet" }
+    }
+
+    /**
+     * Copies the current app log + mirror event ring to the clipboard, so it can be pasted
+     * somewhere to diagnose "opens but gets stuck" without needing `adb logcat` on the car/DHU.
+     */
+    private fun copyDiagnosticsToClipboard() {
+        val runtime = RuntimeContextStore.context.value
+        val text = buildString {
+            appendLine("=== AutoBridge diagnostics ===")
+            appendLine("Mode: ${runtime.mode.name}  Environment: ${runtime.environment.name}")
+            appendLine("Android Auto connected: ${runtime.connected}")
+            appendLine("Pipeline: ${ScreenOffController.pipelineMode.name}")
+            appendLine("Mirroring: ${MirrorCoordinator.isMirroring}")
+            appendLine()
+            appendLine("--- App log ---")
+            appendLine(StructuredLog.format(limit = 60).ifEmpty { "No log entries yet" })
+            appendLine()
+            appendLine("--- Mirror events ---")
+            appendLine(MirrorDiagnostics.format(limit = 60).ifEmpty { "No mirror events yet" })
+        }
+        val manager = getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+        if (manager == null) {
+            Toast.makeText(this, "Clipboard unavailable", Toast.LENGTH_SHORT).show()
+            return
+        }
+        manager.setPrimaryClip(android.content.ClipData.newPlainText("AutoBridge diagnostics", text))
+        Toast.makeText(this, "Diagnostics copied", Toast.LENGTH_SHORT).show()
     }
 
     private fun requestNotificationPermissionIfNeeded() {

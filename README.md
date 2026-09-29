@@ -21,6 +21,7 @@ AutoBridge is a personal/development Android project for experimenting with a pa
 - Xtream Codes and M3U IPTV sources for the TV and Radio sections, with unit-tested credential/playlist parsing, a shared catalog cache, host-aware list paging, favourites and a recently-played list. See [`docs/IPTV_SECTIONS.md`](docs/IPTV_SECTIONS.md).
 - MediaStore-backed Folders, Playlists and Gallery sections on the phone and in the car, reusing the existing MediaSession and car video surface.
 - An AutoBridge phone design language (`AutoBridgeDesign`): ink surfaces, hairline borders, a per-section accent that carries from the home card into that section's screens and player, a dependency-free cached image loader for channel logos, a shared now-playing bar, and a designed player with a scrubber and a LIVE state. See [`docs/PHONE_UI.md`](docs/PHONE_UI.md).
+- A step-by-step car setup screen: notifications, an input backend (Shizuku or accessibility) and screen capture in the order they happen, each with its live state and one action, plus an optional Bluetooth media-session start. See [`docs/MIRROR_ENGINE.md`](docs/MIRROR_ENGINE.md).
 - Bounded Compose phone control-center content embedded in the existing Activity; Android Auto remains host-managed through Car App templates.
 - ScreenOnAuto-inspired mirror automation: optional prevent-sleep, timed auto-dim, opt-in panel-only screen-off, stop-on-disconnect, last-app auto-launch, consented auto-open, Shizuku onboarding, and explicit self-drawn renderer selection.
 

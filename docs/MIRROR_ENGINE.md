@@ -89,6 +89,48 @@ The panel-off and real-touch settings do not bypass this policy. Normal remote o
 
 `StructuredLog` provides an additional bounded, formatted log for the developer screen. These are lifecycle diagnostics, not proof of frame rate or vehicle compatibility.
 
+## Getting ready: the setup screen
+
+`MirrorSetupActivity` (Settings → Car setup) is the one place that says what mirroring needs, in
+the order it happens:
+
+1. **Notifications** — the projection foreground service posts the notification that stops it from
+   outside the app. Marked optional, never blocking: projection itself runs without it.
+2. **Touch control** — Shizuku if it is running (real multi-touch), otherwise the AutoBridge
+   accessibility service (taps and swipes, synthetic pinch). Blocking, because a mirror the driver
+   cannot touch is most of the feature missing.
+3. **Screen capture** — Android grants this for one session at a time, so the step is the start
+   button rather than a permission, and it turns into **Stop** while a session is running.
+
+The three used to live in three different apps — the system app info, Android's accessibility list
+and a button on the control centre — and none of them mentions the other two, so the usual failure
+was a running mirror with dead touch and no stated reason.
+
+The step list is [`MirrorReadiness`](../app/src/main/java/dev/autobridge/mirror/MirrorReadiness.kt):
+pure, with no Android dependency, so the order, the wording and "what is blocking right now" are
+asserted in a JVM test. The activity only reads live state, draws it, and performs one action.
+
+## Media session on car connect
+
+`MediaAutoStart` (off by default, switched on from the same screen) brings the media session up
+when a Bluetooth device connects, so a head unit finds it already there rather than only after
+something has been played from the phone. It starts the session and nothing else: no track is
+chosen and nothing is played, because a car connecting is not a request to make noise.
+
+It connects a `MediaController`, which *binds* `MediaPlaybackService`. `startService` from a
+background receiver would hit the background-start restriction, and a `MediaSessionService` that is
+started without playing cannot go foreground to satisfy it. The binding is released after 15
+seconds.
+
+`BLUETOOTH_CONNECT` is declared for one reason: from Android 12 the `ACL_CONNECTED` broadcast is
+permission protected, so without it the receiver is never called and the setting would be a switch
+that does nothing. The permission is requested when the option is switched on, and the option only
+turns on if it is granted. No device is read and nothing is scanned for.
+
+**Not yet verified in a car:** the broadcast path has not been exercised against a real head unit
+connection. What is verified is that it builds, that the option cannot be enabled without the
+permission it needs, and that the session-start path is the same one the app already uses.
+
 ## Known limitations
 
 - Actual SELF_DRAWN pixels require device validation for ImageReader color/order, copy cost, CPU/battery impact, surface lock behavior, reconnects, and exact measured FPS.
