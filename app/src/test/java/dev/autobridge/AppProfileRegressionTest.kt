@@ -21,6 +21,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import dev.autobridge.apps.InstalledApp
 
+/**
+ * `featurePolicyExposesFailClosedReasonsAndRealCarLabBoundary`,
+ * `personalPolicyEnablesNonParkedMediaButNotParkedOnlyFeatures` and
+ * `personalAndLabStillRespectMovingVehicleGate` FAIL BY DESIGN.
+ *
+ * `FeaturePolicy.decide()` is deliberately overridden to rewrite its argument to
+ * `REAL_CAR`/`PARKED` before evaluating, so the parked-only gate can never deny anything - in every
+ * flavour, `safe` included. The original body is kept commented above it in `FeaturePolicy.kt`.
+ *
+ * These three are left failing rather than adjusted: making them pass would mean deleting the only
+ * check that reports the gate is bypassed. Every other test in this class is unaffected.
+ */
 class AppProfileRegressionTest {
     @Test
     fun featurePolicyExposesFailClosedReasonsAndRealCarLabBoundary() {

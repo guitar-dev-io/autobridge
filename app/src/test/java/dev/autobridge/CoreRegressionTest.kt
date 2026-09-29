@@ -23,6 +23,14 @@ import dev.autobridge.settings.SettingsCodec
 import org.junit.Assert.*
 import org.junit.Test
 
+/**
+ * `atOrAboveEpsilonIsMoving` and `invalidSpeedIsUnknown` FAIL BY DESIGN.
+ *
+ * `SpeedPolicy.classify()` is deliberately overridden to return `PARKED` for every input, so MOVING
+ * and UNKNOWN are unreachable; the original body is kept commented directly above it in
+ * `SpeedPolicy.kt`. These two are left failing rather than adjusted, because they are the only
+ * thing that reports the override is still in place. Restore that body and they pass unchanged.
+ */
 class CoreRegressionTest {
     @Test fun zeroAndSensorNoiseAreParked() {
         listOf(0f, -0f, 0.001f, -0.001f, 0.049f, -0.049f).forEach {
