@@ -67,7 +67,7 @@ android {
                 signingConfig = signingConfigs.getByName("release")
             }
             isMinifyEnabled = false
-            buildConfigField("boolean", "DEV_MODE", "false")
+            buildConfigField("boolean", "DEV_MODE", "true")
             // Unlocked-all-safety build: release mirrors the debug parked-mock behavior so both
             // variants behave identically for personal/DHU use.
             buildConfigField("boolean", "DHU_TEST_MODE", "true")
