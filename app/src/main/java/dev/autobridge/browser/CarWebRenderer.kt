@@ -198,6 +198,9 @@ class CarWebRenderer(context: Context) {
      * prompt and over another app's music: nothing here ever told the system it was making sound.
      */
     private val webAudio = dev.autobridge.audio.WebAudioBridge { webView }
+
+    /** The same YouTube add-ons the phone browser applies, so both surfaces behave alike. */
+    private val youtube by lazy { dev.autobridge.youtube.YouTubeEnhancer(appContext) }
     private val audioEnvironment by lazy { dev.autobridge.audio.AudioEnvironment(appContext) }
     private val audioFocus by lazy {
         dev.autobridge.audio.AudioFocusController(
@@ -438,6 +441,7 @@ class CarWebRenderer(context: Context) {
                 destroy()
             }
             webView = null
+            youtube.release()
             tabThumbnails.values.forEach { it.recycle() }
             tabThumbnails.clear()
             host = null
@@ -1066,7 +1070,14 @@ class CarWebRenderer(context: Context) {
                 BrowserTabStore.save(appContext, tabs)
                 tracePostLoad()
                 if (loadError == null) WebHistoryStore.record(appContext, view.title, url)
+                youtube.onPageChanged(view, url)
                 onPageChanged?.invoke(url, view.title)
+            }
+
+            /** YouTube switches videos with `pushState`; onPageFinished never fires for those. */
+            override fun doUpdateVisitedHistory(view: WebView, url: String, isReload: Boolean) {
+                currentUrl = url
+                youtube.onPageChanged(view, url)
             }
 
             override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {

@@ -50,6 +50,9 @@ import dev.autobridge.safety.ParkingStateStore
  */
 class BrowserActivity : Activity() {
     private lateinit var web: WebView
+
+    /** YouTube add-ons (SponsorBlock, auto quality). Does nothing unless the user enabled them. */
+    private val youtube by lazy { dev.autobridge.youtube.YouTubeEnhancer(this) }
     private lateinit var address: EditText
     private lateinit var toolbar: LinearLayout
     private lateinit var chromeBar: FrameLayout
@@ -323,8 +326,17 @@ class BrowserActivity : Activity() {
                 if (allowed()) {
                     BrowserDefaults.remember(this@BrowserActivity, url)
                     WebHistoryStore.record(this@BrowserActivity, view.title, url)
+                    youtube.onPageChanged(view, url)
                 }
                 updateNavigation()
+            }
+
+            /**
+             * YouTube changes videos with `pushState`, which never reaches onPageFinished. This is
+             * the callback that does fire for those in-page navigations.
+             */
+            override fun doUpdateVisitedHistory(view: WebView, url: String, isReload: Boolean) {
+                if (allowed()) youtube.onPageChanged(view, url)
             }
 
             override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
@@ -721,6 +733,7 @@ class BrowserActivity : Activity() {
 
     override fun onDestroy() {
         ParkingStateStore.removeListener(parkingListener)
+        youtube.release()
         web.stopLoading(); web.destroy(); super.onDestroy()
     }
 }

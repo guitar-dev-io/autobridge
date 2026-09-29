@@ -2336,6 +2336,9 @@ class MainActivity : androidx.activity.ComponentActivity() {
                 item("Car setup", "Permissions, in order, and Bluetooth start", R.drawable.ic_tile_mirror) {
                     startActivity(dev.autobridge.mirror.MirrorSetupActivity.intent(this))
                 },
+                item("YouTube add-ons", "SponsorBlock and playback quality", R.drawable.ic_tile_youtube) {
+                    startActivity(dev.autobridge.youtube.YouTubeSettingsActivity.intent(this))
+                },
                 item("Debug", "Logs, diagnostics and mirror events", R.drawable.ic_tile_debug) {
                     showPhoneScreen(PhoneScreen.DEVELOPER)
                 }

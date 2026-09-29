@@ -102,6 +102,10 @@ dependencies {
     androidTestImplementation("androidx.test:core:1.6.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    // The android.jar the unit tests link against stubs org.json with methods that throw. The
+    // SponsorBlock response parser is ordinary JSON work and is worth testing, so the tests get a
+    // real implementation of the same API. Not shipped: the platform provides it on a device.
+    testImplementation("org.json:json:20250107")
     // Compose BOM pinned to the last release line compatible with AGP 8.13.2 / compileSdk 36.
     // Compose 1.12+ (BOM 2026.06.01) requires compileSdk 37 and AGP 9.1.0+, so it is not used here.
     val composeBom = platform("androidx.compose:compose-bom:2025.06.01")

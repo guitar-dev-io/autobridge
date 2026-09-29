@@ -87,6 +87,9 @@
             </intent-filter>
         </receiver>
 
+        <!-- SponsorBlock and auto-quality toggles for the in-app browser's YouTube pages. -->
+        <activity android:name=".youtube.YouTubeSettingsActivity" android:exported="false" />
+
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

@@ -23,6 +23,7 @@ AutoBridge is a personal/development Android project for experimenting with a pa
 - MediaStore-backed Folders, Playlists and Gallery sections on the phone and in the car, reusing the existing MediaSession and car video surface.
 - An AutoBridge phone design language (`AutoBridgeDesign`): ink surfaces, hairline borders, a per-section accent that carries from the home card into that section's screens and player, a dependency-free cached image loader for channel logos, a shared now-playing bar, and a designed player with a scrubber and a LIVE state. See [`docs/PHONE_UI.md`](docs/PHONE_UI.md).
 - A step-by-step car setup screen: notifications, an input backend (Shizuku or accessibility) and screen capture in the order they happen, each with its live state and one action, plus an optional Bluetooth media-session start. See [`docs/MIRROR_ENGINE.md`](docs/MIRROR_ENGINE.md).
+- Optional YouTube add-ons for the in-app browser, off by default: SponsorBlock segment skipping with per-category switches and a privacy-preserving hash-prefix lookup, and an auto-highest-quality setting. Both run in the phone and car browsers from one implementation. See [`docs/YOUTUBE_ADDONS.md`](docs/YOUTUBE_ADDONS.md).
 - Bounded Compose phone control-center content embedded in the existing Activity; Android Auto remains host-managed through Car App templates.
 - ScreenOnAuto-inspired mirror automation: optional prevent-sleep, timed auto-dim, opt-in panel-only screen-off, stop-on-disconnect, last-app auto-launch, consented auto-open, Shizuku onboarding, and explicit self-drawn renderer selection.
 
@@ -201,6 +202,7 @@ For ownership and lifecycle details see [`docs/ARCHITECTURE.md`](docs/ARCHITECTU
 - [`docs/FORD_NEXT_GEN.md`](docs/FORD_NEXT_GEN.md) — measured Ford profile procedure
 - [`docs/REFERENCE_PROJECTS.md`](docs/REFERENCE_PROJECTS.md) — independent reference matrix
 - [`docs/SCREENON_AUTO_INTEGRATION.md`](docs/SCREENON_AUTO_INTEGRATION.md) — independent ScreenOnAuto feature mapping and limits
+- [`docs/YOUTUBE_ADDONS.md`](docs/YOUTUBE_ADDONS.md) — optional SponsorBlock and quality behaviour
 - [`docs/DHU_SCENARIOS.md`](docs/DHU_SCENARIOS.md) — manual host/device scenarios
 - [`docs/FORD_TEST.md`](docs/FORD_TEST.md) — DHU/Ford safety checklist
 - [`docs/CARVIEW_PARITY.md`](docs/CARVIEW_PARITY.md) — product-reference comparison
