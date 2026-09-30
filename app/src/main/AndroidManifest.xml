@@ -61,13 +61,52 @@
         <meta-data android:name="androidx.car.app.theme" android:resource="@style/CarAppTheme" />
         <meta-data android:name="androidx.car.app.minCarApiLevel" android:value="3" />
 
-        <!-- configChanges: rotation and density changes are handled in-process so the WebView is
-             not destroyed and rebuilt from saved state on every configuration change.
+        <!-- Two routes onto the head unit, kept side by side on purpose.
+             AutoBridgeCarAppService paints the template UI into a Surface the host owns; this
+             activity runs as a real window on the Android Auto display. Only the activity route
+             gets a hardware-accelerated WebView, because nothing is captured and re-drawn - the
+             system composites it like any other window. That is what removes the white bands the
+             software canvas leaves while the page scrolls, and it is also the route on which
+             Widevine works at all.
+
+             It needs Android Auto's developer setting "Unknown sources". Without it the car
+             launcher simply does not list this entry and the template route stays the only one, so
+             nothing here can break the existing car UI.
+
+             resizeableActivity + <layout gravity="fill"> + maxAspectRatio: the car panel is a
+             different size, density and aspect from the phone. Without all three the window is
+             sized for the phone's aspect and letterboxed into the display instead of filling it.
+
+             exported: the car launcher has to be able to start it. The only thing it takes from an
+             intent is a URL, and ContentAddress.https filters that to HTTPS (see onNewIntent), so
+             the exposure is the same any browser has.
+
+             configChanges: rotation and density changes are handled in-process so the WebView is
+             not destroyed and rebuilt from saved state on every configuration change - moving
+             between the phone and the car display is exactly such a change.
              adjustResize: the IME inset is applied to the content container only (see
              BrowserActivity), so the keyboard never moves the toolbar or the page under it. -->
-        <activity android:name=".browser.BrowserActivity" android:exported="false"
-            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation|density|uiMode|fontScale"
-            android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".browser.BrowserActivity" android:exported="true"
+            android:resizeableActivity="true"
+            android:hardwareAccelerated="true"
+            android:launchMode="singleTop"
+            android:maxAspectRatio="5.0"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation|density|uiMode|fontScale|layoutDirection|locale"
+            android:windowSoftInputMode="adjustResize">
+            <!-- No android.intent.category.LAUNCHER: this entry belongs to the car launcher only
+                 and must not add a second icon to the phone's. -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.CAR_LAUNCHER" />
+                <category android:name="androidx.car.app.category.NAVIGATION" />
+                <category android:name="android.intent.category.APP_MAPS" />
+            </intent-filter>
+            <layout android:gravity="fill" android:minWidth="1dp" android:minHeight="1dp"
+                android:defaultWidth="800dp" android:defaultHeight="480dp" />
+            <meta-data android:name="distractionOptimized" android:value="true" />
+            <meta-data android:name="android.max_aspect" android:value="5.0" />
+        </activity>
 
         <activity android:name=".entertainment.EntertainmentActivity" android:exported="false"
             android:windowSoftInputMode="adjustResize" />

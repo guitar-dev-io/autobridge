@@ -10,7 +10,9 @@ import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
+import android.os.Build
 import android.os.Bundle
+import android.view.Display
 import android.view.Gravity
 import android.view.View
 import android.view.inputmethod.EditorInfo
@@ -25,7 +27,9 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.*
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import dev.autobridge.core.model.Feature
 import dev.autobridge.core.policy.FeaturePolicy
 import dev.autobridge.entertainment.BrowserLauncher
@@ -87,6 +91,49 @@ class BrowserActivity : Activity() {
 
     /** Converts a token dp value to the sp figure a [TextView] needs, with the scale already capped. */
     private fun iconSp(dp: Float) = dp * (fontScale / resources.configuration.fontScale.coerceAtLeast(0.01f))
+
+    /**
+     * True while this activity is showing on the car's display instead of the phone's.
+     *
+     * Launched onto the Android Auto display the activity owns a real window there, so the WebView
+     * is attached and hardware-accelerated and the system composites it — none of the software
+     * capture the template route ([CarWebRenderer]) has to do. What the head unit does not have is
+     * a user who can usefully reach the system bars, which is what [applyCarDisplayWindow] acts on.
+     */
+    private val onCarDisplay: Boolean
+        get() {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return false
+            val id = runCatching { display?.displayId }.getOrNull() ?: return false
+            return id != Display.DEFAULT_DISPLAY
+        }
+
+    /**
+     * Pins the page's CSS width to the same band the car surface uses, by re-basing the whole
+     * activity's density. Doing it here rather than on the WebView alone keeps the toolbar and the
+     * page on one density; see [CarDisplayScaling].
+     */
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(CarDisplayScaling.rebase(newBase))
+    }
+
+    /**
+     * Gives the page the whole car display.
+     *
+     * The status and navigation bars are phone affordances: on a head unit the user reaches the car
+     * launcher through the host's own controls, so the height those bars reserve is simply lost.
+     * Hiding them is what makes the window's aspect match the display's, which is the difference
+     * between the page filling the panel and being laid out into a shorter box inside it. They stay
+     * reachable by a swipe, so nothing becomes unrecoverable.
+     *
+     * The phone window is left exactly as it was — this runs only when [onCarDisplay].
+     */
+    private fun applyCarDisplayWindow() {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        WindowInsetsControllerCompat(window, root).apply {
+            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            hide(WindowInsetsCompat.Type.systemBars())
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -187,6 +234,7 @@ class BrowserActivity : Activity() {
 
         fullscreenController = FullscreenVideoController(this, content)
         setContentView(root)
+        if (onCarDisplay) applyCarDisplayWindow()
 
         val restored = savedInstanceState?.getBundle("web")?.let { web.restoreState(it) } != null
         pendingUrl = savedInstanceState?.getString("pending_url")
