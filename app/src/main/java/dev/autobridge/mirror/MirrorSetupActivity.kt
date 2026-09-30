@@ -6,8 +6,10 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.projection.MediaProjectionManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.provider.Settings
 import android.view.View
 import android.widget.Toast
@@ -91,7 +93,10 @@ class MirrorSetupActivity : Activity() {
             realTouchAvailable = runCatching { ShizukuInputBackend.isRealTouchAvailable }.getOrDefault(false),
             accessibilityEnabled = AccessibilityInputBackend.isAvailable,
             projecting = ProjectionService.sessionState == ProjectionService.SessionState.READY ||
-                ProjectionService.sessionState == ProjectionService.SessionState.STARTING
+                ProjectionService.sessionState == ProjectionService.SessionState.STARTING,
+            batteryOptimizationExempt = runCatching {
+                getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(packageName)
+            }.getOrDefault(true)
         )
     }
 
@@ -169,6 +174,7 @@ class MirrorSetupActivity : Activity() {
             MirrorReadiness.Step.NOTIFICATIONS -> requestNotifications()
             MirrorReadiness.Step.TOUCH -> openTouchSetup()
             MirrorReadiness.Step.CAPTURE -> toggleProjection()
+            MirrorReadiness.Step.BATTERY -> requestBatteryExemption()
         }
     }
 
@@ -206,6 +212,29 @@ class MirrorSetupActivity : Activity() {
             // Shizuku gives real multi-touch, so it stays the offer even once accessibility works.
             shizukuRunning -> ShizukuInputBackend.bind(this)
             else -> startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        }
+    }
+
+    /**
+     * This is the one system dialog Android lets an app trigger directly for itself — no chain of
+     * settings screens — because Google requires an explicit user-facing prompt naming the app
+     * before it can be exempted. `onResume()` re-reads the real state either way, so a denial here
+     * just leaves the step showing "Allow" again rather than needing its own result handling.
+     */
+    private fun requestBatteryExemption() {
+        val alreadyExempt = getSystemService(PowerManager::class.java)
+            .isIgnoringBatteryOptimizations(packageName)
+        if (alreadyExempt) return
+        runCatching {
+            startActivity(
+                Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                    .setData(Uri.parse("package:$packageName"))
+            )
+        }.onFailure {
+            // Some OEM builds (custom battery managers) don't implement this action at all.
+            startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                .setData(Uri.fromParts("package", packageName, null)))
+            toast("Allow AutoBridge to run in the background from here")
         }
     }
 

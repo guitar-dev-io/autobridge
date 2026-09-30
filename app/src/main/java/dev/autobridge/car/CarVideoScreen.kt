@@ -29,6 +29,7 @@ import dev.autobridge.media.VideoOutputGeometry
 import dev.autobridge.mirror.MirrorSurfaceOwnership
 import dev.autobridge.mirror.ProjectionService
 import dev.autobridge.safety.ParkingStateStore
+import dev.autobridge.safety.SafetyEnforcement
 
 /** Native video output: the shared MediaSession renders to the host surface, without capture. */
 class CarVideoScreen(
@@ -43,10 +44,27 @@ class CarVideoScreen(
     private var surfaceHeight = 0
     private var active = false
     private var started = false
+    /**
+     * Set when playback is paused by something other than the user - the host taking the surface
+     * away, or this screen being stopped - so the picture comes back on its own once the surface
+     * does. Never set for a pause the user asked for, and cleared as soon as it is consumed.
+     */
+    private var resumeWhenSurfaceReturns = false
+    /** Setup and connection failures, which stand until the screen is reopened. */
     private var failure: String? = null
+
+    /**
+     * Playback failure, kept apart from [failure] because it follows the player instead of
+     * latching. A live channel that recovers - the service re-prepares at the live edge after
+     * BEHIND_LIVE_WINDOW - used to leave this screen on the error pane for good, because nothing
+     * ever cleared the message again.
+     */
+    private var playbackFailure: String? = null
     private val listener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) {
-            player.playerError?.let { failure = "Unable to play this source. Return to the library and try another video." }
+            playbackFailure = player.playerError?.let {
+                "Unable to play this source. Return to the library and try another video."
+            }
             invalidate()
         }
 
@@ -90,6 +108,7 @@ class CarVideoScreen(
                 active = false
                 ParkingStateStore.removeListener(parkingListener)
                 if (MirrorSurfaceOwnership.isOwner(this@CarVideoScreen)) {
+                    resumeWhenSurfaceReturns = media.player?.playWhenReady == true
                     detach()
                     media.pause()
                 } else {
@@ -102,7 +121,8 @@ class CarVideoScreen(
         })
     }
 
-    private fun allowed() = ParkingStateStore.isParked && FeaturePolicy.app.isAvailable(Feature.VIDEO)
+    private fun allowed() =
+        SafetyEnforcement.gateParked(ParkingStateStore.isParked) && FeaturePolicy.app.isAvailable(Feature.VIDEO)
 
     private fun attach() {
         val output = surface ?: return
@@ -120,6 +140,17 @@ class CarVideoScreen(
         if (!started) {
             started = true
             media.play(uri, title)
+        } else if (resumeWhenSurfaceReturns) {
+            resumeWhenSurfaceReturns = false
+            // A live channel has moved on while the surface was gone. Resuming where it stopped
+            // either stalls or throws BEHIND_LIVE_WINDOW, so rejoin at the live edge instead.
+            if (player.isCurrentMediaItemLive &&
+                player.isCommandAvailable(Player.COMMAND_SEEK_TO_DEFAULT_POSITION)
+            ) {
+                player.seekToDefaultPosition()
+            }
+            StructuredLog.i("CAR_VIDEO", "resuming playback after the surface came back")
+            media.resume()
         }
     }
 
@@ -146,12 +177,18 @@ class CarVideoScreen(
 
     override fun onSurfaceDestroyed(surfaceContainer: SurfaceContainer) {
         if (!MirrorSurfaceOwnership.isOwner(this)) return
+        // The host takes the surface away on transient events - the phone display going to sleep is
+        // one of them - and hands it back a moment later. Pausing without recording why left TV
+        // playback stopped for good: the car screen kept the last frame and only the Play button
+        // could restart it.
+        resumeWhenSurfaceReturns = media.player?.playWhenReady == true
         detach()
         media.pause()
     }
 
     override fun onGetTemplate(): Template {
-        val message = failure ?: if (!allowed()) "Park the vehicle to watch video." else null
+        val message = failure ?: playbackFailure
+            ?: if (!allowed()) "Park the vehicle to watch video." else null
         if (message != null) {
             return PaneTemplate.Builder(Pane.Builder().addRow(Row.Builder().setTitle(title).addText(message).build()).build())
                 .setHeader(Header.Builder().setTitle("Video").setStartHeaderAction(Action.BACK).build()).build()

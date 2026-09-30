@@ -13,23 +13,41 @@ class MirrorReadinessTest {
         shizukuGranted: Boolean = false,
         realTouchAvailable: Boolean = false,
         accessibilityEnabled: Boolean = false,
-        projecting: Boolean = false
+        projecting: Boolean = false,
+        batteryOptimizationExempt: Boolean = true
     ) = MirrorReadiness.Status(
         notificationsRequired, notificationsGranted, shizukuRunning, shizukuGranted,
-        realTouchAvailable, accessibilityEnabled, projecting
+        realTouchAvailable, accessibilityEnabled, projecting, batteryOptimizationExempt
     )
 
     @Test
-    fun `the steps are always the same three, in order`() {
+    fun `the steps are always the same four, in order`() {
         val steps = MirrorReadiness.steps(status())
         assertEquals(
             listOf(
                 MirrorReadiness.Step.NOTIFICATIONS,
                 MirrorReadiness.Step.TOUCH,
-                MirrorReadiness.Step.CAPTURE
+                MirrorReadiness.Step.CAPTURE,
+                MirrorReadiness.Step.BATTERY
             ),
             steps.map { it.step }
         )
+    }
+
+    @Test
+    fun `background use never blocks, and asks only when not already exempt`() {
+        val exempt = MirrorReadiness.steps(status()).last()
+        assertEquals(MirrorReadiness.State.DONE, exempt.state)
+        assertNull(exempt.actionLabel)
+
+        val notExempt = MirrorReadiness.steps(status(batteryOptimizationExempt = false)).last()
+        assertEquals(MirrorReadiness.State.OPTIONAL, notExempt.state)
+        assertEquals("Allow", notExempt.actionLabel)
+        // Everything else already satisfied: an OPTIONAL battery step must not become "next".
+        val otherwiseReady = status(
+            accessibilityEnabled = true, projecting = true, batteryOptimizationExempt = false
+        )
+        assertNull(MirrorReadiness.nextAction(otherwiseReady))
     }
 
     @Test

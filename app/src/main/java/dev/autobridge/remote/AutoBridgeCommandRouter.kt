@@ -131,6 +131,22 @@ object AutoBridgeCommandRouter {
                 CommandResult.success(id, "เปิด Media แล้ว")
             }
 
+            CommandType.PLAY_VIDEO -> {
+                if (!FeaturePolicy.app.isAvailable(Feature.VIDEO)) return denied(id, Feature.VIDEO)
+                val url = command.payload?.trim()
+                if (url.isNullOrBlank()) {
+                    return CommandResult.failure(id, "ไม่พบลิงก์วิดีโอ", CommandFailureReason.INVALID_ARGUMENT)
+                }
+                val title = command.extras["title"]?.takeIf { it.isNotBlank() } ?: "Video"
+                host!!.pushVideo(url, title)
+                RecentActivityStore.record(
+                    context,
+                    RecentActivityStore.Entry(RecentActivityStore.Kind.MEDIA, title, data = url)
+                )
+                AutoBridgeStateRepository.setCurrentScreen(RemoteScreen.MEDIA)
+                CommandResult.success(id, "ส่ง \"$title\" ไปที่รถแล้ว")
+            }
+
             CommandType.PLAY -> mediaAction(id, media) { it.resume(); "เล่นเพลง" }
             CommandType.PAUSE -> mediaAction(id, media) { it.pause(); "หยุดเพลง" }
             CommandType.NEXT -> mediaAction(id, media) { it.next(); "เพลงถัดไป" }

@@ -1,4 +1,4 @@
-Updated: 2026-09-28
+Updated: 2026-09-29
 
 AutoBridge is an independent implementation under the `dev.autobridge` package. The references below inform behavior and architecture; their source trees and assets were not merged into this project.
 
@@ -58,6 +58,20 @@ Adopted independently:
 - parked-only video/browser/mirror behavior and audio continuity when policy allows.
 
 Not adopted as claims: product tier compatibility, bank/ride-hailing guarantees, Google Assistant integration, catalog/add-on services, or Ford/wireless compatibility.
+
+### Fermata changelog sweep — 2026-09-29
+
+Upstream ships behaviour fixes against its own tree, so each one is checked against AutoBridge's
+independent implementation rather than applied. Recorded here so a later reading of the same
+changelog does not re-investigate the three that have no counterpart.
+
+| Upstream item | Disposition here |
+|---|---|
+| Disable `Virtualizer` on Android 15+ | No counterpart. `audio/` does focus, routing, and the WebView bridge; the app attaches no `AudioEffect`, so there is nothing to gate on API 35. |
+| Safer notification receiver registration | No counterpart. The only receiver, `MediaAutoStart.BluetoothReceiver`, is manifest-declared (so no runtime `registerReceiver` flag applies) and its work is already wrapped in `runCatching`. Notification posting belongs to `MediaSessionService`. |
+| Do not redirect `v.youtube.com` into the YouTube addon | Already correct, now locked in. `YouTubeUrls.HOSTS` matches the host exactly, so the add-ons never arm on it, and `IptvPlaylistConventions` still routes it to the browser rather than the decoder. Both are covered by tests; the exact-match rule is documented where a future suffix match would break it. |
+| Play from the beginning when an item is tapped | Applied. `EntertainmentActivity.open()` seeks only when a position was handed in, so a tapped item is not seeked at all — a saved offset reaches the player only through `restoreLast()`. |
+| Library updates | media3 moved to 1.11.1 (upstream's 1.10.1 is behind this tree); WebKit already matches at 1.16.0. `androidx.core:core-ktx` is now declared instead of inherited, pinned at 1.18.0 — 1.19.x requires AGP 9.1.0 and compileSdk 37, the same ceiling the Compose BOM note in `app/build.gradle.kts` records. Material, Media, Guava, and libVLC are not dependencies of this tree; libVLC in particular would mean a second playback backend beside media3. |
 
 ## Current feature matrix
 

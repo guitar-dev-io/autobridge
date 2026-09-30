@@ -135,7 +135,7 @@ class CarMediaCenterScreen(carContext: CarContext) : Screen(carContext) {
                                 RecentActivityStore.Kind.MEDIA, track.title, "Video", track.uri
                             )
                         )
-                        screenManager.push(CarVideoScreen(carContext, track.uri, track.title))
+                        CarVideoLauncher.open(screenManager, carContext, track.uri, track.title)
                     }
                     .build()
             )
@@ -160,7 +160,7 @@ class CarMediaCenterScreen(carContext: CarContext) : Screen(carContext) {
                                         RecentActivityStore.Kind.MEDIA, "Stream", "Streaming", url
                                     )
                                 )
-                                screenManager.push(CarVideoScreen(carContext, url, "Video stream"))
+                                CarVideoLauncher.open(screenManager, carContext, url, "Video stream")
                             } else {
                                 CarToast.makeText(carContext, "Enter a valid HTTPS link", CarToast.LENGTH_SHORT).show()
                             }

@@ -59,7 +59,7 @@ class CarMediaLibraryScreen(carContext: CarContext, private val videoOnly: Boole
                     .setOnClickListener {
                         screenManager.pushForResult(CarBrowserSearchScreen(carContext, "")) { result ->
                             val url = dev.autobridge.entertainment.ContentAddress.https(result as? String ?: "")
-                            if (url != null) screenManager.push(CarVideoScreen(carContext, url, "Video stream"))
+                            if (url != null) CarVideoLauncher.open(screenManager, carContext, url, "Video stream")
                             else CarToast.makeText(carContext, "Enter a valid HTTPS video link", CarToast.LENGTH_SHORT).show()
                         }
                     }.build())
@@ -112,7 +112,7 @@ class CarMediaLibraryScreen(carContext: CarContext, private val videoOnly: Boole
             .setEnabled(connected)
             .setOnClickListener {
                 if (video) {
-                    screenManager.push(CarVideoScreen(carContext, track.uri, track.title))
+                    CarVideoLauncher.open(screenManager, carContext, track.uri, track.title)
                 } else {
                     mediaPlayback.play(track.uri, track.title)
                     CarNavigation.open(screenManager, "CarNowPlayingScreen") { CarNowPlayingScreen(carContext) }

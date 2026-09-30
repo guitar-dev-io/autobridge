@@ -53,7 +53,20 @@ class BrowserChromeLayout private constructor(
     val fab: Box,
 ) {
     companion object {
-        fun create(sizes: AutoUiSizes, viewport: BrowserViewport): BrowserChromeLayout {
+        /**
+         * @param showMenuButton Whether the toolbar carries its own ☰ button. The floating button
+         *   ([ChromeZone.FAB]) already opens the drawer whenever it is bound to
+         *   [FloatingButtonAction.MENU] — the default — so a second, identical-looking button on
+         *   the toolbar was two controls for one action and the reported source of "which one do I
+         *   press?" confusion. The toolbar button is only drawn when the floating button has been
+         *   rebound to something else, so the menu never loses a fixed, reachable entry point but
+         *   is also never offered twice.
+         */
+        fun create(
+            sizes: AutoUiSizes,
+            viewport: BrowserViewport,
+            showMenuButton: Boolean = true,
+        ): BrowserChromeLayout {
             val left = viewport.left.toFloat()
             val top = viewport.top.toFloat()
             val right = left + viewport.width
@@ -66,7 +79,11 @@ class BrowserChromeLayout private constructor(
             val pad = sizes.horizontalPadding
 
             val leading = listOf(ChromeZone.BACK, ChromeZone.FORWARD, ChromeZone.RELOAD)
-            val trailing = listOf(ChromeZone.FULLSCREEN, ChromeZone.MENU)
+            val trailing = if (showMenuButton) {
+                listOf(ChromeZone.FULLSCREEN, ChromeZone.MENU)
+            } else {
+                listOf(ChromeZone.FULLSCREEN)
+            }
 
             val slots = ArrayList<ChromeSlot>(leading.size + trailing.size)
             var cursor = left + pad
@@ -129,8 +146,17 @@ class BrowserChromeLayout private constructor(
      *
      * @param chromeVisible whether the toolbar is currently shown.
      * @param drawer the open drawer's geometry, or null when closed.
+     * @param fabVisible whether the floating button is currently drawn. A button that has faded
+     *   out must not keep taking taps from the page underneath it, so drawing and hit testing are
+     *   driven by the same flag.
      */
-    fun hitTest(x: Float, y: Float, chromeVisible: Boolean, drawer: Box?): ChromeZone {
+    fun hitTest(
+        x: Float,
+        y: Float,
+        chromeVisible: Boolean,
+        drawer: Box?,
+        fabVisible: Boolean = true,
+    ): ChromeZone {
         if (!viewport.contains(x, y)) return ChromeZone.NONE
         if (drawer != null) {
             // An open drawer owns every tap: items are resolved by the drawer itself, and anything
@@ -139,7 +165,7 @@ class BrowserChromeLayout private constructor(
         }
         // Checked before the toolbar and before the page: the floating button is the one control
         // that is available in every chrome state, which is the whole reason it exists.
-        if (fab.contains(x, y)) return ChromeZone.FAB
+        if (fabVisible && fab.contains(x, y)) return ChromeZone.FAB
         if (chromeVisible) {
             slots.firstOrNull { it.bounds.contains(x, y) }?.let { return it.zone }
             if (toolbar.contains(x, y)) {

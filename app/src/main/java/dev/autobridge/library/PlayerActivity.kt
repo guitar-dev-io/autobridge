@@ -24,6 +24,7 @@ import dev.autobridge.core.policy.FeaturePolicy
 import dev.autobridge.entertainment.ContentKind
 import dev.autobridge.media.MediaPlaybackClient
 import dev.autobridge.safety.ParkingStateStore
+import dev.autobridge.safety.SafetyEnforcement
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.dp
 import dev.autobridge.ui.ImageLoader
@@ -352,7 +353,7 @@ class PlayerActivity : Activity() {
         val player = playback.player
         val videoAllowed = kind == ContentKind.VIDEO &&
             FeaturePolicy.app.isAvailable(Feature.VIDEO) &&
-            ParkingStateStore.isParked
+            SafetyEnforcement.gateParked(ParkingStateStore.isParked)
 
         val failed = failure
         if (failed != null) {

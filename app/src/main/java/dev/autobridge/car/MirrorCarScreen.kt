@@ -56,12 +56,19 @@ class MirrorCarScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
 
     init {
         Log.i(TAG, "Creating MirrorCarScreen")
-        MirrorSurfaceOwnership.claim(this)
-        appManager.setSurfaceCallback(this)
-        Log.i(TAG, "Surface callback registered")
 
         lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) {
+                // Claimed here rather than in the constructor, matching CarBrowserScreen and
+                // CarVideoScreen. MirrorSurfaceOwnership is process-global and is only given back
+                // in onDestroy, so a screen that was constructed but never started - a push that
+                // lands after the app lifecycle is already DESTROYED is a no-op, so no lifecycle
+                // callback ever runs - used to hold the surface for the rest of the process. Every
+                // later browser/video screen then failed its own isOwner() guard and rendered a
+                // black surface that swallowed touch.
+                MirrorSurfaceOwnership.claim(this@MirrorCarScreen)
+                appManager.setSurfaceCallback(this@MirrorCarScreen)
+                Log.i(TAG, "Surface callback registered")
                 // Publish mirror status so the Mobile Remote reflects the car screen in real time.
                 AutoBridgeStateRepository.setMirrorStatus(
                     if (MirrorCoordinator.isMirroring) MirrorStatus.ACTIVE else MirrorStatus.READY
@@ -91,7 +98,11 @@ class MirrorCarScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
         // Keep the live phone image clear. Phone navigation and Stop remain in the Controls panel.
         // No dedicated back button: "Controls" is the single hamburger-style entry point into the
         // menu (Apps, Media, Settings, Stop mirroring), matching the reference head-unit layout.
+        // The speed readout carries a title, and map action strips reject titled actions
+        // (ActionsConstraints.ACTIONS_CONSTRAINTS_MAP allows 0 custom titles), so it lives in the
+        // top strip, which allows up to four titled actions.
         val topActions = ActionStrip.Builder()
+            .apply { speedAction()?.let { addAction(it) } }
             .addAction(
                 Action.Builder()
                     .setIcon(carIcon(R.drawable.ic_car_panel))
@@ -123,7 +134,6 @@ class MirrorCarScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
             .build()
 
         val mapActions = ActionStrip.Builder()
-            .apply { speedAction()?.let { addAction(it) } }
             .addAction(safetyAction)
             .addAction(panelAction())
             .addAction(Action.PAN)
@@ -157,9 +167,10 @@ class MirrorCarScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
     }
 
     /**
-     * Read-only speed readout in the map action strip (e.g. "72 km/h"). Non-invasive: the live
+     * Read-only speed readout for the top action strip (e.g. "72 km/h"). Non-invasive: the live
      * mirror surface is OS-owned, so the speed is shown as a strip action rather than drawn over the
-     * pixels. Returns null when no valid reading exists so the strip stays clean.
+     * pixels. It must not go in the map action strip, which rejects actions with custom titles.
+     * Returns null when no valid reading exists so the strip stays clean.
      */
     private fun speedAction(): Action? {
         val sample = dev.autobridge.speed.SpeedManager.speed.value

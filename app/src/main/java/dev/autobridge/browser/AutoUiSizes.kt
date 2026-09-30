@@ -50,6 +50,36 @@ class AutoUiSizes private constructor(
         const val MENU_COLUMNS_MAX = 5
 
         /**
+         * Floor under a menu tile once the grid is sized from the box it must fit rather than
+         * authored outright ([MENU_TILE_WIDTH_DP]/[MENU_TILE_HEIGHT_DP] are the *preferred* shape,
+         * these are the smallest a tile may be squeezed to before the sheet gives up and scrolls).
+         *
+         * A fixed 78dp tile made the sheet's content height independent of the panel it was drawn
+         * in, so on a short stable area the last row simply fell below the fold with nothing on
+         * screen to say it was there — and on the primary list that row held "More", the only way
+         * to reach the rest of the menu. Deriving the tile from the box instead means the same item
+         * list fits a 300dp-tall stable area and a 720dp one.
+         *
+         * [MIN_TILE_HEIGHT_DP] stays above [TOUCH_TARGET_DP] so the smallest tile the grid can
+         * produce is still a comfortable target, not a bare minimum one.
+         */
+        const val MIN_TILE_WIDTH_DP = 76f
+        const val MIN_TILE_HEIGHT_DP = 48f
+
+        /**
+         * Ceiling on tile growth, as a multiple of the authored size. Without it a widescreen head
+         * unit would spread eleven entries into tiles the size of playing cards; the grid is
+         * centred in the leftover space instead.
+         */
+        const val MAX_TILE_SCALE = 1.6f
+
+        /**
+         * The sheet header shrinks with the panel, but never below this — it has to hold a close
+         * button that is still hittable at [TOUCH_TARGET_DP] * 0.7.
+         */
+        const val MIN_HEADER_HEIGHT_DP = 40f
+
+        /**
          * The floating control button. It stays reachable over the page so opening the menu never
          * requires first recalling an auto-hidden toolbar — two taps, one of them on a 28dp strip,
          * became one tap on a 56dp circle.

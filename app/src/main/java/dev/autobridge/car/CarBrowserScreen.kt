@@ -30,6 +30,7 @@ import dev.autobridge.mirror.ProjectionService
 import dev.autobridge.remote.AutoBridgeStateRepository
 import dev.autobridge.remote.CarScreenController
 import dev.autobridge.safety.ParkingStateStore
+import dev.autobridge.safety.SafetyEnforcement
 
 /**
  * Native Android Auto web browser, AA-Browser-style: a [CarWebRenderer] draws a WebView directly
@@ -62,7 +63,8 @@ class CarBrowserScreen(carContext: CarContext) :
     private var surfaceDpi = 0
 
     private var active = false
-    private fun allowed() = ParkingStateStore.isParked && FeaturePolicy.app.isAvailable(Feature.BROWSER)
+    private fun allowed() =
+        SafetyEnforcement.gateParked(ParkingStateStore.isParked) && FeaturePolicy.app.isAvailable(Feature.BROWSER)
     private val parkingListener: (ParkingStateStore.State) -> Unit = {
         carContext.mainExecutor.execute {
             if (active && !allowed()) {
@@ -231,14 +233,22 @@ class CarBrowserScreen(carContext: CarContext) :
 
     override fun openSettings() {
         screenManager.pushForResult(CarBrowserSettingsScreen(carContext)) { changed ->
-            if (changed == true) {
-                renderer.applyUserAgentAndReload()
-                CarToast.makeText(
-                    carContext,
-                    "User-Agent: ${BrowserUserAgentStore.label(carContext)}",
-                    CarToast.LENGTH_SHORT
-                ).show()
-                invalidate()
+            when (changed) {
+                // Chrome preferences take effect on the live surface; reloading the page for them
+                // would throw away the user's scroll position to change a toolbar setting.
+                CarBrowserSettingsScreen.CHANGED -> {
+                    renderer.applyControlSettings()
+                    invalidate()
+                }
+                CarBrowserSettingsScreen.IDENTITY_CHANGED -> {
+                    renderer.applyUserAgentAndReload()
+                    CarToast.makeText(
+                        carContext,
+                        "User-Agent: ${BrowserUserAgentStore.label(carContext)}",
+                        CarToast.LENGTH_SHORT
+                    ).show()
+                    invalidate()
+                }
             }
         }
     }
@@ -253,6 +263,17 @@ class CarBrowserScreen(carContext: CarContext) :
 
     override fun onBrowserStateChanged() {
         invalidate()
+    }
+
+    /**
+     * Leaves the browser and returns to the app's main dashboard. [CarHomeDashboardScreen] is
+     * already the root of the stack (see [AutoBridgeSession.onCreateScreen]), so this pops back to
+     * that existing instance rather than pushing a second one on top of it. This is the car
+     * surface's only route back to Home, since the screen carries no header Back action of its
+     * own (see the comment on [onGetTemplate]).
+     */
+    override fun openAppHome() {
+        screenManager.popToRoot()
     }
 
     override fun openExternal(url: String) {
@@ -280,7 +301,18 @@ class CarBrowserScreen(carContext: CarContext) :
     // --- SurfaceCallback ---
 
     override fun onSurfaceAvailable(surfaceContainer: SurfaceContainer) {
-        if (!active || !MirrorSurfaceOwnership.isOwner(this)) return
+        // Every way this can bail leaves the car showing an unpainted, untouchable black surface,
+        // which is indistinguishable from "the browser hung" on the head unit. Logcat is not
+        // readable on every phone (some OEM builds drop third-party tags), so the reason goes to
+        // StructuredLog, which CarDiagnosticsScreen renders on the car itself.
+        if (!active || !MirrorSurfaceOwnership.isOwner(this) || surfaceContainer.surface == null) {
+            dev.autobridge.display.StructuredLog.w(
+                TAG,
+                "surface ignored active=$active owner=${MirrorSurfaceOwnership.isOwner(this)} " +
+                    "surface=${surfaceContainer.surface != null}"
+            )
+            return
+        }
         val surface = surfaceContainer.surface ?: return
         surfaceWidth = surfaceContainer.width
         surfaceHeight = surfaceContainer.height
@@ -288,7 +320,11 @@ class CarBrowserScreen(carContext: CarContext) :
         // density describes a different screen and would mis-size every icon.
         surfaceDpi = surfaceContainer.dpi
         Log.i(TAG, "Browser surface ${surfaceWidth}x$surfaceHeight dpi=$surfaceDpi")
-        if (allowed()) renderer.start(surface, surfaceWidth, surfaceHeight, surfaceDpi)
+        val permitted = allowed()
+        dev.autobridge.display.StructuredLog.i(
+            TAG, "surface ${surfaceWidth}x$surfaceHeight dpi=$surfaceDpi allowed=$permitted"
+        )
+        if (permitted) renderer.start(surface, surfaceWidth, surfaceHeight, surfaceDpi)
     }
 
     override fun onSurfaceDestroyed(surfaceContainer: SurfaceContainer) {

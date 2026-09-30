@@ -213,6 +213,9 @@ class IptvParsingTest {
         assertTrue(IptvPlaylistConventions.isWebPage("https://www.youtube.com/@EuronewsAlbania/live"))
         assertTrue(IptvPlaylistConventions.isWebPage("https://www.twitch.tv/topnewsal"))
         assertTrue(IptvPlaylistConventions.isWebPage("http://youtu.be/abc123"))
+        // A service host under the same domain is still a page rather than a stream, so it is
+        // browsed and not decoded. The YouTube add-ons match the host exactly and leave it alone.
+        assertTrue(IptvPlaylistConventions.isWebPage("https://v.youtube.com/abc123"))
         assertFalse(IptvPlaylistConventions.isWebPage("https://fe.tring.al/delta/105/out/u/1200_1.m3u8"))
     }
 

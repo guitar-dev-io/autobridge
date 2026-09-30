@@ -1,0 +1,82 @@
+package dev.autobridge.browser
+
+import android.content.Context
+import androidx.core.content.edit
+
+/**
+ * What the floating button does when it is tapped.
+ *
+ * The button is the one control available in every chrome state, so which action it carries is the
+ * single biggest lever the user has over how the browser feels. Someone who lives in the menu wants
+ * [MENU]; someone who switches between two sites all day wants [TABS] and never opens the menu at
+ * all. Fixing it to one behaviour makes the other user press two things for every one.
+ */
+enum class FloatingButtonAction(val label: String, val glyph: String) {
+    MENU("เปิดเมนู", "☰"),
+    TABS("สลับแท็บ", "▣"),
+    NEW_TAB("แท็บใหม่", "+"),
+    HOME("หน้าแรก", "⌂"),
+    ADDRESS("ช่อง URL / คีย์บอร์ด", "⌨"),
+    FULLSCREEN("สลับเต็มหน้าจอ", "⛶"),
+}
+
+/**
+ * User preferences for the browser's own on-screen controls, shared by the car surface and the
+ * phone activity.
+ *
+ * These exist because there is no single right answer for how much chrome belongs over a page in a
+ * car. Auto-hiding the toolbar gives the page every pixel but costs a tap to get the address back;
+ * pinning it costs 52dp forever. Both are reasonable, so both are offered, and the default is the
+ * one that keeps the page largest.
+ *
+ * Stored in the same preference file as [BrowserDefaults] and [BrowserUserAgentStore] so the whole
+ * browser reads one file.
+ */
+object BrowserControlsStore {
+    private const val PREFS_NAME = "autobridge_browser"
+    private const val KEY_ALWAYS_SHOW_URL_BAR = "controls_always_show_url_bar"
+    private const val KEY_ALWAYS_SHOW_FLOATING_BUTTON = "controls_always_show_floating_button"
+    private const val KEY_FLOATING_BUTTON_ACTION = "controls_floating_button_action"
+
+    private fun prefs(context: Context) =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    /**
+     * Keeps the toolbar (and with it the address pill) on screen instead of letting it fade after
+     * [ChromeVisibility.DEFAULT_AUTO_HIDE_MS] of no interaction.
+     *
+     * Off by default: the auto-hiding toolbar is what lets the page own the whole surface, and the
+     * floating button means nothing is unreachable while it is away.
+     */
+    fun alwaysShowUrlBar(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_ALWAYS_SHOW_URL_BAR, false)
+
+    fun setAlwaysShowUrlBar(context: Context, enabled: Boolean) {
+        prefs(context).edit { putBoolean(KEY_ALWAYS_SHOW_URL_BAR, enabled) }
+    }
+
+    /**
+     * Keeps the floating button on screen at all times. When off it fades with the toolbar, so a
+     * page that has been left alone is drawn with nothing over it at all.
+     *
+     * On by default — a control that has to be summoned before it can be used is the problem the
+     * floating button exists to solve.
+     */
+    fun alwaysShowFloatingButton(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_ALWAYS_SHOW_FLOATING_BUTTON, true)
+
+    fun setAlwaysShowFloatingButton(context: Context, enabled: Boolean) {
+        prefs(context).edit { putBoolean(KEY_ALWAYS_SHOW_FLOATING_BUTTON, enabled) }
+    }
+
+    fun floatingButtonAction(context: Context): FloatingButtonAction =
+        runCatching {
+            FloatingButtonAction.valueOf(
+                prefs(context).getString(KEY_FLOATING_BUTTON_ACTION, FloatingButtonAction.MENU.name).orEmpty()
+            )
+        }.getOrDefault(FloatingButtonAction.MENU)
+
+    fun setFloatingButtonAction(context: Context, action: FloatingButtonAction) {
+        prefs(context).edit { putString(KEY_FLOATING_BUTTON_ACTION, action.name) }
+    }
+}

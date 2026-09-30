@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import dev.autobridge.safety.ParkingStateStore
+import dev.autobridge.safety.SafetyEnforcement
 
 /**
  * V0.6 experiment: rendering a single chosen app onto the car display, instead of mirroring the
@@ -46,7 +47,7 @@ object PerAppDisplayController {
      * the platform refuses the targeted-display launch.
      */
     fun launchOnDisplay(context: Context, packageName: String, displayId: Int): Boolean {
-        if (!canLaunchOnDisplay(ParkingStateStore.isParked, displayId)) return false
+        if (!canLaunchOnDisplay(SafetyEnforcement.gateParked(ParkingStateStore.isParked), displayId)) return false
 
         val intent = context.packageManager.getLaunchIntentForPackage(packageName)
             ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

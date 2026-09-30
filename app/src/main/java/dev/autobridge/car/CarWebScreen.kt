@@ -51,8 +51,7 @@ class CarWebScreen(carContext: CarContext) : Screen(carContext) {
                     .setStartHeaderAction(Action.BACK)
                     .addEndHeaderAction(
                         Action.Builder()
-                            .setTitle("Manage")
-                            .setBackgroundColor(CarColor.BLUE)
+                            .setIcon(CarIcons.of(carContext, CarIcons.MANAGE))
                             .setOnClickListener { CarNavigation.open(screenManager, "CarBookmarksScreen") { CarBookmarksScreen(carContext) } }
                             .build()
                     )

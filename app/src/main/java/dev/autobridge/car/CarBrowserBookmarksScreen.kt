@@ -62,7 +62,7 @@ class CarBrowserBookmarksScreen(carContext: CarContext) : Screen(carContext) {
                     .setStartHeaderAction(Action.BACK)
                     .addEndHeaderAction(
                         Action.Builder()
-                            .setTitle(if (manageMode) "Done" else "Manage")
+                            .setIcon(CarIcons.of(carContext, if (manageMode) CarIcons.DONE else CarIcons.MANAGE))
                             .setOnClickListener { manageMode = !manageMode; invalidate() }
                             .build()
                     )

@@ -106,13 +106,13 @@ class CarNowPlayingScreen(carContext: CarContext) : Screen(carContext) {
                     .setStartHeaderAction(Action.BACK)
                     .addEndHeaderAction(
                         Action.Builder()
-                            .setTitle("Library")
+                            .setIcon(CarIcons.of(carContext, CarIcons.LIBRARY))
                             .setOnClickListener { CarNavigation.open(screenManager, "CarMediaLibraryScreen") { CarMediaLibraryScreen(carContext) } }
                             .build()
                     )
                     .addEndHeaderAction(
                         Action.Builder()
-                            .setTitle("Full controls")
+                            .setIcon(CarIcons.of(carContext, CarIcons.CONTROLS))
                             .setOnClickListener { CarNavigation.open(screenManager, "CarMediaScreen") { CarMediaScreen(carContext) } }
                             .build()
                     )

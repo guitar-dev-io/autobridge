@@ -49,7 +49,7 @@ class CarQuickLaunchScreen(carContext: CarContext, private val manage: Boolean =
                     .setStartHeaderAction(Action.BACK)
                     .addEndHeaderAction(
                         Action.Builder()
-                            .setTitle("Add")
+                            .setIcon(CarIcons.of(carContext, CarIcons.ADD))
                             .setOnClickListener { addShortcut() }
                             .build()
                     )
@@ -57,7 +57,7 @@ class CarQuickLaunchScreen(carContext: CarContext, private val manage: Boolean =
                         if (!manage) {
                             addEndHeaderAction(
                                 Action.Builder()
-                                    .setTitle("Edit")
+                                    .setIcon(CarIcons.of(carContext, CarIcons.EDIT))
                                     .setOnClickListener { CarNavigation.open(screenManager, "CarQuickLaunchScreen") { CarQuickLaunchScreen(carContext, manage = true) } }
                                     .build()
                             )

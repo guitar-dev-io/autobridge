@@ -5,9 +5,12 @@ import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.os.Process
+import android.os.SystemClock
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
 import androidx.media3.common.util.Size
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
@@ -25,9 +28,37 @@ import dev.autobridge.safety.ParkingStateStore
 
 /** Hosts the long-lived Media3 player and MediaSession used by Android Auto and steering controls. */
 class MediaPlaybackService : MediaSessionService() {
+    private companion object {
+        /** Minimum gap between two live-edge recoveries, so a failing stream is not retried in a loop. */
+        const val LIVE_RECOVERY_INTERVAL_MS = 5_000L
+    }
+
     private var player: ExoPlayer? = null
     private var session: MediaSession? = null
     private val mainHandler = Handler(Looper.getMainLooper())
+    private var lastLiveRecoveryMs = 0L
+
+    /**
+     * Rejoins a live stream whose window has moved past our position - what an IPTV channel does
+     * while playback is paused, and the reason a paused channel came back as a dead error pane
+     * instead of a picture. Media3 does not recover from this on its own.
+     */
+    private val playerListener = object : Player.Listener {
+        override fun onPlayerError(error: PlaybackException) {
+            if (error.errorCode != PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) return
+            val now = SystemClock.elapsedRealtime()
+            if (now - lastLiveRecoveryMs < LIVE_RECOVERY_INTERVAL_MS) {
+                StructuredLog.w("MEDIA", "behind live window again within ${LIVE_RECOVERY_INTERVAL_MS}ms; reporting it")
+                return
+            }
+            lastLiveRecoveryMs = now
+            StructuredLog.i("MEDIA", "behind live window; rejoining at the live edge")
+            player?.let { target ->
+                target.seekToDefaultPosition()
+                target.prepare()
+            }
+        }
+    }
     private val parkingListener: (ParkingStateStore.State) -> Unit = {
         if (Looper.myLooper() == Looper.getMainLooper()) enforceVideoParking()
         else mainHandler.post { enforceVideoParking() }
@@ -115,6 +146,7 @@ class MediaPlaybackService : MediaSessionService() {
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
         player = exoPlayer
+        exoPlayer.addListener(playerListener)
         // Arms the effect pipeline. The renderer only builds it when a video-effects list has been
         // set before the first prepare(), so this empty call has to happen at construction even
         // though the real letterbox ratio is not known until a screen attaches a surface.
@@ -155,6 +187,7 @@ class MediaPlaybackService : MediaSessionService() {
         ParkingStateStore.removeListener(parkingListener)
         VideoOutputGeometry.removeListener(geometryListener)
         mainHandler.removeCallbacksAndMessages(null)
+        player?.removeListener(playerListener)
         session?.release()
         session = null
         player?.release()

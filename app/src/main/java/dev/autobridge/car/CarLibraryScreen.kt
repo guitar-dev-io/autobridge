@@ -153,7 +153,7 @@ class CarLibraryScreen(
             return
         }
         if (mode == Mode.GALLERY || (mode == Mode.FOLDERS && item.subtitle != "Audio")) {
-            screenManager.push(CarVideoScreen(carContext, item.uri, item.title))
+            CarVideoLauncher.open(screenManager, carContext, item.uri, item.title)
             return
         }
         if (!mediaPlayback.isConnected) {

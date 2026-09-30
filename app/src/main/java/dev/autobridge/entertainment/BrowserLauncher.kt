@@ -16,11 +16,19 @@ object BrowserLauncher {
     fun canOpen(): Boolean = FeaturePolicy.app.isAvailable(Feature.BROWSER)
 
     /**
-     * Opens a provider sign-in page (accounts.google.com etc.) as a Custom Tab instead of handing
-     * off to a full external browser app. A Custom Tab renders inside Chrome's own process and
-     * shares its cookie jar, so a device already signed in to Chrome skips the credential prompt
-     * entirely — unlike this app's own WebView, which providers block from hosting sign-in at all.
-     * Falls back to [openUrl] when no Custom Tabs-capable browser is installed.
+     * Opens a provider sign-in page as a Custom Tab instead of handing off to a full external
+     * browser app. A Custom Tab renders inside Chrome's own process and shares its cookie jar, so a
+     * device already signed in to Chrome skips the credential prompt entirely. Falls back to
+     * [openUrl] when no Custom Tabs-capable browser is installed.
+     *
+     * Sharing Chrome's cookie jar cuts only one way, and that limit is why this path is a last
+     * resort rather than the default. The session a Custom Tab establishes is written to Chrome's
+     * cookie store, which this app's WebView cannot read — so signing in here does not leave the
+     * page in [dev.autobridge.browser.CarWebRenderer] signed in. For the hosts still routed through
+     * here (Apple and Microsoft, per `BrowserDefaults.externalSignInHosts`) that makes it a dead
+     * end: sign-in succeeds in Chrome and the car surface is unchanged. Google is deliberately not
+     * on that list — it signs in inside this app's own WebView, where the resulting cookies land in
+     * the process-wide [android.webkit.CookieManager] that both presentations share.
      *
      * Deliberately does NOT set `FLAG_ACTIVITY_NEW_TASK`: that flag is what makes Custom Tabs
      * launch into a separate task instead of stacking on top of the caller, which looks and

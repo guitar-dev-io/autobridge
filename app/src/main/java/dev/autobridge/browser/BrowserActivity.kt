@@ -58,6 +58,7 @@ class BrowserActivity : Activity() {
     private lateinit var chromeBar: FrameLayout
     private lateinit var handle: TextView
     private lateinit var menuButton: TextView
+    private lateinit var toolbarMenuButton: Button
     private lateinit var stopReload: Button
     private lateinit var fullscreenButton: Button
     private lateinit var progress: ProgressBar
@@ -112,15 +113,16 @@ class BrowserActivity : Activity() {
             textSize = iconSp(AutoUiSizes.ICON_MEDIUM_DP)
             gravity = Gravity.CENTER
             setTextColor(BrowserTheme.iconEnabled)
-            contentDescription = "Browser menu"
+            contentDescription = "เมนูเบราว์เซอร์ (ลากเพื่อย้ายปุ่ม)"
             isFocusable = true
             background = GradientDrawable().apply {
                 setColor(0xE6101113.toInt())
                 cornerRadius = sizes.fabSize / 2f
                 setStroke(1.dp(), 0xFF526FA6.toInt())
             }
-            setOnClickListener { showMenu() }
+            setOnClickListener { runFloatingButtonAction() }
         }
+        makeMenuButtonDraggable()
         content.addView(
             menuButton,
             FrameLayout.LayoutParams(
@@ -267,7 +269,10 @@ class BrowserActivity : Activity() {
             }
         )
         fullscreenButton = control("⛶", "Fullscreen") { setFullscreen(!fullscreen) }
-        control("☰", "Browser menu") { showMenu() }
+        // Same ☰ as the floating button. Both live on screen only when the floating button has
+        // been rebound away from MENU; while it is still the default, the toolbar button would be
+        // a second, identical-looking way to do the one thing the floating one already does.
+        toolbarMenuButton = control("☰", "Browser menu") { showMenu() }
 
         progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal)
         return FrameLayout(this).apply {
@@ -285,7 +290,7 @@ class BrowserActivity : Activity() {
     }
 
     private fun createWebView(): WebView = WebView(this).apply {
-        BrowserDefaults.configure(this@BrowserActivity, settings)
+        BrowserDefaults.configure(this@BrowserActivity, this)
         BrowserDefaults.configureDebugTools()
         setDownloadListener(BrowserDownloads.listener(this@BrowserActivity) { toast(it) })
         webChromeClient = object : WebChromeClient() {
@@ -381,7 +386,7 @@ class BrowserActivity : Activity() {
 
     private fun setFullscreen(enabled: Boolean) {
         fullscreen = enabled
-        menuButton.visibility = if (enabled) View.VISIBLE else View.GONE
+        applyFloatingButtonPreference()
         chromeBar.visibility = if (enabled) View.GONE else View.VISIBLE
         handle.visibility = if (enabled) View.VISIBLE else View.GONE
         fullscreenButton.contentDescription = if (enabled) "Exit fullscreen" else "Fullscreen"
@@ -395,6 +400,124 @@ class BrowserActivity : Activity() {
             systemBars = null, imeBottom = 0,
             chromeVisible = !enabled, fullscreen = enabled
         )
+    }
+
+    // ------------------------------------------------------------------ floating menu button
+
+    /**
+     * Makes the floating menu button draggable, and remembers where it was left.
+     *
+     * A control that is always on top of the page will sometimes sit on top of something the page
+     * wanted that corner for — a site's own chat bubble, a "back to top" arrow, a video's controls.
+     * The usual answer is to hide the button, which is what made the menu hard to find in the first
+     * place. Letting it be moved keeps it present without it ever being permanently in the way.
+     *
+     * A drag is distinguished from a tap by [android.view.ViewConfiguration.getScaledTouchSlop], so
+     * a touch that drifts a few pixels — which is every touch in a moving car — still opens the
+     * menu instead of being swallowed as a failed drag.
+     */
+    private fun makeMenuButtonDraggable() {
+        val slop = android.view.ViewConfiguration.get(this).scaledTouchSlop
+        var downX = 0f
+        var downY = 0f
+        var startX = 0f
+        var startY = 0f
+        var dragging = false
+        menuButton.setOnTouchListener { view, event ->
+            when (event.actionMasked) {
+                android.view.MotionEvent.ACTION_DOWN -> {
+                    downX = event.rawX; downY = event.rawY
+                    startX = view.translationX; startY = view.translationY
+                    dragging = false
+                    true
+                }
+                android.view.MotionEvent.ACTION_MOVE -> {
+                    val dx = event.rawX - downX
+                    val dy = event.rawY - downY
+                    if (!dragging && (kotlin.math.abs(dx) > slop || kotlin.math.abs(dy) > slop)) dragging = true
+                    if (dragging) {
+                        view.translationX = startX + dx
+                        view.translationY = startY + dy
+                        clampMenuButton()
+                    }
+                    true
+                }
+                android.view.MotionEvent.ACTION_UP -> {
+                    if (dragging) saveMenuButtonPosition() else view.performClick()
+                    true
+                }
+                android.view.MotionEvent.ACTION_CANCEL -> true
+                else -> false
+            }
+        }
+        // Rotation, the keyboard and the system bars all change the box the button may sit in, so
+        // the saved offset is re-clamped on every layout rather than only when it is dragged.
+        menuButton.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> clampMenuButton() }
+        val saved = getSharedPreferences(FAB_PREFS, Context.MODE_PRIVATE)
+        menuButton.translationX = saved.getFloat(FAB_KEY_X, 0f)
+        menuButton.translationY = saved.getFloat(FAB_KEY_Y, 0f)
+    }
+
+    /**
+     * Applies [BrowserControlsStore.alwaysShowFloatingButton].
+     *
+     * The button used to appear only in fullscreen, so with the toolbar on screen the menu existed
+     * in exactly one place — a 46dp glyph in the top corner — and reaching it from the bottom of a
+     * long page meant scrolling back up first. Being always present is now the default and the
+     * whole point of a floating control; the old behaviour stays available for anyone who would
+     * rather have the pixels back, and dragging keeps the button off whatever the page puts
+     * underneath it either way.
+     */
+    private fun applyFloatingButtonPreference() {
+        val always = BrowserControlsStore.alwaysShowFloatingButton(this)
+        menuButton.visibility = if (always || fullscreen) View.VISIBLE else View.GONE
+        // The glyph says what the button will do, so a button rebound to "new tab" does not keep
+        // claiming to be the menu.
+        val action = BrowserControlsStore.floatingButtonAction(this)
+        menuButton.text = action.glyph
+        // The toolbar's own ☰ only appears once the floating button stops being the fixed way to
+        // reach the menu; otherwise the two sat side by side doing the same thing.
+        toolbarMenuButton.visibility = if (action == FloatingButtonAction.MENU) View.GONE else View.VISIBLE
+    }
+
+    /** Runs whatever the user bound the floating button to; the menu is only the default. */
+    private fun runFloatingButtonAction() {
+        if (!allowed()) return
+        when (BrowserControlsStore.floatingButtonAction(this)) {
+            FloatingButtonAction.MENU -> showMenu()
+            // The phone presentation keeps one page per activity — tabs live on the car surface —
+            // so both tab actions land on the menu, which is where its page actions are.
+            FloatingButtonAction.TABS, FloatingButtonAction.NEW_TAB -> showMenu()
+            FloatingButtonAction.HOME -> navigate(BrowserDefaults.HOME)
+            FloatingButtonAction.ADDRESS -> focusAddressBar()
+            FloatingButtonAction.FULLSCREEN -> setFullscreen(!fullscreen)
+        }
+    }
+
+    /** Brings the toolbar back if it is hidden, then puts the caret in the address field. */
+    private fun focusAddressBar() {
+        if (fullscreen) setFullscreen(false)
+        address.requestFocus()
+        (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager)
+            .showSoftInput(address, InputMethodManager.SHOW_IMPLICIT)
+    }
+
+    /** Keeps the button inside the content area, whatever the offset was before. */
+    private fun clampMenuButton() {
+        if (menuButton.width == 0 || content.width == 0) return
+        val minX = (content.paddingLeft - menuButton.left).toFloat()
+        val maxX = (content.width - content.paddingRight - menuButton.right).toFloat()
+        val minY = (content.paddingTop - menuButton.top).toFloat()
+        val maxY = (content.height - content.paddingBottom - menuButton.bottom).toFloat()
+        menuButton.translationX = menuButton.translationX.coerceIn(minOf(minX, maxX), maxOf(minX, maxX))
+        menuButton.translationY = menuButton.translationY.coerceIn(minOf(minY, maxY), maxOf(minY, maxY))
+    }
+
+    private fun saveMenuButtonPosition() {
+        getSharedPreferences(FAB_PREFS, Context.MODE_PRIVATE).edit()
+            .putFloat(FAB_KEY_X, menuButton.translationX)
+            .putFloat(FAB_KEY_Y, menuButton.translationY)
+            .apply()
     }
 
     /**
@@ -473,6 +596,10 @@ class BrowserActivity : Activity() {
         dialog = AlertDialog.Builder(this)
             .setTitle(title)
             .setView(ScrollView(this).apply { addView(grid) })
+            // Two separate exits, because they used to be one. The pinned button leaves the
+            // browser entirely, which is not what someone who opened the menu by mistake wants;
+            // without a plain "close" the only way back to the page was the system back key.
+            .setNeutralButton("ปิดเมนู", null)
             .setNegativeButton(closeLabel) { _, _ -> onClose() }
             .create()
         dialog.show()
@@ -490,6 +617,7 @@ class BrowserActivity : Activity() {
             listOf(
                 MenuEntry("\u2302", "หน้าแรก") { navigate(BrowserDefaults.HOME) },
                 MenuEntry("\u2606", "บุ๊กมาร์ก") { showBookmarks() },
+                MenuEntry("\u2605", "บุ๊กมาร์กหน้านี้") { bookmarkCurrentPage() },
                 MenuEntry("\u21ba", "ประวัติ") { showHistory() },
                 MenuEntry("\u2193", "ดาวน์โหลด") { showDownloads() },
                 MenuEntry("\u2315", "ค้นหาในหน้า") { showFindInPage() },
@@ -498,21 +626,29 @@ class BrowserActivity : Activity() {
                         this,
                         if (desktop) BrowserUserAgentMode.MOBILE else BrowserUserAgentMode.DESKTOP
                     )
-                    BrowserDefaults.configure(this, web.settings)
+                    BrowserDefaults.configure(this, web)
                     web.reload()
                 },
                 MenuEntry("\u22ef", "เพิ่มเติม") { showMoreMenu() },
             ),
-            "กลับหน้า Home"
+            "ออกจากเบราว์เซอร์"
         ) { finish() }
     }
 
-    /** Secondary menu for actions used rarely enough not to earn a slot in [showMenu]. */
+    /**
+     * Secondary menu for actions used rarely enough not to earn a slot in [showMenu].
+     *
+     * Fullscreen used to lead this list, which made it the menu's most prominent entry while the
+     * identical ⛶ sat on the toolbar the menu was opened from. A menu that repeats the bar above it
+     * spends its largest targets re-stating what the user can already see, so entries with a
+     * toolbar button of their own are not repeated here. The slot went to the controls settings,
+     * which has nowhere else to live.
+     */
     private fun showMoreMenu() {
         showActionGrid(
             "เพิ่มเติม",
             listOf(
-                MenuEntry("\u26f6", "เต็มหน้าจอ") { setFullscreen(true) },
+                MenuEntry("\u2699", "ตั้งค่าปุ่มลอย") { showControlSettings() },
                 MenuEntry("\u29c9", "คัดลอก URL") {
                     val manager = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     manager.setPrimaryClip(ClipData.newPlainText("URL", web.url.orEmpty()))
@@ -541,8 +677,70 @@ class BrowserActivity : Activity() {
                     if (url == null) toast("เปิด Browser บน Android Auto ก่อน") else navigate(url)
                 },
             ),
-            "ย้อนกลับ"
-        ) { }
+            "‹ ย้อนกลับ"
+        ) { showMenu() }
+    }
+
+    /** Saves the page on screen, the one action the phone menu could list bookmarks but not add to. */
+    private fun bookmarkCurrentPage() {
+        val url = web.url.orEmpty()
+        if (url.isBlank()) { toast("ยังไม่มีหน้าให้บันทึก"); return }
+        val added = WebBookmarkStore.add(this, web.title?.takeIf { it.isNotBlank() } ?: url, url)
+        toast(if (added) "บันทึกบุ๊กมาร์กแล้ว" else "บันทึกไม่สำเร็จ")
+    }
+
+    /**
+     * The in-app control preferences, shared with the car surface through [BrowserControlsStore].
+     *
+     * Kept as one small dialog rather than a settings activity: there are three switches, and a
+     * separate screen to reach them would be more chrome than the settings themselves.
+     */
+    private fun showControlSettings() {
+        val labels = arrayOf<CharSequence>(
+            "แสดงแถบ URL ตลอดเวลา (จอรถ)",
+            "แสดงปุ่มลอยตลอดเวลา"
+        )
+        val checked = booleanArrayOf(
+            BrowserControlsStore.alwaysShowUrlBar(this),
+            BrowserControlsStore.alwaysShowFloatingButton(this)
+        )
+        AlertDialog.Builder(this)
+            .setTitle("ปุ่มลอยและแถบควบคุม")
+            .setMultiChoiceItems(labels, checked) { _, index, value ->
+                when (index) {
+                    0 -> BrowserControlsStore.setAlwaysShowUrlBar(this, value)
+                    1 -> BrowserControlsStore.setAlwaysShowFloatingButton(this, value)
+                }
+                applyFloatingButtonPreference()
+            }
+            .setNeutralButton("ปุ่มลอยกดแล้วทำอะไร") { _, _ -> showFloatingActionChooser() }
+            .setPositiveButton("เสร็จสิ้น", null)
+            .show()
+    }
+
+    private fun showFloatingActionChooser() {
+        val actions = FloatingButtonAction.values()
+        val current = BrowserControlsStore.floatingButtonAction(this)
+        AlertDialog.Builder(this)
+            .setTitle("ปุ่มลอยกดแล้วทำอะไร")
+            .setSingleChoiceItems(
+                actions.map { "${it.glyph}  ${it.label}" }.toTypedArray(),
+                actions.indexOf(current)
+            ) { dialog, index ->
+                BrowserControlsStore.setFloatingButtonAction(this, actions[index])
+                applyFloatingButtonPreference()
+                dialog.dismiss()
+                showControlSettings()
+            }
+            .setNegativeButton("‹ ย้อนกลับ") { _, _ -> showControlSettings() }
+            .show()
+    }
+
+    private companion object {
+        /** Shared with [BrowserDefaults] and [BrowserUserAgentStore]: one browser preference file. */
+        const val FAB_PREFS = "autobridge_browser"
+        const val FAB_KEY_X = "menu_button_dx"
+        const val FAB_KEY_Y = "menu_button_dy"
     }
 
     private fun clipboardText(): String? {
@@ -709,12 +907,21 @@ class BrowserActivity : Activity() {
     override fun onResume() {
         super.onResume(); resumed = true
         val previousAgent = web.settings.userAgentString
-        BrowserDefaults.configure(this, web.settings)
+        BrowserDefaults.configure(this, web)
         enforcePolicy()
         if (allowed() && previousAgent != web.settings.userAgentString) web.reload()
     }
 
-    override fun onPause() { resumed = false; web.onPause(); super.onPause() }
+    override fun onPause() {
+        resumed = false
+        web.onPause()
+        // WebView writes cookies to disk lazily, so a session established moments ago can still be
+        // memory-only at this point. Flushing on the way to the background is what keeps a fresh
+        // sign-in from being lost when the process is killed before Chromium's own periodic flush
+        // runs. It blocks on I/O, which is acceptable once per backgrounding.
+        CookieManager.getInstance().flush()
+        super.onPause()
+    }
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {

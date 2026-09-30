@@ -8,6 +8,8 @@ import android.webkit.CookieManager
 import android.webkit.PermissionRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
+import androidx.webkit.WebSettingsCompat
+import androidx.webkit.WebViewFeature
 import dev.autobridge.BuildConfig
 import dev.autobridge.entertainment.ContentAddress
 
@@ -40,9 +42,16 @@ object BrowserDefaults {
      *
      * - `allowFileAccess`/`allowContentAccess` stay **false** — the browser only ever loads HTTPS,
      *   so a page has no legitimate reason to reach `file://` or this app's content providers.
-     * - `setAcceptThirdPartyCookies` is **not** enabled. First-party cookies are on (the default),
-     *   which is what keeps a site signed in; third-party cookies would only widen cross-site
-     *   tracking and are not needed by any feature here.
+     * - `setAcceptThirdPartyCookies` **is** enabled, reversing an earlier decision to leave it off.
+     *   First-party cookies alone keep an already-signed-in site signed in, but they are not enough
+     *   to *complete* a Google sign-in: the handoff between `accounts.google.com` and
+     *   `youtube.com` leans on requests made to the accounts origin from a page served by the
+     *   content origin, which WebView classifies as third-party and strips cookies from when this
+     *   is off. The visible symptom is a sign-in that appears to succeed and then lands on a page
+     *   still showing a signed-out header. The cost is real and accepted knowingly: third-party
+     *   cookies are also the mechanism of cross-site tracking, so enabling them widens what
+     *   embedded content can correlate. It is a per-WebView setting, not a global one, which is why
+     *   [configure] takes the WebView rather than only its [WebSettings].
      * - JavaScript interfaces / `addJavascriptInterface` are never registered, so no page can reach
      *   Android APIs.
      *
@@ -50,7 +59,8 @@ object BrowserDefaults {
      * that makes `WebView.zoomBy()` and pinch work at all, and the floating +/- buttons it would
      * otherwise draw are unwanted clutter on a car surface.
      */
-    fun configure(context: Context, settings: WebSettings) {
+    fun configure(context: Context, webView: WebView) {
+        val settings = webView.settings
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true
         settings.allowFileAccess = false
@@ -68,6 +78,16 @@ object BrowserDefaults {
         settings.textZoom = 100
         settings.userAgentString = BrowserUserAgentStore.resolve(context, WebSettings.getDefaultUserAgent(context))
         CookieManager.getInstance().setAcceptCookie(true)
+        CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
+        // WebView adds an "X-Requested-With: <package name>" header to every request by default —
+        // a second signal (independent of the "; wv)" UA token stripped above) that identifies the
+        // request as coming from an embedded WebView rather than a real browser. Google's sign-in
+        // flow checks for it too, so an empty allow-list here removes it from every origin. Only
+        // available on WebView versions that support this androidx.webkit feature; older WebViews
+        // keep sending the header and are unaffected by this call.
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.REQUESTED_WITH_HEADER_ALLOW_LIST)) {
+            WebSettingsCompat.setRequestedWithHeaderOriginAllowList(settings, emptySet())
+        }
     }
 
     /**

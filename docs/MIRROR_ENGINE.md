@@ -101,10 +101,17 @@ the order it happens:
    cannot touch is most of the feature missing.
 3. **Screen capture** — Android grants this for one session at a time, so the step is the start
    button rather than a permission, and it turns into **Stop** while a session is running.
+4. **Background use** — `PowerManager.isIgnoringBatteryOptimizations`. Mirroring and IPTV playback
+   both run in correctly declared foreground services, which is the officially supported way to
+   survive backgrounding, but some OEM battery managers (MIUI/HyperOS and similar) kill the process
+   anyway unless the app is explicitly exempted — observed on a Xiaomi 13T Pro as mirroring/media
+   stopping outright (not just pausing) when the phone app was backgrounded or another Android Auto
+   app took the car display. Marked optional, never blocking: stock Android needs nothing here.
 
-The three used to live in three different apps — the system app info, Android's accessibility list
-and a button on the control centre — and none of them mentions the other two, so the usual failure
-was a running mirror with dead touch and no stated reason.
+The four used to live in different apps — the system app info, Android's accessibility list, a
+button on the control centre, and (for background use) OEM-specific battery settings — and none of
+them mentions the others, so the usual failure was a running mirror with dead touch, or one that
+stopped entirely on a phone with an aggressive battery manager, with no stated reason.
 
 The step list is [`MirrorReadiness`](../app/src/main/java/dev/autobridge/mirror/MirrorReadiness.kt):
 pure, with no Android dependency, so the order, the wording and "what is blocking right now" are

@@ -121,6 +121,8 @@ class CarWebRenderer(context: Context) {
         fun openDiagnostics()
         fun openExternal(url: String)
         fun showMessage(text: String)
+        /** Leaves the browser entirely and returns to AutoBridge's main dashboard. */
+        fun openAppHome()
 
         /** Browser state changed in a way the car template should reflect. */
         fun onBrowserStateChanged()
@@ -174,7 +176,7 @@ class CarWebRenderer(context: Context) {
 
     private var sizes: AutoUiSizes = AutoUiSizes.forDensity(1f)
     private var viewport: BrowserViewport = BrowserViewport.create(1, 1, 1f, 1f)
-    private var chrome: BrowserChromeLayout = BrowserChromeLayout.create(sizes, viewport)
+    private var chrome: BrowserChromeLayout = BrowserChromeLayout.create(sizes, viewport, showMenuButton = true)
     private val visibility = ChromeVisibility()
     private var overlay: Overlay = Overlay.NONE
     private var drawer: BrowserDrawerModel? = null
@@ -244,6 +246,10 @@ class CarWebRenderer(context: Context) {
 
     /** Fired instead of navigating when a page is a provider that blocks sign-in inside any WebView. */
     var onExternalSignInRequired: ((url: String) -> Unit)? = null
+
+    /** Live copies of [BrowserControlsStore], refreshed by [applyControlSettings]. */
+    private var alwaysShowFab: Boolean = true
+    private var fabAction: FloatingButtonAction = FloatingButtonAction.MENU
 
     private val frameRunnable = object : Runnable {
         override fun run() {
@@ -369,6 +375,7 @@ class CarWebRenderer(context: Context) {
             running = true
             // Give the user the full idle window from the moment the browser appears.
             visibility.onInteraction(SystemClock.uptimeMillis())
+            applyControlSettings()
             // Only load on the very first start (or when an explicit URL is requested). A surface
             // recreation/resize must re-fit the existing page, never reload and lose it. The
             // User-Agent is applied when the WebView is created and when the user changes it, not
@@ -422,6 +429,11 @@ class CarWebRenderer(context: Context) {
             saveActiveTabState()
             BrowserTabStore.save(appContext, tabs)
             webView?.onPause()
+            // stop() is the teardown that runs whenever the car surface detaches — including on
+            // unplug, which is exactly when the process is most likely to be killed outright.
+            // Cookies not yet written to disk would go with it, and the cost of losing them is
+            // paid on a screen where typing a password back in is painful.
+            CookieManager.getInstance().flush()
             trace(ViewportDebug.Event.SURFACE_DESTROYED)
         }
     }
@@ -700,6 +712,11 @@ class CarWebRenderer(context: Context) {
         }
         val drawerPanel = drawer?.panel.takeIf { overlay == Overlay.DRAWER || overlay == Overlay.DRAWER_MORE }
         if (overlay == Overlay.DRAWER || overlay == Overlay.DRAWER_MORE) {
+            // Checked before the rows: the header sits above them and owns its own tap.
+            if (drawer?.hitsClose(x, y) == true) {
+                closeDrawer()
+                return@runOnMain
+            }
             val row = drawer?.rowAt(x, y)
             if (row != null) {
                 when (row.item.action) {
@@ -725,7 +742,7 @@ class CarWebRenderer(context: Context) {
         // its buttons must be hittable immediately. Testing the fade alpha made every tap during
         // the 180ms fade-in fall through to the edge-reveal band instead of the button under it.
         val chromeVisible = visibility.isShown
-        val zone = chrome.hitTest(x, y, chromeVisible, null)
+        val zone = chrome.hitTest(x, y, chromeVisible, null, fabVisible(now))
         if (ViewportDebug.enabled) {
             Log.i(
                 TAG,
@@ -743,7 +760,7 @@ class CarWebRenderer(context: Context) {
             ChromeZone.ADDRESS -> { visibility.onInteraction(now); host?.openAddressInput() }
             ChromeZone.FULLSCREEN -> toggleFullscreen()
             ChromeZone.MENU -> openDrawer()
-            ChromeZone.FAB -> { visibility.onInteraction(now); openDrawer() }
+            ChromeZone.FAB -> { visibility.onInteraction(now); performFloatingAction() }
             ChromeZone.HANDLE, ChromeZone.EDGE_REVEAL -> {
                 // Recalling chrome must not also leave fullscreen: the page keeps every pixel it
                 // has, the toolbar simply fades back in over it.
@@ -863,6 +880,51 @@ class CarWebRenderer(context: Context) {
 
     // ------------------------------------------------------------------ overlays
 
+    /**
+     * Re-reads [BrowserControlsStore] and applies it to the live surface. Called when the renderer
+     * starts and again whenever the settings screen reports a change, so a toggle takes effect on
+     * the panel without the browser being restarted.
+     */
+    fun applyControlSettings() = runOnMain {
+        visibility.setAutoHide(
+            SystemClock.uptimeMillis(),
+            !BrowserControlsStore.alwaysShowUrlBar(appContext)
+        )
+        alwaysShowFab = BrowserControlsStore.alwaysShowFloatingButton(appContext)
+        fabAction = BrowserControlsStore.floatingButtonAction(appContext)
+        // The toolbar's own ☰ only appears once the floating button stops being the menu's fixed
+        // entry point, so a change made in settings has to be reflected in the chrome immediately.
+        chrome = BrowserChromeLayout.create(sizes, viewport, showToolbarMenuButton())
+    }
+
+    /** Whether the floating button is drawn right now; hit testing asks the same question. */
+    private fun fabVisible(nowMs: Long): Boolean =
+        overlay == Overlay.NONE && (alwaysShowFab || visibility.isRendered(nowMs))
+
+    /**
+     * Whether the toolbar draws its own ☰ button, alongside the floating button.
+     *
+     * The two used to always coexist: an identical hamburger glyph on the auto-hiding toolbar and
+     * on the always-present floating button, both opening the same drawer. Nothing distinguished
+     * them, so the reported confusion was "which one do I press?" rather than either control being
+     * broken. As long as the floating button is bound to [FloatingButtonAction.MENU] — the default
+     * — it is the single, fixed way to open the menu and the toolbar does not repeat it. Rebinding
+     * the floating button to a different action (tabs, new tab, home...) hands the toolbar button
+     * back, since the menu then needs a way in of its own again.
+     */
+    private fun showToolbarMenuButton(): Boolean = fabAction != FloatingButtonAction.MENU
+
+    private fun performFloatingAction() {
+        when (fabAction) {
+            FloatingButtonAction.MENU -> openDrawer()
+            FloatingButtonAction.TABS -> openTabSwitcher()
+            FloatingButtonAction.NEW_TAB -> openNewTab()
+            FloatingButtonAction.HOME -> goHome()
+            FloatingButtonAction.ADDRESS -> host?.openAddressInput()
+            FloatingButtonAction.FULLSCREEN -> toggleFullscreen()
+        }
+    }
+
     fun openDrawer() = runOnMain {
         drawerScroll = 0f
         overlay = Overlay.DRAWER
@@ -894,12 +956,15 @@ class CarWebRenderer(context: Context) {
 
     private fun rebuildDrawer() {
         val isDesktop = BrowserUserAgentStore.mode(appContext) == BrowserUserAgentMode.DESKTOP
-        val sections = if (overlay == Overlay.DRAWER_MORE) {
+        val more = overlay == Overlay.DRAWER_MORE
+        val sections = if (more) {
             BrowserDrawerModel.moreSectionsFor(isDesktop = isDesktop)
         } else {
             BrowserDrawerModel.sectionsFor(tabCount = tabCount, isDesktop = isDesktop)
         }
-        drawer = BrowserDrawerModel.create(sizes, viewport, sections, drawerScroll)
+        drawer = BrowserDrawerModel.create(
+            sizes, viewport, sections, drawerScroll, if (more) "More" else "Menu"
+        )
     }
 
     private fun performDrawerAction(action: DrawerAction) {
@@ -933,6 +998,7 @@ class CarWebRenderer(context: Context) {
             DrawerAction.ZOOM_IN -> zoomIn()
             DrawerAction.ZOOM_OUT -> zoomOut()
             DrawerAction.RELOAD -> reload()
+            DrawerAction.APP_HOME -> target?.openAppHome()
             DrawerAction.OPEN_EXTERNAL -> target?.openExternal(url)
             DrawerAction.SETTINGS -> target?.openSettings()
             DrawerAction.CLEAR_DATA -> {
@@ -948,6 +1014,14 @@ class CarWebRenderer(context: Context) {
     }
 
     private fun handleTabOverlayClick(x: Float, y: Float) {
+        // Checked first, matching the drawer: a fixed, always-in-the-same-corner way to leave the
+        // switcher without picking a tab, instead of relying on "tap the background" which is easy
+        // to miss in a moving car.
+        if (tabSwitcherCloseButton().contains(x, y)) {
+            overlay = Overlay.NONE
+            visibility.setDrawerOpen(SystemClock.uptimeMillis(), false)
+            return
+        }
         val cards = tabCardLayout()
         cards.forEach { (tab, box, closeBox) ->
             if (closeBox.contains(x, y)) {
@@ -965,6 +1039,16 @@ class CarWebRenderer(context: Context) {
         }
         overlay = Overlay.NONE
         visibility.setDrawerOpen(SystemClock.uptimeMillis(), false)
+    }
+
+    /** Same corner and size as the drawer's own close button, so the two overlays feel consistent. */
+    private fun tabSwitcherCloseButton(): Box {
+        val headerHeight = sizes.toolbarHeight(viewport.height)
+        val top = viewport.top.toFloat()
+        val closeSide = sizes.touchTarget.coerceAtMost(headerHeight - sizes.contentGap)
+        val centerY = top + headerHeight / 2f
+        val right = viewport.left + viewport.width - sizes.horizontalPadding
+        return Box(right - closeSide, centerY - closeSide / 2f, right, centerY + closeSide / 2f)
     }
 
     /** Tab cards laid out in a row; the trailing card (null tab) is "new tab". */
@@ -1001,7 +1085,7 @@ class CarWebRenderer(context: Context) {
         // cannot be inspected by looking at it. Debug builds expose it over chrome://inspect for the
         // same reason the phone activities do; release builds are untouched.
         BrowserDefaults.configureDebugTools()
-        BrowserDefaults.configure(appContext, settings)
+        BrowserDefaults.configure(appContext, this)
         setDownloadListener(
             BrowserDownloads.listener(appContext) { message ->
                 mainHandler.post { host?.showMessage(message) }
@@ -1122,7 +1206,7 @@ class CarWebRenderer(context: Context) {
         )
         val geometryUnchanged = next == viewport && view.width == next.webWidth
         viewport = next
-        chrome = BrowserChromeLayout.create(sizes, viewport)
+        chrome = BrowserChromeLayout.create(sizes, viewport, showToolbarMenuButton())
         if (overlay == Overlay.DRAWER || overlay == Overlay.DRAWER_MORE) rebuildDrawer()
         if (geometryUnchanged) {
             trace(event, "reflow=skipped")
@@ -1209,20 +1293,29 @@ class CarWebRenderer(context: Context) {
             }
             canvas.restore()
 
+            // No grab-handle graphic while chrome is hidden: the page fills the surface with
+            // nothing floating over it. The edge-reveal band ([BrowserChromeLayout.edgeReveal])
+            // still recalls the toolbar on a swipe/tap; it is simply never drawn.
+            val alpha = visibility.alphaAt(nowMs)
+            val overlayOpen = overlay != Overlay.NONE
+            // While an overlay owns the surface the toolbar is painted *first*, so the overlay's
+            // scrim dims it. Painted afterwards it stayed fully lit above the sheet: its buttons
+            // advertised themselves as live while every tap on them was being swallowed, and the
+            // bar covered the sheet's own close button. Dimmed and behind, it reads as what it is
+            // — inactive until the sheet is dismissed.
+            if (overlayOpen && alpha > 0.01f) drawToolbar(canvas, alpha)
             when (overlay) {
                 Overlay.DRAWER, Overlay.DRAWER_MORE -> drawDrawer(canvas)
                 Overlay.TABS -> drawTabSwitcher(canvas)
                 Overlay.NONE -> Unit
             }
-            // No grab-handle graphic while chrome is hidden: the page fills the surface with
-            // nothing floating over it. The edge-reveal band ([BrowserChromeLayout.edgeReveal])
-            // still recalls the toolbar on a swipe/tap; it is simply never drawn.
-            val alpha = visibility.alphaAt(nowMs)
-            if (alpha > 0.01f) drawToolbar(canvas, alpha)
-            // Drawn last and at full opacity regardless of the chrome fade: an always-available
-            // control that faded with the toolbar would be the same two-step it replaces. It is
-            // hidden only while an overlay already owns the surface.
-            if (overlay == Overlay.NONE) drawFab(canvas)
+            if (!overlayOpen && alpha > 0.01f) drawToolbar(canvas, alpha)
+            // Drawn last and, by default, at full opacity regardless of the chrome fade: an
+            // always-available control that faded with the toolbar would be the same two-step it
+            // replaces. It is hidden while an overlay already owns the surface, and follows the
+            // toolbar's fade only when the user has asked for that
+            // ([BrowserControlsStore.alwaysShowFloatingButton]).
+            if (fabVisible(nowMs)) drawFab(canvas, if (alwaysShowFab) 1f else alpha)
             canvas.restoreToCount(cardOuterSave)
         } catch (error: RuntimeException) {
             Log.w(TAG, "WebView draw to car surface failed", error)
@@ -1232,16 +1325,21 @@ class CarWebRenderer(context: Context) {
     }
 
     /** The floating control button: one large, always-present target that opens the menu. */
-    private fun drawFab(canvas: Canvas) {
+    private fun drawFab(canvas: Canvas, alpha: Float) {
         val box = chrome.fab
+        val opacity = alpha.coerceIn(0f, 1f)
         val radius = minOf(box.width, box.height) / 2f
         toolbarPaint.color = BrowserTheme.toolbarBackground
-        toolbarPaint.alpha = 235
+        toolbarPaint.alpha = (235 * opacity).toInt()
         canvas.drawCircle(box.centerX, box.centerY, radius, toolbarPaint)
         toolbarPaint.alpha = 255
         glyphPaint.color = BrowserTheme.iconEnabled
+        glyphPaint.alpha = (255 * opacity).toInt()
         glyphPaint.textSize = radius * 0.95f
-        canvas.drawText("\u2630", box.centerX, box.centerY + radius * 0.34f, glyphPaint)
+        // The glyph says what the button will do, so a button rebound to "new tab" does not keep
+        // claiming to be the menu.
+        canvas.drawText(fabAction.glyph, box.centerX, box.centerY + radius * 0.34f, glyphPaint)
+        glyphPaint.alpha = 255
     }
 
     /**
@@ -1376,15 +1474,6 @@ class CarWebRenderer(context: Context) {
         canvas.save()
         canvas.clipRect(panel.left, model.headerBottom, panel.right, panel.bottom)
         model.rows.forEach { row ->
-            row.sectionTitle?.let { section ->
-                detailPaint.color = BrowserTheme.textSecondary
-                detailPaint.textSize = sizes.iconSmall * 0.7f
-                canvas.drawText(
-                    section.uppercase(),
-                    row.bounds.left,
-                    row.bounds.top - sizes.contentGap * 0.8f, detailPaint
-                )
-            }
             val tile = row.bounds
             // Each entry is a filled tile, so the whole rectangle reads as the button it already
             // was for hit testing — the old list drew only text, leaving the target invisible.
@@ -1430,16 +1519,22 @@ class CarWebRenderer(context: Context) {
         titlePaint.color = BrowserTheme.textPrimary
         titlePaint.textSize = sizes.iconMedium * 0.8f
         canvas.drawText(
-            "AutoBridge", panel.left + sizes.horizontalPadding * 1.5f,
+            model.title, panel.left + sizes.horizontalPadding * 1.5f,
             (panel.top + model.headerBottom) / 2f + sizes.iconMedium * 0.28f, titlePaint
         )
-        detailPaint.color = BrowserTheme.textSecondary
-        detailPaint.textSize = sizes.iconSmall * 0.75f
-        val hint = "แตะนอกกรอบเพื่อปิด"
+        // A drawn close button rather than the old "tap outside to close" caption: the sheet leaves
+        // only a narrow margin around itself, so that instruction pointed at a target too small to
+        // hit in a moving car. This is a full touch target in a fixed corner.
+        val close = model.closeButton
+        toolbarPaint.color = BrowserTheme.drawerBackground
+        canvas.drawRoundRect(
+            close.left, close.top, close.right, close.bottom,
+            sizes.cornerRadius, sizes.cornerRadius, toolbarPaint
+        )
+        glyphPaint.color = BrowserTheme.iconEnabled
+        glyphPaint.textSize = minOf(close.width, close.height) * 0.5f
         canvas.drawText(
-            hint,
-            panel.right - sizes.horizontalPadding * 1.5f - detailPaint.measureText(hint),
-            (panel.top + model.headerBottom) / 2f + sizes.iconSmall * 0.28f, detailPaint
+            "\u2715", close.centerX, close.centerY + glyphPaint.textSize * 0.36f, glyphPaint
         )
     }
 
@@ -1457,14 +1552,42 @@ class CarWebRenderer(context: Context) {
             viewport.left + sizes.horizontalPadding * 2f,
             viewport.top + sizes.toolbarHeight(viewport.height) * 0.65f, titlePaint
         )
+        // Same fixed close target the drawer uses, drawn in the header's opposite corner from the
+        // title so the two overlays share one dismissal pattern instead of each inventing its own.
+        val close = tabSwitcherCloseButton()
+        toolbarPaint.color = BrowserTheme.drawerBackground
+        canvas.drawRoundRect(
+            close.left, close.top, close.right, close.bottom,
+            sizes.cornerRadius, sizes.cornerRadius, toolbarPaint
+        )
+        glyphPaint.color = BrowserTheme.iconEnabled
+        glyphPaint.textSize = minOf(close.width, close.height) * 0.5f
+        canvas.drawText("\u2715", close.centerX, close.centerY + glyphPaint.textSize * 0.36f, glyphPaint)
 
         tabCardLayout().forEach { (tab, box, closeBox) ->
-            toolbarPaint.color =
-                if (tab != null && tab.id == tabs.activeId) BrowserTheme.accent else BrowserTheme.addressPillBackground
+            val isActive = tab != null && tab.id == tabs.activeId
+            // A solid accent fill used to sit behind the thumbnail itself, so the active card's own
+            // preview was tinted and harder to read than every other card's. The active state is now
+            // a border around the card instead, which marks it without touching what is drawn inside.
+            toolbarPaint.color = BrowserTheme.addressPillBackground
             canvas.drawRoundRect(
                 RectF(box.left, box.top, box.right, box.bottom),
                 sizes.cornerRadius, sizes.cornerRadius, toolbarPaint
             )
+            if (isActive) {
+                val strokeWidth = sizes.dp(2f)
+                toolbarPaint.style = Paint.Style.STROKE
+                toolbarPaint.strokeWidth = strokeWidth
+                toolbarPaint.color = BrowserTheme.accent
+                canvas.drawRoundRect(
+                    RectF(
+                        box.left + strokeWidth / 2f, box.top + strokeWidth / 2f,
+                        box.right - strokeWidth / 2f, box.bottom - strokeWidth / 2f
+                    ),
+                    sizes.cornerRadius, sizes.cornerRadius, toolbarPaint
+                )
+                toolbarPaint.style = Paint.Style.FILL
+            }
             if (tab == null) {
                 glyphPaint.color = BrowserTheme.textPrimary
                 glyphPaint.textSize = sizes.iconLarge

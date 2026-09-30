@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.view.View
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.Toast
 import dev.autobridge.entertainment.ContentKind
 import dev.autobridge.entertainment.EntertainmentActivity
 import dev.autobridge.entertainment.WebBookmarkStore
@@ -362,7 +363,7 @@ class LibraryActivity : Activity() {
 
     private fun entryRow(source: IptvSource, entry: IptvEntry): View {
         val favorite = entry.url.isNotBlank() && IptvHistoryStore.isFavorite(this, entry.url)
-        return AutoBridgeDesign.contentRow(
+        val row = AutoBridgeDesign.contentRow(
             context = this,
             title = entry.title,
             subtitle = listOfNotNull(
@@ -381,6 +382,44 @@ class LibraryActivity : Activity() {
             },
             onClick = { openEntry(source, entry) }
         )
+        // TV video streams (not web pages, not folders) can be sent straight to the car's video
+        // screen without opening the phone player first — a long press keeps the tap target simple.
+        if (!entry.isSeriesFolder && !entry.isWebPage && source.kind != IptvKind.RADIO) {
+            row.setOnLongClickListener { sendChannelMenu(source, entry); true }
+        }
+        return row
+    }
+
+    /** Long-press menu for a TV entry: play here, or send it straight to the car's video screen. */
+    private fun sendChannelMenu(source: IptvSource, entry: IptvEntry) {
+        AlertDialog.Builder(this)
+            .setTitle(entry.title)
+            .setItems(arrayOf("Play here", "Send to car")) { _, index ->
+                when (index) {
+                    0 -> openEntry(source, entry)
+                    1 -> sendToCar(source, entry)
+                }
+            }
+            .show()
+    }
+
+    /**
+     * Sends a TV channel to the car's native video screen via the same command bus the Mobile
+     * Remote uses, so it works whether Android Auto is connected right now or not — the router
+     * reports NOT_CONNECTED instead of silently doing nothing.
+     */
+    private fun sendToCar(source: IptvSource, entry: IptvEntry) {
+        IptvHistoryStore.recordPlayback(this, source, entry)
+        dev.autobridge.remote.RemoteRuntime.ensureStarted(this)
+        dev.autobridge.remote.AutoBridgeCommandBus.send(
+            dev.autobridge.remote.AutoBridgeCommand(
+                type = dev.autobridge.remote.CommandType.PLAY_VIDEO,
+                payload = entry.url,
+                source = dev.autobridge.remote.CommandSource.MOBILE,
+                extras = mapOf("title" to entry.title)
+            )
+        )
+        Toast.makeText(this, "Sending \"${entry.title}\" to the car…", Toast.LENGTH_SHORT).show()
     }
 
     private fun openEntry(source: IptvSource, entry: IptvEntry) {

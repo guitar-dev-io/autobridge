@@ -26,10 +26,21 @@ object StructuredLog {
     private const val MAX_ENTRIES = 100
     private val entries = ArrayDeque<Entry>()
 
+    /**
+     * Optional mirror for every entry, set once at startup by
+     * [dev.autobridge.diagnostics.CrashReportStore] so the log also lands on disk and survives the
+     * process dying. It is a hook rather than a direct file write so this object stays pure and
+     * unit-testable, and so a failure to write a file can never take down logging.
+     */
+    @Volatile
+    var sink: ((Entry) -> Unit)? = null
+
     @Synchronized
     fun log(level: Level, tag: String, message: String, nowMs: Long = SystemClock.elapsedRealtime()) {
-        entries.addLast(Entry(level, tag, message, nowMs))
+        val entry = Entry(level, tag, message, nowMs)
+        entries.addLast(entry)
         while (entries.size > MAX_ENTRIES) entries.removeFirst()
+        runCatching { sink?.invoke(entry) }
         when (level) {
             Level.DEBUG -> Log.d(tag, message)
             Level.INFO -> Log.i(tag, message)

@@ -64,11 +64,19 @@ object CarNavigation {
      * [marker] must be stable for the destination; its class name is the natural choice.
      */
     fun open(screenManager: ScreenManager, marker: String, create: () -> Screen) {
-        if (tracker.returnedTo(marker)) {
+        // The live stack decides, not the tracker. The tracker is process-global and is only
+        // cleared by Session.onDestroy, so a session that goes away without that callback leaves
+        // its markers behind. ScreenManager.popTo() pops everything down to the root when it
+        // cannot find the marker, which turned "open this screen" into a silent "go back to Home"
+        // for the rest of the process.
+        if (screenManager.screenStack.any { it.marker == marker }) {
+            tracker.returnedTo(marker)
             StructuredLog.i("CarNav", "return -> $marker")
             screenManager.popTo(marker)
             return
         }
+        // Not on the stack: any marker still held for it is stale bookkeeping.
+        tracker.removed(marker)
         val screen = runCatching { create() }.onFailure {
             StructuredLog.e("CarNav", "open failed -> $marker: ${it.message}")
         }.getOrThrow()

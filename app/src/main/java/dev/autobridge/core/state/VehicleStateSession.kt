@@ -1,6 +1,7 @@
 package dev.autobridge.core.state
 
 import androidx.car.app.CarContext
+import dev.autobridge.safety.SafetyEnforcement
 import dev.autobridge.safety.VehicleStateProvider
 import dev.autobridge.safety.VehicleStateProviderFactory
 
@@ -75,7 +76,15 @@ object VehicleStateSession {
         }
     }
 
+    /**
+     * The screens' motion callbacks stop the projection and finish the car app, which is an action
+     * on the reading rather than a display of it. They fire only while the gate is enforcing
+     * ([SafetyEnforcement]); with it reporting, the provider still publishes MOVING to
+     * [dev.autobridge.safety.ParkingStateStore] so every status row updates, and nothing is torn
+     * down underneath the driver.
+     */
     private fun dispatchMoving() {
+        if (!SafetyEnforcement.isBlocking) return
         val callbacks = synchronized(lock) { movingCallbacks.values.toList() }
         callbacks.forEach { callback -> runCatching { callback() } }
     }

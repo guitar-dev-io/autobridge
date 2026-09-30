@@ -151,19 +151,15 @@ class EntertainmentActivity : Activity() {
             setOnCheckedChangeListener { _, checked -> prefs.edit().putBoolean("autoResume", checked).apply() }
         })
         browser = WebView(this).apply {
-            settings.javaScriptEnabled = true
-            settings.domStorageEnabled = true
-            settings.allowFileAccess = false
-            settings.allowContentAccess = false
+            // Shares the same UA-stripping and X-Requested-With allow-list as the other two
+            // WebView surfaces (BrowserActivity, CarWebRenderer) so a Google sign-in started from
+            // this player (e.g. from a YouTube page) is not flagged as an embedded WebView here
+            // either. This call also sets javaScriptEnabled/domStorageEnabled/allowFileAccess and
+            // the third-party-cookie policy, so the settings block below only adds what
+            // BrowserDefaults intentionally leaves out for this player surface.
+            BrowserDefaults.configure(this@EntertainmentActivity, this)
             // Allow tapping play directly from the car screen without a second gesture on the phone.
             settings.mediaPlaybackRequiresUserGesture = false
-            // Share the same browser identity selected from the Android Auto browser.
-            settings.useWideViewPort = true
-            settings.loadWithOverviewMode = true
-            settings.userAgentString = dev.autobridge.browser.BrowserUserAgentStore.resolve(
-                this@EntertainmentActivity,
-                android.webkit.WebSettings.getDefaultUserAgent(this@EntertainmentActivity)
-            )
             BrowserDefaults.configureDebugTools()
             webChromeClient = object : WebChromeClient() {
                 // Lets a page's own navigator.requestMediaKeySystemAccess() (Widevine EME) reach
@@ -316,7 +312,10 @@ YouTube · TV · Web
         if (needsPlayer) {
             client.play(url, pendingTitle)
             pendingTitle = null
-            client.player?.seekTo(position.coerceAtLeast(0L))
+            // Only "เล่นต่อ" and the auto-resume path carry a position. An item the user tapped
+            // starts at the beginning, so it must not be seeked at all: the saved offset belongs
+            // to the last session, and seeking a freshly prepared item races that prepare().
+            if (position > 0L) client.player?.seekTo(position)
         } else {
             browser.loadUrl(url)
         }

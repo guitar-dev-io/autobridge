@@ -41,6 +41,15 @@ class YouTubeAddonsTest {
     }
 
     @Test
+    fun `service hosts under the youtube domain are not watch pages`() {
+        // v.youtube.com is not a front end the add-ons can drive: there is no player on it to
+        // skip a segment in or set a quality on. Matching the host by suffix would pull it in.
+        assertTrue(!YouTubeUrls.isYouTube("https://v.youtube.com/watch?v=dQw4w9WgXcQ"))
+        assertNull(YouTubeUrls.videoId("https://v.youtube.com/watch?v=dQw4w9WgXcQ"))
+        assertNull(YouTubeUrls.videoId("https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"))
+    }
+
+    @Test
     fun `the hash prefix is the documented sha256 head, not the id`() {
         // Four hex characters is what the API expects, and it must not contain the id itself.
         val prefix = SponsorBlock.hashPrefix("dQw4w9WgXcQ")

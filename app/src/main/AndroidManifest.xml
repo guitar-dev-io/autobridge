@@ -15,6 +15,12 @@
     <!-- Special permission: granted via ACTION_MANAGE_WRITE_SETTINGS, used only for the
          per-app force-landscape profile (QuickAppLauncher). -->
     <uses-permission android:name="android.permission.WRITE_SETTINGS" />
+    <!-- Lets the Car setup screen show Android's own "Allow background activity" prompt directly
+         instead of sending the user hunting through Settings. Some OEM battery managers
+         (MIUI/HyperOS and similar) kill AutoBridge's foreground mirroring/media services anyway
+         unless the app is exempted, even though both are declared and started correctly. Optional
+         step — mirroring and playback still work without it on stock Android. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <!-- Android for Cars: development/personal-use POC surface. -->
     <uses-permission android:name="androidx.car.app.ACCESS_SURFACE" />
@@ -49,7 +55,7 @@
     <!-- IPTV portals and set-top playlists are overwhelmingly plain http, so cleartext has to be
          permitted for user-entered hosts. The network security config keeps that explicit and
          reviewable instead of hiding it behind a blanket attribute. -->
-    <application android:networkSecurityConfig="@xml/network_security_config" android:allowBackup="true" android:icon="@drawable/ic_autobridge_launcher" android:label="AutoBridge" android:roundIcon="@drawable/ic_autobridge_launcher" android:supportsRtl="true" android:theme="@style/AppTheme">
+    <application android:name=".AutoBridgeApplication" android:networkSecurityConfig="@xml/network_security_config" android:allowBackup="true" android:icon="@drawable/ic_autobridge_launcher" android:label="AutoBridge" android:roundIcon="@drawable/ic_autobridge_launcher" android:supportsRtl="true" android:theme="@style/AppTheme">
 
         <meta-data android:name="com.google.android.gms.car.application" android:resource="@xml/automotive_app_desc" />
         <meta-data android:name="androidx.car.app.theme" android:resource="@style/CarAppTheme" />
@@ -89,6 +95,9 @@
 
         <!-- SponsorBlock and auto-quality toggles for the in-app browser's YouTube pages. -->
         <activity android:name=".youtube.YouTubeSettingsActivity" android:exported="false" />
+
+        <!-- Weather home tile: pick a place and see its current conditions (Open-Meteo, no key). -->
+        <activity android:name=".weather.WeatherActivity" android:exported="false" />
 
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>

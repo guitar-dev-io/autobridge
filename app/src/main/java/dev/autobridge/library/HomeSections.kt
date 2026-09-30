@@ -26,6 +26,7 @@ enum class HomeSection(
     FAVORITES("Favorites", "Saved channels & pages", Accents.FAVORITE),
     PLAYLISTS("Playlists", "Your music", Accents.FILES),
     GALLERY("Gallery", "Photos & clips", Accents.WEB),
+    WEATHER("Weather", "Current conditions", Accents.WEATHER),
     MIRROR("Mirror", "Share this screen", Accents.SYSTEM),
     APPS("Apps", "Quick launch", Accents.SYSTEM),
     REMOTE("Remote", "Drive the car screen", Accents.SYSTEM),
@@ -55,6 +56,7 @@ enum class HomeSection(
         const val FILES = 0xFF9BE08A.toInt()
         const val FAVORITE = 0xFFFF8FB1.toInt()
         const val SYSTEM = 0xFFB39DFF.toInt()
+        const val WEATHER = 0xFF6BC5FF.toInt()
     }
 
     companion object {

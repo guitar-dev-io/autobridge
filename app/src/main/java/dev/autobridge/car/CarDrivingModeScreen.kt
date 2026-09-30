@@ -68,7 +68,7 @@ class CarDrivingModeScreen(carContext: CarContext) : Screen(carContext) {
                     .setStartHeaderAction(Action.APP_ICON)
                     .addEndHeaderAction(
                         Action.Builder()
-                            .setTitle("Show all")
+                            .setIcon(CarIcons.of(carContext, CarIcons.APPS))
                             .setOnClickListener {
                                 // "Show all" returns to the full home; Driving Mode never removes
                                 // access to any feature, it only re-presents the important ones.

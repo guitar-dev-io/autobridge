@@ -4,10 +4,9 @@ import androidx.car.app.CarContext
 import androidx.car.app.CarToast
 import androidx.car.app.Screen
 import androidx.car.app.model.Action
-import androidx.car.app.model.CarColor
 import androidx.car.app.model.Header
-import androidx.car.app.model.Pane
-import androidx.car.app.model.PaneTemplate
+import androidx.car.app.model.ItemList
+import androidx.car.app.model.ListTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
 import dev.autobridge.core.model.ScaleMode
@@ -47,20 +46,30 @@ class CarMirrorIntroScreen(carContext: CarContext) : Screen(carContext) {
             }
             .build()
 
-        val pane = Pane.Builder()
-            .addRow(statusRow)
-            .addRow(fitRow)
-            .addRow(qualityRow)
-            .addAction(
-                Action.Builder()
-                    .setTitle("Start Mirroring")
-                    .setBackgroundColor(CarColor.BLUE)
-                    .setOnClickListener { startMirroring() }
-                    .build()
-            )
+        // ListTemplate, not PaneTemplate: Fit and Quality are rows the user taps, and a Pane row
+        // may not carry a click listener. PaneTemplate.Builder.build() threw
+        // "A click listener is not allowed on the row" out of onGetTemplate, which the host
+        // rethrows on the main thread - the whole process died and Android Auto restarted the app
+        // at its root screen, so the tile looked like it blanked and bounced back to Home.
+        // The primary action becomes the first row rather than a header action or an action strip:
+        // a header action must carry an icon (ACTIONS_CONSTRAINTS_MULTI_HEADER sets
+        // requireActionIcons), and ListTemplate.setActionStrip is deprecated. Both alternatives
+        // risk the same kind of constraint violation this screen is being fixed for.
+        val startRow = Row.Builder()
+            .setTitle("Start Mirroring")
+            .addText(if (MirrorCoordinator.isMirroring) "Mirroring is running" else "Show the phone screen on the car")
+            .setOnClickListener { startMirroring() }
             .build()
 
-        return PaneTemplate.Builder(pane)
+        val items = ItemList.Builder()
+            .addItem(startRow)
+            .addItem(statusRow)
+            .addItem(fitRow)
+            .addItem(qualityRow)
+            .build()
+
+        return ListTemplate.Builder()
+            .setSingleList(items)
             .setHeader(
                 Header.Builder()
                     .setTitle("Mirror")

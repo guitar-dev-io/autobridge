@@ -10,6 +10,10 @@ private val HEAD_UNITS = listOf(
     Triple(1280, 720, 160),
     Triple(1280, 720, 240),
     Triple(1920, 720, 160), // widescreen
+    // The short stable area a DHU session actually reports: the host keeps a band top and bottom,
+    // leaving far less height than the surface suggests. Recorded in CarWebRenderer.setStableArea
+    // as "the real 752x300 at 24,88" — the case the fixed-height tile grid used to overflow.
+    Triple(800, 320, 160),
 )
 
 class BrowserViewportTest {
@@ -218,6 +222,29 @@ class BrowserChromeLayoutTest {
         }
     }
 
+    /**
+     * A faded-out floating button must stop taking taps. Drawing and hit testing read the same
+     * flag, so an invisible button cannot sit there swallowing presses meant for the page.
+     */
+    @Test fun aHiddenFloatingButtonDoesNotTakeTapsFromThePage() {
+        HEAD_UNITS.forEach { (width, height, dpi) ->
+            val layout = BrowserChromeLayout.create(
+                AutoUiSizes.forCarSurface(dpi),
+                BrowserViewport.create(width, height, 3f, AutoUiSizes.forCarSurface(dpi).density)
+            )
+            val x = layout.fab.centerX
+            val y = layout.fab.centerY
+            assertEquals(
+                ChromeZone.FAB,
+                layout.hitTest(x, y, chromeVisible = false, drawer = null, fabVisible = true)
+            )
+            assertEquals(
+                ChromeZone.NONE,
+                layout.hitTest(x, y, chromeVisible = false, drawer = null, fabVisible = false)
+            )
+        }
+    }
+
     /** An open drawer owns every tap, including the one the floating button would otherwise take. */
     @Test fun anOpenDrawerTakesPrecedenceOverTheFloatingButton() {
         val layout = layoutFor(1024, 600, 160)
@@ -282,6 +309,34 @@ class ChromeVisibilityTest {
         assertFalse(visibility.tick(uptime + 500L))
         assertTrue(visibility.tick(uptime + 1_100L))
         assertFalse(visibility.isShown)
+    }
+
+    /**
+     * "Always show URL bar" is a standing preference, not a gesture, so no amount of idle time may
+     * take the toolbar away while it is on.
+     */
+    @Test fun pinningTheToolbarSurvivesAnyAmountOfIdleTime() {
+        // The clock starts at a non-zero value: tick() treats 0 as "never interacted" and seeds
+        // itself, so an interaction at 0L would cost this test a tick before idle timing begins.
+        val visibility = ChromeVisibility(autoHideAfterMs = 1_000L, fadeDurationMs = 0L)
+        visibility.onInteraction(1_000L)
+        visibility.setAutoHide(1_000L, false)
+        assertFalse(visibility.tick(60_000L))
+        assertTrue(visibility.isShown)
+        // And turning it back on hands idle timing back.
+        visibility.setAutoHide(60_000L, true)
+        assertTrue(visibility.tick(61_500L))
+        assertFalse(visibility.isShown)
+    }
+
+    /** Turning the preference on while the toolbar has already faded must bring it back. */
+    @Test fun pinningTheToolbarRevealsItImmediately() {
+        val visibility = ChromeVisibility(autoHideAfterMs = 1_000L, fadeDurationMs = 0L)
+        visibility.onInteraction(1_000L)
+        assertTrue(visibility.tick(2_500L))
+        assertFalse(visibility.isShown)
+        visibility.setAutoHide(2_600L, false)
+        assertTrue(visibility.isShown)
     }
 
     @Test fun anOpenDrawerSuspendsAutoHide() {
@@ -409,14 +464,70 @@ class BrowserTabsStateTest {
 }
 
 class BrowserDrawerModelTest {
-    private fun modelFor(width: Int, height: Int, dpi: Int, scroll: Float = 0f): BrowserDrawerModel {
+    private fun modelFor(
+        width: Int,
+        height: Int,
+        dpi: Int,
+        scroll: Float = 0f,
+        sections: List<DrawerSection> = BrowserDrawerModel.sectionsFor(tabCount = 2, isDesktop = false),
+    ): BrowserDrawerModel {
         val sizes = AutoUiSizes.forCarSurface(dpi)
         val viewport = BrowserViewport.create(width, height, 3f, sizes.density)
-        return BrowserDrawerModel.create(
-            sizes, viewport,
-            BrowserDrawerModel.sectionsFor(tabCount = 2, isDesktop = false),
-            scroll
+        return BrowserDrawerModel.create(sizes, viewport, sections, scroll)
+    }
+
+    /**
+     * The property the whole grid-sizing rewrite exists for. A fixed 78dp tile plus a 26dp heading
+     * per section made the sheet's content height a constant, so on a short panel the last row fell
+     * below the fold silently — and on the primary list that row held "More", the only way into the
+     * rest of the menu. Every entry of both lists must be reachable without a scroll on every
+     * supported head unit, because a tap that drifts during a scroll is read as a scroll and the
+     * entry never fires.
+     */
+    @Test fun bothMenuListsFitWithoutScrollingOnEveryHeadUnit() {
+        val lists = mapOf(
+            "primary" to BrowserDrawerModel.sectionsFor(tabCount = 2, isDesktop = false),
+            "more" to BrowserDrawerModel.moreSectionsFor(isDesktop = false),
         )
+        HEAD_UNITS.forEach { (width, height, dpi) ->
+            lists.forEach { (name, sections) ->
+                val model = modelFor(width, height, dpi, sections = sections)
+                assertEquals(
+                    "$name list scrolls at ${width}x$height @$dpi",
+                    0f, model.maxScroll, 0.01f
+                )
+                assertEquals(sections.sumOf { it.items.size }, model.rows.size)
+                model.rows.forEach { row ->
+                    assertTrue(
+                        "${row.item.label} falls outside the sheet at ${width}x$height @$dpi",
+                        row.bounds.top >= model.headerBottom - 0.01f &&
+                            row.bounds.bottom <= model.panel.bottom + 0.01f
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Regression: the sheet began one margin below the top of the viewport, inside the band the
+     * toolbar occupies, and [CarWebRenderer] draws the toolbar after the sheet — so the bar painted
+     * over the sheet's header and left the close button 73% hidden behind the fullscreen icon.
+     * Taps split too: the few dp of bar above the panel dismissed the sheet while the rest of it
+     * landed inside the panel and did nothing at all.
+     */
+    @Test fun theSheetStartsBelowTheToolbarSoItsHeaderIsNeverPaintedOver() {
+        HEAD_UNITS.forEach { (width, height, dpi) ->
+            val sizes = AutoUiSizes.forCarSurface(dpi)
+            val viewport = BrowserViewport.create(width, height, 3f, sizes.density)
+            val toolbar = BrowserChromeLayout.create(sizes, viewport).toolbar
+            val model = modelFor(width, height, dpi)
+            assertTrue(
+                "sheet overlaps the toolbar at ${width}x$height @$dpi",
+                model.panel.top >= toolbar.bottom - 0.01f
+            )
+            // The close button is the thing the overlap used to hide, so assert it specifically.
+            assertTrue(model.closeButton.top >= toolbar.bottom - 0.01f)
+        }
     }
 
     @Test fun drawerOverlaysRatherThanShrinkingTheViewport() {
@@ -484,6 +595,31 @@ class BrowserDrawerModelTest {
             }
     }
 
+    /**
+     * Regression: the sheet's only dismissal was a tap outside it, and it covers the viewport apart
+     * from a margin a few dp wide. On a head unit that band is not a target anyone can hit, so the
+     * drawer could be opened and then not closed without choosing an action. The header carries a
+     * real close button instead.
+     */
+    @Test fun theDrawerCanBeClosedWithoutTappingTheMarginAroundIt() {
+        HEAD_UNITS.forEach { (width, height, dpi) ->
+            val sizes = AutoUiSizes.forCarSurface(dpi)
+            val model = modelFor(width, height, dpi)
+            val close = model.closeButton
+            assertTrue(
+                "close button too small at ${width}x$height",
+                minOf(close.width, close.height) >= sizes.touchTarget * 0.7f
+            )
+            // In the header, inside the panel, and never over the tiles.
+            assertTrue(close.top >= model.panel.top)
+            assertTrue(close.bottom <= model.headerBottom)
+            assertTrue(close.right <= model.panel.right)
+            assertTrue(model.hitsClose(close.centerX, close.centerY))
+            assertNull(model.rowAt(close.centerX, close.centerY))
+            assertTrue(!model.hitsClose(model.panel.centerX, model.panel.bottom - 1f))
+        }
+    }
+
     @Test fun rowsScrolledUnderTheHeaderAreNotTappable() {
         val model = modelFor(800, 480, 160, scroll = 200f)
         assertNull(model.rowAt(model.panel.centerX, model.headerBottom - 1f))
@@ -520,6 +656,30 @@ class BrowserDrawerModelTest {
             .flatMap { it.items }.map { it.action }
         assertTrue(actions.size <= 12)
         assertTrue(actions.contains(DrawerAction.MORE))
+    }
+
+    /**
+     * The drawer is opened from the toolbar, so a primary row that repeats a toolbar button spends
+     * the largest target on the surface re-stating what the user can already see. Reload and the
+     * address/keyboard row used to do exactly that. They still exist — under "More", for when the
+     * toolbar has faded out — but never in the list the menu opens on.
+     */
+    @Test fun noPrimaryDrawerRowRepeatsAToolbarButton() {
+        val onTheToolbar = mapOf(
+            DrawerAction.RELOAD to ChromeZone.RELOAD,
+            DrawerAction.ADDRESS_KEYBOARD to ChromeZone.ADDRESS,
+        )
+        val primary = BrowserDrawerModel.sectionsFor(tabCount = 1, isDesktop = true)
+            .flatMap { it.items }.map { it.action }
+        onTheToolbar.forEach { (action, zone) ->
+            val layout = BrowserChromeLayout.create(
+                AutoUiSizes.forCarSurface(160),
+                BrowserViewport.create(1024, 600, 3f, 1f)
+            )
+            val drawnOnTheBar = zone == ChromeZone.ADDRESS || layout.slot(zone) != null
+            assertTrue("$zone is not on the toolbar; the premise of this test is stale", drawnOnTheBar)
+            assertFalse("$action is on the toolbar and in the primary menu", primary.contains(action))
+        }
     }
 
     @Test fun everyDrawerActionHasExactlyOneRowAcrossBothLists() {

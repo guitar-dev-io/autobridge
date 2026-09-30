@@ -22,21 +22,19 @@ import org.junit.Test
 import dev.autobridge.apps.InstalledApp
 
 /**
- * `featurePolicyExposesFailClosedReasonsAndRealCarLabBoundary`,
- * `personalPolicyEnablesNonParkedMediaButNotParkedOnlyFeatures` and
- * `personalAndLabStillRespectMovingVehicleGate` FAIL BY DESIGN.
+ * The parked-only gate is built but not armed: AutoBridge ships with
+ * [dev.autobridge.safety.SafetyEnforcement] reporting rather than blocking, so
+ * `FeaturePolicy()` allows a parked-only feature on a moving car.
  *
- * `FeaturePolicy.decide()` is deliberately overridden to rewrite its argument to
- * `REAL_CAR`/`PARKED` before evaluating, so the parked-only gate can never deny anything - in every
- * flavour, `safe` included. The original body is kept commented above it in `FeaturePolicy.kt`.
- *
- * These three are left failing rather than adjusted: making them pass would mean deleting the only
- * check that reports the gate is bypassed. Every other test in this class is unaffected.
+ * The tests below therefore come in pairs - what the gate decides when it is enforcing
+ * (`enforceParkedOnly = true`, the branch that would run if the flag were flipped) and what the
+ * shipped default does with the same context. Asserting only the default would leave the denial
+ * branch uncovered, which is how it rotted the last time it was turned off.
  */
 class AppProfileRegressionTest {
     @Test
     fun featurePolicyExposesFailClosedReasonsAndRealCarLabBoundary() {
-        val policy = FeaturePolicy()
+        val policy = FeaturePolicy(enforceParkedOnly = true)
         val blocked = policy.decide(
             Feature.MIRROR,
             RuntimeContext(AutoBridgeMode.PERSONAL, Environment.DHU, VehicleState.UNKNOWN)
@@ -55,7 +53,7 @@ class AppProfileRegressionTest {
 
     @Test
     fun personalPolicyEnablesNonParkedMediaButNotParkedOnlyFeatures() {
-        val policy = FeaturePolicy()
+        val policy = FeaturePolicy(enforceParkedOnly = true)
         val context = RuntimeContext(AutoBridgeMode.PERSONAL, Environment.DHU, VehicleState.MOVING)
 
         assertTrue(policy.isAvailable(Feature.MEDIA, context))
@@ -63,6 +61,28 @@ class AppProfileRegressionTest {
         assertFalse(policy.isAvailable(Feature.TOUCH, context))
         assertTrue(policy.enabledFeatures(context).contains(Feature.MEDIA))
         assertFalse(policy.enabledFeatures(context).contains(Feature.MIRROR))
+    }
+
+    /**
+     * The shipped default. A moving car still allows the feature, but the decision has to say so
+     * out loud: `requiresParked` stays true and the reason names the state, because the Vehicle
+     * status row and the mirror diagnostics are what the driver is left with.
+     */
+    @Test
+    fun reportingPolicyAllowsParkedOnlyFeaturesButStillNamesTheMovingVehicle() {
+        val policy = FeaturePolicy(enforceParkedOnly = false)
+        val moving = RuntimeContext(AutoBridgeMode.PERSONAL, Environment.REAL_CAR, VehicleState.MOVING)
+
+        val decision = policy.decide(Feature.VIDEO, moving)
+        assertTrue(decision.allowed)
+        assertTrue(decision.requiresParked)
+        assertTrue(decision.reason.contains("moving"))
+        assertTrue(decision.reason.contains("not blocking"))
+
+        // Mode is a separate boundary and is still enforced while the speed gate only reports.
+        val safeMoving = RuntimeContext(AutoBridgeMode.SAFE, Environment.REAL_CAR, VehicleState.MOVING)
+        assertFalse(policy.isAvailable(Feature.MIRROR, safeMoving))
+        assertTrue(policy.isAvailable(Feature.MEDIA, safeMoving))
     }
 
     @Test
@@ -199,7 +219,7 @@ class AppProfileRegressionTest {
 
     @Test
     fun personalAndLabStillRespectMovingVehicleGate() {
-        val policy = FeaturePolicy()
+        val policy = FeaturePolicy(enforceParkedOnly = true)
         val personalMoving = RuntimeContext(AutoBridgeMode.PERSONAL, Environment.DHU, VehicleState.MOVING)
         val labBenchParked = RuntimeContext(AutoBridgeMode.LAB, Environment.TEST_BENCH, VehicleState.PARKED)
         val labRealCarMoving = RuntimeContext(AutoBridgeMode.LAB, Environment.REAL_CAR, VehicleState.MOVING)

@@ -9,6 +9,11 @@ package dev.autobridge.youtube
  * trying them by hand in a car.
  */
 object YouTubeUrls {
+    /**
+     * Matched exactly, never by suffix. Only these front ends serve a watch page the add-ons can
+     * drive; hosts such as `v.youtube.com` sit under the same domain without being one, and a
+     * suffix match would arm SponsorBlock and the quality script on a page with no player.
+     */
     private val HOSTS = setOf(
         "youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com",
         "youtube-nocookie.com", "www.youtube-nocookie.com", "youtu.be", "www.youtu.be"

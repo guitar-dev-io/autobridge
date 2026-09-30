@@ -34,7 +34,7 @@ class CarRecentScreen(carContext: CarContext) : Screen(carContext) {
                     .setStartHeaderAction(Action.BACK)
                     .addEndHeaderAction(
                         Action.Builder()
-                            .setTitle("Clear")
+                            .setIcon(CarIcons.of(carContext, CarIcons.CLEAR))
                             .setOnClickListener {
                                 RecentActivityStore.clear(carContext)
                                 invalidate()

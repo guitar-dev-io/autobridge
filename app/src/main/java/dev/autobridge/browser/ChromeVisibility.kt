@@ -22,6 +22,14 @@ class ChromeVisibility(
         const val DEFAULT_FADE_MS = 180L
     }
 
+    /**
+     * Whether idle time is allowed to hide the chrome at all. Off means the toolbar is pinned by
+     * preference ([BrowserControlsStore.alwaysShowUrlBar]) rather than by the current gesture, so
+     * [tick] can never take it away.
+     */
+    var autoHideEnabled: Boolean = true
+        private set
+
     /** Pinned chrome never auto-hides; the user asked for it and only the user takes it away. */
     var fullscreen: Boolean = false
         private set
@@ -54,6 +62,16 @@ class ChromeVisibility(
         if (shown) beginTransition(nowMs, false)
     }
 
+    /**
+     * Applies the auto-hide preference. Turning it off reveals the chrome immediately: the setting
+     * is "keep the address bar on screen", and leaving it hidden until the next tap would be the
+     * opposite of what was asked for.
+     */
+    fun setAutoHide(nowMs: Long, enabled: Boolean) {
+        autoHideEnabled = enabled
+        if (!enabled) show(nowMs)
+    }
+
     fun setFullscreen(nowMs: Long, enabled: Boolean) {
         fullscreen = enabled
         if (enabled) hide(nowMs) else show(nowMs)
@@ -75,9 +93,12 @@ class ChromeVisibility(
      * must fade away again on its own, otherwise the toolbar recalled once stays over the page for
      * the rest of the session — observed on a head unit as `chrome=shown fullscreen=true` never
      * returning to hidden.
+     *
+     * [autoHideEnabled] does suspend it, because that one is a standing preference rather than a
+     * transient state.
      */
     fun tick(nowMs: Long): Boolean {
-        if (!shown || drawerOpen) return false
+        if (!shown || drawerOpen || !autoHideEnabled) return false
         // Seed the idle clock on the first tick. lastInteractionMs starts at 0 while the caller's
         // clock is an uptime in the millions, so without this the very first tick saw an "idle" of
         // the whole uptime and hid the toolbar a few frames after the browser opened.

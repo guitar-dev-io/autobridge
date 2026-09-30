@@ -146,12 +146,15 @@ import androidx.car.app.model.ItemList
 import androidx.car.app.model.ListTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import dev.autobridge.input.InputBackend
 import dev.autobridge.input.TouchRouter
 import dev.autobridge.display.ScreenPowerController
 import dev.autobridge.mirror.MirrorCoordinator
 import dev.autobridge.mirror.ProjectionService
 import dev.autobridge.safety.ParkingStateStore
+import dev.autobridge.safety.SafetyEnforcement
 
 /**
  * Host-managed dashboard for the car side. The live phone pixels remain owned by the
@@ -161,13 +164,23 @@ class MirrorControlScreen(
     carContext: CarContext,
     private val onSafetyRequested: () -> Unit
 ) : Screen(carContext) {
+    /** Redraws the Vehicle row; a state nobody repaints is not a display. */
+    private val parkingListener: (ParkingStateStore.State) -> Unit = {
+        carContext.mainExecutor.execute { invalidate() }
+    }
+
     init {
-        // Bypass: ปิดการเรียกขอ Speed Permission อัตโนมัติ เพื่อข้ามเงื่อนไขความปลอดภัย
-        /*
+        // Asked for on UNKNOWN rather than on "not parked": the gate only reports now
+        // (SafetyEnforcement), so the reason to hold CAR_SPEED is that there is no reading to show
+        // at all. A car that reports MOVING is already answering, and is not re-prompted.
         carContext.mainExecutor.execute {
-            if (!ParkingStateStore.isParked) onSafetyRequested()
+            if (ParkingStateStore.state == ParkingStateStore.State.UNKNOWN) onSafetyRequested()
         }
-        */
+        lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onStart(owner: LifecycleOwner) = ParkingStateStore.addListener(parkingListener)
+
+            override fun onStop(owner: LifecycleOwner) = ParkingStateStore.removeListener(parkingListener)
+        })
     }
 
     override fun onGetTemplate(): Template {
@@ -266,9 +279,10 @@ class MirrorControlScreen(
             }
             .build()
 
-    private fun vehicleLabel(): String = when (ParkingStateStore.state) {
-        ParkingStateStore.State.PARKED -> "PARKED"
-        ParkingStateStore.State.MOVING -> "PARKED" // Bypass สถานะ MOVING ให้รายงานเป็น PARKED
-        ParkingStateStore.State.UNKNOWN -> "PARKED" // Bypass สถานะ UNKNOWN ให้รายงานเป็น PARKED
-    }
+    /**
+     * The real reading. This row exists to tell the driver what the car is reporting, so it must
+     * never print PARKED over a MOVING sample - that was the one thing the previous bypass broke
+     * that no feature gate would have noticed.
+     */
+    private fun vehicleLabel(): String = SafetyEnforcement.statusLabel(ParkingStateStore.state)
 }

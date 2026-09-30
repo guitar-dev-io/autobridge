@@ -60,7 +60,7 @@ class CarLauncherScreen(carContext: CarContext) : Screen(carContext) {
                     .setStartHeaderAction(Action.APP_ICON)
                     .addEndHeaderAction(
                         Action.Builder()
-                            .setTitle("All apps")
+                            .setIcon(CarIcons.of(carContext, CarIcons.APPS))
                             .setOnClickListener { CarNavigation.open(screenManager, "CarAppsScreen") { CarAppsScreen(carContext) } }
                             .build()
                     )

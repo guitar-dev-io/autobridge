@@ -32,8 +32,8 @@ android {
         applicationId = "dev.autobridge"
         minSdk = 29
         targetSdk = 36
-        versionCode = 10
-        versionName = "0.3.7"
+        versionCode = 17
+        versionName = "0.4.3"
         // The faults that actually reach a head unit — viewport geometry, scroll bounds, WebView
         // state — only reproduce against a real WebView, so this module needs on-device tests as
         // well as JVM ones.
@@ -78,6 +78,17 @@ android {
         }
     }
 
+    testOptions {
+        unitTests {
+            // StructuredLog mirrors to android.util.Log and stamps entries with
+            // SystemClock.elapsedRealtime(). Both are android.jar stubs that throw "not mocked" by
+            // default, which made the log's own behaviour the one thing its tests could not touch.
+            // Returning defaults lets those paths run; every assertion still comes from this
+            // project's own state, never from a stubbed return value.
+            isReturnDefaultValues = true
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -114,6 +125,10 @@ dependencies {
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")
     debugImplementation("androidx.compose.ui:ui-tooling")
+    // Declared rather than inherited: SharedPreferences.edit {} and the permission/compat helpers
+    // are used directly across media, IPTV, and settings, so the version those calls resolve
+    // against should not be whatever media3 or car-app happens to drag in this release.
+    implementation("androidx.core:core-ktx:1.18.0")
     implementation("androidx.car.app:app:1.7.0")
     implementation("androidx.car.app:app-projected:1.7.0")
     // WebViewCompat.getCurrentWebViewPackage() for the DRM/WebView diagnostics screen.
@@ -123,13 +138,13 @@ dependencies {
     implementation("androidx.browser:browser:1.8.0")
     implementation("dev.rikka.shizuku:api:13.1.5")
     implementation("dev.rikka.shizuku:provider:13.1.5")
-    implementation("androidx.media3:media3-exoplayer:1.11.0")
-    implementation("androidx.media3:media3-exoplayer-hls:1.11.0")
-    implementation("androidx.media3:media3-exoplayer-dash:1.11.0")
-    implementation("androidx.media3:media3-common:1.11.0")
-    implementation("androidx.media3:media3-session:1.11.0")
+    implementation("androidx.media3:media3-exoplayer:1.11.1")
+    implementation("androidx.media3:media3-exoplayer-hls:1.11.1")
+    implementation("androidx.media3:media3-exoplayer-dash:1.11.1")
+    implementation("androidx.media3:media3-common:1.11.1")
+    implementation("androidx.media3:media3-session:1.11.1")
     // Presentation (letterboxing) for the car surface. media3-exoplayer does not depend on the
     // effect module, so setVideoEffects() needs it declared here, at the same version.
-    implementation("androidx.media3:media3-effect:1.11.0")
+    implementation("androidx.media3:media3-effect:1.11.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 }

@@ -22,6 +22,9 @@ object CarScreenController {
         fun pushBrowser(): BrowserTarget
         fun pushMirror()
         fun pushMedia()
+        /** Pushes the car's native video screen for [url], behind the same one-time disclaimer
+         *  every other video entry point (library, IPTV) goes through. */
+        fun pushVideo(url: String, title: String)
         fun pushAgent()
         fun popToHome()
         fun pushSettings()

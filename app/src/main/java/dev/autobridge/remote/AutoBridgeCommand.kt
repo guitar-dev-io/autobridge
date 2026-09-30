@@ -30,6 +30,8 @@ enum class CommandType {
     PAUSE,
     NEXT,
     PREVIOUS,
+    /** Sends a video URL (an IPTV/TV channel) from the phone to the car's native video screen. */
+    PLAY_VIDEO,
 
     // Agent
     OPEN_AGENT,

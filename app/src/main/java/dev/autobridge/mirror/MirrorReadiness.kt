@@ -14,7 +14,7 @@ package dev.autobridge.mirror
  */
 object MirrorReadiness {
 
-    enum class Step { NOTIFICATIONS, TOUCH, CAPTURE }
+    enum class Step { NOTIFICATIONS, TOUCH, CAPTURE, BATTERY }
 
     enum class State {
         /** Nothing to do. */
@@ -41,6 +41,8 @@ object MirrorReadiness {
      * Android.
      *
      * @param notificationsRequired false below API 33, where the permission does not exist.
+     * @param batteryOptimizationExempt whether the OS has already agreed not to restrict this app
+     *        in the background — see [android.os.PowerManager.isIgnoringBatteryOptimizations].
      */
     data class Status(
         val notificationsRequired: Boolean,
@@ -49,13 +51,15 @@ object MirrorReadiness {
         val shizukuGranted: Boolean,
         val realTouchAvailable: Boolean,
         val accessibilityEnabled: Boolean,
-        val projecting: Boolean
+        val projecting: Boolean,
+        val batteryOptimizationExempt: Boolean = true
     )
 
     fun steps(status: Status): List<Item> = listOf(
         notifications(status),
         touch(status),
-        capture(status)
+        capture(status),
+        battery(status)
     )
 
     /** The step the user should act on next, or null when mirroring is ready to start. */
@@ -116,6 +120,22 @@ object MirrorReadiness {
             Step.CAPTURE, "Screen capture",
             "Android asks for this each time mirroring starts",
             State.BLOCKING, "Start mirroring"
+        )
+    }
+
+    private fun battery(status: Status): Item = when {
+        status.batteryOptimizationExempt -> Item(
+            Step.BATTERY, "Background use", "Won't be stopped while mirroring or playing in the background",
+            State.DONE, null
+        )
+        // Mirroring and IPTV playback both run in foreground services, which is the officially
+        // correct way to survive backgrounding — but some OEM battery managers (MIUI/HyperOS and
+        // similar) kill the whole process anyway unless the app is explicitly exempted. This is a
+        // warning, not a gate: everything works right up until the OS decides to end the process.
+        else -> Item(
+            Step.BATTERY, "Background use",
+            "Some phones stop AutoBridge in the background unless this is allowed",
+            State.OPTIONAL, "Allow"
         )
     }
 }

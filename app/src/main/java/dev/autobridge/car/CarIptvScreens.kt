@@ -325,7 +325,7 @@ internal object CarIptvPlayback {
             mediaPlayback.play(url, title)
             screens.push(CarNowPlayingScreen(carContext))
         } else {
-            screens.push(CarVideoScreen(carContext, url, title))
+            CarVideoLauncher.open(screens, carContext, url, title)
         }
     }
 

@@ -1901,6 +1901,7 @@ import dev.autobridge.display.OrientationMonitor
 import dev.autobridge.display.ScreenOffController
 import dev.autobridge.display.ScreenPowerController
 import dev.autobridge.display.StructuredLog
+import dev.autobridge.diagnostics.CrashReportStore
 import dev.autobridge.display.SurfaceProfile
 import dev.autobridge.entertainment.BrowserLauncher
 import dev.autobridge.input.AccessibilityInputBackend
@@ -1959,6 +1960,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
     private lateinit var bottomNav: LinearLayout
     private var homeConnectionView: TextView? = null
     private var developerLogView: TextView? = null
+    private var crashReportView: TextView? = null
     private var developerMirrorEventsView: TextView? = null
     private var labSummaryView: TextView? = null
     private var pendingEntertainmentLaunch = false
@@ -2091,7 +2093,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
         return root
     }
 
-    private fun showPhoneScreen(requested: PhoneScreen) {
+    private fun showPhoneScreen(requested: PhoneScreen, force: Boolean = false) {
         val target = if (requested == PhoneScreen.PROFILE && selectedApp == null) {
             PhoneScreen.APPS
         } else {
@@ -2100,8 +2102,9 @@ class MainActivity : androidx.activity.ComponentActivity() {
         // Re-selecting the destination already on screen is a no-op rather than a rebuild: tapping
         // the active bottom-bar tab used to discard the Applications search term and the scroll
         // position and hand back an identical screen. PROFILE is exempt because which app it shows
-        // is state, so the same destination can still need a rebuild.
-        if (screenRendered && target == currentScreen && target != PhoneScreen.PROFILE) return
+        // is state, so the same destination can still need a rebuild. [force] overrides this for
+        // callers that need the same screen rebuilt with new data (e.g. the weather chip landing).
+        if (!force && screenRendered && target == currentScreen && target != PhoneScreen.PROFILE) return
         screenRendered = true
         currentScreen = target
         homeConnectionView = null
@@ -2230,8 +2233,10 @@ class MainActivity : androidx.activity.ComponentActivity() {
             entries = entries,
             grid = true,
             menu = ::phoneMenu,
-            // The reference launcher puts weather in this chip. AutoBridge has no weather source,
-            // so it shows the state the app actually knows and gates its features on.
+            // The reference launcher puts weather in this chip. AutoBridge shows the outdoor
+            // temperature here when the user has picked a place in Weather (see
+            // WeatherLocationStore/WeatherRepository) and falls back to the connection state
+            // otherwise.
             statusChip = homeStatusChip(),
             headerAction = "\uD83C\uDF99" to ::homeVoiceSearch,
             subtitle = homeSubtitle(),
@@ -2259,6 +2264,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
             dev.autobridge.library.HomeSection.FAVORITES -> R.drawable.ic_tile_favorite
             dev.autobridge.library.HomeSection.PLAYLISTS -> R.drawable.ic_tile_playlist
             dev.autobridge.library.HomeSection.GALLERY -> R.drawable.ic_tile_gallery
+            dev.autobridge.library.HomeSection.WEATHER -> R.drawable.ic_tile_weather
             dev.autobridge.library.HomeSection.MIRROR -> R.drawable.ic_tile_mirror
             dev.autobridge.library.HomeSection.APPS -> R.drawable.ic_tile_apps
             dev.autobridge.library.HomeSection.REMOTE -> R.drawable.ic_tile_remote
@@ -2273,6 +2279,8 @@ class MainActivity : androidx.activity.ComponentActivity() {
                 startActivity(dev.autobridge.library.LibraryActivity.intent(this, librarySection))
             url != null -> startActivity(browserScreenIntent().setData(android.net.Uri.parse(url)))
             section == dev.autobridge.library.HomeSection.WEB -> openBrowserOnCar()
+            section == dev.autobridge.library.HomeSection.WEATHER ->
+                startActivity(dev.autobridge.weather.WeatherActivity.intent(this))
             section == dev.autobridge.library.HomeSection.MIRROR -> requestScreenCapture()
             section == dev.autobridge.library.HomeSection.APPS -> showPhoneScreen(PhoneScreen.APPS)
             section == dev.autobridge.library.HomeSection.REMOTE -> showPhoneScreen(PhoneScreen.REMOTE)
@@ -2280,10 +2288,40 @@ class MainActivity : androidx.activity.ComponentActivity() {
         }
     }
 
-    /** Connection + vehicle state, kept to two short words so the chip never wraps. */
+    /**
+     * Outdoor temperature for the user's saved Weather place when available, otherwise connection
+     * + vehicle state — kept to a couple of short words so the chip never wraps. Reads only the
+     * [dev.autobridge.weather.WeatherRepository] cache; [refreshHomeWeatherIfNeeded] is what kicks
+     * off (and redraws Home after) an actual fetch.
+     */
     private fun homeStatusChip(): String {
+        refreshHomeWeatherIfNeeded()
+        val place = dev.autobridge.weather.WeatherLocationStore.place(this)
+        val snapshot = dev.autobridge.weather.WeatherRepository.cachedSnapshot()
+        if (place != null && snapshot != null && snapshot.place == place) {
+            return "${Math.round(snapshot.temperatureC)}°C"
+        }
         val runtime = RuntimeContextStore.context.value
         return if (runtime.connected) "AUTO" else "PHONE"
+    }
+
+    private var homeWeatherRequested = false
+
+    /**
+     * Fires one Weather fetch per Home visit when a place is saved and nothing has loaded yet,
+     * then redraws Home so the chip picks up the result. Guarded by [homeWeatherRequested] so a
+     * screen full of chip reads does not queue a request per rebuild.
+     */
+    private fun refreshHomeWeatherIfNeeded() {
+        if (homeWeatherRequested) return
+        val place = dev.autobridge.weather.WeatherLocationStore.place(this) ?: return
+        val cached = dev.autobridge.weather.WeatherRepository.cachedSnapshot()
+        if (cached != null && cached.place == place) return
+        homeWeatherRequested = true
+        dev.autobridge.weather.WeatherRepository.load(this, forceRefresh = false) {
+            homeWeatherRequested = false
+            if (currentScreen == PhoneScreen.HOME) showPhoneScreen(PhoneScreen.HOME, force = true)
+        }
     }
 
     /**
@@ -2945,6 +2983,34 @@ class MainActivity : androidx.activity.ComponentActivity() {
         )
         addCard(content, logActions, top = 8)
 
+        // Survives the process dying, which the in-memory log above does not. This is the only way
+        // to see why the app died on a head unit when the phone running it is in someone's car and
+        // `adb logcat` is not an option.
+        content.addView(sectionLabel("CRASH REPORTS"))
+        val crashView = TextView(this).apply {
+            crashReportView = this
+            textSize = 12f
+            setTextColor(COLOR_TEXT)
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+            background = roundedBackground(COLOR_SURFACE, COLOR_BORDER)
+            text = crashReportSummary()
+        }
+        addCard(content, crashView, top = 4)
+
+        val crashActions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        crashActions.addView(
+            actionCard("SHARE") { shareDiagnostics() },
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(6) }
+        )
+        crashActions.addView(
+            actionCard("CLEAR", destructive = true) {
+                CrashReportStore.clear(this)
+                crashReportView?.text = crashReportSummary()
+            },
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(6) }
+        )
+        addCard(content, crashActions, top = 8)
+
         content.addView(sectionLabel("MIRROR EVENTS"))
         val mirrorEventsView = TextView(this).apply {
             developerMirrorEventsView = this
@@ -3318,6 +3384,29 @@ class MainActivity : androidx.activity.ComponentActivity() {
      * Copies the current app log + mirror event ring to the clipboard, so it can be pasted
      * somewhere to diagnose "opens but gets stuck" without needing `adb logcat` on the car/DHU.
      */
+    /** Newest crash report, or a line saying there is none. Shown in Developer Tools. */
+    private fun crashReportSummary(): String {
+        val count = CrashReportStore.reportCount(this)
+        val latest = CrashReportStore.latestReport(this)
+            ?: return "No crash recorded on this device."
+        return "$count report(s) stored. Newest:\n\n$latest"
+    }
+
+    /**
+     * Sends the crash report and session log as plain text. Text rather than a file attachment so
+     * it needs no FileProvider and lands in any chat app the user already has.
+     */
+    private fun shareDiagnostics() {
+        val text = CrashReportStore.shareText(this)
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, "AutoBridge diagnostics")
+            putExtra(Intent.EXTRA_TEXT, text)
+        }
+        runCatching { startActivity(Intent.createChooser(intent, "Share diagnostics")) }
+            .onFailure { Toast.makeText(this, "No app available to share with", Toast.LENGTH_SHORT).show() }
+    }
+
     private fun copyDiagnosticsToClipboard() {
         val runtime = RuntimeContextStore.context.value
         val text = buildString {

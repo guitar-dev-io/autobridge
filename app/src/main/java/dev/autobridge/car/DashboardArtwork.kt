@@ -13,7 +13,8 @@ internal object DashboardArtwork {
     enum class Kind {
         BROWSER, MIRROR, MEDIA, AGENT, QUICK_LAUNCH, RECENT, MORE, YOUTUBE,
         // Content sections shared with the phone home grid.
-        TV, RADIO, YOUTUBE_MUSIC, YOUTUBE_KIDS, FOLDERS, FAVORITES, PLAYLISTS, GALLERY, SETTINGS
+        TV, RADIO, YOUTUBE_MUSIC, YOUTUBE_KIDS, FOLDERS, FAVORITES, PLAYLISTS, GALLERY, SETTINGS,
+        WEATHER
     }
 
     private val icons = mutableMapOf<Pair<Kind, Boolean>, CarIcon>()
@@ -50,6 +51,7 @@ internal object DashboardArtwork {
             Kind.FAVORITES -> 0xFFFF8FB1.toInt()
             Kind.GALLERY -> 0xFF7CE1CB.toInt()
             Kind.RECENT, Kind.MORE, Kind.YOUTUBE, Kind.SETTINGS -> 0xFFD8E3F7.toInt()
+            Kind.WEATHER -> 0xFF6BC5FF.toInt()
         }
         val pen = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = if (compact) 0xFFF5F5F7.toInt() else accent
@@ -182,6 +184,28 @@ internal object DashboardArtwork {
                 canvas.drawPath(mountains, pen)
                 pen.style = Paint.Style.FILL
                 canvas.drawCircle(174f, 60f, 7f, pen)
+            }
+            Kind.WEATHER -> {
+                // A sun peeking behind a cloud, drawn from the same primitives as the rest of the set.
+                pen.style = Paint.Style.STROKE
+                canvas.drawCircle(148f, 58f, 14f, pen)
+                for (angle in 0 until 360 step 45) {
+                    val radians = Math.toRadians(angle.toDouble())
+                    canvas.drawLine(
+                        148f + (16f * Math.cos(radians)).toFloat(),
+                        58f + (16f * Math.sin(radians)).toFloat(),
+                        148f + (22f * Math.cos(radians)).toFloat(),
+                        58f + (22f * Math.sin(radians)).toFloat(),
+                        pen
+                    )
+                }
+                pen.style = Paint.Style.FILL
+                val cloud = Path().apply {
+                    addRoundRect(RectF(126f, 78f, 198f, 104f), 12f, 12f, Path.Direction.CW)
+                }
+                canvas.drawPath(cloud, pen)
+                canvas.drawCircle(150f, 76f, 14f, pen)
+                canvas.drawCircle(172f, 80f, 10f, pen)
             }
             Kind.SETTINGS -> {
                 canvas.drawCircle(160f, 76f, 16f, pen)

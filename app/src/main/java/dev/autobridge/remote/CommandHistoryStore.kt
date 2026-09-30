@@ -71,6 +71,7 @@ object CommandHistoryStore {
             CommandType.START_MIRROR -> "Start Mirror"
             CommandType.STOP_MIRROR -> "Stop Mirror"
             CommandType.OPEN_MEDIA -> "เปิด Media"
+            CommandType.PLAY_VIDEO -> "ส่งวิดีโอไปที่รถ: ${command.extras["title"] ?: shortUrl(command.payload)}"
             CommandType.PLAY -> "เล่นเพลง"
             CommandType.PAUSE -> "หยุดเพลง"
             CommandType.NEXT -> "เพลงถัดไป"

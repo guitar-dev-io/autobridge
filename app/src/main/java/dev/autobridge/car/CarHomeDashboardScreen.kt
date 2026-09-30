@@ -115,6 +115,7 @@ class CarHomeDashboardScreen(
             dev.autobridge.library.HomeSection.FAVORITES -> DashboardArtwork.Kind.FAVORITES
             dev.autobridge.library.HomeSection.PLAYLISTS -> DashboardArtwork.Kind.PLAYLISTS
             dev.autobridge.library.HomeSection.GALLERY -> DashboardArtwork.Kind.GALLERY
+            dev.autobridge.library.HomeSection.WEATHER -> DashboardArtwork.Kind.WEATHER
             dev.autobridge.library.HomeSection.MIRROR -> DashboardArtwork.Kind.MIRROR
             dev.autobridge.library.HomeSection.APPS -> DashboardArtwork.Kind.QUICK_LAUNCH
             dev.autobridge.library.HomeSection.REMOTE -> DashboardArtwork.Kind.AGENT
@@ -143,6 +144,8 @@ class CarHomeDashboardScreen(
                 screenManager.push(CarLibraryScreen(carContext, CarLibraryScreen.Mode.GALLERY))
             section == dev.autobridge.library.HomeSection.FAVORITES ->
                 screenManager.push(CarFavoritesScreen(carContext))
+            section == dev.autobridge.library.HomeSection.WEATHER ->
+                screenManager.push(CarWeatherScreen(carContext))
             section == dev.autobridge.library.HomeSection.MIRROR ->
                 screenManager.push(CarMirrorIntroScreen(carContext))
             section == dev.autobridge.library.HomeSection.APPS ->
