@@ -66,15 +66,32 @@ class BrowserChromeLayout private constructor(
             sizes: AutoUiSizes,
             viewport: BrowserViewport,
             showMenuButton: Boolean = true,
+            /**
+             * Where chrome may be drawn, when that is smaller than the page.
+             *
+             * The page takes the whole car surface, but the host composites its own status bar and
+             * action strip over part of it and only guarantees the stable area is left alone.
+             * Letting a toolbar button land under the host's chrome would make it look pressable
+             * while the tap went somewhere else, so controls are held inside these bounds while the
+             * page keeps the full surface behind them. Null means chrome may use the whole page,
+             * which is what a host that reports no stable area, and every test below, gets.
+             */
+            chromeBounds: Box? = null,
         ): BrowserChromeLayout {
-            val left = viewport.left.toFloat()
-            val top = viewport.top.toFloat()
-            val right = left + viewport.width
-            val barHeight = sizes.toolbarHeight(viewport.height)
+            val page = Box(
+                viewport.left.toFloat(), viewport.top.toFloat(),
+                (viewport.left + viewport.width).toFloat(),
+                (viewport.top + viewport.height).toFloat()
+            )
+            val bounds = chromeBounds?.takeIf { it.width > 0f && it.height > 0f } ?: page
+            val left = bounds.left
+            val top = bounds.top
+            val right = bounds.right
+            val barHeight = sizes.toolbarHeight(bounds.height.toInt())
             val toolbar = Box(left, top, right, top + barHeight)
 
             // A button is never narrower than the touch target, and never wider than it needs to be.
-            val target = sizes.touchTarget.coerceAtMost(viewport.width / 8f)
+            val target = sizes.touchTarget.coerceAtMost(bounds.width / 8f)
             val icon = sizes.iconMedium.coerceAtMost(barHeight * 0.5f)
             val pad = sizes.horizontalPadding
 
@@ -114,10 +131,10 @@ class BrowserChromeLayout private constructor(
             )
 
             val handleHeight = sizes.handleHeight
-            val handleWidth = (viewport.width * 0.22f).coerceAtLeast(sizes.touchTarget * 2f)
+            val handleWidth = (bounds.width * 0.22f).coerceAtLeast(sizes.touchTarget * 2f)
             val handle = Box(
-                left + (viewport.width - handleWidth) / 2f, top,
-                left + (viewport.width + handleWidth) / 2f, top + handleHeight
+                left + (bounds.width - handleWidth) / 2f, top,
+                left + (bounds.width + handleWidth) / 2f, top + handleHeight
             )
 
             // Deliberately a narrow band, not a full-surface gesture layer: anything wider would
@@ -127,8 +144,8 @@ class BrowserChromeLayout private constructor(
             // Bottom-trailing corner: far from the toolbar it duplicates, and the part of the page
             // least likely to hold a control the user meant to press. Bounded against the surface
             // so it cannot dominate a short panel.
-            val bottom = top + viewport.height
-            val fabSize = sizes.fabSize.coerceAtMost(minOf(viewport.width, viewport.height) * 0.22f)
+            val bottom = bounds.bottom
+            val fabSize = sizes.fabSize.coerceAtMost(minOf(bounds.width, bounds.height) * 0.22f)
             val fabMargin = sizes.fabMargin
             val fab = Box(
                 right - fabMargin - fabSize, bottom - fabMargin - fabSize,

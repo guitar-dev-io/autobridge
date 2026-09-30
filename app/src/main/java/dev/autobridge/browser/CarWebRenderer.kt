@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -176,6 +177,8 @@ class CarWebRenderer(context: Context) {
 
     private var sizes: AutoUiSizes = AutoUiSizes.forDensity(1f)
     private var viewport: BrowserViewport = BrowserViewport.create(1, 1, 1f, 1f)
+    /** Where the host leaves room for our controls; null until it reports a stable area. */
+    private var chromeBounds: Box? = null
     private var chrome: BrowserChromeLayout = BrowserChromeLayout.create(sizes, viewport, showMenuButton = true)
     private val visibility = ChromeVisibility()
     private var overlay: Overlay = Overlay.NONE
@@ -191,7 +194,37 @@ class CarWebRenderer(context: Context) {
     private var flingY = 0f
 
 
-    private val webViewDensity: Float get() = appContext.resources.displayMetrics.density
+    /**
+     * Density of the context the off-screen WebView was actually built with.
+     *
+     * Read from the phone this was the wrong number to lay the page out against. The WebView
+     * inherits its context's density, so a phone at 2.75 laying out the 730dp the car panel asks
+     * for produced a ~2000px-wide page that [BrowserViewport] then scaled to ~0.39 to fit the
+     * surface: every frame rasterised close to seven times the pixels it displayed, on the CPU,
+     * and a scroll simply out-ran it — which is what left bands of the white [drawFrame] paints
+     * under the page. Building the WebView against the panel's own density instead makes the
+     * layout and the surface the same size, so the scale is 1 and nothing is thrown away.
+     *
+     * Captured at creation rather than recomputed, because it has to describe the WebView that
+     * exists: a later dpi change re-scales the existing page instead of silently invalidating the
+     * geometry every consumer of [viewport] is working from.
+     */
+    private var webViewDensity: Float = appContext.resources.displayMetrics.density
+
+    /**
+     * [appContext] re-based on the car panel's density, or [appContext] itself when the panel has
+     * not reported one yet or already agrees with the phone.
+     */
+    private fun carDensityContext(): Context {
+        val dpi = surfaceDpi.takeIf { it > 0 } ?: return appContext
+        val configuration = appContext.resources.configuration
+        if (configuration.densityDpi == dpi) return appContext
+        return runCatching {
+            appContext.createConfigurationContext(
+                Configuration(configuration).apply { densityDpi = dpi }
+            )
+        }.getOrDefault(appContext)
+    }
 
     /**
      * Page audio under native control.
@@ -894,7 +927,7 @@ class CarWebRenderer(context: Context) {
         fabAction = BrowserControlsStore.floatingButtonAction(appContext)
         // The toolbar's own ☰ only appears once the floating button stops being the menu's fixed
         // entry point, so a change made in settings has to be reflected in the chrome immediately.
-        chrome = BrowserChromeLayout.create(sizes, viewport, showToolbarMenuButton())
+        chrome = BrowserChromeLayout.create(sizes, viewport, showToolbarMenuButton(), chromeBounds)
     }
 
     /** Whether the floating button is drawn right now; hit testing asks the same question. */
@@ -1080,7 +1113,9 @@ class CarWebRenderer(context: Context) {
 
     // ------------------------------------------------------------------ WebView
 
-    private fun createWebView(): ScrollableWebView = ScrollableWebView(appContext).apply {
+    private fun createWebView(): ScrollableWebView = ScrollableWebView(
+        carDensityContext().also { webViewDensity = it.resources.displayMetrics.density }
+    ).apply {
         // The car WebView is off-screen and drawn to a Surface, so it is the one presentation that
         // cannot be inspected by looking at it. Debug builds expose it over chrome://inspect for the
         // same reason the phone activities do; release builds are untouched.
@@ -1192,21 +1227,32 @@ class CarWebRenderer(context: Context) {
         // than adding a separate "card rect") means every consumer of `viewport` — hit testing,
         // touch mapping, the drawer — automatically operates on the inset card with no extra state.
         val margin = sizes.cardMargin.roundToInt()
-        val areaLeft = area?.left ?: 0
-        val areaTop = area?.top ?: 0
-        val areaRight = area?.right ?: width
-        val areaBottom = area?.bottom ?: height
-        val cardLeft = areaLeft + margin
-        val cardTop = areaTop + margin
-        val cardRight = (areaRight - margin).coerceAtLeast(cardLeft + 1)
-        val cardBottom = (areaBottom - margin).coerceAtLeast(cardTop + 1)
+        // The page takes the whole surface. It used to be shrunk to the host's stable area, which
+        // is the region the host guarantees it will never cover - the intersection of every state
+        // its own chrome can be in, and so always the smallest of them. Sizing the page to it meant
+        // the panel was permanently laid out for the host's worst case, and the difference was
+        // simply black: on one observed head unit an 800x400 surface reported 752x300 stable, a
+        // quarter of the height given away for chrome that is not on screen most of the time.
+        // Chrome still respects the stable area (see chromeBounds); only the page grew.
+        val cardLeft = margin
+        val cardTop = margin
+        val cardRight = (width - margin).coerceAtLeast(cardLeft + 1)
+        val cardBottom = (height - margin).coerceAtLeast(cardTop + 1)
         val next = BrowserViewport.create(
             width, height, webViewDensity, sizes.density,
             cardLeft, cardTop, cardRight, cardBottom
         )
         val geometryUnchanged = next == viewport && view.width == next.webWidth
         viewport = next
-        chrome = BrowserChromeLayout.create(sizes, viewport, showToolbarMenuButton())
+        chromeBounds = area?.let {
+            Box(
+                it.left.coerceIn(cardLeft, cardRight).toFloat(),
+                it.top.coerceIn(cardTop, cardBottom).toFloat(),
+                it.right.coerceIn(cardLeft, cardRight).toFloat(),
+                it.bottom.coerceIn(cardTop, cardBottom).toFloat()
+            )
+        }
+        chrome = BrowserChromeLayout.create(sizes, viewport, showToolbarMenuButton(), chromeBounds)
         if (overlay == Overlay.DRAWER || overlay == Overlay.DRAWER_MORE) rebuildDrawer()
         if (geometryUnchanged) {
             trace(event, "reflow=skipped")

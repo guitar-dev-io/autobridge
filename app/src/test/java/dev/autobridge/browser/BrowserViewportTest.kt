@@ -72,6 +72,27 @@ class BrowserViewportTest {
         assertTrue(highDpi.contentWidthDp < lowDpi.contentWidthDp)
     }
 
+    /**
+     * Regression: the WebView used to be built from the phone's context, so a 780px panel at
+     * 171dpi was laid out ~2000px wide and drawn at scale ~0.39 - close to seven times the pixels
+     * the surface shows, rasterised on the CPU every frame. Building it against the panel's own
+     * density collapses that to 1:1. What the page *sees* is unchanged; only the pixel count is.
+     */
+    @Test fun buildingThePageAtThePanelDensityRastersNoMorePixelsThanAreShown() {
+        val panelDensity = 171 / 160f
+        val phoneHosted = BrowserViewport.create(780, 770, webViewDensity = 2.75f, surfaceDensity = panelDensity)
+        val panelHosted = BrowserViewport.create(780, 770, webViewDensity = panelDensity, surfaceDensity = panelDensity)
+
+        // Same page, same CSS width - the layout the site runs its breakpoints against is untouched.
+        assertEquals(phoneHosted.contentWidthDp, panelHosted.contentWidthDp)
+
+        assertEquals(1f, panelHosted.scale, 0.01f)
+        assertEquals(780, panelHosted.webWidth)
+        val before = phoneHosted.webWidth.toLong() * phoneHosted.webHeight
+        val after = panelHosted.webWidth.toLong() * panelHosted.webHeight
+        assertTrue("rastered $before -> $after px", after * 6 < before)
+    }
+
     @Test fun contentWidthIsClampedToAReadableRange() {
         val tiny = BrowserViewport.create(480, 320, 2f, 2f)
         assertEquals(BrowserViewport.MIN_CONTENT_WIDTH_DP, tiny.contentWidthDp)
@@ -141,6 +162,47 @@ class BrowserChromeLayoutTest {
         val sizes = AutoUiSizes.forCarSurface(dpi)
         val viewport = BrowserViewport.create(width, height, 3f, sizes.density)
         return BrowserChromeLayout.create(sizes, viewport)
+    }
+
+    /**
+     * Regression: the page used to be shrunk to the host's stable area - the intersection of every
+     * state the host's own chrome can be in, and so always its smallest. The panel was permanently
+     * laid out for the worst case and the difference was drawn black. The page now takes the whole
+     * surface while the controls stay where the host promises not to cover them, so a button can
+     * never look pressable while the tap lands on host chrome instead.
+     */
+    @Test fun thePageTakesTheWholeSurfaceWhileControlsStayInsideTheStableArea() {
+        // An observed head unit: 800x400 of surface, of which only 752x300 at (24,88) is stable.
+        val sizes = AutoUiSizes.forCarSurface(160)
+        val viewport = BrowserViewport.create(800, 400, 2f, sizes.density)
+        val stable = Box(24f, 88f, 776f, 388f)
+        val layout = BrowserChromeLayout.create(sizes, viewport, showMenuButton = true, chromeBounds = stable)
+
+        assertEquals(0, viewport.left)
+        assertEquals(0, viewport.top)
+        assertEquals(800, viewport.width)
+        assertEquals(400, viewport.height)
+
+        assertEquals(stable.left, layout.toolbar.left, 0.01f)
+        assertEquals(stable.top, layout.toolbar.top, 0.01f)
+        assertEquals(stable.right, layout.toolbar.right, 0.01f)
+        layout.slots.forEach { slot ->
+            assertTrue(
+                "${slot.zone} escapes the stable area",
+                slot.bounds.left >= stable.left - 0.01f && slot.bounds.right <= stable.right + 0.01f &&
+                    slot.bounds.top >= stable.top - 0.01f && slot.bounds.bottom <= stable.bottom + 0.01f
+            )
+        }
+        assertTrue("fab escapes the stable area", layout.fab.bottom <= stable.bottom + 0.01f)
+    }
+
+    @Test fun aHostThatReportsNoStableAreaGetsChromeOnTheWholePage() {
+        val sizes = AutoUiSizes.forCarSurface(160)
+        val viewport = BrowserViewport.create(800, 400, 2f, sizes.density)
+        val unbounded = BrowserChromeLayout.create(sizes, viewport, showMenuButton = true)
+        assertEquals(0f, unbounded.toolbar.left, 0.01f)
+        assertEquals(0f, unbounded.toolbar.top, 0.01f)
+        assertEquals(800f, unbounded.toolbar.right, 0.01f)
     }
 
     @Test fun everyToolbarButtonIsHitTestableWhereItIsDrawn() {
