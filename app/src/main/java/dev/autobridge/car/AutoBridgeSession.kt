@@ -10,6 +10,7 @@ import androidx.car.app.Session
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import dev.autobridge.browser.CarBrowserRuntime
+import dev.autobridge.core.state.RuntimeContextStore
 import dev.autobridge.remote.CarScreenController
 import dev.autobridge.remote.RemoteRuntime
 
@@ -25,10 +26,21 @@ class AutoBridgeSession : Session(), CarScreenController.Host {
                 // (navigation) through the SAME ScreenManager the car UI already uses.
                 RemoteRuntime.ensureStarted(carContext)
                 CarScreenController.register(this@AutoBridgeSession)
+                // A live Session IS the Android Auto connection; nothing else observes the host
+                // handshake. Without this the runtime context stayed false for the whole drive, so
+                // the phone UI read "Not connected" and the Mobile Remote showed the car offline
+                // while the head unit was plainly running our screens.
+                RuntimeContextStore.setConnected(true)
+                dev.autobridge.display.StructuredLog.i(TAG, "car session connected")
             }
 
             override fun onDestroy(owner: LifecycleOwner) {
                 CarScreenController.unregister(this@AutoBridgeSession)
+                // A replacement session can be created before the outgoing one is destroyed, so the
+                // registered host - not this callback - decides whether anything is still attached.
+                val stillConnected = CarScreenController.isConnected
+                RuntimeContextStore.setConnected(stillConnected)
+                dev.autobridge.display.StructuredLog.i(TAG, "car session destroyed connected=$stillConnected")
                 // The browser renderer outlives individual screens on purpose, so the session is
                 // the only correct place to tear its WebView down.
                 CarBrowserRuntime.release()
@@ -71,6 +83,10 @@ class AutoBridgeSession : Session(), CarScreenController.Host {
 
     override fun pushMedia() {
         carContext.mainExecutor.execute { screens.push(CarMediaCenterScreen(carContext)) }
+    }
+
+    override fun pushVideo(url: String, title: String) {
+        carContext.mainExecutor.execute { CarVideoLauncher.open(screens, carContext, url, title) }
     }
 
     override fun pushAgent() {

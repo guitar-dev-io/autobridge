@@ -2,6 +2,7 @@ package dev.autobridge
 
 import dev.autobridge.core.model.AutoBridgeMode
 import dev.autobridge.core.model.Environment
+import dev.autobridge.core.state.RuntimeContextStore
 import dev.autobridge.entertainment.ContentKind
 import dev.autobridge.entertainment.ContentKindResolver
 import dev.autobridge.display.MirrorDiagnostics
@@ -135,6 +136,26 @@ class RuntimeBoundaryTest {
         assertEquals(75L, MirrorDiagnostics.currentMirroringUptimeMs(nowMs = 375))
         assertEquals("", MirrorDiagnostics.format())
         MirrorDiagnostics.reset()
+    }
+
+    /**
+     * Regression: the car session's connect/disconnect callbacks are the only writers of this flag,
+     * and every write goes through an `update` that force-overrides environment and vehicle state.
+     * Connection state has to survive that pass, or the phone UI and Mobile Remote read the car as
+     * offline while the head unit is plainly running our screens.
+     */
+    @Test
+    fun connectionStateSurvivesTheForcedRuntimeOverrides() {
+        val wasConnected = RuntimeContextStore.context.value.connected
+        try {
+            RuntimeContextStore.setConnected(true)
+            assertTrue(RuntimeContextStore.context.value.connected)
+            assertEquals(Environment.REAL_CAR, RuntimeContextStore.context.value.environment)
+            RuntimeContextStore.setConnected(false)
+            assertFalse(RuntimeContextStore.context.value.connected)
+        } finally {
+            RuntimeContextStore.setConnected(wasConnected)
+        }
     }
 
     @Test

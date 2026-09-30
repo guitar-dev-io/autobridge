@@ -18,6 +18,7 @@ import dev.autobridge.display.StructuredLog
 import dev.autobridge.display.SurfaceProfile
 import dev.autobridge.input.DisplayTransform
 import dev.autobridge.safety.ParkingStateStore
+import dev.autobridge.safety.SafetyEnforcement
 
 /**
  * Joins the phone-side MediaProjection session to the Surface supplied by Android Auto.
@@ -78,7 +79,8 @@ object MirrorCoordinator {
         }
 
     private fun canRenderLocked(): Boolean =
-        FeaturePolicy.app.isAvailable(Feature.MIRROR) && ParkingStateStore.isParked
+        FeaturePolicy.app.isAvailable(Feature.MIRROR) &&
+            SafetyEnforcement.gateParked(ParkingStateStore.isParked)
 
     private fun isSelfDrawnLocked(): Boolean =
         ScreenOffController.pipelineMode == ScreenOffController.PipelineMode.SELF_DRAWN
@@ -239,7 +241,10 @@ object MirrorCoordinator {
         projection = null
         DisplayTransform.resetSurfaceState()
         runCatching { old?.stop() }
-        MirrorDiagnostics.record("projection_stopped")
+        // Only a real teardown is an event. The parking listener and the service call this
+        // defensively even when nothing was ever attached, and recording those made the ring read
+        // as if a live mirror session had died.
+        if (old != null) MirrorDiagnostics.record("projection_stopped")
     }
 
     private fun reconcileLocked(): Boolean {
