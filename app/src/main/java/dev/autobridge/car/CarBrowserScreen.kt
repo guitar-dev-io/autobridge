@@ -18,6 +18,7 @@ import androidx.car.app.model.Template
 import androidx.car.app.navigation.model.NavigationTemplate
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
+import dev.autobridge.R
 import dev.autobridge.browser.BrowserUserAgentMode
 import dev.autobridge.browser.BrowserUserAgentStore
 import dev.autobridge.browser.CarBrowserRuntime
@@ -169,13 +170,36 @@ class CarBrowserScreen(carContext: CarContext) :
                     .addText("Park the vehicle to browse websites.").build()
             ).build()
         ).setHeader(Header.Builder().setTitle("Browser").setStartHeaderAction(Action.BACK).build()).build()
-        // No dedicated back button and no second menu button: the on-canvas hamburger menu (☰,
-        // already drawn by the renderer in its own toolbar) is the single entry point into browser
-        // navigation — Home, Bookmarks, History, Settings, etc. Action.APP_ICON is a non-interactive
-        // filler; the host requires a non-empty action strip, but nothing here should compete with
-        // the canvas hamburger for the same job.
+        // No dedicated back button and no second menu button: the on-canvas hamburger menu, already
+        // drawn by the renderer in its own toolbar, is the single entry point into browser
+        // navigation — Home, Bookmarks, History, Settings, etc. NavigationTemplate still requires a
+        // non-empty action strip, so one icon-only Home action fills it.
+        //
+        // Action.APP_ICON must NOT be used here. It is a header action: the host has no generic
+        // action ui model for it inside an ActionStrip, and building one kills the whole projection
+        // process the moment this template is rendered —
+        //
+        //   E/GH.CrashHandler: GH FATAL EXCEPTION: main
+        //   Process: com.google.android.projection.gearhead:projection
+        //   java.lang.IllegalStateException: Unexpected generic action ui model type
+        //       at com.google.android.apps.auto.components.apphost.view.TemplateView.p
+        //
+        // The host then restarts and rebuilds the session from its root screen, so the browser
+        // reads on the head unit as "opens and immediately goes back to Home". ActionsConstraints
+        // cannot catch this: ACTIONS_CONSTRAINTS_NAVIGATION declares no disallowed action types, so
+        // the template builds cleanly on the client and only a real host fails. Same shape as the
+        // header-action problem recorded on [CarIcons], and invisible in DHU for the same reason.
         return NavigationTemplate.Builder()
-            .setActionStrip(ActionStrip.Builder().addAction(Action.APP_ICON).build())
+            .setActionStrip(
+                ActionStrip.Builder()
+                    .addAction(
+                        Action.Builder()
+                            .setIcon(CarIcons.of(carContext, R.drawable.ic_car_home))
+                            .setOnClickListener { openAppHome() }
+                            .build()
+                    )
+                    .build()
+            )
             .setMapActionStrip(ActionStrip.Builder().addAction(Action.PAN).build())
             .build()
     }
