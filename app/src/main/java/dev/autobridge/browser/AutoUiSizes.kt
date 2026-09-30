@@ -50,28 +50,37 @@ class AutoUiSizes private constructor(
         const val MENU_COLUMNS_MAX = 5
 
         /**
-         * Floor under a menu tile once the grid is sized from the box it must fit rather than
-         * authored outright ([MENU_TILE_WIDTH_DP]/[MENU_TILE_HEIGHT_DP] are the *preferred* shape,
-         * these are the smallest a tile may be squeezed to before the sheet gives up and scrolls).
+         * Ceiling on the menu sheet's width.
+         *
+         * The sheet is authored against a phone's proportions — a header, a full-width address row
+         * and three tiles across. Letting it take the full width of a 1920px head unit would stretch
+         * those same three tiles to the size of playing cards and put the address row's trailing
+         * buttons a hand's width from its leading lock icon. Bounded and centred, a wide panel gets
+         * the same sheet a narrow one does, with the page showing either side of it.
+         */
+        const val MENU_SHEET_MAX_WIDTH_DP = 560f
+
+        /**
+         * Floor under the sheet's footer band. It carries the version text and two pills, so it
+         * compresses further than a tile row before the sheet gives up and scrolls.
+         */
+        const val MIN_FOOTER_HEIGHT_DP = 30f
+
+        /**
+         * Floor under a menu tile, once the sheet is sized from the box it must fit rather than
+         * authored outright ([MENU_TILE_HEIGHT_DP] is the *preferred* height, this is the smallest a
+         * tile may be squeezed to before the sheet gives up and scrolls).
          *
          * A fixed 78dp tile made the sheet's content height independent of the panel it was drawn
          * in, so on a short stable area the last row simply fell below the fold with nothing on
-         * screen to say it was there — and on the primary list that row held "More", the only way
-         * to reach the rest of the menu. Deriving the tile from the box instead means the same item
-         * list fits a 300dp-tall stable area and a 720dp one.
+         * screen to say it was there — and that row held "More", the only way to reach the rest of
+         * the menu. Deriving the tile from the box instead means the same sheet fits a 300dp-tall
+         * stable area and a 720dp one.
          *
-         * [MIN_TILE_HEIGHT_DP] stays above [TOUCH_TARGET_DP] so the smallest tile the grid can
-         * produce is still a comfortable target, not a bare minimum one.
+         * It stays above [TOUCH_TARGET_DP] so the smallest tile the sheet can produce is still a
+         * comfortable target, not a bare minimum one.
          */
-        const val MIN_TILE_WIDTH_DP = 76f
         const val MIN_TILE_HEIGHT_DP = 48f
-
-        /**
-         * Ceiling on tile growth, as a multiple of the authored size. Without it a widescreen head
-         * unit would spread eleven entries into tiles the size of playing cards; the grid is
-         * centred in the leftover space instead.
-         */
-        const val MAX_TILE_SCALE = 1.6f
 
         /**
          * The sheet header shrinks with the panel, but never below this — it has to hold a close
@@ -150,7 +159,7 @@ class AutoUiSizes private constructor(
     val handleHeight: Float get() = dp(HANDLE_HEIGHT_DP)
     val cardMargin: Float get() = dp(CARD_MARGIN_DP)
     val cardCornerRadius: Float get() = dp(CARD_CORNER_RADIUS_DP)
-    val menuTileHeight: Float get() = dp(MENU_TILE_HEIGHT_DP)
+    val menuSheetMaxWidth: Float get() = dp(MENU_SHEET_MAX_WIDTH_DP)
     val menuTileGap: Float get() = dp(MENU_TILE_GAP_DP)
     val fabSize: Float get() = dp(FAB_SIZE_DP)
     val fabMargin: Float get() = dp(FAB_MARGIN_DP)

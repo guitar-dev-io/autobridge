@@ -17,6 +17,7 @@ import android.view.Gravity
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
+import android.os.Message
 import android.webkit.CookieManager
 import android.webkit.PermissionRequest
 import android.webkit.WebChromeClient
@@ -356,6 +357,42 @@ class BrowserActivity : Activity() {
             override fun onPermissionRequest(request: PermissionRequest) =
                 BrowserDefaults.grantProtectedMediaPermission(request)
 
+            /**
+             * `window.open()` / `target="_blank"`. Without a handler the platform drops the window
+             * silently, so YouTube's "Sign in" popup (a window.open to accounts.google.com) did
+             * nothing at all. The popup WebView is configured with the same clean identity as the
+             * main one — clean UA, no X-Requested-With header — so the request Google sees is not a
+             * raw, rejected WebView. A sign-in origin is loaded into the main WebView in place (the
+             * OAuth cookies belong there); any other new window becomes a same-tab navigation too,
+             * since this single-WebView activity has no tab strip to host a second page.
+             */
+            override fun onCreateWindow(
+                view: WebView,
+                isDialog: Boolean,
+                isUserGesture: Boolean,
+                resultMsg: Message,
+            ): Boolean {
+                if (!isUserGesture) return false
+                val transport = resultMsg.obj as? WebView.WebViewTransport ?: return false
+                val popup = WebView(this@BrowserActivity).apply {
+                    BrowserDefaults.configure(this@BrowserActivity, this)
+                    webViewClient = object : WebViewClient() {
+                        override fun shouldOverrideUrlLoading(
+                            popupView: WebView,
+                            request: WebResourceRequest,
+                        ): Boolean {
+                            val target = request.url.toString()
+                            ContentAddress.https(target)?.let { web.loadUrl(it) }
+                            popupView.destroy()
+                            return true
+                        }
+                    }
+                }
+                transport.webView = popup
+                resultMsg.sendToTarget()
+                return true
+            }
+
             override fun onShowCustomView(view: View, callback: CustomViewCallback) =
                 fullscreenController.show(view, callback) { pageFullscreen -> setFullscreen(pageFullscreen) }
 
@@ -568,165 +605,106 @@ class BrowserActivity : Activity() {
             .apply()
     }
 
-    /**
-     * Primary menu: only the actions used every session, sized so the list fits on screen without
-     * scrolling. A 16-item single list forced a scroll on most screens, and a touch that started as
-     * a tap but drifted a few px while the car vibrated was read as a scroll instead of a click —
-     * the item just never fired. Splitting rare actions into [showMoreMenu] removes the scroll for
-     * the common case and keeps "กลับหน้า Home" as a pinned button so it is never affected by list
-     * scrolling either.
-     */
-    /** One tappable tile in a menu sheet. */
-    private data class MenuEntry(val glyph: String, val label: String, val run: () -> Unit)
+    // ------------------------------------------------------------------ menu sheet
 
     /**
-     * Renders a menu as a grid of tiles rather than a list of text rows.
+     * Live state for the menu sheet, read fresh each time it renders so the switch it just moved
+     * and the Back tile it just used both redraw against the truth.
+     */
+    private fun menuState() = BrowserMenuState(
+        appName = "AutoBridge",
+        pageTitle = web.title?.takeIf { it.isNotBlank() } ?: displayUrl(web.url.orEmpty()),
+        url = web.url.orEmpty(),
+        isDesktop = BrowserUserAgentStore.mode(this) == BrowserUserAgentMode.DESKTOP,
+        canGoBack = web.canGoBack(),
+        canGoForward = web.canGoForward(),
+        version = "v${dev.autobridge.BuildConfig.VERSION_NAME}",
+        surface = MenuSurface.PHONE,
+    )
+
+    /**
+     * Opens the browser menu: the same sheet the car surface draws, built from the same item lists.
      *
-     * A row in an `AlertDialog.setItems` list is about 48dp tall and spans the dialog, so the only
-     * thing distinguishing one entry from the next is where the text sits — there is no visible
-     * target, and a touch that drifts a few px reads as a scroll and never fires. A tile is a drawn
-     * button with an icon, roughly four times the area, and the grid puts every entry on screen at
-     * once so there is nothing to scroll past. This is the same model the car surface uses, so the
-     * two menus now look and behave alike.
-     */
-    private fun showActionGrid(
-        title: String,
-        entries: List<MenuEntry>,
-        closeLabel: String,
-        onClose: () -> Unit,
-    ) {
-        val columns = if (resources.configuration.screenWidthDp >= 600) 4 else 3
-        val gap = sizes.dpInt(AutoUiSizes.MENU_TILE_GAP_DP) / 2
-        val grid = GridLayout(this).apply {
-            columnCount = columns
-            setPadding(gap, gap, gap, gap)
-        }
-        var dialog: AlertDialog? = null
-        entries.forEach { entry ->
-            val tile = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                gravity = Gravity.CENTER
-                background = GradientDrawable().apply {
-                    setColor(BrowserTheme.toolbarBackground)
-                    cornerRadius = sizes.cornerRadius
-                }
-                isClickable = true
-                isFocusable = true
-                contentDescription = entry.label
-                setOnClickListener {
-                    dialog?.dismiss()
-                    if (allowed()) entry.run()
-                }
-                addView(TextView(context).apply {
-                    text = entry.glyph
-                    textSize = iconSp(AutoUiSizes.ICON_LARGE_DP)
-                    gravity = Gravity.CENTER
-                    setTextColor(BrowserTheme.iconEnabled)
-                })
-                addView(TextView(context).apply {
-                    text = entry.label
-                    textSize = iconSp(AutoUiSizes.ICON_SMALL_DP * 0.7f)
-                    gravity = Gravity.CENTER
-                    maxLines = 2
-                    setTextColor(BrowserTheme.textPrimary)
-                })
-            }
-            grid.addView(
-                tile,
-                GridLayout.LayoutParams().apply {
-                    width = 0
-                    height = sizes.dpInt(AutoUiSizes.MENU_TILE_HEIGHT_DP)
-                    columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
-                    setMargins(gap, gap, gap, gap)
-                }
-            )
-        }
-        dialog = AlertDialog.Builder(this)
-            .setTitle(title)
-            .setView(ScrollView(this).apply { addView(grid) })
-            // Two separate exits, because they used to be one. The pinned button leaves the
-            // browser entirely, which is not what someone who opened the menu by mistake wants;
-            // without a plain "close" the only way back to the page was the system back key.
-            .setNeutralButton("ปิดเมนู", null)
-            .setNegativeButton(closeLabel) { _, _ -> onClose() }
-            .create()
-        dialog.show()
-    }
-
-    /**
-     * Primary menu: only the actions used every session, so the grid fits without scrolling.
-     * Rarely used actions live in [showMoreMenu]; "กลับหน้า Home" stays a pinned button so it is
-     * never affected by the sheet's own scrolling.
+     * It replaced a grid of undifferentiated tiles in an `AlertDialog`. See [BrowserMenuSheet] for
+     * what that cost and why the shape changed; the actions themselves are unchanged apart from the
+     * two that only make sense on this surface ([DrawerAction.SEND_TO_CAR] and its opposite), which
+     * used to be buried in a secondary list of ten.
      */
     private fun showMenu() {
-        val desktop = BrowserUserAgentStore.mode(this) == BrowserUserAgentMode.DESKTOP
-        showActionGrid(
-            "Browser",
-            listOf(
-                MenuEntry("\u2302", "หน้าแรก") { navigate(BrowserDefaults.HOME) },
-                MenuEntry("\u2606", "บุ๊กมาร์ก") { showBookmarks() },
-                MenuEntry("\u2605", "บุ๊กมาร์กหน้านี้") { bookmarkCurrentPage() },
-                MenuEntry("\u21ba", "ประวัติ") { showHistory() },
-                MenuEntry("\u2193", "ดาวน์โหลด") { showDownloads() },
-                MenuEntry("\u2315", "ค้นหาในหน้า") { showFindInPage() },
-                MenuEntry("\u25a1", "Desktop: ${if (desktop) "เปิด" else "ปิด"}") {
-                    BrowserUserAgentStore.select(
-                        this,
-                        if (desktop) BrowserUserAgentMode.MOBILE else BrowserUserAgentMode.DESKTOP
-                    )
-                    BrowserDefaults.configure(this, web)
-                    web.reload()
-                },
-                MenuEntry("\u22ef", "เพิ่มเติม") { showMoreMenu() },
-            ),
-            "ออกจากเบราว์เซอร์"
-        ) { finish() }
+        BrowserMenuSheet(
+            activity = this,
+            sizes = sizes,
+            state = { menuState() },
+            onNavigate = { navigate(it) },
+            onAction = { runMenuAction(it) },
+        ).show()
     }
 
     /**
-     * Secondary menu for actions used rarely enough not to earn a slot in [showMenu].
+     * Runs one menu entry.
      *
-     * Fullscreen used to lead this list, which made it the menu's most prominent entry while the
-     * identical ⛶ sat on the toolbar the menu was opened from. A menu that repeats the bar above it
-     * spends its largest targets re-stating what the user can already see, so entries with a
-     * toolbar button of their own are not repeated here. The slot went to the controls settings,
-     * which has nowhere else to live.
+     * Entries the phone cannot perform never reach here: [BrowserDrawerModel] builds the phone's
+     * lists from [MenuSurface.PHONE] and simply does not offer the car's tabs, media screens or
+     * agent, so this is not a place where unsupported actions are silently swallowed.
      */
-    private fun showMoreMenu() {
-        showActionGrid(
-            "เพิ่มเติม",
-            listOf(
-                MenuEntry("\u2699", "ตั้งค่าปุ่มลอย") { showControlSettings() },
-                MenuEntry("\u29c9", "คัดลอก URL") {
-                    val manager = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    manager.setPrimaryClip(ClipData.newPlainText("URL", web.url.orEmpty()))
-                    toast("คัดลอก URL แล้ว")
-                },
-                MenuEntry("\u2398", "วาง URL แล้วไป") {
-                    clipboardText()?.let { navigate(it) } ?: toast("คลิปบอร์ดว่าง")
-                },
-                MenuEntry("+", "ซูมเข้า") { web.zoomBy(1.25f) },
-                MenuEntry("\u2212", "ซูมออก") { web.zoomBy(0.8f) },
-                MenuEntry("\u2327", "ล้างข้อมูล") { confirmClearBrowsingData() },
-                MenuEntry("\u2197", "เบราว์เซอร์ภายนอก") {
-                    if (!BrowserLauncher.openUrl(this, web.url.orEmpty())) toast("เปิดเบราว์เซอร์ไม่ได้")
-                },
-                MenuEntry("\u25b6", "ส่งไป Android Auto") {
-                    val url = web.url?.let(ContentAddress::https)
-                    val target = CarScreenController.requireBrowser()
-                    when {
-                        url == null -> Unit
-                        target == null -> toast("ยังไม่ได้เชื่อมต่อ Android Auto")
-                        else -> target.openUrl(url)
-                    }
-                },
-                MenuEntry("\u2199", "รับจาก Android Auto") {
-                    val url = CarScreenController.activeBrowser?.currentUrl
-                    if (url == null) toast("เปิด Browser บน Android Auto ก่อน") else navigate(url)
-                },
-            ),
-            "‹ ย้อนกลับ"
-        ) { showMenu() }
+    private fun runMenuAction(action: DrawerAction) {
+        if (!allowed()) return
+        when (action) {
+            DrawerAction.NAV_BACK -> if (web.canGoBack()) web.goBack()
+            DrawerAction.NAV_FORWARD -> if (web.canGoForward()) web.goForward()
+            DrawerAction.RELOAD -> web.reload()
+            DrawerAction.BOOKMARKS -> showBookmarks()
+            DrawerAction.OPEN_EXTERNAL ->
+                if (!BrowserLauncher.openUrl(this, web.url.orEmpty())) toast("เปิดเบราว์เซอร์ไม่ได้")
+            DrawerAction.SETTINGS -> showControlSettings()
+            DrawerAction.HOME -> navigate(BrowserDefaults.HOME)
+            DrawerAction.HISTORY -> showHistory()
+            DrawerAction.DOWNLOADS -> showDownloads()
+            DrawerAction.TOGGLE_DESKTOP -> {
+                val desktop = BrowserUserAgentStore.mode(this) == BrowserUserAgentMode.DESKTOP
+                BrowserUserAgentStore.select(
+                    this,
+                    if (desktop) BrowserUserAgentMode.MOBILE else BrowserUserAgentMode.DESKTOP
+                )
+                BrowserDefaults.configure(this, web)
+                web.reload()
+            }
+            DrawerAction.BOOKMARK_PAGE -> bookmarkCurrentPage()
+            DrawerAction.FIND_IN_PAGE -> showFindInPage()
+            DrawerAction.COPY_URL -> {
+                val manager = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                manager.setPrimaryClip(ClipData.newPlainText("URL", web.url.orEmpty()))
+                toast("คัดลอก URL แล้ว")
+            }
+            DrawerAction.PASTE_AND_GO -> clipboardText()?.let { navigate(it) } ?: toast("คลิปบอร์ดว่าง")
+            DrawerAction.ZOOM_IN -> web.zoomBy(1.25f)
+            DrawerAction.ZOOM_OUT -> web.zoomBy(0.8f)
+            DrawerAction.CLEAR_DATA -> confirmClearBrowsingData()
+            DrawerAction.SEND_TO_CAR -> {
+                val url = web.url?.let(ContentAddress::https)
+                val target = CarScreenController.requireBrowser()
+                when {
+                    url == null -> Unit
+                    target == null -> toast("ยังไม่ได้เชื่อมต่อ Android Auto")
+                    else -> target.openUrl(url)
+                }
+            }
+            DrawerAction.RECEIVE_FROM_CAR -> {
+                val url = CarScreenController.activeBrowser?.currentUrl
+                if (url == null) toast("เปิด Browser บน Android Auto ก่อน") else navigate(url)
+            }
+            // The sheet's own footer pair: leaving the browser is this activity finishing.
+            DrawerAction.APP_HOME -> finish()
+            // Handled inside the sheet, which owns a real text field and does not need the activity
+            // to open a keyboard screen the way the car surface does.
+            DrawerAction.ADDRESS_KEYBOARD, DrawerAction.ADDRESS_CLEAR -> Unit
+            // Car-surface entries; [MenuSurface.PHONE] never lists them.
+            DrawerAction.NEW_TAB, DrawerAction.TABS, DrawerAction.MEDIA_CENTER,
+            DrawerAction.NOW_PLAYING, DrawerAction.MEDIA_LIBRARY, DrawerAction.AGENT,
+            DrawerAction.DIAGNOSTICS -> Unit
+            // Sheet navigation, resolved before an action is dispatched.
+            DrawerAction.MORE, DrawerAction.BACK_TO_MENU, DrawerAction.CLOSE_SHEET -> Unit
+        }
     }
 
     /** Saves the page on screen, the one action the phone menu could list bookmarks but not add to. */
@@ -745,10 +723,12 @@ class BrowserActivity : Activity() {
      */
     private fun showControlSettings() {
         val labels = arrayOf<CharSequence>(
+            "ซ่อนแถบ URL ทั้งหมด (จอรถ)",
             "แสดงแถบ URL ตลอดเวลา (จอรถ)",
             "แสดงปุ่มลอยตลอดเวลา"
         )
         val checked = booleanArrayOf(
+            BrowserControlsStore.hideUrlBar(this),
             BrowserControlsStore.alwaysShowUrlBar(this),
             BrowserControlsStore.alwaysShowFloatingButton(this)
         )
@@ -756,8 +736,9 @@ class BrowserActivity : Activity() {
             .setTitle("ปุ่มลอยและแถบควบคุม")
             .setMultiChoiceItems(labels, checked) { _, index, value ->
                 when (index) {
-                    0 -> BrowserControlsStore.setAlwaysShowUrlBar(this, value)
-                    1 -> BrowserControlsStore.setAlwaysShowFloatingButton(this, value)
+                    0 -> BrowserControlsStore.setHideUrlBar(this, value)
+                    1 -> BrowserControlsStore.setAlwaysShowUrlBar(this, value)
+                    2 -> BrowserControlsStore.setAlwaysShowFloatingButton(this, value)
                 }
                 applyFloatingButtonPreference()
             }

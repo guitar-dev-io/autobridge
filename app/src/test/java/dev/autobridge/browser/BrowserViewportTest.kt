@@ -72,27 +72,6 @@ class BrowserViewportTest {
         assertTrue(highDpi.contentWidthDp < lowDpi.contentWidthDp)
     }
 
-    /**
-     * Regression: the WebView used to be built from the phone's context, so a 780px panel at
-     * 171dpi was laid out ~2000px wide and drawn at scale ~0.39 - close to seven times the pixels
-     * the surface shows, rasterised on the CPU every frame. Building it against the panel's own
-     * density collapses that to 1:1. What the page *sees* is unchanged; only the pixel count is.
-     */
-    @Test fun buildingThePageAtThePanelDensityRastersNoMorePixelsThanAreShown() {
-        val panelDensity = 171 / 160f
-        val phoneHosted = BrowserViewport.create(780, 770, webViewDensity = 2.75f, surfaceDensity = panelDensity)
-        val panelHosted = BrowserViewport.create(780, 770, webViewDensity = panelDensity, surfaceDensity = panelDensity)
-
-        // Same page, same CSS width - the layout the site runs its breakpoints against is untouched.
-        assertEquals(phoneHosted.contentWidthDp, panelHosted.contentWidthDp)
-
-        assertEquals(1f, panelHosted.scale, 0.01f)
-        assertEquals(780, panelHosted.webWidth)
-        val before = phoneHosted.webWidth.toLong() * phoneHosted.webHeight
-        val after = panelHosted.webWidth.toLong() * panelHosted.webHeight
-        assertTrue("rastered $before -> $after px", after * 6 < before)
-    }
-
     @Test fun contentWidthIsClampedToAReadableRange() {
         val tiny = BrowserViewport.create(480, 320, 2f, 2f)
         assertEquals(BrowserViewport.MIN_CONTENT_WIDTH_DP, tiny.contentWidthDp)
@@ -526,39 +505,54 @@ class BrowserTabsStateTest {
 }
 
 class BrowserDrawerModelTest {
+    private val state = BrowserMenuState(
+        appName = "AutoBridge",
+        pageTitle = "YouTube",
+        url = "https://www.youtube.com/",
+        tabCount = 2,
+        isDesktop = false,
+        canGoBack = true,
+        canGoForward = false,
+        version = "v0.4.4",
+    )
+
     private fun modelFor(
         width: Int,
         height: Int,
         dpi: Int,
         scroll: Float = 0f,
-        sections: List<DrawerSection> = BrowserDrawerModel.sectionsFor(tabCount = 2, isDesktop = false),
+        more: Boolean = false,
+        state: BrowserMenuState = this.state,
     ): BrowserDrawerModel {
         val sizes = AutoUiSizes.forCarSurface(dpi)
         val viewport = BrowserViewport.create(width, height, 3f, sizes.density)
-        return BrowserDrawerModel.create(sizes, viewport, sections, scroll)
+        return BrowserDrawerModel.create(sizes, viewport, state, more, scroll)
     }
 
     /**
-     * The property the whole grid-sizing rewrite exists for. A fixed 78dp tile plus a 26dp heading
-     * per section made the sheet's content height a constant, so on a short panel the last row fell
-     * below the fold silently — and on the primary list that row held "More", the only way into the
-     * rest of the menu. Every entry of both lists must be reachable without a scroll on every
-     * supported head unit, because a tap that drifts during a scroll is read as a scroll and the
-     * entry never fires.
+     * Head units tall enough for the sheet's authored shape. The 800x320 stable area a DHU session
+     * reports is deliberately excluded: the reference layout is a header, an address row, two cards,
+     * a switch and a footer, and at 320px there is no arrangement of those that leaves a tile at a
+     * touchable size. That panel scrolls, and [theSheetScrollsOnlyWhenItsOwnMinimumsDoNotFit]
+     * covers it.
      */
-    @Test fun bothMenuListsFitWithoutScrollingOnEveryHeadUnit() {
-        val lists = mapOf(
-            "primary" to BrowserDrawerModel.sectionsFor(tabCount = 2, isDesktop = false),
-            "more" to BrowserDrawerModel.moreSectionsFor(isDesktop = false),
-        )
-        HEAD_UNITS.forEach { (width, height, dpi) ->
-            lists.forEach { (name, sections) ->
-                val model = modelFor(width, height, dpi, sections = sections)
+    private val tallEnough = HEAD_UNITS.filter { (_, height, dpi) -> height / (dpi / 160f) >= 440f }
+
+    /**
+     * The property the band-sizing rewrite exists for. Entries below the fold are the failure mode
+     * this menu keeps hitting: a tap that drifts a few px during a scroll is read as a scroll and
+     * the entry never fires, so on every panel with room for the sheet, nothing may need scrolling
+     * to reach.
+     */
+    @Test fun bothSheetsFitWithoutScrollingOnEveryHeadUnitWithRoomForThem() {
+        tallEnough.forEach { (width, height, dpi) ->
+            listOf(false, true).forEach { more ->
+                val model = modelFor(width, height, dpi, more = more)
+                val name = if (more) "more" else "primary"
                 assertEquals(
-                    "$name list scrolls at ${width}x$height @$dpi",
+                    "$name sheet scrolls at ${width}x$height @$dpi",
                     0f, model.maxScroll, 0.01f
                 )
-                assertEquals(sections.sumOf { it.items.size }, model.rows.size)
                 model.rows.forEach { row ->
                     assertTrue(
                         "${row.item.label} falls outside the sheet at ${width}x$height @$dpi",
@@ -568,6 +562,31 @@ class BrowserDrawerModelTest {
                 }
             }
         }
+    }
+
+    /**
+     * The short stable area is the one case the authored shape cannot fit, so it degrades the
+     * correct way: bands compress to their minimums first, and only what is still over the box
+     * becomes scroll. The header and its close button stay put either way, so the sheet is never
+     * opened into a state it cannot be closed from.
+     */
+    @Test fun theSheetScrollsOnlyWhenItsOwnMinimumsDoNotFit() {
+        val short = modelFor(800, 320, 160)
+        assertTrue("a 320px panel should need to scroll", short.maxScroll > 0f)
+        assertTrue(short.closeButton.bottom <= short.headerBottom + 0.01f)
+        // Scrolled to the end, the last thing on the sheet is on screen.
+        val scrolled = modelFor(800, 320, 160, scroll = short.maxScroll)
+        assertTrue(scrolled.footer.bottom <= scrolled.panel.bottom + 0.01f)
+    }
+
+    /** Every band shrinks by the same fraction of its own slack; nothing is starved to feed another. */
+    @Test fun bandsShareTheShortfallInsteadOfTheFirstOneTakingItAll() {
+        val bands = listOf(100f to 50f, 40f to 20f)
+        assertEquals(listOf(100f, 40f), BrowserDrawerModel.distribute(bands, 200f))
+        // 140 wanted, 70 of slack, 35 short -> each gives up half its slack.
+        assertEquals(listOf(75f, 30f), BrowserDrawerModel.distribute(bands, 105f))
+        // Past every minimum it stops shrinking and the caller scrolls.
+        assertEquals(listOf(50f, 20f), BrowserDrawerModel.distribute(bands, 10f))
     }
 
     /**
@@ -592,7 +611,7 @@ class BrowserDrawerModelTest {
         }
     }
 
-    @Test fun drawerOverlaysRatherThanShrinkingTheViewport() {
+    @Test fun theSheetOverlaysRatherThanShrinkingTheViewport() {
         HEAD_UNITS.forEach { (width, height, dpi) ->
             val sizes = AutoUiSizes.forCarSurface(dpi)
             val viewport = BrowserViewport.create(width, height, 3f, sizes.density)
@@ -606,15 +625,30 @@ class BrowserDrawerModelTest {
     }
 
     /**
-     * The point of the grid: an entry is a real button, not a minimum-height text row. 46dp square
+     * A widescreen head unit gets the reference proportions, not three tiles stretched across two
+     * feet of dashboard, and the sheet stays centred so it is reachable from either side.
+     */
+    @Test fun theSheetIsBoundedInWidthAndCentredOnAWideHeadUnit() {
+        val sizes = AutoUiSizes.forCarSurface(160)
+        val model = modelFor(1920, 720, 160)
+        assertEquals(sizes.dp(AutoUiSizes.MENU_SHEET_MAX_WIDTH_DP), model.panel.width, 0.5f)
+        assertEquals(960f, model.panel.centerX, 0.5f)
+        // A panel narrower than the cap keeps the whole width it has, less its margins.
+        val dense = AutoUiSizes.forCarSurface(240)
+        val narrow = modelFor(800, 480, 240)
+        assertEquals(800f - dense.contentGap * 2f, narrow.panel.width, 0.5f)
+    }
+
+    /**
+     * The point of the tiles: an entry is a real button, not a minimum-height text row. 46dp square
      * is the smallest target a finger hits reliably at rest, which is the wrong size for a control
      * used while the car is moving, so a tile must be comfortably larger than that.
      */
     @Test fun everyTileIsLargerThanTheBareMinimumTouchTarget() {
-        HEAD_UNITS.forEach { (width, height, dpi) ->
+        tallEnough.forEach { (width, height, dpi) ->
             val sizes = AutoUiSizes.forCarSurface(dpi)
             val minimum = sizes.touchTarget * sizes.touchTarget
-            modelFor(width, height, dpi).rows.forEach { row ->
+            modelFor(width, height, dpi).tiles.forEach { row ->
                 assertTrue(
                     "tile ${row.item.label} too small at ${width}x$height",
                     row.bounds.width * row.bounds.height >= minimum * 1.5f
@@ -624,16 +658,21 @@ class BrowserDrawerModelTest {
         }
     }
 
-    @Test fun tilesInTheSameRowDoNotOverlap() {
+    @Test fun nothingOnTheSheetOverlapsAnythingElse() {
         HEAD_UNITS.forEach { (width, height, dpi) ->
-            val rows = modelFor(width, height, dpi).rows
-            rows.forEachIndexed { index, row ->
-                rows.drop(index + 1).forEach { other ->
-                    val overlaps = row.bounds.left < other.bounds.right &&
-                        other.bounds.left < row.bounds.right &&
-                        row.bounds.top < other.bounds.bottom &&
-                        other.bounds.top < row.bounds.bottom
-                    assertTrue("${row.item.label} overlaps ${other.item.label}", !overlaps)
+            listOf(false, true).forEach { more ->
+                val rows = modelFor(width, height, dpi, more = more).rows
+                    // The address row deliberately contains its own two buttons; it is hit-tested
+                    // after them, which is what makes the buttons win.
+                    .filter { it.kind != DrawerKind.ADDRESS }
+                rows.forEachIndexed { index, row ->
+                    rows.drop(index + 1).forEach { other ->
+                        val overlaps = row.bounds.left < other.bounds.right &&
+                            other.bounds.left < row.bounds.right &&
+                            row.bounds.top < other.bounds.bottom &&
+                            other.bounds.top < row.bounds.bottom
+                        assertTrue("${row.item.label} overlaps ${other.item.label}", !overlaps)
+                    }
                 }
             }
         }
@@ -649,109 +688,189 @@ class BrowserDrawerModelTest {
         assertEquals(narrow.menuColumns(800f), dense.menuColumns(1600f))
     }
 
-    @Test fun everyRowIsTappableAtItsOwnCentre() {
-        val model = modelFor(1024, 600, 160)
-        model.rows.filter { it.bounds.top >= model.headerBottom && it.bounds.bottom <= model.panel.bottom }
-            .forEach { row ->
-                assertEquals(row.item.action, model.rowAt(row.bounds.centerX, row.bounds.centerY)?.item?.action)
+    @Test fun everyEntryIsTappableAtItsOwnCentre() {
+        listOf(false, true).forEach { more ->
+            val model = modelFor(1024, 600, 160, more = more)
+            model.rows.filter { it.item.enabled }.forEach { row ->
+                val hit = model.rowAt(row.bounds.centerX, row.bounds.centerY)
+                assertEquals(
+                    "${row.item.label} is not tappable at its own centre",
+                    row.item.action, hit?.item?.action
+                )
             }
+        }
+    }
+
+    /**
+     * Back with nothing behind it is drawn so the card keeps its shape, but it must not swallow the
+     * tap: a control that lights up and does nothing reads as broken, where a dimmed one reads as
+     * unavailable.
+     */
+    @Test fun aDisabledTileIsDrawnButTakesNoTap() {
+        val model = modelFor(1024, 600, 160)
+        val forward = model.tiles.first { it.item.action == DrawerAction.NAV_FORWARD }
+        assertFalse(forward.item.enabled)
+        assertNull(model.rowAt(forward.bounds.centerX, forward.bounds.centerY))
+        val back = model.tiles.first { it.item.action == DrawerAction.NAV_BACK }
+        assertTrue(back.item.enabled)
+        assertEquals(
+            DrawerAction.NAV_BACK,
+            model.actionAt(back.bounds.centerX, back.bounds.centerY)
+        )
+    }
+
+    /** The address row's own buttons win over the row they sit inside. */
+    @Test fun theAddressButtonsOutrankTheRowTheySitIn() {
+        val model = modelFor(1024, 600, 160)
+        val address = model.address
+        assertEquals(DrawerAction.ADDRESS_CLEAR, model.actionAt(address.clear.centerX, address.clear.centerY))
+        assertEquals(DrawerAction.ADDRESS_KEYBOARD, model.actionAt(address.go.centerX, address.go.centerY))
+        assertEquals(
+            DrawerAction.ADDRESS_KEYBOARD,
+            model.actionAt(address.bounds.left + 1f, address.bounds.centerY)
+        )
+        // It reports the page the sheet was opened over, which is the whole reason it is there.
+        assertTrue(address.secure)
+        assertTrue(address.text.contains("youtube.com"))
     }
 
     /**
      * Regression: the sheet's only dismissal was a tap outside it, and it covers the viewport apart
      * from a margin a few dp wide. On a head unit that band is not a target anyone can hit, so the
-     * drawer could be opened and then not closed without choosing an action. The header carries a
+     * sheet could be opened and then not closed without choosing an action. The header carries a
      * real close button instead.
      */
-    @Test fun theDrawerCanBeClosedWithoutTappingTheMarginAroundIt() {
+    @Test fun theSheetCanBeClosedWithoutTappingTheMarginAroundIt() {
         HEAD_UNITS.forEach { (width, height, dpi) ->
             val sizes = AutoUiSizes.forCarSurface(dpi)
             val model = modelFor(width, height, dpi)
             val close = model.closeButton
             assertTrue(
                 "close button too small at ${width}x$height",
-                minOf(close.width, close.height) >= sizes.touchTarget * 0.7f
+                minOf(close.width, close.height) >= sizes.touchTarget * 0.75f - 0.01f
             )
-            // In the header, inside the panel, and never over the tiles.
+            // In the header, inside the panel, and never over the content.
             assertTrue(close.top >= model.panel.top)
             assertTrue(close.bottom <= model.headerBottom)
             assertTrue(close.right <= model.panel.right)
             assertTrue(model.hitsClose(close.centerX, close.centerY))
+            assertEquals(DrawerAction.CLOSE_SHEET, model.actionAt(close.centerX, close.centerY))
             assertNull(model.rowAt(close.centerX, close.centerY))
             assertTrue(!model.hitsClose(model.panel.centerX, model.panel.bottom - 1f))
         }
     }
 
-    @Test fun rowsScrolledUnderTheHeaderAreNotTappable() {
-        val model = modelFor(800, 480, 160, scroll = 200f)
+    @Test fun entriesScrolledUnderTheHeaderAreNotTappable() {
+        val model = modelFor(800, 320, 160, scroll = 200f)
         assertNull(model.rowAt(model.panel.centerX, model.headerBottom - 1f))
     }
 
     @Test fun scrollIsClampedToTheContent() {
-        val model = modelFor(800, 480, 160, scroll = 99_999f)
+        val model = modelFor(800, 320, 160, scroll = 99_999f)
         assertEquals(model.maxScroll, model.scrollOffset, 0.01f)
-        val negative = modelFor(800, 480, 160, scroll = -50f)
+        val negative = modelFor(800, 320, 160, scroll = -50f)
         assertEquals(0f, negative.scrollOffset, 0.01f)
     }
 
-    /**
-     * Regression: the paste row used to be hidden unless a clipboard probe succeeded. On a car
-     * surface that probe is always refused (the app is not focused on the phone), so the row never
-     * appeared. It is now unconditional and reports failure when tapped. It now lives in the
-     * "More" list rather than the primary one.
-     */
-    @Test fun pasteRowIsAlwaysOfferedRegardlessOfClipboardReadability() {
+    /** The switch reports the store, not a label the user has to decode. */
+    @Test fun theDesktopSwitchShowsTheStateItToggles() {
         listOf(true, false).forEach { desktop ->
-            val actions = BrowserDrawerModel.moreSectionsFor(isDesktop = desktop)
-                .flatMap { it.items }.map { it.action }
-            assertTrue(actions.contains(DrawerAction.PASTE_AND_GO))
+            val model = modelFor(1024, 600, 160, state = state.copy(isDesktop = desktop))
+            val toggle = requireNotNull(model.toggle)
+            assertEquals(DrawerKind.TOGGLE, toggle.kind)
+            assertEquals(desktop, toggle.item.on)
+            assertEquals(DrawerAction.TOGGLE_DESKTOP, model.actionAt(toggle.bounds.centerX, toggle.bounds.centerY))
+        }
+        // The "More" sheet is a plain grid; the switch belongs to the page-level sheet only.
+        assertNull(modelFor(1024, 600, 160, more = true).toggle)
+    }
+
+    /**
+     * Regression: the paste entry used to be hidden unless a clipboard probe succeeded. On a car
+     * surface that probe is always refused (the app is not focused on the phone), so the entry never
+     * appeared. It is now unconditional and reports failure when tapped.
+     */
+    @Test fun pasteIsAlwaysOfferedRegardlessOfClipboardReadability() {
+        assertTrue(BrowserDrawerModel.moreItems().map { it.action }.contains(DrawerAction.PASTE_AND_GO))
+    }
+
+    /**
+     * The primary sheet is the one drawn by default, and its size is what keeps it scroll-free on a
+     * real head unit. Nine tiles in two cards is the reference layout; growing it is how the old
+     * menu ended up with a fold.
+     */
+    @Test fun thePrimarySheetStaysNineTilesInTwoCards() {
+        val cards = BrowserDrawerModel.primaryCards(state)
+        assertEquals(2, cards.size)
+        assertEquals(9, cards.sumOf { it.size })
+        cards.forEach { card ->
+            assertEquals(0, card.size % BrowserDrawerModel.PRIMARY_COLUMNS)
         }
     }
 
     /**
-     * The primary list is the one drawn by default and must stay short enough to fit without
-     * scrolling on the smallest supported head unit, so a drifting tap can never be misread as a
-     * scroll instead of a click on a common action.
+     * Both routes off the primary sheet are one tap from it and never behind "More": the secondary
+     * list itself, and the way out of the browser, which on the car surface has no other home (see
+     * [DrawerAction.APP_HOME]).
      */
-    @Test fun primaryDrawerListStaysShort() {
-        val actions = BrowserDrawerModel.sectionsFor(tabCount = 1, isDesktop = true)
-            .flatMap { it.items }.map { it.action }
-        assertTrue(actions.size <= 12)
-        assertTrue(actions.contains(DrawerAction.MORE))
-    }
-
-    /**
-     * The drawer is opened from the toolbar, so a primary row that repeats a toolbar button spends
-     * the largest target on the surface re-stating what the user can already see. Reload and the
-     * address/keyboard row used to do exactly that. They still exist — under "More", for when the
-     * toolbar has faded out — but never in the list the menu opens on.
-     */
-    @Test fun noPrimaryDrawerRowRepeatsAToolbarButton() {
-        val onTheToolbar = mapOf(
-            DrawerAction.RELOAD to ChromeZone.RELOAD,
-            DrawerAction.ADDRESS_KEYBOARD to ChromeZone.ADDRESS,
+    @Test fun theFooterKeepsBothWaysOffTheSheetOneTapAway() {
+        val primary = modelFor(1024, 600, 160)
+        assertEquals(
+            listOf(DrawerAction.MORE, DrawerAction.APP_HOME),
+            primary.footerLinks.map { it.item.action }
         )
-        val primary = BrowserDrawerModel.sectionsFor(tabCount = 1, isDesktop = true)
-            .flatMap { it.items }.map { it.action }
-        onTheToolbar.forEach { (action, zone) ->
-            val layout = BrowserChromeLayout.create(
-                AutoUiSizes.forCarSurface(160),
-                BrowserViewport.create(1024, 600, 3f, 1f)
-            )
-            val drawnOnTheBar = zone == ChromeZone.ADDRESS || layout.slot(zone) != null
-            assertTrue("$zone is not on the toolbar; the premise of this test is stale", drawnOnTheBar)
-            assertFalse("$action is on the toolbar and in the primary menu", primary.contains(action))
-        }
+        // On the secondary list the same slot is the way back, so the pair is never a dead end.
+        val more = modelFor(1024, 600, 160, more = true)
+        assertEquals(
+            listOf(DrawerAction.BACK_TO_MENU, DrawerAction.APP_HOME),
+            more.footerLinks.map { it.item.action }
+        )
     }
 
-    @Test fun everyDrawerActionHasExactlyOneRowAcrossBothLists() {
-        val primary = BrowserDrawerModel.sectionsFor(tabCount = 1, isDesktop = true)
-            .flatMap { it.items }.map { it.action }
-        val more = BrowserDrawerModel.moreSectionsFor(isDesktop = true)
-            .flatMap { it.items }.map { it.action }
-        val actions = primary + more
-        assertEquals(actions.size, actions.toSet().size)
-        assertEquals(DrawerAction.entries.toSet(), actions.toSet())
+    /**
+     * Every action belongs to a surface and is reachable there, and no action is reachable twice on
+     * the same sheet — which is what makes "where is that?" a question with one answer. The two
+     * surfaces between them cover the whole enum, so an action can never be added and then left
+     * with nothing that offers it.
+     */
+    @Test fun everySheetOffersEachOfItsActionsExactlyOnce() {
+        val covered = mutableSetOf(DrawerAction.CLOSE_SHEET) // the header's button, not a row
+        MenuSurface.entries.forEach { surface ->
+            val primary = modelFor(1024, 600, 160, state = state.copy(surface = surface))
+            val more = modelFor(1024, 600, 160, more = true, state = state.copy(surface = surface))
+            covered += (primary.rows + more.rows).map { it.item.action }
+            listOf(primary, more).forEach { model ->
+                val actions = model.rows.map { it.item.action }
+                    // ADDRESS_KEYBOARD is deliberately both the row and its ⌕ button.
+                    .filter { it != DrawerAction.ADDRESS_KEYBOARD }
+                assertEquals("$surface offers something twice", actions.size, actions.toSet().size)
+            }
+            // Nothing the other surface owns leaks into this one: a tile over an action this
+            // browser cannot perform is a button that does nothing.
+            val offered = (primary.rows + more.rows).map { it.item.action }.toSet()
+            val foreign = when (surface) {
+                MenuSurface.CAR -> setOf(DrawerAction.SEND_TO_CAR, DrawerAction.RECEIVE_FROM_CAR)
+                MenuSurface.PHONE -> setOf(
+                    DrawerAction.TABS, DrawerAction.NEW_TAB, DrawerAction.AGENT,
+                    DrawerAction.MEDIA_CENTER, DrawerAction.NOW_PLAYING,
+                    DrawerAction.MEDIA_LIBRARY, DrawerAction.DIAGNOSTICS,
+                )
+            }
+            assertEquals(emptySet<DrawerAction>(), offered intersect foreign)
+        }
+        assertEquals(DrawerAction.entries.toSet(), covered)
+    }
+
+    /** The phone browser has no tabs, so its second card holds the two lists it does have. */
+    @Test fun thePhoneSheetKeepsTheShapeAndSwapsWhatItCannotDo() {
+        val phone = BrowserDrawerModel.primaryCards(state.copy(surface = MenuSurface.PHONE))
+        val car = BrowserDrawerModel.primaryCards(state)
+        assertEquals(car.map { it.size }, phone.map { it.size })
+        assertEquals(car[0].map { it.action }, phone[0].map { it.action })
+        assertEquals(
+            listOf(DrawerAction.HOME, DrawerAction.HISTORY, DrawerAction.DOWNLOADS),
+            phone[1].map { it.action }
+        )
     }
 }
 

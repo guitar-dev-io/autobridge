@@ -103,8 +103,10 @@ For every host run save APK flavor/build type, phone/Android version, Android Au
 
 - Open Browser while parked on portrait and landscape surfaces. Verify the dark toolbar has back, forward, reload, address, save bookmark, and menu controls with no speed overlay covering the page. Toolbar drawing and touch zones scale together within the host's stable area.
 - Enter a URL or query through the address field. Follow a link, then use back/forward. Back with no page history stays in the browser; the host Back action exits the screen.
-- Save the current page with the star. Open Menu → Bookmarks, select it, and verify it opens in the same browser with history retained. Save more than four pages and verify bookmark pagination.
-- Use Menu → Home, Desktop mode, and Fullscreen. The fullscreen handle restores the toolbar without reloading. Check touch coordinates after a surface resize and fullscreen transition.
+- Save the current page with Menu → More → Bookmark. Open Menu → Bookmarks, select it, and verify it opens in the same browser with history retained. Save more than four pages and verify bookmark pagination.
+- Open the menu and check the sheet itself: the header names the page, the address row reports it, Back is dimmed with no history behind it, and the desktop-site switch shows the state it toggles and leaves the sheet open when tapped. Menu → More and its Back return to the same sheet without it blinking out.
+- Use Menu → Start Page, the desktop switch, and Fullscreen. The fullscreen handle restores the toolbar without reloading. Check touch coordinates after a surface resize and fullscreen transition.
+- On a short stable area (the 800x320 a DHU session reports), verify the sheet scrolls to its footer and that the header's `✕ Close` stays put while it does.
 - Check the phone remote's loading indicator while a page loads and after completion.
 - Verify ordinary web content and video separately. This remains an off-screen WebView drawn to a software Canvas; matching toolbar appearance does not establish Fermata-equivalent video playback or hardware-composited/DRM support.
 
@@ -112,7 +114,7 @@ For every host run save APK flavor/build type, phone/Android version, Android Au
 
 - On the phone, choose OPEN BROWSER without capture consent. Verify the compact dark toolbar has back/forward/reload, editable URL, bookmark and menu controls, and the keyboard does not cover the focused address.
 - Use the same URL/search, bookmark set, and Desktop preference from either display. A newly created browser starts at the last completed HTTPS page; an already open browser retains its own history.
-- From the phone menu, send the current page to Android Auto, or receive the active car browser page. With no car session, verify a connection message rather than a crash. These are explicit URL transfers, not live page/scroll/video synchronization.
+- From the phone menu (More → Send to car / Get from car), send the current page to Android Auto, or receive the active car browser page. With no car session, verify a connection message rather than a crash. These are explicit URL transfers, not live page/scroll/video synchronization.
 - Rotate the phone, background/resume, and toggle fullscreen. Verify page history is restored and the fullscreen handle restores the toolbar. Check the blocked view when browser policy denies use.
 - Start Mirror separately and open the phone browser to see the same phone pixels on the car. Opening the native car browser stops projection as before.
 

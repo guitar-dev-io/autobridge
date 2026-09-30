@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -193,38 +192,30 @@ class CarWebRenderer(context: Context) {
     private var flingX = 0f
     private var flingY = 0f
 
+    /**
+     * Reused by [drawFrame] for the page clip. Both used to be allocated inside the draw loop, so
+     * every frame handed the collector a Path and a RectF - garbage produced at frame rate, in the
+     * one code path whose whole problem is that it cannot keep up with a scroll.
+     */
+    private val clipRect = RectF()
+    private val clipPath = android.graphics.Path()
+
 
     /**
-     * Density of the context the off-screen WebView was actually built with.
+     * Density the page is laid out against: the phone's, because that is the one the off-screen
+     * WebView actually renders at.
      *
-     * Read from the phone this was the wrong number to lay the page out against. The WebView
-     * inherits its context's density, so a phone at 2.75 laying out the 730dp the car panel asks
-     * for produced a ~2000px-wide page that [BrowserViewport] then scaled to ~0.39 to fit the
-     * surface: every frame rasterised close to seven times the pixels it displayed, on the CPU,
-     * and a scroll simply out-ran it — which is what left bands of the white [drawFrame] paints
-     * under the page. Building the WebView against the panel's own density instead makes the
-     * layout and the surface the same size, so the scale is 1 and nothing is thrown away.
-     *
-     * Captured at creation rather than recomputed, because it has to describe the WebView that
-     * exists: a later dpi change re-scales the existing page instead of silently invalidating the
-     * geometry every consumer of [viewport] is working from.
+     * Laying the page out at the panel's density instead looked like the obvious saving - the
+     * surface is ~800px wide and the phone makes that a ~2400px page that is then drawn at scale
+     * 0.33, so roughly nine times the pixels the surface shows are rasterised every frame. It does
+     * not work. A detached WebView takes its device scale factor from the application, not from the
+     * Context it is constructed with, so re-basing only that Context left Chromium still painting
+     * at 3x into a view a third of the size: a third of the page, three times too big. The pair is
+     * self-consistent as it stands - render at 3x, draw at 0.33, net 1:1 - and the waste is the
+     * price of the OS keeping the scale factor to itself. Reducing it needs the scale factor
+     * itself, not the layout size.
      */
-    private var webViewDensity: Float = appContext.resources.displayMetrics.density
-
-    /**
-     * [appContext] re-based on the car panel's density, or [appContext] itself when the panel has
-     * not reported one yet or already agrees with the phone.
-     */
-    private fun carDensityContext(): Context {
-        val dpi = surfaceDpi.takeIf { it > 0 } ?: return appContext
-        val configuration = appContext.resources.configuration
-        if (configuration.densityDpi == dpi) return appContext
-        return runCatching {
-            appContext.createConfigurationContext(
-                Configuration(configuration).apply { densityDpi = dpi }
-            )
-        }.getOrDefault(appContext)
-    }
+    private val webViewDensity: Float get() = appContext.resources.displayMetrics.density
 
     /**
      * Page audio under native control.
@@ -282,6 +273,18 @@ class CarWebRenderer(context: Context) {
 
     /** Live copies of [BrowserControlsStore], refreshed by [applyControlSettings]. */
     private var alwaysShowFab: Boolean = true
+    /**
+     * When the toolbar is pinned on screen the page is inset below it, so a pinned address bar no
+     * longer paints over the top of the page (the sign-in header half-hidden under the bar). The
+     * auto-hiding default keeps its full-surface page: an inset there would leave a permanent band
+     * for a bar that is usually gone.
+     */
+    private var alwaysShowUrlBar: Boolean = false
+    /**
+     * Toolbar removed entirely: never drawn, never hit-tested, never recalled by an edge/handle
+     * gesture. The floating button is the only chrome left, and stays the way to reach the menu.
+     */
+    private var hideUrlBar: Boolean = false
     private var fabAction: FloatingButtonAction = FloatingButtonAction.MENU
 
     private val frameRunnable = object : Runnable {
@@ -743,20 +746,31 @@ class CarWebRenderer(context: Context) {
             handleTabOverlayClick(x, y)
             return@runOnMain
         }
-        val drawerPanel = drawer?.panel.takeIf { overlay == Overlay.DRAWER || overlay == Overlay.DRAWER_MORE }
         if (overlay == Overlay.DRAWER || overlay == Overlay.DRAWER_MORE) {
-            // Checked before the rows: the header sits above them and owns its own tap.
-            if (drawer?.hitsClose(x, y) == true) {
+            val model = drawer
+            if (model == null) {
                 closeDrawer()
                 return@runOnMain
             }
-            val row = drawer?.rowAt(x, y)
+            // Checked before the rows: the header sits above them and owns its own tap.
+            if (model.hitsClose(x, y)) {
+                closeDrawer()
+                return@runOnMain
+            }
+            val row = model.rowAt(x, y)
             if (row != null) {
                 when (row.item.action) {
-                    // These two switch which list is drawn instead of closing the drawer, so the
-                    // drawer stays open across the "More" round trip.
+                    // These two switch which list is drawn instead of closing the sheet, so it
+                    // stays open across the "More" round trip.
                     DrawerAction.MORE -> openDrawerMore()
                     DrawerAction.BACK_TO_MENU -> openDrawer()
+                    // A switch reports state, so the sheet stays open and redraws it. Closing on
+                    // the way out would hide the one thing the tap was for.
+                    DrawerAction.TOGGLE_DESKTOP -> {
+                        toggleDesktopMode(appContext)
+                        rebuildDrawer()
+                        host?.onBrowserStateChanged()
+                    }
                     else -> {
                         closeDrawer()
                         performDrawerAction(row.item.action)
@@ -764,17 +778,17 @@ class CarWebRenderer(context: Context) {
                 }
                 return@runOnMain
             }
-            if (drawerPanel?.contains(x, y) != true) {
-                closeDrawer()
-                return@runOnMain
-            }
+            // Anything else inside the sheet is its background and is swallowed; outside dismisses.
+            if (!model.panel.contains(x, y)) closeDrawer()
             return@runOnMain
         }
 
         // The *target* state, not the animated opacity: once the user has asked for the toolbar,
         // its buttons must be hittable immediately. Testing the fade alpha made every tap during
         // the 180ms fade-in fall through to the edge-reveal band instead of the button under it.
-        val chromeVisible = visibility.isShown
+        // A hidden bar is never visible and never recalled, so hit testing is told the chrome is
+        // down and the edge/handle bands are treated as page taps below.
+        val chromeVisible = !hideUrlBar && visibility.isShown
         val zone = chrome.hitTest(x, y, chromeVisible, null, fabVisible(now))
         if (ViewportDebug.enabled) {
             Log.i(
@@ -795,9 +809,16 @@ class CarWebRenderer(context: Context) {
             ChromeZone.MENU -> openDrawer()
             ChromeZone.FAB -> { visibility.onInteraction(now); performFloatingAction() }
             ChromeZone.HANDLE, ChromeZone.EDGE_REVEAL -> {
-                // Recalling chrome must not also leave fullscreen: the page keeps every pixel it
-                // has, the toolbar simply fades back in over it.
-                visibility.show(now)
+                if (hideUrlBar) {
+                    // The bar is hidden for good: the recall bands do not exist, so a tap there is
+                    // just a tap on the page underneath.
+                    visibility.onInteraction(now)
+                    if (loadError != null) retry() else dispatchPageTap(x, y)
+                } else {
+                    // Recalling chrome must not also leave fullscreen: the page keeps every pixel it
+                    // has, the toolbar simply fades back in over it.
+                    visibility.show(now)
+                }
             }
             ChromeZone.DRAWER_SCRIM -> closeDrawer()
             ChromeZone.TOOLBAR_BACKGROUND -> {
@@ -919,15 +940,30 @@ class CarWebRenderer(context: Context) {
      * the panel without the browser being restarted.
      */
     fun applyControlSettings() = runOnMain {
-        visibility.setAutoHide(
-            SystemClock.uptimeMillis(),
-            !BrowserControlsStore.alwaysShowUrlBar(appContext)
-        )
+        val now = SystemClock.uptimeMillis()
+        val hideBar = BrowserControlsStore.hideUrlBar(appContext)
+        // "Hide the bar" wins over "pin the bar": the two are contradictory and the hide is the
+        // more explicit "I never use it". A hidden bar also gets no page inset — there is no bar to
+        // make room for — so the page keeps the whole surface.
+        val pinToolbar = !hideBar && BrowserControlsStore.alwaysShowUrlBar(appContext)
+        // Auto-hide stays on while the bar is hidden so any bar accidentally shown still fades; it
+        // simply is never drawn or recalled. Pinned keeps it up; otherwise it fades as before.
+        visibility.setAutoHide(now, !pinToolbar)
+        if (hideBar) visibility.hide(now)
         alwaysShowFab = BrowserControlsStore.alwaysShowFloatingButton(appContext)
         fabAction = BrowserControlsStore.floatingButtonAction(appContext)
-        // The toolbar's own ☰ only appears once the floating button stops being the menu's fixed
-        // entry point, so a change made in settings has to be reflected in the chrome immediately.
-        chrome = BrowserChromeLayout.create(sizes, viewport, showToolbarMenuButton(), chromeBounds)
+        // A change to whether a bar reserves space (pinned) or the surface is whole (hidden/auto)
+        // changes how much of the surface the page may use, so re-measure the page when it flips.
+        val insetChanged = pinToolbar != alwaysShowUrlBar || hideBar != hideUrlBar
+        alwaysShowUrlBar = pinToolbar
+        hideUrlBar = hideBar
+        if (insetChanged) {
+            layoutWebView(surfaceWidth, surfaceHeight, ViewportDebug.Event.STABLE_AREA)
+        } else {
+            // The toolbar's own ☰ only appears once the floating button stops being the menu's fixed
+            // entry point, so a change made in settings has to be reflected in the chrome immediately.
+            chrome = BrowserChromeLayout.create(sizes, viewport, showToolbarMenuButton(), chromeBounds)
+        }
     }
 
     /** Whether the floating button is drawn right now; hit testing asks the same question. */
@@ -987,16 +1023,26 @@ class CarWebRenderer(context: Context) {
         visibility.setDrawerOpen(SystemClock.uptimeMillis(), true)
     }
 
+    /**
+     * The live state the sheet reports. Read fresh on every rebuild rather than cached, because the
+     * sheet stays open across a desktop-site toggle and must redraw the switch it just moved.
+     */
+    private fun menuState(): BrowserMenuState = BrowserMenuState(
+        appName = "AutoBridge",
+        pageTitle = title?.takeIf { it.isNotBlank() } ?: BrowserDisplayUrl.compact(url),
+        url = url,
+        tabCount = tabCount,
+        isDesktop = BrowserUserAgentStore.mode(appContext) == BrowserUserAgentMode.DESKTOP,
+        canGoBack = canGoBack,
+        canGoForward = canGoForward,
+        version = "v${dev.autobridge.BuildConfig.VERSION_NAME}",
+    )
+
     private fun rebuildDrawer() {
-        val isDesktop = BrowserUserAgentStore.mode(appContext) == BrowserUserAgentMode.DESKTOP
-        val more = overlay == Overlay.DRAWER_MORE
-        val sections = if (more) {
-            BrowserDrawerModel.moreSectionsFor(isDesktop = isDesktop)
-        } else {
-            BrowserDrawerModel.sectionsFor(tabCount = tabCount, isDesktop = isDesktop)
-        }
         drawer = BrowserDrawerModel.create(
-            sizes, viewport, sections, drawerScroll, if (more) "More" else "Menu"
+            sizes, viewport, menuState(),
+            more = overlay == Overlay.DRAWER_MORE,
+            scrollOffset = drawerScroll
         )
     }
 
@@ -1012,7 +1058,11 @@ class CarWebRenderer(context: Context) {
             DrawerAction.MEDIA_CENTER -> target?.openMediaCenter()
             DrawerAction.NOW_PLAYING -> target?.openNowPlaying()
             DrawerAction.MEDIA_LIBRARY -> target?.openMediaLibrary()
-            DrawerAction.ADDRESS_KEYBOARD -> target?.openAddressInput()
+            DrawerAction.NAV_BACK -> goBack()
+            DrawerAction.NAV_FORWARD -> goForward()
+            // Both routes land on the same editor; "clear" is the one that starts it empty, which
+            // the car's address screen does by ignoring the current URL it was not given.
+            DrawerAction.ADDRESS_KEYBOARD, DrawerAction.ADDRESS_CLEAR -> target?.openAddressInput()
             DrawerAction.FIND_IN_PAGE -> target?.openFindInPage()
             DrawerAction.AGENT -> target?.openAgent()
             DrawerAction.COPY_URL ->
@@ -1039,9 +1089,13 @@ class CarWebRenderer(context: Context) {
                 target?.showMessage("ล้างข้อมูลการท่องเว็บแล้ว")
             }
             DrawerAction.DIAGNOSTICS -> target?.openDiagnostics()
-            // Handled directly in onSurfaceClick before performDrawerAction is called, since both
-            // switch the open drawer's list rather than performing a browser action.
-            DrawerAction.MORE, DrawerAction.BACK_TO_MENU -> Unit
+            // Handled directly in onSurfaceClick before performDrawerAction is called, since these
+            // change what the sheet shows rather than performing a browser action.
+            DrawerAction.MORE, DrawerAction.BACK_TO_MENU, DrawerAction.CLOSE_SHEET -> Unit
+            // Phone-sheet entries. [BrowserDrawerModel.moreItems] never offers them on the car
+            // surface — the car *is* the other end of both — so reaching here means a caller
+            // bypassed the model, and doing nothing is the correct response.
+            DrawerAction.SEND_TO_CAR, DrawerAction.RECEIVE_FROM_CAR -> Unit
         }
         host?.onBrowserStateChanged()
     }
@@ -1113,9 +1167,7 @@ class CarWebRenderer(context: Context) {
 
     // ------------------------------------------------------------------ WebView
 
-    private fun createWebView(): ScrollableWebView = ScrollableWebView(
-        carDensityContext().also { webViewDensity = it.resources.displayMetrics.density }
-    ).apply {
+    private fun createWebView(): ScrollableWebView = ScrollableWebView(appContext).apply {
         // The car WebView is off-screen and drawn to a Surface, so it is the one presentation that
         // cannot be inspected by looking at it. Debug builds expose it over chrome://inspect for the
         // same reason the phone activities do; release builds are untouched.
@@ -1145,7 +1197,14 @@ class CarWebRenderer(context: Context) {
             ): Boolean {
                 if (!isUserGesture) return false
                 val transport = resultMsg.obj as? WebView.WebViewTransport ?: return false
+                // The probe carries the same identity as the main WebView — clean UA, no
+                // X-Requested-With header, third-party cookies on. Without configure() a popup
+                // opened by window.open() (which is how YouTube launches Google sign-in) reaches
+                // accounts.google.com as a raw, detectable WebView and Google refuses it with
+                // "this browser or app may not be secure". Configuring it first means the very
+                // first request the popup makes already looks like a real browser.
                 val probe = WebView(appContext).apply {
+                    BrowserDefaults.configure(appContext, this)
                     webViewClient = object : WebViewClient() {
                         override fun shouldOverrideUrlLoading(
                             probeView: WebView,
@@ -1153,7 +1212,15 @@ class CarWebRenderer(context: Context) {
                         ): Boolean {
                             val target = request.url.toString()
                             mainHandler.post {
-                                ContentAddress.https(target)?.let { openNewTab(it) }
+                                ContentAddress.https(target)?.let { url ->
+                                    // The car surface can only show one WebView, so a popup cannot
+                                    // be a visible second window. A Google sign-in popup is loaded
+                                    // into the current, visible tab instead of a new one: the user
+                                    // sees the sign-in, cookies land in the configured main
+                                    // WebView, and returning to the video is a Back away. An
+                                    // ordinary target="_blank" still opens a new tab.
+                                    if (BrowserDefaults.isSignInPopupHost(url)) load(url) else openNewTab(url)
+                                }
                                 probeView.destroy()
                             }
                             return true
@@ -1222,10 +1289,13 @@ class CarWebRenderer(context: Context) {
         if (width <= 0 || height <= 0) return
         val area = stableArea
         sizes = AutoUiSizes.forCarSurface(surfaceDpi)
-        // Fermata-style floating card: the whole toolbar+page rect sits inset from the stable area
-        // by a fixed margin, drawn with rounded corners in drawFrame(). Shrinking it here (rather
-        // than adding a separate "card rect") means every consumer of `viewport` — hit testing,
-        // touch mapping, the drawer — automatically operates on the inset card with no extra state.
+        // The page rect is inset from the surface by [AutoUiSizes.cardMargin] and drawn with
+        // [AutoUiSizes.cardCornerRadius] in drawFrame(). Both are currently 0 — the inset card was
+        // tried and dropped because it ringed the page in black on the head unit — so this reduces
+        // to "the page is the surface". It stays expressed as an inset rather than assuming zero
+        // because shrinking `viewport` is what makes every consumer of it — hit testing, touch
+        // mapping, the drawer — follow the page automatically, with no second "card rect" to keep
+        // in step.
         val margin = sizes.cardMargin.roundToInt()
         // The page takes the whole surface. It used to be shrunk to the host's stable area, which
         // is the region the host guarantees it will never cover - the intersection of every state
@@ -1235,8 +1305,19 @@ class CarWebRenderer(context: Context) {
         // quarter of the height given away for chrome that is not on screen most of the time.
         // Chrome still respects the stable area (see chromeBounds); only the page grew.
         val cardLeft = margin
-        val cardTop = margin
         val cardRight = (width - margin).coerceAtLeast(cardLeft + 1)
+        // A pinned toolbar occupies the top of the surface for good, so the page starts below it
+        // instead of being drawn under it (the sign-in header half-hidden under the bar). The page
+        // is inset down to the bar's real bottom edge — the bar is drawn at the top of the chrome
+        // bounds, which is the stable-area top the host guarantees, so the inset is measured from
+        // there rather than from the surface top. With the auto-hiding default the inset is zero
+        // and the page keeps the whole surface, exactly as before.
+        val toolbarTop = area?.top?.coerceIn(margin, height - margin) ?: margin
+        val toolbarBottom = if (alwaysShowUrlBar) {
+            val chromeHeight = area?.let { (it.bottom - it.top).toFloat() } ?: (height - 2 * margin).toFloat()
+            toolbarTop + sizes.toolbarHeight(chromeHeight.roundToInt()).roundToInt()
+        } else margin
+        val cardTop = toolbarBottom.coerceAtMost(height - margin - 1)
         val cardBottom = (height - margin).coerceAtLeast(cardTop + 1)
         val next = BrowserViewport.create(
             width, height, webViewDensity, sizes.density,
@@ -1244,13 +1325,25 @@ class CarWebRenderer(context: Context) {
         )
         val geometryUnchanged = next == viewport && view.width == next.webWidth
         viewport = next
-        chromeBounds = area?.let {
-            Box(
-                it.left.coerceIn(cardLeft, cardRight).toFloat(),
-                it.top.coerceIn(cardTop, cardBottom).toFloat(),
-                it.right.coerceIn(cardLeft, cardRight).toFloat(),
-                it.bottom.coerceIn(cardTop, cardBottom).toFloat()
+        // Chrome is confined to the host's stable area. Its top is clamped to the surface (not to
+        // the page's cardTop): when the toolbar is pinned it is drawn in the reserved band *above*
+        // the page, so clamping it down into the page would put the bar below the content it labels.
+        val chromeTopBound = toolbarTop
+        chromeBounds = when {
+            area != null -> Box(
+                area.left.coerceIn(cardLeft, cardRight).toFloat(),
+                area.top.coerceIn(chromeTopBound, cardBottom).toFloat(),
+                area.right.coerceIn(cardLeft, cardRight).toFloat(),
+                area.bottom.coerceIn(chromeTopBound, cardBottom).toFloat()
             )
+            // No stable area, but the toolbar is pinned: chrome must still start in the reserved
+            // band above the page rather than defaulting to the page rect (which now starts below
+            // the inset), or the pinned bar would paint over the top of the content again.
+            alwaysShowUrlBar -> Box(
+                cardLeft.toFloat(), chromeTopBound.toFloat(),
+                cardRight.toFloat(), cardBottom.toFloat()
+            )
+            else -> null
         }
         chrome = BrowserChromeLayout.create(sizes, viewport, showToolbarMenuButton(), chromeBounds)
         if (overlay == Overlay.DRAWER || overlay == Overlay.DRAWER_MORE) rebuildDrawer()
@@ -1308,21 +1401,24 @@ class CarWebRenderer(context: Context) {
         val canvas: Canvas = runCatching { activeSurface.lockCanvas(null) }.getOrNull() ?: return
         try {
             canvas.drawColor(BrowserTheme.background)
-            // Fermata-style floating card: everything for this frame — page, drawer/tab overlays,
-            // toolbar, handle — is clipped to one rounded rect so the corners read as a single
-            // panel rather than a rounded page with a square toolbar stitched on top of it.
+            // Everything for this frame — page, drawer/tab overlays, toolbar, handle — is clipped
+            // to one rect, so a rounded panel reads as a single surface rather than a rounded page
+            // with a square toolbar stitched on top of it. Squared off (the current sizing) that
+            // is an ordinary rect clip: clipPath is the slower of the two and forces the canvas off
+            // its fast paths, so it is used only when there is actually a corner to round.
             val cardOuterSave = canvas.save()
-            val cardPath = android.graphics.Path().apply {
-                addRoundRect(
-                    RectF(
-                        viewport.left.toFloat(), viewport.top.toFloat(),
-                        (viewport.left + viewport.width).toFloat(), (viewport.top + viewport.height).toFloat()
-                    ),
-                    sizes.cardCornerRadius, sizes.cardCornerRadius,
-                    android.graphics.Path.Direction.CW
-                )
+            val radius = sizes.cardCornerRadius
+            clipRect.set(
+                viewport.left.toFloat(), viewport.top.toFloat(),
+                (viewport.left + viewport.width).toFloat(), (viewport.top + viewport.height).toFloat()
+            )
+            if (radius > 0f) {
+                clipPath.rewind()
+                clipPath.addRoundRect(clipRect, radius, radius, android.graphics.Path.Direction.CW)
+                canvas.clipPath(clipPath)
+            } else {
+                canvas.clipRect(clipRect)
             }
-            canvas.clipPath(cardPath)
 
             canvas.save()
             canvas.translate(viewport.left.toFloat(), viewport.top.toFloat())
@@ -1342,7 +1438,10 @@ class CarWebRenderer(context: Context) {
             // No grab-handle graphic while chrome is hidden: the page fills the surface with
             // nothing floating over it. The edge-reveal band ([BrowserChromeLayout.edgeReveal])
             // still recalls the toolbar on a swipe/tap; it is simply never drawn.
-            val alpha = visibility.alphaAt(nowMs)
+            // When the bar is hidden it is never painted, in any state — not even dimmed behind an
+            // open drawer. Forcing the alpha to zero here (rather than guarding each drawToolbar
+            // call) keeps the single source of "is the bar visible" for both draw branches below.
+            val alpha = if (hideUrlBar) 0f else visibility.alphaAt(nowMs)
             val overlayOpen = overlay != Overlay.NONE
             // While an overlay owns the surface the toolbar is painted *first*, so the overlay's
             // scrim dims it. Painted afterwards it stayed fully lit above the sheet: its buttons
@@ -1503,8 +1602,18 @@ class CarWebRenderer(context: Context) {
         }
     }
 
+    /**
+     * Draws the menu sheet: header, address row, cards of tiles, the desktop switch and the footer.
+     *
+     * Two passes around one clip. Everything below [BrowserDrawerModel.headerBottom] scrolls and is
+     * drawn inside a clip that starts there; the header is drawn afterwards, above it, so a tile
+     * scrolled up vanishes under the header rather than over it. That boundary is the same one
+     * [BrowserDrawerModel.rowAt] refuses taps above, so what is hidden is also untappable — the two
+     * are read from one model instead of being kept in step by hand.
+     */
     private fun drawDrawer(canvas: Canvas) {
         val model = drawer ?: return
+        val radius = sizes.cornerRadius
         // Scrim over the page so the sheet reads as a layer, without moving anything beneath it.
         toolbarPaint.color = BrowserTheme.scrim
         canvas.drawRect(
@@ -1512,76 +1621,257 @@ class CarWebRenderer(context: Context) {
             (viewport.left + viewport.width).toFloat(), (viewport.top + viewport.height).toFloat(),
             toolbarPaint
         )
+
         val panel = model.panel
-        val radius = sizes.cornerRadius
-        toolbarPaint.color = BrowserTheme.drawerBackground
+        toolbarPaint.color = BrowserTheme.sheetBackground
         canvas.drawRoundRect(panel.left, panel.top, panel.right, panel.bottom, radius, radius, toolbarPaint)
 
         canvas.save()
         canvas.clipRect(panel.left, model.headerBottom, panel.right, panel.bottom)
-        model.rows.forEach { row ->
-            val tile = row.bounds
-            // Each entry is a filled tile, so the whole rectangle reads as the button it already
-            // was for hit testing — the old list drew only text, leaving the target invisible.
-            toolbarPaint.color = BrowserTheme.toolbarBackground
-            canvas.drawRoundRect(tile.left, tile.top, tile.right, tile.bottom, radius, radius, toolbarPaint)
-
-            glyphPaint.color = BrowserTheme.iconEnabled
-            glyphPaint.textSize = sizes.iconLarge
-            canvas.drawText(
-                row.item.glyph, tile.centerX,
-                tile.top + tile.height * 0.44f + sizes.iconLarge * 0.35f, glyphPaint
+        drawSheetAddress(canvas, model.address)
+        model.cards.forEach { card ->
+            toolbarPaint.color = BrowserTheme.sheetCardBackground
+            canvas.drawRoundRect(
+                card.bounds.left, card.bounds.top, card.bounds.right, card.bounds.bottom,
+                radius, radius, toolbarPaint
             )
-
-            titlePaint.color = BrowserTheme.textPrimary
-            titlePaint.textAlign = Paint.Align.CENTER
-            titlePaint.textSize = sizes.iconSmall * 0.8f
-            val label = TextUtils.ellipsize(
-                row.item.label, TextPaint(titlePaint),
-                tile.width - sizes.contentGap, TextUtils.TruncateAt.END
-            ).toString()
-            canvas.drawText(label, tile.centerX, tile.bottom - tile.height * 0.16f, titlePaint)
-
-            if (row.item.value.isNotBlank()) {
-                detailPaint.color = BrowserTheme.accent
-                detailPaint.textSize = sizes.iconSmall * 0.8f
-                val width = detailPaint.measureText(row.item.value)
-                canvas.drawText(
-                    row.item.value,
-                    tile.right - sizes.contentGap - width,
-                    tile.top + sizes.contentGap + sizes.iconSmall * 0.7f, detailPaint
-                )
-            }
+            card.tiles.forEach { drawSheetTile(canvas, it) }
         }
+        model.toggle?.let { drawSheetToggle(canvas, it) }
+        drawSheetFooter(canvas, model)
         canvas.restore()
-        titlePaint.textAlign = Paint.Align.LEFT
 
-        // Sheet header, drawn after the tiles so anything scrolled up is clipped beneath it.
-        toolbarPaint.color = BrowserTheme.toolbarBackground
+        drawSheetHeader(canvas, model)
+    }
+
+    /** Draws [text] centred on [cx], restoring the alignment so no later draw inherits it. */
+    private fun drawCentered(canvas: Canvas, paint: Paint, text: String, cx: Float, baseline: Float) {
+        val previous = paint.textAlign
+        paint.textAlign = Paint.Align.CENTER
+        canvas.drawText(text, cx, baseline, paint)
+        paint.textAlign = previous
+    }
+
+    /** Truncates to what [width] can hold, so a long title can never run past its box. */
+    private fun fit(text: String, paint: Paint, width: Float): String =
+        TextUtils.ellipsize(text, TextPaint(paint), width.coerceAtLeast(0f), TextUtils.TruncateAt.END)
+            .toString()
+
+    private fun drawSheetHeader(canvas: Canvas, model: BrowserDrawerModel) {
+        val radius = sizes.cornerRadius
+        val grip = model.grip
+        toolbarPaint.color = BrowserTheme.iconDisabled
         canvas.drawRoundRect(
-            panel.left, panel.top, panel.right, model.headerBottom + radius, radius, radius, toolbarPaint
+            grip.left, grip.top, grip.right, grip.bottom,
+            grip.height / 2f, grip.height / 2f, toolbarPaint
         )
-        canvas.drawRect(panel.left, model.headerBottom - radius, panel.right, model.headerBottom, toolbarPaint)
+
+        val card = model.headerCard
+        toolbarPaint.color = BrowserTheme.sheetCardBackground
+        canvas.drawRoundRect(card.left, card.top, card.right, card.bottom, radius, radius, toolbarPaint)
+
+        val titleSize = sizes.iconMedium.coerceAtMost(card.height * 0.40f)
+        val subSize = (sizes.iconSmall * 0.8f).coerceAtMost(card.height * 0.26f)
+        val textLeft = card.left + sizes.horizontalPadding
+        val textLimit = model.closeButton.left - textLeft - sizes.contentGap
+        val hasSubtitle = model.subtitle.isNotBlank()
+        val blockTop = card.centerY - (titleSize + if (hasSubtitle) subSize * 1.4f else 0f) / 2f
         titlePaint.color = BrowserTheme.textPrimary
-        titlePaint.textSize = sizes.iconMedium * 0.8f
-        canvas.drawText(
-            model.title, panel.left + sizes.horizontalPadding * 1.5f,
-            (panel.top + model.headerBottom) / 2f + sizes.iconMedium * 0.28f, titlePaint
-        )
+        titlePaint.textSize = titleSize
+        canvas.drawText(fit(model.title, titlePaint, textLimit), textLeft, blockTop + titleSize, titlePaint)
+        if (hasSubtitle) {
+            detailPaint.color = BrowserTheme.textSecondary
+            detailPaint.textSize = subSize
+            canvas.drawText(
+                fit(model.subtitle, detailPaint, textLimit), textLeft,
+                blockTop + titleSize + subSize * 1.3f, detailPaint
+            )
+        }
+
         // A drawn close button rather than the old "tap outside to close" caption: the sheet leaves
         // only a narrow margin around itself, so that instruction pointed at a target too small to
-        // hit in a moving car. This is a full touch target in a fixed corner.
+        // hit in a moving car. This is a full touch target in a fixed corner, and it carries the
+        // word as well as the glyph — a bare ✕ in a car is a guess.
         val close = model.closeButton
-        toolbarPaint.color = BrowserTheme.drawerBackground
+        toolbarPaint.color = BrowserTheme.tileBackground
         canvas.drawRoundRect(
             close.left, close.top, close.right, close.bottom,
-            sizes.cornerRadius, sizes.cornerRadius, toolbarPaint
+            close.height / 2f, close.height / 2f, toolbarPaint
+        )
+        glyphPaint.color = BrowserTheme.textPrimary
+        glyphPaint.textSize = (sizes.iconSmall * 0.9f).coerceAtMost(close.height * 0.45f)
+        drawCentered(
+            canvas, glyphPaint, "\u2715  Close", close.centerX,
+            close.centerY + glyphPaint.textSize * 0.36f
+        )
+    }
+
+    /**
+     * The address row. The sheet's own copy of the toolbar pill, because the toolbar auto-hides and
+     * the menu is frequently what the user opens *instead* of recalling it — a menu that cannot say
+     * which page it is acting on is a menu the user has to close to check.
+     */
+    private fun drawSheetAddress(canvas: Canvas, address: DrawerAddress) {
+        val box = address.bounds
+        val radius = box.height / 2f
+        addressPaint.color = BrowserTheme.addressPillBackground
+        canvas.drawRoundRect(box.left, box.top, box.right, box.bottom, radius, radius, addressPaint)
+
+        val badgeX = box.left + sizes.horizontalPadding
+        detailPaint.color = if (address.secure) BrowserTheme.secureBadge else BrowserTheme.insecureBadge
+        detailPaint.textSize = sizes.iconSmall * 0.9f
+        canvas.drawText(
+            if (address.secure) "\uD83D\uDD12" else "!", badgeX,
+            box.centerY + detailPaint.textSize * 0.34f, detailPaint
+        )
+
+        titlePaint.color = BrowserTheme.textPrimary
+        titlePaint.textSize = sizes.iconSmall * 0.9f
+        val textLeft = badgeX + sizes.iconSmall + sizes.contentGap
+        canvas.drawText(
+            fit(address.text, titlePaint, address.clear.left - textLeft - sizes.contentGap),
+            textLeft, box.centerY + titlePaint.textSize * 0.34f, titlePaint
+        )
+
+        glyphPaint.color = BrowserTheme.textSecondary
+        glyphPaint.textSize = sizes.iconSmall.coerceAtMost(address.clear.height * 0.5f)
+        canvas.drawText(
+            "\u2715", address.clear.centerX,
+            address.clear.centerY + glyphPaint.textSize * 0.36f, glyphPaint
+        )
+
+        // The one filled control on the row, because it is the one that commits.
+        toolbarPaint.color = BrowserTheme.tileBackground
+        canvas.drawCircle(
+            address.go.centerX, address.go.centerY,
+            minOf(address.go.width, address.go.height) / 2f, toolbarPaint
         )
         glyphPaint.color = BrowserTheme.iconEnabled
-        glyphPaint.textSize = minOf(close.width, close.height) * 0.5f
+        glyphPaint.textSize = sizes.iconMedium.coerceAtMost(address.go.height * 0.55f)
         canvas.drawText(
-            "\u2715", close.centerX, close.centerY + glyphPaint.textSize * 0.36f, glyphPaint
+            "\u2315", address.go.centerX,
+            address.go.centerY + glyphPaint.textSize * 0.36f, glyphPaint
         )
+    }
+
+    private fun drawSheetTile(canvas: Canvas, row: DrawerRow) {
+        val tile = row.bounds
+        val enabled = row.item.enabled
+        // Fully rounded, the way the reference menu draws them: at a glance the shape alone says
+        // "button", which a square tile the same colour as its card does not.
+        val radius = (tile.height / 2f).coerceAtMost(sizes.cornerRadius * 2.5f)
+        toolbarPaint.color =
+            if (enabled) BrowserTheme.tileBackground else BrowserTheme.tileDisabledBackground
+        canvas.drawRoundRect(tile.left, tile.top, tile.right, tile.bottom, radius, radius, toolbarPaint)
+
+        glyphPaint.color = if (enabled) BrowserTheme.iconEnabled else BrowserTheme.iconDisabled
+        glyphPaint.textSize = sizes.iconLarge.coerceAtMost(tile.height * 0.38f)
+        canvas.drawText(
+            row.item.glyph, tile.centerX,
+            tile.top + tile.height * 0.42f + glyphPaint.textSize * 0.35f, glyphPaint
+        )
+
+        titlePaint.color = if (enabled) BrowserTheme.textPrimary else BrowserTheme.iconDisabled
+        titlePaint.textSize = (sizes.iconSmall * 0.8f).coerceAtMost(tile.height * 0.26f)
+        drawCentered(
+            canvas, titlePaint,
+            fit(row.item.label, titlePaint, tile.width - sizes.contentGap),
+            tile.centerX, tile.bottom - tile.height * 0.15f
+        )
+
+        if (row.item.value.isNotBlank()) {
+            detailPaint.color = BrowserTheme.accent
+            detailPaint.textSize = sizes.iconSmall * 0.75f
+            val width = detailPaint.measureText(row.item.value)
+            canvas.drawText(
+                row.item.value, tile.right - sizes.contentGap - width,
+                tile.top + sizes.contentGap + detailPaint.textSize * 0.8f, detailPaint
+            )
+        }
+    }
+
+    /**
+     * The desktop-site switch. A switch rather than a tile because what it reports is a state: a
+     * tile labelled "Desktop site / On" asks the user to read two things and work out which one is
+     * the button, while a track and a knob say the same thing in one glance.
+     */
+    private fun drawSheetToggle(canvas: Canvas, row: DrawerRow) {
+        val box = row.bounds
+        toolbarPaint.color = BrowserTheme.sheetCardBackground
+        canvas.drawRoundRect(
+            box.left, box.top, box.right, box.bottom,
+            sizes.cornerRadius, sizes.cornerRadius, toolbarPaint
+        )
+
+        glyphPaint.color = BrowserTheme.textSecondary
+        glyphPaint.textSize = sizes.iconMedium.coerceAtMost(box.height * 0.5f)
+        val glyphX = box.left + sizes.horizontalPadding + glyphPaint.textSize / 2f
+        canvas.drawText(row.item.glyph, glyphX, box.centerY + glyphPaint.textSize * 0.36f, glyphPaint)
+
+        val trackWidth = (sizes.touchTarget * 0.9f).coerceAtMost(box.width * 0.25f)
+        val trackHeight = (trackWidth * 0.52f).coerceAtMost(box.height * 0.6f)
+        val trackRight = box.right - sizes.horizontalPadding
+        val trackLeft = trackRight - trackWidth
+
+        titlePaint.color = BrowserTheme.textPrimary
+        titlePaint.textSize = (sizes.iconSmall * 0.9f).coerceAtMost(box.height * 0.42f)
+        val labelLeft = glyphX + glyphPaint.textSize / 2f + sizes.horizontalPadding
+        canvas.drawText(
+            fit(row.item.label, titlePaint, trackLeft - labelLeft - sizes.contentGap),
+            labelLeft, box.centerY + titlePaint.textSize * 0.34f, titlePaint
+        )
+
+        toolbarPaint.color =
+            if (row.item.on) BrowserTheme.toggleTrackOn else BrowserTheme.toggleTrackOff
+        canvas.drawRoundRect(
+            trackLeft, box.centerY - trackHeight / 2f, trackRight, box.centerY + trackHeight / 2f,
+            trackHeight / 2f, trackHeight / 2f, toolbarPaint
+        )
+        toolbarPaint.color =
+            if (row.item.on) BrowserTheme.toggleKnob else BrowserTheme.textSecondary
+        val knobX = if (row.item.on) trackRight - trackHeight / 2f else trackLeft + trackHeight / 2f
+        canvas.drawCircle(knobX, box.centerY, trackHeight * 0.4f, toolbarPaint)
+    }
+
+    /**
+     * Footer: who is drawing the page on the left, and the two routes the sheet must never bury on
+     * the right — "More" for everything that did not earn a tile, and "Exit" for the car surface's
+     * only way back to AutoBridge's dashboard.
+     */
+    private fun drawSheetFooter(canvas: Canvas, model: BrowserDrawerModel) {
+        val box = model.footer
+        val ruleY = box.top - sizes.contentGap * 0.5f
+        toolbarPaint.color = BrowserTheme.hairline
+        canvas.drawRect(box.left, ruleY, box.right, ruleY + sizes.dp(1f), toolbarPaint)
+
+        val links = model.footerLinks
+        val textLimit = (links.minOfOrNull { it.bounds.left } ?: box.right) - box.left - sizes.contentGap
+        detailPaint.textSize = (sizes.iconSmall * 0.7f).coerceAtMost(box.height * 0.38f)
+        detailPaint.color = BrowserTheme.textSecondary
+        canvas.drawText(
+            fit(model.footerName, detailPaint, textLimit), box.left,
+            box.centerY - detailPaint.textSize * 0.15f, detailPaint
+        )
+        detailPaint.color = BrowserTheme.iconDisabled
+        canvas.drawText(
+            fit(model.footerVersion, detailPaint, textLimit), box.left,
+            box.centerY + detailPaint.textSize * 1.15f, detailPaint
+        )
+
+        links.forEach { link ->
+            val pill = link.bounds
+            toolbarPaint.color = BrowserTheme.tileBackground
+            canvas.drawRoundRect(
+                pill.left, pill.top, pill.right, pill.bottom,
+                pill.height / 2f, pill.height / 2f, toolbarPaint
+            )
+            glyphPaint.color = BrowserTheme.textPrimary
+            glyphPaint.textSize = (sizes.iconSmall * 0.75f).coerceAtMost(pill.height * 0.5f)
+            drawCentered(
+                canvas, glyphPaint, "${link.item.glyph} ${link.item.label}",
+                pill.centerX, pill.centerY + glyphPaint.textSize * 0.36f
+            )
+        }
     }
 
     private fun drawTabSwitcher(canvas: Canvas) {

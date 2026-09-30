@@ -20,18 +20,36 @@ object BrowserDefaults {
 
     const val HOME = "https://www.google.com/"
 
-    // Identity providers that block sign-in inside any embedded WebView by checking for the "; wv)"
-    // token Android's WebView adds to its default user-agent (anti-phishing policy). BrowserUserAgentStore
-    // strips that token from the mobile UA (the same technique the Fermata Auto project uses for its
-    // YouTube tab — see AndreyPavlenko/Fermata's FermataWebView.UserAgent), which lets accounts.google.com
-    // complete sign-in inside this WebView instead of bouncing out. Apple/Microsoft haven't been verified
-    // against the same technique, so they still hand off to a real external browser.
+    // Identity providers that block sign-in inside any embedded WebView (anti-phishing policy).
+    // Google detects the embedding through three signals, all of which are neutralised elsewhere in
+    // this file and in BrowserUserAgentCodec: the "; wv" and "Version/4.0" user-agent tokens, and
+    // the "X-Requested-With" header. That is the same technique the Fermata Auto project uses for
+    // its YouTube tab (see AndreyPavlenko/Fermata's FermataWebView.UserAgent), and it lets
+    // accounts.google.com complete sign-in here instead of bouncing out. Apple/Microsoft haven't
+    // been verified against it, so they still hand off to a real external browser.
     private val externalSignInHosts = setOf(
         "appleid.apple.com", "login.microsoftonline.com", "login.live.com"
     )
 
     fun isExternalSignInHost(url: String): Boolean =
         runCatching { Uri.parse(url).host?.lowercase() }.getOrNull() in externalSignInHosts
+
+    // Google sign-in origins. These are meant to complete *inside* this app's WebView (so the
+    // cookies land locally), which is why they are deliberately absent from [externalSignInHosts].
+    // YouTube launches this flow through window.open(); on a surface that can only show one WebView
+    // the popup is redirected into the visible tab, and this is the test that recognises it.
+    private val signInPopupHostSuffixes = listOf(
+        "accounts.google.com", "accounts.youtube.com"
+    )
+
+    /**
+     * Whether [url] is a Google sign-in origin that a popup should load in place rather than being
+     * reopened as an ordinary new tab (which would break the OAuth handshake).
+     */
+    fun isSignInPopupHost(url: String): Boolean {
+        val host = runCatching { Uri.parse(url).host?.lowercase() }.getOrNull() ?: return false
+        return signInPopupHostSuffixes.any { host == it || host.endsWith(".$it") }
+    }
 
     fun resolve(input: String): String = ContentAddress.https(input)
         ?: "https://www.google.com/search?q=" + URLEncoder.encode(input.trim(), "UTF-8")
@@ -80,7 +98,7 @@ object BrowserDefaults {
         CookieManager.getInstance().setAcceptCookie(true)
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
         // WebView adds an "X-Requested-With: <package name>" header to every request by default —
-        // a second signal (independent of the "; wv)" UA token stripped above) that identifies the
+        // a third signal (independent of the two UA tokens stripped above) that identifies the
         // request as coming from an embedded WebView rather than a real browser. Google's sign-in
         // flow checks for it too, so an empty allow-list here removes it from every origin. Only
         // available on WebView versions that support this androidx.webkit feature; older WebViews

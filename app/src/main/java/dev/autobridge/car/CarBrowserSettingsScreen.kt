@@ -28,18 +28,37 @@ import dev.autobridge.browser.FloatingButtonAction
  */
 class CarBrowserSettingsScreen(carContext: CarContext) : Screen(carContext) {
     override fun onGetTemplate(): Template {
+        val hideBar = BrowserControlsStore.hideUrlBar(carContext)
         val controls = ItemList.Builder()
+            .addItem(
+                Row.Builder()
+                    .setTitle("Hide URL bar")
+                    .addText("Remove the address bar completely; use the floating button for the menu")
+                    .setToggle(
+                        Toggle.Builder { checked ->
+                            BrowserControlsStore.setHideUrlBar(carContext, checked)
+                            setResult(CHANGED)
+                            invalidate()
+                        }
+                            .setChecked(hideBar)
+                            .build()
+                    )
+                    .build()
+            )
             .addItem(
                 Row.Builder()
                     .setTitle("Always show URL bar")
                     .addText("Keep the address bar over the page instead of letting it fade away")
+                    // Hiding the bar wins over pinning it, so this row is disabled while the bar is
+                    // hidden rather than offering a contradictory choice.
+                    .setEnabled(!hideBar)
                     .setToggle(
                         Toggle.Builder { checked ->
                             BrowserControlsStore.setAlwaysShowUrlBar(carContext, checked)
                             setResult(CHANGED)
                             invalidate()
                         }
-                            .setChecked(BrowserControlsStore.alwaysShowUrlBar(carContext))
+                            .setChecked(!hideBar && BrowserControlsStore.alwaysShowUrlBar(carContext))
                             .build()
                     )
                     .build()

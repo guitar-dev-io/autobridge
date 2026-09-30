@@ -35,6 +35,7 @@ enum class FloatingButtonAction(val label: String, val glyph: String) {
 object BrowserControlsStore {
     private const val PREFS_NAME = "autobridge_browser"
     private const val KEY_ALWAYS_SHOW_URL_BAR = "controls_always_show_url_bar"
+    private const val KEY_HIDE_URL_BAR = "controls_hide_url_bar"
     private const val KEY_ALWAYS_SHOW_FLOATING_BUTTON = "controls_always_show_floating_button"
     private const val KEY_FLOATING_BUTTON_ACTION = "controls_floating_button_action"
 
@@ -53,6 +54,23 @@ object BrowserControlsStore {
 
     fun setAlwaysShowUrlBar(context: Context, enabled: Boolean) {
         prefs(context).edit { putBoolean(KEY_ALWAYS_SHOW_URL_BAR, enabled) }
+    }
+
+    /**
+     * Removes the toolbar/address bar entirely: it is never drawn, never hit-tested, and neither
+     * the edge-reveal band nor the handle can recall it. The floating button remains the way to
+     * reach the menu, back/forward and the address input, so nothing becomes unreachable.
+     *
+     * On by default: the address bar over a car page is the reported clutter ("it just covers the
+     * page and I never use it"), and the floating button already reaches everything the bar did.
+     * When on it wins over [alwaysShowUrlBar] — asking to hide the bar and to pin it are
+     * contradictory, and "hide it, I never use it" is the stronger, more explicit intent.
+     */
+    fun hideUrlBar(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_HIDE_URL_BAR, true)
+
+    fun setHideUrlBar(context: Context, enabled: Boolean) {
+        prefs(context).edit { putBoolean(KEY_HIDE_URL_BAR, enabled) }
     }
 
     /**

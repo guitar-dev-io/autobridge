@@ -118,6 +118,33 @@ nothing. Unfocused it now shows the host (`google.com`); focusing restores the r
 The floating `☰` was visible exactly when the toolbar (which already has a `☰`) was showing, and
 hidden in fullscreen — the one state with no other way to reach the menu. That is inverted.
 
+### The browser menu is one sheet on both surfaces
+
+The menu was a grid of undifferentiated tiles — an `AlertDialog` on the phone, a Canvas grid on the
+car. Nine common actions and nine rare ones were drawn identically, the page's own address was
+nowhere on it, and the desktop-site setting was stated as a label (`Desktop: เปิด`) the user had to
+read and decode rather than a switch whose position they could see.
+
+Both surfaces now draw the same sheet, top to bottom: a header naming the app and the page with a
+`✕ Close` beside it, the address row, a card of six page actions (Back / Reload / Forward,
+Bookmarks / External / Settings), a card of three place actions, the desktop-site switch, and a
+footer carrying the version and the two routes off the sheet — `More` and `Exit`.
+
+`BrowserDrawerModel` owns the *content*: the same item lists build both, so an entry added for one
+surface exists on the other and the two cannot drift into being different menus. It does not own
+the phone's *geometry* — `BrowserMenuSheet` builds Views and lets the layout engine measure them,
+while the model's pixel boxes stay the car's, where nothing measures anything. Where the surfaces
+genuinely differ they say so: `MenuSurface.PHONE` has no tabs, so its second card holds History and
+Downloads, and its secondary list carries the send-to-car / get-from-car pair instead of the car's
+media and agent screens. A tile is never drawn over an action its surface cannot perform.
+
+Each band of the sheet declares a preferred and a minimum height and they shrink together, so the
+whole layout fits without scrolling on every head unit down to a 480px-tall panel. The 800x320
+stable area a DHU session reports is the one exception: there is no arrangement of a header, an
+address row, two cards, a switch and a footer that leaves a touchable tile in 260px, so that panel
+scrolls — with the header and its close button pinned above the scroll, so the sheet is never
+opened into a state it cannot be closed from.
+
 ### Apps and Settings
 
 `screenHeader` — shared by Applications, Profiles, Devices, Debug and Mirror settings — drew a

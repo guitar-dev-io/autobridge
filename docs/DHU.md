@@ -37,9 +37,12 @@ cd ~/Library/Android/sdk/extras/google/auto/
 # ใช้ไฟล์ config กำหนดความละเอียด/ขนาดหน้าจอ
 ./desktop-head-unit -c ~/.android/headunit.ini
 
-# ระบุโหมด input (touch / rotary / touchpad)
-./desktop-head-unit --input-mode touch
+# ระบุโหมด input (touch / rotary / hybrid)
+./desktop-head-unit -i touch
 ```
+
+DHU 2.0 ใช้ `-i` / `--input` ไม่ใช่ `--input-mode` (ถ้าใส่ผิดมันจะพิมพ์ usage แล้วออกทันที)
+และค่าที่รับมีแค่ `touch|rotary|hybrid`
 
 ## 4. เชื่อมต่อผ่าน Wi-Fi (ไม่ใช้ USB)
 
@@ -58,6 +61,27 @@ adb forward tcp:5277 tcp:5277
 - ถ้า `adb forward` แล้ว DHU ยังต่อไม่ติด ให้ตรวจว่าเปิด **Start head unit server**
   บนมือถือแล้ว และมือถือปลดล็อกหน้าจออยู่
 - พอร์ตมาตรฐานที่ DHU ใช้คือ `5277`
+- head unit server รับการเชื่อมต่อได้ครั้งเดียว ถ้า DHU หลุดหรือปิดไป ต้อง **หยุด** แล้ว
+  **เริ่ม** server ใหม่จากเมนูสามจุดก่อนต่อรอบถัดไป ไม่งั้น DHU จะบอกว่า `connected`
+  แต่ไม่มีภาพ และ `screenshot` จะตอบ `Don't have video focus`
+
+## ข้อจำกัดที่เจอจริง: DHU 2.0 ใช้กับ Android Auto รุ่นใหม่ไม่ได้
+
+ทดสอบเมื่อ 2026-09-30: Android Auto **17.7.663654** กับ DHU **2.0 (build 2022-03-30)**
+บน macOS arm64 — TLS handshake ผ่าน (`SSL negotiation finished successfully`) แต่หลังจากนั้น
+มือถือตัดการเชื่อมต่อทันที DHU ขึ้น `Failed to read from transport - disconnect` และใน logcat
+ฝั่งมือถือขึ้น:
+
+```
+GH.ConnLoggerV2: Session ..., event 41, ..., USB_ISSUE_PROJECTION_NOT_STARTED
+GH.ConnLoggerV2: Session ..., event 42, ..., USB_MONITOR_STOPPED
+```
+
+ไม่มี virtual display ถูกสร้าง แปลว่า projection ไม่เริ่มเลย
+
+`sdkmanager --list` มี `extras;google;auto` แค่เวอร์ชัน **2.0** เท่านั้น ไม่มีตัวใหม่กว่าให้อัปเดต
+ดังนั้นบนเครื่องที่ Android Auto เป็นรุ่นใหม่ **ต้องทดสอบกับ head unit จริง** หรือย้อนเวอร์ชัน
+Android Auto ลง (ซึ่งทำให้สภาพแวดล้อมต่างจากที่ผู้ใช้เจอจริง จึงไม่แนะนำสำหรับไล่บั๊ก)
 - ปิด DHU ด้วย `Ctrl + C` ที่หน้าต่าง terminal
 
 
