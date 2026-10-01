@@ -33,6 +33,9 @@ class EntertainmentActivity : Activity() {
     companion object {
         const val EXTRA_BROWSER_MODE = "dev.autobridge.extra.BROWSER_MODE"
 
+        /** [dev.autobridge.browser.WebViewTimerGate] owner tag for this player's WebView. */
+        private const val TIMER_GATE_OWNER = "entertainment"
+
         /**
          * Direct playback request from the library/IPTV screens. Unlike the `intent.data` path,
          * these accept http, file and content URIs, because IPTV portals and on-device media are
@@ -161,6 +164,9 @@ class EntertainmentActivity : Activity() {
             // the third-party-cookie policy, so the settings block below only adds what
             // BrowserDefaults intentionally leaves out for this player surface.
             BrowserDefaults.configure(this@EntertainmentActivity, this)
+            // Held for the activity's whole life, not just while resumed: this player keeps
+            // playing in the background, and the car browser may pause the process-wide timers.
+            dev.autobridge.browser.WebViewTimerGate.hold(TIMER_GATE_OWNER, this)
             // Allow tapping play directly from the car screen without a second gesture on the phone.
             settings.mediaPlaybackRequiresUserGesture = false
             BrowserDefaults.configureDebugTools()
@@ -548,6 +554,7 @@ YouTube · TV · Web
         ParkingStateStore.removeListener(parkingListener)
         client.player?.removeListener(playerListener)
         client.player?.clearVideoSurfaceView(video)
+        dev.autobridge.browser.WebViewTimerGate.release(TIMER_GATE_OWNER, browser)
         browser.destroy()
         client.disconnect()
         super.onDestroy()

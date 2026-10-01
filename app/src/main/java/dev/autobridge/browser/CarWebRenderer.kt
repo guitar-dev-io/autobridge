@@ -98,7 +98,29 @@ import kotlin.math.roundToInt
 class CarWebRenderer(context: Context) {
     private companion object {
         const val TAG = "AutoBridgeCarWeb"
-        const val FRAME_INTERVAL_MS = 33L // ~30fps repaint pump
+
+        /** How soon after a page play a permanent focus loss counts as the WebView's own request. */
+        const val SELF_FOCUS_WINDOW_MS = 1_500L
+        const val FRAME_INTERVAL_MS = 33L // ~30fps repaint pump while something is moving
+
+        /**
+         * Pump interval while nothing is known to be moving (~4fps). Still ticking, so auto-hide
+         * timers advance and page changes the renderer cannot observe (title, a carousel, a page
+         * repaint in legacy mode) still reach the car within a quarter second.
+         */
+        const val IDLE_FRAME_INTERVAL_MS = 250L
+
+        /** Full-rate window after any call into the renderer (touch, scroll, command, settings). */
+        const val ACTIVE_WINDOW_MS = 1_000L
+
+        /**
+         * Legacy mode paints the page itself, so playing media only moves as fast as the pump. The
+         * page's media state is re-read this often while idle, to switch back to full rate.
+         */
+        const val LEGACY_MEDIA_POLL_MS = 2_000L
+
+        /** [WebViewTimerGate] owner tag for the car browser. */
+        const val TIMER_GATE_OWNER = "car-browser"
 
         /** M3 FAB corner: 16dp on a 56dp button. */
         const val FAB_CORNER_FRACTION = 16f / 56f
@@ -203,6 +225,13 @@ class CarWebRenderer(context: Context) {
      * retrying on every geometry change would log the same warning for the life of the session.
      */
     private var rasterHostAttempted = false
+
+    /**
+     * Set when [stop] released the raster host because nothing was playing, so [start] knows to
+     * host the view again. Kept apart from [rasterHostAttempted]: a platform that refused hosting
+     * must not be retried, but a host this class released on purpose must come back.
+     */
+    private var rasterHostReleasedOnStop = false
 
     /**
      * Requested render path. [CarBrowserRenderMode.HARDWARE] unless the rollback preference says
@@ -346,10 +375,39 @@ class CarWebRenderer(context: Context) {
         dev.autobridge.audio.AudioFocusController(
             context = appContext,
             environment = audioEnvironment,
-            onAction = { webAudio.apply(it); sideAudio.apply(it) },
+            onAction = { applyFocusAction(it) },
             keepPlayingThroughFocusLoss =
                 dev.autobridge.audio.AudioPlaybackStore.keepPlayingThroughFocusLoss(appContext)
         )
+    }
+
+    /**
+     * Applies a focus decision to both panes, except the one self-inflicted case.
+     *
+     * When a page starts playing, the WebView's Chromium requests audio focus itself. It is the
+     * same app, so the system moves focus to Chromium and reports a permanent loss to
+     * [audioFocus] — and pausing on that loss stopped the page a few milliseconds after the user
+     * pressed play. A permanent loss that lands within [SELF_FOCUS_WINDOW_MS] of a play on a pane
+     * is that hand-over, so the pane keeps playing; Chromium now holds focus for it and pauses it
+     * itself if another app takes over. Any other loss is applied as before.
+     */
+    private fun applyFocusAction(action: dev.autobridge.audio.AudioFocusAction) {
+        val selfHandOverPossible = action == dev.autobridge.audio.AudioFocusAction.PAUSE &&
+            audioFocus.state == dev.autobridge.audio.AudioFocusState.PERMANENT_LOSS
+        if (!selfHandOverPossible) {
+            webAudio.apply(action)
+            sideAudio.apply(action)
+            return
+        }
+        listOf("main" to webAudio, "side" to sideAudio).forEach { (pane, bridge) ->
+            bridge.msSinceLastPlay { ms ->
+                if (ms <= SELF_FOCUS_WINDOW_MS) {
+                    Log.i(TAG, "Focus loss right after a $pane-pane play (${ms}ms): WebView took focus; not pausing")
+                } else {
+                    bridge.apply(action)
+                }
+            }
+        }
     }
 
     /** Current audio focus state, for the diagnostics screen. */
@@ -361,6 +419,27 @@ class CarWebRenderer(context: Context) {
     /** Reads what the page is playing, for the media session and diagnostics. */
     fun readWebMediaStatus(onResult: (dev.autobridge.audio.WebMediaStatus) -> Unit) =
         webAudio.readState(onResult)
+
+    /**
+     * The main page's audio as seen by the media session, so the Android Auto media card and the
+     * steering-wheel buttons follow the browser too. Registered while the renderer exists, not
+     * only while its surface is shown: the card matters most when the driver has gone back to the
+     * dashboard and the page keeps playing behind it.
+     */
+    private val mediaSource = object : dev.autobridge.media.WebMediaSource {
+        override fun readMediaStatus(onResult: (dev.autobridge.audio.WebMediaStatus) -> Unit) =
+            webAudio.readState(onResult)
+
+        override fun play() {
+            // A page whose surface went away silent was paused; it cannot play until resumed.
+            webView?.onResume()
+            webAudio.userPlay()
+        }
+
+        override fun pause() = webAudio.userPause()
+
+        override fun seekTo(positionMs: Long) = webAudio.seekTo(positionMs)
+    }
 
     var onFindResult: ((activeMatch: Int, matchCount: Int) -> Unit)? = null
 
@@ -408,12 +487,70 @@ class CarWebRenderer(context: Context) {
         override fun run() {
             if (!running) return
             val now = SystemClock.uptimeMillis()
-            // Idle timing and fling stepping advance every frame; the surface is then repainted
-            // unconditionally, because a detached WebView only rasterises while it is being drawn.
+            // Idle timing and fling stepping advance every frame, and every frame repaints (a
+            // detached WebView only rasterises while it is being drawn). What changes is how often:
+            // full rate while something moves, a slow tick otherwise, so a page left alone on the
+            // car screen stops costing 30 redraws a second.
             visibility.tick(now)
-            stepFling()
+            val flinging = stepFling()
             drawFrame(now)
-            mainHandler.postDelayed(this, FRAME_INTERVAL_MS)
+            pollLegacyMedia(now)
+            val busy = flinging || needsFullRate(now)
+            pumpIdle = !busy
+            mainHandler.postDelayed(this, if (busy) FRAME_INTERVAL_MS else IDLE_FRAME_INTERVAL_MS)
+        }
+    }
+
+    /** Uptime until which the pump stays at full rate; pushed forward by [requestFullRate]. */
+    private var activeUntilMs = 0L
+
+    /** True while the next pump frame is scheduled at the idle interval. */
+    private var pumpIdle = false
+
+    private var lastLegacyMediaPollMs = 0L
+
+    /** Whether anything on the surface is animating or may change from frame to frame. */
+    private fun needsFullRate(nowMs: Long): Boolean {
+        if (nowMs < activeUntilMs) return true
+        if (visibility.isAnimating(nowMs)) return true
+        if (fullscreenFabFading(nowMs)) return true
+        if (loadingProgress < 100 || (sideView != null && sideProgress < 100)) return true
+        // HARDWARE: the WebView renders itself, so playback needs nothing from the pump. Legacy
+        // paints the page on every frame, so a playing video would drop to the idle rate.
+        val playing = dev.autobridge.audio.WebAudioState.PLAYING
+        if (!hardwareMode && (webAudio.state == playing || sideAudio.state == playing)) return true
+        return false
+    }
+
+    /**
+     * The immersive FAB fade is time-driven, not input-driven. The window opens one idle interval
+     * early so the fade's first frame is not skipped by a slow tick.
+     */
+    private fun fullscreenFabFading(nowMs: Long): Boolean {
+        if (!visibility.fullscreen) return false
+        val idle = nowMs - lastInputMs
+        return idle in (FULLSCREEN_FAB_IDLE_MS - IDLE_FRAME_INTERVAL_MS)..(FULLSCREEN_FAB_IDLE_MS + FULLSCREEN_FAB_FADE_MS)
+    }
+
+    /** Legacy only: refreshes the pages' playing state so [needsFullRate] can see a video start. */
+    private fun pollLegacyMedia(nowMs: Long) {
+        if (hardwareMode || nowMs - lastLegacyMediaPollMs < LEGACY_MEDIA_POLL_MS) return
+        lastLegacyMediaPollMs = nowMs
+        webAudio.readState { }
+        if (sideView != null) sideAudio.readState { }
+    }
+
+    /**
+     * Puts the pump back on full rate for [ACTIVE_WINDOW_MS]. Called after every [runOnMain]
+     * block, which is the entry point of every touch, scroll, command and settings change, so
+     * individual call sites do not have to remember to wake the surface.
+     */
+    private fun requestFullRate() {
+        activeUntilMs = SystemClock.uptimeMillis() + ACTIVE_WINDOW_MS
+        if (running && pumpIdle) {
+            pumpIdle = false
+            mainHandler.removeCallbacks(frameRunnable)
+            mainHandler.post(frameRunnable)
         }
     }
 
@@ -545,12 +682,16 @@ class CarWebRenderer(context: Context) {
                 webView = createWebView()
                 restoreTabs()
             }
+            dev.autobridge.media.WebMediaHub.register(appContext, mediaSource)
+            webView?.let { WebViewTimerGate.hold(TIMER_GATE_OWNER, it) }
             webView?.onResume()
             sideView?.onResume()
             AutoBridgeVideoLog.surface("available", surface, width, height, dpi)
             if (hardwareMode) attachHardwareWindow(surface, width, height)
             layoutWebView(width, height, ViewportDebug.Event.SURFACE_AVAILABLE)
+            reattachRasterHost()
             running = true
+            pumpIdle = false
             // Give the user the full idle window from the moment the browser appears.
             visibility.onInteraction(SystemClock.uptimeMillis())
             applyControlSettings()
@@ -575,20 +716,38 @@ class CarWebRenderer(context: Context) {
             // rebuilding the controller.
             audioFocus.keepPlayingThroughFocusLoss =
                 dev.autobridge.audio.AudioPlaybackStore.keepPlayingThroughFocusLoss(appContext)
-            surfaceGeneration++
+            val generation = ++surfaceGeneration
             audioFocus.isPlaying = true
-            audioFocus.request()
-            // Bring back what was playing when the surface went away (rear camera on reverse,
-            // a pushed template). The page may have paused itself when it was hidden, and a
-            // granted request only resumes media when focus was actually re-acquired. Skipped
-            // while a call or prompt holds focus: the focus GAIN resumes it once that ends.
-            when (audioFocus.state) {
-                dev.autobridge.audio.AudioFocusState.GAINED,
-                dev.autobridge.audio.AudioFocusState.DUCKED -> {
-                    webAudio.resumeMarked()
-                    sideAudio.resumeMarked()
+            // A page that kept playing while the car showed another app (Maps, the dashboard)
+            // is being played under Chromium's own audio focus. Requesting focus here took it
+            // from Chromium, whose AudioFocusDelegate pauses the page on that LOSS and abandons
+            // its request, so the music stopped the moment the driver came back. While anything
+            // is still audible, leave focus with Chromium and only clear the resume tags.
+            webAudio.isAnyPlaying { mainPlaying ->
+                sideAudio.isAnyPlaying { sidePlaying ->
+                    // A newer start()/stop() has taken over; its own decision stands.
+                    if (generation != surfaceGeneration || !running) return@isAnyPlaying
+                    if (mainPlaying || sidePlaying) {
+                        Log.i(TAG, "Page still playing on re-attach; leaving audio focus with the WebView")
+                        webAudio.resumeMarked()
+                        sideAudio.resumeMarked()
+                        return@isAnyPlaying
+                    }
+                    audioFocus.request()
+                    // Bring back what was playing when the surface went away (rear camera on
+                    // reverse, a pushed template). The page may have paused itself when it was
+                    // hidden, and a granted request only resumes media when focus was actually
+                    // re-acquired. Skipped while a call or prompt holds focus: the focus GAIN
+                    // resumes it once that ends.
+                    when (audioFocus.state) {
+                        dev.autobridge.audio.AudioFocusState.GAINED,
+                        dev.autobridge.audio.AudioFocusState.DUCKED -> {
+                            webAudio.resumeMarked()
+                            sideAudio.resumeMarked()
+                        }
+                        else -> Unit
+                    }
                 }
-                else -> Unit
             }
             mainHandler.removeCallbacks(frameRunnable)
             mainHandler.post(frameRunnable)
@@ -643,6 +802,7 @@ class CarWebRenderer(context: Context) {
                     }
                     if (!mainPlaying) main?.takeIf { it === webView }?.onPause()
                     if (!sidePlaying) side?.takeIf { it === sideView }?.onPause()
+                    if (!mainPlaying && !sidePlaying) suspendWhileHidden(main)
                 }
             }
             mainHandler.removeCallbacks(frameRunnable)
@@ -666,9 +826,45 @@ class CarWebRenderer(context: Context) {
         }
     }
 
+    /**
+     * Runs from [stop]'s playing check once it has found both panes silent: the surface is gone and
+     * nothing needs to keep going until it comes back.
+     *
+     * - JavaScript timers are paused (through [WebViewTimerGate], since the pause is process-wide
+     *   and the phone browser may still be in use). `onPause()` alone leaves them running.
+     * - Legacy only: the off-screen raster host is released. Its hidden display keeps rastering
+     *   and its sink thread keeps draining for as long as it exists, with nobody looking.
+     *   [reattachRasterHost] brings it back on the next [start].
+     */
+    private fun suspendWhileHidden(main: WebView?) {
+        main?.takeIf { it === webView }?.let { WebViewTimerGate.release(TIMER_GATE_OWNER, it) }
+        val host = rasterHost ?: return
+        host.release()
+        rasterHost = null
+        rasterHostReleasedOnStop = true
+        Log.i(TAG, "Raster host released while the car surface is away")
+    }
+
+    /**
+     * Re-hosts the legacy WebView after [suspendWhileHidden] released its window. Done here rather
+     * than left to [layoutWebView], which skips everything when the geometry is unchanged — exactly
+     * the case for a template pushed and popped over the browser.
+     */
+    private fun reattachRasterHost() {
+        if (!rasterHostReleasedOnStop) return
+        rasterHostReleasedOnStop = false
+        if (hardwareMode || hardwareWindow != null || rasterHost != null) return
+        val view = webView ?: return
+        rasterHost = OffscreenWebViewWindow.attach(
+            appContext, view, viewport.webWidth, viewport.webHeight,
+            appContext.resources.configuration.densityDpi
+        )
+    }
+
     fun destroy() {
         runOnMain {
             running = false
+            dev.autobridge.media.WebMediaHub.unregister(mediaSource)
             audioFocus.isPlaying = false
             audioFocus.abandon()
             mainHandler.removeCallbacks(frameRunnable)
@@ -683,8 +879,11 @@ class CarWebRenderer(context: Context) {
             hardwareWindow?.release()
             hardwareWindow = null
             releaseSidePane()
+            rasterHostReleasedOnStop = false
             webView?.apply {
                 stopLoading()
+                // Released while the view is still alive: pausing timers goes through a WebView.
+                WebViewTimerGate.release(TIMER_GATE_OWNER, this)
                 destroy()
             }
             webView = null
@@ -1666,6 +1865,7 @@ class CarWebRenderer(context: Context) {
                 tracePostLoad()
                 if (loadError == null) WebHistoryStore.record(appContext, view.title, url)
                 youtube.onPageChanged(view, url)
+                webAudio.installPlayTracking()
                 onPageChanged?.invoke(url, view.title)
                 logDisplays("page-finished")
             }
@@ -2011,6 +2211,7 @@ class CarWebRenderer(context: Context) {
                 sideProgress = 100
                 BrowserSplitStore.setSideUrl(appContext, url)
                 WebHistoryStore.record(appContext, view.title, url)
+                sideAudio.installPlayTracking()
                 if (sideActive) onPageChanged?.invoke(url, view.title)
             }
 
@@ -2824,7 +3025,14 @@ class CarWebRenderer(context: Context) {
     }
 
     private fun runOnMain(block: () -> Unit) {
-        if (Looper.myLooper() == Looper.getMainLooper()) block()
-        else mainHandler.post(block)
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            block()
+            requestFullRate()
+        } else {
+            mainHandler.post {
+                block()
+                requestFullRate()
+            }
+        }
     }
 }

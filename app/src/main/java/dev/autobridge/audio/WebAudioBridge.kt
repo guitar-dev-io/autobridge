@@ -22,6 +22,20 @@ enum class WebAudioState { IDLE, PLAYING, PAUSED }
  */
 class WebAudioBridge(private val webViewProvider: () -> WebView?) {
 
+    private companion object {
+        /** Records when any media element starts playing. Fixed string, takes nothing from the page. */
+        const val PLAY_TRACKING_SCRIPT = """
+            (function(){
+              if (window.__abPlayHook) return 0;
+              window.__abPlayHook = 1;
+              var mark = function(){ window.__abLastPlayAt = Date.now(); };
+              document.addEventListener('play', mark, true);
+              document.addEventListener('playing', mark, true);
+              return 1;
+            })();
+        """
+    }
+
     var state: WebAudioState = WebAudioState.IDLE
         private set
 
@@ -103,8 +117,132 @@ class WebAudioBridge(private val webViewProvider: () -> WebView?) {
         }
     }
 
+    /**
+     * Reports whether any media element is playing right now, without tagging or changing
+     * anything. Always answers, false when there is no WebView, so callers can chain on it.
+     */
+    fun isAnyPlaying(onResult: (Boolean) -> Unit) {
+        if (webViewProvider() == null) {
+            onResult(false)
+            return
+        }
+        evaluate(
+            """
+            (function(){
+              var n = 0;
+              document.querySelectorAll('audio,video').forEach(function(m){
+                if (!m.paused && !m.ended) n++;
+              });
+              return n;
+            })();
+            """.trimIndent()
+        ) { result -> onResult((result.toIntOrNull() ?: 0) > 0) }
+    }
+
     /** Resumes media tagged by [markPlayingForResume] or by a focus pause. */
     fun resumeMarked() = resumeAll()
+
+    /**
+     * Installs the page-side play timestamp used by [msSinceLastPlay]. Idempotent; call it when a
+     * page finishes loading. Listens in the capture phase because media events do not bubble.
+     */
+    fun installPlayTracking() {
+        evaluate(PLAY_TRACKING_SCRIPT) { }
+    }
+
+    /**
+     * Milliseconds since media on the page last started playing, or [Long.MAX_VALUE] when unknown
+     * (tracking not installed, no WebView).
+     *
+     * Why this exists: the WebView's own Chromium media session requests audio focus the moment a
+     * page starts playing. Both requests come from this app, so the system hands focus to Chromium
+     * and tells this app's controller it has lost focus permanently — which used to pause the page
+     * a few milliseconds after the user pressed play. A loss that lands right after a play started
+     * on this page is that self-inflicted one, not another app taking over.
+     */
+    fun msSinceLastPlay(onResult: (Long) -> Unit) {
+        if (webViewProvider() == null) {
+            onResult(Long.MAX_VALUE)
+            return
+        }
+        evaluate(
+            """
+            (function(){
+              var t = window.__abLastPlayAt || 0;
+              return t > 0 ? Math.max(0, Date.now() - t) : -1;
+            })();
+            """.trimIndent()
+        ) { raw ->
+            val value = raw.toLongOrNull() ?: -1L
+            onResult(if (value < 0) Long.MAX_VALUE else value)
+        }
+    }
+
+    /**
+     * A pause the user asked for (car media card, steering wheel). Unlike a focus pause it clears
+     * the focus tag, so a later focus gain does not restart what the user stopped, and tags the
+     * element for [userPlay] instead.
+     */
+    fun userPause() {
+        evaluate(
+            """
+            (function(){
+              var n = 0;
+              document.querySelectorAll('audio,video').forEach(function(m){
+                if (!m.paused) { delete m.dataset.abResume; m.dataset.abUser = '1'; m.pause(); n++; }
+              });
+              return n;
+            })();
+            """.trimIndent()
+        ) { StructuredLog.i("AUDIO", "web user pause -> $it element(s)") }
+        state = WebAudioState.PAUSED
+    }
+
+    /**
+     * A play the user asked for: resumes what [userPause] stopped, or else the first element that
+     * has a source and has not ended. The returned promise is swallowed so a rejected play (no
+     * source yet) does not surface as an unhandled rejection on the page.
+     */
+    fun userPlay() {
+        evaluate(
+            """
+            (function(){
+              var all = Array.prototype.slice.call(document.querySelectorAll('audio,video'));
+              var targets = all.filter(function(m){ return m.dataset.abUser === '1'; });
+              if (!targets.length) {
+                targets = all.filter(function(m){ return m.currentSrc && !m.ended; }).slice(0, 1);
+              }
+              targets.forEach(function(m){
+                delete m.dataset.abUser;
+                var p = m.play();
+                if (p && p.catch) p.catch(function(){});
+              });
+              return targets.length;
+            })();
+            """.trimIndent()
+        ) { StructuredLog.i("AUDIO", "web user play -> $it element(s)") }
+        state = WebAudioState.PLAYING
+    }
+
+    /**
+     * Seeks the element that is playing (or, failing that, the first one with a duration). The
+     * only value placed in the script is a number this app computed, so it stays a fixed shape.
+     */
+    fun seekTo(positionMs: Long) {
+        val seconds = positionMs.coerceAtLeast(0L) / 1000.0
+        evaluate(
+            """
+            (function(){
+              var all = Array.prototype.slice.call(document.querySelectorAll('audio,video'));
+              var m = all.filter(function(x){ return !x.paused && !x.ended; })[0] ||
+                      all.filter(function(x){ return isFinite(x.duration) && x.duration > 0; })[0];
+              if (!m) return 0;
+              m.currentTime = $seconds;
+              return 1;
+            })();
+            """.trimIndent()
+        ) { StructuredLog.i("AUDIO", "web seek ${positionMs}ms -> $it element(s)") }
+    }
 
     private fun duck() {
         evaluate(
@@ -149,17 +287,28 @@ class WebAudioBridge(private val webViewProvider: () -> WebView?) {
      * Session API, which is what a site fills in for the system's own media controls.
      */
     fun readState(onResult: (WebMediaStatus) -> Unit) {
+        // The tracking hook rides along, so a page loaded before it existed still gets it on the
+        // next read. The state object below stays the script's last value, which is what returns.
         evaluate(
+            PLAY_TRACKING_SCRIPT.trimIndent() + "\n" +
             """
             (function(){
-              var playing = false, dur = 0, pos = 0;
+              var playing = false, dur = 0, pos = 0, held = null;
               document.querySelectorAll('audio,video').forEach(function(m){
                 if (!m.paused && !m.ended) {
                   playing = true;
                   if (isFinite(m.duration)) dur = m.duration;
                   pos = m.currentTime;
+                } else if (held === null && m.currentSrc && !m.ended) {
+                  held = m;
                 }
               });
+              // Nothing playing: report where the paused element stands, so a paused card still
+              // shows the right position instead of jumping to zero.
+              if (!playing && held !== null) {
+                if (isFinite(held.duration)) dur = held.duration;
+                pos = held.currentTime;
+              }
               var md = (navigator.mediaSession && navigator.mediaSession.metadata) || null;
               return JSON.stringify({
                 playing: playing,
@@ -168,7 +317,8 @@ class WebAudioBridge(private val webViewProvider: () -> WebView?) {
                 title: md ? md.title : '',
                 artist: md ? md.artist : '',
                 album: md ? md.album : '',
-                artwork: (md && md.artwork && md.artwork.length) ? md.artwork[0].src : ''
+                artwork: (md && md.artwork && md.artwork.length) ? md.artwork[0].src : '',
+                pageTitle: document.title || ''
               });
             })();
             """.trimIndent()
@@ -205,6 +355,8 @@ data class WebMediaStatus(
     val artist: String = "",
     val album: String = "",
     val artworkUrl: String = "",
+    /** `document.title`, the fallback name for sites that publish no Media Session metadata. */
+    val pageTitle: String = "",
 ) {
     val hasMetadata: Boolean get() = title.isNotBlank() || artist.isNotBlank()
 
@@ -227,6 +379,7 @@ data class WebMediaStatus(
                 artist = string(text, "artist"),
                 album = string(text, "album"),
                 artworkUrl = string(text, "artwork"),
+                pageTitle = string(text, "pageTitle"),
             )
         }
 

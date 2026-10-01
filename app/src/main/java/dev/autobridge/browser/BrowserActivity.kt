@@ -1075,6 +1075,9 @@ class BrowserActivity : Activity() {
     }
 
     private companion object {
+        /** [WebViewTimerGate] owner tag for the phone browser. */
+        const val TIMER_GATE_OWNER = "phone-browser"
+
         /** Shared with [BrowserDefaults] and [BrowserUserAgentStore]: one browser preference file. */
         const val FAB_PREFS = "autobridge_browser"
         const val FAB_KEY_X = "menu_button_dx"
@@ -1252,6 +1255,8 @@ class BrowserActivity : Activity() {
 
     override fun onResume() {
         super.onResume(); resumed = true
+        // Timers are process-wide; the car browser may have paused them while it was hidden.
+        WebViewTimerGate.hold(TIMER_GATE_OWNER, web)
         val previousAgent = web.settings.userAgentString
         BrowserDefaults.configure(this, web)
         enforcePolicy()
@@ -1261,6 +1266,7 @@ class BrowserActivity : Activity() {
     override fun onPause() {
         resumed = false
         web.onPause()
+        WebViewTimerGate.release(TIMER_GATE_OWNER, web)
         // WebView writes cookies to disk lazily, so a session established moments ago can still be
         // memory-only at this point. Flushing on the way to the background is what keeps a fresh
         // sign-in from being lost when the process is killed before Chromium's own periodic flush

@@ -51,10 +51,41 @@ class MediaPlaybackService : MediaLibraryService() {
         const val LIVE_RECOVERY_INTERVAL_MS = 5_000L
         const val ROOT_ID = "autobridge:root"
         const val QUEUE_PREFIX = "autobridge:queue:"
+        const val WEB_POLL_MS = 1_000L
     }
 
     private var player: ExoPlayer? = null
+    private var webPlayer: WebMediaPlayer? = null
+    private var carPlayer: CarMediaPlayer? = null
     private var session: MediaLibrarySession? = null
+
+    /**
+     * Polls the car browser's page audio once a second while a browser is registered, and lets
+     * [SessionSourceArbiter] decide whether the session shows it or ExoPlayer. One small fixed
+     * script per second, and only while the browser exists.
+     */
+    private val webPoll = object : Runnable {
+        override fun run() {
+            val composite = carPlayer ?: return
+            val exo = player ?: return
+            val source = WebMediaHub.source
+            val exoActive = exo.isPlaying ||
+                (exo.playWhenReady && exo.playbackState == Player.STATE_BUFFERING)
+            if (source == null) {
+                composite.select(SessionSourceArbiter.choose(composite.source, exoActive, false, false))
+            } else {
+                source.readMediaStatus { status ->
+                    // The answer is asynchronous; the service may have been torn down meanwhile.
+                    if (carPlayer !== composite) return@readMediaStatus
+                    webPlayer?.update(status)
+                    composite.select(
+                        SessionSourceArbiter.choose(composite.source, exoActive, true, status.playing)
+                    )
+                }
+            }
+            mainHandler.postDelayed(this, WEB_POLL_MS)
+        }
+    }
     private val mainHandler = Handler(Looper.getMainLooper())
     private var lastLiveRecoveryMs = 0L
 
@@ -313,9 +344,17 @@ class MediaPlaybackService : MediaLibraryService() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        session = MediaLibrarySession.Builder(this, exoPlayer, LibraryCallback())
+        // The session sits on the composite, not on ExoPlayer directly, so the car media card can
+        // follow browser audio too. Everything else here keeps talking to ExoPlayer itself.
+        val web = WebMediaPlayer(exoPlayer.applicationLooper)
+        val composite = CarMediaPlayer(exoPlayer, web)
+        webPlayer = web
+        carPlayer = composite
+
+        session = MediaLibrarySession.Builder(this, composite, LibraryCallback())
             .setSessionActivity(openAppIntent)
             .build()
+        mainHandler.post(webPoll)
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? {
@@ -340,6 +379,9 @@ class MediaPlaybackService : MediaLibraryService() {
         player?.removeListener(playerListener)
         session?.release()
         session = null
+        carPlayer?.release()
+        carPlayer = null
+        webPlayer = null
         player?.release()
         player = null
         super.onDestroy()
