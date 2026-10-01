@@ -43,6 +43,23 @@ object BrowserUserAgentStore {
         BrowserUserAgentMode.CUSTOM -> custom(context).ifBlank { BrowserUserAgentCodec.mobile(mobileDefault) }
     }
 
+    /**
+     * The User-Agent to use for a specific [url]. Identical to [resolve] except that Google
+     * sign-in origins are always served the clean **mobile** UA, whatever mode the user picked.
+     *
+     * A desktop UA claims `X11; Linux x86_64`, but a WebView cannot stop sending the User-Agent
+     * Client Hints that still say `Sec-CH-UA-Platform: "Android"` and `Sec-CH-UA-Mobile: ?1`.
+     * Google's sign-in reads both, sees a desktop UA contradicting an Android client, and refuses
+     * it as "this browser or app may not be secure" — the failure only appears in desktop mode.
+     * The mobile UA matches those hints, so sign-in behaves the same in either mode.
+     */
+    fun resolveForUrl(context: Context, url: String, mobileDefault: String): String =
+        if (BrowserDefaults.isSignInPopupHost(url)) {
+            BrowserUserAgentCodec.mobile(mobileDefault)
+        } else {
+            resolve(context, mobileDefault)
+        }
+
     fun label(context: Context): String = when (mode(context)) {
         BrowserUserAgentMode.MOBILE -> "Mobile"
         BrowserUserAgentMode.DESKTOP -> "Desktop"

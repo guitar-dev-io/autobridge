@@ -175,7 +175,7 @@ class CarWebRenderer(context: Context) {
     }
 
     private var sizes: AutoUiSizes = AutoUiSizes.forDensity(1f)
-    private var viewport: BrowserViewport = BrowserViewport.create(1, 1, 1f, 1f)
+    private var viewport: BrowserViewport = BrowserViewport.create(1, 1, 1f)
     /** Where the host leaves room for our controls; null until it reports a stable area. */
     private var chromeBounds: Box? = null
     private var chrome: BrowserChromeLayout = BrowserChromeLayout.create(sizes, viewport, showMenuButton = true)
@@ -192,6 +192,9 @@ class CarWebRenderer(context: Context) {
     private var flingX = 0f
     private var flingY = 0f
 
+    /** Last value handed to `setInitialScale`, so an unchanged scale costs nothing. */
+    private var lastPageScalePercent = 0
+
     /**
      * Reused by [drawFrame] for the page clip. Both used to be allocated inside the draw loop, so
      * every frame handed the collector a Path and a RectF - garbage produced at frame rate, in the
@@ -202,18 +205,17 @@ class CarWebRenderer(context: Context) {
 
 
     /**
-     * Density the page is laid out against: the phone's, because that is the one the off-screen
-     * WebView actually renders at.
+     * The phone's density — the one a detached WebView scales by, whatever Context it was built
+     * with. **Traced only.** It no longer sizes anything.
      *
-     * Laying the page out at the panel's density instead looked like the obvious saving - the
-     * surface is ~800px wide and the phone makes that a ~2400px page that is then drawn at scale
-     * 0.33, so roughly nine times the pixels the surface shows are rasterised every frame. It does
-     * not work. A detached WebView takes its device scale factor from the application, not from the
-     * Context it is constructed with, so re-basing only that Context left Chromium still painting
-     * at 3x into a view a third of the size: a third of the page, three times too big. The pair is
-     * self-consistent as it stands - render at 3x, draw at 0.33, net 1:1 - and the waste is the
-     * price of the OS keeping the scale factor to itself. Reducing it needs the scale factor
-     * itself, not the layout size.
+     * It used to multiply the page's CSS width to get the view's pixel width, which is what made
+     * the off-screen WebView many times larger than the surface it is drawn to. Re-basing the
+     * WebView's Context to the panel's density was tried first and does not work: the device scale
+     * factor comes from the application, so only the layout shrank and Chromium kept painting at
+     * 3x into a third of the space. [BrowserViewport.pageScalePercent] reaches the same CSS width
+     * through the page zoom instead, which is a knob the WebView does expose, so the view can stay
+     * the size of the surface. Kept here because a trace that prints it makes the difference
+     * between "the scale is pinned" and "the WebView fell back to its own" readable at a glance.
      */
     private val webViewDensity: Float get() = appContext.resources.displayMetrics.density
 
@@ -389,6 +391,10 @@ class CarWebRenderer(context: Context) {
             BrowserUserAgentMode.DESKTOP
         }
         BrowserUserAgentStore.select(context, next)
+        // Desktop mode also widens the page's CSS viewport (see BrowserViewport.desktop), so the
+        // page must be re-measured, not just reloaded — a UA change alone leaves modern sites on
+        // their mobile layout. Re-layout first so the reload lands at the new width.
+        layoutWebView(surfaceWidth, surfaceHeight, ViewportDebug.Event.STABLE_AREA)
         applyUserAgentAndReload()
     }
 
@@ -507,6 +513,7 @@ class CarWebRenderer(context: Context) {
             if (tabs.tabs.isEmpty()) {
                 tabs = BrowserTabsState.single(target, id = nextTabId++)
             }
+            syncUserAgentFor(target)
             webView?.loadUrl(target)
         }
     }
@@ -526,10 +533,25 @@ class CarWebRenderer(context: Context) {
     fun applyUserAgentAndReload() = runOnMain {
         val view = webView ?: return@runOnMain
         val mobileDefault = WebSettings.getDefaultUserAgent(appContext)
-        val selected = BrowserUserAgentStore.resolve(appContext, mobileDefault)
+        val selected = BrowserUserAgentStore.resolveForUrl(appContext, view.url ?: currentUrl, mobileDefault)
         if (view.settings.userAgentString != selected) {
             view.settings.userAgentString = selected
             view.reload()
+        }
+    }
+
+    /**
+     * Aligns the WebView's User-Agent with [url] before it loads. Sign-in origins force the mobile
+     * UA (see [BrowserUserAgentStore.resolveForUrl]); everything else uses the user's chosen mode.
+     * Called for every navigation so a redirect into accounts.google.com from a desktop-mode page
+     * still gets the UA Google accepts, without a visible reload.
+     */
+    private fun syncUserAgentFor(url: String) {
+        val view = webView ?: return
+        val mobileDefault = WebSettings.getDefaultUserAgent(appContext)
+        val wanted = BrowserUserAgentStore.resolveForUrl(appContext, url, mobileDefault)
+        if (view.settings.userAgentString != wanted) {
+            view.settings.userAgentString = wanted
         }
     }
 
@@ -1245,6 +1267,10 @@ class CarWebRenderer(context: Context) {
 
             override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
                 loadError = null
+                // A redirect into a sign-in origin (e.g. desktop-mode YouTube handing off to
+                // accounts.google.com) must switch to the mobile UA Google accepts. Doing it here
+                // catches redirects that never went through load()/shouldOverrideUrlLoading.
+                syncUserAgentFor(url)
             }
 
             override fun onPageFinished(view: WebView, url: String) {
@@ -1320,8 +1346,9 @@ class CarWebRenderer(context: Context) {
         val cardTop = toolbarBottom.coerceAtMost(height - margin - 1)
         val cardBottom = (height - margin).coerceAtLeast(cardTop + 1)
         val next = BrowserViewport.create(
-            width, height, webViewDensity, sizes.density,
-            cardLeft, cardTop, cardRight, cardBottom
+            width, height, sizes.density,
+            cardLeft, cardTop, cardRight, cardBottom,
+            desktop = BrowserUserAgentStore.mode(appContext) == BrowserUserAgentMode.DESKTOP,
         )
         val geometryUnchanged = next == viewport && view.width == next.webWidth
         viewport = next
@@ -1352,6 +1379,10 @@ class CarWebRenderer(context: Context) {
             return
         }
 
+        // The zoom that turns a surface-sized view into a [contentWidthDp]-wide page. Applied
+        // before measure/layout so the reflow this triggers already lays out at the right width,
+        // and re-applied on every geometry change because the ratio moves with the surface.
+        applyPageScale(view)
         view.layoutParams = ViewGroup.LayoutParams(viewport.webWidth, viewport.webHeight)
         view.measure(
             View.MeasureSpec.makeMeasureSpec(viewport.webWidth, View.MeasureSpec.EXACTLY),
@@ -1359,6 +1390,36 @@ class CarWebRenderer(context: Context) {
         )
         view.layout(0, 0, viewport.webWidth, viewport.webHeight)
         trace(event, "reflow=applied")
+    }
+
+    /**
+     * Pins the WebView's page zoom to [BrowserViewport.pageScalePercent].
+     *
+     * `setInitialScale` is what decouples "how wide the page thinks it is" from "how many pixels we
+     * rasterise". Without it the WebView scales by the phone's density, so the only way to reach a
+     * car-appropriate CSS width was to inflate the view by that factor — which is what drove the
+     * off-screen surface to 3840x1920 and made Chromium drop tiles it could not afford.
+     *
+     * It takes effect on the next load, so a change that must be visible immediately (the desktop
+     * toggle) reloads afterwards. [lastPageScalePercent] keeps that reload out of the ordinary
+     * resize path, where the scale usually has not moved at all.
+     */
+    private fun applyPageScale(view: WebView) {
+        val percent = viewport.pageScalePercent
+        if (percent == lastPageScalePercent) return
+        lastPageScalePercent = percent
+        // `setInitialScale` alone is not enough, and the first attempt at this shipped without
+        // these two lines: the trace came back `scale=1.000` (the raster was 1:1, as intended) but
+        // `pageScale=3.000`, so the page had been laid out at 800/3 = 267 CSS px and blown up three
+        // times. With useWideViewPort on, Chromium takes the layout width and the scale from the
+        // page's own `<meta name="viewport">` and the requested initial scale is simply discarded.
+        // Turning both off is what hands the decision back: the viewport is then the view's own
+        // width at the scale set here. It is set on the car WebView rather than in
+        // BrowserDefaults.configure because the phone window wants the opposite - there the
+        // WebView's density *is* the display's, so the meta viewport already resolves correctly.
+        view.settings.useWideViewPort = false
+        view.settings.loadWithOverviewMode = false
+        view.setInitialScale(percent)
     }
 
     /** WebView-side geometry, so a mismatch between what is laid out and what gets painted shows up. */

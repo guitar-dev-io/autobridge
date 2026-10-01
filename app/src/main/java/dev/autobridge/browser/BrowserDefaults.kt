@@ -8,6 +8,7 @@ import android.webkit.CookieManager
 import android.webkit.PermissionRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
+import androidx.webkit.UserAgentMetadata
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
 import dev.autobridge.BuildConfig
@@ -106,7 +107,49 @@ object BrowserDefaults {
         if (WebViewFeature.isFeatureSupported(WebViewFeature.REQUESTED_WITH_HEADER_ALLOW_LIST)) {
             WebSettingsCompat.setRequestedWithHeaderOriginAllowList(settings, emptySet())
         }
+        applyUserAgentMetadata(
+            settings,
+            desktop = BrowserUserAgentStore.mode(context) == BrowserUserAgentMode.DESKTOP
+        )
     }
+
+    /**
+     * Makes the User-Agent Client Hints agree with the User-Agent string.
+     *
+     * A UA string is only half of what a site is told. Chromium also sends structured hints —
+     * `Sec-CH-UA-Platform`, `Sec-CH-UA-Mobile`, `Sec-CH-UA-Arch` — and a WebView fills them in from
+     * the device, not from [WebSettings.userAgentString]. Setting a desktop UA therefore used to
+     * produce a request that claimed `X11; Linux x86_64` while its own hints still said
+     * `Platform: "Android", Mobile: ?1`, and a site that reads both sees a contradiction. The one
+     * that matters here is Google's sign-in, which treats it as exactly the sort of thing a
+     * repackaged browser does and refuses with "this browser or app may not be secure" — which is
+     * why sign-in failed in desktop mode but not in mobile mode.
+     *
+     * The fields are set to describe the identity being claimed, so the two halves tell one story.
+     * Model is left empty on purpose: it is the device string a desktop browser has no equivalent
+     * of, and sending the real one would re-introduce the OEM fragment the UA is rebuilt to drop.
+     * No-op where the WebView is too old to support the API, which simply leaves today's behaviour.
+     */
+    fun applyUserAgentMetadata(settings: WebSettings, desktop: Boolean) {
+        if (!WebViewFeature.isFeatureSupported(WebViewFeature.USER_AGENT_METADATA)) return
+        val metadata = UserAgentMetadata.Builder()
+            // Matches BrowserUserAgentCodec.desktop()'s "X11; Linux x86_64" rather than a Windows
+            // claim: the hints have to describe the same browser the UA string names.
+            .setPlatform(if (desktop) "Linux" else "Android")
+            .setPlatformVersion(if (desktop) DESKTOP_PLATFORM_VERSION else ANDROID_PLATFORM_VERSION)
+            .setArchitecture(if (desktop) "x86" else "")
+            .setModel("")
+            .setMobile(!desktop)
+            .setBitness(if (desktop) DESKTOP_BITNESS else UserAgentMetadata.BITNESS_DEFAULT)
+            .setWow64(false)
+            .build()
+        runCatching { WebSettingsCompat.setUserAgentMetadata(settings, metadata) }
+            .onFailure { Log.w(TAG_WEBVIEW, "user-agent metadata rejected by this WebView", it) }
+    }
+
+    private const val DESKTOP_PLATFORM_VERSION = "6.0.0"
+    private const val ANDROID_PLATFORM_VERSION = "10.0.0"
+    private const val DESKTOP_BITNESS = 64
 
     /**
      * Grants only the protected-media (Widevine EME) permission a page requests, so a page's own

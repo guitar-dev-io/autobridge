@@ -23,6 +23,7 @@ import android.webkit.PermissionRequest
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.WebSettings
 import android.webkit.WebStorage
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -341,6 +342,9 @@ class BrowserActivity : Activity() {
     private fun createWebView(): WebView = WebView(this).apply {
         BrowserDefaults.configure(this@BrowserActivity, this)
         BrowserDefaults.configureDebugTools()
+        // Match the viewport to the saved desktop/mobile preference before the first page loads,
+        // so a desktop-mode session opens at desktop width rather than mobile-then-reflow.
+        applyDesktopViewport(this)
         setDownloadListener(BrowserDownloads.listener(this@BrowserActivity) { toast(it) })
         webChromeClient = object : WebChromeClient() {
             override fun onProgressChanged(view: WebView, value: Int) {
@@ -410,6 +414,13 @@ class BrowserActivity : Activity() {
 
             override fun onPageStarted(view: WebView, url: String, favicon: android.graphics.Bitmap?) {
                 loadError.visibility = View.GONE
+                // Sign-in origins always get the clean mobile UA (see resolveForUrl): a desktop UA
+                // contradicts the WebView's Android client hints and Google refuses it. This fires
+                // for redirects too, so a desktop-mode page handing off to accounts.google.com is
+                // corrected before the page loads.
+                val mobileDefault = WebSettings.getDefaultUserAgent(this@BrowserActivity)
+                val wanted = BrowserUserAgentStore.resolveForUrl(this@BrowserActivity, url, mobileDefault)
+                if (view.settings.userAgentString != wanted) view.settings.userAgentString = wanted
             }
 
             override fun onPageFinished(view: WebView, url: String) {
@@ -434,6 +445,34 @@ class BrowserActivity : Activity() {
                 loadError.visibility = View.VISIBLE
             }
         }
+    }
+
+    /**
+     * Matches the page's viewport to the desktop/mobile preference.
+     *
+     * A desktop User-Agent alone leaves modern sites on their mobile layout, because a site picks
+     * its layout from the viewport width, not from the UA. The two modes want opposite settings:
+     *
+     *  - **Desktop** turns `useWideViewPort` on so the page's own `<meta name="viewport">` (or
+     *    Chromium's 980px default) decides the layout width, with `loadWithOverviewMode` zooming
+     *    the result down to fit. The initial scale is handed back to Chromium (`0`) precisely
+     *    because the page is the one that knows how wide it wants to be.
+     *  - **Mobile** turns both off and pins the scale to the display's density, so one CSS pixel is
+     *    one dp and the page lays out at the window's dp width — which [CarDisplayScaling] has
+     *    already placed inside the readable band on a car panel.
+     *
+     * This replaces an arithmetic attempt to force a fixed CSS width, whose percentage was a factor
+     * of the display density too small: `setInitialScale` takes the scale in percent, where 100 is
+     * one CSS pixel per *device* pixel, so dividing by a density-multiplied width asked a 1220px
+     * window for a ~3900 CSS px page and rendered everything at a third of the intended size.
+     */
+    private fun applyDesktopViewport(view: WebView = web) {
+        val desktop = BrowserUserAgentStore.mode(this) == BrowserUserAgentMode.DESKTOP
+        view.settings.useWideViewPort = desktop
+        view.settings.loadWithOverviewMode = desktop
+        view.setInitialScale(
+            if (desktop) 0 else (resources.displayMetrics.density * 100).toInt().coerceAtLeast(1)
+        )
     }
 
     private fun navigate(input: String) {
@@ -667,6 +706,7 @@ class BrowserActivity : Activity() {
                     if (desktop) BrowserUserAgentMode.MOBILE else BrowserUserAgentMode.DESKTOP
                 )
                 BrowserDefaults.configure(this, web)
+                applyDesktopViewport()
                 web.reload()
             }
             DrawerAction.BOOKMARK_PAGE -> bookmarkCurrentPage()

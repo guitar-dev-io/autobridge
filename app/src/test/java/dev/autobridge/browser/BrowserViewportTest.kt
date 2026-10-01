@@ -17,17 +17,52 @@ private val HEAD_UNITS = listOf(
 )
 
 class BrowserViewportTest {
-    @Test fun landscapeViewportDoesNotDependOnPhoneDensity() {
-        for (density in listOf(1f, 2f, 3.5f)) {
-            val viewport = BrowserViewport.create(800, 400, density, 1f)
-            assertEquals(800f, viewport.webWidth / density, 1f)
-            assertEquals(800f, viewport.webWidth * viewport.scale, 0.01f)
-            assertEquals(400f, viewport.webHeight * viewport.scale, 1f)
+    /**
+     * The WebView is exactly the size of the surface, so nothing is rasterised that is not shown.
+     * The CSS width the page sees is carried by [BrowserViewport.pageScalePercent] instead — the
+     * page is zoomed, not enlarged.
+     */
+    @Test fun thePageRastersOnePixelPerSurfacePixel() {
+        val viewport = BrowserViewport.create(800, 400, 1f)
+        assertEquals(800, viewport.webWidth)
+        assertEquals(400, viewport.webHeight)
+        assertEquals(1f, viewport.scale, 0.001f)
+        // 800 CSS px into an 800px view is 1:1 zoom; the page still lays out at 800 CSS px.
+        assertEquals(800, viewport.contentWidthDp)
+        assertEquals(100, viewport.pageScalePercent)
+    }
+
+    /** Desktop mode buys its wide layout with zoom, not with a bigger raster. */
+    @Test fun desktopWidthIsReachedByZoomingOutNotByEnlargingTheView() {
+        val viewport = BrowserViewport.create(800, 400, 1f, desktop = true)
+        assertEquals(BrowserViewport.DESKTOP_CONTENT_WIDTH_DP, viewport.contentWidthDp)
+        assertEquals(800, viewport.webWidth)
+        assertEquals(400, viewport.webHeight)
+        // 800 view px / 1280 CSS px = 62.5% -> 63% once rounded to whole percent.
+        assertEquals(63, viewport.pageScalePercent)
+    }
+
+    /**
+     * Regression for the failure this replaced: an 800x400 panel in desktop mode used to be laid
+     * out 3840x1920 (the CSS width times the *phone's* density), 23 times the pixels the surface
+     * shows, and Chromium refused to raster it - "tile memory limits exceeded, some content may
+     * not draw" - leaving the page half-painted.
+     */
+    @Test fun noPanelRastersMorePixelsThanItDisplays() {
+        HEAD_UNITS.forEach { (width, height, dpi) ->
+            for (desktop in listOf(false, true)) {
+                val viewport = BrowserViewport.create(width, height, dpi / 160f, desktop = desktop)
+                assertEquals(
+                    "${width}x$height@$dpi desktop=$desktop",
+                    width.toLong() * height,
+                    viewport.webWidth.toLong() * viewport.webHeight
+                )
+            }
         }
     }
 
     @Test fun insetPageAndTouchCoordinatesShareTheSameOriginAndScale() {
-        val viewport = BrowserViewport.create(1000, 600, 3f, 1f, 24, 80, 940, 580)
+        val viewport = BrowserViewport.create(1000, 600, 1f, 24, 80, 940, 580)
         assertFalse(viewport.contains(23f, 100f))
         assertFalse(viewport.contains(940f, 100f))
         val webX = 500f
@@ -40,7 +75,7 @@ class BrowserViewportTest {
     }
 
     @Test fun staleBoundsAfterResizeFallBackToTheSurface() {
-        val viewport = BrowserViewport.create(800, 400, 2f, 1f, 20, 80, 1000, 600)
+        val viewport = BrowserViewport.create(800, 400, 1f, 20, 80, 1000, 600)
         assertEquals(0, viewport.left)
         assertEquals(800, viewport.width)
         assertEquals(400, viewport.height)
@@ -54,9 +89,9 @@ class BrowserViewportTest {
     @Test fun pageSizeIsIndependentOfChromeState() {
         HEAD_UNITS.forEach { (width, height, dpi) ->
             val surfaceDensity = dpi / 160f
-            val viewport = BrowserViewport.create(width, height, 3f, surfaceDensity)
+            val viewport = BrowserViewport.create(width, height, surfaceDensity)
             // Whatever the chrome does, the same surface geometry yields the same page geometry.
-            val again = BrowserViewport.create(width, height, 3f, surfaceDensity)
+            val again = BrowserViewport.create(width, height, surfaceDensity)
             assertEquals("$width x $height @$dpi", viewport, again)
             assertEquals(height.toFloat(), viewport.webHeight * viewport.scale, 1.5f)
         }
@@ -65,24 +100,27 @@ class BrowserViewportTest {
     @Test fun contentWidthFollowsPanelDensityNotPixelCount() {
         // Same pixel width, different physical density: the denser panel asks for fewer CSS pixels
         // so text stays legible instead of shrinking with the panel's dpi.
-        val lowDpi = BrowserViewport.create(1280, 720, 3f, 1f)
-        val highDpi = BrowserViewport.create(1280, 720, 3f, 1.5f)
+        val lowDpi = BrowserViewport.create(1280, 720, 1f)
+        val highDpi = BrowserViewport.create(1280, 720, 1.5f)
         assertEquals(1280, lowDpi.contentWidthDp)
         assertEquals(853, highDpi.contentWidthDp)
         assertTrue(highDpi.contentWidthDp < lowDpi.contentWidthDp)
     }
 
     @Test fun contentWidthIsClampedToAReadableRange() {
-        val tiny = BrowserViewport.create(480, 320, 2f, 2f)
+        val tiny = BrowserViewport.create(480, 320, 2f)
         assertEquals(BrowserViewport.MIN_CONTENT_WIDTH_DP, tiny.contentWidthDp)
-        val huge = BrowserViewport.create(3840, 1080, 2f, 1f)
+        val huge = BrowserViewport.create(3840, 1080, 1f)
         assertEquals(BrowserViewport.MAX_CONTENT_WIDTH_DP, huge.contentWidthDp)
     }
 
     @Test fun invalidDensitiesFallBackInsteadOfProducingNaNGeometry() {
-        val viewport = BrowserViewport.create(1024, 600, Float.NaN, 0f)
-        assertTrue(viewport.scale.isFinite() && viewport.scale > 0f)
-        assertTrue(viewport.webWidth > 0 && viewport.webHeight > 0)
+        for (density in listOf(0f, Float.NaN, -1f, Float.POSITIVE_INFINITY)) {
+            val viewport = BrowserViewport.create(1024, 600, density)
+            assertTrue("density=$density", viewport.scale.isFinite() && viewport.scale > 0f)
+            assertTrue("density=$density", viewport.webWidth > 0 && viewport.webHeight > 0)
+            assertTrue("density=$density", viewport.pageScalePercent > 0)
+        }
     }
 }
 
@@ -139,7 +177,7 @@ class AutoUiSizesTest {
 class BrowserChromeLayoutTest {
     private fun layoutFor(width: Int, height: Int, dpi: Int): BrowserChromeLayout {
         val sizes = AutoUiSizes.forCarSurface(dpi)
-        val viewport = BrowserViewport.create(width, height, 3f, sizes.density)
+        val viewport = BrowserViewport.create(width, height, sizes.density)
         return BrowserChromeLayout.create(sizes, viewport)
     }
 
@@ -153,7 +191,7 @@ class BrowserChromeLayoutTest {
     @Test fun thePageTakesTheWholeSurfaceWhileControlsStayInsideTheStableArea() {
         // An observed head unit: 800x400 of surface, of which only 752x300 at (24,88) is stable.
         val sizes = AutoUiSizes.forCarSurface(160)
-        val viewport = BrowserViewport.create(800, 400, 2f, sizes.density)
+        val viewport = BrowserViewport.create(800, 400, sizes.density)
         val stable = Box(24f, 88f, 776f, 388f)
         val layout = BrowserChromeLayout.create(sizes, viewport, showMenuButton = true, chromeBounds = stable)
 
@@ -177,7 +215,7 @@ class BrowserChromeLayoutTest {
 
     @Test fun aHostThatReportsNoStableAreaGetsChromeOnTheWholePage() {
         val sizes = AutoUiSizes.forCarSurface(160)
-        val viewport = BrowserViewport.create(800, 400, 2f, sizes.density)
+        val viewport = BrowserViewport.create(800, 400, sizes.density)
         val unbounded = BrowserChromeLayout.create(sizes, viewport, showMenuButton = true)
         assertEquals(0f, unbounded.toolbar.left, 0.01f)
         assertEquals(0f, unbounded.toolbar.top, 0.01f)
@@ -252,7 +290,7 @@ class BrowserChromeLayoutTest {
     @Test fun floatingButtonStaysInsideTheViewportAndClearOfTheToolbar() {
         HEAD_UNITS.forEach { (width, height, dpi) ->
             val sizes = AutoUiSizes.forCarSurface(dpi)
-            val viewport = BrowserViewport.create(width, height, 3f, sizes.density)
+            val viewport = BrowserViewport.create(width, height, sizes.density)
             val layout = layoutFor(width, height, dpi)
             assertTrue(layout.fab.left >= viewport.left.toFloat())
             assertTrue(layout.fab.right <= viewport.left + viewport.width.toFloat())
@@ -271,7 +309,7 @@ class BrowserChromeLayoutTest {
         HEAD_UNITS.forEach { (width, height, dpi) ->
             val layout = BrowserChromeLayout.create(
                 AutoUiSizes.forCarSurface(dpi),
-                BrowserViewport.create(width, height, 3f, AutoUiSizes.forCarSurface(dpi).density)
+                BrowserViewport.create(width, height, AutoUiSizes.forCarSurface(dpi).density)
             )
             val x = layout.fab.centerX
             val y = layout.fab.centerY
@@ -315,7 +353,7 @@ class BrowserChromeLayoutTest {
 
     @Test fun layoutHonoursAnInsetStableArea() {
         val sizes = AutoUiSizes.forCarSurface(160)
-        val viewport = BrowserViewport.create(1024, 600, 3f, sizes.density, 40, 20, 984, 580)
+        val viewport = BrowserViewport.create(1024, 600, sizes.density, 40, 20, 984, 580)
         val layout = BrowserChromeLayout.create(sizes, viewport)
         assertEquals(40f, layout.toolbar.left, 0.01f)
         assertEquals(20f, layout.toolbar.top, 0.01f)
@@ -525,7 +563,7 @@ class BrowserDrawerModelTest {
         state: BrowserMenuState = this.state,
     ): BrowserDrawerModel {
         val sizes = AutoUiSizes.forCarSurface(dpi)
-        val viewport = BrowserViewport.create(width, height, 3f, sizes.density)
+        val viewport = BrowserViewport.create(width, height, sizes.density)
         return BrowserDrawerModel.create(sizes, viewport, state, more, scroll)
     }
 
@@ -599,7 +637,7 @@ class BrowserDrawerModelTest {
     @Test fun theSheetStartsBelowTheToolbarSoItsHeaderIsNeverPaintedOver() {
         HEAD_UNITS.forEach { (width, height, dpi) ->
             val sizes = AutoUiSizes.forCarSurface(dpi)
-            val viewport = BrowserViewport.create(width, height, 3f, sizes.density)
+            val viewport = BrowserViewport.create(width, height, sizes.density)
             val toolbar = BrowserChromeLayout.create(sizes, viewport).toolbar
             val model = modelFor(width, height, dpi)
             assertTrue(
@@ -614,7 +652,7 @@ class BrowserDrawerModelTest {
     @Test fun theSheetOverlaysRatherThanShrinkingTheViewport() {
         HEAD_UNITS.forEach { (width, height, dpi) ->
             val sizes = AutoUiSizes.forCarSurface(dpi)
-            val viewport = BrowserViewport.create(width, height, 3f, sizes.density)
+            val viewport = BrowserViewport.create(width, height, sizes.density)
             val model = modelFor(width, height, dpi)
             // The sheet sits inside the same viewport; the page geometry is untouched by it.
             assertTrue(model.panel.left >= viewport.left.toFloat())
