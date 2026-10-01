@@ -7,65 +7,103 @@ import android.graphics.Color
  * and the car [CarWebRenderer] (Canvas-drawn chrome), so both presentations read as one app the way
  * a Fermata-style browser keeps its toolbar/menu look consistent across screens.
  *
+ * The values are a Material 3 **dark** colour scheme generated from a blue seed (the app's
+ * `#4C7DF0` accent), using the M3 role names in the comments: surfaces are the tonal
+ * `surfaceContainer*` ladder rather than ad-hoc greys, the accent is `primary`, and filled controls
+ * use `primaryContainer` / `secondaryContainer`. A car display is always treated as dark here —
+ * Android Auto runs its own UI dark at night and most of the day, and a light page chrome over a
+ * dark host frame reads as a hole in the dashboard.
+ *
  * Sizing deliberately lives in [AutoUiSizes], not here. This object used to also expose a
  * `chromeScale(shortestWidthDp)` that grew icons with the screen's *dimension*, which is what made
  * a wide head unit render toolbar glyphs at tablet size.
  */
 object BrowserTheme {
-    val background = Color.rgb(20, 22, 26)
-    val toolbarBackground = Color.rgb(20, 22, 26)
-    val addressPillBackground = Color.rgb(38, 41, 48)
-    val iconEnabled = Color.WHITE
-    val iconDisabled = Color.rgb(100, 108, 120)
-    val textPrimary = Color.WHITE
-    val textSecondary = Color.rgb(200, 206, 214)
-    val accent = Color.rgb(32, 156, 255)
-    val secureBadge = Color.rgb(120, 200, 130)
-    val insecureBadge = Color.rgb(230, 170, 90)
-    val errorBackground = Color.rgb(28, 20, 20)
-    val errorAccent = Color.rgb(230, 100, 90)
+    // ---------------------------------------------------------------- M3 roles (dark scheme)
+    val primary = Color.rgb(0xAA, 0xC7, 0xFF)
+    val onPrimary = Color.rgb(0x0A, 0x30, 0x5F)
+    val primaryContainer = Color.rgb(0x28, 0x47, 0x77)
+    val onPrimaryContainer = Color.rgb(0xD6, 0xE3, 0xFF)
+    val secondaryContainer = Color.rgb(0x3E, 0x47, 0x59)
+    val onSecondaryContainer = Color.rgb(0xDA, 0xE2, 0xF9)
+    val surface = Color.rgb(0x11, 0x13, 0x18)
+    val surfaceContainerLowest = Color.rgb(0x0C, 0x0E, 0x13)
+    val surfaceContainerLow = Color.rgb(0x19, 0x1C, 0x20)
+    val surfaceContainer = Color.rgb(0x1D, 0x20, 0x24)
+    val surfaceContainerHigh = Color.rgb(0x28, 0x2A, 0x2F)
+    val surfaceContainerHighest = Color.rgb(0x33, 0x35, 0x3A)
+    val onSurface = Color.rgb(0xE2, 0xE2, 0xE9)
+    val onSurfaceVariant = Color.rgb(0xC4, 0xC6, 0xD0)
+    val outline = Color.rgb(0x8E, 0x90, 0x99)
+    val outlineVariant = Color.rgb(0x44, 0x47, 0x4E)
+    val error = Color.rgb(0xFF, 0xB4, 0xAB)
 
-    /** Drawer panel and the dimming layer it sits on. */
-    val drawerBackground = Color.rgb(16, 18, 22)
-    val scrim = Color.argb(140, 0, 0, 0)
+    // ---------------------------------------------------------------- browser chrome
+    val background = surface
+    val toolbarBackground = surfaceContainer
+    val addressPillBackground = surfaceContainerHighest
+    val iconEnabled = onSurface
+
+    /** onSurface at the M3 disabled opacity (38%), pre-blended so it stays opaque on any surface. */
+    val iconDisabled = Color.rgb(0x68, 0x6A, 0x6F)
+    val textPrimary = onSurface
+    val textSecondary = onSurfaceVariant
+    val accent = primary
+
+    /** Tone-80 green / amber: M3 has no success role, so these sit at the same tone as primary. */
+    val secureBadge = Color.rgb(0x9C, 0xD6, 0x7D)
+    val insecureBadge = Color.rgb(0xF3, 0xBD, 0x6E)
+    val errorBackground = surface
+    val errorAccent = error
+
+    /** M3 FAB: primaryContainer with onPrimaryContainer content. */
+    val fabContainer = primaryContainer
+    val onFabContainer = onPrimaryContainer
+
+    /** Tab switcher backdrop. */
+    val drawerBackground = surfaceContainerLow
+
+    /** M3 scrim is black at 32%. */
+    val scrim = Color.argb(82, 0, 0, 0)
 
     // ---------------------------------------------------------------- menu sheet
     // Three separate surfaces, because the sheet is three levels deep: the sheet itself, the cards
-    // grouping related actions on it, and the tiles on those cards. The previous menu drew the
-    // panel and its tiles one RGB step apart, so the tiles had no visible edge and the grouping was
-    // invisible; a control the user cannot see the boundary of is one they aim at by memory.
+    // grouping related actions on it, and the tiles on those cards. Each sits one step up the
+    // surfaceContainer ladder, and the tiles are tonal (secondaryContainer) buttons, so every
+    // pressable thing has a visible edge.
 
-    /** The sheet's own background, one step above the page it floats over. */
-    val sheetBackground = Color.rgb(26, 29, 35)
+    /** M3 bottom sheets use surfaceContainerLow. */
+    val sheetBackground = surfaceContainerLow
 
-    /** A card grouping related tiles: recessed, so the tiles on it read as raised. */
-    val sheetCardBackground = Color.rgb(17, 19, 23)
+    /** A card grouping related tiles. */
+    val sheetCardBackground = surfaceContainerHigh
 
-    /** A tile: the only raised surface on the sheet, and the only thing meant to be pressed. */
-    val tileBackground = Color.rgb(69, 75, 92)
+    /** A tile: an M3 filled-tonal button. */
+    val tileBackground = secondaryContainer
 
-    /** A tile whose action is unavailable — Back with no history. Dimmed, never hidden. */
-    val tileDisabledBackground = Color.rgb(46, 50, 60)
+    /** onSurface at 12% over the card — the M3 disabled container treatment. */
+    val tileDisabledBackground = Color.rgb(0x3E, 0x40, 0x45)
 
     /** Hairline above the footer, the one rule the sheet draws. */
-    val hairline = Color.rgb(48, 52, 62)
+    val hairline = outlineVariant
 
-    val toggleTrackOn = Color.rgb(74, 92, 210)
-    val toggleTrackOff = Color.rgb(64, 69, 80)
-    val toggleKnob = Color.rgb(198, 204, 245)
+    /** M3 switch: primary track + onPrimary handle when on; outline handle on a dim track when off. */
+    val toggleTrackOn = primary
+    val toggleTrackOff = surfaceContainerHighest
+    val toggleKnob = onPrimary
+    val toggleKnobOff = outline
 
     // ---------------------------------------------------------------- tile icon chip
     // A tile's glyph sits in its own rounded "chip" a shade lighter than the tile, so the icon
     // reads as an object on the button rather than text printed on it. This is the phone sheet's
-    // own detail — the car surface keeps its flat Canvas tiles — and it is what gives the two
-    // presentations a family resemblance without either being a copy of the other.
+    // own detail — the car surface keeps its flat Canvas tiles.
 
     /** The rounded background behind a tile's glyph on an enabled tile. */
-    val tileIconChip = Color.rgb(90, 98, 120)
+    val tileIconChip = Color.rgb(0x55, 0x5F, 0x73)
 
     /** A thin accent edge down the primary (navigation) card, marking it as the first thing read. */
-    val primaryCardAccent = Color.rgb(32, 156, 255)
+    val primaryCardAccent = primary
 
-    /** The glyph chip on the primary card picks up a hint of the accent to match its edge. */
-    val primaryTileIconChip = Color.rgb(46, 86, 132)
+    /** The glyph chip on the primary card picks up the accent to match its edge. */
+    val primaryTileIconChip = primaryContainer
 }

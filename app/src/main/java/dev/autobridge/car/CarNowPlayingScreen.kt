@@ -71,7 +71,7 @@ class CarNowPlayingScreen(carContext: CarContext) : Screen(carContext) {
             .addAction(
                 Action.Builder()
                     .setTitle(if (playing) "Pause" else "Play")
-                    .setBackgroundColor(CarColor.GREEN)
+                    .setBackgroundColor(CarColor.PRIMARY)
                     .setEnabled(connected)
                     .setOnClickListener {
                         if (mediaPlayback.isPlaying) {

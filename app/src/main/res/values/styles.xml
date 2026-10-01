@@ -7,7 +7,16 @@
         <item name="android:colorAccent">#4C7DF0</item>
     </style>
 
+    <!--
+        Material 3 brand colours for host-drawn templates (CarColor.PRIMARY / SECONDARY: buttons,
+        toggles, accents). Same blue seed as BrowserTheme. The host checks contrast and falls back
+        to its own default if a colour is unreadable on its background.
+    -->
     <style name="CarAppTheme">
         <item name="carPermissionActivityLayout">@layout/car_permission_background</item>
+        <item name="carColorPrimary">#415F91</item>
+        <item name="carColorPrimaryDark">#AAC7FF</item>
+        <item name="carColorSecondary">#565F71</item>
+        <item name="carColorSecondaryDark">#BEC6DC</item>
     </style>
 </resources>

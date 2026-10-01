@@ -301,6 +301,25 @@ class BrowserChromeLayoutTest {
         }
     }
 
+    /** The left-side setting mirrors the button into the bottom-left corner, same size and height. */
+    @Test fun theFloatingButtonCanSitOnTheLeft() {
+        HEAD_UNITS.forEach { (width, height, dpi) ->
+            val sizes = AutoUiSizes.forCarSurface(dpi)
+            val viewport = BrowserViewport.create(width, height, sizes.density)
+            val right = BrowserChromeLayout.create(sizes, viewport)
+            val left = BrowserChromeLayout.create(sizes, viewport, fabOnLeft = true)
+            assertTrue(left.fab.centerX < viewport.left + viewport.width / 2f)
+            assertTrue(right.fab.centerX > viewport.left + viewport.width / 2f)
+            assertTrue(left.fab.left >= viewport.left.toFloat())
+            assertEquals(right.fab.width, left.fab.width, 0.01f)
+            assertEquals(right.fab.bottom, left.fab.bottom, 0.01f)
+            assertEquals(
+                ChromeZone.FAB,
+                left.hitTest(left.fab.centerX, left.fab.centerY, chromeVisible = false, drawer = null)
+            )
+        }
+    }
+
     /**
      * A faded-out floating button must stop taking taps. Drawing and hit testing read the same
      * flag, so an invisible button cannot sit there swallowing presses meant for the page.

@@ -48,7 +48,7 @@ class CarVideoDisclaimerScreen(
             .addAction(
                 Action.Builder()
                     .setTitle("I understand, continue")
-                    .setBackgroundColor(CarColor.BLUE)
+                    .setBackgroundColor(CarColor.PRIMARY)
                     .setOnClickListener { accept() }
                     .build()
             )

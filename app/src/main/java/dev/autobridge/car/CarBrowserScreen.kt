@@ -348,7 +348,10 @@ class CarBrowserScreen(carContext: CarContext) :
         dev.autobridge.display.StructuredLog.i(
             TAG, "surface ${surfaceWidth}x$surfaceHeight dpi=$surfaceDpi allowed=$permitted"
         )
-        if (permitted) renderer.start(surface, surfaceWidth, surfaceHeight, surfaceDpi)
+        if (!permitted) return
+        // The renderer turns this surface into the sink of its own VirtualDisplay (HARDWARE mode),
+        // so the page and its video are composited by the system rather than drawn on a Canvas.
+        renderer.start(surface, surfaceWidth, surfaceHeight, surfaceDpi)
     }
 
     override fun onSurfaceDestroyed(surfaceContainer: SurfaceContainer) {

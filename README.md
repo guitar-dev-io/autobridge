@@ -1,4 +1,4 @@
-**Version:** `0.4.4` &nbsp;·&nbsp; **Build (versionCode):** `18`
+**Version:** `0.4.5` &nbsp;·&nbsp; **Build (versionCode):** `19`
 
 AutoBridge is a personal/development Android project for experimenting with a parked-only phone-to-Android-Auto surface bridge. It is an independent codebase, not a merge of the reference projects listed in [`docs/REFERENCE_PROJECTS.md`](docs/REFERENCE_PROJECTS.md).
 
@@ -120,7 +120,7 @@ Upload this file in Play Console:
 app/build/outputs/bundle/personalRelease/app-personal-release.aab
 ```
 
-The bundle is signed with the AutoBridge release keystore and contains `dev.autobridge`, version `0.4.4`, and `versionCode 18`. Increment `versionCode` for every later upload; keep the same keystore for updates. Start with Internal testing/App Sharing before attempting production release. The current Android Auto surface is a development/personal-use POC using a `NavigationTemplate` for mirroring, so Play/Android Auto policy approval is not guaranteed.
+The bundle is signed with the AutoBridge release keystore and contains `dev.autobridge`, version `0.4.5`, and `versionCode 19`. Increment `versionCode` for every later upload; keep the same keystore for updates. Start with Internal testing/App Sharing before attempting production release. The current Android Auto surface is a development/personal-use POC using a `NavigationTemplate` for mirroring, so Play/Android Auto policy approval is not guaranteed.
 
 ## Development flow
 
@@ -207,3 +207,15 @@ For ownership and lifecycle details see [`docs/ARCHITECTURE.md`](docs/ARCHITECTU
 - [`docs/FORD_TEST.md`](docs/FORD_TEST.md) — DHU/Ford safety checklist
 - [`docs/CARVIEW_PARITY.md`](docs/CARVIEW_PARITY.md) — product-reference comparison
 - [`docs/PROGRESS.md`](docs/PROGRESS.md) — current verification record
+
+
+
+
+adb install -r app-debug.apk
+
+# force stop app เรา
+adb shell am force-stop YOUR.PACKAGE.NAME
+
+# restart Android Auto
+adb shell am force-stop com.google.android.projection.gearhead
+adb shell monkey -p com.google.android.projection.gearhead 1

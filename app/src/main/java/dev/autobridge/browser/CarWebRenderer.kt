@@ -47,6 +47,24 @@ import kotlin.math.roundToInt
  * dispatched straight into the WebView, so this does NOT depend on MediaProjection mirroring or an
  * accessibility/Shizuku input backend.
  *
+ * ## The WebView still needs a window
+ *
+ * Off-screen is not the same as windowless, and Chromium charges dearly for the difference. Its
+ * tile budget comes from `BrowserViewRenderer::ComputeTileRectAndUpdateMemoryPolicy`, which opens
+ * `if (!hardware_enabled_) { compositor_->SetMemoryPolicy(0u); return; }`, and `hardware_enabled_`
+ * is set only by `OnDrawHardware()` — the draw pass a real window performs. A WebView in no window
+ * therefore rasters on **zero bytes** of tile memory: `cc` forces through the little a draw
+ * strictly requires, drops the rest, and logs `tile memory limits exceeded, some content may not
+ * draw` for every frame. A light page survives it; a heavy one composites down to its root
+ * background colour.
+ *
+ * That is the bug this cost: m.youtube.com came out as a flat black panel on the head unit (dark
+ * theme, so the background it fell back to was near-black) while ordinary pages showed as blank
+ * white bands. The two symptoms look unrelated and both were previously chased as raster *speed*.
+ *
+ * [OffscreenWebViewWindow] fixes it by hosting the same WebView in a window no one can see, while
+ * everything below carries on drawing it to the car surface exactly as before.
+ *
  * ## Layout contract
  *
  * The page is laid out **once per surface geometry change** and never re-measured for a UI state
@@ -66,8 +84,9 @@ import kotlin.math.roundToInt
  * width and only completed once the user scrolled.
  *
  * Known platform limits (documented, not a bug): software-canvas capture of a WebView cannot show
- * fully hardware-accelerated composited layers (some DRM video/WebGL). This mirrors the same
- * constraint AA-Browser-style projects hit and cannot be verified from this host.
+ * fully hardware-accelerated composited layers (some DRM video/WebGL). Hosting the view in a
+ * window ([OffscreenWebViewWindow]) restores its tile budget, which is what makes ordinary page
+ * content appear; it does not make this a hardware *presentation* path, so that limit stands.
  *
  * [BrowserDefaults.grantProtectedMediaPermission] and [FullscreenVideoController] give the
  * phone-hosted, hardware-composited WebViews ([BrowserActivity], [dev.autobridge.entertainment.EntertainmentActivity])
@@ -79,6 +98,16 @@ class CarWebRenderer(context: Context) {
     private companion object {
         const val TAG = "AutoBridgeCarWeb"
         const val FRAME_INTERVAL_MS = 33L // ~30fps repaint pump
+
+        /** M3 FAB corner: 16dp on a 56dp button. */
+        const val FAB_CORNER_FRACTION = 16f / 56f
+
+        /**
+         * Immersive fullscreen: the floating button stays this long after the last touch, then
+         * fades out over [FULLSCREEN_FAB_FADE_MS]. Any tap or scroll brings it back.
+         */
+        const val FULLSCREEN_FAB_IDLE_MS = 3_000L
+        const val FULLSCREEN_FAB_FADE_MS = 250L
         const val DEFAULT_HOME = BrowserDefaults.HOME
 
         /** Per-frame velocity decay for the synthetic fling; ~0.92 reads as a natural glide. */
@@ -154,6 +183,34 @@ class CarWebRenderer(context: Context) {
     var host: Host? = null
 
     private var webView: ScrollableWebView? = null
+
+    /**
+     * The off-screen window that gives [webView] a non-zero tile budget. See
+     * [OffscreenWebViewWindow] — without it Chromium rasters almost nothing for a view that is in
+     * no window, and a heavy page comes out as its background colour and nothing else.
+     */
+    private var rasterHost: OffscreenWebViewWindow? = null
+
+    /**
+     * Whether hosting has already been tried. A platform that refuses once will refuse again, and
+     * retrying on every geometry change would log the same warning for the life of the session.
+     */
+    private var rasterHostAttempted = false
+
+    /**
+     * Requested render path. [CarBrowserRenderMode.HARDWARE] unless the rollback preference says
+     * otherwise; [activeMode] drops to legacy for the session if the hardware window cannot be made.
+     */
+    private val requestedMode: CarBrowserRenderMode = CarBrowserRenderMode.current(appContext)
+    private var activeMode: CarBrowserRenderMode = requestedMode
+
+    /** The real window on a VirtualDisplay backed by the car surface. Null in legacy mode. */
+    private var hardwareWindow: CarHardwareWebWindow? = null
+
+    private val hardwareMode: Boolean get() = activeMode == CarBrowserRenderMode.HARDWARE
+
+    /** True while a page video (or any element) is in Chromium fullscreen on the car display. */
+    val isVideoFullscreen: Boolean get() = hardwareWindow?.fullscreen?.isShowing == true
     private var surface: Surface? = null
     private var surfaceWidth = 0
     private var surfaceHeight = 0
@@ -288,6 +345,7 @@ class CarWebRenderer(context: Context) {
      */
     private var hideUrlBar: Boolean = false
     private var fabAction: FloatingButtonAction = FloatingButtonAction.MENU
+    private var fabOnLeft: Boolean = false
 
     private val frameRunnable = object : Runnable {
         override fun run() {
@@ -302,7 +360,7 @@ class CarWebRenderer(context: Context) {
         }
     }
 
-    val canGoBack: Boolean get() = webView?.canGoBack() == true
+    val canGoBack: Boolean get() = isVideoFullscreen || webView?.canGoBack() == true
     val canGoForward: Boolean get() = webView?.canGoForward() == true
     val url: String get() = webView?.url ?: currentUrl
     val title: String? get() = webView?.title
@@ -352,7 +410,11 @@ class CarWebRenderer(context: Context) {
      */
     fun setFullscreen(enabled: Boolean) = runOnMain {
         if (visibility.fullscreen == enabled) return@runOnMain
-        visibility.setFullscreen(SystemClock.uptimeMillis(), enabled)
+        val now = SystemClock.uptimeMillis()
+        // Show the floating button for one idle window on entry, so the way out is visible
+        // before it fades.
+        lastInputMs = now
+        visibility.setFullscreen(now, enabled)
         trace(ViewportDebug.Event.FULLSCREEN, "enabled=$enabled")
         host?.onBrowserStateChanged()
     }
@@ -391,10 +453,6 @@ class CarWebRenderer(context: Context) {
             BrowserUserAgentMode.DESKTOP
         }
         BrowserUserAgentStore.select(context, next)
-        // Desktop mode also widens the page's CSS viewport (see BrowserViewport.desktop), so the
-        // page must be re-measured, not just reloaded — a UA change alone leaves modern sites on
-        // their mobile layout. Re-layout first so the reload lands at the new width.
-        layoutWebView(surfaceWidth, surfaceHeight, ViewportDebug.Event.STABLE_AREA)
         applyUserAgentAndReload()
     }
 
@@ -413,6 +471,8 @@ class CarWebRenderer(context: Context) {
                 restoreTabs()
             }
             webView?.onResume()
+            AutoBridgeVideoLog.surface("available", surface, width, height, dpi)
+            if (hardwareMode) attachHardwareWindow(surface, width, height)
             layoutWebView(width, height, ViewportDebug.Event.SURFACE_AVAILABLE)
             running = true
             // Give the user the full idle window from the moment the browser appears.
@@ -425,6 +485,12 @@ class CarWebRenderer(context: Context) {
             when {
                 startUrl != null -> load(startUrl)
                 firstStart -> load(tabs.active?.url ?: currentUrl)
+                // The mode was changed while this surface was away (phone browser, agent command,
+                // a screen pushed on top): the kept page still has the old identity and width.
+                identityKey() != appliedIdentity -> {
+                    Log.i(TAG, "Browser identity changed while detached; re-applying")
+                    applyUserAgentAndReload()
+                }
                 else -> Log.i(TAG, "Surface re-attached ${width}x$height, keeping current page")
             }
             // Hold focus while this surface is live, so page audio participates in ducking and
@@ -448,6 +514,9 @@ class CarWebRenderer(context: Context) {
             surfaceWidth = width
             surfaceHeight = height
             if (dpi > 0) surfaceDpi = dpi
+            AutoBridgeVideoLog.surface("resized", surface, width, height, dpi)
+            val activeSurface = surface
+            if (hardwareMode && activeSurface != null) attachHardwareWindow(activeSurface, width, height)
             layoutWebView(width, height, ViewportDebug.Event.SURFACE_RESIZED)
         }
     }
@@ -467,6 +536,11 @@ class CarWebRenderer(context: Context) {
                 }
             }
             mainHandler.removeCallbacks(frameRunnable)
+            AutoBridgeVideoLog.surface("destroyed", surface, surfaceWidth, surfaceHeight, surfaceDpi)
+            // The host is taking its surface back. The display is pointed at nothing rather than
+            // released, so the window and the WebView in it (page, playback, fullscreen) survive
+            // until the next surface arrives — a pushed template or a DHU reconnect.
+            hardwareWindow?.setSurface(null)
             surface = null
             saveActiveTabState()
             BrowserTabStore.save(appContext, tabs)
@@ -490,6 +564,12 @@ class CarWebRenderer(context: Context) {
             surface = null
             saveActiveTabState()
             BrowserTabStore.save(appContext, tabs)
+            // Released before the WebView, so the view is out of the window before it is destroyed.
+            rasterHost?.release()
+            rasterHost = null
+            rasterHostAttempted = false
+            hardwareWindow?.release()
+            hardwareWindow = null
             webView?.apply {
                 stopLoading()
                 destroy()
@@ -507,6 +587,12 @@ class CarWebRenderer(context: Context) {
     /** Loads a validated HTTPS URL or turns free text into a Google search. */
     fun load(input: String) {
         runOnMain {
+            // The non-DRM MP4 test page (TEST 3 of the video matrix), reachable from the car's
+            // address input by typing "videodiag".
+            if (WebVideoDiagnostics.isSentinel(input)) {
+                webView?.let(WebVideoDiagnostics::loadTestPage)
+                return@runOnMain
+            }
             val target = BrowserDefaults.resolve(input)
             currentUrl = target
             loadError = null
@@ -524,21 +610,45 @@ class CarWebRenderer(context: Context) {
         webView?.reload()
     }
 
-    fun goBack() = runOnMain { webView?.let { if (it.canGoBack()) it.goBack() } }
+    /** Back leaves video fullscreen first, exactly like the phone browser, then walks history. */
+    fun goBack() = runOnMain {
+        if (hardwareWindow?.fullscreen?.onBackPressed() == true) {
+            AutoBridgeVideoLog.i("fullscreen exit via back")
+            return@runOnMain
+        }
+        webView?.let { if (it.canGoBack()) it.goBack() }
+    }
     fun goForward() = runOnMain { webView?.let { if (it.canGoForward()) it.goForward() } }
     fun reload() = runOnMain { webView?.reload() }
     fun stopLoading() = runOnMain { webView?.stopLoading(); loadingProgress = 100 }
     fun goHome() = runOnMain { load(DEFAULT_HOME) }
 
+    /**
+     * Applies the persisted browser identity (Mobile / Desktop / Custom) to the live page. Every
+     * entry point — the drawer switch, the settings screen, remote and agent commands — goes through
+     * here, so none of them can apply only part of desktop mode.
+     *
+     *  1. Re-layout: desktop mode pins the CSS viewport to [BrowserViewport.DESKTOP_CONTENT_WIDTH_DP]
+     *     through `setInitialScale`, so the page has to be re-measured, not just reloaded.
+     *  2. UA string, client hints and the page-side script ([BrowserDefaults.applyIdentity]). The
+     *     hints used to be set only when the WebView was created, so they kept saying "mobile"
+     *     after a toggle.
+     *  3. Always reload. The new initial scale and document-start script only apply to a fresh
+     *     load, and the UA string can be unchanged (sign-in host, Custom) while the scale moved.
+     */
     fun applyUserAgentAndReload() = runOnMain {
         val view = webView ?: return@runOnMain
-        val mobileDefault = WebSettings.getDefaultUserAgent(appContext)
-        val selected = BrowserUserAgentStore.resolveForUrl(appContext, view.url ?: currentUrl, mobileDefault)
-        if (view.settings.userAgentString != selected) {
-            view.settings.userAgentString = selected
-            view.reload()
-        }
+        layoutWebView(surfaceWidth, surfaceHeight, ViewportDebug.Event.STABLE_AREA)
+        BrowserDefaults.applyIdentity(appContext, view, view.url ?: currentUrl)
+        appliedIdentity = identityKey()
+        view.reload()
     }
+
+    /** The identity [applyUserAgentAndReload] last pushed to the WebView. */
+    private var appliedIdentity: String = ""
+
+    private fun identityKey(): String =
+        BrowserUserAgentStore.mode(appContext).name + "|" + BrowserUserAgentStore.custom(appContext)
 
     /**
      * Aligns the WebView's User-Agent with [url] before it loads. Sign-in origins force the mobile
@@ -548,11 +658,7 @@ class CarWebRenderer(context: Context) {
      */
     private fun syncUserAgentFor(url: String) {
         val view = webView ?: return
-        val mobileDefault = WebSettings.getDefaultUserAgent(appContext)
-        val wanted = BrowserUserAgentStore.resolveForUrl(appContext, url, mobileDefault)
-        if (view.settings.userAgentString != wanted) {
-            view.settings.userAgentString = wanted
-        }
+        BrowserDefaults.applyIdentity(appContext, view, url)
     }
 
     // ------------------------------------------------------------------ tabs
@@ -812,6 +918,9 @@ class CarWebRenderer(context: Context) {
         // down and the edge/handle bands are treated as page taps below.
         val chromeVisible = !hideUrlBar && visibility.isShown
         val zone = chrome.hitTest(x, y, chromeVisible, null, fabVisible(now))
+        // Recorded after the hit test, so a tap where a faded fullscreen FAB used to be reaches
+        // the page and only wakes the button, instead of pressing it unseen.
+        lastInputMs = now
         if (ViewportDebug.enabled) {
             Log.i(
                 TAG,
@@ -855,9 +964,21 @@ class CarWebRenderer(context: Context) {
     }
 
     private fun dispatchPageTap(x: Float, y: Float) {
+        val now = SystemClock.uptimeMillis()
+        // While Chromium is fullscreen the page content lives in the custom view, which covers the
+        // whole display at (0,0), so surface coordinates are already its coordinates.
+        val fullscreenView = hardwareWindow?.fullscreen?.container
+        if (fullscreenView != null) {
+            val down = MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, x, y, 0)
+            val up = MotionEvent.obtain(now, now + 20, MotionEvent.ACTION_UP, x, y, 0)
+            fullscreenView.dispatchTouchEvent(down)
+            fullscreenView.dispatchTouchEvent(up)
+            down.recycle()
+            up.recycle()
+            return
+        }
         val view = webView ?: return
         if (!viewport.contains(x, y)) return
-        val now = SystemClock.uptimeMillis()
         val webX = viewport.toWebX(x)
         val webY = viewport.toWebY(y)
         val down = MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, webX, webY, 0)
@@ -874,6 +995,9 @@ class CarWebRenderer(context: Context) {
      */
     private fun scrollPageBy(dx: Int, dy: Int): Boolean {
         val view = webView ?: return false
+        // The page underneath a fullscreen video is not on screen; scrolling it would only move
+        // the position the user returns to.
+        if (isVideoFullscreen) return false
         val nextX = PageScroll.clamp(view.scrollX, dx, view.maxScrollX)
         val nextY = PageScroll.clamp(view.scrollY, dy, view.maxScrollY)
         if (nextX == view.scrollX && nextY == view.scrollY) return false
@@ -901,6 +1025,7 @@ class CarWebRenderer(context: Context) {
     /** Scrolls the page content, or the open overlay, by the given car-surface delta. */
     fun scrollBy(distanceX: Float, distanceY: Float) = runOnMain {
         val now = SystemClock.uptimeMillis()
+        lastInputMs = now
         visibility.onInteraction(now)
         if (overlay == Overlay.DRAWER || overlay == Overlay.DRAWER_MORE) {
             val model = drawer ?: return@runOnMain
@@ -920,7 +1045,8 @@ class CarWebRenderer(context: Context) {
      */
     fun fling(velocityX: Float, velocityY: Float) = runOnMain {
         if (overlay != Overlay.NONE) return@runOnMain
-        visibility.onInteraction(SystemClock.uptimeMillis())
+        lastInputMs = SystemClock.uptimeMillis()
+        visibility.onInteraction(lastInputMs)
         flingX = -velocityX / 60f
         flingY = -velocityY / 60f
     }
@@ -951,6 +1077,7 @@ class CarWebRenderer(context: Context) {
     fun scaleBy(factor: Float) = runOnMain {
         if (overlay != Overlay.NONE) return@runOnMain
         if (!factor.isFinite() || factor <= 0f) return@runOnMain
+        lastInputMs = SystemClock.uptimeMillis()
         webView?.zoomBy(factor.coerceIn(0.8f, 1.25f))
     }
 
@@ -974,6 +1101,7 @@ class CarWebRenderer(context: Context) {
         if (hideBar) visibility.hide(now)
         alwaysShowFab = BrowserControlsStore.alwaysShowFloatingButton(appContext)
         fabAction = BrowserControlsStore.floatingButtonAction(appContext)
+        fabOnLeft = BrowserControlsStore.floatingButtonOnLeft(appContext)
         // A change to whether a bar reserves space (pinned) or the surface is whole (hidden/auto)
         // changes how much of the surface the page may use, so re-measure the page when it flips.
         val insetChanged = pinToolbar != alwaysShowUrlBar || hideBar != hideUrlBar
@@ -984,13 +1112,31 @@ class CarWebRenderer(context: Context) {
         } else {
             // The toolbar's own ☰ only appears once the floating button stops being the menu's fixed
             // entry point, so a change made in settings has to be reflected in the chrome immediately.
-            chrome = BrowserChromeLayout.create(sizes, viewport, showToolbarMenuButton(), chromeBounds)
+            chrome = BrowserChromeLayout.create(sizes, viewport, showToolbarMenuButton(), chromeBounds, fabOnLeft)
         }
     }
 
     /** Whether the floating button is drawn right now; hit testing asks the same question. */
     private fun fabVisible(nowMs: Long): Boolean =
-        overlay == Overlay.NONE && (alwaysShowFab || visibility.isRendered(nowMs))
+        overlay == Overlay.NONE && fabAlpha(nowMs) > 0.01f
+
+    /**
+     * The floating button's opacity. Outside fullscreen it is always lit (the default) or follows
+     * the toolbar fade. In fullscreen it is immersive: lit right after any touch, then fading out
+     * after [FULLSCREEN_FAB_IDLE_MS], so a video or page is left with nothing over it. The tap that
+     * brings it back goes to the page as usual — the button only takes taps while it is drawn.
+     */
+    private fun fabAlpha(nowMs: Long): Float {
+        if (visibility.fullscreen) {
+            val idle = nowMs - lastInputMs
+            if (idle < FULLSCREEN_FAB_IDLE_MS) return 1f
+            return (1f - (idle - FULLSCREEN_FAB_IDLE_MS).toFloat() / FULLSCREEN_FAB_FADE_MS).coerceIn(0f, 1f)
+        }
+        return if (alwaysShowFab) 1f else visibility.alphaAt(nowMs)
+    }
+
+    /** Uptime of the last tap/scroll/fling/pinch on the car surface; drives the fullscreen FAB. */
+    private var lastInputMs: Long = 0L
 
     /**
      * Whether the toolbar draws its own ☰ button, alongside the floating button.
@@ -1100,6 +1246,7 @@ class CarWebRenderer(context: Context) {
                 target?.showMessage(if (added) "บันทึกบุ๊กมาร์กแล้ว" else "บันทึกไม่สำเร็จ")
             }
             DrawerAction.TOGGLE_DESKTOP -> toggleDesktopMode(appContext)
+            DrawerAction.TOGGLE_FULLSCREEN -> toggleFullscreen()
             DrawerAction.ZOOM_IN -> zoomIn()
             DrawerAction.ZOOM_OUT -> zoomOut()
             DrawerAction.RELOAD -> reload()
@@ -1195,6 +1342,17 @@ class CarWebRenderer(context: Context) {
         // same reason the phone activities do; release builds are untouched.
         BrowserDefaults.configureDebugTools()
         BrowserDefaults.configure(appContext, this)
+        appliedIdentity = identityKey()
+        // Half of the tile-budget fix; [rasterHost] is the other half, and neither works alone.
+        // With the WebView hosted in a window, Chromium sizes its tile budget from `interest_rect`
+        // — which is the view's on-screen visible rect unless this is on, and that rect is empty
+        // for a view nobody can see. On, it becomes the view's own size, which is the quantity
+        // that actually describes what this renderer rasterises. Not set in
+        // [BrowserDefaults.configure] because the phone window's WebView is on screen, where it
+        // would only cost memory.
+        // Legacy only: in HARDWARE mode the WebView is on a real (car) display, its visible rect is
+        // the true interest rect, and pre-rastering off-screen content would only cost memory.
+        settings.setOffscreenPreRaster(!hardwareMode)
         setDownloadListener(
             BrowserDownloads.listener(appContext) { message ->
                 mainHandler.post { host?.showMessage(message) }
@@ -1204,6 +1362,31 @@ class CarWebRenderer(context: Context) {
             override fun onProgressChanged(view: WebView, newProgress: Int) {
                 loadingProgress = newProgress.coerceIn(0, 100)
                 onPageChanged?.invoke(view.url ?: currentUrl, view.title)
+            }
+
+            /**
+             * HTML5 fullscreen (YouTube's fullscreen button, `requestFullscreen()` on a video).
+             * Hosted by the same [FullscreenVideoController] the phone browser uses, inside the
+             * car window, so the fullscreen video is composited by the system like the inline one.
+             * The legacy canvas path has no window to put it in and declines immediately, which
+             * tells Chromium to stay inline instead of waiting on a view nobody shows.
+             */
+            override fun onShowCustomView(view: View, callback: CustomViewCallback) {
+                val window = hardwareWindow
+                if (window == null) {
+                    AutoBridgeVideoLog.w("fullscreen declined mode=$activeMode (no hardware window)")
+                    callback.onCustomViewHidden()
+                    return
+                }
+                window.fullscreen.show(view, callback) { entered ->
+                    AutoBridgeVideoLog.i("fullscreen ${if (entered) "enter" else "exit"} url=${webView?.url}")
+                    setFullscreen(entered)
+                }
+                logDisplays("fullscreen-shown")
+            }
+
+            override fun onHideCustomView() {
+                hardwareWindow?.fullscreen?.hide()
             }
 
             /**
@@ -1262,7 +1445,11 @@ class CarWebRenderer(context: Context) {
                     return true
                 }
                 // Only allow HTTPS navigation; block custom schemes/intents on the car surface.
-                return ContentAddress.https(target) == null
+                if (ContentAddress.https(target) == null) return true
+                // Set the identity before the request leaves; onPageStarted is too late for the
+                // main-frame request of a link tap.
+                if (request.isForMainFrame) syncUserAgentFor(target)
+                return false
             }
 
             override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
@@ -1284,6 +1471,7 @@ class CarWebRenderer(context: Context) {
                 if (loadError == null) WebHistoryStore.record(appContext, view.title, url)
                 youtube.onPageChanged(view, url)
                 onPageChanged?.invoke(url, view.title)
+                logDisplays("page-finished")
             }
 
             /** YouTube switches videos with `pushState`; onPageFinished never fires for those. */
@@ -1348,7 +1536,7 @@ class CarWebRenderer(context: Context) {
         val next = BrowserViewport.create(
             width, height, sizes.density,
             cardLeft, cardTop, cardRight, cardBottom,
-            desktop = BrowserUserAgentStore.mode(appContext) == BrowserUserAgentMode.DESKTOP,
+            desktop = BrowserUserAgentStore.isDesktopIdentity(appContext),
         )
         val geometryUnchanged = next == viewport && view.width == next.webWidth
         viewport = next
@@ -1372,7 +1560,7 @@ class CarWebRenderer(context: Context) {
             )
             else -> null
         }
-        chrome = BrowserChromeLayout.create(sizes, viewport, showToolbarMenuButton(), chromeBounds)
+        chrome = BrowserChromeLayout.create(sizes, viewport, showToolbarMenuButton(), chromeBounds, fabOnLeft)
         if (overlay == Overlay.DRAWER || overlay == Overlay.DRAWER_MORE) rebuildDrawer()
         if (geometryUnchanged) {
             trace(event, "reflow=skipped")
@@ -1383,7 +1571,34 @@ class CarWebRenderer(context: Context) {
         // before measure/layout so the reflow this triggers already lays out at the right width,
         // and re-applied on every geometry change because the ratio moves with the surface.
         applyPageScale(view)
-        view.layoutParams = ViewGroup.LayoutParams(viewport.webWidth, viewport.webHeight)
+        // Sized here rather than on surface attach because this is the one place the page's pixel
+        // size is decided, and the host window has to be the same size as the view it rasters.
+        // The host is kept across surface attach/detach: detaching the view would release the
+        // hardware draw state and put the tile budget back to zero.
+        val hardware = hardwareWindow
+        if (hardware != null) {
+            // A real window lays the view out itself; it only needs to know where the page goes.
+            hardware.placePage(view, viewport.left, viewport.top, viewport.webWidth, viewport.webHeight)
+            trace(event, "reflow=applied")
+            return
+        }
+        val host = rasterHost
+        if (host != null) {
+            // Hosted: the window owns the view's layout params, because its parent measures it.
+            host.resize(
+                viewport.webWidth, viewport.webHeight,
+                appContext.resources.configuration.densityDpi
+            )
+        } else {
+            view.layoutParams = ViewGroup.LayoutParams(viewport.webWidth, viewport.webHeight)
+            if (!rasterHostAttempted) {
+                rasterHostAttempted = true
+                rasterHost = OffscreenWebViewWindow.attach(
+                    appContext, view, viewport.webWidth, viewport.webHeight,
+                    appContext.resources.configuration.densityDpi
+                )
+            }
+        }
         view.measure(
             View.MeasureSpec.makeMeasureSpec(viewport.webWidth, View.MeasureSpec.EXACTLY),
             View.MeasureSpec.makeMeasureSpec(viewport.webHeight, View.MeasureSpec.EXACTLY)
@@ -1429,7 +1644,8 @@ class CarWebRenderer(context: Context) {
         return "view=${view.width}x${view.height}" +
             " viewScroll=${view.scrollX},${view.scrollY}" +
             " pageScale=" + String.format("%.3f", view.scale) +
-            " contentH=${view.contentHeight}"
+            " contentH=${view.contentHeight}" +
+            " rasterHost=" + (if (rasterHost != null) "window" else "none")
     }
 
     private fun trace(event: String, extra: String = "") {
@@ -1455,7 +1671,101 @@ class CarWebRenderer(context: Context) {
 
     // ------------------------------------------------------------------ drawing
 
+    /**
+     * Creates (or re-points) the hardware window for [surface]. Returns false and drops this session
+     * to [CarBrowserRenderMode.LEGACY_CANVAS] if the platform refuses, with the exact failure logged.
+     */
+    private fun attachHardwareWindow(surface: Surface, width: Int, height: Int): Boolean {
+        val view = webView ?: return false
+        val dpi = appContext.resources.configuration.densityDpi
+        val existing = hardwareWindow
+        if (existing != null && existing.matches(width, height, dpi)) {
+            existing.setSurface(surface)
+            logDisplays("hardware-surface-reattached")
+            return true
+        }
+        if (existing != null) {
+            AutoBridgeVideoLog.i("car surface size changed ${existing.width}x${existing.height} -> ${width}x$height; recreating window")
+            existing.release()
+            hardwareWindow = null
+        }
+        return try {
+            val window = CarHardwareWebWindow.create(
+                context = appContext,
+                surface = surface,
+                width = width,
+                height = height,
+                densityDpi = dpi,
+                drawChrome = ::drawChromeLayer,
+                onUnexpectedDismiss = { mainHandler.post(::recoverHardwareWindow) },
+            )
+            hardwareWindow = window
+            window.placePage(view, viewport.left, viewport.top, viewport.webWidth, viewport.webHeight)
+            logDisplays("hardware-window-attached")
+            true
+        } catch (error: RuntimeException) {
+            AutoBridgeVideoLog.w(
+                "HARDWARE render path refused (sdk=${android.os.Build.VERSION.SDK_INT} " +
+                    "surface=${width}x$height valid=${surface.isValid}); falling back to LEGACY_CANVAS",
+                error
+            )
+            activeMode = CarBrowserRenderMode.LEGACY_CANVAS
+            view.settings.setOffscreenPreRaster(true)
+            false
+        }
+    }
+
+    /** The platform dismissed the window (e.g. display metrics changed); rebuild it on the live surface. */
+    private fun recoverHardwareWindow() {
+        val dismissed = hardwareWindow ?: return
+        dismissed.release()
+        hardwareWindow = null
+        val activeSurface = surface
+        if (running && activeSurface != null && activeSurface.isValid) {
+            attachHardwareWindow(activeSurface, surfaceWidth, surfaceHeight)
+            layoutWebView(surfaceWidth, surfaceHeight, ViewportDebug.Event.SURFACE_RESIZED)
+        }
+    }
+
+    private fun logDisplays(stage: String) {
+        val window = hardwareWindow
+        AutoBridgeVideoLog.displays(
+            stage, activeMode, window?.displayId, window?.windowView, webView, webView?.url
+        )
+    }
+
+    /**
+     * HARDWARE mode's chrome pass: runs on the chrome layer's hardware canvas, which covers the
+     * whole display in car-surface pixels — the same coordinate space [drawFrame] draws in, so the
+     * toolbar, drawer, tab switcher and FAB are drawn by the very same functions and still match
+     * [onSurfaceClick]'s hit testing. The page itself is not drawn here; it is a real view below.
+     */
+    private fun drawChromeLayer(canvas: Canvas) {
+        val save = canvas.save()
+        clipRect.set(
+            viewport.left.toFloat(), viewport.top.toFloat(),
+            (viewport.left + viewport.width).toFloat(), (viewport.top + viewport.height).toFloat()
+        )
+        canvas.clipRect(clipRect)
+        if (loadError != null && !isVideoFullscreen) {
+            canvas.save()
+            canvas.translate(viewport.left.toFloat(), viewport.top.toFloat())
+            drawErrorOverlay(canvas)
+            canvas.restore()
+        }
+        drawChrome(canvas, SystemClock.uptimeMillis())
+        canvas.restoreToCount(save)
+    }
+
     private fun drawFrame(nowMs: Long) {
+        // HARDWARE: the WebView renders itself through the window; only the chrome layer needs
+        // re-recording so fades and overlays advance. Never lockCanvas() here — the virtual
+        // display is the surface's producer.
+        hardwareWindow?.let {
+            it.invalidateChrome()
+            return
+        }
+        if (hardwareMode) return
         val activeSurface = surface ?: return
         val view = webView ?: return
         if (!activeSurface.isValid || surfaceWidth <= 0 || surfaceHeight <= 0) return
@@ -1495,33 +1805,7 @@ class CarWebRenderer(context: Context) {
                 canvas.restore()
             }
             canvas.restore()
-
-            // No grab-handle graphic while chrome is hidden: the page fills the surface with
-            // nothing floating over it. The edge-reveal band ([BrowserChromeLayout.edgeReveal])
-            // still recalls the toolbar on a swipe/tap; it is simply never drawn.
-            // When the bar is hidden it is never painted, in any state — not even dimmed behind an
-            // open drawer. Forcing the alpha to zero here (rather than guarding each drawToolbar
-            // call) keeps the single source of "is the bar visible" for both draw branches below.
-            val alpha = if (hideUrlBar) 0f else visibility.alphaAt(nowMs)
-            val overlayOpen = overlay != Overlay.NONE
-            // While an overlay owns the surface the toolbar is painted *first*, so the overlay's
-            // scrim dims it. Painted afterwards it stayed fully lit above the sheet: its buttons
-            // advertised themselves as live while every tap on them was being swallowed, and the
-            // bar covered the sheet's own close button. Dimmed and behind, it reads as what it is
-            // — inactive until the sheet is dismissed.
-            if (overlayOpen && alpha > 0.01f) drawToolbar(canvas, alpha)
-            when (overlay) {
-                Overlay.DRAWER, Overlay.DRAWER_MORE -> drawDrawer(canvas)
-                Overlay.TABS -> drawTabSwitcher(canvas)
-                Overlay.NONE -> Unit
-            }
-            if (!overlayOpen && alpha > 0.01f) drawToolbar(canvas, alpha)
-            // Drawn last and, by default, at full opacity regardless of the chrome fade: an
-            // always-available control that faded with the toolbar would be the same two-step it
-            // replaces. It is hidden while an overlay already owns the surface, and follows the
-            // toolbar's fade only when the user has asked for that
-            // ([BrowserControlsStore.alwaysShowFloatingButton]).
-            if (fabVisible(nowMs)) drawFab(canvas, if (alwaysShowFab) 1f else alpha)
+            drawChrome(canvas, nowMs)
             canvas.restoreToCount(cardOuterSave)
         } catch (error: RuntimeException) {
             Log.w(TAG, "WebView draw to car surface failed", error)
@@ -1530,16 +1814,49 @@ class CarWebRenderer(context: Context) {
         }
     }
 
+    /** Toolbar, overlays and FAB — shared by the legacy frame and the hardware chrome layer. */
+    private fun drawChrome(canvas: Canvas, nowMs: Long) {
+        // No grab-handle graphic while chrome is hidden: the page fills the surface with
+        // nothing floating over it. The edge-reveal band ([BrowserChromeLayout.edgeReveal])
+        // still recalls the toolbar on a swipe/tap; it is simply never drawn.
+        // When the bar is hidden it is never painted, in any state — not even dimmed behind an
+        // open drawer. Forcing the alpha to zero here (rather than guarding each drawToolbar
+        // call) keeps the single source of "is the bar visible" for both draw branches below.
+        val alpha = if (hideUrlBar) 0f else visibility.alphaAt(nowMs)
+        val overlayOpen = overlay != Overlay.NONE
+        // While an overlay owns the surface the toolbar is painted *first*, so the overlay's
+        // scrim dims it. Painted afterwards it stayed fully lit above the sheet: its buttons
+        // advertised themselves as live while every tap on them was being swallowed, and the
+        // bar covered the sheet's own close button. Dimmed and behind, it reads as what it is
+        // — inactive until the sheet is dismissed.
+        if (overlayOpen && alpha > 0.01f) drawToolbar(canvas, alpha)
+        when (overlay) {
+            Overlay.DRAWER, Overlay.DRAWER_MORE -> drawDrawer(canvas)
+            Overlay.TABS -> drawTabSwitcher(canvas)
+            Overlay.NONE -> Unit
+        }
+        if (!overlayOpen && alpha > 0.01f) drawToolbar(canvas, alpha)
+        // Drawn last and, by default, at full opacity regardless of the chrome fade: an
+        // always-available control that faded with the toolbar would be the same two-step it
+        // replaces. It is hidden while an overlay already owns the surface, and follows the
+        // toolbar's fade only when the user has asked for that
+        // ([BrowserControlsStore.alwaysShowFloatingButton]).
+        if (fabVisible(nowMs)) drawFab(canvas, fabAlpha(nowMs))
+    }
+
     /** The floating control button: one large, always-present target that opens the menu. */
     private fun drawFab(canvas: Canvas, alpha: Float) {
         val box = chrome.fab
         val opacity = alpha.coerceIn(0f, 1f)
         val radius = minOf(box.width, box.height) / 2f
-        toolbarPaint.color = BrowserTheme.toolbarBackground
-        toolbarPaint.alpha = (235 * opacity).toInt()
-        canvas.drawCircle(box.centerX, box.centerY, radius, toolbarPaint)
+        // M3 FAB: a rounded square (16dp corners on a 56dp button) in primaryContainer, not a
+        // circle in the toolbar colour. The hit box is the same square either way.
+        val corner = minOf(box.width, box.height) * FAB_CORNER_FRACTION
+        toolbarPaint.color = BrowserTheme.fabContainer
+        toolbarPaint.alpha = (245 * opacity).toInt()
+        canvas.drawRoundRect(box.left, box.top, box.right, box.bottom, corner, corner, toolbarPaint)
         toolbarPaint.alpha = 255
-        glyphPaint.color = BrowserTheme.iconEnabled
+        glyphPaint.color = BrowserTheme.onFabContainer
         glyphPaint.alpha = (255 * opacity).toInt()
         glyphPaint.textSize = radius * 0.95f
         // The glyph says what the button will do, so a button rebound to "new tab" does not keep
@@ -1593,9 +1910,10 @@ class CarWebRenderer(context: Context) {
         if (pill.width > sizes.touchTarget) {
             addressPaint.color = BrowserTheme.addressPillBackground
             addressPaint.alpha = opacity
+            // Fully rounded, like the M3 search bar.
             canvas.drawRoundRect(
                 RectF(pill.left, pill.top, pill.right, pill.bottom),
-                sizes.cornerRadius, sizes.cornerRadius, addressPaint
+                pill.height / 2f, pill.height / 2f, addressPaint
             )
             val address = runCatching { Uri.parse(url) }.getOrNull()
             val host = address?.host.orEmpty()
@@ -1638,12 +1956,15 @@ class CarWebRenderer(context: Context) {
     /** Slim grab handle shown while chrome is hidden, so it can always be recalled. */
     private fun drawHandle(canvas: Canvas) {
         val handle = chrome.handle
-        toolbarPaint.color = Color.argb(90, 20, 22, 26)
+        toolbarPaint.color = BrowserTheme.surfaceContainer
+        toolbarPaint.alpha = 90
         canvas.drawRoundRect(
             RectF(handle.left, handle.top, handle.right, handle.bottom),
             sizes.cornerRadius, sizes.cornerRadius, toolbarPaint
         )
-        addressPaint.color = Color.argb(170, 210, 214, 220)
+        toolbarPaint.alpha = 255
+        addressPaint.color = BrowserTheme.onSurfaceVariant
+        addressPaint.alpha = 170
         val barWidth = handle.width * 0.3f
         val barHeight = sizes.dp(3f)
         canvas.drawRoundRect(
@@ -1653,6 +1974,7 @@ class CarWebRenderer(context: Context) {
             ),
             barHeight, barHeight, addressPaint
         )
+        addressPaint.alpha = 255
         if (loadingProgress in 0..99) {
             toolbarPaint.color = BrowserTheme.accent
             canvas.drawRect(
@@ -1801,13 +2123,13 @@ class CarWebRenderer(context: Context) {
             address.clear.centerY + glyphPaint.textSize * 0.36f, glyphPaint
         )
 
-        // The one filled control on the row, because it is the one that commits.
-        toolbarPaint.color = BrowserTheme.tileBackground
+        // The one filled control on the row, because it is the one that commits: M3 filled button.
+        toolbarPaint.color = BrowserTheme.primary
         canvas.drawCircle(
             address.go.centerX, address.go.centerY,
             minOf(address.go.width, address.go.height) / 2f, toolbarPaint
         )
-        glyphPaint.color = BrowserTheme.iconEnabled
+        glyphPaint.color = BrowserTheme.onPrimary
         glyphPaint.textSize = sizes.iconMedium.coerceAtMost(address.go.height * 0.55f)
         canvas.drawText(
             "\u2315", address.go.centerX,
@@ -1825,14 +2147,14 @@ class CarWebRenderer(context: Context) {
             if (enabled) BrowserTheme.tileBackground else BrowserTheme.tileDisabledBackground
         canvas.drawRoundRect(tile.left, tile.top, tile.right, tile.bottom, radius, radius, toolbarPaint)
 
-        glyphPaint.color = if (enabled) BrowserTheme.iconEnabled else BrowserTheme.iconDisabled
+        glyphPaint.color = if (enabled) BrowserTheme.onSecondaryContainer else BrowserTheme.iconDisabled
         glyphPaint.textSize = sizes.iconLarge.coerceAtMost(tile.height * 0.38f)
         canvas.drawText(
             row.item.glyph, tile.centerX,
             tile.top + tile.height * 0.42f + glyphPaint.textSize * 0.35f, glyphPaint
         )
 
-        titlePaint.color = if (enabled) BrowserTheme.textPrimary else BrowserTheme.iconDisabled
+        titlePaint.color = if (enabled) BrowserTheme.onSecondaryContainer else BrowserTheme.iconDisabled
         titlePaint.textSize = (sizes.iconSmall * 0.8f).coerceAtMost(tile.height * 0.26f)
         drawCentered(
             canvas, titlePaint,
@@ -1889,7 +2211,7 @@ class CarWebRenderer(context: Context) {
             trackHeight / 2f, trackHeight / 2f, toolbarPaint
         )
         toolbarPaint.color =
-            if (row.item.on) BrowserTheme.toggleKnob else BrowserTheme.textSecondary
+            if (row.item.on) BrowserTheme.toggleKnob else BrowserTheme.toggleKnobOff
         val knobX = if (row.item.on) trackRight - trackHeight / 2f else trackLeft + trackHeight / 2f
         canvas.drawCircle(knobX, box.centerY, trackHeight * 0.4f, toolbarPaint)
     }

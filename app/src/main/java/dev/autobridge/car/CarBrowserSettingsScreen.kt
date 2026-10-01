@@ -1,5 +1,6 @@
 package dev.autobridge.car
 
+import android.webkit.WebSettings
 import androidx.car.app.CarContext
 import androidx.car.app.CarToast
 import androidx.car.app.Screen
@@ -13,6 +14,7 @@ import androidx.car.app.model.SectionedItemList
 import androidx.car.app.model.Template
 import androidx.car.app.model.Toggle
 import dev.autobridge.browser.BrowserControlsStore
+import dev.autobridge.browser.BrowserUserAgentCodec
 import dev.autobridge.browser.BrowserUserAgentMode
 import dev.autobridge.browser.BrowserUserAgentStore
 import dev.autobridge.browser.FloatingButtonAction
@@ -86,13 +88,28 @@ class CarBrowserSettingsScreen(carContext: CarContext) : Screen(carContext) {
                     .setOnClickListener { openFloatingActionPicker() }
                     .build()
             )
+            .addItem(
+                Row.Builder()
+                    .setTitle("Floating button on left")
+                    .addText("Move the button to the bottom-left corner instead of the bottom-right")
+                    .setToggle(
+                        Toggle.Builder { checked ->
+                            BrowserControlsStore.setFloatingButtonOnLeft(carContext, checked)
+                            setResult(CHANGED)
+                            invalidate()
+                        }
+                            .setChecked(BrowserControlsStore.floatingButtonOnLeft(carContext))
+                            .build()
+                    )
+                    .build()
+            )
             .build()
 
         val identity = ItemList.Builder()
             .addItem(
                 Row.Builder()
                     .setTitle("Browser identity")
-                    .addText(BrowserUserAgentStore.label(carContext))
+                    .addText(identitySummary())
                     .setBrowsable(true)
                     .setOnClickListener { openIdentityPicker() }
                     .build()
@@ -118,6 +135,14 @@ class CarBrowserSettingsScreen(carContext: CarContext) : Screen(carContext) {
                 invalidate()
             }
         }
+    }
+
+    /** "Custom" alone does not say which identity is active, so the string itself is shown too. */
+    private fun identitySummary(): String {
+        val label = BrowserUserAgentStore.label(carContext)
+        if (BrowserUserAgentStore.mode(carContext) != BrowserUserAgentMode.CUSTOM) return label
+        val ua = BrowserUserAgentStore.custom(carContext)
+        return if (ua.isBlank()) label else "$label · " + if (ua.length <= 48) ua else ua.take(45) + "…"
     }
 
     private fun openIdentityPicker() {
@@ -184,6 +209,14 @@ private class CarBrowserIdentityScreen(carContext: CarContext) : Screen(carConte
                     .setOnClickListener { openCustomEditor() }
                     .build()
             )
+            .addItem(
+                Row.Builder()
+                    .setTitle("Custom presets")
+                    .addText("Windows, macOS, iPad, iPhone… without typing")
+                    .setBrowsable(true)
+                    .setOnClickListener { openPresets() }
+                    .build()
+            )
             .build()
 
         return ListTemplate.Builder()
@@ -217,6 +250,15 @@ private class CarBrowserIdentityScreen(carContext: CarContext) : Screen(carConte
         ?.let { if (it.length <= 54) it else it.take(51) + "…" }
         ?: "Enter a custom User-Agent string"
 
+    private fun openPresets() {
+        screenManager.pushForResult(CarUserAgentPresetScreen(carContext)) { changed ->
+            if (changed == true) {
+                setResult(true)
+                screenManager.pop()
+            }
+        }
+    }
+
     private fun openCustomEditor() {
         screenManager.pushForResult(
             CarUserAgentInputScreen(carContext, BrowserUserAgentStore.custom(carContext))
@@ -229,6 +271,46 @@ private class CarBrowserIdentityScreen(carContext: CarContext) : Screen(carConte
                 CarToast.makeText(carContext, "Enter a valid User-Agent", CarToast.LENGTH_SHORT).show()
             }
         }
+    }
+}
+
+/**
+ * Ready-made Custom identities. Typing a 120-character UA on a head-unit keyboard is the hard part
+ * of a custom User-Agent, so the common ones are one tap; picking one saves it as the Custom string,
+ * which the Custom editor can then tweak.
+ */
+private class CarUserAgentPresetScreen(carContext: CarContext) : Screen(carContext) {
+    override fun onGetTemplate(): Template {
+        val presets = BrowserUserAgentCodec.presets(
+            runCatching { WebSettings.getDefaultUserAgent(carContext) }.getOrDefault("")
+        )
+        val current = BrowserUserAgentStore.custom(carContext)
+        val isCustom = BrowserUserAgentStore.mode(carContext) == BrowserUserAgentMode.CUSTOM
+        val list = ItemList.Builder()
+        presets.forEach { preset ->
+            val selected = isCustom && preset.userAgent == current
+            list.addItem(
+                Row.Builder()
+                    .setTitle(if (selected) "${preset.label}  •  Selected" else preset.label)
+                    .addText(preset.userAgent.let { if (it.length <= 54) it else it.take(51) + "…" })
+                    .setOnClickListener {
+                        if (BrowserUserAgentStore.saveCustom(carContext, preset.userAgent)) {
+                            setResult(true)
+                            screenManager.pop()
+                        }
+                    }
+                    .build()
+            )
+        }
+        return ListTemplate.Builder()
+            .setHeader(
+                Header.Builder()
+                    .setTitle("User-Agent presets")
+                    .setStartHeaderAction(Action.BACK)
+                    .build()
+            )
+            .setSingleList(list.build())
+            .build()
     }
 }
 

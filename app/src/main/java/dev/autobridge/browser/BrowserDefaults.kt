@@ -107,10 +107,31 @@ object BrowserDefaults {
         if (WebViewFeature.isFeatureSupported(WebViewFeature.REQUESTED_WITH_HEADER_ALLOW_LIST)) {
             WebSettingsCompat.setRequestedWithHeaderOriginAllowList(settings, emptySet())
         }
-        applyUserAgentMetadata(
-            settings,
-            desktop = BrowserUserAgentStore.mode(context) == BrowserUserAgentMode.DESKTOP
-        )
+        val desktop = BrowserUserAgentStore.isDesktopIdentity(context)
+        applyUserAgentMetadata(settings, desktop = desktop)
+        DesktopSiteMode.apply(webView, desktop)
+    }
+
+    /**
+     * Brings every part of the browser identity in line with the selected mode for [url]: the UA
+     * string, the client hints and the page-side desktop script. These three used to drift apart,
+     * because only [configure] set the hints and a WebView is configured once — so after an
+     * in-session toggle a desktop UA went out with `Sec-CH-UA-Mobile: ?1` and sites kept serving
+     * mobile until the app restarted. Sign-in origins get the mobile identity on all three, the same
+     * rule as [BrowserUserAgentStore.resolveForUrl].
+     *
+     * Returns true when the UA string changed. Takes effect from the next request; callers that need
+     * the current page to change reload it.
+     */
+    fun applyIdentity(context: Context, webView: WebView, url: String): Boolean {
+        val settings = webView.settings
+        val wanted = BrowserUserAgentStore.resolveForUrl(context, url, WebSettings.getDefaultUserAgent(context))
+        val changed = settings.userAgentString != wanted
+        if (changed) settings.userAgentString = wanted
+        val desktop = BrowserUserAgentStore.isDesktopIdentity(context)
+        applyUserAgentMetadata(settings, desktop = desktop && !isSignInPopupHost(url))
+        DesktopSiteMode.apply(webView, desktop)
+        return changed
     }
 
     /**

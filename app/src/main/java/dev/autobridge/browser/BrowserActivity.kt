@@ -397,10 +397,30 @@ class BrowserActivity : Activity() {
                 return true
             }
 
-            override fun onShowCustomView(view: View, callback: CustomViewCallback) =
-                fullscreenController.show(view, callback) { pageFullscreen -> setFullscreen(pageFullscreen) }
+            // AutoBridgeVideoDiag (temporary): surface page console errors (e.g. video load
+            // failures) to logcat. Remove with WebVideoDiagnostics.
+            override fun onConsoleMessage(msg: android.webkit.ConsoleMessage): Boolean {
+                android.util.Log.i(
+                    WebVideoDiagnostics.TAG,
+                    "console[${msg.messageLevel()}] ${msg.message()} @${msg.sourceId()}:${msg.lineNumber()}"
+                )
+                return super.onConsoleMessage(msg)
+            }
 
-            override fun onHideCustomView() = fullscreenController.hide()
+            override fun onShowCustomView(view: View, callback: CustomViewCallback) {
+                // AutoBridgeVideoDiag (temporary): confirm the fullscreen path fires here and on
+                // which display, then proceed exactly as before. Remove with WebVideoDiagnostics.
+                WebVideoDiagnostics.logState(
+                    "BrowserActivity", web,
+                    "stage=onShowCustomView-FIRED onCarDisplay=$onCarDisplay customView=${view.javaClass.simpleName}"
+                )
+                fullscreenController.show(view, callback) { pageFullscreen -> setFullscreen(pageFullscreen) }
+            }
+
+            override fun onHideCustomView() {
+                android.util.Log.i(WebVideoDiagnostics.TAG, "path=BrowserActivity stage=onHideCustomView-FIRED")
+                fullscreenController.hide()
+            }
         }
         webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
@@ -418,12 +438,13 @@ class BrowserActivity : Activity() {
                 // contradicts the WebView's Android client hints and Google refuses it. This fires
                 // for redirects too, so a desktop-mode page handing off to accounts.google.com is
                 // corrected before the page loads.
-                val mobileDefault = WebSettings.getDefaultUserAgent(this@BrowserActivity)
-                val wanted = BrowserUserAgentStore.resolveForUrl(this@BrowserActivity, url, mobileDefault)
-                if (view.settings.userAgentString != wanted) view.settings.userAgentString = wanted
+                BrowserDefaults.applyIdentity(this@BrowserActivity, view, url)
             }
 
             override fun onPageFinished(view: WebView, url: String) {
+                WebVideoDiagnostics.logState(
+                    "BrowserActivity", view, "stage=onPageFinished onCarDisplay=$onCarDisplay"
+                )
                 if (allowed()) {
                     BrowserDefaults.remember(this@BrowserActivity, url)
                     WebHistoryStore.record(this@BrowserActivity, view.title, url)
@@ -467,7 +488,7 @@ class BrowserActivity : Activity() {
      * window for a ~3900 CSS px page and rendered everything at a third of the intended size.
      */
     private fun applyDesktopViewport(view: WebView = web) {
-        val desktop = BrowserUserAgentStore.mode(this) == BrowserUserAgentMode.DESKTOP
+        val desktop = BrowserUserAgentStore.isDesktopIdentity(this)
         view.settings.useWideViewPort = desktop
         view.settings.loadWithOverviewMode = desktop
         view.setInitialScale(
@@ -477,6 +498,14 @@ class BrowserActivity : Activity() {
 
     private fun navigate(input: String) {
         if (!allowed()) { toast(FeaturePolicy.app.denialMessage(Feature.BROWSER)); return }
+        // AutoBridgeVideoDiag (temporary): the sentinel loads the self-contained non-DRM MP4 test
+        // page on THIS (phone/hardware-composited) path. Remove with WebVideoDiagnostics.
+        android.util.Log.i(WebVideoDiagnostics.TAG, "path=BrowserActivity navigate input='$input'")
+        if (WebVideoDiagnostics.isSentinel(input)) {
+            WebVideoDiagnostics.loadTestPage(web)
+            WebVideoDiagnostics.logState("BrowserActivity", web, "stage=load-test-page onCarDisplay=$onCarDisplay")
+            return
+        }
         if (input.isNotBlank()) {
             val url = BrowserDefaults.resolve(input)
             address.setText(if (address.hasFocus()) url else displayUrl(url))
@@ -741,7 +770,7 @@ class BrowserActivity : Activity() {
             // Car-surface entries; [MenuSurface.PHONE] never lists them.
             DrawerAction.NEW_TAB, DrawerAction.TABS, DrawerAction.MEDIA_CENTER,
             DrawerAction.NOW_PLAYING, DrawerAction.MEDIA_LIBRARY, DrawerAction.AGENT,
-            DrawerAction.DIAGNOSTICS -> Unit
+            DrawerAction.DIAGNOSTICS, DrawerAction.TOGGLE_FULLSCREEN -> Unit
             // Sheet navigation, resolved before an action is dispatched.
             DrawerAction.MORE, DrawerAction.BACK_TO_MENU, DrawerAction.CLOSE_SHEET -> Unit
         }
@@ -783,8 +812,80 @@ class BrowserActivity : Activity() {
                 applyFloatingButtonPreference()
             }
             .setNeutralButton("ปุ่มลอยกดแล้วทำอะไร") { _, _ -> showFloatingActionChooser() }
+            .setNegativeButton("User-Agent") { _, _ -> showUserAgentChooser() }
             .setPositiveButton("เสร็จสิ้น", null)
             .show()
+    }
+
+    /**
+     * Browser identity on the phone: Mobile, Desktop, a typed Custom string, or one of the presets.
+     * Stored in [BrowserUserAgentStore], so the car browser picks up the same choice — typing a UA
+     * here is far easier than on a head-unit keyboard.
+     */
+    private fun showUserAgentChooser() {
+        val presets = BrowserUserAgentCodec.presets(WebSettings.getDefaultUserAgent(this))
+        val mode = BrowserUserAgentStore.mode(this)
+        val custom = BrowserUserAgentStore.custom(this)
+        val labels = buildList {
+            add(if (mode == BrowserUserAgentMode.MOBILE) "✓ Mobile" else "Mobile")
+            add(if (mode == BrowserUserAgentMode.DESKTOP) "✓ Desktop" else "Desktop")
+            add(if (mode == BrowserUserAgentMode.CUSTOM) "✓ กำหนดเอง… (${custom.take(40)})" else "กำหนดเอง…")
+            presets.forEach { preset ->
+                val selected = mode == BrowserUserAgentMode.CUSTOM && preset.userAgent == custom
+                add(if (selected) "✓ ${preset.label}" else preset.label)
+            }
+        }.toTypedArray<CharSequence>()
+        AlertDialog.Builder(this)
+            .setTitle("User-Agent")
+            .setItems(labels) { _, index ->
+                when (index) {
+                    0 -> { BrowserUserAgentStore.select(this, BrowserUserAgentMode.MOBILE); applyUserAgentChange() }
+                    1 -> { BrowserUserAgentStore.select(this, BrowserUserAgentMode.DESKTOP); applyUserAgentChange() }
+                    2 -> showCustomUserAgentEditor()
+                    else -> {
+                        BrowserUserAgentStore.saveCustom(this, presets[index - 3].userAgent)
+                        applyUserAgentChange()
+                    }
+                }
+            }
+            .setNegativeButton("ยกเลิก", null)
+            .show()
+    }
+
+    private fun showCustomUserAgentEditor() {
+        val field = EditText(this).apply {
+            setText(BrowserUserAgentStore.custom(this@BrowserActivity).ifBlank { web.settings.userAgentString.orEmpty() })
+            hint = "Mozilla/5.0 (…)"
+            minLines = 3
+            setSelectAllOnFocus(false)
+        }
+        val pad = sizes.dpInt(AutoUiSizes.HORIZONTAL_PADDING_DP)
+        val container = FrameLayout(this).apply {
+            setPadding(pad, pad / 2, pad, 0)
+            addView(field)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("User-Agent กำหนดเอง")
+            .setView(container)
+            .setPositiveButton("บันทึก") { _, _ ->
+                if (BrowserUserAgentStore.saveCustom(this, field.text.toString())) {
+                    applyUserAgentChange()
+                } else {
+                    toast("User-Agent ไม่ถูกต้อง (ว่าง, ยาวเกิน 512 ตัว หรือมีขึ้นบรรทัดใหม่)")
+                }
+            }
+            .setNegativeButton("ยกเลิก", null)
+            .show()
+    }
+
+    /** Pushes the stored identity onto this WebView and the car browser, then reloads. */
+    private fun applyUserAgentChange() {
+        BrowserDefaults.configure(this, web)
+        applyDesktopViewport()
+        web.reload()
+        // The car browser picks the new identity up from the shared store the next time its
+        // surface attaches (CarWebRenderer compares identityKey() on start).
+        toast("User-Agent: ${BrowserUserAgentStore.label(this)}")
     }
 
     private fun showFloatingActionChooser() {
@@ -951,7 +1052,15 @@ class BrowserActivity : Activity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        intent.dataString?.let(ContentAddress::https)?.let { pendingUrl = it }
+        // AutoBridgeVideoDiag (temporary): allow triggering the test page via adb without typing,
+        // e.g. `adb shell am start -n dev.autobridge/.browser.BrowserActivity -d videodiag`.
+        val data = intent.dataString
+        if (data != null && WebVideoDiagnostics.isSentinel(data)) {
+            WebVideoDiagnostics.loadTestPage(web)
+            WebVideoDiagnostics.logState("BrowserActivity", web, "stage=load-test-page(intent) onCarDisplay=$onCarDisplay")
+            return
+        }
+        data?.let(ContentAddress::https)?.let { pendingUrl = it }
         enforcePolicy()
     }
 

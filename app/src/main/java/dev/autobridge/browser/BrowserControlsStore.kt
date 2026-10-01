@@ -38,6 +38,7 @@ object BrowserControlsStore {
     private const val KEY_HIDE_URL_BAR = "controls_hide_url_bar"
     private const val KEY_ALWAYS_SHOW_FLOATING_BUTTON = "controls_always_show_floating_button"
     private const val KEY_FLOATING_BUTTON_ACTION = "controls_floating_button_action"
+    private const val KEY_FLOATING_BUTTON_ON_LEFT = "controls_floating_button_on_left"
 
     private fun prefs(context: Context) =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -96,5 +97,20 @@ object BrowserControlsStore {
 
     fun setFloatingButtonAction(context: Context, action: FloatingButtonAction) {
         prefs(context).edit { putString(KEY_FLOATING_BUTTON_ACTION, action.name) }
+    }
+
+    /**
+     * Puts the floating button in the bottom-left corner instead of the bottom-right.
+     *
+     * The right corner is where video players, "next" buttons and chat inputs tend to live, so a
+     * fixed right-hand button can sit over exactly the control the user wants. A free drag is not
+     * possible on the car surface (the host's scroll callback carries no start point, so a drag on
+     * the button cannot be told apart from a page scroll), so the side is a setting instead.
+     */
+    fun floatingButtonOnLeft(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_FLOATING_BUTTON_ON_LEFT, false)
+
+    fun setFloatingButtonOnLeft(context: Context, onLeft: Boolean) {
+        prefs(context).edit { putBoolean(KEY_FLOATING_BUTTON_ON_LEFT, onLeft) }
     }
 }

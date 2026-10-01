@@ -69,15 +69,16 @@
              software canvas leaves while the page scrolls, and it is also the route on which
              Widevine works at all.
 
-             It needs Android Auto's developer setting "Unknown sources". Without it the car
-             launcher simply does not list this entry and the template route stays the only one, so
-             nothing here can break the existing car UI.
+             This activity is no longer listed in the car launcher (no CAR_LAUNCHER category, see
+             the intent-filter below - Play does not accept it alongside the
+             com.google.android.gms.car.application meta-data). The template route through
+             AutoBridgeCarAppService is the entry point on the head unit.
 
              resizeableActivity + <layout gravity="fill"> + maxAspectRatio: the car panel is a
              different size, density and aspect from the phone. Without all three the window is
              sized for the phone's aspect and letterboxed into the display instead of filling it.
 
-             exported: the car launcher has to be able to start it. The only thing it takes from an
+             exported: external callers (car host, other apps) may start it. The only thing it takes from an
              intent is a URL, and ContentAddress.https filters that to HTTPS (see onNewIntent), so
              the exposure is the same any browser has.
 
@@ -93,12 +94,16 @@
             android:maxAspectRatio="5.0"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation|density|uiMode|fontScale|layoutDirection|locale"
             android:windowSoftInputMode="adjustResize">
-            <!-- No android.intent.category.LAUNCHER: this entry belongs to the car launcher only
-                 and must not add a second icon to the phone's. -->
+            <!-- No android.intent.category.LAUNCHER: this entry must not add a second icon to the
+                 phone's launcher.
+                 No android.intent.category.CAR_LAUNCHER either: Google Play rejects an app that
+                 declares a CAR_LAUNCHER activity together with the
+                 com.google.android.gms.car.application meta-data. The meta-data is what makes
+                 AutoBridgeCarAppService (the Android Auto route) visible, so that one stays and
+                 the activity is no longer advertised to the car launcher. -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.CAR_LAUNCHER" />
                 <category android:name="androidx.car.app.category.NAVIGATION" />
                 <category android:name="android.intent.category.APP_MAPS" />
             </intent-filter>

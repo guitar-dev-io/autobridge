@@ -10,6 +10,9 @@ enum class DrawerAction {
     MEDIA_CENTER, NOW_PLAYING, MEDIA_LIBRARY,
     COPY_URL, PASTE_AND_GO, FIND_IN_PAGE, AGENT,
     TOGGLE_DESKTOP, ZOOM_IN, ZOOM_OUT, RELOAD, HOME,
+
+    /** Car only: immersive fullscreen (no toolbar, floating button fades until touched). */
+    TOGGLE_FULLSCREEN,
     BOOKMARK_PAGE, OPEN_EXTERNAL, SETTINGS, CLEAR_DATA, DIAGNOSTICS,
 
     /** Page history, the two controls the address row sits between. */
@@ -235,6 +238,9 @@ class BrowserDrawerModel private constructor(
         }
 
         private fun carMoreItems(): List<DrawerItem> = listOf(
+            // First in the list: with the URL bar hidden by default, this is the only route to
+            // fullscreen that does not need the floating button rebound.
+            DrawerItem(DrawerAction.TOGGLE_FULLSCREEN, "Fullscreen", "⛶"),
             DrawerItem(DrawerAction.HISTORY, "History", "↺"),
             DrawerItem(DrawerAction.DOWNLOADS, "Downloads", "↓"),
             DrawerItem(DrawerAction.BOOKMARK_PAGE, "Bookmark", "★"),

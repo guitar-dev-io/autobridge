@@ -47,11 +47,10 @@ object BrowserUserAgentStore {
      * The User-Agent to use for a specific [url]. Identical to [resolve] except that Google
      * sign-in origins are always served the clean **mobile** UA, whatever mode the user picked.
      *
-     * A desktop UA claims `X11; Linux x86_64`, but a WebView cannot stop sending the User-Agent
-     * Client Hints that still say `Sec-CH-UA-Platform: "Android"` and `Sec-CH-UA-Mobile: ?1`.
-     * Google's sign-in reads both, sees a desktop UA contradicting an Android client, and refuses
-     * it as "this browser or app may not be secure" — the failure only appears in desktop mode.
-     * The mobile UA matches those hints, so sign-in behaves the same in either mode.
+     * Google's sign-in refuses a desktop identity coming from an Android WebView as "this browser
+     * or app may not be secure", so sign-in origins always get the mobile identity.
+     * [BrowserDefaults.applyIdentity] applies the same rule to the client hints and the desktop
+     * page script, so the UA, hints and page agree on those hosts.
      */
     fun resolveForUrl(context: Context, url: String, mobileDefault: String): String =
         if (BrowserDefaults.isSignInPopupHost(url)) {
@@ -59,6 +58,17 @@ object BrowserUserAgentStore {
         } else {
             resolve(context, mobileDefault)
         }
+
+    /**
+     * Whether the active identity is a desktop browser: Desktop mode, or a Custom UA that reads as
+     * desktop ([BrowserUserAgentCodec.looksDesktop]). Drives the desktop viewport, client hints and
+     * page-side desktop script, so a custom desktop UA is not contradicted by the rest of the page.
+     */
+    fun isDesktopIdentity(context: Context): Boolean = when (mode(context)) {
+        BrowserUserAgentMode.MOBILE -> false
+        BrowserUserAgentMode.DESKTOP -> true
+        BrowserUserAgentMode.CUSTOM -> BrowserUserAgentCodec.looksDesktop(custom(context))
+    }
 
     fun label(context: Context): String = when (mode(context)) {
         BrowserUserAgentMode.MOBILE -> "Mobile"
@@ -124,6 +134,55 @@ object BrowserUserAgentCodec {
             "(KHTML, like Gecko) Chrome/$version Safari/537.36"
     }
 
+    /**
+     * Whether a custom UA presents a desktop browser. A custom desktop string (Windows/macOS/Linux
+     * Chrome, Firefox...) has to get the desktop viewport and desktop client hints too, otherwise
+     * the page is told "desktop" by the UA and "Android phone" by everything else, and sites serve
+     * a broken mix of both. Anything carrying a mobile marker is treated as mobile.
+     */
+    fun looksDesktop(userAgent: String): Boolean =
+        userAgent.isNotBlank() && !MOBILE_MARKERS.containsMatchIn(userAgent)
+
+    /** A ready-made identity the user can pick instead of typing a whole UA on a car keyboard. */
+    data class Preset(val label: String, val userAgent: String)
+
+    /**
+     * Common identities. The Chrome ones reuse the installed WebView's Chrome version (the same
+     * rule as [desktop]) so they never claim an out-of-date browser.
+     */
+    fun presets(defaultUserAgent: String): List<Preset> {
+        val chrome = CHROME_VERSION.find(defaultUserAgent)?.groupValues?.getOrNull(1)
+            ?: FALLBACK_CHROME_VERSION
+        val major = chrome.substringBefore('.')
+        return listOf(
+            Preset(
+                "Chrome · Windows",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+                    "(KHTML, like Gecko) Chrome/$chrome Safari/537.36"
+            ),
+            Preset(
+                "Chrome · macOS",
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
+                    "(KHTML, like Gecko) Chrome/$chrome Safari/537.36"
+            ),
+            Preset(
+                "Chrome · Android tablet",
+                "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 " +
+                    "(KHTML, like Gecko) Chrome/$major.0.0.0 Safari/537.36"
+            ),
+            Preset(
+                "Safari · iPad",
+                "Mozilla/5.0 (iPad; CPU OS 18_6 like Mac OS X) AppleWebKit/605.1.15 " +
+                    "(KHTML, like Gecko) Version/18.6 Mobile/15E148 Safari/604.1"
+            ),
+            Preset(
+                "Safari · iPhone",
+                "Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 " +
+                    "(KHTML, like Gecko) Version/18.6 Mobile/15E148 Safari/604.1"
+            ),
+        )
+    }
+
     fun normalizeCustom(value: String?): String? {
         val normalized = value?.trim().orEmpty()
         if (normalized.isEmpty() || normalized.length > MAX_LENGTH) return null
@@ -145,6 +204,7 @@ object BrowserUserAgentCodec {
     private val VERSION_TOKEN = Regex("""Version/\d+(?:\.\d+)*\s*""")
     private val CHROME_VERSION = Regex("""Chrome/(\d+(?:\.\d+)*)""")
     private val REPEATED_SPACE = Regex("""\s{2,}""")
+    private val MOBILE_MARKERS = Regex("""Mobile|Android|iPhone|iPad|iPod""", RegexOption.IGNORE_CASE)
 
     /** Captures the WebKit build (group 1) and the Chrome version (group 2) from a WebView UA. */
     private val WEBKIT_AND_CHROME =

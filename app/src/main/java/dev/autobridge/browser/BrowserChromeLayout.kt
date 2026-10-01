@@ -77,6 +77,8 @@ class BrowserChromeLayout private constructor(
              * which is what a host that reports no stable area, and every test below, gets.
              */
             chromeBounds: Box? = null,
+            /** Bottom-left corner for the floating button instead of the default bottom-right. */
+            fabOnLeft: Boolean = false,
         ): BrowserChromeLayout {
             val page = Box(
                 viewport.left.toFloat(), viewport.top.toFloat(),
@@ -141,15 +143,15 @@ class BrowserChromeLayout private constructor(
             // intercept taps meant for the page.
             val edgeReveal = Box(left, top, right, top + sizes.edgeReveal)
 
-            // Bottom-trailing corner: far from the toolbar it duplicates, and the part of the page
-            // least likely to hold a control the user meant to press. Bounded against the surface
-            // so it cannot dominate a short panel.
+            // Bottom corner (trailing by default, leading when the user moves it): far from the
+            // toolbar it duplicates. Bounded against the surface so it cannot dominate a short panel.
             val bottom = bounds.bottom
             val fabSize = sizes.fabSize.coerceAtMost(minOf(bounds.width, bounds.height) * 0.22f)
             val fabMargin = sizes.fabMargin
+            val fabLeft = if (fabOnLeft) left + fabMargin else right - fabMargin - fabSize
             val fab = Box(
-                right - fabMargin - fabSize, bottom - fabMargin - fabSize,
-                right - fabMargin, bottom - fabMargin
+                fabLeft, bottom - fabMargin - fabSize,
+                fabLeft + fabSize, bottom - fabMargin
             )
 
             return BrowserChromeLayout(
