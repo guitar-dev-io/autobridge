@@ -20,7 +20,7 @@ import android.widget.TextView
  * Appearance, Display scale, Start up, In-app control, Start page, User agent, Playback (DRM) and
  * Privacy & site data. Each control reads and writes a store directly ([BrowserAppearanceStore],
  * [BrowserDisplayScaleStore], [BrowserStartupStore], [BrowserControlsStore], [BrowserUserAgentStore],
- * [BrowserDrmStore]) and then calls back so the activity can apply the change to the live WebView;
+ * [BrowserDrmStore], [BrowserAdBlock]) and then calls back so the activity can apply the change to the live WebView;
  * the sheet owns no browser behaviour of its own, exactly like the other sheets.
  *
  * The whole sheet re-renders in place after any change (the [render] clear-and-rebuild pattern from
@@ -39,6 +39,8 @@ class BrowserSettingsSheet(
     private val onFloatingButtonChanged: () -> Unit,
     /** DRM preference changed: re-apply the Widevine level and reload. */
     private val onDrmChanged: () -> Unit,
+    /** Ad blocking was switched: reload so the current page is fetched under the new rule. */
+    private val onAdBlockChanged: () -> Unit,
     /** Start-page background preference changed: re-apply the window backdrop. */
     private val onStartPageBackgroundChanged: () -> Unit,
     /** Opens the Home-page editor (a text field dialog owned by the activity). */
@@ -117,6 +119,20 @@ class BrowserSettingsSheet(
             }
         )
 
+        container.addView(sectionLabel("Content blocking"))
+        container.addView(
+            toggleRow(
+                "Block ads and trackers",
+                "Drops requests to known ad and tracking hosts. YouTube's pre-roll and mid-roll " +
+                    "video ads are not among them — they share a host with the video; use the " +
+                    "YouTube add-ons for those",
+                BrowserAdBlock.enabled(activity),
+            ) {
+                BrowserAdBlock.setEnabled(activity, it)
+                onAdBlockChanged()
+            }
+        )
+
         container.addView(sectionLabel("Privacy and site data"))
         container.addView(
             navRow("Reset saved site permissions", "Clear camera, mic and other per-site grants") {
@@ -190,11 +206,15 @@ class BrowserSettingsSheet(
         }
         BrowserDisplayScaleStore.STEPS.forEachIndexed { index, percent ->
             val active = percent == current
-            val isDefault = percent == BrowserDisplayScaleStore.DEFAULT_PERCENT
+            // The chosen step is marked with a tick rather than the word "default" under 100%:
+            // "default" named a step instead of answering the question the row asks, which is
+            // which one is on. The fill and the bold say it too, but neither survives a glance in
+            // a car, and a tick does.
             val chip = TextView(activity).apply {
-                text = if (isDefault) "$percent%\ndefault" else "$percent%"
+                text = if (active) "✓ $percent%" else "$percent%"
+                contentDescription = if (active) "$percent%, selected" else "$percent%"
                 gravity = Gravity.CENTER
-                maxLines = 2
+                maxLines = 1
                 textSize = shell.sp(AutoUiSizes.ICON_SMALL_DP * 0.78f)
                 setTextColor(if (active) BrowserTheme.onPrimary else BrowserTheme.textSecondary)
                 if (active) setTypeface(typeface, Typeface.BOLD)
@@ -301,9 +321,13 @@ class BrowserSettingsSheet(
         options.forEachIndexed { index, (value, label) ->
             val active = value == selected
             val chip = TextView(activity).apply {
-                text = label
+                // Same tick the display-scale row uses, so "which one is on" is answered the same
+                // way everywhere in this sheet rather than by fill and weight alone.
+                text = if (active) "✓ $label" else label
+                contentDescription = if (active) "$label, selected" else label
                 gravity = Gravity.CENTER
                 maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
                 textSize = shell.sp(AutoUiSizes.ICON_SMALL_DP * 0.85f)
                 setTextColor(if (active) BrowserTheme.onPrimary else BrowserTheme.textSecondary)
                 if (active) setTypeface(typeface, Typeface.BOLD)

@@ -34,8 +34,8 @@ android {
         applicationId = "dev.autobridge"
         minSdk = 29
         targetSdk = 36
-        versionCode = 22
-        versionName = "0.4.8"
+        versionCode = 25
+        versionName = "0.4.11"
         // The faults that actually reach a head unit — viewport geometry, scroll bounds, WebView
         // state — only reproduce against a real WebView, so this module needs on-device tests as
         // well as JVM ones.
@@ -128,6 +128,10 @@ dependencies {
     "personalImplementation"(files("libs/aauto.aar"))
     "labImplementation"(files("libs/aauto.aar"))
     testImplementation("junit:junit:4.13.2")
+    // The subtitle pipeline launches its translation on an injected CoroutineScope; the test
+    // drives that scope with a test dispatcher so a line's result lands synchronously and the
+    // ordering guarantees can be asserted without sleeping.
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
     androidTestImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test:core:1.6.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
@@ -166,6 +170,13 @@ dependencies {
     // effect module, so setVideoEffects() needs it declared here, at the same version.
     implementation("androidx.media3:media3-effect:1.11.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    // On-device subtitle translation. ML Kit is the default engine: it ships compact per-language
+    // models through Play Services and needs no inference code here. Opus-MT is the optional
+    // engine for full-sentence quality and pairs ML Kit has no model for, run as a Marian
+    // encoder-decoder through ONNX Runtime. Both keep the subtitle track - the dialogue of
+    // whatever is playing - on the device rather than on a translation API's server.
+    implementation("com.google.mlkit:translate:17.0.3")
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.20.0")
     // Renders the generated third-party license list in OssLicensesMenuActivity, which the
     // Settings "Open-source licenses" row opens. The oss-licenses-plugin collects the notices from
     // the dependency POMs at build time; this library is the viewer for them.

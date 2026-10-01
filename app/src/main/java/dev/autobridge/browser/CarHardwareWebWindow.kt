@@ -168,7 +168,7 @@ class CarHardwareWebWindow private constructor(
             try {
                 val presentation = Presentation(context, virtual.display)
                 val root = FrameLayout(presentation.context).apply {
-                    setBackgroundColor(BrowserTheme.background)
+                    setBackgroundColor(BrowserTheme.dark.background)
                 }
                 val content = FrameLayout(presentation.context)
                 root.addView(content, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))

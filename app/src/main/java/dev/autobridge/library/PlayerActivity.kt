@@ -1,14 +1,20 @@
 package dev.autobridge.library
 
 import android.app.Activity
+import android.app.PictureInPictureParams
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.graphics.BitmapFactory
 import android.graphics.Typeface
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.Rational
+import android.view.GestureDetector
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.SurfaceView
 import android.view.View
 import android.view.WindowManager
@@ -17,17 +23,27 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.SeekBar
 import android.widget.TextView
+import androidx.media3.common.C
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.VideoSize
 import dev.autobridge.core.model.Feature
 import dev.autobridge.core.policy.FeaturePolicy
 import dev.autobridge.entertainment.ContentKind
 import dev.autobridge.media.MediaPlaybackClient
+import dev.autobridge.media.VideoAspect
 import dev.autobridge.safety.ParkingStateStore
 import dev.autobridge.safety.SafetyEnforcement
+import dev.autobridge.settings.ChannelGesture
+import dev.autobridge.settings.PlayerDpi
+import dev.autobridge.settings.SplitLayout
+import dev.autobridge.settings.VideoSettings
+import dev.autobridge.subtitles.SubtitleHub
+import dev.autobridge.subtitles.SubtitleLine
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.dp
 import dev.autobridge.ui.ImageLoader
+import kotlin.math.abs
 
 /**
  * The phone playback screen for everything the library and IPTV sections open.
@@ -39,6 +55,12 @@ import dev.autobridge.ui.ImageLoader
  *
  * Live streams report no duration, so the transport switches to a LIVE badge and hides seeking
  * instead of showing a scrubber that cannot move.
+ *
+ * How it behaves — background playback, picture-in-picture, the channel gesture, the queue panel,
+ * the aspect ratio and the size of the controls — is read from [VideoSettings] rather than fixed
+ * here. The settings that change the layout are re-read in [onResume] and rebuild the screen,
+ * because the settings screen is opened from this one's header and a value that only took effect
+ * on the next channel would look broken.
  */
 class PlayerActivity : Activity() {
     companion object {
@@ -49,6 +71,8 @@ class PlayerActivity : Activity() {
         const val EXTRA_KIND = "dev.autobridge.extra.PLAYER_KIND"
         /** Queue for Next/Previous, e.g. every track in the folder that was opened. */
         const val EXTRA_QUEUE = "dev.autobridge.extra.PLAYER_QUEUE"
+        /** Names for [EXTRA_QUEUE], in the same order, for the queue panel and the channel toast. */
+        const val EXTRA_QUEUE_TITLES = "dev.autobridge.extra.PLAYER_QUEUE_TITLES"
         const val EXTRA_QUEUE_INDEX = "dev.autobridge.extra.PLAYER_QUEUE_INDEX"
 
         fun intent(
@@ -59,6 +83,7 @@ class PlayerActivity : Activity() {
             artwork: String = "",
             video: Boolean = true,
             queue: List<String> = emptyList(),
+            queueTitles: List<String> = emptyList(),
             queueIndex: Int = 0
         ): Intent = Intent(context, PlayerActivity::class.java)
             .putExtra(EXTRA_URL, url)
@@ -67,9 +92,16 @@ class PlayerActivity : Activity() {
             .putExtra(EXTRA_ARTWORK, artwork)
             .putExtra(EXTRA_KIND, (if (video) ContentKind.VIDEO else ContentKind.AUDIO).name)
             .putStringArrayListExtra(EXTRA_QUEUE, ArrayList(queue))
+            .putStringArrayListExtra(EXTRA_QUEUE_TITLES, ArrayList(queueTitles))
             .putExtra(EXTRA_QUEUE_INDEX, queueIndex)
 
         private const val SEEK_STEP_MS = 10_000L
+        /** A failed channel is left on screen this long before "Auto next channel" moves on. */
+        private const val AUTO_NEXT_DELAY_MS = 1_500L
+        /** Rows in the queue panel; a country playlist would otherwise put thousands in a column. */
+        private const val MAX_QUEUE_ROWS = 50
+        /** The window a fling has to cross before it counts as a channel change rather than a tap. */
+        private const val SWIPE_DISTANCE_DP = 48
     }
 
     private val url by lazy { intent.getStringExtra(EXTRA_URL)?.trim().orEmpty() }
@@ -81,20 +113,26 @@ class PlayerActivity : Activity() {
             ?: ContentKind.VIDEO
     }
     private val queue by lazy { intent.getStringArrayListExtra(EXTRA_QUEUE).orEmpty() }
+    private val queueTitles by lazy { intent.getStringArrayListExtra(EXTRA_QUEUE_TITLES).orEmpty() }
     private val queueIndex by lazy { intent.getIntExtra(EXTRA_QUEUE_INDEX, 0) }
 
     private lateinit var playback: MediaPlaybackClient
+    private lateinit var bodyView: LinearLayout
     private lateinit var stage: FrameLayout
     private lateinit var video: SurfaceView
     private lateinit var artworkPanel: View
     private lateinit var artworkImage: ImageView
     private lateinit var artworkGlyph: TextView
     private lateinit var notice: TextView
+    private lateinit var subtitleView: TextView
     private lateinit var toggle: TextView
     private lateinit var scrubber: SeekBar
     private lateinit var elapsed: TextView
     private lateinit var remaining: TextView
     private lateinit var liveBadge: View
+
+    /** Everything that is not the picture, hidden while the window is a picture-in-picture one. */
+    private val chrome = mutableListOf<View>()
 
     private var started = false
 
@@ -103,11 +141,24 @@ class PlayerActivity : Activity() {
     private var scrubbing = false
     private var surfaceAttached = false
 
+    /** The settings the current view tree was built for; a change rebuilds it. */
+    private var builtFor: LayoutSignature? = null
+
+    /** Guards against queueing a second advance while the first one is still pending. */
+    private var autoNextPending = false
+
     private val accent get() = if (kind == ContentKind.AUDIO) {
         AutoBridgeDesign.ACCENT_RADIO
     } else {
         AutoBridgeDesign.ACCENT_TV
     }
+
+    /** The settings that decide the shape of the view tree rather than what it displays. */
+    private data class LayoutSignature(
+        val dpi: PlayerDpi,
+        val split: SplitLayout,
+        val orientation: Int
+    )
 
     private val ticker = Handler(Looper.getMainLooper())
     private val tick = object : Runnable {
@@ -117,6 +168,19 @@ class PlayerActivity : Activity() {
         }
     }
     private val parkingListener: (ParkingStateStore.State) -> Unit = { runOnUiThread { render() } }
+
+    /**
+     * Draws the translated subtitle line published by [SubtitleHub]. The hub calls on the main
+     * thread, and the view is only touched here, so no post is needed. A blank line hides the
+     * overlay rather than leaving an empty bar on the picture.
+     */
+    private val subtitleListener: (SubtitleLine) -> Unit = { line ->
+        if (::subtitleView.isInitialized) {
+            val text = line.displayText
+            subtitleView.text = text
+            subtitleView.visibility = if (line.isBlank || text.isBlank()) View.GONE else View.VISIBLE
+        }
+    }
     private val playerListener = object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) {
             runOnUiThread {
@@ -126,6 +190,7 @@ class PlayerActivity : Activity() {
                 // started yet.
                 failure = "Playback failed: ${error.errorCodeName}. Tap play to retry."
                 render()
+                scheduleAutoNext("after ${error.errorCodeName}")
             }
         }
 
@@ -133,6 +198,14 @@ class PlayerActivity : Activity() {
             if (isPlaying) failure = null
             render()
         }
+
+        override fun onPlaybackStateChanged(state: Int) = runOnUiThread {
+            if (state == Player.STATE_ENDED) scheduleAutoNext("at the end of the item")
+            render()
+        }
+
+        /** The chosen aspect ratio can only be applied once the frame's own shape is known. */
+        override fun onVideoSizeChanged(videoSize: VideoSize) = runOnUiThread { applyVideoGeometry() }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -162,37 +235,107 @@ class PlayerActivity : Activity() {
 
     // ----- UI -----
 
+    /** Control sizes follow the "Preferred DPI" setting; the picture itself never shrinks. */
+    private fun scaled(value: Int): Int = dp((value * VideoSettings.playerDpi(this).scale).toInt())
+
+    private fun scaledText(size: Float): Float = size * VideoSettings.playerDpi(this).scale
+
+    private fun signature(): LayoutSignature = LayoutSignature(
+        dpi = VideoSettings.playerDpi(this),
+        split = VideoSettings.splitLayout(this),
+        orientation = resources.configuration.orientation
+    )
+
     private fun buildUi(): View {
+        builtFor = signature()
+        chrome.clear()
+
         val header = AutoBridgeDesign.header(
             context = this,
             title = title,
             subtitle = subtitleText.ifBlank { if (kind == ContentKind.AUDIO) "Audio" else "Video" },
-            onBack = { finish() }
+            onBack = { finish() },
+            actions = listOf(
+                AutoBridgeDesign.HeaderAction("⚙", { startActivity(VideoSettingsActivity.intent(this)) })
+            )
         )
+        chrome += header
 
         stage = FrameLayout(this).apply {
             background = AutoBridgeDesign.surface(
                 this@PlayerActivity, AutoBridgeDesign.SURFACE, 20, AutoBridgeDesign.HAIRLINE
             )
             clipToOutline = true
+            // The aspect ratio is applied against the stage's measured size, which is not known
+            // when the view is built and changes with rotation and with picture-in-picture.
+            addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> applyVideoGeometry() }
         }
+        attachChannelGesture(stage)
         video = SurfaceView(this).apply { visibility = View.GONE }
         artworkPanel = buildArtworkPanel()
         notice = TextView(this).apply {
-            textSize = 14f
+            textSize = scaledText(14f)
             setTextColor(AutoBridgeDesign.TEXT_MUTED)
             gravity = Gravity.CENTER
             visibility = View.GONE
             setPadding(dp(24), dp(24), dp(24), dp(24))
         }
+        subtitleView = TextView(this).apply {
+            textSize = scaledText(16f)
+            setTextColor(0xFFFFFFFF.toInt())
+            // A translucent slab behind the text so a white line stays legible over a bright
+            // frame; the picture is still visible around it rather than letterboxed by a bar.
+            setBackgroundColor(0xA6000000.toInt())
+            gravity = Gravity.CENTER
+            setPadding(dp(12), dp(6), dp(12), dp(6))
+            visibility = View.GONE
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+        }
         stage.addView(artworkPanel, FrameLayout.LayoutParams(-1, -1))
-        stage.addView(video, FrameLayout.LayoutParams(-1, -1))
+        stage.addView(video, FrameLayout.LayoutParams(-1, -1, Gravity.CENTER))
         stage.addView(notice, FrameLayout.LayoutParams(-1, -1))
+        // On top of the picture, pinned to the bottom with a small inset so it does not touch the
+        // rounded corners of the stage.
+        stage.addView(
+            subtitleView,
+            FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply {
+                bottomMargin = dp(12)
+                leftMargin = dp(12)
+                rightMargin = dp(12)
+            }
+        )
+
+        val progress = buildProgress()
+        val transport = buildTransport()
+        chrome += progress
+        chrome += transport
+
+        val split = VideoSettings.splitLayout(this)
+        val queuePanel = if (split == SplitLayout.MAIN_ONLY) null else buildQueuePanel()
+        val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        val sideBySide = split == SplitLayout.SIDE_BY_SIDE && landscape && queuePanel != null
 
         val body = AutoBridgeDesign.body(this)
-        body.addView(stage, LinearLayout.LayoutParams(-1, dp(220)).apply { topMargin = dp(4) })
-        body.addView(buildProgress(), LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(18) })
-        body.addView(buildTransport(), LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10) })
+        bodyView = body
+        val stageHeight = scaled(220)
+        if (sideBySide) {
+            // Landscape with a queue: the picture keeps the larger share, the list takes the rest.
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            row.addView(stage, LinearLayout.LayoutParams(0, stageHeight, 1.7f))
+            row.addView(queuePanel, LinearLayout.LayoutParams(0, stageHeight, 1f).apply {
+                marginStart = dp(10)
+            })
+            chrome += queuePanel
+            body.addView(row, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) })
+        } else {
+            body.addView(stage, LinearLayout.LayoutParams(-1, stageHeight).apply { topMargin = dp(4) })
+        }
+        body.addView(progress, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(18) })
+        body.addView(transport, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10) })
+        if (queuePanel != null && !sideBySide) {
+            chrome += queuePanel
+            body.addView(queuePanel, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(16) })
+        }
 
         return AutoBridgeDesign.page(context = this, header = header, body = body)
     }
@@ -248,17 +391,17 @@ class PlayerActivity : Activity() {
 
         val times = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         elapsed = TextView(this).apply {
-            textSize = 12f
+            textSize = scaledText(12f)
             setTextColor(AutoBridgeDesign.TEXT_MUTED)
         }
         remaining = TextView(this).apply {
-            textSize = 12f
+            textSize = scaledText(12f)
             setTextColor(AutoBridgeDesign.TEXT_MUTED)
             gravity = Gravity.END
         }
         liveBadge = TextView(this).apply {
             text = "LIVE"
-            textSize = 11f
+            textSize = scaledText(11f)
             gravity = Gravity.CENTER
             setTextColor(AutoBridgeDesign.DANGER)
             letterSpacing = 0.12f
@@ -283,8 +426,8 @@ class PlayerActivity : Activity() {
         val row = LinearLayout(this).apply { gravity = Gravity.CENTER }
         fun control(glyph: String, size: Float, diameter: Int, action: () -> Unit) {
             row.addView(
-                AutoBridgeDesign.glyphButton(this, glyph, size) { action() },
-                LinearLayout.LayoutParams(dp(diameter), dp(diameter)).apply {
+                AutoBridgeDesign.glyphButton(this, glyph, scaledText(size)) { action() },
+                LinearLayout.LayoutParams(scaled(diameter), scaled(diameter)).apply {
                     marginStart = dp(8)
                     marginEnd = dp(8)
                 }
@@ -292,19 +435,183 @@ class PlayerActivity : Activity() {
         }
         control("⏮", 16f, 48) { playback.previous() }
         control("−10", 13f, 48) { seekBy(-SEEK_STEP_MS) }
-        toggle = AutoBridgeDesign.glyphButton(this, "▶", 22f, filled = true) {
+        toggle = AutoBridgeDesign.glyphButton(this, "▶", scaledText(22f), filled = true) {
             // After an error the player needs a new prepare(); resume() alone would do nothing,
             // leaving the only visible control dead for the rest of the screen's life.
             if (failure != null) retry() else if (playback.isPlaying) playback.pause() else playback.resume()
             render()
         }
-        row.addView(toggle, LinearLayout.LayoutParams(dp(64), dp(64)).apply {
+        row.addView(toggle, LinearLayout.LayoutParams(scaled(64), scaled(64)).apply {
             marginStart = dp(10)
             marginEnd = dp(10)
         })
         control("+10", 13f, 48) { seekBy(SEEK_STEP_MS) }
         control("⏭", 16f, 48) { playback.next() }
         return row
+    }
+
+    /**
+     * The "Split screen layout" sub panel: what else is in the queue, and a tap to jump to it.
+     *
+     * Null when there is nothing to show — a single channel opened on its own has no queue, and an
+     * empty panel under the transport would just be a gap.
+     */
+    private fun buildQueuePanel(): View? {
+        if (queue.size <= 1) return null
+        val column = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = AutoBridgeDesign.surface(this@PlayerActivity, AutoBridgeDesign.SURFACE, 16)
+            setPadding(dp(10), dp(8), dp(10), dp(8))
+        }
+        column.addView(TextView(this).apply {
+            text = "UP NEXT"
+            textSize = scaledText(11f)
+            letterSpacing = 0.14f
+            setTextColor(AutoBridgeDesign.TEXT_MUTED)
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            setPadding(dp(4), dp(2), dp(4), dp(6))
+        })
+        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        queue.take(MAX_QUEUE_ROWS).forEachIndexed { index, item ->
+            val name = queueTitles.getOrNull(index)?.takeIf { it.isNotBlank() } ?: item
+            list.addView(TextView(this).apply {
+                text = name
+                textSize = scaledText(13f)
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+                setTextColor(AutoBridgeDesign.TEXT)
+                setPadding(dp(6), dp(9), dp(6), dp(9))
+                isClickable = true
+                isFocusable = true
+                background = AutoBridgeDesign.tappable(
+                    this@PlayerActivity, AutoBridgeDesign.SURFACE, 12, accent
+                )
+                setOnClickListener { jumpTo(index, name) }
+            }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(4) })
+        }
+        // Side by side gives the panel the stage's height, so it has to scroll on its own.
+        val scroller = android.widget.ScrollView(this).apply {
+            isVerticalScrollBarEnabled = false
+            addView(list, LinearLayout.LayoutParams(-1, -2))
+        }
+        column.addView(scroller, LinearLayout.LayoutParams(-1, -2))
+        return column
+    }
+
+    // ----- Channel changes -----
+
+    /** Applies the "Change channel" setting to the picture. */
+    private fun attachChannelGesture(target: View) {
+        val minimum = dp(SWIPE_DISTANCE_DP)
+        val detector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onDown(event: MotionEvent): Boolean = true
+
+            override fun onFling(
+                start: MotionEvent?,
+                end: MotionEvent,
+                velocityX: Float,
+                velocityY: Float
+            ): Boolean {
+                val from = start ?: return false
+                val dx = end.x - from.x
+                val dy = end.y - from.y
+                return when (VideoSettings.channelGesture(this@PlayerActivity)) {
+                    ChannelGesture.SWIPE_VERTICAL ->
+                        if (abs(dy) > abs(dx) && abs(dy) > minimum) {
+                            // Up is "forward", the direction a channel list runs on screen.
+                            changeChannel(forward = dy < 0)
+                            true
+                        } else false
+                    ChannelGesture.SWIPE_HORIZONTAL ->
+                        if (abs(dx) > abs(dy) && abs(dx) > minimum) {
+                            changeChannel(forward = dx < 0)
+                            true
+                        } else false
+                    else -> false
+                }
+            }
+
+            override fun onDoubleTap(event: MotionEvent): Boolean {
+                if (VideoSettings.channelGesture(this@PlayerActivity) != ChannelGesture.DOUBLE_TAP) {
+                    return false
+                }
+                // The middle third is left alone, so a double tap meant for nothing in particular
+                // does not change channel.
+                val third = target.width / 3f
+                return when {
+                    event.x < third -> { changeChannel(forward = false); true }
+                    event.x > target.width - third -> { changeChannel(forward = true); true }
+                    else -> false
+                }
+            }
+        })
+        target.setOnTouchListener { view, event ->
+            val handled = detector.onTouchEvent(event)
+            if (event.actionMasked == MotionEvent.ACTION_UP) view.performClick()
+            handled
+        }
+    }
+
+    private fun changeChannel(forward: Boolean) {
+        val player = playback.player ?: return
+        val available = if (forward) player.hasNextMediaItem() else player.hasPreviousMediaItem()
+        if (!available) {
+            announce(if (forward) "Last in the queue" else "First in the queue")
+            return
+        }
+        failure = null
+        // Read the target before issuing the command: a MediaController applies it on the session
+        // thread, so the index here may or may not have moved by the time the toast is built.
+        val target = player.currentMediaItemIndex + if (forward) 1 else -1
+        if (forward) playback.next() else playback.previous()
+        announce(nameAt(target))
+        render()
+    }
+
+    private fun jumpTo(index: Int, name: String) {
+        val player = playback.player ?: return
+        if (index !in 0 until player.mediaItemCount) return
+        failure = null
+        player.seekTo(index, 0L)
+        player.play()
+        announce(name)
+        render()
+    }
+
+    /**
+     * Moves on from a channel that failed or ended, when "Auto next channel" is on.
+     *
+     * Delayed rather than immediate: a provider that is down answers instantly, and advancing with
+     * no pause would walk the whole playlist in a second and leave the user on an unrelated
+     * channel with no idea why.
+     */
+    private fun scheduleAutoNext(reason: String) {
+        if (!VideoSettings.autoNextChannel(this)) return
+        if (autoNextPending) return
+        if (playback.player?.hasNextMediaItem() != true) return
+        autoNextPending = true
+        ticker.postDelayed({
+            autoNextPending = false
+            if (isFinishing || isDestroyed) return@postDelayed
+            if (!VideoSettings.autoNextChannel(this)) return@postDelayed
+            val player = playback.player ?: return@postDelayed
+            if (!player.hasNextMediaItem()) return@postDelayed
+            failure = null
+            val target = player.currentMediaItemIndex + 1
+            playback.next()
+            announce("Auto next $reason: " + nameAt(target))
+            render()
+        }, AUTO_NEXT_DELAY_MS)
+    }
+
+    private fun nameAt(index: Int): String =
+        queueTitles.getOrNull(index)?.takeIf { it.isNotBlank() }
+            ?: queue.getOrNull(index)
+            ?: playback.currentTitle
+            ?: "Next"
+
+    private fun announce(message: String) {
+        android.widget.Toast.makeText(this, message, android.widget.Toast.LENGTH_SHORT).show()
     }
 
     // ----- Playback -----
@@ -322,8 +629,10 @@ class PlayerActivity : Activity() {
         }
         started = true
         failure = null
-        if (queue.size > 1 && kind == ContentKind.AUDIO) {
-            playback.playPlaylist(queue, queueIndex)
+        // Video queues the list too, now that a channel list is what Next/Previous, the channel
+        // gesture and "Auto next channel" all walk.
+        if (queue.size > 1) {
+            playback.playPlaylist(queue, queueIndex, queueTitles)
         } else {
             playback.play(url, title)
         }
@@ -351,9 +660,7 @@ class PlayerActivity : Activity() {
      */
     private fun render() {
         val player = playback.player
-        val videoAllowed = kind == ContentKind.VIDEO &&
-            FeaturePolicy.app.isAvailable(Feature.VIDEO) &&
-            SafetyEnforcement.gateParked(ParkingStateStore.isParked)
+        val videoAllowed = videoAllowed()
 
         val failed = failure
         if (failed != null) {
@@ -372,6 +679,7 @@ class PlayerActivity : Activity() {
                 player.setVideoSurfaceView(video)
                 surfaceAttached = true
             }
+            applyVideoGeometry()
             if (!started) startPlayback()
         } else {
             video.visibility = View.GONE
@@ -400,10 +708,50 @@ class PlayerActivity : Activity() {
         liveBadge.visibility = if (live) View.VISIBLE else View.GONE
         scrubber.isEnabled = !live
         elapsed.text = if (live) "" else formatTime(position)
-        remaining.text = if (live) "" else "-" + formatTime((duration - position).coerceAtLeast(0L))
+        remaining.text = when {
+            !live -> "-" + formatTime((duration - position).coerceAtLeast(0L))
+            else -> liveDelayText(player)
+        }
         if (!scrubbing) {
             scrubber.progress = if (live) 0 else (scrubber.max * position / duration).toInt()
         }
+    }
+
+    private fun videoAllowed(): Boolean = kind == ContentKind.VIDEO &&
+        FeaturePolicy.app.isAvailable(Feature.VIDEO) &&
+        SafetyEnforcement.gateParked(ParkingStateStore.isParked)
+
+    /**
+     * "Show delay": how far behind the live edge the stream is sitting.
+     *
+     * Only a target-latency stream (a low-latency HLS or DASH channel) reports an offset at all;
+     * anything else answers [C.TIME_UNSET], and an empty line is the honest reading rather than a
+     * zero that would claim the picture is live to the second.
+     */
+    private fun liveDelayText(player: Player?): String {
+        if (!VideoSettings.showDelay(this)) return ""
+        val offset = player?.currentLiveOffset ?: C.TIME_UNSET
+        if (offset == C.TIME_UNSET || offset <= 0L) return ""
+        return "${offset / 1000}s behind live"
+    }
+
+    /** Sizes the video view inside the stage for the chosen aspect ratio. */
+    private fun applyVideoGeometry() {
+        if (!::video.isInitialized || !::stage.isInitialized) return
+        val size = playback.player?.videoSize
+        val target = VideoAspect.layout(
+            mode = VideoSettings.aspectRatio(this),
+            videoWidth = size?.width ?: 0,
+            videoHeight = size?.height ?: 0,
+            boxWidth = stage.width,
+            boxHeight = stage.height
+        )
+        val params = video.layoutParams as? FrameLayout.LayoutParams ?: return
+        if (params.width == target.width && params.height == target.height) return
+        params.width = target.width
+        params.height = target.height
+        params.gravity = Gravity.CENTER
+        video.layoutParams = params
     }
 
     private fun detachSurface() {
@@ -431,18 +779,100 @@ class PlayerActivity : Activity() {
         else "%d:%02d".format(minutes, seconds)
     }
 
+    // ----- Picture in picture -----
+
+    private val pictureInPictureSupported: Boolean
+        get() = packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
+
+    /**
+     * "Automatic picture in picture": leaving the screen shrinks the picture into a floating
+     * window instead of stopping it.
+     *
+     * Gated on the same parked check as the full screen, because a video window floating over the
+     * launcher while the car is moving is exactly what [SafetyEnforcement] exists to prevent.
+     */
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (!pictureInPictureSupported) return
+        if (!VideoSettings.autoPictureInPicture(this)) return
+        if (!videoAllowed() || failure != null || !playback.isPlaying) return
+        if (isInPictureInPictureMode) return
+        val size = playback.player?.videoSize
+        val params = PictureInPictureParams.Builder()
+            .setAspectRatio(pictureInPictureRatio(size))
+            .build()
+        // A device can refuse PiP (an OEM policy, or a window that is not eligible right now).
+        // Refusing is not a crash, and the screen simply stays as it is.
+        runCatching { enterPictureInPictureMode(params) }
+    }
+
+    /**
+     * Android rejects a picture-in-picture ratio outside roughly 1:2.39..2.39:1, and a stream that
+     * has not reported a size yet has none at all, so the window falls back to 16:9.
+     */
+    private fun pictureInPictureRatio(size: VideoSize?): Rational {
+        val width = size?.width ?: 0
+        val height = size?.height ?: 0
+        if (width <= 0 || height <= 0) return Rational(16, 9)
+        val ratio = width.toFloat() / height.toFloat()
+        return when {
+            ratio > 2.39f -> Rational(239, 100)
+            ratio < 1f / 2.39f -> Rational(100, 239)
+            else -> Rational(width, height)
+        }
+    }
+
+    override fun onPictureInPictureModeChanged(
+        isInPictureInPictureMode: Boolean,
+        newConfig: Configuration
+    ) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        // The window is a thumbnail: everything that is not the picture would be unreadable, and
+        // the controls belong to the system's own PiP affordances there.
+        chrome.forEach { it.visibility = if (isInPictureInPictureMode) View.GONE else View.VISIBLE }
+        // MATCH_PARENT inside the page's ScrollView would measure against the content rather than
+        // the window, so the picture takes the window height the configuration itself reports.
+        val params = stage.layoutParams
+        params.height = if (isInPictureInPictureMode) dp(newConfig.screenHeightDp) else scaled(220)
+        stage.layoutParams = params
+        // The page gutter is a quarter of a thumbnail; the window is all picture in that mode.
+        if (isInPictureInPictureMode) {
+            bodyView.setPadding(0, 0, 0, 0)
+        } else {
+            bodyView.setPadding(dp(16), 0, dp(16), dp(20))
+        }
+        render()
+    }
+
     override fun onResume() {
         super.onResume()
+        // A layout setting changed on the settings screen this header opens; rebuild rather than
+        // leave a stale shape behind. The surface is released first so the new SurfaceView can
+        // take the player's output.
+        if (builtFor != signature()) {
+            detachSurface()
+            setContentView(buildUi())
+        }
         ticker.removeCallbacks(tick)
         ticker.post(tick)
+        // Registered here rather than in onCreate because onResume may have just rebuilt the view
+        // tree, replacing subtitleView; addListener hands back the current line immediately, so
+        // the fresh view is populated without waiting for the next cue.
+        SubtitleHub.addListener(subtitleListener)
     }
 
     override fun onPause() {
         super.onPause()
         ticker.removeCallbacks(tick)
+        SubtitleHub.removeListener(subtitleListener)
         // Video output is exclusive to a visible surface; audio deliberately keeps going so a
-        // radio stream survives leaving the screen, matching the car behaviour.
-        if (kind == ContentKind.VIDEO) {
+        // radio stream survives leaving the screen, matching the car behaviour. "Play in
+        // background" extends that to video, and a picture-in-picture window is still on screen,
+        // so neither case may pause here.
+        val keepPlaying = kind != ContentKind.VIDEO ||
+            VideoSettings.playInBackground(this) ||
+            (pictureInPictureSupported && isInPictureInPictureMode)
+        if (!keepPlaying) {
             playback.pause()
             detachSurface()
         }
@@ -450,7 +880,7 @@ class PlayerActivity : Activity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        ticker.removeCallbacks(tick)
+        ticker.removeCallbacksAndMessages(null)
         ParkingStateStore.removeListener(parkingListener)
         detachSurface()
         playback.player?.removeListener(playerListener)

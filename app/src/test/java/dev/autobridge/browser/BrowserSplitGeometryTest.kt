@@ -31,6 +31,14 @@ class BrowserSplitGeometryTest {
         assertEquals(gap, panes.main.left - panes.side.right)
     }
 
+    @Test fun sixtyFiveThirtyFiveGivesTheSidePaneThirtyFive() {
+        val panes = split(BrowserSplitLayout.SIXTY_FIVE_THIRTY_FIVE, 1280, 720)!!
+        assertEquals(447, panes.side.width) // 35% of 1276 (usable = width - gap)
+        assertEquals(829, panes.main.width) // the remaining 65%
+        assertEquals(gap, panes.main.left - panes.side.right)
+        assertEquals(720, panes.main.height)
+    }
+
     @Test fun portraitLandscapeFillsAWideScreenWithExactSixteenByNine() {
         val panes = split(BrowserSplitLayout.PORTRAIT_LANDSCAPE, 1920, 720)!!
         assertEquals(PaneRect(1916 - 1280 + 4, 0, 1920, 720).width, panes.main.width)

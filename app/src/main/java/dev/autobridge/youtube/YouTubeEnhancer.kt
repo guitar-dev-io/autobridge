@@ -33,6 +33,7 @@ class YouTubeEnhancer(private val context: Context) {
 
     private var armedVideoId: String? = null
     private var qualityAppliedTo: String? = null
+    private var adSkipArmed = false
 
     /**
      * Call from `onPageFinished` and `doUpdateVisitedHistory`.
@@ -40,6 +41,8 @@ class YouTubeEnhancer(private val context: Context) {
      * [view] is read and written only on the main thread; the network part happens on [lookups].
      */
     fun onPageChanged(view: WebView, url: String) {
+        applyAdSkip(view, url)
+
         val videoId = YouTubeUrls.videoId(url)
         if (videoId == null) {
             armedVideoId = null
@@ -81,6 +84,31 @@ class YouTubeEnhancer(private val context: Context) {
                 // would skip parts of a different video.
                 if (armedVideoId == videoId) arm(view, videoId, segments)
             }
+        }
+    }
+
+    /**
+     * Arms or disarms [YouTubeAdSkip] for whatever page [view] is on.
+     *
+     * Unlike SponsorBlock this is per-document, not per-video: one armed poll covers every video
+     * reached by an in-page navigation afterwards, and the script's own guard makes the repeat call
+     * on each navigation cheap. It is also armed on pages that are not a single video — the feed and
+     * search results carry ad slots of their own — so it runs before the [YouTubeUrls.videoId] check
+     * rather than after it.
+     *
+     * Leaving YouTube for another site needs no clear: the document goes, and the timer with it.
+     * [adSkipArmed] exists only for the case that matters, which is the setting being switched off
+     * while a YouTube page is still open.
+     */
+    private fun applyAdSkip(view: WebView, url: String) {
+        if (YouTubeSettings.adSkipEnabled(context) && YouTubeUrls.isYouTube(url)) {
+            adSkipArmed = true
+            evaluate(view, YouTubeAdSkip.script()) { result ->
+                StructuredLog.i("YOUTUBE", "ad skip -> $result")
+            }
+        } else if (adSkipArmed) {
+            adSkipArmed = false
+            evaluate(view, YouTubeAdSkip.clearScript()) {}
         }
     }
 

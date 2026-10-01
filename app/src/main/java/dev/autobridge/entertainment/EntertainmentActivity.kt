@@ -16,11 +16,13 @@ import android.webkit.GeolocationPermissions
 import android.webkit.PermissionRequest
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.*
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import dev.autobridge.browser.BrowserAdBlock
 import dev.autobridge.browser.BrowserDefaults
 import dev.autobridge.browser.BrowserGeolocation
 import dev.autobridge.browser.FullscreenVideoController
@@ -190,6 +192,16 @@ class EntertainmentActivity : Activity() {
                 override fun onHideCustomView() = fullscreenController.hide()
             }
             webViewClient = object : WebViewClient() {
+                /**
+                 * Drops advertising and tracking subresources when the user has turned blocking on.
+                 * Returns null — "fetch it as usual" — for everything else.
+                 */
+                override fun shouldInterceptRequest(
+                    view: WebView,
+                    request: WebResourceRequest,
+                ): WebResourceResponse? =
+                    BrowserAdBlock.intercept(this@EntertainmentActivity, request)
+
                 override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean =
                     !FeaturePolicy.app.isAvailable(ContentKind.WEB.requiredFeature) ||
                         ContentAddress.https(request.url.toString()) == null

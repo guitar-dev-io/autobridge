@@ -41,8 +41,12 @@ class CarStreamingScreen(carContext: CarContext) : Screen(carContext) {
         return template.build()
     }
 
+    /** Same entry rule as the home tiles: a site already open is returned to, not reloaded. */
     private fun open(url: String) {
-        dev.autobridge.browser.CarBrowserRuntime.renderer(carContext).load(url)
+        val renderer = dev.autobridge.browser.CarBrowserRuntime.renderer(carContext)
+        if (!dev.autobridge.browser.CarBrowserEntry.resumes(renderer.livePageUrl, url)) {
+            renderer.load(url)
+        }
         CarNavigation.open(screenManager, "CarBrowserScreen") { CarBrowserScreen(carContext) }
     }
 }

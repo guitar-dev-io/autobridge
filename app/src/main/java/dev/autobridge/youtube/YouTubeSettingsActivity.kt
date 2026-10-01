@@ -11,10 +11,11 @@ import dev.autobridge.ui.AutoBridgeDesign.stack
 /**
  * Settings for the YouTube add-ons.
  *
- * Both features are off until switched on here: SponsorBlock changes what is played and talks to a
- * third-party service, and forcing the highest quality overrides a choice the site made about the
- * connection. The category list stays visible while SponsorBlock is off — greyed rather than
- * hidden — so it is obvious what turning it on will do before it is turned on.
+ * Every feature is off until switched on here: SponsorBlock changes what is played and talks to a
+ * third-party service, forcing the highest quality overrides a choice the site made about the
+ * connection, and skipping ads is something YouTube looks for and may answer with an interstitial of
+ * its own. The category list stays visible while SponsorBlock is off — greyed rather than hidden —
+ * so it is obvious what turning it on will do before it is turned on.
  */
 class YouTubeSettingsActivity : Activity() {
 
@@ -42,6 +43,19 @@ class YouTubeSettingsActivity : Activity() {
                 offCaption = "YouTube chooses, as usual"
             ) {
                 YouTubeSettings.setAutoHighestQuality(this, !YouTubeSettings.autoHighestQuality(this))
+                render()
+            }
+        )
+
+        body.stack(AutoBridgeDesign.sectionLabel(this, "Ads"), gap = 12)
+        body.stack(
+            toggleRow(
+                title = "Skip video ads",
+                on = YouTubeSettings.adSkipEnabled(this),
+                onCaption = "Presses Skip, or seeks past an unskippable ad",
+                offCaption = "Ads play as YouTube sends them"
+            ) {
+                YouTubeSettings.setAdSkipEnabled(this, !YouTubeSettings.adSkipEnabled(this))
                 render()
             }
         )
@@ -85,6 +99,20 @@ class YouTubeSettingsActivity : Activity() {
         body.stack(
             AutoBridgeDesign.emptyState(
                 context = this,
+                title = "What skipping ads can and cannot do",
+                message = "A pre-roll is served from the same address as the video itself, so it " +
+                    "cannot be blocked without blocking playback. It is ended from inside the " +
+                    "page instead, which means it may flash up for a moment first. YouTube " +
+                    "detects ad skipping and may ask you to turn it off. Banner ads elsewhere on " +
+                    "the web are handled by Block ads and trackers in Browser settings.",
+                accent = accent
+            ),
+            gap = 16
+        )
+
+        body.stack(
+            AutoBridgeDesign.emptyState(
+                context = this,
                 title = "Where the data comes from",
                 message = "Segments are submitted by SponsorBlock users. A lookup sends only a " +
                     "four-character hash of the video id, so the service is told a bucket of " +
@@ -100,12 +128,22 @@ class YouTubeSettingsActivity : Activity() {
                 header = AutoBridgeDesign.header(
                     context = this,
                     title = "YouTube",
-                    subtitle = if (sponsorOn) "SponsorBlock on" else "Add-ons off",
+                    subtitle = addOnSummary(),
                     onBack = { finish() }
                 ),
                 body = body
             )
         )
+    }
+
+    /** Names what is actually on, so the header is not "Add-ons off" while ad skipping is on. */
+    private fun addOnSummary(): String {
+        val on = buildList {
+            if (YouTubeSettings.adSkipEnabled(this@YouTubeSettingsActivity)) add("Ad skip")
+            if (YouTubeSettings.sponsorBlockEnabled(this@YouTubeSettingsActivity)) add("SponsorBlock")
+            if (YouTubeSettings.autoHighestQuality(this@YouTubeSettingsActivity)) add("Auto quality")
+        }
+        return if (on.isEmpty()) "Add-ons off" else on.joinToString(" · ") + " on"
     }
 
     /**

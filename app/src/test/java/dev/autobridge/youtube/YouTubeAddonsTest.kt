@@ -140,4 +140,30 @@ class YouTubeAddonsTest {
         assertTrue(!script.contains("JavascriptInterface"))
         assertTrue(!script.contains("Android."))
     }
+
+    @Test
+    fun `arming and clearing the ad skipper address the same state object`() {
+        // A typo in either key would leave clearScript() flipping a flag nothing reads, and the
+        // timer running after the setting was switched off — with nothing on screen to show it.
+        val key = "__abAdSkip"
+        assertTrue(YouTubeAdSkip.script().contains(key))
+        assertTrue(YouTubeAdSkip.clearScript().contains(key))
+        // Re-arming after a clear has to restart the timer the clear stopped.
+        assertTrue(YouTubeAdSkip.script().contains("setInterval"))
+        assertTrue(YouTubeAdSkip.clearScript().contains("clearInterval"))
+    }
+
+    @Test
+    fun `the ad skip selectors stay inside their javascript string literals`() {
+        // The selector lists are interpolated into single-quoted JS strings. One apostrophe in a
+        // selector would close the literal early, and the whole script would fail to parse — with
+        // no error anywhere, because evaluateJavascript reports a parse failure as a null result.
+        listOf(YouTubeAdSkip.script(), YouTubeAdSkip.clearScript()).forEach { script ->
+            assertEquals(script, 0, script.count { it == '"' })
+            script.lines().forEach { line ->
+                assertEquals(line, 0, line.count { it == '\'' } % 2)
+            }
+        }
+        assertTrue(!YouTubeAdSkip.script().contains("JavascriptInterface"))
+    }
 }

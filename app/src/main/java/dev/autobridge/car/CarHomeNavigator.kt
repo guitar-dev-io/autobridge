@@ -23,7 +23,13 @@ internal object CarHomeNavigator {
             section == HomeSection.RADIO ->
                 screenManager.push(CarIptvSourcesScreen(carContext, dev.autobridge.iptv.IptvKind.RADIO))
             url != null -> {
-                dev.autobridge.browser.CarBrowserRuntime.renderer(carContext).load(url)
+                // Tapping a site tile that is already open means "take me back to it", not "start
+                // over": loading the root again would throw the page away and restart whatever is
+                // playing on it. See [dev.autobridge.browser.CarBrowserEntry].
+                val renderer = dev.autobridge.browser.CarBrowserRuntime.renderer(carContext)
+                if (!dev.autobridge.browser.CarBrowserEntry.resumes(renderer.livePageUrl, url)) {
+                    renderer.load(url)
+                }
                 CarNavigation.open(screenManager, "CarBrowserScreen") { CarBrowserScreen(carContext) }
             }
             section == HomeSection.WEB ->

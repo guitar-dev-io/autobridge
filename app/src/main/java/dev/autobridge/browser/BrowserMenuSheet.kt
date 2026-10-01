@@ -138,8 +138,14 @@ class BrowserMenuSheet(
             shell.dismiss()
             if (target.isNotEmpty()) onNavigate(target)
         }
-        field.setOnEditorActionListener { _, action, _ ->
-            if (action == EditorInfo.IME_ACTION_GO) { go(); true } else false
+        // Accept both the IME "Go" action and a raw Enter key event. Some soft keyboards deliver
+        // Enter as a KEYCODE_ENTER key event with IME_ACTION_UNSPECIFIED rather than IME_ACTION_GO;
+        // handling only the latter is why the sheet sometimes stayed open on submit while nothing
+        // navigated. This mirrors the toolbar's own address field.
+        field.setOnEditorActionListener { _, action, event ->
+            val enterUp = event?.keyCode == android.view.KeyEvent.KEYCODE_ENTER &&
+                event.action == android.view.KeyEvent.ACTION_UP
+            if (action == EditorInfo.IME_ACTION_GO || enterUp) { go(); true } else false
         }
         val lock = TextView(activity).apply {
             text = if (current.secure) "🔒" else "!"

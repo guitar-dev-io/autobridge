@@ -136,8 +136,16 @@
         <!-- Phone playback for library/IPTV content. configChanges: rotation is handled in-process
              so the video SurfaceView is not torn down and re-created on every orientation change,
              which would drop the decoder attachment mid-stream. -->
+        <!-- supportsPictureInPicture: the "Automatic picture in picture" video setting shrinks the
+             player into a floating window when the screen is left. PiP delivers the change as a
+             configuration change, which the same configChanges list already keeps in-process. -->
         <activity android:name=".library.PlayerActivity" android:exported="false"
+            android:supportsPictureInPicture="true"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation|density|uiMode|fontScale" />
+
+        <!-- Video settings for the player above, and its enhancement sub-screen. -->
+        <activity android:name=".library.VideoSettingsActivity" android:exported="false" />
+        <activity android:name=".library.VideoEnhancementActivity" android:exported="false" />
 
         <!-- Step-by-step permissions and car-connection options. -->
         <activity android:name=".mirror.MirrorSetupActivity" android:exported="false" />

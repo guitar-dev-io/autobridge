@@ -8,6 +8,35 @@
     </style>
 
     <!--
+        The browser window's two faces, picked at runtime from the Appearance setting
+        (BrowserAppearanceStore.activityTheme). What matters beyond the bar colours is
+        android:isLightTheme: WebView reads it off the context a WebView is built with to decide
+        what to report for the page's prefers-color-scheme, which is why "Light" could not work
+        while the browser was pinned to a dark theme. The colours match BrowserTheme's two schemes
+        (surfaceContainer for the status bar, surface for the navigation bar) so the system bars
+        continue the chrome instead of framing it.
+    -->
+    <style name="BrowserThemeDark" parent="AppTheme">
+        <item name="android:isLightTheme">false</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:statusBarColor">#1D2024</item>
+        <item name="android:navigationBarColor">#111318</item>
+        <item name="android:windowBackground">#111318</item>
+    </style>
+
+    <style name="BrowserThemeLight" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:isLightTheme">true</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:statusBarColor">#EDEDF4</item>
+        <item name="android:navigationBarColor">#F9F9FF</item>
+        <item name="android:windowBackground">#F9F9FF</item>
+        <item name="android:colorAccent">#415F91</item>
+    </style>
+
+    <!--
         Material 3 brand colours for host-drawn templates (CarColor.PRIMARY / SECONDARY: buttons,
         toggles, accents). Same blue seed as BrowserTheme. The host checks contrast and falls back
         to its own default if a colour is unreadable on its background.

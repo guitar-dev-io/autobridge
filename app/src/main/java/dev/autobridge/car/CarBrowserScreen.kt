@@ -271,6 +271,10 @@ class CarBrowserScreen(carContext: CarContext) :
                     renderer.applyControlSettings()
                     invalidate()
                 }
+                CarBrowserSettingsScreen.CONTENT_CHANGED -> {
+                    renderer.reload()
+                    invalidate()
+                }
                 CarBrowserSettingsScreen.IDENTITY_CHANGED -> {
                     renderer.applyUserAgentAndReload()
                     CarToast.makeText(

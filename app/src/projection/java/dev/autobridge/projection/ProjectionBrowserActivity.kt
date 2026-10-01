@@ -9,6 +9,7 @@ import android.view.ViewGroup
 import android.webkit.PermissionRequest
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
@@ -17,6 +18,7 @@ import android.widget.TextView
 import com.google.android.apps.auto.sdk.CarActivity
 import dev.autobridge.audio.WebAudioBridge
 import dev.autobridge.audio.WebMediaStatus
+import dev.autobridge.browser.BrowserAdBlock
 import dev.autobridge.browser.BrowserDefaults
 import dev.autobridge.browser.WebViewTimerGate
 import dev.autobridge.core.model.Feature
@@ -99,6 +101,16 @@ class ProjectionBrowserActivity : CarActivity() {
         val web = WebView(this).apply {
             BrowserDefaults.configure(this@ProjectionBrowserActivity, this)
             webViewClient = object : WebViewClient() {
+                /**
+                 * Drops advertising and tracking subresources when the user has turned blocking on.
+                 * Returns null — "fetch it as usual" — for everything else.
+                 */
+                override fun shouldInterceptRequest(
+                    view: WebView,
+                    request: WebResourceRequest,
+                ): WebResourceResponse? =
+                    BrowserAdBlock.intercept(this@ProjectionBrowserActivity, request)
+
                 override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                     // Only web pages load here; app links and other schemes are dropped rather than
                     // handed to an intent the car display cannot show.

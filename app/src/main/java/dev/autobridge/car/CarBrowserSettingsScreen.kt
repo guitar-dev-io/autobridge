@@ -14,6 +14,7 @@ import androidx.car.app.model.SectionedItemList
 import androidx.car.app.model.Template
 import androidx.car.app.model.Toggle
 import dev.autobridge.audio.AudioPlaybackStore
+import dev.autobridge.browser.BrowserAdBlock
 import dev.autobridge.browser.BrowserControlsStore
 import dev.autobridge.browser.BrowserSplitLayout
 import dev.autobridge.browser.BrowserSplitStore
@@ -21,6 +22,7 @@ import dev.autobridge.browser.BrowserUserAgentCodec
 import dev.autobridge.browser.BrowserUserAgentMode
 import dev.autobridge.browser.BrowserUserAgentStore
 import dev.autobridge.browser.FloatingButtonAction
+import dev.autobridge.youtube.YouTubeSettings
 
 /**
  * Browser settings for the car surface.
@@ -131,6 +133,41 @@ class CarBrowserSettingsScreen(carContext: CarContext) : Screen(carContext) {
             )
             .build()
 
+        val blocking = ItemList.Builder()
+            .addItem(
+                Row.Builder()
+                    .setTitle("Block ads and trackers")
+                    .addText("Drops requests to known ad hosts. Not YouTube's in-video ads — those share a host with the video")
+                    .setToggle(
+                        Toggle.Builder { checked ->
+                            BrowserAdBlock.setEnabled(carContext, checked)
+                            setResult(CONTENT_CHANGED)
+                            invalidate()
+                        }
+                            .setChecked(BrowserAdBlock.enabled(carContext))
+                            .build()
+                    )
+                    .build()
+            )
+            .addItem(
+                Row.Builder()
+                    .setTitle("Skip YouTube video ads")
+                    .addText("Presses Skip, or seeks past an unskippable ad. YouTube may notice and ask you to turn it off")
+                    .setToggle(
+                        Toggle.Builder { checked ->
+                            YouTubeSettings.setAdSkipEnabled(carContext, checked)
+                            // The skipper is armed from the page's own navigation callbacks, so it
+                            // picks the new setting up on the next video without a reload.
+                            setResult(CHANGED)
+                            invalidate()
+                        }
+                            .setChecked(YouTubeSettings.adSkipEnabled(carContext))
+                            .build()
+                    )
+                    .build()
+            )
+            .build()
+
         val identity = ItemList.Builder()
             .addItem(
                 Row.Builder()
@@ -150,6 +187,7 @@ class CarBrowserSettingsScreen(carContext: CarContext) : Screen(carContext) {
                     .build()
             )
             .addSectionedList(SectionedItemList.create(controls, "In-app controls"))
+            .addSectionedList(SectionedItemList.create(blocking, "Content blocking"))
             .addSectionedList(SectionedItemList.create(identity, "Identity"))
             .build()
     }
@@ -197,6 +235,12 @@ class CarBrowserSettingsScreen(carContext: CarContext) : Screen(carContext) {
 
         /** The User-Agent changed, so the page has to be reloaded to be served under it. */
         const val IDENTITY_CHANGED = "identity"
+
+        /**
+         * Request blocking was switched. Blocking is decided per request, so the page on screen
+         * keeps whatever it already fetched until it is loaded again.
+         */
+        const val CONTENT_CHANGED = "content"
     }
 }
 
@@ -250,6 +294,7 @@ private class CarSplitLayoutScreen(carContext: CarContext) : Screen(carContext) 
         BrowserSplitLayout.SINGLE -> "One page on the whole screen"
         BrowserSplitLayout.HALF -> "Side page and main page, equal width"
         BrowserSplitLayout.FORTY_SIXTY -> "Side page 40%, main page 60%"
+        BrowserSplitLayout.SIXTY_FIVE_THIRTY_FIVE -> "Main page 65% (video), side page 35% (map)"
         BrowserSplitLayout.PORTRAIT_LANDSCAPE -> "Tall side page (map) + 16:9 main page (video)"
     }
 }

@@ -8,12 +8,15 @@ import androidx.core.content.edit
  *
  * Everything here is off unless the user turns it on. Skipping parts of a video and overriding the
  * quality a site chose are both changes to what someone asked to watch, and the network traffic
- * SponsorBlock adds goes to a third party, so none of it may happen by default.
+ * SponsorBlock adds goes to a third party, so none of it may happen by default. Skipping ads is off
+ * for a further reason: YouTube detects it and may answer with an interstitial of its own, which is
+ * a trade only the person watching can agree to.
  */
 object YouTubeSettings {
     private const val PREFS_NAME = "autobridge_youtube"
     private const val KEY_SPONSOR_BLOCK = "sponsor_block_enabled"
     private const val KEY_HIGHEST_QUALITY = "auto_highest_quality"
+    private const val KEY_AD_SKIP = "ad_skip_enabled"
     private const val CATEGORY_PREFIX = "sponsor_category_"
 
     fun sponsorBlockEnabled(context: Context): Boolean =
@@ -21,6 +24,13 @@ object YouTubeSettings {
 
     fun setSponsorBlockEnabled(context: Context, value: Boolean) =
         prefs(context).edit { putBoolean(KEY_SPONSOR_BLOCK, value) }
+
+    /** Whether [YouTubeAdSkip] is armed on watch pages. See that class for what it can and cannot do. */
+    fun adSkipEnabled(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_AD_SKIP, false)
+
+    fun setAdSkipEnabled(context: Context, value: Boolean) =
+        prefs(context).edit { putBoolean(KEY_AD_SKIP, value) }
 
     fun autoHighestQuality(context: Context): Boolean =
         prefs(context).getBoolean(KEY_HIGHEST_QUALITY, false)

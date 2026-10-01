@@ -106,11 +106,23 @@ class MediaPlaybackClient(private val context: Context) {
     /**
      * Replaces the queue with [uris] (in order) and starts at [startIndex], enabling
      * steering-wheel Next/Previous across the list. Blank/invalid entries are dropped.
+     *
+     * [titles] is optional and positional: when a name is given for an entry it becomes that
+     * item's session metadata, so the car's media card and the phone's now-playing line say
+     * "Channel 3HD" rather than a playlist URL. A title is looked up by the entry's own index in
+     * [uris], so an unusable entry takes its own name out of the queue with it.
      */
-    fun playPlaylist(uris: List<String>, startIndex: Int = 0) {
+    fun playPlaylist(uris: List<String>, startIndex: Int = 0, titles: List<String> = emptyList()) {
         if (!FeaturePolicy.app.isAvailable(Feature.MEDIA)) return
         val mediaController = controller ?: return
-        val items = uris.mapNotNull { buildMediaItem(it) }
+        val items = uris.mapIndexedNotNull { index, uri ->
+            val source = buildMediaItem(uri) ?: return@mapIndexedNotNull null
+            val name = titles.getOrNull(index)?.takeIf { it.isNotBlank() }
+                ?: return@mapIndexedNotNull source
+            source.buildUpon()
+                .setMediaMetadata(MediaMetadata.Builder().setTitle(name).build())
+                .build()
+        }
         if (items.isEmpty()) return
         val safeIndex = startIndex.coerceIn(0, items.size - 1)
         mediaController.setMediaItems(items, safeIndex, 0L)

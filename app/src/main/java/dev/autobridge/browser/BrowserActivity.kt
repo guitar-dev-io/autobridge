@@ -24,6 +24,7 @@ import android.webkit.PermissionRequest
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebStorage
 import android.webkit.WebView
@@ -60,6 +61,16 @@ class BrowserActivity : Activity() {
 
     /** YouTube add-ons (SponsorBlock, auto quality). Does nothing unless the user enabled them. */
     private val youtube by lazy { dev.autobridge.youtube.YouTubeEnhancer(this) }
+
+    /**
+     * Reads and pauses this page's `<audio>`/`<video>` elements, for the resume point "Send to car"
+     * carries over; see [sendWithResumePoint]. The car surface keeps its own bridge
+     * ([CarWebRenderer]) because each presentation has its own WebView. Null-safe on [web] so a read
+     * that races the activity's setup asks nothing rather than throwing.
+     */
+    private val webAudio by lazy {
+        dev.autobridge.audio.WebAudioBridge { if (::web.isInitialized) web else null }
+    }
 
     /** Per-site location prompt plus the runtime location permission; see [BrowserGeolocation]. */
     private val geolocation by lazy { BrowserGeolocation.Prompter(this) }
@@ -119,7 +130,10 @@ class BrowserActivity : Activity() {
      * page on one density; see [CarDisplayScaling].
      */
     override fun attachBaseContext(newBase: Context) {
-        super.attachBaseContext(CarDisplayScaling.rebase(newBase))
+        // Two re-bases, for two unrelated reasons: the density one pins the page's CSS width, the
+        // appearance one puts the window in the night mode the user picked so the WebView built
+        // from this context reports the matching prefers-color-scheme.
+        super.attachBaseContext(BrowserAppearanceStore.rebase(CarDisplayScaling.rebase(newBase)))
     }
 
     /**
@@ -142,6 +156,10 @@ class BrowserActivity : Activity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Both before anything is built: the chrome below reads BrowserTheme as it constructs its
+        // views and drawables, and the window theme has to be set before the first view exists.
+        BrowserAppearanceStore.syncChrome(this)
+        setTheme(BrowserAppearanceStore.activityTheme(this))
         super.onCreate(savedInstanceState)
         root = FrameLayout(this)
         applyStartPageBackground()
@@ -286,39 +304,12 @@ class BrowserActivity : Activity() {
             if (web.progress < 100) web.stopLoading() else web.reload()
             updateNavigation()
         }
-        address = EditText(this).apply {
-            hint = "URL / ค้นหา"
-            setTextColor(BrowserTheme.textPrimary)
-            setHintTextColor(Color.LTGRAY)
-            textSize = iconSp(AutoUiSizes.ICON_SMALL_DP * 0.85f)
-            setSingleLine()
-            setSelectAllOnFocus(true)
-            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
-            imeOptions = EditorInfo.IME_ACTION_GO
-            setPadding(sizes.dpInt(AutoUiSizes.HORIZONTAL_PADDING_DP), 0, sizes.dpInt(AutoUiSizes.HORIZONTAL_PADDING_DP), 0)
-            background = GradientDrawable().apply {
-                setColor(BrowserTheme.addressPillBackground)
-                cornerRadius = sizes.cornerRadius
-            }
-            setOnFocusChangeListener { _, hasFocus ->
-                // Editing needs the real URL; reading only needs the part that identifies the page.
-                setText(if (hasFocus) web.url.orEmpty() else displayUrl(web.url.orEmpty()))
-                if (hasFocus) setSelection(text.length)
-            }
-            setOnEditorActionListener { _, action, event ->
-                if (action == EditorInfo.IME_ACTION_GO ||
-                    (event?.keyCode == android.view.KeyEvent.KEYCODE_ENTER && event.action == android.view.KeyEvent.ACTION_UP)
-                ) {
-                    navigate(text.toString())
-                    clearFocus()
-                    (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(windowToken, 0)
-                    true
-                } else false
-            }
-        }
+        address = buildAddressField()
         toolbar.addView(
             address,
-            LinearLayout.LayoutParams(0, sizes.dpInt(AutoUiSizes.TOUCH_TARGET_DP * 0.8f), 1f).apply {
+            // Compact pill: shorter than a full touch target and vertically centred in the toolbar,
+            // so it reads as a slim address chip rather than a text box filling the bar's height.
+            LinearLayout.LayoutParams(0, sizes.dpInt(ADDRESS_PILL_HEIGHT_DP), 1f).apply {
                 marginStart = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP)
                 marginEnd = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP)
             }
@@ -342,6 +333,159 @@ class BrowserActivity : Activity() {
                 }
             )
         }
+    }
+
+    /** The address text the field restores to when editing is cancelled, captured on focus. */
+    private var addressBeforeEdit: String = ""
+
+    /**
+     * The compact omnibox that stays in the top bar at all times.
+     *
+     * Idle it shows only the hostname (via [displayUrl]) on a slim dark rounded pill, deliberately
+     * shorter than the toolbar buttons so it reads as a chip rather than a text box. Tapping it
+     * turns the same field into a full editable omnibox in place — the real URL, selected, with the
+     * keyboard up and a clear button — without opening a dialog, sheet or separate screen. Entering
+     * loads through the shared [BrowserInputResolver] (URL, bare host, or search); Back cancels and
+     * restores the previous address without touching the page.
+     */
+    private fun buildAddressField(): EditText = EditText(this).apply {
+        hint = HINT_IDLE
+        setTextColor(BrowserTheme.textPrimary)
+        setHintTextColor(BrowserTheme.textSecondary)
+        textSize = iconSp(AutoUiSizes.ICON_SMALL_DP * 0.85f)
+        setSingleLine()
+        setSelectAllOnFocus(true)
+        // A slim pill, not a boxed text field: no multi-line growth, caret centred vertically.
+        gravity = Gravity.CENTER_VERTICAL
+        inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
+        imeOptions = EditorInfo.IME_ACTION_GO
+        setPadding(
+            sizes.dpInt(AutoUiSizes.HORIZONTAL_PADDING_DP),
+            0,
+            sizes.dpInt(AutoUiSizes.HORIZONTAL_PADDING_DP),
+            0
+        )
+        background = GradientDrawable().apply {
+            setColor(BrowserTheme.addressPillBackground)
+            // Fully rounded ends keep the compact chip look at the shorter pill height.
+            cornerRadius = sizes.dp(ADDRESS_PILL_HEIGHT_DP) / 2f
+        }
+        setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                // Remember what to fall back to, then switch inline into edit mode: full URL,
+                // search-or-address hint, all text selected, clear button, keyboard up.
+                addressBeforeEdit = displayUrl(web.url.orEmpty())
+                hint = HINT_EDITING
+                setText(web.url.orEmpty())
+                setSelection(0, text.length)
+                updateAddressClearButton()
+                (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager)
+                    .showSoftInput(this, InputMethodManager.SHOW_IMPLICIT)
+            } else {
+                // Leaving edit mode collapses back to the compact hostname with no clear button.
+                hint = HINT_IDLE
+                setText(displayUrl(web.url.orEmpty()))
+                setClearButtonVisible(false)
+            }
+        }
+        // Keep the clear (X) button in step with the text while editing.
+        addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) = Unit
+            override fun afterTextChanged(s: android.text.Editable?) {
+                if (hasFocus()) updateAddressClearButton()
+            }
+        })
+        // Tap on the trailing X clears the field; the rest of the field behaves normally.
+        setOnTouchListener { _, event ->
+            if (event.action == android.view.MotionEvent.ACTION_UP && isClearButtonHit(event)) {
+                setText("")
+                updateAddressClearButton()
+                performClick()
+                true
+            } else false
+        }
+        setOnEditorActionListener { _, action, event ->
+            if (action == EditorInfo.IME_ACTION_GO ||
+                (event?.keyCode == android.view.KeyEvent.KEYCODE_ENTER && event.action == android.view.KeyEvent.ACTION_UP)
+            ) {
+                navigate(text.toString())
+                collapseAddressEditing(hideKeyboard = true)
+                true
+            } else false
+        }
+        // Android Back while editing cancels: restore the previous address and keep the page as it
+        // is. Handled on the field's own key events so it never falls through to WebView back/exit.
+        setOnKeyListener { _, keyCode, event ->
+            if (keyCode == android.view.KeyEvent.KEYCODE_BACK &&
+                event.action == android.view.KeyEvent.ACTION_UP && hasFocus()
+            ) {
+                cancelAddressEditing()
+                true
+            } else false
+        }
+    }
+
+    /** The horizontal span, from the field's right edge, treated as the clear-button hit area. */
+    private fun EditText.isClearButtonHit(event: android.view.MotionEvent): Boolean {
+        val drawable = compoundDrawablesRelative[2] ?: return false
+        val hit = drawable.bounds.width() + paddingEnd + sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP)
+        return event.x >= width - hit
+    }
+
+    /** Shows the inline clear (X) button only while editing with non-empty text. */
+    private fun updateAddressClearButton() {
+        address.setClearButtonVisible(address.hasFocus() && address.text.isNotEmpty())
+    }
+
+    /**
+     * Draws (or removes) the trailing clear glyph inside the pill.
+     *
+     * The glyph is painted as text ("✕"), the same way the toolbar draws "☰"/"⛶", so it needs no
+     * drawable resource or appcompat dependency and tints the same way on every API level.
+     */
+    private fun EditText.setClearButtonVisible(visible: Boolean) {
+        setCompoundDrawablesRelative(null, null, if (visible) clearGlyphDrawable else null, null)
+    }
+
+    /** The "✕" glyph used as the inline clear button, built once and tinted to the chrome icons. */
+    private val clearGlyphDrawable by lazy {
+        val size = sizes.dpInt(AutoUiSizes.ICON_SMALL_DP)
+        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            color = BrowserTheme.iconEnabled
+            textAlign = android.graphics.Paint.Align.CENTER
+            textSize = size * 0.9f
+        }
+        object : android.graphics.drawable.Drawable() {
+            override fun draw(canvas: android.graphics.Canvas) {
+                val b = bounds
+                val y = b.exactCenterY() - (paint.descent() + paint.ascent()) / 2f
+                canvas.drawText("✕", b.exactCenterX(), y, paint)
+            }
+            override fun setAlpha(alpha: Int) { paint.alpha = alpha }
+            override fun setColorFilter(cf: android.graphics.ColorFilter?) { paint.colorFilter = cf }
+            @Deprecated("Deprecated in Java")
+            override fun getOpacity() = android.graphics.PixelFormat.TRANSLUCENT
+        }.apply { setBounds(0, 0, size, size) }
+    }
+
+    /** Enter/Go path: drop focus and (optionally) the keyboard, collapsing back to compact display. */
+    private fun collapseAddressEditing(hideKeyboard: Boolean) {
+        address.clearFocus()
+        if (hideKeyboard) {
+            (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager)
+                .hideSoftInputFromWindow(address.windowToken, 0)
+        }
+    }
+
+    /**
+     * Cancels an in-progress edit: restores the address shown before focus, hides the keyboard and
+     * leaves the page untouched. The focus-change listener resets the text to the live page too, so
+     * [addressBeforeEdit] only matters while the page URL is briefly out of step mid-edit.
+     */
+    private fun cancelAddressEditing() {
+        address.setText(addressBeforeEdit)
+        collapseAddressEditing(hideKeyboard = true)
     }
 
     private fun createWebView(): WebView = WebView(this).apply {
@@ -437,6 +581,16 @@ class BrowserActivity : Activity() {
             }
         }
         webViewClient = object : WebViewClient() {
+            /**
+             * Drops advertising and tracking subresources when the user has turned blocking on.
+             * Returns null — "fetch it as usual" — for everything else, which is the whole of the
+             * web whenever the preference is off.
+             */
+            override fun shouldInterceptRequest(
+                view: WebView,
+                request: WebResourceRequest,
+            ): WebResourceResponse? = BrowserAdBlock.intercept(this@BrowserActivity, request)
+
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val target = request.url.toString()
                 if (allowed() && BrowserDefaults.isExternalSignInHost(target)) {
@@ -521,7 +675,11 @@ class BrowserActivity : Activity() {
             return
         }
         if (input.isNotBlank()) {
-            val url = BrowserDefaults.resolve(input)
+            // One shared resolver for the whole browser: a valid http/https URL (or a bare host
+            // like youtube.com, normalised to https://youtube.com) opens as-is; free text runs on
+            // the user's current/default search engine. See BrowserInputResolver.
+            val url = BrowserInputResolver.resolveBrowserInput(input, SearchEngineStore.engine(this))
+            // Collapse straight to the compact hostname; focus is cleared by the caller on Enter.
             address.setText(if (address.hasFocus()) url else displayUrl(url))
             web.loadUrl(url)
         }
@@ -765,7 +923,7 @@ class BrowserActivity : Activity() {
         SendToCarSheet(
             activity = this,
             sizes = sizes,
-            currentUrl = { web.url?.let(ContentAddress::https) },
+            currentUrl = { currentPageUrl() },
             currentTitle = { web.title?.takeIf { it.isNotBlank() } },
             engine = { SearchEngineStore.engine(this) },
             onEngineChange = { SearchEngineStore.setEngine(this, it) },
@@ -776,10 +934,19 @@ class BrowserActivity : Activity() {
         ).show()
     }
 
+    /** The page this activity is showing, as the one validated HTTPS form the car is given. */
+    private fun currentPageUrl(): String? = web.url?.let(ContentAddress::https)
+
     /**
      * Hands one resolved HTTPS URL to the browser running on the car surface, opening a fresh car
      * browser if none is on top. The single choke point every "send" path funnels through, so the
      * not-connected and empty-input cases are handled once.
+     *
+     * Sending the page the phone is *already playing* takes one detour: the position lives in this
+     * WebView's `<video>` element and nothing but the URL crosses to the car, so it is read out and
+     * written into the URL first ([BrowserResumePoint]). That read is a round trip into the page, so
+     * the send finishes a frame or two after this returns — the result below is about whether a car
+     * browser was reachable, which is all the sheet needs in order to close.
      *
      * @return true when the URL was accepted by a car browser, so the caller (the sheet) can close
      *   itself only on success and leave itself open with the input intact otherwise.
@@ -789,9 +956,47 @@ class BrowserActivity : Activity() {
         if (url.isNullOrBlank()) { toast("ยังไม่มีหน้าหรือคำค้นให้ส่ง"); return false }
         val target = CarScreenController.requireBrowser()
         if (target == null) { toast("ยังไม่ได้เชื่อมต่อ Android Auto"); return false }
-        target.openUrl(url)
-        toast("ส่งไปที่จอรถแล้ว")
+        if (url == currentPageUrl() && BrowserResumePoint.supports(url)) {
+            sendWithResumePoint(url, target)
+        } else {
+            target.openUrl(url)
+            toast("ส่งไปที่จอรถแล้ว")
+        }
         return true
+    }
+
+    /**
+     * Reads where this page's player stands, then sends the URL with that position written in.
+     *
+     * The send is latched so it happens exactly once. A page that never answers the read — a wedged
+     * renderer, a WebView torn down mid-gesture — must not swallow the handoff, since the user has
+     * already been told it went through, so a short fallback sends the plain URL instead. Both paths
+     * run on the main thread, so the flag needs no synchronisation.
+     */
+    private fun sendWithResumePoint(url: String, target: CarScreenController.BrowserTarget) {
+        var sent = false
+        val send = { resolved: String, positionMs: Long ->
+            if (!sent) {
+                sent = true
+                target.openUrl(resolved)
+                // Naming the time is the whole confirmation: "it started over" was the complaint this
+                // path answers, and the user is looking at the phone, not yet at the car.
+                toast(
+                    if (resolved == url) "ส่งไปที่จอรถแล้ว"
+                    else "ส่งไปที่จอรถแล้ว · เล่นต่อที่ ${BrowserResumePoint.clock(positionMs)}"
+                )
+            }
+        }
+        webAudio.readState { status ->
+            send(
+                BrowserResumePoint.withResumeAt(url, status.positionMs, status.durationMs),
+                status.positionMs,
+            )
+            // One video playing on two screens is worse than none: the phone stops at the point the
+            // car picks up from. Only what was actually playing is touched.
+            if (status.playing) webAudio.userPause()
+        }
+        web.postDelayed({ send(url, 0L) }, RESUME_READ_TIMEOUT_MS)
     }
 
     /** Pulls whatever the car surface is showing back onto the phone. Unchanged behaviour. */
@@ -920,8 +1125,12 @@ class BrowserActivity : Activity() {
             sizes = sizes,
             onBack = { showMenu() },
             onAppearanceChanged = {
+                // The chrome's colours are baked into views and drawables, and the page's colour
+                // scheme is baked into the WebView's own context, so neither can be re-tinted in
+                // place: the activity is rebuilt instead. onSaveInstanceState carries the page
+                // and its history across, the same path a rotation already takes.
                 BrowserAppearanceStore.apply(this, web)
-                web.reload()
+                recreate()
             },
             onDisplayScaleChanged = { BrowserDisplayScaleStore.apply(this, web) },
             onFloatingButtonChanged = { applyFloatingButtonPreference() },
@@ -929,6 +1138,9 @@ class BrowserActivity : Activity() {
                 BrowserDefaults.applyDrmPreference(this)
                 web.reload()
             },
+            // Blocking is decided per request, so only a fresh fetch of the page applies the new
+            // rule to what is already on screen.
+            onAdBlockChanged = { web.reload() },
             onStartPageBackgroundChanged = { applyStartPageBackground() },
             onEditHomePage = { showHomePageEditor() },
             onEditUserAgent = { showUserAgentChooser() },
@@ -1077,6 +1289,27 @@ class BrowserActivity : Activity() {
     private companion object {
         /** [WebViewTimerGate] owner tag for the phone browser. */
         const val TIMER_GATE_OWNER = "phone-browser"
+
+        /**
+         * Height of the compact address pill, in dp. Deliberately shorter than the toolbar's
+         * [AutoUiSizes.TOUCH_TARGET_DP] buttons so the field reads as a slim chip, not a boxed text
+         * field, while still clearing the minimum a finger can hit.
+         */
+        const val ADDRESS_PILL_HEIGHT_DP = 34f
+
+        /** Hint shown on the compact, unfocused pill. */
+        const val HINT_IDLE = "URL / ค้นหา"
+
+        /** Hint shown once the field is tapped and becomes a full editable omnibox. */
+        const val HINT_EDITING = "Search or enter address"
+
+        /**
+         * How long [sendWithResumePoint] waits for the page to report its playback position before
+         * sending the plain URL instead. A live page answers in single-digit milliseconds, so this is
+         * long enough to never cost a resume in practice and short enough to be invisible next to the
+         * second or more the car's own page load takes.
+         */
+        const val RESUME_READ_TIMEOUT_MS = 500L
 
         /** Shared with [BrowserDefaults] and [BrowserUserAgentStore]: one browser preference file. */
         const val FAB_PREFS = "autobridge_browser"
@@ -1242,6 +1475,11 @@ class BrowserActivity : Activity() {
      */
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
+        // Appearance "Auto" means the system's night mode, and the system just changed it.
+        if (BrowserAppearanceStore.needsRestart(this, newConfig)) {
+            recreate()
+            return
+        }
         ViewportDebug.logWindow(
             event = ViewportDebug.Event.CONFIG_CHANGE,
             widthPx = web.width, heightPx = web.height,

@@ -16,6 +16,14 @@ enum class BrowserSplitLayout(val label: String, val glyph: String) {
     FORTY_SIXTY("แบ่ง 40/60", "◧"),
 
     /**
+     * The main pane takes 65% (video / web), the side pane 35% (map / navigation / info). This is
+     * the "video beside a map" preset: wide enough for a 16:9-ish main picture while still leaving a
+     * usable navigation strip, without pinning either pane to a fixed aspect the way
+     * [PORTRAIT_LANDSCAPE] does.
+     */
+    SIXTY_FIVE_THIRTY_FIVE("แบ่ง 65/35", "◧"),
+
+    /**
      * A tall side pane next to a 16:9 main pane: e.g. a portrait map beside a landscape video. The
      * main pane is sized to exactly 16:9 where the surface allows, the side pane takes the rest.
      */
@@ -38,6 +46,9 @@ object BrowserSplitGeometry {
     /** Side share of the width for the fixed-ratio layouts. */
     private const val HALF_FRACTION = 0.5f
     private const val FORTY_FRACTION = 0.4f
+
+    /** Side (map) share for the 65/35 preset: the main pane keeps 65%, the map strip takes 35%. */
+    private const val THIRTY_FIVE_FRACTION = 0.35f
 
     /** In [BrowserSplitLayout.PORTRAIT_LANDSCAPE], the 16:9 main pane never takes more than this. */
     private const val LANDSCAPE_MAX_FRACTION = 0.7f
@@ -66,6 +77,7 @@ object BrowserSplitGeometry {
             BrowserSplitLayout.SINGLE -> return null
             BrowserSplitLayout.HALF -> fixed(usable, height, HALF_FRACTION)
             BrowserSplitLayout.FORTY_SIXTY -> fixed(usable, height, FORTY_FRACTION)
+            BrowserSplitLayout.SIXTY_FIVE_THIRTY_FIVE -> fixed(usable, height, THIRTY_FIVE_FRACTION)
             BrowserSplitLayout.PORTRAIT_LANDSCAPE -> {
                 val main = minOf((height * 16f / 9f).roundToInt(), (usable * LANDSCAPE_MAX_FRACTION).roundToInt())
                 Triple(usable - main, main, (main * 9f / 16f).roundToInt().coerceAtMost(height))

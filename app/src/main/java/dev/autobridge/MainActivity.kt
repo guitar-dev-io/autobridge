@@ -2523,6 +2523,9 @@ class MainActivity : androidx.activity.ComponentActivity() {
                 }
             )),
             SettingsGroup("Features", listOf(
+                settingsEntry("Video", "Player, layout, aspect ratio and picture", R.drawable.ic_tile_tv) {
+                    startActivity(dev.autobridge.library.VideoSettingsActivity.intent(this))
+                },
                 settingsEntry("YouTube", "SponsorBlock and playback quality", R.drawable.ic_tile_youtube) {
                     startActivity(dev.autobridge.youtube.YouTubeSettingsActivity.intent(this))
                 },

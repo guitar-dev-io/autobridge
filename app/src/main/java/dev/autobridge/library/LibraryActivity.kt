@@ -346,7 +346,7 @@ class LibraryActivity : Activity() {
                 } else {
                     counted
                 },
-                rows = shown.map { entryRow(source, it) },
+                rows = shown.map { entryRow(source, it, shown) },
                 empty = AutoBridgeDesign.emptyState(
                     this, "No matches", "Nothing in this category matches that search."
                 ),
@@ -363,7 +363,16 @@ class LibraryActivity : Activity() {
         push(draw)
     }
 
-    private fun entryRow(source: IptvSource, entry: IptvEntry): View {
+    /**
+     * [siblings] is the list this row is shown in. It becomes the player's queue, which is what
+     * Next/Previous, the channel gesture and "Auto next channel" walk; without it a channel opened
+     * from a category would be the only thing the player knows about.
+     */
+    private fun entryRow(
+        source: IptvSource,
+        entry: IptvEntry,
+        siblings: List<IptvEntry> = emptyList()
+    ): View {
         val favorite = entry.url.isNotBlank() && IptvHistoryStore.isFavorite(this, entry.url)
         val row = AutoBridgeDesign.contentRow(
             context = this,
@@ -382,7 +391,7 @@ class LibraryActivity : Activity() {
                     refresh()
                 }
             },
-            onClick = { openEntry(source, entry) }
+            onClick = { openEntry(source, entry, siblings) }
         )
         // TV video streams (not web pages, not folders) can be sent straight to the car's video
         // screen without opening the phone player first — a long press keeps the tap target simple.
@@ -424,7 +433,11 @@ class LibraryActivity : Activity() {
         Toast.makeText(this, "Sending \"${entry.title}\" to the car…", Toast.LENGTH_SHORT).show()
     }
 
-    private fun openEntry(source: IptvSource, entry: IptvEntry) {
+    private fun openEntry(
+        source: IptvSource,
+        entry: IptvEntry,
+        siblings: List<IptvEntry> = emptyList()
+    ) {
         if (entry.isSeriesFolder) {
             val dialog = progressDialog("Loading ${entry.title}…")
             IptvCatalog.loadEpisodes(source, entry) { episodes ->
@@ -439,12 +452,18 @@ class LibraryActivity : Activity() {
             openWebChannel(entry.url, entry.title)
             return
         }
+        // Only entries the player can actually open belong in the queue: a folder or a web page
+        // in it would make Next land on something that cannot play.
+        val playable = siblings.filter { !it.isSeriesFolder && !it.isWebPage && it.url.isNotBlank() }
         play(
             url = entry.url,
             title = entry.title,
             subtitle = entry.subtitle,
             artwork = entry.logo,
-            video = source.kind != IptvKind.RADIO
+            video = source.kind != IptvKind.RADIO,
+            queue = playable.map { it.url },
+            queueTitles = playable.map { it.title },
+            queueIndex = playable.indexOfFirst { it.url == entry.url }.coerceAtLeast(0)
         )
     }
 
@@ -484,7 +503,7 @@ class LibraryActivity : Activity() {
         render(
             title = title,
             subtitle = "${episodes.size} episodes",
-            rows = episodes.map { entryRow(source, it) },
+            rows = episodes.map { entryRow(source, it, episodes) },
             empty = AutoBridgeDesign.emptyState(this, "No episodes", "Nothing to play here.")
         )
     }
@@ -889,7 +908,19 @@ class LibraryActivity : Activity() {
                     IptvHistoryStore.removeFavorite(this, item.url)
                     refresh()
                 },
-                onClick = { play(item.url, item.title, video = item.kind != IptvKind.RADIO) }
+                onClick = {
+                    // Favorites of the same kind are a channel list in their own right, so the
+                    // player gets them as its queue.
+                    val peers = channels.filter { it.kind == item.kind && it.url.isNotBlank() }
+                    play(
+                        url = item.url,
+                        title = item.title,
+                        video = item.kind != IptvKind.RADIO,
+                        queue = peers.map { it.url },
+                        queueTitles = peers.map { it.title },
+                        queueIndex = peers.indexOfFirst { it.url == item.url }.coerceAtLeast(0)
+                    )
+                }
             )
         }
         bookmarks.forEach { bookmark ->
@@ -957,6 +988,7 @@ class LibraryActivity : Activity() {
         artwork: String = "",
         video: Boolean,
         queue: List<String> = emptyList(),
+        queueTitles: List<String> = emptyList(),
         queueIndex: Int = 0
     ) {
         if (url.isBlank()) {
@@ -972,6 +1004,7 @@ class LibraryActivity : Activity() {
                 artwork = artwork,
                 video = video,
                 queue = queue,
+                queueTitles = queueTitles,
                 queueIndex = queueIndex
             )
         )

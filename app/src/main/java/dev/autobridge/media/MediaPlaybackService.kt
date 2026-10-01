@@ -11,13 +11,20 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.text.CueGroup
 import androidx.media3.common.util.Size
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.effect.Contrast
+import androidx.media3.effect.HslAdjustment
 import androidx.media3.effect.Presentation
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.Renderer
+import androidx.media3.exoplayer.mediacodec.MediaCodecInfo
+import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.common.Effect
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Timeline
@@ -35,6 +42,10 @@ import dev.autobridge.core.model.Feature
 import dev.autobridge.core.policy.FeaturePolicy
 import dev.autobridge.display.StructuredLog
 import dev.autobridge.safety.ParkingStateStore
+import dev.autobridge.settings.PreferredPlayer
+import dev.autobridge.subtitles.SubtitleController
+import dev.autobridge.settings.VideoEnhancement
+import dev.autobridge.settings.VideoSettings
 
 /**
  * Hosts the long-lived Media3 player and MediaSession used by Android Auto and steering controls.
@@ -90,6 +101,13 @@ class MediaPlaybackService : MediaLibraryService() {
     private var lastLiveRecoveryMs = 0L
 
     /**
+     * Translates the text-track cues ExoPlayer decodes and publishes them to [SubtitleHub], which
+     * the player screen reads. Held here because this service owns the player the cues come off;
+     * null until [onCreate] builds it.
+     */
+    private var subtitles: SubtitleController? = null
+
+    /**
      * Rejoins a live stream whose window has moved past our position - what an IPTV channel does
      * while playback is paused, and the reason a paused channel came back as a dead error pane
      * instead of a picture. Media3 does not recover from this on its own.
@@ -114,6 +132,25 @@ class MediaPlaybackService : MediaLibraryService() {
         override fun onTimelineChanged(timeline: Timeline, reason: Int) {
             if (reason != Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED) return
             session?.notifyChildrenChanged(ROOT_ID, player?.mediaItemCount ?: 0, null)
+        }
+
+        /**
+         * Every cue group off the active text track, forwarded to the translator. ExoPlayer
+         * delivers these on its application looper - the main thread here - which is the thread
+         * [SubtitleController] and [dev.autobridge.subtitles.SubtitleHub] expect, so no hop is
+         * needed. An empty group is the gap between two lines and clears the screen.
+         */
+        override fun onCues(cueGroup: CueGroup) {
+            subtitles?.onCues(cueGroup.cues.map { it.text })
+        }
+
+        /**
+         * Clears the subtitle line when the track changes under us: a new item, or a seek that
+         * jumps past the current cue, should not leave the previous line stranded on screen until
+         * the next cue happens to arrive.
+         */
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            subtitles?.clear()
         }
     }
 
@@ -256,6 +293,16 @@ class MediaPlaybackService : MediaLibraryService() {
     }
 
     /**
+     * Re-applies the picture settings when they change on the settings screen. Only the colour
+     * adjustments can be applied to a stream already on air; the decoder choice is read when the
+     * next item is prepared, so a change there is deliberately not forced through here - taking a
+     * playing channel down to rebuild its renderer is worse than waiting for the next one.
+     */
+    private val videoSettingsListener: () -> Unit = {
+        mainHandler.post { applyOutputGeometry(VideoOutputGeometry.current) }
+    }
+
+    /**
      * Letterboxes the picture into the output surface rather than stretching it to fill.
      *
      * [Presentation.LAYOUT_SCALE_TO_FIT] pads the frame with black until it matches the surface's
@@ -268,10 +315,16 @@ class MediaPlaybackService : MediaLibraryService() {
     private fun applyOutputGeometry(output: VideoOutputGeometry.Output?) {
         val currentPlayer = player ?: return
         runCatching {
-            currentPlayer.setVideoEffects(
-                if (output == null) emptyList()
-                else listOf(Presentation.createForAspectRatio(output.aspectRatio, Presentation.LAYOUT_SCALE_TO_FIT))
-            )
+            // Colour first, letterbox last: Presentation pads the frame to the surface's shape,
+            // and padding that has been through a brightness or saturation shader is no longer
+            // black.
+            val effects = buildList {
+                addAll(enhancementEffects(VideoSettings.enhancement(this@MediaPlaybackService)))
+                if (output != null) {
+                    add(Presentation.createForAspectRatio(output.aspectRatio, Presentation.LAYOUT_SCALE_TO_FIT))
+                }
+            }
+            currentPlayer.setVideoEffects(effects)
             if (output != null) {
                 videoRenderer(currentPlayer)?.let { renderer ->
                     currentPlayer.createMessage(renderer)
@@ -285,10 +338,55 @@ class MediaPlaybackService : MediaLibraryService() {
         }.onSuccess {
             StructuredLog.i(
                 "MEDIA",
-                "videoOutputGeometry " + (output?.let { "${it.width}x${it.height} ratio=${"%.3f".format(it.aspectRatio)}" } ?: "cleared")
+                "videoOutputGeometry " +
+                    (output?.let { "${it.width}x${it.height} ratio=${"%.3f".format(it.aspectRatio)}" } ?: "cleared") +
+                    " enhancement=" + (if (VideoSettings.enhancement(this).isNeutral) "neutral" else "on")
             )
         }
     }
+
+    /**
+     * The GL effects for the user's picture adjustments, or nothing at all when every slider sits
+     * at neutral. An identity shader is still a shader the renderer has to run on every frame, so
+     * "no adjustment" has to mean an empty list rather than a no-op effect.
+     */
+    @OptIn(UnstableApi::class)
+    private fun enhancementEffects(enhancement: VideoEnhancement): List<Effect> {
+        if (enhancement.isNeutral) return emptyList()
+        return buildList {
+            if (enhancement.brightness != 0 || enhancement.saturation != 0) {
+                add(
+                    HslAdjustment.Builder()
+                        .adjustLightness(enhancement.lightnessAdjustment)
+                        .adjustSaturation(enhancement.saturationAdjustment)
+                        .build()
+                )
+            }
+            if (enhancement.contrast != 0) add(Contrast(enhancement.contrastAdjustment))
+        }
+    }
+
+    /**
+     * Applies the "Preferred player" setting to decoder selection.
+     *
+     * The selector is consulted each time an item is prepared, so it reads the setting rather than
+     * capturing it, and a change takes effect on the next channel without rebuilding the player.
+     * A hardware-only filter that would leave nothing to decode with falls back to the full ranked
+     * list: an unplayable stream is a worse answer than one decoded the other way.
+     */
+    @OptIn(UnstableApi::class)
+    private fun decoderSelector(): MediaCodecSelector =
+        MediaCodecSelector { mimeType, requiresSecureDecoder, requiresTunnelingDecoder ->
+            val ranked: List<MediaCodecInfo> = when (VideoSettings.preferredPlayer(this)) {
+                PreferredPlayer.SOFTWARE -> MediaCodecSelector.PREFER_SOFTWARE
+                else -> MediaCodecSelector.DEFAULT
+            }.getDecoderInfos(mimeType, requiresSecureDecoder, requiresTunnelingDecoder)
+            if (VideoSettings.preferredPlayer(this) != PreferredPlayer.HARDWARE) {
+                ranked
+            } else {
+                ranked.filter { it.hardwareAccelerated }.ifEmpty { ranked }
+            }
+        }
 
     private fun videoRenderer(target: ExoPlayer): Renderer? =
         (0 until target.rendererCount).firstOrNull { target.getRendererType(it) == C.TRACK_TYPE_VIDEO }
@@ -310,6 +408,13 @@ class MediaPlaybackService : MediaLibraryService() {
         val mediaSourceFactory = DefaultMediaSourceFactory(DefaultDataSource.Factory(this))
         val exoPlayer = ExoPlayer.Builder(this)
             .setMediaSourceFactory(mediaSourceFactory)
+            // Decoder choice is a setting ("Preferred player"), and fallback is on so a decoder
+            // that initialises and then refuses the stream hands over instead of ending playback.
+            .setRenderersFactory(
+                DefaultRenderersFactory(this)
+                    .setEnableDecoderFallback(true)
+                    .setMediaCodecSelector(decoderSelector())
+            )
             // Stated rather than defaulted: USAGE_MEDIA with CONTENT_TYPE_MUSIC is what tells the
             // car's audio policy this is media and may be ducked for a navigation prompt, instead
             // of being treated as an unclassified stream. The second argument hands focus handling
@@ -327,6 +432,7 @@ class MediaPlaybackService : MediaLibraryService() {
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
         player = exoPlayer
+        subtitles = SubtitleController(this).also { it.start() }
         exoPlayer.addListener(playerListener)
         // Arms the effect pipeline. The renderer only builds it when a video-effects list has been
         // set before the first prepare(), so this empty call has to happen at construction even
@@ -334,6 +440,7 @@ class MediaPlaybackService : MediaLibraryService() {
         exoPlayer.setVideoEffects(emptyList())
         ParkingStateStore.addListener(parkingListener)
         VideoOutputGeometry.addListener(geometryListener)
+        VideoSettings.addListener(videoSettingsListener)
         applyOutputGeometry(VideoOutputGeometry.current)
         enforceVideoParking()
 
@@ -375,8 +482,11 @@ class MediaPlaybackService : MediaLibraryService() {
     override fun onDestroy() {
         ParkingStateStore.removeListener(parkingListener)
         VideoOutputGeometry.removeListener(geometryListener)
+        VideoSettings.removeListener(videoSettingsListener)
         mainHandler.removeCallbacksAndMessages(null)
         player?.removeListener(playerListener)
+        subtitles?.release()
+        subtitles = null
         session?.release()
         session = null
         carPlayer?.release()

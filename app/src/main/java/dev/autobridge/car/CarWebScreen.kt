@@ -64,7 +64,14 @@ class CarWebScreen(carContext: CarContext) : Screen(carContext) {
     private fun openUrl(url: String) {
         // The renderer is session-scoped, so loading through it works whether the browser screen is
         // about to be created or is already open further down the stack.
-        dev.autobridge.browser.CarBrowserRuntime.renderer(carContext).load(url)
+        //
+        // A site shortcut for a site already open is returned to rather than reloaded, which is what
+        // keeps a playing page alive; a bookmark to a specific page always loads, because it is not
+        // a bare site root. [dev.autobridge.browser.CarBrowserEntry] draws that line.
+        val renderer = dev.autobridge.browser.CarBrowserRuntime.renderer(carContext)
+        if (!dev.autobridge.browser.CarBrowserEntry.resumes(renderer.livePageUrl, url)) {
+            renderer.load(url)
+        }
         CarNavigation.open(screenManager, "CarBrowserScreen") { CarBrowserScreen(carContext) }
     }
 

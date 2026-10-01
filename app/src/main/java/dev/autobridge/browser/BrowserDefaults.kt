@@ -112,6 +112,9 @@ object BrowserDefaults {
         val desktop = BrowserUserAgentStore.isDesktopIdentity(context)
         applyUserAgentMetadata(settings, desktop = desktop)
         DesktopSiteMode.apply(webView, desktop)
+        // Keeps page audio playing when the window loses its surface, by not letting the page see
+        // that it was hidden. Always on; see [BackgroundPlaybackMode] for what breaks without it.
+        BackgroundPlaybackMode.install(webView)
         // The page colour-scheme preference (Appearance: Auto/Light/Dark). Scoped to this WebView.
         BrowserAppearanceStore.apply(context, webView)
         // Widevine level enforcement, if the user opted into L3 to work around black-screen playback.
