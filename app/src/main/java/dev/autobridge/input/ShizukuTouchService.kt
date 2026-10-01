@@ -44,6 +44,35 @@ object ShizukuCommandRunner {
         if (exitCode != 0) Log.w(TAG, "input command failed exit=$exitCode args=$args")
         return exitCode == 0
     }
+
+    /**
+     * Runs an arbitrary bounded command (not just `input`) and returns its combined stdout+stderr,
+     * or null if it could not start, timed out, or exited non-zero. Shared by root and Shizuku so
+     * the installer spoof reports the same way regardless of how it got its privilege.
+     */
+    fun capture(args: List<String>, timeoutMs: Long = 8_000L): String? {
+        if (args.isEmpty() || timeoutMs <= 0L) return null
+        val process = runCatching {
+            ProcessBuilder(args).redirectErrorStream(true).start()
+        }.getOrElse {
+            Log.w(TAG, "Could not start command args=$args", it)
+            return null
+        }
+        val output = runCatching { process.inputStream.bufferedReader().readText() }.getOrDefault("")
+        val completed = runCatching { process.waitFor(timeoutMs, TimeUnit.MILLISECONDS) }
+            .getOrDefault(false)
+        if (!completed) {
+            process.destroyForcibly()
+            Log.w(TAG, "Timed out command args=$args")
+            return null
+        }
+        val exitCode = process.exitValue()
+        if (exitCode != 0) {
+            Log.w(TAG, "command failed exit=$exitCode args=$args out=${output.take(200)}")
+            return null
+        }
+        return output
+    }
 }
 
 /**
@@ -308,6 +337,9 @@ class ShizukuTouchService : IShizukuTouchService.Stub() {
         ShizukuRealTouchController.touchUp(pointerId, x, y)
 
     override fun touchCancel(): Boolean = ShizukuRealTouchController.touchCancel()
+
+    override fun runShellCommand(args: Array<String>, timeoutMs: Long): String? =
+        ShizukuCommandRunner.capture(args.toList(), timeoutMs)
 
     override fun destroy() {
         runCatching { ShizukuRealTouchController.touchCancel() }

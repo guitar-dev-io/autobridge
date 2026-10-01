@@ -130,6 +130,21 @@ object ShizukuInputBackend : InputBackend {
         it.touchCancel()
     }
 
+    /**
+     * Runs a bounded shell command in the Shizuku shell-UID process, returning its combined output
+     * or null. Bypasses the TOUCH feature gate: this is used for installation setup, not input
+     * injection, and must work before any touch capability is relevant.
+     */
+    fun runShellCommand(args: List<String>, timeoutMs: Long = 8_000L): String? {
+        val service = remote ?: return null
+        return runCatching { service.runShellCommand(args.toTypedArray(), timeoutMs) }
+            .onFailure {
+                clearRemote("runShellCommand failed")
+                Log.w(TAG, "Shizuku runShellCommand failed", it)
+            }
+            .getOrNull()
+    }
+
     private fun clearRemote(reason: String) {
         val binder = remoteBinder
         remote = null

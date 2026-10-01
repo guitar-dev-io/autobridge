@@ -109,7 +109,24 @@ kotlin {
     }
 }
 
+// Projection route (split screen beside the navigation app) for the sideloaded flavors only. It
+// depends on the unofficial Android Auto SDK, which Play does not accept, so the safe flavor never
+// sees this source set or the archive.
+android.sourceSets {
+    listOf("personal", "lab").forEach { flavor ->
+        getByName(flavor) {
+            java.srcDir("src/projection/java")
+            manifest.srcFile("src/projection/AndroidManifest.xml")
+        }
+    }
+}
+
 dependencies {
+    // Unofficial Android Auto SDK (CarActivity/CarActivityService), the same archive Fermata Auto
+    // ships as fermata/lib/auto/aauto.aar. Not published by Google and carries no license file.
+    // sha256 99337c3b591ac9670c12b508da38886aedba61dd494f39f5f166f02580ec584b
+    "personalImplementation"(files("libs/aauto.aar"))
+    "labImplementation"(files("libs/aauto.aar"))
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test:core:1.6.1")

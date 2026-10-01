@@ -17,5 +17,12 @@ interface IShizukuTouchService {
     boolean touchUp(int pointerId, int x, int y);
     boolean touchCancel();
 
+    /**
+     * Runs a bounded shell command in the Shizuku shell-UID process and returns its combined
+     * output, or null on failure. Used by the installer-source spoof (pm set-installer-package),
+     * which the projection route needs so Android Auto treats a sideloaded build as a store app.
+     */
+    @nullable String runShellCommand(in String[] args, long timeoutMs);
+
     void destroy();
 }

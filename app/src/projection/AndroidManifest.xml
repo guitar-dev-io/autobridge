@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Projection route (personal and lab flavors only - see app/build.gradle.kts).
+
+     Android Auto lists a CATEGORY_PROJECTION service as an ordinary, non-navigation app. That is
+     what gives the split screen: the app opens in the main area and the active navigation app
+     (Google Maps) shrinks into the side panel next to it. The Car App Library route is a
+     NAVIGATION app, and Android Auto has only one navigation slot, so that route always replaces
+     Maps full screen instead.
+
+     This uses the unofficial Android Auto SDK (app/libs/aauto.aar, the same archive Fermata Auto
+     ships). Android Auto only shows such apps when they are sideloaded with "Unknown sources"
+     enabled in its developer settings, and Google Play does not accept them, which is why this
+     never reaches the safe (Play) flavor.
+
+     exported: Android Auto (gearhead) binds it. CarActivityService accepts only the car host's
+     binding protocol; it exposes no data or commands of this app beyond the activity it hosts. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <application>
+        <service
+            android:name="dev.autobridge.projection.ProjectionCarService"
+            android:exported="true"
+            android:label="AutoBridge Browser"
+            tools:ignore="ExportedService">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="com.google.android.gms.car.category.CATEGORY_PROJECTION" />
+                <category android:name="com.google.android.gms.car.category.CATEGORY_PROJECTION_OEM" />
+            </intent-filter>
+        </service>
+
+        <!-- Walks the user through making this sideloaded build visible on Android Auto (installer
+             rewrite via root or Shizuku). Not exported: launched only from within the app. -->
+        <activity
+            android:name="dev.autobridge.projection.ProjectionSetupActivity"
+            android:exported="false"
+            android:label="AutoBridge on Android Auto" />
+    </application>
+</manifest>
