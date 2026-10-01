@@ -369,6 +369,52 @@ private fun SettingsTabContent(context: android.content.Context) {
         ToggleRow("Resume last feature", settings.resumeLastFeature) {
             RemoteSettingsStore.update(context) { s -> s.copy(resumeLastFeature = it) }
         }
+
+        Box(Modifier.height(16.dp))
+        SectionLabel("ABOUT & SUPPORT")
+        Card {
+            LinkRow(
+                icon = "☕",
+                label = "Support AutoBridge",
+                detail = "Buy me a coffee"
+            ) { openUrl(context, "https://buymeacoffee.com/guitar.story") }
+            LinkRow(
+                icon = "⚖",
+                label = "Open-source licenses",
+                detail = "View third-party notices"
+            ) { showLicenses(context) }
+            LinkRow(
+                icon = "⌥",
+                label = "GitHub",
+                detail = "github.com/guitar-dev-io/autobridge"
+            ) { openUrl(context, "https://github.com/guitar-dev-io/autobridge") }
+        }
+    }
+}
+
+/** Opens an external URL in the user's browser, failing quietly if nothing can handle it. */
+private fun openUrl(context: android.content.Context, url: String) {
+    runCatching {
+        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
+    }
+}
+
+/**
+ * Opens the Play-services open-source licenses screen when it is available, and otherwise falls back
+ * to the LICENSE on GitHub so the entry is never a dead end on builds without the oss-licenses menu.
+ */
+private fun showLicenses(context: android.content.Context) {
+    val opened = runCatching {
+        val clazz = Class.forName("com.google.android.gms.oss.licenses.OssLicensesMenuActivity")
+        context.startActivity(
+            android.content.Intent(context, clazz).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+        true
+    }.getOrDefault(false)
+    if (!opened) {
+        openUrl(context, "https://github.com/guitar-dev-io/autobridge/blob/main/LICENSE")
     }
 }
 
@@ -448,6 +494,21 @@ private fun StatusLine(label: String, value: String, ok: Boolean) {
         Text(if (ok) "●" else "○", color = if (ok) AccentGreen else TextMuted)
         Text(label, color = TextPrimary, fontSize = 14.sp, modifier = Modifier.padding(start = 8.dp).weight(1f))
         Text(value, color = TextMuted, fontSize = 13.sp)
+    }
+}
+
+@Composable
+private fun LinkRow(icon: String, label: String, detail: String, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickableCompat(onClick).padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(icon, fontSize = 18.sp, color = Accent)
+        Column(Modifier.padding(start = 12.dp).weight(1f)) {
+            Text(label, color = TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            Text(detail, color = TextMuted, fontSize = 12.sp)
+        }
+        Text("›", color = TextMuted, fontSize = 20.sp)
     }
 }
 

@@ -6,6 +6,8 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+apply(plugin = "com.google.android.gms.oss-licenses-plugin")
+
 val releaseSigningPropertiesFile = rootProject.file("keystore/release.properties")
 val releaseSigningProperties = Properties()
 if (releaseSigningPropertiesFile.isFile) {
@@ -147,4 +149,8 @@ dependencies {
     // effect module, so setVideoEffects() needs it declared here, at the same version.
     implementation("androidx.media3:media3-effect:1.11.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    // Renders the generated third-party license list in OssLicensesMenuActivity, which the
+    // Settings "Open-source licenses" row opens. The oss-licenses-plugin collects the notices from
+    // the dependency POMs at build time; this library is the viewer for them.
+    implementation("com.google.android.gms:play-services-oss-licenses:17.1.0")
 }
