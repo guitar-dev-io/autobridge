@@ -1,39 +1,37 @@
 package dev.autobridge.browser
 
 import android.app.Activity
-import android.app.Dialog
-import android.graphics.Color
-import android.graphics.drawable.ColorDrawable
-import android.graphics.drawable.GradientDrawable
+import android.graphics.Typeface
 import android.text.InputType
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
-import android.view.Window
-import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
-import android.widget.FrameLayout
-import android.widget.GridLayout
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.Switch
 import android.widget.TextView
 
 /**
- * The phone's browser menu: the same sheet [CarWebRenderer] composites over the car surface, built
- * out of Views instead of Canvas calls.
+ * The phone's main browser sheet, redesigned around the one action the phone browser exists for:
+ * handing a page or a search to the car.
  *
- * **What is shared and what is not.** The *content* comes from [BrowserDrawerModel] — the same two
- * cards, the same desktop switch, the same footer pair — so an entry added for one surface exists on
- * both and neither drifts into being a different menu. The *geometry* does not: a View hierarchy
- * measures itself, and re-deriving pixel boxes here would be reimplementing layout on top of a
- * layout engine. [BrowserDrawerModel]'s boxes stay the car's, where nothing measures anything.
+ * **Hierarchy, top to bottom.** A compact header (the app name, the current page title, and a round
+ * ✕ to close); the address/search field; a large, accent-filled **Send to car** button that is the
+ * loudest thing on the sheet; a medium-emphasis row of the three controls used mid-page
+ * (Back / Reload / Forward); a lower-emphasis row of Bookmarks / Settings / More; and a compact
+ * desktop-site toggle. Everything rare — Find, Copy URL, Paste & go, Open external, Start page,
+ * History, Downloads, Zoom and Get-from-car — moved into the [MoreActionsSheet] behind "More", and
+ * "Clear browsing data" moved into Settings ▸ Privacy, so the main sheet carries only what is
+ * reached often and nothing destructive sits next to a navigation button.
  *
- * It replaces an `AlertDialog` of tiles. That dialog had no address row, so the menu could not say
- * which page it was acting on; it had no grouping, so nine common actions and nine rare ones were
- * drawn identically; and it stated the desktop-site setting as a label ("Desktop: เปิด") that the
- * user had to read and decode rather than a switch they could see the position of.
+ * **What this is and is not.** This is phone-only. The car surface draws its own menu on a Canvas
+ * through [CarWebRenderer] from the shared [BrowserDrawerModel] data; this sheet renders real Views
+ * and now lays itself out directly rather than mirroring that model's two-card grid, because the
+ * phone's hierarchy (one big primary button, two small rows) is deliberately different from the
+ * car's. It still owns no browser behaviour: every control dispatches a [DrawerAction] back through
+ * [onAction], or navigates through [onNavigate], or opens one of the two secondary sheets through
+ * [onSendToCar] / [onMore].
  */
 class BrowserMenuSheet(
     private val activity: Activity,
@@ -42,149 +40,84 @@ class BrowserMenuSheet(
     private val state: () -> BrowserMenuState,
     private val onNavigate: (String) -> Unit,
     private val onAction: (DrawerAction) -> Unit,
+    /** Opens the dedicated "Send to car" sheet; the primary button's whole job. */
+    private val onSendToCar: () -> Unit,
+    /** Opens the "More actions" sheet. */
+    private val onMore: () -> Unit,
 ) {
-    private var dialog: Dialog? = null
+    private val shell = BrowserSheetShell(activity, sizes)
+    private lateinit var container: LinearLayout
 
-    /** Text size in sp for a dp token, with the accessibility scale already capped by the caller. */
-    private fun sp(dp: Float) = dp * (fontScale / activity.resources.configuration.fontScale.coerceAtLeast(0.01f))
-    private val fontScale = AutoUiSizes.clampFontScale(activity.resources.configuration.fontScale)
-
-    private fun rounded(color: Int, radius: Float) = GradientDrawable().apply {
-        setColor(color)
-        cornerRadius = radius
-    }
-
-    /** Opens the sheet on its primary list. */
+    /** Opens the sheet. */
     fun show() {
-        val content = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            // Only the top corners: the sheet is anchored to the bottom of the window, so its
-            // lower edge is the screen edge and rounding it would draw a gap the page shows through.
-            background = GradientDrawable().apply {
-                setColor(BrowserTheme.sheetBackground)
-                val r = sizes.cornerRadius * 2f
-                cornerRadii = floatArrayOf(r, r, r, r, 0f, 0f, 0f, 0f)
-            }
-            setPadding(
-                sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP), sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP),
-                sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP), sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP)
-            )
-        }
-        render(content, more = false)
-
-        // Translucent rather than the platform dialog theme, which insets its own panel from the
-        // window and would draw a card inside the sheet. Everything the sheet shows is drawn here,
-        // so the window contributes nothing but the dimming behind it.
-        dialog = Dialog(activity, android.R.style.Theme_Translucent_NoTitleBar).apply {
-            requestWindowFeature(Window.FEATURE_NO_TITLE)
-            // The sheet can outgrow a short phone in landscape, so it scrolls as a whole rather
-            // than any one card scrolling inside it — a nested scroll is what turns a tap that
-            // drifted a few px into a scroll gesture that never fires the entry under it.
-            setContentView(ScrollView(activity).apply {
-                isFillViewport = true
-                addView(
-                    content,
-                    FrameLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT
-                    )
-                )
-            })
-            setCanceledOnTouchOutside(true)
-            window?.apply {
-                setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-                setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-                setGravity(Gravity.BOTTOM)
-                // The translucent theme carries no dim of its own; the sheet needs one for the same
-                // reason the car surface draws a scrim — it has to read as a layer over the page.
-                addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-                setDimAmount(0.55f)
-            }
-            show()
-        }
+        container = shell.contentColumn()
+        render()
+        shell.show(container)
     }
 
-    private fun dismiss() {
-        dialog?.dismiss()
-        dialog = null
-    }
-
-    /** Runs [action] and closes the sheet, the default for anything that leaves the menu behind. */
     private fun perform(action: DrawerAction) {
-        dismiss()
+        shell.dismiss()
         onAction(action)
     }
 
-    /**
-     * Fills [container] with one list. Called again in place for the "More" round trip rather than
-     * opening a second dialog, so the sheet does not blink out and back on the way.
-     */
-    private fun render(container: LinearLayout, more: Boolean) {
+    private fun render() {
         val current = state()
         container.removeAllViews()
-        container.addView(grip())
-        container.addView(header(current, more))
+        container.addView(shell.grip())
+        container.addView(header(current))
         container.addView(addressRow(current))
-        val groups = if (more) listOf(BrowserDrawerModel.moreItems(current.surface)) else BrowserDrawerModel.primaryCards(current)
-        // The first primary card holds navigation (Back/Reload/Forward…). It gets the accent edge
-        // and the accent-tinted glyph chips; the rest stay neutral. "More" has one flat grid.
-        groups.forEachIndexed { index, items ->
-            container.addView(card(items, more, primary = !more && index == 0))
-        }
-        if (!more) container.addView(desktopSwitch(BrowserDrawerModel.desktopToggle(current)))
-        container.addView(footer(current, more, container))
+        container.addView(sendToCarButton())
+        container.addView(divider())
+        container.addView(navRow(current))
+        container.addView(secondaryRow())
+        container.addView(divider())
+        container.addView(desktopToggle(current))
     }
 
-    private fun gap() = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP)
-
-    private fun grip(): View = View(activity).apply {
-        background = rounded(BrowserTheme.iconDisabled, sizes.dp(2f))
-        layoutParams = LinearLayout.LayoutParams(sizes.dpInt(44f), sizes.dpInt(4f)).apply {
-            gravity = Gravity.CENTER_HORIZONTAL
-            bottomMargin = gap()
-        }
+    /** The faint full-width rule the mockup draws between its grouped sections. */
+    private fun divider(): View = View(activity).apply {
+        setBackgroundColor(BrowserTheme.hairline)
+        layoutParams = LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, sizes.dpInt(1f)
+        ).apply { topMargin = shell.gap() / 2; bottomMargin = shell.gap() }
     }
 
-    private fun header(current: BrowserMenuState, more: Boolean): View {
+    // ------------------------------------------------------------------------------------ header
+
+    private fun header(current: BrowserMenuState): View {
         val texts = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             addView(TextView(activity).apply {
-                text = if (more) "More" else current.appName
-                textSize = sp(AutoUiSizes.ICON_MEDIUM_DP)
-                setTypeface(typeface, android.graphics.Typeface.BOLD)
+                text = current.appName
+                textSize = shell.sp(AutoUiSizes.ICON_LARGE_DP * 0.9f)
+                setTypeface(typeface, Typeface.BOLD)
                 setTextColor(BrowserTheme.textPrimary)
             })
-            val subtitle = if (more) "All browser actions" else current.pageTitle
+            val subtitle = current.pageTitle
             if (subtitle.isNotBlank()) {
                 addView(TextView(activity).apply {
                     text = subtitle
-                    textSize = sp(AutoUiSizes.ICON_SMALL_DP * 0.8f)
+                    textSize = shell.sp(AutoUiSizes.ICON_SMALL_DP * 0.82f)
                     maxLines = 1
                     ellipsize = android.text.TextUtils.TruncateAt.END
                     setTextColor(BrowserTheme.textSecondary)
                 })
             }
         }
-        // The word as well as the glyph: a bare ✕ is a guess, and this is the control someone who
-        // opened the menu by mistake reaches for first.
-        val close = pill("✕", "Close") { dismiss() }
         return LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            background = rounded(BrowserTheme.sheetCardBackground, sizes.cornerRadius)
-            setPadding(sizes.dpInt(AutoUiSizes.HORIZONTAL_PADDING_DP), gap(), sizes.dpInt(AutoUiSizes.HORIZONTAL_PADDING_DP), gap())
             addView(texts, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-            addView(close)
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply { bottomMargin = gap() }
+            addView(shell.closeButton { shell.dismiss() })
+            layoutParams = rowParams()
         }
     }
 
+    // ------------------------------------------------------------------------------- address row
+
     /**
-     * The sheet's copy of the address bar. The toolbar auto-hides and the menu is frequently what
-     * gets opened *instead* of recalling it, so a menu that cannot say — or change — which page it
-     * is acting on is one the user has to close again to do either.
+     * The sheet's URL / search field. Accepts either a URL or a free-text query and hands it to
+     * [onNavigate], which resolves it the same way the toolbar's address bar does.
      */
     private fun addressRow(current: BrowserMenuState): View {
         val field = EditText(activity).apply {
@@ -194,15 +127,15 @@ class BrowserMenuSheet(
             hint = "URL / ค้นหา"
             setHintTextColor(BrowserTheme.iconDisabled)
             setTextColor(BrowserTheme.textPrimary)
-            textSize = sp(AutoUiSizes.ICON_SMALL_DP * 0.85f)
+            textSize = shell.sp(AutoUiSizes.ICON_SMALL_DP * 0.9f)
             background = null
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
             imeOptions = EditorInfo.IME_ACTION_GO
-            setPadding(gap(), 0, gap(), 0)
+            setPadding(shell.gap(), 0, shell.gap(), 0)
         }
         fun go() {
             val target = field.text.toString().trim()
-            dismiss()
+            shell.dismiss()
             if (target.isNotEmpty()) onNavigate(target)
         }
         field.setOnEditorActionListener { _, action, _ ->
@@ -210,222 +143,173 @@ class BrowserMenuSheet(
         }
         val lock = TextView(activity).apply {
             text = if (current.secure) "🔒" else "!"
-            textSize = sp(AutoUiSizes.ICON_SMALL_DP * 0.9f)
+            textSize = shell.sp(AutoUiSizes.ICON_SMALL_DP * 0.9f)
             setTextColor(if (current.secure) BrowserTheme.secureBadge else BrowserTheme.insecureBadge)
         }
         val clear = TextView(activity).apply {
             text = "✕"
             gravity = Gravity.CENTER
-            textSize = sp(AutoUiSizes.ICON_SMALL_DP * 0.9f)
+            textSize = shell.sp(AutoUiSizes.ICON_SMALL_DP * 0.9f)
             setTextColor(BrowserTheme.textSecondary)
-            contentDescription = "Clear address"
+            contentDescription = "ล้าง URL"
+            val side = sizes.dpInt(AutoUiSizes.SHEET_URL_FIELD_HEIGHT_DP * 0.78f)
+            layoutParams = LinearLayout.LayoutParams(side, side)
             setOnClickListener { field.setText(""); field.requestFocus() }
-            layoutParams = LinearLayout.LayoutParams(sizes.dpInt(AutoUiSizes.TOUCH_TARGET_DP * 0.8f), sizes.dpInt(AutoUiSizes.TOUCH_TARGET_DP * 0.8f))
         }
-        val search = TextView(activity).apply {
-            text = "⌕"
+        val fieldHeight = sizes.dpInt(AutoUiSizes.SHEET_URL_FIELD_HEIGHT_DP)
+        return LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = shell.rounded(BrowserTheme.addressPillBackground, fieldHeight / 2f)
+            setPadding(shell.pad(), 0, sizes.dpInt(6f), 0)
+            addView(lock, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { marginEnd = shell.gap() / 2 })
+            addView(field, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f))
+            addView(clear)
+            layoutParams = rowParams().apply { height = fieldHeight }
+        }
+    }
+
+    // --------------------------------------------------------------------------- send-to-car CTA
+
+    /**
+     * The primary action: large, accent-filled, with a car icon, a bold title and a subtitle. It
+     * opens the focused [SendToCarSheet] rather than firing straight away so the user can choose the
+     * page, a different URL or a search before it goes to the car.
+     */
+    private fun sendToCarButton(): View {
+        val icon = TextView(activity).apply {
+            text = "🚗"
             gravity = Gravity.CENTER
-            textSize = sp(AutoUiSizes.ICON_MEDIUM_DP * 0.9f)
-            setTextColor(BrowserTheme.iconEnabled)
-            contentDescription = "Go"
-            background = rounded(BrowserTheme.tileBackground, sizes.dp(AutoUiSizes.TOUCH_TARGET_DP * 0.8f) / 2f)
-            setOnClickListener { go() }
-            layoutParams = LinearLayout.LayoutParams(sizes.dpInt(AutoUiSizes.TOUCH_TARGET_DP * 0.8f), sizes.dpInt(AutoUiSizes.TOUCH_TARGET_DP * 0.8f))
+            textSize = shell.sp(AutoUiSizes.SHEET_ICON_DP * 1.15f)
+            setPadding(0, 0, shell.pad(), 0)
+        }
+        val label = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_VERTICAL
+            addView(TextView(activity).apply {
+                text = "Send to car"
+                textSize = shell.sp(AutoUiSizes.ICON_MEDIUM_DP)
+                setTypeface(typeface, Typeface.BOLD)
+                setTextColor(BrowserTheme.onPrimary)
+            })
+            addView(TextView(activity).apply {
+                text = "ส่งหน้าเว็บหรือคำค้นไปที่หน้าจอรถ"
+                textSize = shell.sp(AutoUiSizes.ICON_SMALL_DP * 0.78f)
+                setTextColor(BrowserTheme.onPrimary)
+            })
+        }
+        val chevron = TextView(activity).apply {
+            text = "›"
+            gravity = Gravity.CENTER
+            textSize = shell.sp(AutoUiSizes.ICON_LARGE_DP)
+            setTextColor(BrowserTheme.onPrimary)
         }
         return LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            background = rounded(BrowserTheme.addressPillBackground, sizes.dp(AutoUiSizes.TOUCH_TARGET_DP) / 2f)
-            setPadding(sizes.dpInt(AutoUiSizes.HORIZONTAL_PADDING_DP), sizes.dpInt(4f), sizes.dpInt(6f), sizes.dpInt(4f))
-            addView(lock)
-            addView(field, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-            addView(clear)
-            addView(search)
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply { bottomMargin = gap() }
+            background = shell.rounded(BrowserTheme.accent, shell.cornerRadius())
+            setPadding(shell.pad() + shell.gap(), shell.pad(), shell.pad(), shell.pad())
+            contentDescription = "Send to car"
+            addView(icon)
+            addView(label, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            addView(chevron)
+            setOnClickListener { shell.dismiss(); onSendToCar() }
+            layoutParams = rowParams().apply {
+                height = sizes.dpInt(AutoUiSizes.SHEET_PRIMARY_CTA_HEIGHT_DP)
+            }
         }
+    }
+
+    // ------------------------------------------------------------------------------------- rows
+
+    /** Back / Reload / Forward: the three controls used while reading a page. Medium emphasis. */
+    private fun navRow(current: BrowserMenuState): View = LinearLayout(activity).apply {
+        orientation = LinearLayout.HORIZONTAL
+        addView(actionButton("←", "Back", enabled = current.canGoBack) { perform(DrawerAction.NAV_BACK) }, equalParams(0))
+        addView(actionButton("↻", "Reload", enabled = true) { perform(DrawerAction.RELOAD) }, equalParams(1))
+        addView(actionButton("→", "Forward", enabled = current.canGoForward) { perform(DrawerAction.NAV_FORWARD) }, equalParams(2))
+        layoutParams = rowParams()
+    }
+
+    /** Bookmarks / Settings / More: lower emphasis than navigation, but still on the main sheet. */
+    private fun secondaryRow(): View = LinearLayout(activity).apply {
+        orientation = LinearLayout.HORIZONTAL
+        addView(actionButton("☆", "Bookmarks", enabled = true) { perform(DrawerAction.BOOKMARKS) }, equalParams(0))
+        addView(actionButton("⚙", "Settings", enabled = true) { perform(DrawerAction.SETTINGS) }, equalParams(1))
+        addView(actionButton("⋯", "More", enabled = true) { shell.dismiss(); onMore() }, equalParams(2))
+        layoutParams = rowParams()
     }
 
     /**
-     * One card of tiles: a recessed background so the tiles on it read as raised. The [primary]
-     * card (navigation) carries a thin accent edge down its leading side, so the eye lands on it
-     * first without a heading eating a whole row.
+     * One button in a navigation/secondary row: a glyph chip over a label, on a tonal background.
+     * Disabled entries keep their place (so the row never reflows) but take no tap and read dimmed.
      */
-    private fun card(items: List<DrawerItem>, more: Boolean, primary: Boolean = false): View {
-        val columns = if (more && activity.resources.configuration.screenWidthDp >= 600) {
-            AutoUiSizes.MENU_COLUMNS_MAX.coerceAtMost(items.size)
-        } else {
-            BrowserDrawerModel.PRIMARY_COLUMNS
-        }
-        val inset = sizes.dpInt(AutoUiSizes.MENU_TILE_GAP_DP) / 2
-        val grid = GridLayout(activity).apply {
-            columnCount = columns
-            background = rounded(BrowserTheme.sheetCardBackground, sizes.cornerRadius)
-            setPadding(inset, inset, inset, inset)
-        }
-        items.forEach { item -> grid.addView(tile(item, primary), tileParams()) }
-        val cardParams = LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
-        ).apply { bottomMargin = gap() }
-
-        if (!primary) return grid.apply { layoutParams = cardParams }
-
-        // Accent edge + card in a horizontal strip. The edge is a slim rounded bar, not a full
-        // border, so it reads as a marker rather than an outline.
-        val edge = View(activity).apply {
-            background = rounded(BrowserTheme.primaryCardAccent, sizes.dp(2f))
-            layoutParams = LinearLayout.LayoutParams(sizes.dpInt(3f), ViewGroup.LayoutParams.MATCH_PARENT).apply {
-                marginEnd = inset
-            }
-        }
-        return LinearLayout(activity).apply {
-            orientation = LinearLayout.HORIZONTAL
-            addView(edge)
-            addView(grid, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-            layoutParams = cardParams
-        }
-    }
-
-    private fun tileParams() = GridLayout.LayoutParams().apply {
-        width = 0
-        height = sizes.dpInt(AutoUiSizes.MENU_TILE_HEIGHT_DP)
-        columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
-        val margin = sizes.dpInt(AutoUiSizes.MENU_TILE_GAP_DP) / 2
-        setMargins(margin, margin, margin, margin)
-    }
-
-    private fun tile(item: DrawerItem, primary: Boolean = false): View = LinearLayout(activity).apply {
-        orientation = LinearLayout.VERTICAL
-        gravity = Gravity.CENTER
-        background = rounded(
-            if (item.enabled) BrowserTheme.tileBackground else BrowserTheme.tileDisabledBackground,
-            sizes.dp(AutoUiSizes.MENU_TILE_HEIGHT_DP) / 2f
-        )
-        contentDescription = item.label
-        // Disabled entries keep their place so the card never reflows under the user's finger, but
-        // they take no tap: a control that lights up and does nothing reads as broken, where a
-        // dimmed one reads as unavailable.
-        isClickable = item.enabled
-        isFocusable = item.enabled
-        if (item.enabled) setOnClickListener { perform(item.action) }
-        val tint = if (item.enabled) BrowserTheme.iconEnabled else BrowserTheme.iconDisabled
-        // The glyph sits in a rounded chip rather than floating as bare text, which gives each tile
-        // a small focal point and lets the primary card tint it toward the accent. A disabled tile
-        // shows no chip at all — nothing to press means nothing raised.
-        val chipSide = sizes.dpInt(AutoUiSizes.ICON_LARGE_DP + AutoUiSizes.CONTENT_GAP_DP)
-        val glyphView = TextView(activity).apply {
-            text = item.glyph
-            textSize = sp(AutoUiSizes.ICON_MEDIUM_DP)
+    private fun actionButton(glyph: String, label: String, enabled: Boolean, onClick: () -> Unit): View =
+        LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setTextColor(tint)
-            if (item.enabled) {
-                val chipColor = if (primary) BrowserTheme.primaryTileIconChip else BrowserTheme.tileIconChip
-                background = rounded(chipColor, chipSide / 2f)
-            }
-            layoutParams = LinearLayout.LayoutParams(chipSide, chipSide).apply {
-                bottomMargin = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP) / 2
-            }
+            background = shell.rounded(
+                if (enabled) BrowserTheme.tileBackground else BrowserTheme.tileDisabledBackground,
+                shell.cornerRadius()
+            )
+            setPadding(shell.gap(), shell.gap(), shell.gap(), shell.gap())
+            contentDescription = label
+            isClickable = enabled
+            isFocusable = enabled
+            if (enabled) setOnClickListener { onClick() }
+            val tint = if (enabled) BrowserTheme.iconEnabled else BrowserTheme.iconDisabled
+            addView(TextView(activity).apply {
+                text = glyph
+                gravity = Gravity.CENTER
+                textSize = shell.sp(AutoUiSizes.SHEET_ICON_DP)
+                setTextColor(tint)
+                setPadding(0, 0, 0, shell.gap())
+            })
+            addView(TextView(activity).apply {
+                text = label
+                gravity = Gravity.CENTER
+                maxLines = 1
+                textSize = shell.sp(AutoUiSizes.ICON_SMALL_DP * 0.78f)
+                setTextColor(if (enabled) BrowserTheme.textPrimary else BrowserTheme.iconDisabled)
+            })
         }
-        addView(glyphView)
-        addView(TextView(activity).apply {
-            text = if (item.value.isBlank()) item.label else "${item.label}  ${item.value}"
-            textSize = sp(AutoUiSizes.ICON_SMALL_DP * 0.66f)
-            gravity = Gravity.CENTER
-            maxLines = 2
-            setTextColor(if (item.enabled) BrowserTheme.textPrimary else BrowserTheme.iconDisabled)
-        })
-    }
 
-    /**
-     * A switch rather than a tile, because what it reports is a state. The label it replaced —
-     * "Desktop: เปิด" — asked the user to read two things and work out which one was the button.
-     */
-    private fun desktopSwitch(item: DrawerItem): View = LinearLayout(activity).apply {
+    /** A compact full-width row with a switch — not an oversized card. 60dp, matching the mockup. */
+    private fun desktopToggle(current: BrowserMenuState): View = LinearLayout(activity).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
-        background = rounded(BrowserTheme.sheetCardBackground, sizes.cornerRadius)
-        setPadding(sizes.dpInt(AutoUiSizes.HORIZONTAL_PADDING_DP), gap(), sizes.dpInt(AutoUiSizes.HORIZONTAL_PADDING_DP), gap())
+        background = shell.rounded(BrowserTheme.sheetCardBackground, shell.cornerRadius())
+        setPadding(shell.pad(), 0, shell.pad(), 0)
         addView(TextView(activity).apply {
-            text = item.glyph
-            textSize = sp(AutoUiSizes.ICON_MEDIUM_DP)
+            text = "🖥"
+            textSize = shell.sp(AutoUiSizes.SHEET_ICON_DP * 0.85f)
             setTextColor(BrowserTheme.textSecondary)
+            setPadding(0, 0, shell.pad(), 0)
         })
         addView(
             TextView(activity).apply {
-                text = item.label
-                textSize = sp(AutoUiSizes.ICON_SMALL_DP * 0.9f)
+                text = "Request desktop site"
+                textSize = shell.sp(AutoUiSizes.ICON_SMALL_DP * 0.9f)
                 setTextColor(BrowserTheme.textPrimary)
-                setPadding(sizes.dpInt(AutoUiSizes.HORIZONTAL_PADDING_DP), 0, 0, 0)
             },
             LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
         )
         addView(Switch(activity).apply {
-            isChecked = item.on
-            // The sheet stays open: closing it on the way out would hide the one thing the tap was
-            // for. The page reloads under it, which is what the setting changes.
-            setOnCheckedChangeListener { _, _ -> onAction(item.action) }
+            isChecked = current.isDesktop
+            // The sheet stays open: the page reloads under it, which is what the setting changes.
+            setOnCheckedChangeListener { _, _ -> onAction(DrawerAction.TOGGLE_DESKTOP) }
         })
-        layoutParams = LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
-        ).apply { bottomMargin = gap() }
+        layoutParams = rowParams().apply { height = sizes.dpInt(AutoUiSizes.SHEET_ROW_HEIGHT_DP) }
     }
 
-    /**
-     * Who is drawing the page on the left, and on the right the two routes the sheet must never
-     * bury: the secondary list, and the way out of the browser.
-     */
-    private fun footer(current: BrowserMenuState, more: Boolean, container: LinearLayout): View {
-        val identity = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            addView(TextView(activity).apply {
-                text = "${current.appName} — Browser"
-                textSize = sp(AutoUiSizes.ICON_SMALL_DP * 0.72f)
-                setTextColor(BrowserTheme.textSecondary)
-            })
-            addView(TextView(activity).apply {
-                text = current.version
-                textSize = sp(AutoUiSizes.ICON_SMALL_DP * 0.66f)
-                setTextColor(BrowserTheme.iconDisabled)
-            })
-        }
-        val secondary = if (more) {
-            pill("‹", "Back") { render(container, more = false) }
-        } else {
-            pill("⋯", "More") { render(container, more = true) }
-        }
-        val exit = pill("⏏", "Exit") { perform(DrawerAction.APP_HOME) }
-        val row = LinearLayout(activity).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(sizes.dpInt(AutoUiSizes.HORIZONTAL_PADDING_DP), gap(), 0, 0)
-            addView(identity, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-            addView(secondary)
-            addView(exit, LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply { marginStart = gap() })
-        }
-        return LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            addView(View(activity).apply {
-                setBackgroundColor(BrowserTheme.hairline)
-                layoutParams = LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, sizes.dpInt(1f)
-                )
-            })
-            addView(row)
-        }
-    }
+    private fun rowParams() = LinearLayout.LayoutParams(
+        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+    ).apply { bottomMargin = shell.gap() }
 
-    private fun pill(glyph: String, label: String, onClick: () -> Unit): View = TextView(activity).apply {
-        text = "$glyph  $label"
-        gravity = Gravity.CENTER
-        textSize = sp(AutoUiSizes.ICON_SMALL_DP * 0.75f)
-        setTextColor(BrowserTheme.textPrimary)
-        contentDescription = label
-        background = rounded(BrowserTheme.tileBackground, sizes.dp(AutoUiSizes.TOUCH_TARGET_DP * 0.8f) / 2f)
-        minHeight = sizes.dpInt(AutoUiSizes.TOUCH_TARGET_DP * 0.8f)
-        setPadding(sizes.dpInt(AutoUiSizes.HORIZONTAL_PADDING_DP), 0, sizes.dpInt(AutoUiSizes.HORIZONTAL_PADDING_DP), 0)
-        setOnClickListener { onClick() }
-    }
+    /** Equal-width tiles in a nav/secondary row, each a fixed [AutoUiSizes.SHEET_TILE_HEIGHT_DP] tall. */
+    private fun equalParams(index: Int) = LinearLayout.LayoutParams(
+        0, sizes.dpInt(AutoUiSizes.SHEET_TILE_HEIGHT_DP), 1f
+    ).apply { if (index > 0) marginStart = shell.gap() }
 }

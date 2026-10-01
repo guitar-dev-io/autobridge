@@ -9,31 +9,66 @@ import androidx.car.app.model.ListTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
 import dev.autobridge.core.state.UiModeStore
+import dev.autobridge.library.HomeSection
 
-/** Secondary destinations kept one tap away from the compact home grid. */
-class CarHomeMoreScreen(carContext: CarContext, private val requestSafety: () -> Unit) : Screen(carContext) {
+/**
+ * Secondary destinations kept one tap away from the compact home menu.
+ *
+ * The home menu itself carries only the six primary cards. Every other section is listed here
+ * first, followed by the tools that were always on this screen, and finally the six primary
+ * sections again: the home cards are drawn on the car surface, which a rotary controller cannot
+ * focus, so this host-drawn list is what keeps every feature reachable without touch.
+ */
+class CarHomeMoreScreen(
+    carContext: CarContext,
+    private val requestSafety: () -> Unit,
+    private val page: Int = 0
+) : Screen(carContext) {
+
+    private data class Entry(val title: String, val action: () -> Unit)
+
+    private fun entries(): List<Entry> {
+        val primary = HomeMenuItem.primary.map { it.section }.toSet()
+        val section = { s: HomeSection ->
+            Entry(s.title) { CarHomeNavigator.open(carContext, screenManager, s, requestSafety) }
+        }
+        val secondary = HomeSection.carSections.filterNot { it in primary || it == HomeSection.SETTINGS }
+        val tools = listOf(
+            // Media Center is reached from here rather than the home grid, which leads with the
+            // content sections shared with the phone launcher.
+            Entry("Media Center") { CarNavigation.open(screenManager, "CarMediaCenterScreen") { CarMediaCenterScreen(carContext) } },
+            Entry("Manage bookmarks") { CarNavigation.open(screenManager, "CarBookmarksScreen") { CarBookmarksScreen(carContext) } },
+            Entry("Agent") { CarNavigation.open(screenManager, "CarAgentScreen") { CarAgentScreen(carContext) } },
+            Entry("Recent") { CarNavigation.open(screenManager, "CarRecentScreen") { CarRecentScreen(carContext) } },
+            Entry("Driving") {
+                UiModeStore.setDriving(true)
+                screenManager.push(CarDrivingModeScreen(carContext))
+            },
+            section(HomeSection.SETTINGS)
+        )
+        return secondary.map(section) + tools + HomeMenuItem.primary.map { section(it.section) }
+    }
+
     override fun onGetTemplate(): Template {
+        val paged = CarListPaging.page(carContext, entries(), page)
         val items = ItemList.Builder()
-        fun item(title: String, action: () -> Unit) {
-            items.addItem(Row.Builder().setTitle(title).setOnClickListener { action() }.build())
+        paged.items.forEach { entry ->
+            items.addItem(Row.Builder().setTitle(entry.title).setOnClickListener { entry.action() }.build())
         }
-        // Media Center is reached from here rather than the home grid, which now leads with the
-        // content sections shared with the phone launcher.
-        item("Media Center") { CarNavigation.open(screenManager, "CarMediaCenterScreen") { CarMediaCenterScreen(carContext) } }
-        item("Manage bookmarks") { CarNavigation.open(screenManager, "CarBookmarksScreen") { CarBookmarksScreen(carContext) } }
-        item("Agent") { CarNavigation.open(screenManager, "CarAgentScreen") { CarAgentScreen(carContext) } }
-        item("Recent") { CarNavigation.open(screenManager, "CarRecentScreen") { CarRecentScreen(carContext) } }
-        item("Driving") {
-            UiModeStore.setDriving(true)
-            screenManager.push(CarDrivingModeScreen(carContext))
+        if (paged.hasMore) {
+            items.addItem(
+                Row.Builder().setTitle("Show more")
+                    .setOnClickListener { screenManager.push(CarHomeMoreScreen(carContext, requestSafety, page + 1)) }
+                    .build()
+            )
         }
-        item("Settings") { CarNavigation.open(screenManager, "CarSettingsScreen") { CarSettingsScreen(carContext, requestSafety) } }
         val template = ListTemplate.Builder().setSingleList(items.build())
+        val title = if (page == 0) "More" else "More · ${page + 1}"
         if (carContext.carAppApiLevel >= 7) {
-            template.setHeader(Header.Builder().setTitle("More").setStartHeaderAction(Action.BACK).build())
+            template.setHeader(Header.Builder().setTitle(title).setStartHeaderAction(Action.BACK).build())
         } else {
             @Suppress("DEPRECATION")
-            template.setTitle("More").setHeaderAction(Action.BACK)
+            template.setTitle(title).setHeaderAction(Action.BACK)
         }
         return template.build()
     }

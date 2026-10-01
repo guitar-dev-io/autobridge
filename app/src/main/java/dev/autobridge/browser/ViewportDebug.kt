@@ -32,6 +32,7 @@ object ViewportDebug {
         const val KEYBOARD = "keyboard"
         const val CONFIG_CHANGE = "config_change"
         const val TAB_SWITCH = "tab_switch"
+        const val SPLIT_LAYOUT = "split_layout"
         const val LAYOUT = "layout"
     }
 

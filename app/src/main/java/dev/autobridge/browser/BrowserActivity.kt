@@ -19,6 +19,7 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.os.Message
 import android.webkit.CookieManager
+import android.webkit.GeolocationPermissions
 import android.webkit.PermissionRequest
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
@@ -59,6 +60,9 @@ class BrowserActivity : Activity() {
 
     /** YouTube add-ons (SponsorBlock, auto quality). Does nothing unless the user enabled them. */
     private val youtube by lazy { dev.autobridge.youtube.YouTubeEnhancer(this) }
+
+    /** Per-site location prompt plus the runtime location permission; see [BrowserGeolocation]. */
+    private val geolocation by lazy { BrowserGeolocation.Prompter(this) }
     private lateinit var address: EditText
     private lateinit var toolbar: LinearLayout
     private lateinit var chromeBar: FrameLayout
@@ -139,7 +143,8 @@ class BrowserActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        root = FrameLayout(this).apply { setBackgroundColor(BrowserTheme.background) }
+        root = FrameLayout(this)
+        applyStartPageBackground()
 
         content = FrameLayout(this)
         web = createWebView()
@@ -240,7 +245,7 @@ class BrowserActivity : Activity() {
 
         val restored = savedInstanceState?.getBundle("web")?.let { web.restoreState(it) } != null
         pendingUrl = savedInstanceState?.getString("pending_url")
-            ?: if (!restored) intent.dataString?.let(ContentAddress::https) ?: BrowserDefaults.lastUrl(this) else null
+            ?: if (!restored) intent.dataString?.let(ContentAddress::https) ?: BrowserStartupStore.coldStartUrl(this) else null
         setFullscreen(savedInstanceState?.getBoolean("fullscreen") == true)
         ParkingStateStore.addListener(parkingListener)
     }
@@ -360,6 +365,15 @@ class BrowserActivity : Activity() {
             // Android's normal MediaDrm stack; only the protected-media resource is granted.
             override fun onPermissionRequest(request: PermissionRequest) =
                 BrowserDefaults.grantProtectedMediaPermission(request)
+
+            // navigator.geolocation (Google Maps "my location" etc.). Without these overrides the
+            // request is never answered and map sites cannot get a GPS fix; see BrowserGeolocation.
+            override fun onGeolocationPermissionsShowPrompt(
+                origin: String,
+                callback: GeolocationPermissions.Callback,
+            ) = geolocation.show(origin, callback)
+
+            override fun onGeolocationPermissionsHidePrompt() = geolocation.hide()
 
             /**
              * `window.open()` / `target="_blank"`. Without a handler the platform drops the window
@@ -624,6 +638,19 @@ class BrowserActivity : Activity() {
     private fun applyFloatingButtonPreference() {
         val always = BrowserControlsStore.alwaysShowFloatingButton(this)
         menuButton.visibility = if (always || fullscreen) View.VISIBLE else View.GONE
+        // Honour the chosen resting corner. A drag offset is stored separately and re-clamped on
+        // layout, so flipping the side resets the drag so the button lands cleanly on the new corner.
+        val onLeft = BrowserControlsStore.floatingButtonOnLeft(this)
+        (menuButton.layoutParams as? FrameLayout.LayoutParams)?.let { lp ->
+            val wanted = Gravity.BOTTOM or (if (onLeft) Gravity.START else Gravity.END)
+            if (lp.gravity != wanted) {
+                lp.gravity = wanted
+                menuButton.layoutParams = lp
+                menuButton.translationX = 0f
+                menuButton.translationY = 0f
+                saveMenuButtonPosition()
+            }
+        }
         // The glyph says what the button will do, so a button rebound to "new tab" does not keep
         // claiming to be the menu.
         val action = BrowserControlsStore.floatingButtonAction(this)
@@ -631,6 +658,22 @@ class BrowserActivity : Activity() {
         // The toolbar's own ☰ only appears once the floating button stops being the fixed way to
         // reach the menu; otherwise the two sat side by side doing the same thing.
         toolbarMenuButton.visibility = if (action == FloatingButtonAction.MENU) View.GONE else View.VISIBLE
+    }
+
+    /**
+     * The backdrop the window shows behind the page — most visible on the start page and while a
+     * page is still loading or transparent. [BrowserStartupStore.gradientBackground] (on by default)
+     * draws the app's branded gradient; off falls back to the flat surface colour.
+     */
+    private fun applyStartPageBackground() {
+        root.background = if (BrowserStartupStore.gradientBackground(this)) {
+            GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(BrowserTheme.surfaceContainerHigh, BrowserTheme.background)
+            )
+        } else {
+            null.also { root.setBackgroundColor(BrowserTheme.background) }
+        }
     }
 
     /** Runs whatever the user bound the floating button to; the menu is only the default. */
@@ -641,7 +684,7 @@ class BrowserActivity : Activity() {
             // The phone presentation keeps one page per activity — tabs live on the car surface —
             // so both tab actions land on the menu, which is where its page actions are.
             FloatingButtonAction.TABS, FloatingButtonAction.NEW_TAB -> showMenu()
-            FloatingButtonAction.HOME -> navigate(BrowserDefaults.HOME)
+            FloatingButtonAction.HOME -> navigate(BrowserStartupStore.homePage(this))
             FloatingButtonAction.ADDRESS -> focusAddressBar()
             FloatingButtonAction.FULLSCREEN -> setFullscreen(!fullscreen)
         }
@@ -705,6 +748,69 @@ class BrowserActivity : Activity() {
             state = { menuState() },
             onNavigate = { navigate(it) },
             onAction = { runMenuAction(it) },
+            onSendToCar = { openSendToCar() },
+            onMore = { openMoreActions() },
+        ).show()
+    }
+
+    // ------------------------------------------------------------------ send / get to car
+
+    /**
+     * Opens the dedicated "Send to car" sheet, seeded with the current page.
+     *
+     * The actual send is one call — [sendToCar] — so the sheet never has to know how the car is
+     * reached; it only resolves what the user typed into a URL and hands it over.
+     */
+    private fun openSendToCar() {
+        SendToCarSheet(
+            activity = this,
+            sizes = sizes,
+            currentUrl = { web.url?.let(ContentAddress::https) },
+            currentTitle = { web.title?.takeIf { it.isNotBlank() } },
+            engine = { SearchEngineStore.engine(this) },
+            onEngineChange = { SearchEngineStore.setEngine(this, it) },
+            onSend = { input, selectedEngine ->
+                sendToCar(BrowserInputResolver.resolveBrowserInput(input, selectedEngine))
+            },
+            onSendUrl = { url -> sendToCar(url) },
+        ).show()
+    }
+
+    /**
+     * Hands one resolved HTTPS URL to the browser running on the car surface, opening a fresh car
+     * browser if none is on top. The single choke point every "send" path funnels through, so the
+     * not-connected and empty-input cases are handled once.
+     *
+     * @return true when the URL was accepted by a car browser, so the caller (the sheet) can close
+     *   itself only on success and leave itself open with the input intact otherwise.
+     */
+    private fun sendToCar(url: String?): Boolean {
+        if (!allowed()) return false
+        if (url.isNullOrBlank()) { toast("ยังไม่มีหน้าหรือคำค้นให้ส่ง"); return false }
+        val target = CarScreenController.requireBrowser()
+        if (target == null) { toast("ยังไม่ได้เชื่อมต่อ Android Auto"); return false }
+        target.openUrl(url)
+        toast("ส่งไปที่จอรถแล้ว")
+        return true
+    }
+
+    /** Pulls whatever the car surface is showing back onto the phone. Unchanged behaviour. */
+    private fun receiveFromCar() {
+        val url = CarScreenController.activeBrowser?.currentUrl
+        if (url.isNullOrBlank()) toast("เปิด Browser บน Android Auto ก่อน") else navigate(url)
+    }
+
+    /**
+     * Opens the secondary "More actions" sheet: a compact vertical list of the rarely-used entries
+     * moved off the main sheet. Each row dispatches straight back through [runMenuAction], so no
+     * behaviour is duplicated here.
+     */
+    private fun openMoreActions() {
+        MoreActionsSheet(
+            activity = this,
+            sizes = sizes,
+            onAction = { runMenuAction(it) },
+            onBack = { showMenu() },
         ).show()
     }
 
@@ -724,8 +830,8 @@ class BrowserActivity : Activity() {
             DrawerAction.BOOKMARKS -> showBookmarks()
             DrawerAction.OPEN_EXTERNAL ->
                 if (!BrowserLauncher.openUrl(this, web.url.orEmpty())) toast("เปิดเบราว์เซอร์ไม่ได้")
-            DrawerAction.SETTINGS -> showControlSettings()
-            DrawerAction.HOME -> navigate(BrowserDefaults.HOME)
+            DrawerAction.SETTINGS -> showBrowserSettings()
+            DrawerAction.HOME -> navigate(BrowserStartupStore.homePage(this))
             DrawerAction.HISTORY -> showHistory()
             DrawerAction.DOWNLOADS -> showDownloads()
             DrawerAction.TOGGLE_DESKTOP -> {
@@ -749,19 +855,16 @@ class BrowserActivity : Activity() {
             DrawerAction.ZOOM_IN -> web.zoomBy(1.25f)
             DrawerAction.ZOOM_OUT -> web.zoomBy(0.8f)
             DrawerAction.CLEAR_DATA -> confirmClearBrowsingData()
-            DrawerAction.SEND_TO_CAR -> {
-                val url = web.url?.let(ContentAddress::https)
-                val target = CarScreenController.requireBrowser()
-                when {
-                    url == null -> Unit
-                    target == null -> toast("ยังไม่ได้เชื่อมต่อ Android Auto")
-                    else -> target.openUrl(url)
-                }
-            }
-            DrawerAction.RECEIVE_FROM_CAR -> {
-                val url = CarScreenController.activeBrowser?.currentUrl
-                if (url == null) toast("เปิด Browser บน Android Auto ก่อน") else navigate(url)
-            }
+            // Opens the dedicated "Send to car" sheet rather than firing immediately: the sheet
+            // lets the user send the current page, a different URL, or a search query, and pick
+            // the engine. One-tap "send current page" still lives there as the default.
+            DrawerAction.SEND_TO_CAR -> openSendToCar()
+            DrawerAction.RECEIVE_FROM_CAR -> receiveFromCar()
+            DrawerAction.SUPPORT ->
+                if (!BrowserLauncher.openUrl(this, "https://buymeacoffee.com/guitar.story")) toast("เปิดเบราว์เซอร์ไม่ได้")
+            DrawerAction.LICENSES -> showOpenSourceLicenses()
+            DrawerAction.GITHUB ->
+                if (!BrowserLauncher.openUrl(this, "https://github.com/guitar-dev-io/autobridge")) toast("เปิดเบราว์เซอร์ไม่ได้")
             // The sheet's own footer pair: leaving the browser is this activity finishing.
             DrawerAction.APP_HOME -> finish()
             // Handled inside the sheet, which owns a real text field and does not need the activity
@@ -770,9 +873,26 @@ class BrowserActivity : Activity() {
             // Car-surface entries; [MenuSurface.PHONE] never lists them.
             DrawerAction.NEW_TAB, DrawerAction.TABS, DrawerAction.MEDIA_CENTER,
             DrawerAction.NOW_PLAYING, DrawerAction.MEDIA_LIBRARY, DrawerAction.AGENT,
-            DrawerAction.DIAGNOSTICS, DrawerAction.TOGGLE_FULLSCREEN -> Unit
+            DrawerAction.DIAGNOSTICS, DrawerAction.TOGGLE_FULLSCREEN, DrawerAction.SPLIT_LAYOUT -> Unit
             // Sheet navigation, resolved before an action is dispatched.
             DrawerAction.MORE, DrawerAction.BACK_TO_MENU, DrawerAction.CLOSE_SHEET -> Unit
+        }
+    }
+
+    /**
+     * Opens the Play-services open-source licenses screen when it is on the classpath, and
+     * otherwise falls back to the LICENSE on GitHub so the entry is never a dead end on a build
+     * without the oss-licenses menu. The in-app list is populated at build time by the
+     * oss-licenses Gradle plugin from the dependency POMs.
+     */
+    private fun showOpenSourceLicenses() {
+        val opened = runCatching {
+            val clazz = Class.forName("com.google.android.gms.oss.licenses.OssLicensesMenuActivity")
+            startActivity(Intent(this, clazz))
+            true
+        }.getOrDefault(false)
+        if (!opened && !BrowserLauncher.openUrl(this, "https://github.com/guitar-dev-io/autobridge/blob/main/LICENSE")) {
+            toast("เปิดสัญญาอนุญาตไม่ได้")
         }
     }
 
@@ -785,35 +905,101 @@ class BrowserActivity : Activity() {
     }
 
     /**
-     * The in-app control preferences, shared with the car surface through [BrowserControlsStore].
+     * The browser's Settings, as one scrollable [BrowserSettingsSheet] rather than the stack of
+     * `AlertDialog`s this used to be. Every group reads and writes a store directly inside the
+     * sheet; the callbacks here are only the apply-to-the-live-WebView side (push the new text zoom,
+     * colour scheme, floating-button binding or Widevine level onto the running page), plus the two
+     * editors that need a text field (Home page, custom User-Agent) and the three privacy actions.
      *
-     * Kept as one small dialog rather than a settings activity: there are three switches, and a
-     * separate screen to reach them would be more chrome than the settings themselves.
+     * Shared stores mean the car surface picks the same choices up the next time its surface
+     * attaches, exactly as the old dialogs did.
      */
-    private fun showControlSettings() {
-        val labels = arrayOf<CharSequence>(
-            "ซ่อนแถบ URL ทั้งหมด (จอรถ)",
-            "แสดงแถบ URL ตลอดเวลา (จอรถ)",
-            "แสดงปุ่มลอยตลอดเวลา"
-        )
-        val checked = booleanArrayOf(
-            BrowserControlsStore.hideUrlBar(this),
-            BrowserControlsStore.alwaysShowUrlBar(this),
-            BrowserControlsStore.alwaysShowFloatingButton(this)
-        )
+    private fun showBrowserSettings() {
+        BrowserSettingsSheet(
+            activity = this,
+            sizes = sizes,
+            onBack = { showMenu() },
+            onAppearanceChanged = {
+                BrowserAppearanceStore.apply(this, web)
+                web.reload()
+            },
+            onDisplayScaleChanged = { BrowserDisplayScaleStore.apply(this, web) },
+            onFloatingButtonChanged = { applyFloatingButtonPreference() },
+            onDrmChanged = {
+                BrowserDefaults.applyDrmPreference(this)
+                web.reload()
+            },
+            onStartPageBackgroundChanged = { applyStartPageBackground() },
+            onEditHomePage = { showHomePageEditor() },
+            onEditUserAgent = { showUserAgentChooser() },
+            onResetPermissions = { confirmResetSitePermissions() },
+            onDeleteSiteData = { confirmDeleteSiteData() },
+            onClearBrowsingData = { confirmClearBrowsingData() },
+        ).show()
+    }
+
+    /** Edits the configured Home page. A URL field, validated through [BrowserStartupStore]. */
+    private fun showHomePageEditor() {
+        val field = EditText(this).apply {
+            setText(BrowserStartupStore.homePage(this@BrowserActivity))
+            hint = "https://…"
+            setSingleLine()
+            setSelectAllOnFocus(true)
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
+        }
+        val pad = sizes.dpInt(AutoUiSizes.HORIZONTAL_PADDING_DP)
+        val container = FrameLayout(this).apply {
+            setPadding(pad, pad / 2, pad, 0)
+            addView(field)
+        }
         AlertDialog.Builder(this)
-            .setTitle("ปุ่มลอยและแถบควบคุม")
-            .setMultiChoiceItems(labels, checked) { _, index, value ->
-                when (index) {
-                    0 -> BrowserControlsStore.setHideUrlBar(this, value)
-                    1 -> BrowserControlsStore.setAlwaysShowUrlBar(this, value)
-                    2 -> BrowserControlsStore.setAlwaysShowFloatingButton(this, value)
+            .setTitle("Home page")
+            .setView(container)
+            .setPositiveButton("บันทึก") { _, _ ->
+                if (BrowserStartupStore.setHomePage(this, field.text.toString())) {
+                    toast("ตั้งค่าหน้าแรกแล้ว")
+                    showBrowserSettings()
+                } else {
+                    toast("URL ไม่ถูกต้อง")
                 }
-                applyFloatingButtonPreference()
             }
-            .setNeutralButton("ปุ่มลอยกดแล้วทำอะไร") { _, _ -> showFloatingActionChooser() }
-            .setNegativeButton("User-Agent") { _, _ -> showUserAgentChooser() }
-            .setPositiveButton("เสร็จสิ้น", null)
+            .setNegativeButton("ยกเลิก") { _, _ -> showBrowserSettings() }
+            .show()
+    }
+
+    /**
+     * Resets saved per-site permission grants. The phone browser only ever grants the protected-media
+     * (Widevine) permission per request and persists nothing of its own, so this clears the WebView's
+     * geolocation database — the one permission store Android keeps for a WebView — so a site that was
+     * allowed to locate the user is asked again next time.
+     */
+    private fun confirmResetSitePermissions() {
+        AlertDialog.Builder(this)
+            .setTitle("Reset saved site permissions")
+            .setMessage("ล้างสิทธิ์ที่เว็บไซต์เคยได้รับ (เช่น ตำแหน่งที่ตั้ง) เว็บจะถามใหม่ครั้งถัดไป")
+            .setPositiveButton("รีเซ็ต") { _, _ ->
+                @Suppress("DEPRECATION")
+                android.webkit.GeolocationPermissions.getInstance().clearAll()
+                showBrowserSettings()
+                toast("รีเซ็ตสิทธิ์แล้ว")
+            }
+            .setNegativeButton("ยกเลิก") { _, _ -> showBrowserSettings() }
+            .show()
+    }
+
+    /** Deletes cookies and local site data, leaving the cache, history and bookmarks in place. */
+    private fun confirmDeleteSiteData() {
+        AlertDialog.Builder(this)
+            .setTitle("Delete cookies and site data")
+            .setMessage("ลบคุกกี้และข้อมูลเว็บที่เก็บไว้ในเครื่อง (ประวัติและบุ๊กมาร์กจะไม่ถูกลบ)")
+            .setPositiveButton("ลบ") { _, _ ->
+                CookieManager.getInstance().removeAllCookies(null)
+                CookieManager.getInstance().flush()
+                WebStorage.getInstance().deleteAllData()
+                toast("ลบคุกกี้และข้อมูลเว็บแล้ว")
+                showBrowserSettings()
+            }
+            .setNegativeButton("ยกเลิก") { _, _ -> showBrowserSettings() }
             .show()
     }
 
@@ -886,24 +1072,6 @@ class BrowserActivity : Activity() {
         // The car browser picks the new identity up from the shared store the next time its
         // surface attaches (CarWebRenderer compares identityKey() on start).
         toast("User-Agent: ${BrowserUserAgentStore.label(this)}")
-    }
-
-    private fun showFloatingActionChooser() {
-        val actions = FloatingButtonAction.values()
-        val current = BrowserControlsStore.floatingButtonAction(this)
-        AlertDialog.Builder(this)
-            .setTitle("ปุ่มลอยกดแล้วทำอะไร")
-            .setSingleChoiceItems(
-                actions.map { "${it.glyph}  ${it.label}" }.toTypedArray(),
-                actions.indexOf(current)
-            ) { dialog, index ->
-                BrowserControlsStore.setFloatingButtonAction(this, actions[index])
-                applyFloatingButtonPreference()
-                dialog.dismiss()
-                showControlSettings()
-            }
-            .setNegativeButton("‹ ย้อนกลับ") { _, _ -> showControlSettings() }
-            .show()
     }
 
     private companion object {
@@ -1116,9 +1284,19 @@ class BrowserActivity : Activity() {
         super.onSaveInstanceState(outState)
     }
 
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        geolocation.onRequestPermissionsResult(requestCode, grantResults)
+    }
+
     override fun onDestroy() {
         ParkingStateStore.removeListener(parkingListener)
         youtube.release()
+        geolocation.release()
         web.stopLoading(); web.destroy(); super.onDestroy()
     }
 }

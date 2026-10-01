@@ -30,6 +30,19 @@ data class BrowserViewport(
      */
     val pageScalePercent: Int,
 ) {
+    /**
+     * The display density at which a [webWidth]-pixel view is exactly [contentWidthDp] CSS pixels
+     * wide at page scale 1: `160 * webWidth / contentWidthDp`.
+     *
+     * Chromium lays a page out at `viewWidthPx / dipScale` CSS px, and `setInitialScale` cannot
+     * widen that layout — a requested scale below "content fits the width" is clamped back up to it.
+     * So with the WebView at the phone's 3.0 density an 800px view always laid out at 267 CSS px
+     * and showed it at `pageScale=3.000`, whatever [pageScalePercent] asked for. The density has to
+     * be the one that yields the wanted CSS width; this is it.
+     */
+    val pageDensityDpi: Int
+        get() = (160f * webWidth / contentWidthDp.coerceAtLeast(1)).roundToInt().coerceAtLeast(1)
+
     fun contains(x: Float, y: Float): Boolean =
         x >= left && y >= top && x < left + width && y < top + height
 
@@ -41,10 +54,20 @@ data class BrowserViewport(
 
     companion object {
         /**
-         * Narrower than this and a landscape page renders as a cramped mobile layout; wider and
-         * text becomes too small to read at arm's length in a car.
+         * The content-width band for the **mobile** identity. The floor exists so a dense head unit
+         * cannot shrink the page into an unreadably cramped layout, and the ceiling so a wide panel
+         * cannot blow it up to desktop-sized text; it is **not** meant to force a desktop layout.
+         *
+         * An earlier revision pushed the floor to 900dp specifically to make sites like
+         * m.youtube.com pick their *desktop* two-column layout on a wide head unit. That defeated
+         * the point of Mobile mode: the user picks Mobile to get the clean single-column phone
+         * layout (what a stock Android Auto browser shows), and 900dp sits above YouTube's desktop
+         * breakpoint (~840–1000px) so Mobile looked like Desktop. The floor is now 600dp — below
+         * that breakpoint, so responsive sites serve their phone/narrow-tablet layout — while still
+         * wide enough to stay legible at arm's length. Desktop mode is unaffected: it pins its own
+         * [DESKTOP_CONTENT_WIDTH_DP] regardless of this band.
          */
-        const val MIN_CONTENT_WIDTH_DP = 720
+        const val MIN_CONTENT_WIDTH_DP = 600
         const val MAX_CONTENT_WIDTH_DP = 1280
 
         /**

@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <automotiveApp>
     <uses name="template" />
+    <!-- Media role: lists MediaPlaybackService as a media source so Android Auto can show it in
+         the media card beside the navigation panel of its split dashboard. -->
+    <uses name="media" />
 </automotiveApp>

@@ -25,7 +25,16 @@ class CarDiagnosticsScreen(carContext: CarContext) : Screen(carContext) {
         val selfDrawn = MirrorCoordinator.activePipelineMode ==
             dev.autobridge.display.ScreenOffController.PipelineMode.SELF_DRAWN
 
+        val carSurface = CarDisplayInfo.last
+        val carDisplayText = CarDisplayInfo.label(carSurface) +
+            if (carSurface != null && CarDisplayInfo.isLowestStream(carSurface)) {
+                // The head unit stretches this stream to its panel, so everything looks enlarged.
+                " • Lowest Android Auto resolution. If the car supports it: Android Auto ▸ " +
+                    "Developer settings ▸ Video resolution ▸ 720p, then reconnect"
+            } else ""
+
         val list = ItemList.Builder()
+            .addItem(statusRow("Car display", carDisplayText))
             .addItem(statusRow("Pipeline", MirrorCoordinator.activePipelineMode.name))
             .addItem(statusRow("Mirror", if (MirrorCoordinator.isMirroring) "Active" else "Inactive"))
             .addItem(statusRow("Uptime", uptimeLabel()))

@@ -12,6 +12,7 @@ import android.speech.RecognizerIntent
 import android.view.SurfaceView
 import android.view.View
 import android.view.WindowManager
+import android.webkit.GeolocationPermissions
 import android.webkit.PermissionRequest
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -21,6 +22,7 @@ import android.widget.*
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import dev.autobridge.browser.BrowserDefaults
+import dev.autobridge.browser.BrowserGeolocation
 import dev.autobridge.browser.FullscreenVideoController
 import dev.autobridge.core.policy.FeaturePolicy
 import dev.autobridge.media.MediaPlaybackClient
@@ -48,6 +50,7 @@ class EntertainmentActivity : Activity() {
     private var audioFocusRequest: AudioFocusRequest? = null
     private lateinit var client: MediaPlaybackClient
     private lateinit var browser: WebView
+    private val geolocation by lazy { BrowserGeolocation.Prompter(this) }
     private lateinit var video: SurfaceView
     private lateinit var fullscreenController: FullscreenVideoController
     private lateinit var emptyState: TextView
@@ -166,6 +169,14 @@ class EntertainmentActivity : Activity() {
                 // Android's normal MediaDrm stack; only the protected-media resource is granted.
                 override fun onPermissionRequest(request: PermissionRequest) =
                     BrowserDefaults.grantProtectedMediaPermission(request)
+
+                // navigator.geolocation; unanswered by default, so map pages never got a fix.
+                override fun onGeolocationPermissionsShowPrompt(
+                    origin: String,
+                    callback: GeolocationPermissions.Callback,
+                ) = geolocation.show(origin, callback)
+
+                override fun onGeolocationPermissionsHidePrompt() = geolocation.hide()
 
                 override fun onShowCustomView(view: View, callback: CustomViewCallback) =
                     fullscreenController.show(view, callback) {}
@@ -521,7 +532,17 @@ YouTube · TV · Web
         super.onSaveInstanceState(out)
     }
 
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        geolocation.onRequestPermissionsResult(requestCode, grantResults)
+    }
+
     override fun onDestroy() {
+        geolocation.release()
         if (!::browser.isInitialized) { super.onDestroy(); return }
         abandonAudioFocus()
         ParkingStateStore.removeListener(parkingListener)

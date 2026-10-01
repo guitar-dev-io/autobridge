@@ -97,6 +97,27 @@ class AutoUiSizes private constructor(
         const val FAB_MARGIN_DP = 14f
 
         /**
+         * Phone bottom-sheet proportions, authored to the Android Auto–style mockup rather than to
+         * the car surface's compact chrome. The car tiles are small and dense because a head unit
+         * is read at arm's length while driving; the phone sheet is held in the hand and the mockup
+         * wants generous rounded cards, a tall primary CTA and a clear emphasis ladder. These are
+         * kept separate from the car tokens above so changing one surface never silently reshapes
+         * the other, and are resolved through [dp] like every other value so they scale with the
+         * phone's real density.
+         */
+        const val SHEET_SIDE_MARGIN_DP = 16f
+        const val SHEET_PADDING_DP = 16f
+        const val SHEET_SECTION_GAP_DP = 12f
+        const val SHEET_CORNER_RADIUS_DP = 26f
+        const val SHEET_URL_FIELD_HEIGHT_DP = 56f
+        const val SHEET_PRIMARY_CTA_HEIGHT_DP = 92f
+        const val SHEET_TILE_HEIGHT_DP = 96f
+        const val SHEET_ROW_HEIGHT_DP = 60f
+        const val SHEET_CLOSE_BUTTON_DP = 48f
+        const val SHEET_LIST_ICON_DP = 44f
+        const val SHEET_ICON_DP = 26f
+
+        /**
          * The page fills the surface edge to edge: no inset margin and no rounded corners. Was
          * previously a Fermata-style floating card inset from the edges, but that left visible
          * black borders around the page on the car display, which is not the wanted look.

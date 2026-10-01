@@ -16,16 +16,16 @@ class CarDisplayScalingTest {
 
     @Test
     fun aPanelAlreadyInsideTheBandKeepsItsOwnDensity() {
-        // The panel from the reported session: 780px at 171dpi is 729dp, comfortably in band.
-        assertEquals(171, CarDisplayScaling.densityDpiFor(widthPx = 780, densityDpi = 171))
+        // 1000px at 160dpi is 1000dp, comfortably inside the 600..1280 band.
+        assertEquals(160, CarDisplayScaling.densityDpiFor(widthPx = 1000, densityDpi = 160))
     }
 
     @Test
     fun aDensePanelIsThinnedUntilThePageIsWideEnoughToReadAtArmsLength() {
-        // 800px at 213dpi sees only 601dp — a cramped phone layout on a car screen.
-        assertTrue(contentWidthDp(800, 213) < BrowserViewport.MIN_CONTENT_WIDTH_DP)
-        val corrected = CarDisplayScaling.densityDpiFor(widthPx = 800, densityDpi = 213)
-        assertTrue(corrected < 213)
+        // 800px at 320dpi sees only 400dp — a cramped phone layout on a car screen.
+        assertTrue(contentWidthDp(800, 320) < BrowserViewport.MIN_CONTENT_WIDTH_DP)
+        val corrected = CarDisplayScaling.densityDpiFor(widthPx = 800, densityDpi = 320)
+        assertTrue(corrected < 320)
         // Flooring the density can only widen the page, so the minimum is a floor and never a
         // figure the result lands just under.
         assertTrue(contentWidthDp(800, corrected) >= BrowserViewport.MIN_CONTENT_WIDTH_DP)

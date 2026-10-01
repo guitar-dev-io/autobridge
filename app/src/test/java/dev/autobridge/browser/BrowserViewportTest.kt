@@ -23,13 +23,35 @@ class BrowserViewportTest {
      * page is zoomed, not enlarged.
      */
     @Test fun thePageRastersOnePixelPerSurfacePixel() {
-        val viewport = BrowserViewport.create(800, 400, 1f)
-        assertEquals(800, viewport.webWidth)
+        // 1000px at density 1 sits inside the 600..1280 content-width band, so the page lays out at
+        // its own pixel width with no zoom — a clean 1:1 raster to check against.
+        val viewport = BrowserViewport.create(1000, 400, 1f)
+        assertEquals(1000, viewport.webWidth)
         assertEquals(400, viewport.webHeight)
         assertEquals(1f, viewport.scale, 0.001f)
-        // 800 CSS px into an 800px view is 1:1 zoom; the page still lays out at 800 CSS px.
-        assertEquals(800, viewport.contentWidthDp)
+        // 1000 CSS px into a 1000px view is 1:1 zoom; the page still lays out at 1000 CSS px.
+        assertEquals(1000, viewport.contentWidthDp)
         assertEquals(100, viewport.pageScalePercent)
+    }
+
+    /**
+     * Regression for `pageScale=3.000` on an 800x400 head unit: the page was hosted at the phone's
+     * 480dpi, so Chromium laid it out at 800 / 3 = 267 CSS px and no initial scale could widen it.
+     * The host display's density must be the one at which webWidth px == contentWidthDp CSS px.
+     */
+    @Test fun pageDensityMakesTheViewExactlyContentWidthCssPixelsWide() {
+        // Mobile on the DHU's 800px @160: 800 CSS px at 160dpi, i.e. page scale 1.
+        val mobile = BrowserViewport.create(800, 400, 1f)
+        assertEquals(800, mobile.contentWidthDp)
+        assertEquals(160, mobile.pageDensityDpi)
+        // Desktop pins 1280 CSS px onto the same 800px: 160 * 800 / 1280 = 100dpi.
+        assertEquals(100, BrowserViewport.create(800, 400, 1f, desktop = true).pageDensityDpi)
+        // Every head unit: the CSS width that density yields is the content width, within rounding.
+        for ((w, h, dpi) in HEAD_UNITS) {
+            val viewport = BrowserViewport.create(w, h, dpi / 160f)
+            val cssWidth = viewport.webWidth * 160f / viewport.pageDensityDpi
+            assertEquals("${w}x$h@$dpi", viewport.contentWidthDp.toFloat(), cssWidth, viewport.contentWidthDp * 0.01f)
+        }
     }
 
     /** Desktop mode buys its wide layout with zoom, not with a bigger raster. */
@@ -101,9 +123,10 @@ class BrowserViewportTest {
         // Same pixel width, different physical density: the denser panel asks for fewer CSS pixels
         // so text stays legible instead of shrinking with the panel's dpi.
         val lowDpi = BrowserViewport.create(1280, 720, 1f)
-        val highDpi = BrowserViewport.create(1280, 720, 1.5f)
+        val highDpi = BrowserViewport.create(1280, 720, 1.25f)
         assertEquals(1280, lowDpi.contentWidthDp)
-        assertEquals(853, highDpi.contentWidthDp)
+        // 1280 / 1.25 = 1024dp, still inside the 600..1280 band.
+        assertEquals(1024, highDpi.contentWidthDp)
         assertTrue(highDpi.contentWidthDp < lowDpi.contentWidthDp)
     }
 
@@ -610,7 +633,8 @@ class BrowserDrawerModelTest {
                     "$name sheet scrolls at ${width}x$height @$dpi",
                     0f, model.maxScroll, 0.01f
                 )
-                model.rows.forEach { row ->
+                // Header buttons live above the scroll boundary by design.
+                (model.rows - model.headerLinks.toSet()).forEach { row ->
                     assertTrue(
                         "${row.item.label} falls outside the sheet at ${width}x$height @$dpi",
                         row.bounds.top >= model.headerBottom - 0.01f &&
@@ -633,7 +657,7 @@ class BrowserDrawerModelTest {
         assertTrue(short.closeButton.bottom <= short.headerBottom + 0.01f)
         // Scrolled to the end, the last thing on the sheet is on screen.
         val scrolled = modelFor(800, 320, 160, scroll = short.maxScroll)
-        assertTrue(scrolled.footer.bottom <= scrolled.panel.bottom + 0.01f)
+        assertTrue(scrolled.contentBottom <= scrolled.panel.bottom + 0.01f)
     }
 
     /** Every band shrinks by the same fraction of its own slack; nothing is starved to feed another. */
@@ -779,7 +803,7 @@ class BrowserDrawerModelTest {
     /** The address row's own buttons win over the row they sit inside. */
     @Test fun theAddressButtonsOutrankTheRowTheySitIn() {
         val model = modelFor(1024, 600, 160)
-        val address = model.address
+        val address = requireNotNull(model.address)
         assertEquals(DrawerAction.ADDRESS_CLEAR, model.actionAt(address.clear.centerX, address.clear.centerY))
         assertEquals(DrawerAction.ADDRESS_KEYBOARD, model.actionAt(address.go.centerX, address.go.centerY))
         assertEquals(
@@ -852,36 +876,51 @@ class BrowserDrawerModelTest {
     }
 
     /**
-     * The primary sheet is the one drawn by default, and its size is what keeps it scroll-free on a
-     * real head unit. Nine tiles in two cards is the reference layout; growing it is how the old
-     * menu ended up with a fold.
+     * The car sheet mirrors the phone's [BrowserMenuSheet]: one accent primary button, then
+     * Back / Reload / Forward and Bookmarks / Settings / More, then the desktop switch. Growing it is
+     * how the old menu ended up with a fold.
      */
-    @Test fun thePrimarySheetStaysNineTilesInTwoCards() {
-        val cards = BrowserDrawerModel.primaryCards(state)
-        assertEquals(2, cards.size)
-        assertEquals(9, cards.sumOf { it.size })
-        cards.forEach { card ->
-            assertEquals(0, card.size % BrowserDrawerModel.PRIMARY_COLUMNS)
-        }
+    @Test fun thePrimarySheetMirrorsThePhoneSheet() {
+        val model = modelFor(1024, 600, 160)
+        assertEquals(DrawerAction.TABS, model.primary?.item?.action)
+        assertEquals(DrawerKind.PRIMARY, model.primary?.kind)
+        assertEquals("2", model.primary?.item?.value)
+        assertEquals(
+            listOf(
+                DrawerAction.NAV_BACK, DrawerAction.RELOAD, DrawerAction.NAV_FORWARD,
+                DrawerAction.BOOKMARKS, DrawerAction.SETTINGS, DrawerAction.MORE,
+            ),
+            model.tiles.map { it.item.action }
+        )
+        // Two rows of three, in that order: the first three share a top, below the primary button.
+        val (nav, secondary) = model.tiles.chunked(BrowserDrawerModel.PRIMARY_COLUMNS)
+        assertTrue(nav.all { it.bounds.top == nav.first().bounds.top })
+        assertTrue(secondary.first().bounds.top > nav.first().bounds.bottom)
+        assertTrue(nav.first().bounds.top > model.primary!!.bounds.bottom)
+        assertTrue(model.toggle!!.bounds.top > secondary.first().bounds.bottom)
+        assertEquals(2, model.dividers.size)
     }
 
     /**
-     * Both routes off the primary sheet are one tap from it and never behind "More": the secondary
-     * list itself, and the way out of the browser, which on the car surface has no other home (see
-     * [DrawerAction.APP_HOME]).
+     * The way out of the browser is one tap from either list and never behind "More", because on
+     * the car surface it has no other home (see [DrawerAction.APP_HOME]). The "More" list adds a
+     * back button in the header, so it is never a dead end.
      */
-    @Test fun theFooterKeepsBothWaysOffTheSheetOneTapAway() {
+    @Test fun theHeaderKeepsTheWayOutOneTapAway() {
         val primary = modelFor(1024, 600, 160)
-        assertEquals(
-            listOf(DrawerAction.MORE, DrawerAction.APP_HOME),
-            primary.footerLinks.map { it.item.action }
-        )
-        // On the secondary list the same slot is the way back, so the pair is never a dead end.
+        assertEquals(listOf(DrawerAction.APP_HOME), primary.headerLinks.map { it.item.action })
         val more = modelFor(1024, 600, 160, more = true)
         assertEquals(
             listOf(DrawerAction.BACK_TO_MENU, DrawerAction.APP_HOME),
-            more.footerLinks.map { it.item.action }
+            more.headerLinks.map { it.item.action }
         )
+        listOf(primary, more).forEach { model ->
+            model.headerLinks.forEach { link ->
+                assertTrue(link.bounds.bottom <= model.headerBottom + 0.01f)
+                assertEquals(link.item.action, model.actionAt(link.bounds.centerX, link.bounds.centerY))
+                assertTrue(link.bounds.right <= model.closeButton.left)
+            }
+        }
     }
 
     /**
@@ -918,16 +957,15 @@ class BrowserDrawerModelTest {
         assertEquals(DrawerAction.entries.toSet(), covered)
     }
 
-    /** The phone browser has no tabs, so its second card holds the two lists it does have. */
+    /** Same rows on both surfaces; only the primary button swaps to what that browser is for. */
     @Test fun thePhoneSheetKeepsTheShapeAndSwapsWhatItCannotDo() {
-        val phone = BrowserDrawerModel.primaryCards(state.copy(surface = MenuSurface.PHONE))
-        val car = BrowserDrawerModel.primaryCards(state)
-        assertEquals(car.map { it.size }, phone.map { it.size })
-        assertEquals(car[0].map { it.action }, phone[0].map { it.action })
+        val phoneState = state.copy(surface = MenuSurface.PHONE)
         assertEquals(
-            listOf(DrawerAction.HOME, DrawerAction.HISTORY, DrawerAction.DOWNLOADS),
-            phone[1].map { it.action }
+            BrowserDrawerModel.primaryRows(state).map { row -> row.map { it.action } },
+            BrowserDrawerModel.primaryRows(phoneState).map { row -> row.map { it.action } },
         )
+        assertEquals(DrawerAction.TABS, BrowserDrawerModel.primaryAction(state).action)
+        assertEquals(DrawerAction.SEND_TO_CAR, BrowserDrawerModel.primaryAction(phoneState).action)
     }
 }
 

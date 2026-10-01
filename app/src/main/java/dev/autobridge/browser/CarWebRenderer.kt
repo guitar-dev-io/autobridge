@@ -26,6 +26,7 @@ import androidx.annotation.VisibleForTesting
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.CookieManager
+import android.webkit.GeolocationPermissions
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -119,6 +120,12 @@ class CarWebRenderer(context: Context) {
          * change. Re-measuring the page for it is what made the viewport drift on its own.
          */
         const val STABLE_AREA_EPSILON_DP = 4f
+
+        /** Empty band between split panes; the window background shows through as the divider. */
+        const val SPLIT_GAP_DP = 4f
+
+        /** Narrowest pane a split may produce; below this the surface stays single. */
+        const val SPLIT_MIN_PANE_DP = 180f
 
         /**
          * Window over which a burst of host stable-area callbacks is coalesced into one layout.
@@ -216,6 +223,8 @@ class CarWebRenderer(context: Context) {
     private var surfaceHeight = 0
     private var surfaceDpi = 0
     private var running = false
+    /** Bumped on every start()/stop(), so a late async check from an older stop() is dropped. */
+    private var surfaceGeneration = 0
     private var currentUrl: String = BrowserDefaults.lastUrl(appContext)
     private var currentTitle: String? = null
     private var loadingProgress = 100
@@ -232,7 +241,46 @@ class CarWebRenderer(context: Context) {
     }
 
     private var sizes: AutoUiSizes = AutoUiSizes.forDensity(1f)
+
+    /**
+     * The card: the whole area the browser owns. Chrome (toolbar, drawer, tab switcher, FAB) is laid
+     * out against this. Without a split it is also where the main page sits.
+     */
     private var viewport: BrowserViewport = BrowserViewport.create(1, 1, 1f)
+
+    /** Where the main page ([webView]) sits. Equal to [viewport] unless the surface is split. */
+    private var mainViewport: BrowserViewport = viewport
+
+    // ------------------------------------------------------------------ split (side pane)
+
+    /**
+     * The optional second page shown beside the main one ([BrowserSplitLayout]). It is a plain
+     * page — no tabs of its own — and exists only while a split layout is active, so a single-page
+     * session pays nothing for it. HARDWARE mode only: the legacy canvas path draws one view.
+     */
+    private var sideView: ScrollableWebView? = null
+    private var sidePageDensity: PageDensityDisplay? = null
+    private var sideViewport: BrowserViewport? = null
+    private var sideLastPageScalePercent = 0
+    private var sideUrl: String = BrowserSplitStore.sideUrl(appContext)
+    private var sideTitle: String? = null
+    private var sideProgress = 100
+
+    /** Applied split preferences, so [applyControlSettings] only re-lays out when they move. */
+    private var splitLayout: BrowserSplitLayout = BrowserSplitStore.layout(appContext)
+    private var splitSideOnRight: Boolean = BrowserSplitStore.sideOnRight(appContext)
+
+    /**
+     * Which pane navigation, the address bar, scrolling and zoom act on. Set by tapping a pane; the
+     * toolbar shows the focused pane's page. Tabs, find and the error overlay stay with the main page.
+     */
+    private var sideFocused = false
+
+    private val isSplit: Boolean get() = sideView != null && sideViewport != null
+    private val sideActive: Boolean get() = sideFocused && isSplit
+
+    /** The WebView user commands go to: the side page while it has focus, else the main page. */
+    private val focusedView: ScrollableWebView? get() = if (sideActive) sideView else webView
     /** Where the host leaves room for our controls; null until it reports a stable area. */
     private var chromeBounds: Box? = null
     private var chrome: BrowserChromeLayout = BrowserChromeLayout.create(sizes, viewport, showMenuButton = true)
@@ -262,8 +310,8 @@ class CarWebRenderer(context: Context) {
 
 
     /**
-     * The phone's density — the one a detached WebView scales by, whatever Context it was built
-     * with. **Traced only.** It no longer sizes anything.
+     * The density the WebView scales by: [PageDensityDisplay]'s when it exists, else the phone's.
+     * **Traced only.** It no longer sizes anything.
      *
      * It used to multiply the page's CSS width to get the view's pixel width, which is what made
      * the off-screen WebView many times larger than the surface it is drawn to. Re-basing the
@@ -274,7 +322,11 @@ class CarWebRenderer(context: Context) {
      * the size of the surface. Kept here because a trace that prints it makes the difference
      * between "the scale is pinned" and "the WebView fell back to its own" readable at a glance.
      */
-    private val webViewDensity: Float get() = appContext.resources.displayMetrics.density
+    private val webViewDensity: Float
+        get() = (pageDensity?.densityDpi?.div(160f)) ?: appContext.resources.displayMetrics.density
+
+    /** Carries the car density into the WebView's Context. Null on API < 30 or if refused. */
+    private var pageDensity: PageDensityDisplay? = null
 
     /**
      * Page audio under native control.
@@ -284,6 +336,9 @@ class CarWebRenderer(context: Context) {
      */
     private val webAudio = dev.autobridge.audio.WebAudioBridge { webView }
 
+    /** The side page's sound follows the same focus decisions, so a call pauses both panes. */
+    private val sideAudio = dev.autobridge.audio.WebAudioBridge { sideView }
+
     /** The same YouTube add-ons the phone browser applies, so both surfaces behave alike. */
     private val youtube by lazy { dev.autobridge.youtube.YouTubeEnhancer(appContext) }
     private val audioEnvironment by lazy { dev.autobridge.audio.AudioEnvironment(appContext) }
@@ -291,7 +346,9 @@ class CarWebRenderer(context: Context) {
         dev.autobridge.audio.AudioFocusController(
             context = appContext,
             environment = audioEnvironment,
-            onAction = { webAudio.apply(it) }
+            onAction = { webAudio.apply(it); sideAudio.apply(it) },
+            keepPlayingThroughFocusLoss =
+                dev.autobridge.audio.AudioPlaybackStore.keepPlayingThroughFocusLoss(appContext)
         )
     }
 
@@ -360,11 +417,16 @@ class CarWebRenderer(context: Context) {
         }
     }
 
-    val canGoBack: Boolean get() = isVideoFullscreen || webView?.canGoBack() == true
-    val canGoForward: Boolean get() = webView?.canGoForward() == true
-    val url: String get() = webView?.url ?: currentUrl
-    val title: String? get() = webView?.title
-    val isLoading: Boolean get() = loadingProgress < 100
+    // All of these describe the focused pane, because that is the page the toolbar, the drawer and
+    // remote commands act on. Without a split the focused pane is always the main page.
+    val canGoBack: Boolean get() = isVideoFullscreen || focusedView?.canGoBack() == true
+    val canGoForward: Boolean get() = focusedView?.canGoForward() == true
+    val url: String get() = if (sideActive) sideView?.url ?: sideUrl else webView?.url ?: currentUrl
+    val title: String? get() = if (sideActive) sideView?.title ?: sideTitle else webView?.title
+    val isLoading: Boolean get() = (if (sideActive) sideProgress else loadingProgress) < 100
+
+    /** The active split layout, for the drawer and settings. */
+    val splitLayoutInUse: BrowserSplitLayout get() = if (isSplit) splitLayout else BrowserSplitLayout.SINGLE
     val isFullscreen: Boolean get() = visibility.fullscreen
     val hasError: Boolean get() = loadError != null
     val tabCount: Int get() = tabs.count.coerceAtLeast(1)
@@ -421,6 +483,19 @@ class CarWebRenderer(context: Context) {
 
     fun toggleFullscreen() = setFullscreen(!visibility.fullscreen)
 
+    /** Drawer shortcut: steps 100 → 50/50 → 40/60 → portrait + landscape → 100. */
+    fun cycleSplitLayout() = runOnMain {
+        val next = splitLayout.next()
+        BrowserSplitStore.setLayout(appContext, next)
+        applyControlSettings()
+        val message = when {
+            next == BrowserSplitLayout.SINGLE || isSplit -> next.label
+            !hardwareMode -> "${next.label}: ใช้ไม่ได้ในโหมดเรนเดอร์ legacy"
+            else -> "${next.label}: จอนี้แคบเกินไป"
+        }
+        host?.showMessage(message)
+    }
+
     // ------------------------------------------------------------------ find
 
     fun findInPage(query: String) = runOnMain {
@@ -471,6 +546,7 @@ class CarWebRenderer(context: Context) {
                 restoreTabs()
             }
             webView?.onResume()
+            sideView?.onResume()
             AutoBridgeVideoLog.surface("available", surface, width, height, dpi)
             if (hardwareMode) attachHardwareWindow(surface, width, height)
             layoutWebView(width, height, ViewportDebug.Event.SURFACE_AVAILABLE)
@@ -494,9 +570,26 @@ class CarWebRenderer(context: Context) {
                 else -> Log.i(TAG, "Surface re-attached ${width}x$height, keeping current page")
             }
             // Hold focus while this surface is live, so page audio participates in ducking and
-            // pauses for calls instead of talking over them.
+            // pauses for calls instead of talking over them. Re-read the "keep playing" preference
+            // on each start so toggling it in settings takes effect on the next playback without
+            // rebuilding the controller.
+            audioFocus.keepPlayingThroughFocusLoss =
+                dev.autobridge.audio.AudioPlaybackStore.keepPlayingThroughFocusLoss(appContext)
+            surfaceGeneration++
             audioFocus.isPlaying = true
             audioFocus.request()
+            // Bring back what was playing when the surface went away (rear camera on reverse,
+            // a pushed template). The page may have paused itself when it was hidden, and a
+            // granted request only resumes media when focus was actually re-acquired. Skipped
+            // while a call or prompt holds focus: the focus GAIN resumes it once that ends.
+            when (audioFocus.state) {
+                dev.autobridge.audio.AudioFocusState.GAINED,
+                dev.autobridge.audio.AudioFocusState.DUCKED -> {
+                    webAudio.resumeMarked()
+                    sideAudio.resumeMarked()
+                }
+                else -> Unit
+            }
             mainHandler.removeCallbacks(frameRunnable)
             mainHandler.post(frameRunnable)
         }
@@ -529,10 +622,27 @@ class CarWebRenderer(context: Context) {
             // the page keeps playing. Abandoning focus then would leave the app audible with no
             // claim to the output, so it would neither duck for a prompt nor pause for a call.
             // It is released when nothing is playing, and unconditionally in destroy().
-            webAudio.readState { status ->
-                if (!status.playing) {
-                    audioFocus.isPlaying = false
-                    audioFocus.abandon()
+            //
+            // The playing check must run BEFORE the WebView is paused. It used to be an async
+            // read queued ahead of onPause(), so its answer often came back after the hidden page
+            // had already stopped its media: the check then saw "not playing", dropped focus, and
+            // nothing ever restarted the music when the surface came back — exactly what happened
+            // when the rear camera took the screen on reverse. Now playing media is tagged for
+            // resume first, and a page that is playing is not paused at all, so its audio keeps
+            // running while the car shows something else.
+            val generation = ++surfaceGeneration
+            val main = webView
+            val side = sideView
+            webAudio.markPlayingForResume { mainPlaying ->
+                sideAudio.markPlayingForResume { sidePlaying ->
+                    // A newer start()/stop() has taken over; its own decision stands.
+                    if (generation != surfaceGeneration || running) return@markPlayingForResume
+                    if (!mainPlaying && !sidePlaying) {
+                        audioFocus.isPlaying = false
+                        audioFocus.abandon()
+                    }
+                    if (!mainPlaying) main?.takeIf { it === webView }?.onPause()
+                    if (!sidePlaying) side?.takeIf { it === sideView }?.onPause()
                 }
             }
             mainHandler.removeCallbacks(frameRunnable)
@@ -544,7 +654,9 @@ class CarWebRenderer(context: Context) {
             surface = null
             saveActiveTabState()
             BrowserTabStore.save(appContext, tabs)
-            webView?.onPause()
+            // WebView.onPause() is applied in the playing check above, only to a pane that is
+            // silent: pausing a playing page hides it, and most sites stop their media then.
+            side?.url?.let { BrowserSplitStore.setSideUrl(appContext, it) }
             // stop() is the teardown that runs whenever the car surface detaches — including on
             // unplug, which is exactly when the process is most likely to be killed outright.
             // Cookies not yet written to disk would go with it, and the cost of losing them is
@@ -570,11 +682,14 @@ class CarWebRenderer(context: Context) {
             rasterHostAttempted = false
             hardwareWindow?.release()
             hardwareWindow = null
+            releaseSidePane()
             webView?.apply {
                 stopLoading()
                 destroy()
             }
             webView = null
+            pageDensity?.release()
+            pageDensity = null
             youtube.release()
             tabThumbnails.values.forEach { it.recycle() }
             tabThumbnails.clear()
@@ -590,10 +705,19 @@ class CarWebRenderer(context: Context) {
             // The non-DRM MP4 test page (TEST 3 of the video matrix), reachable from the car's
             // address input by typing "videodiag".
             if (WebVideoDiagnostics.isSentinel(input)) {
-                webView?.let(WebVideoDiagnostics::loadTestPage)
+                focusedView?.let(WebVideoDiagnostics::loadTestPage)
                 return@runOnMain
             }
             val target = BrowserDefaults.resolve(input)
+            val side = sideView
+            if (sideActive && side != null) {
+                // The side pane has no tabs: an address typed while it has focus replaces its page.
+                sideUrl = target
+                BrowserSplitStore.setSideUrl(appContext, target)
+                BrowserDefaults.applyIdentity(appContext, side, target)
+                side.loadUrl(target)
+                return@runOnMain
+            }
             currentUrl = target
             loadError = null
             if (tabs.tabs.isEmpty()) {
@@ -616,11 +740,14 @@ class CarWebRenderer(context: Context) {
             AutoBridgeVideoLog.i("fullscreen exit via back")
             return@runOnMain
         }
-        webView?.let { if (it.canGoBack()) it.goBack() }
+        focusedView?.let { if (it.canGoBack()) it.goBack() }
     }
-    fun goForward() = runOnMain { webView?.let { if (it.canGoForward()) it.goForward() } }
-    fun reload() = runOnMain { webView?.reload() }
-    fun stopLoading() = runOnMain { webView?.stopLoading(); loadingProgress = 100 }
+    fun goForward() = runOnMain { focusedView?.let { if (it.canGoForward()) it.goForward() } }
+    fun reload() = runOnMain { focusedView?.reload() }
+    fun stopLoading() = runOnMain {
+        focusedView?.stopLoading()
+        if (sideActive) sideProgress = 100 else loadingProgress = 100
+    }
     fun goHome() = runOnMain { load(DEFAULT_HOME) }
 
     /**
@@ -642,6 +769,10 @@ class CarWebRenderer(context: Context) {
         BrowserDefaults.applyIdentity(appContext, view, view.url ?: currentUrl)
         appliedIdentity = identityKey()
         view.reload()
+        sideView?.let { side ->
+            BrowserDefaults.applyIdentity(appContext, side, side.url ?: sideUrl)
+            side.reload()
+        }
     }
 
     /** The identity [applyUserAgentAndReload] last pushed to the WebView. */
@@ -669,6 +800,8 @@ class CarWebRenderer(context: Context) {
      * recreates the renderer's WebView.
      */
     fun activateTab(id: Long) = runOnMain {
+        // Tabs live in the main pane, so picking one hands focus back to it.
+        sideFocused = false
         if (tabs.activeId == id) return@runOnMain
         val view = webView ?: return@runOnMain
         saveActiveTabState()
@@ -685,6 +818,7 @@ class CarWebRenderer(context: Context) {
     }
 
     fun openNewTab(url: String = DEFAULT_HOME) = runOnMain {
+        sideFocused = false
         saveActiveTabState()
         val target = BrowserDefaults.resolve(url)
         val (next, evicted) = tabs.open(nextTabId++, target)
@@ -763,8 +897,8 @@ class CarWebRenderer(context: Context) {
 
     // ------------------------------------------------------------------ tools
 
-    fun zoomIn() = runOnMain { webView?.zoomBy(ZOOM_STEP) }
-    fun zoomOut() = runOnMain { webView?.zoomBy(1f / ZOOM_STEP) }
+    fun zoomIn() = runOnMain { focusedView?.zoomBy(ZOOM_STEP) }
+    fun zoomOut() = runOnMain { focusedView?.zoomBy(1f / ZOOM_STEP) }
 
     fun copyUrl(): Boolean {
         val manager = appContext.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
@@ -796,6 +930,8 @@ class CarWebRenderer(context: Context) {
             view?.clearCache(true)
             view?.clearFormData()
             view?.clearHistory()
+            sideView?.clearFormData()
+            sideView?.clearHistory()
         }
         WebHistoryStore.clear(appContext)
         tabStates.clear()
@@ -810,7 +946,7 @@ class CarWebRenderer(context: Context) {
      * to prevent injection. [autoSubmit] submits the owning form / triggers a search (spec §11).
      */
     fun submitText(text: String, autoSubmit: Boolean) = runOnMain {
-        val view = webView
+        val view = focusedView
         val clean = text.trim()
         if (view == null) {
             // No live WebView: nothing focused, so treat as a search/address load.
@@ -944,7 +1080,7 @@ class CarWebRenderer(context: Context) {
                     // The bar is hidden for good: the recall bands do not exist, so a tap there is
                     // just a tap on the page underneath.
                     visibility.onInteraction(now)
-                    if (loadError != null) retry() else dispatchPageTap(x, y)
+                    pageTap(x, y)
                 } else {
                     // Recalling chrome must not also leave fullscreen: the page keeps every pixel it
                     // has, the toolbar simply fades back in over it.
@@ -958,9 +1094,34 @@ class CarWebRenderer(context: Context) {
             }
             ChromeZone.NONE -> {
                 visibility.onInteraction(now)
-                if (loadError != null) retry() else dispatchPageTap(x, y)
+                pageTap(x, y)
             }
         }
+    }
+
+    /**
+     * A tap that reached the page layer. In a split it first moves focus to the pane under the
+     * finger, so the toolbar, scrolling and the address bar follow what the user last touched. The
+     * error overlay belongs to the main page only, so a failed main page never blocks the side one.
+     */
+    private fun pageTap(x: Float, y: Float) {
+        if (hardwareWindow?.fullscreen?.container == null) {
+            val side = sideViewport
+            val tappedSide = isSplit && side != null && side.contains(x, y)
+            val tappedMain = mainViewport.contains(x, y)
+            if (isSplit && (tappedSide || tappedMain) && tappedSide != sideFocused) {
+                sideFocused = tappedSide
+                stopFling()
+                trace(ViewportDebug.Event.SPLIT_LAYOUT, "focus=${if (tappedSide) "side" else "main"}")
+                onPageChanged?.invoke(url, title)
+                host?.onBrowserStateChanged()
+            }
+            if (!tappedSide && loadError != null) {
+                retry()
+                return
+            }
+        }
+        dispatchPageTap(x, y)
     }
 
     private fun dispatchPageTap(x: Float, y: Float) {
@@ -977,10 +1138,16 @@ class CarWebRenderer(context: Context) {
             up.recycle()
             return
         }
-        val view = webView ?: return
-        if (!viewport.contains(x, y)) return
-        val webX = viewport.toWebX(x)
-        val webY = viewport.toWebY(y)
+        // Each pane maps the tap with its own viewport, which subtracts that pane's offset.
+        val side = sideViewport
+        val sidePage = sideView
+        val (view, pane) = when {
+            side != null && sidePage != null && side.contains(x, y) -> sidePage to side
+            mainViewport.contains(x, y) -> (webView ?: return) to mainViewport
+            else -> return // the divider, or outside both panes
+        }
+        val webX = pane.toWebX(x)
+        val webY = pane.toWebY(y)
         val down = MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, webX, webY, 0)
         val up = MotionEvent.obtain(now, now + 20, MotionEvent.ACTION_UP, webX, webY, 0)
         view.dispatchTouchEvent(down)
@@ -994,7 +1161,8 @@ class CarWebRenderer(context: Context) {
      * offset actually moved, which is what tells a fling it has reached the end.
      */
     private fun scrollPageBy(dx: Int, dy: Int): Boolean {
-        val view = webView ?: return false
+        // The host's scroll and fling callbacks carry no position, so they go to the focused pane.
+        val view = focusedView ?: return false
         // The page underneath a fullscreen video is not on screen; scrolling it would only move
         // the position the user returns to.
         if (isVideoFullscreen) return false
@@ -1078,7 +1246,7 @@ class CarWebRenderer(context: Context) {
         if (overlay != Overlay.NONE) return@runOnMain
         if (!factor.isFinite() || factor <= 0f) return@runOnMain
         lastInputMs = SystemClock.uptimeMillis()
-        webView?.zoomBy(factor.coerceIn(0.8f, 1.25f))
+        focusedView?.zoomBy(factor.coerceIn(0.8f, 1.25f))
     }
 
     // ------------------------------------------------------------------ overlays
@@ -1107,7 +1275,15 @@ class CarWebRenderer(context: Context) {
         val insetChanged = pinToolbar != alwaysShowUrlBar || hideBar != hideUrlBar
         alwaysShowUrlBar = pinToolbar
         hideUrlBar = hideBar
-        if (insetChanged) {
+        // The split layout and side are geometry too: a change re-measures both panes.
+        val nextSplit = BrowserSplitStore.layout(appContext)
+        val nextSideOnRight = BrowserSplitStore.sideOnRight(appContext)
+        val splitChanged = nextSplit != splitLayout || nextSideOnRight != splitSideOnRight
+        splitLayout = nextSplit
+        splitSideOnRight = nextSideOnRight
+        if (splitChanged) {
+            layoutWebView(surfaceWidth, surfaceHeight, ViewportDebug.Event.SPLIT_LAYOUT)
+        } else if (insetChanged) {
             layoutWebView(surfaceWidth, surfaceHeight, ViewportDebug.Event.STABLE_AREA)
         } else {
             // The toolbar's own ☰ only appears once the floating button stops being the menu's fixed
@@ -1247,6 +1423,7 @@ class CarWebRenderer(context: Context) {
             }
             DrawerAction.TOGGLE_DESKTOP -> toggleDesktopMode(appContext)
             DrawerAction.TOGGLE_FULLSCREEN -> toggleFullscreen()
+            DrawerAction.SPLIT_LAYOUT -> cycleSplitLayout()
             DrawerAction.ZOOM_IN -> zoomIn()
             DrawerAction.ZOOM_OUT -> zoomOut()
             DrawerAction.RELOAD -> reload()
@@ -1265,6 +1442,9 @@ class CarWebRenderer(context: Context) {
             // surface — the car *is* the other end of both — so reaching here means a caller
             // bypassed the model, and doing nothing is the correct response.
             DrawerAction.SEND_TO_CAR, DrawerAction.RECEIVE_FROM_CAR -> Unit
+            // Phone-sheet "About & support" links. Offered only on the phone More sheet; the car
+            // surface never lists them, so reaching here means a caller bypassed the model.
+            DrawerAction.SUPPORT, DrawerAction.LICENSES, DrawerAction.GITHUB -> Unit
         }
         host?.onBrowserStateChanged()
     }
@@ -1336,7 +1516,20 @@ class CarWebRenderer(context: Context) {
 
     // ------------------------------------------------------------------ WebView
 
-    private fun createWebView(): ScrollableWebView = ScrollableWebView(appContext).apply {
+    /**
+     * Built on [PageDensityDisplay]'s context so Chromium scales the page by the car density rather
+     * than the phone's; see that class. Falls back to the application context if it cannot exist.
+     */
+    private fun createWebView(): ScrollableWebView {
+        if (pageDensity == null) {
+            pageDensity = PageDensityDisplay.create(
+                appContext, surfaceWidth, surfaceHeight, pageDensityDpiFor(surfaceWidth, surfaceHeight)
+            )
+        }
+        return newWebView(pageDensity?.context ?: appContext)
+    }
+
+    private fun newWebView(context: Context): ScrollableWebView = ScrollableWebView(context).apply {
         // The car WebView is off-screen and drawn to a Surface, so it is the one presentation that
         // cannot be inspected by looking at it. Debug builds expose it over chrome://inspect for the
         // same reason the phone activities do; release builds are untouched.
@@ -1365,25 +1558,28 @@ class CarWebRenderer(context: Context) {
             }
 
             /**
+             * navigator.geolocation. Left to the default, the request was never answered and map
+             * pages had no GPS. This surface has no Activity for a dialog, so it uses the app's
+             * existing location permission; see [BrowserGeolocation.answerForCar].
+             */
+            override fun onGeolocationPermissionsShowPrompt(
+                origin: String,
+                callback: GeolocationPermissions.Callback,
+            ) = BrowserGeolocation.answerForCar(appContext, origin, callback) {
+                mainHandler.post {
+                    host?.showMessage("เปิดสิทธิ์ตำแหน่งให้ AutoBridge บนมือถือก่อน แล้วโหลดหน้านี้ใหม่")
+                }
+            }
+
+            /**
              * HTML5 fullscreen (YouTube's fullscreen button, `requestFullscreen()` on a video).
              * Hosted by the same [FullscreenVideoController] the phone browser uses, inside the
              * car window, so the fullscreen video is composited by the system like the inline one.
              * The legacy canvas path has no window to put it in and declines immediately, which
              * tells Chromium to stay inline instead of waiting on a view nobody shows.
              */
-            override fun onShowCustomView(view: View, callback: CustomViewCallback) {
-                val window = hardwareWindow
-                if (window == null) {
-                    AutoBridgeVideoLog.w("fullscreen declined mode=$activeMode (no hardware window)")
-                    callback.onCustomViewHidden()
-                    return
-                }
-                window.fullscreen.show(view, callback) { entered ->
-                    AutoBridgeVideoLog.i("fullscreen ${if (entered) "enter" else "exit"} url=${webView?.url}")
-                    setFullscreen(entered)
-                }
-                logDisplays("fullscreen-shown")
-            }
+            override fun onShowCustomView(view: View, callback: CustomViewCallback) =
+                hostFullscreen(view, callback)
 
             override fun onHideCustomView() {
                 hardwareWindow?.fullscreen?.hide()
@@ -1533,13 +1729,31 @@ class CarWebRenderer(context: Context) {
         } else margin
         val cardTop = toolbarBottom.coerceAtMost(height - margin - 1)
         val cardBottom = (height - margin).coerceAtLeast(cardTop + 1)
+        val desktop = BrowserUserAgentStore.isDesktopIdentity(appContext)
         val next = BrowserViewport.create(
             width, height, sizes.density,
             cardLeft, cardTop, cardRight, cardBottom,
-            desktop = BrowserUserAgentStore.isDesktopIdentity(appContext),
+            desktop = desktop,
         )
-        val geometryUnchanged = next == viewport && view.width == next.webWidth
+        // Split: the card is divided into the main page and the side page. Each gets its own
+        // viewport (touch mapping, CSS width, page zoom); chrome keeps using the whole card. Only the
+        // HARDWARE path can host two views, so legacy stays single.
+        val panes = if (hardwareMode) {
+            BrowserSplitGeometry.panes(
+                splitLayout, cardLeft, cardTop, cardRight, cardBottom,
+                sideOnRight = splitSideOnRight,
+                gapPx = sizes.dp(SPLIT_GAP_DP).roundToInt(),
+                minPanePx = sizes.dp(SPLIT_MIN_PANE_DP).roundToInt(),
+            )
+        } else null
+        val nextMain = panes?.main?.let { paneViewport(width, height, it, desktop) } ?: next
+        val nextSide = panes?.side?.let { paneViewport(width, height, it, desktop) }
+        val geometryUnchanged = next == viewport && nextMain == mainViewport &&
+            nextSide == sideViewport && view.width == nextMain.webWidth &&
+            (nextSide == null || sideView?.width == nextSide.webWidth)
         viewport = next
+        mainViewport = nextMain
+        if (nextSide == null) releaseSidePane() else sideViewport = nextSide
         // Chrome is confined to the host's stable area. Its top is clamped to the surface (not to
         // the page's cardTop): when the toolbar is pinned it is drawn in the reserved band *above*
         // the page, so clamping it down into the page would put the bar below the content it labels.
@@ -1570,16 +1784,35 @@ class CarWebRenderer(context: Context) {
         // The zoom that turns a surface-sized view into a [contentWidthDp]-wide page. Applied
         // before measure/layout so the reflow this triggers already lays out at the right width,
         // and re-applied on every geometry change because the ratio moves with the surface.
-        applyPageScale(view)
+        pageDensity?.update(mainViewport.webWidth, mainViewport.webHeight, mainViewport.pageDensityDpi)
+        lastPageScalePercent = applyPageScale(view, mainViewport, lastPageScalePercent)
         // Sized here rather than on surface attach because this is the one place the page's pixel
         // size is decided, and the host window has to be the same size as the view it rasters.
         // The host is kept across surface attach/detach: detaching the view would release the
         // hardware draw state and put the tile budget back to zero.
-        val hardware = hardwareWindow
+        var hardware = hardwareWindow
+        val activeSurface = surface
+        // The window's density follows the whole surface, not a pane: with two panes of different
+        // widths there is no single page density, and keying the window to one pane would rebuild
+        // it on every split change. Per-page CSS width comes from each WebView's PageDensityDisplay.
+        // Without a split this is the same value the page viewport yields.
+        if (hardware != null && activeSurface != null &&
+            !hardware.matches(
+                hardware.width, hardware.height,
+                CarHardwareWebWindow.coerceDpi(pageDensityDpiFor(hardware.width, hardware.height))
+            )
+        ) {
+            // The CSS width moved (desktop toggle) without the surface moving. The density lives on
+            // the display, and a Presentation cannot survive its display's metrics changing, so the
+            // window is rebuilt around the same WebView rather than resized in place.
+            attachHardwareWindow(activeSurface, hardware.width, hardware.height)
+            hardware = hardwareWindow
+        }
         if (hardware != null) {
             // A real window lays the view out itself; it only needs to know where the page goes.
-            hardware.placePage(view, viewport.left, viewport.top, viewport.webWidth, viewport.webHeight)
-            trace(event, "reflow=applied")
+            hardware.placePage(view, mainViewport.left, mainViewport.top, mainViewport.webWidth, mainViewport.webHeight)
+            nextSide?.let { placeSidePane(hardware, it) }
+            trace(event, "reflow=applied split=${splitLayoutInUse}")
             return
         }
         val host = rasterHost
@@ -1619,10 +1852,9 @@ class CarWebRenderer(context: Context) {
      * toggle) reloads afterwards. [lastPageScalePercent] keeps that reload out of the ordinary
      * resize path, where the scale usually has not moved at all.
      */
-    private fun applyPageScale(view: WebView) {
-        val percent = viewport.pageScalePercent
-        if (percent == lastPageScalePercent) return
-        lastPageScalePercent = percent
+    private fun applyPageScale(view: WebView, pane: BrowserViewport, lastPercent: Int): Int {
+        val percent = pane.pageScalePercent
+        if (percent == lastPercent) return percent
         // `setInitialScale` alone is not enough, and the first attempt at this shipped without
         // these two lines: the trace came back `scale=1.000` (the raster was 1:1, as intended) but
         // `pageScale=3.000`, so the page had been laid out at 800/3 = 267 CSS px and blown up three
@@ -1635,6 +1867,175 @@ class CarWebRenderer(context: Context) {
         view.settings.useWideViewPort = false
         view.settings.loadWithOverviewMode = false
         view.setInitialScale(percent)
+        return percent
+    }
+
+    /** A pane's own viewport: same rules as the card, so CSS width follows the pane's width. */
+    private fun paneViewport(width: Int, height: Int, pane: PaneRect, desktop: Boolean): BrowserViewport =
+        BrowserViewport.create(
+            width, height, sizes.density,
+            pane.left, pane.top, pane.right, pane.bottom,
+            desktop = desktop,
+        )
+
+    /**
+     * Hosts the side page at [pane], creating it the first time a split needs it. Its
+     * [PageDensityDisplay] is made before the WebView because Chromium reads the density from the
+     * construction Context; a pane narrower than the surface needs its own.
+     */
+    private fun placeSidePane(hardware: CarHardwareWebWindow, pane: BrowserViewport) {
+        var side = sideView
+        val created = side == null
+        if (side == null) {
+            sidePageDensity = PageDensityDisplay.create(appContext, pane.webWidth, pane.webHeight, pane.pageDensityDpi)
+            side = newSideWebView(sidePageDensity?.context ?: appContext)
+            sideView = side
+            sideLastPageScalePercent = 0
+        }
+        sidePageDensity?.update(pane.webWidth, pane.webHeight, pane.pageDensityDpi)
+        sideLastPageScalePercent = applyPageScale(side, pane, sideLastPageScalePercent)
+        hardware.placePage(side, pane.left, pane.top, pane.webWidth, pane.webHeight)
+        if (created) {
+            BrowserDefaults.applyIdentity(appContext, side, sideUrl)
+            side.loadUrl(sideUrl)
+            if (running) side.onResume()
+            AutoBridgeVideoLog.i("split side pane created ${pane.webWidth}x${pane.webHeight} url=$sideUrl")
+        }
+    }
+
+    /**
+     * Drops the side page when the surface goes back to a single page, so a single-page session
+     * carries no second WebView. Its URL is kept, so the next split reopens the same page.
+     */
+    private fun releaseSidePane() {
+        sideViewport = null
+        sideFocused = false
+        val side = sideView ?: return
+        side.url?.let {
+            sideUrl = it
+            BrowserSplitStore.setSideUrl(appContext, it)
+        }
+        (side.parent as? ViewGroup)?.removeView(side)
+        side.stopLoading()
+        side.destroy()
+        sideView = null
+        sidePageDensity?.release()
+        sidePageDensity = null
+        sideTitle = null
+        sideProgress = 100
+        sideLastPageScalePercent = 0
+    }
+
+    /**
+     * The side page: the same identity, HTTPS-only rule and fullscreen/geolocation handling as the
+     * main page, but none of the tab, history-list or find wiring — it is one page, not a browser.
+     */
+    private fun newSideWebView(context: Context): ScrollableWebView = ScrollableWebView(context).apply {
+        BrowserDefaults.configureDebugTools()
+        BrowserDefaults.configure(appContext, this)
+        // Split only exists in HARDWARE mode, where the view is on a real display (see newWebView).
+        settings.setOffscreenPreRaster(false)
+        setDownloadListener(
+            BrowserDownloads.listener(appContext) { message ->
+                mainHandler.post { host?.showMessage(message) }
+            }
+        )
+        webChromeClient = object : WebChromeClient() {
+            override fun onProgressChanged(view: WebView, newProgress: Int) {
+                sideProgress = newProgress.coerceIn(0, 100)
+                if (sideActive) onPageChanged?.invoke(view.url ?: sideUrl, view.title)
+            }
+
+            override fun onGeolocationPermissionsShowPrompt(
+                origin: String,
+                callback: GeolocationPermissions.Callback,
+            ) = BrowserGeolocation.answerForCar(appContext, origin, callback) {
+                mainHandler.post {
+                    host?.showMessage("เปิดสิทธิ์ตำแหน่งให้ AutoBridge บนมือถือก่อน แล้วโหลดหน้านี้ใหม่")
+                }
+            }
+
+            override fun onShowCustomView(view: View, callback: CustomViewCallback) =
+                hostFullscreen(view, callback)
+
+            override fun onHideCustomView() {
+                hardwareWindow?.fullscreen?.hide()
+            }
+
+            /** A popup from the side page replaces the side page; it has no tabs to open it in. */
+            override fun onCreateWindow(
+                view: WebView,
+                isDialog: Boolean,
+                isUserGesture: Boolean,
+                resultMsg: Message,
+            ): Boolean {
+                if (!isUserGesture) return false
+                val transport = resultMsg.obj as? WebView.WebViewTransport ?: return false
+                val probe = WebView(appContext).apply {
+                    BrowserDefaults.configure(appContext, this)
+                    webViewClient = object : WebViewClient() {
+                        override fun shouldOverrideUrlLoading(probeView: WebView, request: WebResourceRequest): Boolean {
+                            val target = request.url.toString()
+                            mainHandler.post {
+                                ContentAddress.https(target)?.let { url -> sideView?.loadUrl(url) }
+                                probeView.destroy()
+                            }
+                            return true
+                        }
+                    }
+                }
+                transport.webView = probe
+                resultMsg.sendToTarget()
+                return true
+            }
+        }
+        webViewClient = object : WebViewClient() {
+            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                val target = request.url.toString()
+                if (BrowserDefaults.isExternalSignInHost(target)) {
+                    onExternalSignInRequired?.invoke(target)
+                    return true
+                }
+                if (ContentAddress.https(target) == null) return true
+                if (request.isForMainFrame) BrowserDefaults.applyIdentity(appContext, view, target)
+                return false
+            }
+
+            override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
+                BrowserDefaults.applyIdentity(appContext, view, url)
+            }
+
+            override fun onPageFinished(view: WebView, url: String) {
+                sideUrl = url
+                sideTitle = view.title
+                sideProgress = 100
+                BrowserSplitStore.setSideUrl(appContext, url)
+                WebHistoryStore.record(appContext, view.title, url)
+                if (sideActive) onPageChanged?.invoke(url, view.title)
+            }
+
+            override fun doUpdateVisitedHistory(view: WebView, url: String, isReload: Boolean) {
+                sideUrl = url
+            }
+        }
+    }
+
+    /**
+     * Shows Chromium fullscreen (from either pane) in the car window. It covers the whole display,
+     * so a fullscreen video from the side pane takes the full surface, not just its pane.
+     */
+    private fun hostFullscreen(view: View, callback: WebChromeClient.CustomViewCallback) {
+        val window = hardwareWindow
+        if (window == null) {
+            AutoBridgeVideoLog.w("fullscreen declined mode=$activeMode (no hardware window)")
+            callback.onCustomViewHidden()
+            return
+        }
+        window.fullscreen.show(view, callback) { entered ->
+            AutoBridgeVideoLog.i("fullscreen ${if (entered) "enter" else "exit"} url=${focusedView?.url}")
+            setFullscreen(entered)
+        }
+        logDisplays("fullscreen-shown")
     }
 
     /** WebView-side geometry, so a mismatch between what is laid out and what gets painted shows up. */
@@ -1645,7 +2046,8 @@ class CarWebRenderer(context: Context) {
             " viewScroll=${view.scrollX},${view.scrollY}" +
             " pageScale=" + String.format("%.3f", view.scale) +
             " contentH=${view.contentHeight}" +
-            " rasterHost=" + (if (rasterHost != null) "window" else "none")
+            " rasterHost=" + (if (rasterHost != null) "window" else "none") +
+            " pageDpi=" + (hardwareWindow?.densityDpi ?: viewport.pageDensityDpi)
     }
 
     private fun trace(event: String, extra: String = "") {
@@ -1677,7 +2079,7 @@ class CarWebRenderer(context: Context) {
      */
     private fun attachHardwareWindow(surface: Surface, width: Int, height: Int): Boolean {
         val view = webView ?: return false
-        val dpi = appContext.resources.configuration.densityDpi
+        val dpi = pageDensityDpiFor(width, height)
         val existing = hardwareWindow
         if (existing != null && existing.matches(width, height, dpi)) {
             existing.setSurface(surface)
@@ -1700,7 +2102,13 @@ class CarWebRenderer(context: Context) {
                 onUnexpectedDismiss = { mainHandler.post(::recoverHardwareWindow) },
             )
             hardwareWindow = window
-            window.placePage(view, viewport.left, viewport.top, viewport.webWidth, viewport.webHeight)
+            window.placePage(view, mainViewport.left, mainViewport.top, mainViewport.webWidth, mainViewport.webHeight)
+            // A rebuilt window starts empty; the side page moves across with the main one.
+            val side = sideView
+            val sidePane = sideViewport
+            if (side != null && sidePane != null) {
+                window.placePage(side, sidePane.left, sidePane.top, sidePane.webWidth, sidePane.webHeight)
+            }
             logDisplays("hardware-window-attached")
             true
         } catch (error: RuntimeException) {
@@ -1714,6 +2122,17 @@ class CarWebRenderer(context: Context) {
             false
         }
     }
+
+    /**
+     * Density of the display the page is hosted on, chosen so the page's CSS width is
+     * [BrowserViewport.contentWidthDp] (see [BrowserViewport.pageDensityDpi]). Computed from the
+     * same inputs [layoutWebView] uses, because the window is created before the first layout.
+     */
+    private fun pageDensityDpiFor(width: Int, height: Int): Int =
+        BrowserViewport.create(
+            width, height, AutoUiSizes.forCarSurface(surfaceDpi).density,
+            desktop = BrowserUserAgentStore.isDesktopIdentity(appContext),
+        ).pageDensityDpi
 
     /** The platform dismissed the window (e.g. display metrics changed); rebuild it on the live surface. */
     private fun recoverHardwareWindow() {
@@ -1749,10 +2168,12 @@ class CarWebRenderer(context: Context) {
         canvas.clipRect(clipRect)
         if (loadError != null && !isVideoFullscreen) {
             canvas.save()
-            canvas.translate(viewport.left.toFloat(), viewport.top.toFloat())
+            canvas.translate(mainViewport.left.toFloat(), mainViewport.top.toFloat())
+            canvas.clipRect(0f, 0f, mainViewport.width.toFloat(), mainViewport.height.toFloat())
             drawErrorOverlay(canvas)
             canvas.restore()
         }
+        if (isSplit && !isVideoFullscreen) drawSplitFocus(canvas)
         drawChrome(canvas, SystemClock.uptimeMillis())
         canvas.restoreToCount(save)
     }
@@ -1812,6 +2233,26 @@ class CarWebRenderer(context: Context) {
         } finally {
             runCatching { activeSurface.unlockCanvasAndPost(canvas) }
         }
+    }
+
+    /**
+     * Outlines the focused pane in a split, so it is clear which page the toolbar, scrolling and the
+     * address bar will act on. The divider itself is the empty gap between the panes.
+     */
+    private fun drawSplitFocus(canvas: Canvas) {
+        val pane = (if (sideFocused) sideViewport else mainViewport) ?: return
+        val stroke = sizes.dp(2f)
+        toolbarPaint.style = Paint.Style.STROKE
+        toolbarPaint.strokeWidth = stroke
+        toolbarPaint.color = BrowserTheme.accent
+        toolbarPaint.alpha = 200
+        canvas.drawRect(
+            pane.left + stroke / 2f, pane.top + stroke / 2f,
+            pane.left + pane.width - stroke / 2f, pane.top + pane.height - stroke / 2f,
+            toolbarPaint
+        )
+        toolbarPaint.alpha = 255
+        toolbarPaint.style = Paint.Style.FILL
     }
 
     /** Toolbar, overlays and FAB — shared by the legacy frame and the hardware chrome layer. */
@@ -1996,7 +2437,8 @@ class CarWebRenderer(context: Context) {
      */
     private fun drawDrawer(canvas: Canvas) {
         val model = drawer ?: return
-        val radius = sizes.cornerRadius
+        // The phone sheet's generous corner, so the two read as the same panel.
+        val radius = sizes.dp(AutoUiSizes.SHEET_CORNER_RADIUS_DP)
         // Scrim over the page so the sheet reads as a layer, without moving anything beneath it.
         toolbarPaint.color = BrowserTheme.scrim
         canvas.drawRect(
@@ -2011,17 +2453,15 @@ class CarWebRenderer(context: Context) {
 
         canvas.save()
         canvas.clipRect(panel.left, model.headerBottom, panel.right, panel.bottom)
-        drawSheetAddress(canvas, model.address)
-        model.cards.forEach { card ->
-            toolbarPaint.color = BrowserTheme.sheetCardBackground
-            canvas.drawRoundRect(
-                card.bounds.left, card.bounds.top, card.bounds.right, card.bounds.bottom,
-                radius, radius, toolbarPaint
-            )
-            card.tiles.forEach { drawSheetTile(canvas, it) }
+        model.address?.let { drawSheetAddress(canvas, it) }
+        model.primary?.let { drawSheetPrimary(canvas, it) }
+        // The phone sheet separates its groups with faint full-width rules, not filled cards.
+        toolbarPaint.color = BrowserTheme.hairline
+        model.dividers.forEach { y ->
+            canvas.drawRect(model.header.left, y, model.header.right, y + sizes.dp(1f), toolbarPaint)
         }
+        model.tiles.forEach { drawSheetTile(canvas, it) }
         model.toggle?.let { drawSheetToggle(canvas, it) }
-        drawSheetFooter(canvas, model)
         canvas.restore()
 
         drawSheetHeader(canvas, model)
@@ -2041,7 +2481,6 @@ class CarWebRenderer(context: Context) {
             .toString()
 
     private fun drawSheetHeader(canvas: Canvas, model: BrowserDrawerModel) {
-        val radius = sizes.cornerRadius
         val grip = model.grip
         toolbarPaint.color = BrowserTheme.iconDisabled
         canvas.drawRoundRect(
@@ -2049,19 +2488,19 @@ class CarWebRenderer(context: Context) {
             grip.height / 2f, grip.height / 2f, toolbarPaint
         )
 
-        val card = model.headerCard
-        toolbarPaint.color = BrowserTheme.sheetCardBackground
-        canvas.drawRoundRect(card.left, card.top, card.right, card.bottom, radius, radius, toolbarPaint)
-
-        val titleSize = sizes.iconMedium.coerceAtMost(card.height * 0.40f)
-        val subSize = (sizes.iconSmall * 0.8f).coerceAtMost(card.height * 0.26f)
-        val textLeft = card.left + sizes.horizontalPadding
-        val textLimit = model.closeButton.left - textLeft - sizes.contentGap
+        // Title and page title straight on the sheet, as the phone header draws them: no card.
+        val header = model.header
+        val firstButton = (model.headerLinks.map { it.bounds.left } + model.closeButton.left)
+            .filter { it > model.titleLeft }.minOrNull() ?: header.right
+        val titleSize = sizes.iconLarge.coerceAtMost(header.height * 0.42f)
+        val subSize = (sizes.iconSmall * 0.82f).coerceAtMost(header.height * 0.26f)
+        val textLeft = model.titleLeft
+        val textLimit = firstButton - textLeft - sizes.contentGap
         val hasSubtitle = model.subtitle.isNotBlank()
-        val blockTop = card.centerY - (titleSize + if (hasSubtitle) subSize * 1.4f else 0f) / 2f
+        val blockTop = header.centerY - (titleSize + if (hasSubtitle) subSize * 1.4f else 0f) / 2f
         titlePaint.color = BrowserTheme.textPrimary
         titlePaint.textSize = titleSize
-        canvas.drawText(fit(model.title, titlePaint, textLimit), textLeft, blockTop + titleSize, titlePaint)
+        canvas.drawText(fit(model.title, titlePaint, textLimit), textLeft, blockTop + titleSize * 0.92f, titlePaint)
         if (hasSubtitle) {
             detailPaint.color = BrowserTheme.textSecondary
             detailPaint.textSize = subSize
@@ -2071,22 +2510,32 @@ class CarWebRenderer(context: Context) {
             )
         }
 
-        // A drawn close button rather than the old "tap outside to close" caption: the sheet leaves
-        // only a narrow margin around itself, so that instruction pointed at a target too small to
-        // hit in a moving car. This is a full touch target in a fixed corner, and it carries the
-        // word as well as the glyph — a bare ✕ in a car is a guess.
+        model.headerLinks.forEach { link ->
+            val box = link.bounds
+            toolbarPaint.color = BrowserTheme.sheetCardBackground
+            canvas.drawRoundRect(
+                box.left, box.top, box.right, box.bottom, box.height / 2f, box.height / 2f, toolbarPaint
+            )
+            glyphPaint.color = BrowserTheme.textPrimary
+            if (link.kind == DrawerKind.ROUND) {
+                glyphPaint.textSize = sizes.iconLarge.coerceAtMost(box.height * 0.6f)
+                canvas.drawText(link.item.glyph, box.centerX, box.centerY + glyphPaint.textSize * 0.34f, glyphPaint)
+            } else {
+                glyphPaint.textSize = (sizes.iconSmall * 0.8f).coerceAtMost(box.height * 0.42f)
+                drawCentered(
+                    canvas, glyphPaint, "${link.item.glyph} ${link.item.label}",
+                    box.centerX, box.centerY + glyphPaint.textSize * 0.36f
+                )
+            }
+        }
+
+        // The phone's round ✕: a full touch target in a fixed corner, on a tonal circle.
         val close = model.closeButton
-        toolbarPaint.color = BrowserTheme.tileBackground
-        canvas.drawRoundRect(
-            close.left, close.top, close.right, close.bottom,
-            close.height / 2f, close.height / 2f, toolbarPaint
-        )
-        glyphPaint.color = BrowserTheme.textPrimary
-        glyphPaint.textSize = (sizes.iconSmall * 0.9f).coerceAtMost(close.height * 0.45f)
-        drawCentered(
-            canvas, glyphPaint, "\u2715  Close", close.centerX,
-            close.centerY + glyphPaint.textSize * 0.36f
-        )
+        toolbarPaint.color = BrowserTheme.sheetCardBackground
+        canvas.drawCircle(close.centerX, close.centerY, minOf(close.width, close.height) / 2f, toolbarPaint)
+        glyphPaint.color = BrowserTheme.textSecondary
+        glyphPaint.textSize = sizes.iconSmall.coerceAtMost(close.height * 0.45f)
+        canvas.drawText("\u2715", close.centerX, close.centerY + glyphPaint.textSize * 0.36f, glyphPaint)
     }
 
     /**
@@ -2140,26 +2589,28 @@ class CarWebRenderer(context: Context) {
     private fun drawSheetTile(canvas: Canvas, row: DrawerRow) {
         val tile = row.bounds
         val enabled = row.item.enabled
-        // Fully rounded, the way the reference menu draws them: at a glance the shape alone says
-        // "button", which a square tile the same colour as its card does not.
-        val radius = (tile.height / 2f).coerceAtMost(sizes.cornerRadius * 2.5f)
+        // The phone sheet's tile: a tonal rounded rectangle, a glyph over a label.
+        val radius = sizes.dp(AutoUiSizes.SHEET_CORNER_RADIUS_DP).coerceAtMost(tile.height * 0.3f)
         toolbarPaint.color =
             if (enabled) BrowserTheme.tileBackground else BrowserTheme.tileDisabledBackground
         canvas.drawRoundRect(tile.left, tile.top, tile.right, tile.bottom, radius, radius, toolbarPaint)
 
-        glyphPaint.color = if (enabled) BrowserTheme.onSecondaryContainer else BrowserTheme.iconDisabled
-        glyphPaint.textSize = sizes.iconLarge.coerceAtMost(tile.height * 0.38f)
-        canvas.drawText(
-            row.item.glyph, tile.centerX,
-            tile.top + tile.height * 0.42f + glyphPaint.textSize * 0.35f, glyphPaint
-        )
+        val glyphSize = sizes.dp(AutoUiSizes.SHEET_ICON_DP).coerceAtMost(tile.height * 0.36f)
+        val labelSize = (sizes.iconSmall * 0.78f).coerceAtMost(tile.height * 0.24f)
+        // Glyph and label centred as one block, with the phone's gap between them.
+        val spacing = (sizes.contentGap * 0.75f).coerceAtMost(tile.height * 0.1f)
+        val blockTop = tile.centerY - (glyphSize + spacing + labelSize) / 2f
 
-        titlePaint.color = if (enabled) BrowserTheme.onSecondaryContainer else BrowserTheme.iconDisabled
-        titlePaint.textSize = (sizes.iconSmall * 0.8f).coerceAtMost(tile.height * 0.26f)
+        glyphPaint.color = if (enabled) BrowserTheme.iconEnabled else BrowserTheme.iconDisabled
+        glyphPaint.textSize = glyphSize
+        canvas.drawText(row.item.glyph, tile.centerX, blockTop + glyphSize * 0.85f, glyphPaint)
+
+        detailPaint.color = if (enabled) BrowserTheme.textPrimary else BrowserTheme.iconDisabled
+        detailPaint.textSize = labelSize
         drawCentered(
-            canvas, titlePaint,
-            fit(row.item.label, titlePaint, tile.width - sizes.contentGap),
-            tile.centerX, tile.bottom - tile.height * 0.15f
+            canvas, detailPaint,
+            fit(row.item.label, detailPaint, tile.width - sizes.contentGap),
+            tile.centerX, blockTop + glyphSize + spacing + labelSize * 0.85f
         )
 
         if (row.item.value.isNotBlank()) {
@@ -2169,6 +2620,57 @@ class CarWebRenderer(context: Context) {
             canvas.drawText(
                 row.item.value, tile.right - sizes.contentGap - width,
                 tile.top + sizes.contentGap + detailPaint.textSize * 0.8f, detailPaint
+            )
+        }
+    }
+
+    /**
+     * The accent-filled primary button, drawn the way the phone draws "Send to car": an icon, a
+     * bold title over a subtitle, and a chevron. On the car it carries the open-tab count as well.
+     */
+    private fun drawSheetPrimary(canvas: Canvas, row: DrawerRow) {
+        val box = row.bounds
+        val radius = sizes.dp(AutoUiSizes.SHEET_CORNER_RADIUS_DP).coerceAtMost(box.height * 0.36f)
+        toolbarPaint.color = BrowserTheme.accent
+        canvas.drawRoundRect(box.left, box.top, box.right, box.bottom, radius, radius, toolbarPaint)
+
+        val pad = sizes.horizontalPadding * 1.5f
+        glyphPaint.color = BrowserTheme.onPrimary
+        glyphPaint.textSize = (sizes.dp(AutoUiSizes.SHEET_ICON_DP) * 1.1f).coerceAtMost(box.height * 0.5f)
+        val iconCx = box.left + pad + glyphPaint.textSize / 2f
+        canvas.drawText(row.item.glyph, iconCx, box.centerY + glyphPaint.textSize * 0.36f, glyphPaint)
+
+        // Chevron, then the optional count badge, from the trailing edge in.
+        glyphPaint.textSize = sizes.iconLarge.coerceAtMost(box.height * 0.6f)
+        val chevronCx = box.right - pad * 0.8f - glyphPaint.textSize * 0.25f
+        canvas.drawText("\u203A", chevronCx, box.centerY + glyphPaint.textSize * 0.34f, glyphPaint)
+        var textRight = chevronCx - glyphPaint.textSize * 0.5f - sizes.contentGap
+        if (row.item.value.isNotBlank()) {
+            val badge = (sizes.iconMedium * 1.3f).coerceAtMost(box.height * 0.55f)
+            val badgeCx = textRight - badge / 2f
+            toolbarPaint.color = BrowserTheme.onPrimary
+            canvas.drawCircle(badgeCx, box.centerY, badge / 2f, toolbarPaint)
+            glyphPaint.color = BrowserTheme.accent
+            glyphPaint.textSize = badge * 0.5f
+            canvas.drawText(row.item.value, badgeCx, box.centerY + glyphPaint.textSize * 0.36f, glyphPaint)
+            textRight = badgeCx - badge / 2f - sizes.contentGap
+        }
+
+        val textLeft = iconCx + sizes.dp(AutoUiSizes.SHEET_ICON_DP) * 0.55f + pad * 0.7f
+        val limit = textRight - textLeft
+        val titleSize = sizes.iconMedium.coerceAtMost(box.height * 0.32f)
+        val subSize = (sizes.iconSmall * 0.78f).coerceAtMost(box.height * 0.22f)
+        val hasDetail = row.item.detail.isNotBlank()
+        val blockTop = box.centerY - (titleSize + if (hasDetail) subSize * 1.35f else 0f) / 2f
+        titlePaint.color = BrowserTheme.onPrimary
+        titlePaint.textSize = titleSize
+        canvas.drawText(fit(row.item.label, titlePaint, limit), textLeft, blockTop + titleSize * 0.9f, titlePaint)
+        if (hasDetail) {
+            detailPaint.color = BrowserTheme.onPrimary
+            detailPaint.textSize = subSize
+            canvas.drawText(
+                fit(row.item.detail, detailPaint, limit), textLeft,
+                blockTop + titleSize + subSize * 1.2f, detailPaint
             )
         }
     }
@@ -2214,47 +2716,6 @@ class CarWebRenderer(context: Context) {
             if (row.item.on) BrowserTheme.toggleKnob else BrowserTheme.toggleKnobOff
         val knobX = if (row.item.on) trackRight - trackHeight / 2f else trackLeft + trackHeight / 2f
         canvas.drawCircle(knobX, box.centerY, trackHeight * 0.4f, toolbarPaint)
-    }
-
-    /**
-     * Footer: who is drawing the page on the left, and the two routes the sheet must never bury on
-     * the right — "More" for everything that did not earn a tile, and "Exit" for the car surface's
-     * only way back to AutoBridge's dashboard.
-     */
-    private fun drawSheetFooter(canvas: Canvas, model: BrowserDrawerModel) {
-        val box = model.footer
-        val ruleY = box.top - sizes.contentGap * 0.5f
-        toolbarPaint.color = BrowserTheme.hairline
-        canvas.drawRect(box.left, ruleY, box.right, ruleY + sizes.dp(1f), toolbarPaint)
-
-        val links = model.footerLinks
-        val textLimit = (links.minOfOrNull { it.bounds.left } ?: box.right) - box.left - sizes.contentGap
-        detailPaint.textSize = (sizes.iconSmall * 0.7f).coerceAtMost(box.height * 0.38f)
-        detailPaint.color = BrowserTheme.textSecondary
-        canvas.drawText(
-            fit(model.footerName, detailPaint, textLimit), box.left,
-            box.centerY - detailPaint.textSize * 0.15f, detailPaint
-        )
-        detailPaint.color = BrowserTheme.iconDisabled
-        canvas.drawText(
-            fit(model.footerVersion, detailPaint, textLimit), box.left,
-            box.centerY + detailPaint.textSize * 1.15f, detailPaint
-        )
-
-        links.forEach { link ->
-            val pill = link.bounds
-            toolbarPaint.color = BrowserTheme.tileBackground
-            canvas.drawRoundRect(
-                pill.left, pill.top, pill.right, pill.bottom,
-                pill.height / 2f, pill.height / 2f, toolbarPaint
-            )
-            glyphPaint.color = BrowserTheme.textPrimary
-            glyphPaint.textSize = (sizes.iconSmall * 0.75f).coerceAtMost(pill.height * 0.5f)
-            drawCentered(
-                canvas, glyphPaint, "${link.item.glyph} ${link.item.label}",
-                pill.centerX, pill.centerY + glyphPaint.textSize * 0.36f
-            )
-        }
     }
 
     private fun drawTabSwitcher(canvas: Canvas) {
@@ -2349,8 +2810,8 @@ class CarWebRenderer(context: Context) {
 
     /** Shown in place of the page when the main frame fails to load; tapping content area retries. */
     private fun drawErrorOverlay(canvas: Canvas) {
-        val w = viewport.width.toFloat()
-        val h = viewport.height.toFloat()
+        val w = mainViewport.width.toFloat()
+        val h = mainViewport.height.toFloat()
         canvas.drawColor(BrowserTheme.errorBackground)
         titlePaint.color = BrowserTheme.errorAccent
         titlePaint.textSize = sizes.iconMedium

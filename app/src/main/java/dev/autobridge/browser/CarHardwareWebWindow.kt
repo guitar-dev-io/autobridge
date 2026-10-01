@@ -128,16 +128,22 @@ class CarHardwareWebWindow private constructor(
     }
 
     companion object {
-        /** Android's own floor for a display; a create below it is refused outright. */
-        private const val MIN_DENSITY_DPI = 120
+        /**
+         * Sanity floor only. The platform accepts any positive density, and the page density can
+         * legitimately be low: desktop mode on an 800px panel wants 1280 CSS px, i.e. 100dpi.
+         */
+        private const val MIN_DENSITY_DPI = 60
+
+        /** The density [create] will actually give the display for a requested [densityDpi]. */
+        fun coerceDpi(densityDpi: Int): Int = densityDpi.coerceAtLeast(MIN_DENSITY_DPI)
 
         /**
          * Creates the display on [surface] and shows a window on it hosting [page].
          *
-         * [densityDpi] must be the density the page view already believes it has (the WebView is
-         * built from the application context, i.e. the phone's density). The car panel's own dpi
-         * is applied by [BrowserViewport.pageScalePercent], not by the display — so the page lays
-         * out at exactly the same CSS width as on the legacy path.
+         * [densityDpi] is [BrowserViewport.pageDensityDpi], so the window (fullscreen video views
+         * included) agrees with the page on one density. It does **not** set the page's CSS width:
+         * Chromium reads that from the WebView's construction Context, which [PageDensityDisplay]
+         * provides. Changing only this value was tried and left the trace at `pageScale=3.000`.
          *
          * Throws on failure; the caller logs it and falls back to [CarBrowserRenderMode.LEGACY_CANVAS].
          */
@@ -153,7 +159,7 @@ class CarHardwareWebWindow private constructor(
             require(width > 0 && height > 0) { "invalid car surface size ${width}x$height" }
             val displays = context.getSystemService(DisplayManager::class.java)
                 ?: error("DisplayManager unavailable")
-            val dpi = densityDpi.coerceAtLeast(MIN_DENSITY_DPI)
+            val dpi = coerceDpi(densityDpi)
             val virtual = displays.createVirtualDisplay(
                 "AutoBridgeCarBrowser", width, height, dpi, surface,
                 DisplayManager.VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY or

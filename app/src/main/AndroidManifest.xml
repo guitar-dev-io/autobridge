@@ -40,7 +40,20 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
 
+    <!-- Voice commands on the car Agent screen (CarVoiceInput): the car microphone through
+         CarAudioRecord, or the phone microphone as a fallback. Requested at runtime only when the
+         user starts listening; nothing is recorded outside a listen session. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <queries>
+        <!-- Package visibility for SpeechRecognizer.isRecognitionAvailable and TextToSpeech on
+             Android 11+; without these both report no service even when one is installed. -->
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.APP_BROWSER" />
@@ -143,6 +156,12 @@
         <!-- Weather home tile: pick a place and see its current conditions (Open-Meteo, no key). -->
         <activity android:name=".weather.WeatherActivity" android:exported="false" />
 
+        <!-- Settings > About > Open-source licenses. The Play-services viewer is an AppCompat
+             activity; under the app's framework Material theme it crashes on launch
+             ("You need to use a Theme.AppCompat theme"), so it gets the dark AppCompat theme. -->
+        <activity android:name="com.google.android.gms.oss.licenses.OssLicensesMenuActivity" android:theme="@style/Theme.AppCompat" />
+        <activity android:name="com.google.android.gms.oss.licenses.OssLicensesActivity" android:theme="@style/Theme.AppCompat" />
+
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -156,10 +175,15 @@
              MediaSessionService pattern. Access control is enforced per-controller inside
              MediaSession (see MediaPlaybackService), not by a manifest permission — a custom
              permission here would also block the legitimate system controllers this needs to
-             stay reachable to. -->
+             stay reachable to.
+             android.media.browse.MediaBrowserService is what Android Auto looks for to list the
+             app as a media source and give it the media card in the split dashboard, next to the
+             navigation panel. -->
         <service android:name=".media.MediaPlaybackService" android:exported="true" android:foregroundServiceType="mediaPlayback" tools:ignore="ExportedService">
             <intent-filter>
+                <action android:name="androidx.media3.session.MediaLibraryService" />
                 <action android:name="androidx.media3.session.MediaSessionService" />
+                <action android:name="android.media.browse.MediaBrowserService" />
             </intent-filter>
         </service>
 

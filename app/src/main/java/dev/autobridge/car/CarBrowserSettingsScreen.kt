@@ -13,7 +13,10 @@ import androidx.car.app.model.SearchTemplate
 import androidx.car.app.model.SectionedItemList
 import androidx.car.app.model.Template
 import androidx.car.app.model.Toggle
+import dev.autobridge.audio.AudioPlaybackStore
 import dev.autobridge.browser.BrowserControlsStore
+import dev.autobridge.browser.BrowserSplitLayout
+import dev.autobridge.browser.BrowserSplitStore
 import dev.autobridge.browser.BrowserUserAgentCodec
 import dev.autobridge.browser.BrowserUserAgentMode
 import dev.autobridge.browser.BrowserUserAgentStore
@@ -103,6 +106,29 @@ class CarBrowserSettingsScreen(carContext: CarContext) : Screen(carContext) {
                     )
                     .build()
             )
+            .addItem(
+                Row.Builder()
+                    .setTitle("Split screen")
+                    .addText(BrowserSplitStore.layout(carContext).label)
+                    .setBrowsable(true)
+                    .setOnClickListener { openSplitLayoutPicker() }
+                    .build()
+            )
+            .addItem(
+                Row.Builder()
+                    .setTitle("Keep music playing in reverse")
+                    .addText("Don't pause for the reverse chime — also stops phone calls and nav prompts pausing it")
+                    .setToggle(
+                        Toggle.Builder { checked ->
+                            AudioPlaybackStore.setKeepPlayingThroughFocusLoss(carContext, checked)
+                            setResult(CHANGED)
+                            invalidate()
+                        }
+                            .setChecked(AudioPlaybackStore.keepPlayingThroughFocusLoss(carContext))
+                            .build()
+                    )
+                    .build()
+            )
             .build()
 
         val identity = ItemList.Builder()
@@ -126,6 +152,15 @@ class CarBrowserSettingsScreen(carContext: CarContext) : Screen(carContext) {
             .addSectionedList(SectionedItemList.create(controls, "In-app controls"))
             .addSectionedList(SectionedItemList.create(identity, "Identity"))
             .build()
+    }
+
+    private fun openSplitLayoutPicker() {
+        screenManager.pushForResult(CarSplitLayoutScreen(carContext)) { changed ->
+            if (changed == true) {
+                setResult(CHANGED)
+                invalidate()
+            }
+        }
     }
 
     private fun openFloatingActionPicker() {
@@ -162,6 +197,60 @@ class CarBrowserSettingsScreen(carContext: CarContext) : Screen(carContext) {
 
         /** The User-Agent changed, so the page has to be reloaded to be served under it. */
         const val IDENTITY_CHANGED = "identity"
+    }
+}
+
+/** How the car surface is divided between the main page and the side page. */
+private class CarSplitLayoutScreen(carContext: CarContext) : Screen(carContext) {
+    override fun onGetTemplate(): Template {
+        val current = BrowserSplitStore.layout(carContext)
+        val list = ItemList.Builder()
+        BrowserSplitLayout.entries.forEach { layout ->
+            list.addItem(
+                Row.Builder()
+                    .setTitle(if (layout == current) "${layout.label}  •  Selected" else layout.label)
+                    .addText(description(layout))
+                    .setOnClickListener {
+                        BrowserSplitStore.setLayout(carContext, layout)
+                        setResult(true)
+                        screenManager.pop()
+                    }
+                    .build()
+            )
+        }
+        // Kept on this screen rather than the settings list, which is already near the row limit
+        // some hosts enforce.
+        list.addItem(
+            Row.Builder()
+                .setTitle("Side page on right")
+                .addText("Put the side page (map) on the right instead of the left")
+                .setToggle(
+                    Toggle.Builder { checked ->
+                        BrowserSplitStore.setSideOnRight(carContext, checked)
+                        setResult(true)
+                        invalidate()
+                    }
+                        .setChecked(BrowserSplitStore.sideOnRight(carContext))
+                        .build()
+                )
+                .build()
+        )
+        return ListTemplate.Builder()
+            .setHeader(
+                Header.Builder()
+                    .setTitle("Split screen")
+                    .setStartHeaderAction(Action.BACK)
+                    .build()
+            )
+            .setSingleList(list.build())
+            .build()
+    }
+
+    private fun description(layout: BrowserSplitLayout): String = when (layout) {
+        BrowserSplitLayout.SINGLE -> "One page on the whole screen"
+        BrowserSplitLayout.HALF -> "Side page and main page, equal width"
+        BrowserSplitLayout.FORTY_SIXTY -> "Side page 40%, main page 60%"
+        BrowserSplitLayout.PORTRAIT_LANDSCAPE -> "Tall side page (map) + 16:9 main page (video)"
     }
 }
 

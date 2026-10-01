@@ -50,6 +50,9 @@ class CarBrowserScreen(carContext: CarContext) :
     Screen(carContext), SurfaceCallback, CarScreenController.BrowserTarget, CarWebRenderer.Host {
     private companion object {
         const val TAG = "AutoBridgeCarBrowser"
+
+        /** A visible area narrower or shorter than this share of the surface is treated as transient. */
+        const val MIN_VISIBLE_FRACTION = 0.4f
     }
 
     private val appManager = carContext.getCarService(AppManager::class.java)
@@ -62,6 +65,10 @@ class CarBrowserScreen(carContext: CarContext) :
     private var surfaceWidth = 0
     private var surfaceHeight = 0
     private var surfaceDpi = 0
+
+    /** Last host-reported areas; combined by [applyContentArea]. */
+    private var stableArea: Rect? = null
+    private var visibleArea: Rect? = null
 
     private var active = false
     private fun allowed() =
@@ -343,12 +350,15 @@ class CarBrowserScreen(carContext: CarContext) :
         // The host's own dpi is the only correct density for car chrome; the connected phone's
         // density describes a different screen and would mis-size every icon.
         surfaceDpi = surfaceContainer.dpi
+        CarDisplayInfo.record(surfaceWidth, surfaceHeight, surfaceDpi)
         Log.i(TAG, "Browser surface ${surfaceWidth}x$surfaceHeight dpi=$surfaceDpi")
         val permitted = allowed()
         dev.autobridge.display.StructuredLog.i(
             TAG, "surface ${surfaceWidth}x$surfaceHeight dpi=$surfaceDpi allowed=$permitted"
         )
         if (!permitted) return
+        // Areas reported before the size was known could not be checked against it; re-evaluate.
+        applyContentArea()
         // The renderer turns this surface into the sink of its own VirtualDisplay (HARDWARE mode),
         // so the page and its video are composited by the system rather than drawn on a Canvas.
         renderer.start(surface, surfaceWidth, surfaceHeight, surfaceDpi)
@@ -364,9 +374,48 @@ class CarBrowserScreen(carContext: CarContext) :
 
     override fun onStableAreaChanged(stableArea: Rect) {
         if (!active || !MirrorSurfaceOwnership.isOwner(this)) return
-        // Reserve host controls without reflowing whenever they temporarily hide or reappear; the
-        // renderer applies its own epsilon so only a material change reaches the page.
-        renderer.setStableArea(stableArea)
+        this.stableArea = Rect(stableArea)
+        applyContentArea()
+    }
+
+    /**
+     * Split-screen (Coolwalk) and other host overlays. The stable area alone describes the host's
+     * permanent chrome, but a host can also lay a card or rail over part of the surface and report
+     * that only through the visible area — which left the edge of the page hidden under it.
+     */
+    override fun onVisibleAreaChanged(visibleArea: Rect) {
+        if (!active || !MirrorSurfaceOwnership.isOwner(this)) return
+        this.visibleArea = Rect(visibleArea)
+        applyContentArea()
+    }
+
+    /**
+     * Lays the page out in the part of the surface that is both stable and visible. Usually the
+     * visible area contains the stable area and this is exactly the old behaviour; it only shrinks
+     * the page when the host actually covers part of it. A visible area that is empty, outside the
+     * surface or implausibly small (the host emits a burst of transient rects on connect) is
+     * ignored rather than squeezing the page into it. The renderer then debounces and applies its
+     * own epsilon, so only a material change reflows the page.
+     */
+    private fun applyContentArea() {
+        val stable = stableArea?.takeUnless { it.isEmpty }
+        val visible = visibleArea?.takeIf { usableVisibleArea(it) }
+        val area = when {
+            stable != null && visible != null ->
+                Rect(stable).takeIf { it.intersect(visible) && usableVisibleArea(it) } ?: stable
+            else -> stable ?: visible
+        } ?: return
+        dev.autobridge.display.StructuredLog.i(TAG, "content area $area stable=$stable visible=$visible")
+        renderer.setStableArea(area)
+    }
+
+    private fun usableVisibleArea(rect: Rect): Boolean {
+        if (rect.isEmpty) return false
+        if (surfaceWidth <= 0 || surfaceHeight <= 0) return true
+        val surface = Rect(0, 0, surfaceWidth, surfaceHeight)
+        return surface.contains(rect) &&
+            rect.width() >= surfaceWidth * MIN_VISIBLE_FRACTION &&
+            rect.height() >= surfaceHeight * MIN_VISIBLE_FRACTION
     }
 
     override fun onClick(x: Float, y: Float) {

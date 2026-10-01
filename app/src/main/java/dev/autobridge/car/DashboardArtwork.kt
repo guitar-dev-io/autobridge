@@ -13,7 +13,7 @@ internal object DashboardArtwork {
     enum class Kind {
         BROWSER, MIRROR, MEDIA, AGENT, QUICK_LAUNCH, RECENT, MORE, YOUTUBE,
         // Content sections shared with the phone home grid.
-        TV, RADIO, YOUTUBE_MUSIC, YOUTUBE_KIDS, FOLDERS, FAVORITES, PLAYLISTS, GALLERY, SETTINGS,
+        TV, RADIO, YOUTUBE_MUSIC, STREAMING, FOLDERS, FAVORITES, PLAYLISTS, GALLERY, SETTINGS,
         WEATHER
     }
 
@@ -45,7 +45,7 @@ internal object DashboardArtwork {
             Kind.MEDIA -> 0xFFAF80F8.toInt()
             Kind.AGENT -> 0xFF7CE1CB.toInt()
             Kind.QUICK_LAUNCH -> 0xFF86E3AF.toInt()
-            Kind.TV, Kind.YOUTUBE_MUSIC, Kind.YOUTUBE_KIDS -> 0xFFFF7A7A.toInt()
+            Kind.TV, Kind.YOUTUBE_MUSIC, Kind.STREAMING -> 0xFFFF7A7A.toInt()
             Kind.RADIO -> 0xFFFFC46B.toInt()
             Kind.FOLDERS, Kind.PLAYLISTS -> 0xFF86E3AF.toInt()
             Kind.FAVORITES -> 0xFFFF8FB1.toInt()
@@ -139,14 +139,17 @@ internal object DashboardArtwork {
                 canvas.drawLine(160f, 88f, 160f, 62f, pen)
                 canvas.drawLine(160f, 62f, 178f, 66f, pen)
             }
-            Kind.YOUTUBE_KIDS -> {
+            Kind.STREAMING -> {
+                // A stack of video tiles: two lines behind a filled screen with a play mark.
+                canvas.drawLine(133f, 40f, 187f, 40f, pen)
+                canvas.drawLine(127f, 52f, 193f, 52f, pen)
                 pen.style = Paint.Style.FILL
-                canvas.drawRoundRect(RectF(121f, 49f, 199f, 103f), 12f, 12f, pen)
+                canvas.drawRoundRect(RectF(121f, 62f, 199f, 112f), 10f, 10f, pen)
                 pen.color = 0xFF202228.toInt()
-                canvas.drawCircle(146f, 70f, 6f, pen)
-                canvas.drawCircle(174f, 70f, 6f, pen)
-                pen.style = Paint.Style.STROKE
-                canvas.drawArc(RectF(142f, 74f, 178f, 98f), 20f, 140f, false, pen)
+                val play = Path().apply {
+                    moveTo(152f, 75f); lineTo(152f, 99f); lineTo(172f, 87f); close()
+                }
+                canvas.drawPath(play, pen)
             }
             Kind.FOLDERS -> {
                 val folder = Path().apply {

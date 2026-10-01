@@ -18,23 +18,43 @@ import androidx.media3.effect.Presentation
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.Renderer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
+import androidx.media3.common.Timeline
+import androidx.media3.session.LibraryResult
+import androidx.media3.session.MediaLibraryService
+import androidx.media3.session.MediaLibraryService.LibraryParams
+import androidx.media3.session.MediaLibraryService.MediaLibrarySession
 import androidx.media3.session.MediaSession
-import androidx.media3.session.MediaSessionService
+import androidx.media3.session.SessionError
+import com.google.common.collect.ImmutableList
+import com.google.common.util.concurrent.Futures
+import com.google.common.util.concurrent.ListenableFuture
 import dev.autobridge.MainActivity
 import dev.autobridge.core.model.Feature
 import dev.autobridge.core.policy.FeaturePolicy
 import dev.autobridge.display.StructuredLog
 import dev.autobridge.safety.ParkingStateStore
 
-/** Hosts the long-lived Media3 player and MediaSession used by Android Auto and steering controls. */
-class MediaPlaybackService : MediaSessionService() {
+/**
+ * Hosts the long-lived Media3 player and MediaSession used by Android Auto and steering controls.
+ *
+ * A [MediaLibraryService] rather than a plain session service: Android Auto only treats an app as a
+ * media app - and so only gives it the media card beside the navigation panel in its split
+ * dashboard - when it can browse a library root through `android.media.browse.MediaBrowserService`.
+ * The tree is deliberately shallow: one root whose children are the current play queue, so the car
+ * can show and jump within what is already playing without this service owning a catalogue.
+ */
+class MediaPlaybackService : MediaLibraryService() {
     private companion object {
         /** Minimum gap between two live-edge recoveries, so a failing stream is not retried in a loop. */
         const val LIVE_RECOVERY_INTERVAL_MS = 5_000L
+        const val ROOT_ID = "autobridge:root"
+        const val QUEUE_PREFIX = "autobridge:queue:"
     }
 
     private var player: ExoPlayer? = null
-    private var session: MediaSession? = null
+    private var session: MediaLibrarySession? = null
     private val mainHandler = Handler(Looper.getMainLooper())
     private var lastLiveRecoveryMs = 0L
 
@@ -57,6 +77,136 @@ class MediaPlaybackService : MediaSessionService() {
                 target.seekToDefaultPosition()
                 target.prepare()
             }
+        }
+
+        /** The browse tree is the queue, so a queue change is a change of the root's children. */
+        override fun onTimelineChanged(timeline: Timeline, reason: Int) {
+            if (reason != Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED) return
+            session?.notifyChildrenChanged(ROOT_ID, player?.mediaItemCount ?: 0, null)
+        }
+    }
+
+    private fun rootItem(): MediaItem = MediaItem.Builder()
+        .setMediaId(ROOT_ID)
+        .setMediaMetadata(
+            MediaMetadata.Builder()
+                .setTitle("AutoBridge")
+                .setIsBrowsable(true)
+                .setIsPlayable(false)
+                .setMediaType(MediaMetadata.MEDIA_TYPE_FOLDER_MIXED)
+                .build()
+        )
+        .build()
+
+    /**
+     * The queue entry at [index] as a browsable child. Entries built by [MediaPlaybackClient] carry
+     * no media id and often no title, so both are synthesised; the original item, with its URI, is
+     * what playback resolves back to in [resolveQueueItem].
+     */
+    private fun queueChild(source: MediaItem, index: Int): MediaItem {
+        val title = source.mediaMetadata.title?.takeIf { it.isNotBlank() }
+            ?: source.localConfiguration?.uri?.lastPathSegment
+            ?: "Item ${index + 1}"
+        return source.buildUpon()
+            .setMediaId(QUEUE_PREFIX + index)
+            .setMediaMetadata(
+                source.mediaMetadata.buildUpon()
+                    .setTitle(title)
+                    .setIsBrowsable(false)
+                    .setIsPlayable(true)
+                    .build()
+            )
+            .build()
+    }
+
+    private fun queueIndexOf(mediaId: String): Int? {
+        if (!mediaId.startsWith(QUEUE_PREFIX)) return null
+        val index = mediaId.removePrefix(QUEUE_PREFIX).toIntOrNull() ?: return null
+        return index.takeIf { it in 0 until (player?.mediaItemCount ?: 0) }
+    }
+
+    /** Maps a controller's item back to something playable, or null when it cannot be. */
+    private fun resolveQueueItem(item: MediaItem): MediaItem? {
+        if (item.localConfiguration != null) return item
+        val index = queueIndexOf(item.mediaId) ?: return null
+        return player?.getMediaItemAt(index)
+    }
+
+    private inner class LibraryCallback : MediaLibrarySession.Callback {
+        override fun onGetLibraryRoot(
+            session: MediaLibrarySession,
+            browser: MediaSession.ControllerInfo,
+            params: LibraryParams?
+        ): ListenableFuture<LibraryResult<MediaItem>> =
+            Futures.immediateFuture(LibraryResult.ofItem(rootItem(), params))
+
+        override fun onGetItem(
+            session: MediaLibrarySession,
+            browser: MediaSession.ControllerInfo,
+            mediaId: String
+        ): ListenableFuture<LibraryResult<MediaItem>> {
+            if (mediaId == ROOT_ID) return Futures.immediateFuture(LibraryResult.ofItem(rootItem(), null))
+            val index = queueIndexOf(mediaId)
+            val currentPlayer = player
+            return Futures.immediateFuture(
+                if (index == null || currentPlayer == null) LibraryResult.ofError(SessionError.ERROR_BAD_VALUE)
+                else LibraryResult.ofItem(queueChild(currentPlayer.getMediaItemAt(index), index), null)
+            )
+        }
+
+        override fun onGetChildren(
+            session: MediaLibrarySession,
+            browser: MediaSession.ControllerInfo,
+            parentId: String,
+            page: Int,
+            pageSize: Int,
+            params: LibraryParams?
+        ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> {
+            if (parentId != ROOT_ID) {
+                return Futures.immediateFuture(LibraryResult.ofError(SessionError.ERROR_BAD_VALUE))
+            }
+            val currentPlayer = player
+            val count = currentPlayer?.mediaItemCount ?: 0
+            val from = (page.coerceAtLeast(0).toLong() * pageSize.coerceAtLeast(1)).coerceAtMost(count.toLong()).toInt()
+            val to = (from + pageSize.coerceAtLeast(1)).coerceAtMost(count)
+            val children = ImmutableList.builder<MediaItem>()
+            if (currentPlayer != null) {
+                for (i in from until to) children.add(queueChild(currentPlayer.getMediaItemAt(i), i))
+            }
+            return Futures.immediateFuture(LibraryResult.ofItemList(children.build(), params))
+        }
+
+        /**
+         * Tapping a queue entry on the car jumps within the existing queue instead of replacing it
+         * with that one item, so steering-wheel next/previous still walk the whole list.
+         */
+        override fun onSetMediaItems(
+            mediaSession: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            mediaItems: MutableList<MediaItem>,
+            startIndex: Int,
+            startPositionMs: Long
+        ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
+            val currentPlayer = player
+            val tapped = mediaItems.singleOrNull()?.let { queueIndexOf(it.mediaId) }
+            if (currentPlayer != null && tapped != null) {
+                val queue = (0 until currentPlayer.mediaItemCount).map { currentPlayer.getMediaItemAt(it) }
+                return Futures.immediateFuture(MediaSession.MediaItemsWithStartPosition(queue, tapped, C.TIME_UNSET))
+            }
+            return super.onSetMediaItems(mediaSession, controller, mediaItems, startIndex, startPositionMs)
+        }
+
+        override fun onAddMediaItems(
+            mediaSession: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            mediaItems: MutableList<MediaItem>
+        ): ListenableFuture<MutableList<MediaItem>> {
+            val resolved = mediaItems.map { resolveQueueItem(it) }
+            if (resolved.any { it == null }) {
+                StructuredLog.w("MEDIA", "addMediaItems: ${resolved.count { it == null }} unresolvable item(s) from ${controller.packageName}")
+                return Futures.immediateFailedFuture(UnsupportedOperationException("unresolvable media item"))
+            }
+            return Futures.immediateFuture(resolved.filterNotNull().toMutableList())
         }
     }
     private val parkingListener: (ParkingStateStore.State) -> Unit = {
@@ -163,12 +313,12 @@ class MediaPlaybackService : MediaSessionService() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        session = MediaSession.Builder(this, exoPlayer)
+        session = MediaLibrarySession.Builder(this, exoPlayer, LibraryCallback())
             .setSessionActivity(openAppIntent)
             .build()
     }
 
-    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? {
         val allowed = MediaControllerAuthorization.isAllowed(
             packageName = controllerInfo.packageName,
             uid = controllerInfo.uid,

@@ -70,6 +70,42 @@ class WebAudioBridge(private val webViewProvider: () -> WebView?) {
         state = WebAudioState.PLAYING
     }
 
+    /**
+     * Tags whatever is playing right now for a later [resumeMarked], without pausing it, and
+     * reports whether anything was playing.
+     *
+     * Used when the car takes its surface away (the rear camera on reverse, a pushed template):
+     * the page may be hidden and pause its own media on `visibilitychange`, which [resumeAll]
+     * would otherwise never undo because only media this bridge paused carries the tag. Reports
+     * false when there is no WebView to ask.
+     */
+    fun markPlayingForResume(onResult: (Boolean) -> Unit) {
+        val view = webViewProvider()
+        if (view == null) {
+            onResult(false)
+            return
+        }
+        evaluate(
+            """
+            (function(){
+              var n = 0;
+              document.querySelectorAll('audio,video').forEach(function(m){
+                if (!m.paused && !m.ended) { m.dataset.abResume = '1'; n++; }
+              });
+              return n;
+            })();
+            """.trimIndent()
+        ) { result ->
+            val count = result.toIntOrNull() ?: 0
+            StructuredLog.i("AUDIO", "web mark-for-resume -> $count element(s)")
+            if (count > 0) state = WebAudioState.PLAYING
+            onResult(count > 0)
+        }
+    }
+
+    /** Resumes media tagged by [markPlayingForResume] or by a focus pause. */
+    fun resumeMarked() = resumeAll()
+
     private fun duck() {
         evaluate(
             """

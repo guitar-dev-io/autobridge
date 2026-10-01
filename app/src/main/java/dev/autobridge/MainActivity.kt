@@ -1891,9 +1891,6 @@ import dev.autobridge.core.model.VehicleState
 import dev.autobridge.core.policy.FeaturePolicy
 import dev.autobridge.core.state.RuntimeContextStore
 import dev.autobridge.ui.AutoBridgePhoneTheme
-import dev.autobridge.ui.PhoneControlCenter
-import dev.autobridge.ui.MobileRemoteScreen
-import dev.autobridge.ui.RemoteTab
 import dev.autobridge.remote.RemoteRuntime
 import dev.autobridge.display.MirrorDiagnostics
 import dev.autobridge.display.MirrorOrientationController
@@ -1915,13 +1912,25 @@ import dev.autobridge.safety.MockVehicleStateProvider
 import dev.autobridge.safety.ParkingStateStore
 import dev.autobridge.settings.MirrorSettings
 import dev.autobridge.settings.SettingsStore
+import dev.autobridge.ui.PhoneNav
 import rikka.shizuku.Shizuku
+
+/** Phone destinations are defined (and unit-tested) in [PhoneNav]. */
+private typealias PhoneScreen = PhoneNav.Route
 
 class MainActivity : androidx.activity.ComponentActivity() {
     private companion object {
         const val REQUEST_CAPTURE = 2001
         const val REQUEST_NOTIFICATIONS = 2002
         const val REQUEST_VOICE_SEARCH = 2003
+
+        const val SUPPORT_URL = "https://buymeacoffee.com/guitar.story"
+        const val GITHUB_URL = "https://github.com/guitar-dev-io/autobridge"
+
+        const val STATE_SCREEN = "phone_screen"
+        const val STATE_BACK_STACK = "phone_back_stack"
+        const val STATE_APPS_FAVORITES = "apps_favorites_only"
+        const val STATE_APPS_QUERY = "apps_query"
 
         const val COLOR_BACKGROUND = 0xff0b0e14.toInt()
         const val COLOR_SURFACE = 0xff141924.toInt()
@@ -1935,21 +1944,9 @@ class MainActivity : androidx.activity.ComponentActivity() {
         const val COLOR_WARNING = 0xffffbf5f.toInt()
     }
 
-    private enum class PhoneScreen {
-        HOME,
-        SETTINGS,
-        CONTROL_CENTER,
-        REMOTE,
-        APPS,
-        PROFILES,
-        PROFILE,
-        MIRROR_SETTINGS,
-        DEVELOPER,
-        DEVICES
-    }
+    /** Back stack of the phone shell; see [PhoneNav.BackStack]. */
+    private var backStack = PhoneNav.BackStack()
 
-    /** Selected sub-tab of the Mobile Remote (Home/Remote/Commands/Settings). */
-    private var remoteTab = RemoteTab.REMOTE
 
     /** Restyles the Applications filter chips; set while that screen is built, null otherwise. */
     private var appsFilterRefresh: (() -> Unit)? = null
@@ -1958,7 +1955,8 @@ class MainActivity : androidx.activity.ComponentActivity() {
     private lateinit var mediaPlayback: MediaPlaybackClient
     private lateinit var screenContainer: FrameLayout
     private lateinit var bottomNav: LinearLayout
-    private var homeConnectionView: TextView? = null
+    /** Live internal-state text on Advanced > Debug; null when that page is not showing. */
+    private var debugStateView: TextView? = null
     private var developerLogView: TextView? = null
     private var crashReportView: TextView? = null
     private var developerMirrorEventsView: TextView? = null
@@ -1981,7 +1979,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
     private val statusHandler = Handler(Looper.getMainLooper())
     private val refreshStatusRunnable = object : Runnable {
         override fun run() {
-            if (::statusView.isInitialized || homeConnectionView != null) refreshStatus()
+            if (::statusView.isInitialized || debugStateView != null) refreshStatus()
             statusHandler.postDelayed(this, 1_000L)
         }
     }
@@ -2018,20 +2016,46 @@ class MainActivity : androidx.activity.ComponentActivity() {
         Shizuku.addRequestPermissionResultListener(shizukuPermissionListener)
         mediaPlayback = MediaPlaybackClient(this)
         mediaPlayback.connect(onConnected = {
-            if (::statusView.isInitialized || homeConnectionView != null) refreshStatus()
+            if (::statusView.isInitialized || debugStateView != null) refreshStatus()
         })
         // Start the Mobile Remote command runtime and share the already-connected media client so
         // media commands reuse the same MediaSession (no duplicate connection).
         RemoteRuntime.ensureStarted(this)
         RemoteRuntime.attachMediaClient(mediaPlayback)
-        setContentView(buildUi())
+        // Rotation and process recreation return to the same page and drill-down path instead of
+        // dropping the user on Home. Unknown or legacy names (REMOTE, DEVICES) are mapped by
+        // PhoneNav.parse, so an old saved state never crashes the restore.
+        val restoredScreen = PhoneNav.parse(savedInstanceState?.getString(STATE_SCREEN))
+        backStack = PhoneNav.BackStack(
+            savedInstanceState?.getStringArrayList(STATE_BACK_STACK).orEmpty().map(PhoneNav::parse)
+        )
+        appsFavoritesOnly = savedInstanceState?.getBoolean(STATE_APPS_FAVORITES, true) ?: true
+        appSearchQuery = savedInstanceState?.getString(STATE_APPS_QUERY).orEmpty()
+        setContentView(buildUi(restoredScreen))
         onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (currentScreen != PhoneScreen.HOME) showPhoneScreen(PhoneScreen.HOME)
-                else { isEnabled = false; onBackPressedDispatcher.onBackPressed(); isEnabled = true }
+                if (!goBack()) { isEnabled = false; onBackPressedDispatcher.onBackPressed(); isEnabled = true }
             }
         })
         refreshStatus()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString(STATE_SCREEN, currentScreen.name)
+        outState.putStringArrayList(STATE_BACK_STACK, ArrayList(backStack.entries.map { it.name }))
+        outState.putBoolean(STATE_APPS_FAVORITES, appsFavoritesOnly)
+        outState.putString(STATE_APPS_QUERY, appSearchQuery)
+    }
+
+    /**
+     * One step back through the phone shell (header ‹ and the system Back both land here).
+     * Returns false when there is nowhere left to go, so the system can leave the app.
+     */
+    private fun goBack(): Boolean {
+        val target = backStack.back(currentScreen) ?: return false
+        showPhoneScreen(target, fromBack = true)
+        return true
     }
 
     override fun onResume() {
@@ -2052,7 +2076,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
         super.onDestroy()
     }
 
-    private fun buildUi(): View {
+    private fun buildUi(initial: PhoneScreen = PhoneScreen.HOME): View {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(COLOR_BACKGROUND)
@@ -2089,11 +2113,11 @@ class MainActivity : androidx.activity.ComponentActivity() {
             )
         )
 
-        showPhoneScreen(PhoneScreen.HOME)
+        showPhoneScreen(initial, fromBack = true)
         return root
     }
 
-    private fun showPhoneScreen(requested: PhoneScreen, force: Boolean = false) {
+    private fun showPhoneScreen(requested: PhoneScreen, force: Boolean = false, fromBack: Boolean = false) {
         val target = if (requested == PhoneScreen.PROFILE && selectedApp == null) {
             PhoneScreen.APPS
         } else {
@@ -2105,9 +2129,10 @@ class MainActivity : androidx.activity.ComponentActivity() {
         // is state, so the same destination can still need a rebuild. [force] overrides this for
         // callers that need the same screen rebuilt with new data (e.g. the weather chip landing).
         if (!force && screenRendered && target == currentScreen && target != PhoneScreen.PROFILE) return
+        if (!fromBack) backStack.onNavigate(if (screenRendered) currentScreen else null, target)
         screenRendered = true
         currentScreen = target
-        homeConnectionView = null
+        debugStateView = null
         developerLogView = null
         developerMirrorEventsView = null
         labSummaryView = null
@@ -2116,14 +2141,22 @@ class MainActivity : androidx.activity.ComponentActivity() {
         val screen = when (target) {
             PhoneScreen.HOME -> buildHomeScreen()
             PhoneScreen.SETTINGS -> buildSettingsMenu()
-            PhoneScreen.CONTROL_CENTER -> buildControlCenterScreen()
-            PhoneScreen.REMOTE -> buildRemoteScreen()
+            PhoneScreen.CONTROL -> buildControlScreen()
+            PhoneScreen.CONTROL_HISTORY -> buildCommandHistoryScreen()
             PhoneScreen.APPS -> buildAppsScreen()
             PhoneScreen.PROFILES -> buildProfilesScreen()
             PhoneScreen.PROFILE -> buildProfileScreen()
             PhoneScreen.MIRROR_SETTINGS -> buildMirrorSettingsScreen()
+            PhoneScreen.INPUT_TOUCH -> buildInputTouchScreen()
+            PhoneScreen.ADVANCED -> buildAdvancedScreen()
             PhoneScreen.DEVELOPER -> buildDeveloperScreen()
-            PhoneScreen.DEVICES -> buildDevicesScreen()
+            PhoneScreen.DEBUG -> buildDebugScreen()
+            PhoneScreen.CAR_CONNECTION -> buildCarConnectionScreen()
+            PhoneScreen.AGENT_COMMANDS -> buildAgentCommandsScreen()
+            PhoneScreen.ABOUT -> buildAboutScreen()
+            PhoneScreen.HOME_MUSIC -> buildHomeGroupScreen("Music", "YouTube Music and playlists", dev.autobridge.ui.PhoneHomeLayout.musicSections)
+            PhoneScreen.HOME_TV_RADIO -> buildHomeGroupScreen("TV / Radio", "Live channels and audio streams", dev.autobridge.ui.PhoneHomeLayout.tvRadioSections)
+            PhoneScreen.HOME_MORE -> buildHomeGroupScreen("More", "Local media, streaming, weather and mirror", dev.autobridge.ui.PhoneHomeLayout.moreSections)
         }
         screenContainer.addView(
             screen,
@@ -2138,14 +2171,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
         // the only way out) and that opening Settings from the Apps tab dropped the bar exactly when
         // switching tabs was the likely next move. Only per-item detail screens hide it now, so Back
         // is unambiguous there.
-        bottomNav.visibility = if (
-            target == PhoneScreen.PROFILE ||
-            target == PhoneScreen.DEVELOPER
-        ) {
-            View.GONE
-        } else {
-            View.VISIBLE
-        }
+        bottomNav.visibility = if (PhoneNav.hidesBottomBar(target)) View.GONE else View.VISIBLE
         renderBottomNavigation()
         refreshStatus()
     }
@@ -2153,24 +2179,15 @@ class MainActivity : androidx.activity.ComponentActivity() {
     private fun renderBottomNavigation() {
         if (!::bottomNav.isInitialized || bottomNav.visibility != View.VISIBLE) return
         bottomNav.removeAllViews()
-        listOf(
-            Triple("⌂", "Home", PhoneScreen.HOME),
-            Triple("➤", "Remote", PhoneScreen.REMOTE),
-            Triple("▦", "Apps", PhoneScreen.APPS),
-            Triple("▣", "Devices", PhoneScreen.DEVICES),
-            Triple("⚙", "Settings", PhoneScreen.SETTINGS)
-        ).forEach { (icon, title, destination) ->
-            // A drill-down keeps its parent tab lit, so the bar still says where you are.
-            val active = destination == when (currentScreen) {
-                PhoneScreen.MIRROR_SETTINGS,
-                PhoneScreen.PROFILES,
-                PhoneScreen.CONTROL_CENTER,
-                PhoneScreen.DEVELOPER -> PhoneScreen.SETTINGS
-                PhoneScreen.PROFILE -> PhoneScreen.APPS
-                else -> currentScreen
-            }
+        // A drill-down keeps its parent tab lit, so the bar still says where you are.
+        val activeTab = PhoneNav.tabFor(currentScreen)
+        PhoneNav.tabs.forEach { tab ->
+            val active = tab.route == activeTab
+            val destination = tab.route
             val item = TextView(this).apply {
-                text = "$icon\n$title"
+                text = "${tab.glyph}\n${tab.label}"
+                contentDescription = tab.label
+                isSelected = active
                 gravity = Gravity.CENTER
                 textSize = 11f
                 setLineSpacing(0f, 0.88f)
@@ -2188,28 +2205,54 @@ class MainActivity : androidx.activity.ComponentActivity() {
         }
     }
 
-    private fun phoneMenu() {
-        val labels = arrayOf("Home", "Settings", "Control Center", "Remote")
-        val screens = arrayOf(PhoneScreen.HOME, PhoneScreen.SETTINGS, PhoneScreen.CONTROL_CENTER, PhoneScreen.REMOTE)
-        android.app.AlertDialog.Builder(this).setItems(labels) { _, index -> showPhoneScreen(screens[index]) }.show()
-    }
 
     /**
-     * The home grid. Order and wording follow the reference launcher so the same tiles appear in
-     * the same place on the phone and on the head unit ([dev.autobridge.car.CarHomeDashboardScreen]
-     * builds its grid from the same list of sections). The AutoBridge-specific tiles — Mirror,
-     * Apps, Remote, Settings — follow the content ones instead of replacing them.
+     * Home: a launcher/dashboard rather than a grid of every feature. Android Auto status, six
+     * Quick Launch tiles ([dev.autobridge.ui.PhoneHomeLayout]), Send to Car and Recent. Every
+     * section the old grid showed is still reachable: directly, through Music / TV / Radio, or
+     * behind More. The car's own grid is unchanged.
      */
     private fun buildHomeScreen(): View {
-        val entries = dev.autobridge.library.HomeSection.phoneSections.map { section ->
-            dev.autobridge.ui.PhoneLauncherUi.Entry(
-                title = section.title,
-                icon = tileIcon(section),
-                caption = section.caption,
-                accent = section.accent,
-                open = { openHomeSection(section) }
-            )
+        val layout = dev.autobridge.ui.PhoneHomeLayout
+        val design = dev.autobridge.ui.AutoBridgeDesign
+        val tiles = dev.autobridge.ui.PhoneHomeLayout.Tile.entries.map { tile ->
+            when (tile) {
+                dev.autobridge.ui.PhoneHomeLayout.Tile.BROWSER, dev.autobridge.ui.PhoneHomeLayout.Tile.YOUTUBE -> {
+                    val section = layout.directSection.getValue(tile)
+                    dev.autobridge.ui.HomeTileUi(tile.title, tileIcon(section), section.accent) { openHomeSection(section) }
+                }
+                dev.autobridge.ui.PhoneHomeLayout.Tile.MUSIC -> dev.autobridge.ui.HomeTileUi(
+                    tile.title, R.drawable.ic_tile_youtube_music, design.ACCENT_FILES
+                ) { showPhoneScreen(PhoneScreen.HOME_MUSIC) }
+                dev.autobridge.ui.PhoneHomeLayout.Tile.TV_RADIO -> dev.autobridge.ui.HomeTileUi(
+                    tile.title, R.drawable.ic_tile_tv, design.ACCENT_TV
+                ) { showPhoneScreen(PhoneScreen.HOME_TV_RADIO) }
+                // Favorite apps: the same QuickAppsStore list the Apps tab stars.
+                dev.autobridge.ui.PhoneHomeLayout.Tile.FAVORITES -> dev.autobridge.ui.HomeTileUi(
+                    tile.title, R.drawable.ic_tile_favorite, design.ACCENT_FAVORITE
+                ) { appsFavoritesOnly = true; showPhoneScreen(PhoneScreen.APPS) }
+                dev.autobridge.ui.PhoneHomeLayout.Tile.MORE -> dev.autobridge.ui.HomeTileUi(
+                    tile.title, R.drawable.ic_tile_apps, design.ACCENT_SYSTEM
+                ) { showPhoneScreen(PhoneScreen.HOME_MORE) }
+            }
         }
+
+        val dashboard = ComposeView(this).apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+            setContent {
+                AutoBridgePhoneTheme {
+                    dev.autobridge.ui.HomeDashboard(
+                        tiles = tiles,
+                        onOpenConnection = { showPhoneScreen(PhoneScreen.CAR_CONNECTION) },
+                        onEditQuickLaunch = { appsFavoritesOnly = true; showPhoneScreen(PhoneScreen.APPS) }
+                    )
+                }
+            }
+        }
+        val body = design.body(this).apply {
+            addView(dashboard, LinearLayout.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT))
+        }
+
         val bar = homeMiniPlayer ?: dev.autobridge.ui.MiniPlayer(this, mediaPlayback) {
             startActivity(
                 dev.autobridge.library.PlayerActivity.intent(
@@ -2227,30 +2270,42 @@ class MainActivity : androidx.activity.ComponentActivity() {
             addView(bar.view, LinearLayout.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT))
         }
 
-        return dev.autobridge.ui.PhoneLauncherUi.screen(
+        return design.page(
             context = this,
-            title = "AutoBridge",
-            entries = entries,
-            grid = true,
-            menu = ::phoneMenu,
-            // The reference launcher puts weather in this chip. AutoBridge shows the outdoor
-            // temperature here when the user has picked a place in Weather (see
-            // WeatherLocationStore/WeatherRepository) and falls back to the connection state
-            // otherwise.
-            statusChip = homeStatusChip(),
-            headerAction = "\uD83C\uDF99" to ::homeVoiceSearch,
-            subtitle = homeSubtitle(),
+            header = design.header(
+                context = this,
+                title = "AutoBridge",
+                subtitle = "Your Car. Smarter.",
+                // Outdoor temperature when a Weather place is saved; the connection itself is
+                // the status card right below, so the chip no longer repeats it.
+                chip = homeStatusChip(),
+                actions = listOf(dev.autobridge.ui.AutoBridgeDesign.HeaderAction("\uD83C\uDF99", ::homeVoiceSearch, filled = true))
+            ),
+            body = body,
             bottomBar = bottom,
             applyInsets = false
         )
     }
 
-    /** One quiet line under the home title: what is connected and what is available right now. */
-    private fun homeSubtitle(): String {
-        val runtime = RuntimeContextStore.context.value
-        val connection = if (runtime.connected) "Connected to Android Auto" else "Not connected"
-        return "$connection • ${runtime.mode.name.lowercase()} mode"
-    }
+    /** Home > Music / TV / Radio / More: a short list of the sections grouped behind one tile. */
+    private fun buildHomeGroupScreen(title: String, subtitle: String, sections: List<dev.autobridge.library.HomeSection>): View =
+        dev.autobridge.ui.PhoneLauncherUi.screen(
+            context = this,
+            title = title,
+            subtitle = subtitle,
+            entries = sections.map { section ->
+                dev.autobridge.ui.PhoneLauncherUi.Entry(
+                    title = section.title,
+                    icon = tileIcon(section),
+                    caption = section.caption,
+                    accent = section.accent,
+                    open = { openHomeSection(section) }
+                )
+            },
+            grid = false,
+            home = { goBack() },
+            applyInsets = false
+        )
 
     private fun tileIcon(section: dev.autobridge.library.HomeSection): Int =
         when (section) {
@@ -2259,7 +2314,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
             dev.autobridge.library.HomeSection.WEB -> R.drawable.ic_tile_web
             dev.autobridge.library.HomeSection.YOUTUBE -> R.drawable.ic_tile_youtube
             dev.autobridge.library.HomeSection.YOUTUBE_MUSIC -> R.drawable.ic_tile_youtube_music
-            dev.autobridge.library.HomeSection.YOUTUBE_KIDS -> R.drawable.ic_tile_youtube_kids
+            dev.autobridge.library.HomeSection.STREAMING -> R.drawable.ic_tile_streaming
             dev.autobridge.library.HomeSection.FOLDERS -> R.drawable.ic_tile_folder
             dev.autobridge.library.HomeSection.FAVORITES -> R.drawable.ic_tile_favorite
             dev.autobridge.library.HomeSection.PLAYLISTS -> R.drawable.ic_tile_playlist
@@ -2283,7 +2338,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
                 startActivity(dev.autobridge.weather.WeatherActivity.intent(this))
             section == dev.autobridge.library.HomeSection.MIRROR -> requestScreenCapture()
             section == dev.autobridge.library.HomeSection.APPS -> showPhoneScreen(PhoneScreen.APPS)
-            section == dev.autobridge.library.HomeSection.REMOTE -> showPhoneScreen(PhoneScreen.REMOTE)
+            section == dev.autobridge.library.HomeSection.REMOTE -> showPhoneScreen(PhoneScreen.CONTROL)
             else -> showPhoneScreen(PhoneScreen.SETTINGS)
         }
     }
@@ -2294,15 +2349,15 @@ class MainActivity : androidx.activity.ComponentActivity() {
      * [dev.autobridge.weather.WeatherRepository] cache; [refreshHomeWeatherIfNeeded] is what kicks
      * off (and redraws Home after) an actual fetch.
      */
-    private fun homeStatusChip(): String {
+    private fun homeStatusChip(): String? {
         refreshHomeWeatherIfNeeded()
         val place = dev.autobridge.weather.WeatherLocationStore.place(this)
         val snapshot = dev.autobridge.weather.WeatherRepository.cachedSnapshot()
         if (place != null && snapshot != null && snapshot.place == place) {
             return "${Math.round(snapshot.temperatureC)}°C"
         }
-        val runtime = RuntimeContextStore.context.value
-        return if (runtime.connected) "AUTO" else "PHONE"
+        // No weather: no chip. Connection state is the Android Auto card under the header.
+        return null
     }
 
     private var homeWeatherRequested = false
@@ -2325,7 +2380,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
     }
 
     /**
-     * Header microphone: dictate a search and open it in the browser. Falls back to the browser's
+     * Header microphone: dictate a command or search (see [runPhoneVoiceCommand]). Falls back to the browser's
      * own search entry when the device has no speech recognizer.
      */
     private fun homeVoiceSearch() {
@@ -2334,7 +2389,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
                 android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL,
                 android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
             )
-            putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Search")
+            putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "พูดคำสั่งหรือคำค้นหา")
         }
         val started = runCatching { startActivityForResult(intent, REQUEST_VOICE_SEARCH) }.isSuccess
         if (!started) {
@@ -2343,190 +2398,326 @@ class MainActivity : androidx.activity.ComponentActivity() {
         }
     }
 
-    private fun buildSettingsMenu(): View {
-        fun item(title: String, caption: String, icon: Int, action: () -> Unit) =
-            dev.autobridge.ui.PhoneLauncherUi.Entry(
-                title = title,
-                icon = icon,
-                caption = caption,
-                accent = dev.autobridge.ui.AutoBridgeDesign.ACCENT_SYSTEM,
-                open = action
-            )
-        return dev.autobridge.ui.PhoneLauncherUi.screen(
+    /**
+     * Runs a dictated phrase through the same parser the car Agent uses, then maps each action
+     * onto the phone's own entry points (the car router needs a car Screen, so it is not reused
+     * here). Anything that is not a recognised command still ends up as a browser search.
+     */
+    private fun runPhoneVoiceCommand(spoken: String) {
+        val command = dev.autobridge.agent.AgentCommandRouter.parse(spoken) ?: return
+        val action = command.action
+        fun openUrl(url: String) =
+            startActivity(browserScreenIntent().setData(android.net.Uri.parse(url)))
+        fun toast(text: String) = Toast.makeText(this, text, Toast.LENGTH_SHORT).show()
+        when (action) {
+            dev.autobridge.agent.AgentCommandRouter.AgentAction.OPEN_URL -> {
+                val url = dev.autobridge.entertainment.ContentAddress.https(command.argument.orEmpty())
+                if (url != null) openUrl(url)
+                else openUrl(dev.autobridge.entertainment.ContentAddress.webSearch(spoken))
+            }
+            dev.autobridge.agent.AgentCommandRouter.AgentAction.OPEN_BROWSER,
+            dev.autobridge.agent.AgentCommandRouter.AgentAction.ENTER_FULLSCREEN,
+            dev.autobridge.agent.AgentCommandRouter.AgentAction.EXIT_FULLSCREEN -> openBrowserOnCar()
+            dev.autobridge.agent.AgentCommandRouter.AgentAction.OPEN_MIRROR -> requestScreenCapture()
+            dev.autobridge.agent.AgentCommandRouter.AgentAction.OPEN_MEDIA ->
+                startActivity(
+                    dev.autobridge.library.LibraryActivity.intent(
+                        this, dev.autobridge.library.LibraryActivity.Section.PLAYLISTS
+                    )
+                )
+            dev.autobridge.agent.AgentCommandRouter.AgentAction.RESUME_MEDIA -> {
+                mediaPlayback.resume()
+                toast("เล่นต่อ")
+            }
+            dev.autobridge.agent.AgentCommandRouter.AgentAction.OPEN_RECENT ->
+                toast("รายการล่าสุดอยู่บนจอรถ")
+            dev.autobridge.agent.AgentCommandRouter.AgentAction.ENABLE_DESKTOP -> {
+                dev.autobridge.browser.BrowserUserAgentStore.select(
+                    this, dev.autobridge.browser.BrowserUserAgentMode.DESKTOP
+                )
+                toast("เปิดโหมดเดสก์ท็อปแล้ว")
+            }
+            dev.autobridge.agent.AgentCommandRouter.AgentAction.DISABLE_DESKTOP -> {
+                dev.autobridge.browser.BrowserUserAgentStore.select(
+                    this, dev.autobridge.browser.BrowserUserAgentMode.MOBILE
+                )
+                toast("ปิดโหมดเดสก์ท็อปแล้ว")
+            }
+        }
+    }
+
+    /** One titled group of rows on a settings-style list page. */
+    private class SettingsGroup(val label: String, val rows: List<dev.autobridge.ui.PhoneLauncherUi.Entry>)
+
+    private fun settingsEntry(title: String, caption: String, icon: Int, action: () -> Unit) =
+        dev.autobridge.ui.PhoneLauncherUi.Entry(
+            title = title,
+            icon = icon,
+            caption = caption,
+            accent = dev.autobridge.ui.AutoBridgeDesign.ACCENT_SYSTEM,
+            open = action
+        )
+
+    /**
+     * A grouped list page in the launcher's visual language: header, then each group as a quiet
+     * section label over accent-badged rows. [back] is null for the Settings root tab.
+     */
+    private fun settingsListPage(
+        title: String,
+        subtitle: String?,
+        groups: List<SettingsGroup>,
+        back: (() -> Unit)?
+    ): View {
+        val design = dev.autobridge.ui.AutoBridgeDesign
+        val body = design.body(this)
+        groups.forEach { group ->
+            if (group.label.isNotBlank()) body.addView(design.sectionLabel(this, group.label))
+            group.rows.forEach { entry ->
+                body.addView(
+                    design.contentRow(
+                        context = this,
+                        title = entry.title,
+                        subtitle = entry.caption,
+                        accent = entry.accent,
+                        badgeIcon = entry.icon,
+                        trailing = "›",
+                        onClick = entry.open
+                    ),
+                    LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8) }
+                )
+            }
+        }
+        return design.page(
             context = this,
-            title = "Settings",
-            entries = listOf(
-                item("Mirror & display", "Renderer, rotation, screen power", R.drawable.ic_tile_mirror) {
-                    showPhoneScreen(PhoneScreen.MIRROR_SETTINGS)
-                },
-                item("Touch control", "Input backend and permissions", R.drawable.ic_tile_touch) {
-                    openTouchSettings()
-                },
-                item("App profiles", "Per-app scale, rotation and audio", R.drawable.ic_tile_apps) {
-                    showPhoneScreen(PhoneScreen.PROFILES)
-                },
-                // Applications, Connected devices and Remote control are deliberately absent:
-                // the bottom navigation already has an Apps, Devices and Remote tab, so repeating
-                // them here only made this list longer without adding a destination.
-                item("Control Center", "Mirror, browser and session actions", R.drawable.ic_tile_remote) {
-                    showPhoneScreen(PhoneScreen.CONTROL_CENTER)
-                },
-                item("Car setup", "Permissions, in order, and Bluetooth start", R.drawable.ic_tile_mirror) {
-                    startActivity(dev.autobridge.mirror.MirrorSetupActivity.intent(this))
-                },
-                item("YouTube add-ons", "SponsorBlock and playback quality", R.drawable.ic_tile_youtube) {
-                    startActivity(dev.autobridge.youtube.YouTubeSettingsActivity.intent(this))
-                },
-                item("Debug", "Logs, diagnostics and mirror events", R.drawable.ic_tile_debug) {
-                    showPhoneScreen(PhoneScreen.DEVELOPER)
-                }
-            ),
-            grid = false,
-            home = { showPhoneScreen(PhoneScreen.HOME) },
-            menu = ::phoneMenu,
-            subtitle = "Modes, permissions and diagnostics",
+            header = design.header(context = this, title = title, subtitle = subtitle, onBack = back),
+            body = body,
             applyInsets = false
         )
     }
 
-    private fun buildControlCenterScreen(): View {
-        val content = screenContent()
-        content.addView(
-            screenHeader(
-                title = "AutoBridge",
-                subtitle = "PHONE CONTROL CENTER",
-                action = "⚙" to { showPhoneScreen(PhoneScreen.MIRROR_SETTINGS) }
-            )
+    /**
+     * Settings root. Grouped the way the user thinks about it rather than by implementation:
+     * what the car shows and how it is touched, the car and per-app setup, features, then the
+     * developer tools and the About page. Car setup, Debug and Control Center are no longer
+     * top-level rows: they live in Car & Connection, Advanced and the Control tab respectively.
+     */
+    private fun buildSettingsMenu(): View = settingsListPage(
+        title = "Settings",
+        subtitle = null,
+        back = null,
+        groups = listOf(
+            SettingsGroup("Display & control", listOf(
+                settingsEntry("Display & Mirror", "Renderer, rotation and fullscreen", R.drawable.ic_tile_mirror) {
+                    showPhoneScreen(PhoneScreen.MIRROR_SETTINGS)
+                },
+                settingsEntry("Input & Touch", "Touch backend and permissions", R.drawable.ic_tile_touch) {
+                    showPhoneScreen(PhoneScreen.INPUT_TOUCH)
+                }
+            )),
+            SettingsGroup("Car & apps", listOf(
+                settingsEntry("Car & Connection", "Android Auto, Bluetooth and startup", R.drawable.ic_tile_car) {
+                    showPhoneScreen(PhoneScreen.CAR_CONNECTION)
+                },
+                settingsEntry("App Profiles", "Per-app display and audio", R.drawable.ic_tile_apps) {
+                    showPhoneScreen(PhoneScreen.PROFILES)
+                }
+            )),
+            SettingsGroup("Features", listOf(
+                settingsEntry("YouTube", "SponsorBlock and playback quality", R.drawable.ic_tile_youtube) {
+                    startActivity(dev.autobridge.youtube.YouTubeSettingsActivity.intent(this))
+                },
+                settingsEntry("Agent & Commands", "Commands, history and automation", R.drawable.ic_tile_remote) {
+                    showPhoneScreen(PhoneScreen.AGENT_COMMANDS)
+                }
+            )),
+            SettingsGroup("Advanced", listOf(
+                settingsEntry("Advanced", "Diagnostics and debug tools", R.drawable.ic_tile_debug) {
+                    showPhoneScreen(PhoneScreen.ADVANCED)
+                }
+            )),
+            SettingsGroup("About", listOf(
+                settingsEntry("About", "Version, licenses and support", R.drawable.ic_tile_settings) {
+                    showPhoneScreen(PhoneScreen.ABOUT)
+                }
+            ))
         )
+    )
 
-        val connection = TextView(this).apply {
-            homeConnectionView = this
-            textSize = 13f
-            setTextColor(COLOR_TEXT)
-            setPadding(dp(16), dp(14), dp(16), dp(14))
-            background = roundedBackground(COLOR_SURFACE, COLOR_BORDER)
-            minHeight = dp(88)
-        }
-        addCard(content, connection, top = 4)
-
-        // ปลดล็อกให้ปุ่ม START MIRROR เรียกใช้งานได้โดยตรง
-        addCard(
-            content,
-            actionCard("▣   START MIRROR", primary = true) {
-                requestScreenCapture()
-            },
-            top = 12
+    /** Settings > Advanced: the developer tools, kept out of the main Settings list. */
+    private fun buildAdvancedScreen(): View = settingsListPage(
+        title = "Advanced",
+        subtitle = "Developer tools",
+        back = { goBack() },
+        groups = listOf(
+            SettingsGroup("", listOf(
+                settingsEntry("Diagnostics", "Logs, crash reports and mirror events", R.drawable.ic_tile_debug) {
+                    showPhoneScreen(PhoneScreen.DEVELOPER)
+                },
+                settingsEntry("Debug", "Internal runtime state", R.drawable.ic_tile_settings) {
+                    showPhoneScreen(PhoneScreen.DEBUG)
+                }
+            ))
         )
+    )
 
-        // Open the shared browser UI; mirroring is a separate, explicit action.
-        addCard(
-            content,
-            actionCard("🌐   OPEN BROWSER", primary = true) {
-                openBrowserOnCar()
-            },
-            top = 8
+    /** Settings > About: support, licenses, source and version (moved from the old Remote options). */
+    private fun buildAboutScreen(): View = settingsListPage(
+        title = "About",
+        subtitle = "AutoBridge ${BuildConfig.VERSION_NAME}",
+        back = { goBack() },
+        groups = listOf(
+            SettingsGroup("", listOf(
+                settingsEntry("Support AutoBridge", "Buy me a coffee", R.drawable.ic_tile_favorite) {
+                    openExternalUrl(SUPPORT_URL)
+                },
+                settingsEntry("Open-source licenses", "View third-party notices", R.drawable.ic_tile_folder) {
+                    showOpenSourceLicenses()
+                },
+                settingsEntry("GitHub", "github.com/guitar-dev-io/autobridge", R.drawable.ic_tile_web) {
+                    openExternalUrl(GITHUB_URL)
+                },
+                settingsEntry(
+                    "Version",
+                    "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}) · ${BuildConfig.AUTOBRIDGE_MODE.lowercase()}",
+                    R.drawable.ic_tile_settings
+                ) {
+                    Toast.makeText(this, "AutoBridge ${BuildConfig.VERSION_NAME}", Toast.LENGTH_SHORT).show()
+                }
+            ))
         )
+    )
 
-        addLastSessionCard(content)
-        content.addView(sectionLabel("CONTROL CENTER"))
-        content.addView(
-            composeControlCenter(),
-            LinearLayout.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(12) }
-        )
-
-        val quickHeader = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        quickHeader.addView(sectionLabel("QUICK APPS"), LinearLayout.LayoutParams(0, dp(40), 1f))
-        val edit = TextView(this).apply {
-            text = "Edit"
-            textSize = 12f
-            setTextColor(COLOR_ACCENT)
-            setPadding(dp(8), 0, 0, 0)
-            setOnClickListener { showPhoneScreen(PhoneScreen.APPS) }
-        }
-        quickHeader.addView(edit, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(40)))
-        content.addView(quickHeader)
-
-        val installedApps = InstalledAppRepository.listLaunchableApps(this)
-        QuickAppsStore.syncFavorites(this, installedApps)
-        val quickApps = QuickAppsStore.enabledInstalledApps(this, installedApps).take(6)
-        val quickRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        if (quickApps.isEmpty()) {
-            quickRow.addView(
-                mutedText("No Quick Apps configured. Add them from Applications."),
-                LinearLayout.LayoutParams(-1, dp(72))
-            )
-        } else {
-            quickApps.forEach { app ->
-                quickRow.addView(
-                    appShortcut(app),
-                    LinearLayout.LayoutParams(dp(72), dp(82)).apply {
-                        marginEnd = dp(8)
-                    }
-                )
-            }
-        }
-        val quickScroll = HorizontalScrollView(this).apply {
-            isHorizontalScrollBarEnabled = false
-            addView(quickRow)
-        }
-        content.addView(quickScroll, LinearLayout.LayoutParams(-1, dp(86)))
-
-        addCard(
-            content,
-            mutedText("Full Mirror Unlocked: All safety gates fully bypassed."),
-            top = 10
-        )
-        return screenScroll(content)
+    private fun openExternalUrl(url: String) {
+        val opened = runCatching {
+            startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+            true
+        }.getOrDefault(false)
+        if (!opened) Toast.makeText(this, "No browser available", Toast.LENGTH_SHORT).show()
     }
 
     /**
-     * The Mobile Remote (spec §1-§21). A full-screen Compose surface with its own header and
-     * sub-tab bar (Home/Remote/Commands/Settings). It only submits commands to the shared
-     * [dev.autobridge.remote.AutoBridgeCommandBus] and renders shared state — no feature logic here.
+     * Opens the generated Play-services license list when present, otherwise the LICENSE on
+     * GitHub, so the row is never a dead end.
      */
-    private fun buildRemoteScreen(): View = ComposeView(this).apply {
-        setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
-        setContent {
-            AutoBridgePhoneTheme {
-                val current = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(remoteTab) }
-                MobileRemoteScreen(
-                    context = this@MainActivity,
-                    tab = current.value,
-                    onSelectTab = { selected ->
-                        remoteTab = selected
-                        current.value = selected
-                    }
-                )
-            }
+    private fun showOpenSourceLicenses() {
+        val opened = runCatching {
+            startActivity(Intent(this, Class.forName("com.google.android.gms.oss.licenses.OssLicensesMenuActivity")))
+            true
+        }.getOrDefault(false)
+        if (!opened) openExternalUrl("$GITHUB_URL/blob/main/LICENSE")
+    }
+
+    /**
+     * Settings > Advanced > Debug: the internal values (mode, environment such as REAL_CAR/DHU,
+     * raw vehicle state, renderer) that user-facing screens deliberately do not show. Refreshed
+     * by the 1s status tick.
+     */
+    private fun buildDebugScreen(): View {
+        val content = screenContent()
+        content.addView(screenHeader("Debug", "INTERNAL STATE", back = { goBack() }))
+        val state = TextView(this).apply {
+            debugStateView = this
+            textSize = 13f
+            setTextColor(COLOR_TEXT)
+            typeface = Typeface.MONOSPACE
+            setPadding(dp(16), dp(14), dp(16), dp(14))
+            background = roundedBackground(COLOR_SURFACE, COLOR_BORDER)
+            text = debugStateText()
+        }
+        addCard(content, state, top = 4)
+        addCard(content, actionCard("COPY DIAGNOSTICS") { copyDiagnosticsToClipboard() }, top = 12)
+        return screenScroll(content)
+    }
+
+    private fun debugStateText(): String {
+        val runtime = RuntimeContextStore.context.value
+        return buildString {
+            appendLine("Mode:          ${runtime.mode.name}")
+            appendLine("Environment:   ${runtime.environment.name}")
+            appendLine("Connected:     ${runtime.connected}")
+            appendLine("Vehicle state: ${runtime.vehicleState.name}")
+            appendLine("Vehicle:       ${runtime.vehicleProfile?.name ?: "—"}")
+            appendLine("Feature:       ${runtime.currentFeature?.name ?: "—"}")
+            appendLine("Pipeline:      ${ScreenOffController.pipelineMode.name}")
+            appendLine("Mirroring:     ${MirrorCoordinator.isMirroring}")
+            append("Dev mode:      ${DevMode.isEnabled}")
         }
     }
 
-    private fun composeControlCenter(): View = ComposeView(this).apply {
-        setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
-        setContent {
-            AutoBridgePhoneTheme {
-                PhoneControlCenter(
-                    onStartMirror = { requestScreenCapture() },
-                    onOpenApps = { showPhoneScreen(PhoneScreen.APPS) },
-                    onOpenProfiles = { showPhoneScreen(PhoneScreen.PROFILES) },
-                    onOpenTouch = { openTouchSettings() },
-                    onOpenDeveloper = { showPhoneScreen(PhoneScreen.DEVELOPER) }
-                )
-            }
+    private fun composeScreen(content: @androidx.compose.runtime.Composable () -> Unit): View =
+        ComposeView(this).apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+            setContent { AutoBridgePhoneTheme { content() } }
         }
+
+    /** Control tab: one page (status, command, quick actions, current screen, send text). */
+    private fun buildControlScreen(): View = composeScreen {
+        dev.autobridge.ui.ControlScreen(
+            context = this@MainActivity,
+            onOpenHistory = { showPhoneScreen(PhoneScreen.CONTROL_HISTORY) },
+            onOpenConnection = { showPhoneScreen(PhoneScreen.CAR_CONNECTION) }
+        )
+    }
+
+    private fun buildCommandHistoryScreen(): View = composeScreen {
+        dev.autobridge.ui.CommandHistoryScreen(context = this@MainActivity, onBack = { goBack() })
+    }
+
+    private fun buildAgentCommandsScreen(): View = composeScreen {
+        dev.autobridge.ui.AgentCommandsScreen(
+            context = this@MainActivity,
+            onBack = { goBack() },
+            onOpenHistory = { showPhoneScreen(PhoneScreen.CONTROL_HISTORY) }
+        )
+    }
+
+    /**
+     * Settings > Input & Touch. The touch rows used to sit inside Mirror settings; they are the
+     * same rows and handlers, only grouped on their own page.
+     */
+    private fun buildInputTouchScreen(): View {
+        val content = screenContent()
+        content.addView(screenHeader("Input & Touch", "TOUCH BACKEND AND PERMISSIONS", back = { goBack() }))
+        content.addView(sectionLabel("TOUCH"))
+        addCard(
+            content,
+            settingRow(
+                "Touch control",
+                "Accessibility service used to inject car touches",
+                "Open",
+                onClick = { openTouchSettings() }
+            ),
+            top = 4
+        )
+        addCard(
+            content,
+            settingRow(
+                "Input backend",
+                "Accessibility preferred, Shizuku optional",
+                inputBackendLabel(),
+                onClick = { openTouchSettings() }
+            ),
+            top = 8
+        )
+        addCard(
+            content,
+            settingSwitchRow(
+                "Real touch injection",
+                "Privileged pointer sink; Android Auto must provide a raw pointer stream",
+                checked = MirrorSettings.realTouchEnabled,
+                enabled = ShizukuInputBackend.isRealTouchAvailable || MirrorSettings.realTouchEnabled
+            ) { enabled -> onRealTouchToggled(enabled) },
+            top = 8
+        )
+        shizukuTouchCard()?.let { addCard(content, it, top = 8) }
+        return screenScroll(content)
     }
 
     private fun buildAppsScreen(): View {
         val content = screenContent()
         // "App launcher" was misleading: tapping a row opens that app's profile, it does not launch
-        // it. The star on each row is what adds it to Quick Apps.
-        content.addView(screenHeader("Applications", "CHOOSE QUICK APPS", back = { showPhoneScreen(PhoneScreen.HOME) }))
+        // it. The star on each row is what adds it to Favorites (stored in QuickAppsStore, the one favorites list).
+        content.addView(screenHeader("Applications", "TAP ☆ TO ADD A FAVORITE"))
 
         val search = EditText(this).apply {
             hint = "Search apps…"
@@ -2550,7 +2741,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
             val quickCount = QuickAppsStore.enabledInstalledApps(this, installed).size
             if (appsFavoritesOnly && quickCount == 0) appsFavoritesOnly = false
             // The counts say up front whether switching tabs will show anything.
-            styleFilter(favorites, "Quick Apps · $quickCount", appsFavoritesOnly)
+            styleFilter(favorites, "Favorites · $quickCount", appsFavoritesOnly)
             styleFilter(allApps, "All apps · ${installed.size}", !appsFavoritesOnly)
         }
         appsFilterRefresh = ::refreshAppFilter
@@ -2583,7 +2774,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
 
     private fun buildProfilesScreen(): View {
         val content = screenContent()
-        content.addView(screenHeader("Profiles", "APP PROFILES", back = { showPhoneScreen(PhoneScreen.HOME) }))
+        content.addView(screenHeader("App Profiles", "PER-APP DISPLAY AND AUDIO", back = { goBack() }))
         content.addView(
             mutedText("Per-app settings are applied when launched."),
             LinearLayout.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT).apply { bottomMargin = dp(12) }
@@ -2592,7 +2783,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
         QuickAppsStore.syncFavorites(this, installedApps)
         val apps = QuickAppsStore.enabledInstalledApps(this, installedApps)
         if (apps.isEmpty()) {
-            addCard(content, mutedText("No enabled Quick Apps yet. Add one from Applications."))
+            addCard(content, mutedText("No favorite apps yet. Star one in Apps to give it a profile here."))
             addCard(content, actionCard("BROWSE ALL APPS") { showPhoneScreen(PhoneScreen.APPS) })
         } else {
             // Everything listed here is already a Quick App, and removing one from this screen is
@@ -2602,7 +2793,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
                     content,
                     appListRow(app, isQuickApp = true) {
                         QuickAppsStore.setEnabled(this, app, false)
-                        Toast.makeText(this, "Removed from Quick Apps", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, "Removed from Favorites", Toast.LENGTH_SHORT).show()
                         showPhoneScreen(PhoneScreen.PROFILES)
                     },
                     top = 8
@@ -2624,12 +2815,12 @@ class MainActivity : androidx.activity.ComponentActivity() {
             screenHeader(
                 title = app.label,
                 subtitle = "APP PROFILE • $profileId",
-                back = { showPhoneScreen(PhoneScreen.APPS) },
+                back = { goBack() },
                 action = (if (isQuickApp) "★" else "☆") to {
                     QuickAppsStore.setEnabled(this, app, !isQuickApp, profileId)
                     Toast.makeText(
                         this,
-                        if (isQuickApp) "Removed from Quick Apps" else "Added to Quick Apps",
+                        if (isQuickApp) "Removed from Favorites" else "Added to Favorites",
                         Toast.LENGTH_SHORT
                     ).show()
                     showPhoneScreen(PhoneScreen.PROFILE)
@@ -2790,7 +2981,17 @@ class MainActivity : androidx.activity.ComponentActivity() {
     private fun buildMirrorSettingsScreen(): View {
         val content = screenContent()
         content.addView(
-            screenHeader("Mirror Settings", "PROJECTION", back = { showPhoneScreen(PhoneScreen.HOME) })
+            screenHeader("Display & Mirror", "RENDERER, ROTATION AND FULLSCREEN", back = { goBack() })
+        )
+
+        // Phone-side projection start (needs the MediaProjection consent prompt on this phone).
+        // It used to be the Control Center's START MIRROR button.
+        addCard(
+            content,
+            actionCard(if (MirrorCoordinator.isMirroring) "▣   MIRRORING" else "▣   START MIRROR", primary = true) {
+                requestScreenCapture()
+            },
+            top = 4
         )
 
         content.addView(sectionLabel("DISPLAY"))
@@ -2883,27 +3084,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
                 showPhoneScreen(PhoneScreen.MIRROR_SETTINGS)
             }
         ), top = 8)
-        addCard(
-            content,
-            settingSwitchRow(
-                "Real touch injection",
-                "Privileged pointer sink; Android Auto must provide a raw pointer stream",
-                checked = MirrorSettings.realTouchEnabled,
-                enabled = ShizukuInputBackend.isRealTouchAvailable || MirrorSettings.realTouchEnabled
-            ) { enabled -> onRealTouchToggled(enabled) },
-            top = 8
-        )
-        addCard(
-            content,
-            settingRow(
-                "Input backend",
-                "Accessibility preferred, Shizuku optional",
-                inputBackendLabel(),
-                onClick = { openTouchSettings() }
-            ),
-            top = 8
-        )
-        shizukuTouchCard()?.let { addCard(content, it, top = 8) }
+        // Real touch injection, Input backend and the Shizuku card moved to Settings > Input & Touch.
 
         content.addView(sectionLabel("AUTOMATION"))
         addCard(
@@ -2948,7 +3129,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
 
     private fun buildDeveloperScreen(): View {
         val content = screenContent()
-        content.addView(screenHeader("Developer Tools", "LAB & DIAGNOSTICS", back = { showPhoneScreen(PhoneScreen.HOME) }))
+        content.addView(screenHeader("Diagnostics", "LOGS, CRASHES AND MIRROR EVENTS", back = { goBack() }))
 
         content.addView(sectionLabel("APP LOG"))
         val logView = TextView(this).apply {
@@ -3035,18 +3216,25 @@ class MainActivity : androidx.activity.ComponentActivity() {
         return screenScroll(content)
     }
 
-    private fun buildDevicesScreen(): View {
-        val content = screenContent()
-        content.addView(screenHeader("Devices", "CONNECTED HEAD UNITS", back = { showPhoneScreen(PhoneScreen.HOME) }))
-        val deviceView = TextView(this).apply {
-            text = "Connected Vehicle State: REAL_CAR (Parked)"
-            textSize = 14f
-            setTextColor(COLOR_SUCCESS)
-            setPadding(dp(16), dp(16), dp(16), dp(16))
-            background = roundedBackground(COLOR_SURFACE, COLOR_BORDER)
-        }
-        addCard(content, deviceView, top = 4)
-        return screenScroll(content)
+    /**
+     * Settings > Car & Connection (the old Devices tab). The vehicle card is live from
+     * RuntimeContextStore; the rows reuse the existing Car setup activity and diagnostics page.
+     */
+    private fun buildCarConnectionScreen(): View = composeScreen {
+        dev.autobridge.ui.CarConnectionScreen(
+            onBack = { goBack() },
+            links = listOf(
+                dev.autobridge.ui.SettingsLink(R.drawable.ic_tile_car, "Connection", "Permissions and Android Auto readiness") {
+                    startActivity(dev.autobridge.mirror.MirrorSetupActivity.intent(this))
+                },
+                dev.autobridge.ui.SettingsLink(R.drawable.ic_tile_remote, "Startup", "Start the media service when the car pairs over Bluetooth") {
+                    startActivity(dev.autobridge.mirror.MirrorSetupActivity.intent(this))
+                },
+                dev.autobridge.ui.SettingsLink(R.drawable.ic_tile_debug, "Diagnostics", "Connection log, crash reports and mirror events") {
+                    showPhoneScreen(PhoneScreen.DEVELOPER)
+                }
+            )
+        )
     }
 
     // Helper functions and UI components
@@ -3171,27 +3359,6 @@ class MainActivity : androidx.activity.ComponentActivity() {
         }
     }
 
-    private fun appShortcut(app: InstalledApp): View {
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(dp(4), dp(6), dp(4), dp(6))
-            background = roundedBackground(COLOR_SURFACE, COLOR_BORDER)
-            addView(appIconView(app, dp(36)))
-            addView(TextView(context).apply {
-                text = app.label
-                textSize = 10f
-                maxLines = 1
-                setTextColor(COLOR_TEXT)
-                gravity = Gravity.CENTER
-            })
-            setOnClickListener {
-                selectedApp = app
-                showPhoneScreen(PhoneScreen.PROFILE)
-            }
-        }
-    }
-
     /**
      * One row of the Applications picker.
      *
@@ -3221,7 +3388,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
             })
             if (isQuickApp) {
                 textColumn.addView(TextView(context).apply {
-                    text = "Quick App"
+                    text = "Favorite"
                     textSize = 11f
                     setTextColor(COLOR_ACCENT)
                 })
@@ -3234,7 +3401,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
                 textSize = 18f
                 gravity = Gravity.CENTER
                 setTextColor(if (isQuickApp) COLOR_ACCENT else COLOR_MUTED)
-                contentDescription = if (isQuickApp) "Remove from Quick Apps" else "Add to Quick Apps"
+                contentDescription = if (isQuickApp) "Remove from Favorites" else "Add to Favorites"
                 isClickable = true
                 isFocusable = true
                 setOnClickListener { onToggleQuick() }
@@ -3271,7 +3438,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
                     QuickAppsStore.setEnabled(this, app, !isQuickApp)
                     Toast.makeText(
                         this,
-                        if (isQuickApp) "Removed from Quick Apps" else "Added to Quick Apps",
+                        if (isQuickApp) "Removed from Favorites" else "Added to Favorites",
                         Toast.LENGTH_SHORT
                     ).show()
                     renderAppGrid(container)
@@ -3347,13 +3514,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
                 android.speech.RecognizerIntent.EXTRA_RESULTS
             )?.firstOrNull()?.trim().orEmpty()
             if (resultCode == Activity.RESULT_OK && spoken.isNotEmpty()) {
-                startActivity(
-                    browserScreenIntent().setData(
-                        android.net.Uri.parse(
-                            dev.autobridge.entertainment.ContentAddress.webSearch(spoken)
-                        )
-                    )
-                )
+                runPhoneVoiceCommand(spoken)
             }
             return
         }
@@ -3373,9 +3534,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
     }
 
     private fun refreshStatus() {
-        val ctx = RuntimeContextStore.context.value
-        val statusText = "Mode: ${ctx.mode.name}\nVehicle: REAL_CAR (Parked)\nConnection: ${if (ctx.connected) "Active" else "Ready"}"
-        homeConnectionView?.text = statusText
+        debugStateView?.text = debugStateText()
         developerLogView?.text = StructuredLog.format(limit = 30).ifEmpty { "No log entries yet" }
         developerMirrorEventsView?.text = MirrorDiagnostics.format(limit = 30).ifEmpty { "No mirror events yet" }
     }
@@ -3439,7 +3598,6 @@ class MainActivity : androidx.activity.ComponentActivity() {
         }
     }
 
-    private fun addLastSessionCard(container: LinearLayout) {}
     private fun cycleProfileScale(pkg: String, id: String) {}
     private fun cycleProfileResolution(pkg: String, id: String) {}
     private fun cycleProfileFps(pkg: String, id: String) {}

@@ -48,7 +48,8 @@ class LibraryActivity : Activity() {
         FOLDERS("Folders", AutoBridgeDesign.ACCENT_FILES),
         PLAYLISTS("Playlists", AutoBridgeDesign.ACCENT_FILES),
         GALLERY("Gallery", AutoBridgeDesign.ACCENT_WEB),
-        FAVORITES("Favorites", AutoBridgeDesign.ACCENT_FAVORITE)
+        FAVORITES("Favorites", AutoBridgeDesign.ACCENT_FAVORITE),
+        STREAMING("Streaming", AutoBridgeDesign.ACCENT_VIDEO)
     }
 
     companion object {
@@ -89,6 +90,7 @@ class LibraryActivity : Activity() {
             Section.PLAYLISTS -> showPlaylists()
             Section.GALLERY -> showGalleryAlbums()
             Section.FAVORITES -> showFavorites()
+            Section.STREAMING -> showStreaming()
         }
     }
 
@@ -916,6 +918,33 @@ class LibraryActivity : Activity() {
                 "Star a channel in TV or Radio, or save a page in the browser, and it appears here."
             )
         )
+    }
+
+    // ----- Streaming -----
+
+    /** The shared [StreamingLinks] catalog, grouped; each row opens the site in the browser. */
+    private fun showStreaming() = push {
+        val rows = mutableListOf<View>()
+        StreamingLinks.grouped().forEach { (group, links) ->
+            rows += AutoBridgeDesign.sectionLabel(this, group.title)
+            links.forEach { link ->
+                rows += AutoBridgeDesign.contentRow(
+                    context = this,
+                    title = link.title,
+                    subtitle = hostOf(link.url),
+                    accent = accent,
+                    onClick = {
+                        // Same intent as the YouTube home tile, so the browser is reused if open.
+                        startActivity(
+                            Intent(this, dev.autobridge.browser.BrowserActivity::class.java)
+                                .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+                                .setData(Uri.parse(link.url))
+                        )
+                    }
+                )
+            }
+        }
+        render(title = "Streaming", subtitle = "${StreamingLinks.all.size} sites", rows = rows)
     }
 
     // ----- Shared helpers -----

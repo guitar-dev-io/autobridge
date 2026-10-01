@@ -13,6 +13,9 @@ enum class DrawerAction {
 
     /** Car only: immersive fullscreen (no toolbar, floating button fades until touched). */
     TOGGLE_FULLSCREEN,
+
+    /** Car only: steps through [BrowserSplitLayout] (100, 50/50, 40/60, portrait + landscape). */
+    SPLIT_LAYOUT,
     BOOKMARK_PAGE, OPEN_EXTERNAL, SETTINGS, CLEAR_DATA, DIAGNOSTICS,
 
     /** Page history, the two controls the address row sits between. */
@@ -47,6 +50,15 @@ enum class DrawerAction {
 
     /** Phone only: pulls whatever the car surface is showing back onto the phone. */
     RECEIVE_FROM_CAR,
+
+    /** Opens the Buy Me a Coffee support page in an external browser. */
+    SUPPORT,
+
+    /** Opens the generated open-source licenses screen (falls back to the GitHub LICENSE). */
+    LICENSES,
+
+    /** Opens the AutoBridge GitHub repository in an external browser. */
+    GITHUB,
 }
 
 /**
@@ -65,13 +77,19 @@ enum class DrawerKind {
     /** A large square-ish button with a glyph over a label. */
     TILE,
 
+    /**
+     * The sheet's one accent-filled, full-width button: icon, bold title, subtitle and chevron.
+     * "Send to car" on the phone, "Tabs" on the car — the action each browser is mostly opened for.
+     */
+    PRIMARY,
+
     /** A full-width row carrying a label and a switch. */
     TOGGLE,
 
-    /** A small labelled pill in the footer. */
+    /** A small labelled pill in the header. */
     PILL,
 
-    /** A circular button inside the address row. */
+    /** A circular button inside the address row or the header. */
     ROUND,
 
     /** The address row itself: tapping anywhere that is not one of its buttons edits the URL. */
@@ -93,13 +111,12 @@ data class DrawerItem(
     val enabled: Boolean = true,
     /** Switch state, for [DrawerKind.TOGGLE] only. */
     val on: Boolean = false,
+    /** Second line under the label, for [DrawerKind.PRIMARY] only. */
+    val detail: String = "",
 )
 
 /** A laid-out entry with the box it occupies in surface coordinates. */
 data class DrawerRow(val item: DrawerItem, val bounds: Box, val kind: DrawerKind)
-
-/** A group of tiles drawn on a shared card, the way the reference menu groups related actions. */
-data class DrawerCard(val bounds: Box, val tiles: List<DrawerRow>)
 
 /** The address row: a pill carrying the page's identity and two controls. */
 data class DrawerAddress(
@@ -126,39 +143,30 @@ data class BrowserMenuState(
 }
 
 /**
- * Content and geometry for the browser menu sheet.
+ * Content and geometry for the browser menu sheet drawn on the car surface.
  *
  * The sheet is an **overlay**: it is composited over the page and never reduces the viewport the
  * WebView is laid out against. A panel that pushes content would change the page's width on every
- * open and close, reflowing the site — the exact class of movement this work removes. That
- * trade-off is taken deliberately on every screen size, including wide ones.
+ * open and close, reflowing the site.
  *
- * **Shape.** Header, address row, cards of tiles, a desktop-site switch and a footer, in that
- * order — one column, top to bottom. It replaces a flat grid of undifferentiated tiles, where
- * "Bookmarks" and "Zoom out" were drawn identically and the page's own address was nowhere on the
- * sheet at all. Grouping is what makes a menu scannable at a glance, which is the only kind of
- * reading that happens in a car.
+ * **Shape.** The same hierarchy as the phone's [BrowserMenuSheet], so the two browsers read as one
+ * product: a header (title, page title, round ✕), the address row, one accent-filled primary
+ * button, a divider, Back / Reload / Forward, Bookmarks / Settings / More, a divider and the
+ * desktop-site switch. The car's primary button is Tabs (the phone's is Send to car); everything
+ * rarer lives behind More. The car additionally carries "Exit" as a header pill, because the car
+ * browser has no other route back to the AutoBridge dashboard and that route must never be buried.
  *
  * Three rules make the same content work on every head unit:
  *
- * 1. **The sheet starts below the toolbar, never under it.** It used to begin one margin below the
- *    top of the viewport, inside the band the toolbar occupies. Since [CarWebRenderer] drew the
- *    toolbar *after* the sheet, the bar painted over the sheet's header: the close button ended up
- *    73% hidden behind the fullscreen icon, and the header title was covered outright. Taps were
- *    worse than the drawing — the top ~16dp of the bar fell outside the panel and dismissed the
- *    sheet, while the rest of it fell *inside* the panel and was swallowed, so visibly-lit buttons
- *    did nothing. Starting below the bar makes the header always visible and gives every tap
- *    outside the panel one meaning.
+ * 1. **The sheet starts below the toolbar, never under it**, so the toolbar can never paint over
+ *    the header or swallow taps meant for it.
  *
- * 2. **The sheet is bounded in width and centred.** [AutoUiSizes.MENU_SHEET_MAX_WIDTH_DP] keeps a
- *    1920px-wide head unit from stretching three tiles across the whole panel; the reference
- *    proportions are a phone's, and they are what the layout keeps.
+ * 2. **The sheet is bounded in width and centred** ([AutoUiSizes.MENU_SHEET_MAX_WIDTH_DP]).
  *
  * 3. **Bands are sized from the box, not authored and hoped for.** Every band declares a preferred
  *    and a minimum height and [distribute] shrinks them together toward those minimums, so the
- *    sheet only scrolls once even the minimums do not fit — which, with the reference layout, is
- *    true of a stable area around 320px tall and nothing larger. The header and its close button
- *    never scroll, so the way out is in the same place whatever the content is doing.
+ *    sheet only scrolls once even the minimums do not fit. The header never scrolls, so the way out
+ *    is in the same place whatever the content is doing.
  *
  * Geometry is pure data so it can be asserted at each supported head unit resolution in a JVM test.
  */
@@ -170,21 +178,22 @@ class BrowserDrawerModel private constructor(
     val subtitle: String,
     /** The decorative drag pill at the top of the sheet. Not a tap target. */
     val grip: Box,
-    val headerCard: Box,
-    /**
-     * The sheet's own close target, in the header. The sheet covers most of the viewport, so "tap
-     * outside to close" asked the user to hit a band a few dp wide while the car moves — in
-     * practice the sheet could not be dismissed except by picking an action. A button in a fixed
-     * place is the way out.
-     */
+    /** The header band: title on the left, its buttons on the right. Never scrolls. */
+    val header: Box,
+    /** Where the title block starts, after the back button on the "More" list. */
+    val titleLeft: Float,
+    /** The round ✕ in the header's trailing corner. */
     val closeButton: Box,
-    val address: DrawerAddress,
-    val cards: List<DrawerCard>,
+    /** Header buttons other than ✕: Back (on "More") and Exit. Tappable, never scrolled. */
+    val headerLinks: List<DrawerRow>,
+    /** The address row; the primary sheet only, as on the phone. */
+    val address: DrawerAddress?,
+    /** The accent-filled primary button; the primary sheet only. */
+    val primary: DrawerRow?,
+    val tiles: List<DrawerRow>,
+    /** Y positions of the hairlines between groups, in surface coordinates. */
+    val dividers: List<Float>,
     val toggle: DrawerRow?,
-    val footer: Box,
-    val footerName: String,
-    val footerVersion: String,
-    val footerLinks: List<DrawerRow>,
     /** Everything below this scrolls; the header above it does not. */
     val headerBottom: Float,
     val contentHeight: Float,
@@ -192,46 +201,44 @@ class BrowserDrawerModel private constructor(
     val scrollOffset: Float,
 ) {
     companion object {
-        /** The nine actions of the primary sheet, in the two cards they are drawn on. */
-        fun primaryCards(state: BrowserMenuState): List<List<DrawerItem>> = listOf(
-            // History and reload first, because they are what a menu opened mid-page is usually
-            // opened for, and because the toolbar they duplicate auto-hides — this is the copy
-            // that is always on screen once the sheet is open.
+        /**
+         * The primary sheet's accent button: what this browser is mostly opened for. The car
+         * browser is tabbed, so it is the tab switcher (which also opens new tabs); the phone
+         * browser exists to hand pages to the car.
+         */
+        fun primaryAction(state: BrowserMenuState): DrawerItem = when (state.surface) {
+            MenuSurface.CAR -> DrawerItem(
+                DrawerAction.TABS, "Tabs", "▣", value = state.tabCount.toString(),
+                detail = "สลับแท็บหรือเปิดแท็บใหม่",
+            )
+            MenuSurface.PHONE -> DrawerItem(
+                DrawerAction.SEND_TO_CAR, "Send to car", "🚗",
+                detail = "ส่งหน้าเว็บหรือคำค้นไปที่หน้าจอรถ",
+            )
+        }
+
+        /** The two rows of three under the primary button; identical on both surfaces. */
+        fun primaryRows(state: BrowserMenuState): List<List<DrawerItem>> = listOf(
+            // Navigation first: it is what a menu opened mid-page is usually opened for, and the
+            // toolbar it duplicates auto-hides.
             listOf(
                 DrawerItem(DrawerAction.NAV_BACK, "Back", "←", enabled = state.canGoBack),
                 DrawerItem(DrawerAction.RELOAD, "Reload", "↻"),
                 DrawerItem(DrawerAction.NAV_FORWARD, "Forward", "→", enabled = state.canGoForward),
-                DrawerItem(DrawerAction.BOOKMARKS, "Bookmarks", "☆"),
-                DrawerItem(DrawerAction.OPEN_EXTERNAL, "External", "↗"),
-                DrawerItem(DrawerAction.SETTINGS, "Settings", "⚙"),
             ),
-            // The car browser is tabbed and the phone one is not, so the phone spends the same
-            // three slots on the two lists it does have. Same shape, same place, no dead tile.
-            when (state.surface) {
-                MenuSurface.CAR -> listOf(
-                    DrawerItem(DrawerAction.HOME, "Start Page", "⌂"),
-                    DrawerItem(DrawerAction.TABS, "Tabs", "▣", state.tabCount.toString()),
-                    DrawerItem(DrawerAction.NEW_TAB, "New Tab", "＋"),
-                )
-                MenuSurface.PHONE -> listOf(
-                    DrawerItem(DrawerAction.HOME, "Start Page", "⌂"),
-                    DrawerItem(DrawerAction.HISTORY, "History", "↺"),
-                    DrawerItem(DrawerAction.DOWNLOADS, "Downloads", "↓"),
-                )
-            },
+            listOf(
+                DrawerItem(DrawerAction.BOOKMARKS, "Bookmarks", "☆"),
+                DrawerItem(DrawerAction.SETTINGS, "Settings", "⚙"),
+                DrawerItem(DrawerAction.MORE, "More", "⋯"),
+            ),
         )
 
         /** The one switch on the primary sheet; a switch because the state is what it reports. */
         fun desktopToggle(state: BrowserMenuState): DrawerItem = DrawerItem(
-            DrawerAction.TOGGLE_DESKTOP, "Request desktop site", "▭", on = state.isDesktop
+            DrawerAction.TOGGLE_DESKTOP, "Request desktop site", "🖥", on = state.isDesktop
         )
 
-        /**
-         * Everything that did not earn a tile on the primary sheet, reached through the footer's
-         * "More" link. One adaptive grid rather than headed sections: a drawn heading cost a whole
-         * band for a word that self-labelled tiles already imply, and on a short panel that band
-         * was the difference between the last row fitting and falling off the bottom.
-         */
+        /** Everything that did not earn a place on the primary sheet, reached through "More". */
         fun moreItems(surface: MenuSurface = MenuSurface.CAR): List<DrawerItem> = when (surface) {
             MenuSurface.CAR -> carMoreItems()
             MenuSurface.PHONE -> phoneMoreItems()
@@ -241,6 +248,9 @@ class BrowserDrawerModel private constructor(
             // First in the list: with the URL bar hidden by default, this is the only route to
             // fullscreen that does not need the floating button rebound.
             DrawerItem(DrawerAction.TOGGLE_FULLSCREEN, "Fullscreen", "⛶"),
+            DrawerItem(DrawerAction.SPLIT_LAYOUT, "Split", "◫"),
+            DrawerItem(DrawerAction.NEW_TAB, "New tab", "＋"),
+            DrawerItem(DrawerAction.HOME, "Start page", "⌂"),
             DrawerItem(DrawerAction.HISTORY, "History", "↺"),
             DrawerItem(DrawerAction.DOWNLOADS, "Downloads", "↓"),
             DrawerItem(DrawerAction.BOOKMARK_PAGE, "Bookmark", "★"),
@@ -248,10 +258,10 @@ class BrowserDrawerModel private constructor(
             DrawerItem(DrawerAction.COPY_URL, "Copy URL", "⧉"),
             // Always offered. Probing the clipboard to decide whether to show this entry does not
             // work on a car surface: Android denies clipboard reads to an app that is not focused
-            // on the phone, so the probe always failed, the entry never appeared, and every sheet
-            // open logged a denial. Whether there is anything to paste is decided when it is
-            // tapped.
+            // on the phone, so the probe always failed and the entry never appeared. Whether there
+            // is anything to paste is decided when it is tapped.
             DrawerItem(DrawerAction.PASTE_AND_GO, "Paste & go", "⎘"),
+            DrawerItem(DrawerAction.OPEN_EXTERNAL, "External", "↗"),
             DrawerItem(DrawerAction.ZOOM_IN, "Zoom in", "+"),
             DrawerItem(DrawerAction.ZOOM_OUT, "Zoom out", "−"),
             DrawerItem(DrawerAction.AGENT, "Agent", "❖"),
@@ -262,25 +272,24 @@ class BrowserDrawerModel private constructor(
             DrawerItem(DrawerAction.DIAGNOSTICS, "About", "ℹ"),
         )
 
-        /**
-         * The phone's secondary list. History and Downloads are absent because the phone keeps them
-         * on its primary sheet; the car's media, agent and diagnostics entries are absent because
-         * they are Car App screens with no phone equivalent. What the phone has instead is the pair
-         * of links to the car surface, which is most of the reason this browser exists on the phone.
-         */
+        /** The phone's secondary list, in the order [MoreActionsSheet] draws it. */
         private fun phoneMoreItems(): List<DrawerItem> = listOf(
-            DrawerItem(DrawerAction.BOOKMARK_PAGE, "Bookmark", "★"),
+            DrawerItem(DrawerAction.RECEIVE_FROM_CAR, "Get from car", "◀"),
             DrawerItem(DrawerAction.FIND_IN_PAGE, "Find", "⌕"),
             DrawerItem(DrawerAction.COPY_URL, "Copy URL", "⧉"),
             DrawerItem(DrawerAction.PASTE_AND_GO, "Paste & go", "⎘"),
+            DrawerItem(DrawerAction.OPEN_EXTERNAL, "External", "↗"),
+            DrawerItem(DrawerAction.HOME, "Start page", "⌂"),
+            DrawerItem(DrawerAction.HISTORY, "History", "↺"),
+            DrawerItem(DrawerAction.DOWNLOADS, "Downloads", "↓"),
+            DrawerItem(DrawerAction.SUPPORT, "Support", "☕"),
+            DrawerItem(DrawerAction.LICENSES, "Licenses", "⚖"),
+            DrawerItem(DrawerAction.GITHUB, "GitHub", "⌥"),
             DrawerItem(DrawerAction.ZOOM_IN, "Zoom in", "+"),
             DrawerItem(DrawerAction.ZOOM_OUT, "Zoom out", "−"),
-            DrawerItem(DrawerAction.SEND_TO_CAR, "Send to car", "▶"),
-            DrawerItem(DrawerAction.RECEIVE_FROM_CAR, "Get from car", "◀"),
-            DrawerItem(DrawerAction.CLEAR_DATA, "Clear data", "⌧"),
         )
 
-        /** Fixed at three so the sheet keeps the reference layout's proportions on every panel. */
+        /** Fixed at three so the primary sheet keeps the phone sheet's proportions on every panel. */
         const val PRIMARY_COLUMNS = 3
 
         fun create(
@@ -291,7 +300,7 @@ class BrowserDrawerModel private constructor(
             scrollOffset: Float = 0f,
         ): BrowserDrawerModel {
             val gap = sizes.contentGap
-            val pad = sizes.horizontalPadding
+            val tileGap = sizes.menuTileGap
 
             // Below the toolbar, never under it. See the class doc, rule 1.
             val top = viewport.top + sizes.toolbarHeight(viewport.height)
@@ -301,6 +310,10 @@ class BrowserDrawerModel private constructor(
             val left = viewport.left + (viewport.width - width) / 2f
             val panel = Box(left, top, left + width, bottom)
 
+            val innerLeft = panel.left + sizes.horizontalPadding
+            val innerRight = panel.right - sizes.horizontalPadding
+            val innerWidth = (innerRight - innerLeft).coerceAtLeast(1f)
+
             val gripWidth = (panel.width * 0.16f).coerceAtLeast(sizes.touchTarget)
             val gripHeight = sizes.dp(4f)
             val grip = Box(
@@ -308,161 +321,153 @@ class BrowserDrawerModel private constructor(
                 panel.centerX + gripWidth / 2f, panel.top + gap + gripHeight
             )
 
-            // The header gives way to the content on a short panel instead of holding a fixed share
-            // of a height there is none of. Floored so it can still carry a hittable close button.
+            // The header gives way to the content on a short panel. Floored so it still carries a
+            // hittable close button.
             val headerHeight = (panel.height * 0.15f)
-                .coerceIn(sizes.dp(AutoUiSizes.MIN_HEADER_HEIGHT_DP), sizes.touchTarget * 1.5f)
-            val headerCard = Box(panel.left + gap, grip.bottom + gap, panel.right - gap, grip.bottom + gap + headerHeight)
-            val headerBottom = headerCard.bottom
+                .coerceIn(sizes.dp(AutoUiSizes.MIN_HEADER_HEIGHT_DP), sizes.touchTarget * 1.3f)
+            val header = Box(innerLeft, grip.bottom + gap * 0.5f, innerRight, grip.bottom + gap * 0.5f + headerHeight)
+            val headerBottom = header.bottom
 
-            val closeHeight = (headerHeight - gap * 0.5f).coerceIn(sizes.touchTarget * 0.75f, sizes.touchTarget)
-            // Wide enough for the glyph and the word beside it: "✕" alone in a car is a guess, and
-            // this is the control the user needs when they opened the sheet by mistake.
-            val closeWidth = (sizes.touchTarget * 2.2f).coerceAtMost(headerCard.width * 0.45f)
-            val closeButton = Box(
-                headerCard.right - pad - closeWidth, headerCard.centerY - closeHeight / 2f,
-                headerCard.right - pad, headerCard.centerY + closeHeight / 2f
+            // Round, like the phone's ✕, and never smaller than a usable target.
+            val roundSide = (headerHeight - gap * 0.5f).coerceIn(sizes.touchTarget * 0.75f, sizes.touchTarget)
+            fun roundAt(right: Float) = Box(
+                right - roundSide, header.centerY - roundSide / 2f, right, header.centerY + roundSide / 2f
             )
+            val closeButton = roundAt(header.right)
 
-            val innerLeft = panel.left + gap
-            val innerRight = panel.right - gap
-            val innerWidth = (innerRight - innerLeft).coerceAtLeast(1f)
+            // Exit leaves the browser for the dashboard: the car's only way out, so it sits in the
+            // header on both lists rather than behind a tap.
+            val headerLinks = ArrayList<DrawerRow>(2)
+            val exitWidth = (sizes.touchTarget * 1.7f).coerceAtMost(header.width * 0.3f)
+            val exitBox = Box(
+                closeButton.left - gap - exitWidth, closeButton.top,
+                closeButton.left - gap, closeButton.bottom
+            )
+            headerLinks += DrawerRow(DrawerItem(DrawerAction.APP_HOME, "Exit", "⏏"), exitBox, DrawerKind.PILL)
+            var titleLeft = header.left
+            if (more) {
+                // The phone's "More actions" sheet opens with a circular back arrow; so does this.
+                val back = Box(header.left, closeButton.top, header.left + roundSide, closeButton.bottom)
+                headerLinks.add(0, DrawerRow(DrawerItem(DrawerAction.BACK_TO_MENU, "Back", "‹"), back, DrawerKind.ROUND))
+                titleLeft = back.right + gap * 1.5f
+            }
+
             val contentTop = headerBottom + gap
             val contentBottom = panel.bottom - gap
             val visibleHeight = (contentBottom - contentTop).coerceAtLeast(1f)
 
-            val cardPad = gap * 0.75f
-            val tileGap = sizes.menuTileGap
-            val itemGroups = if (more) listOf(moreItems(state.surface)) else primaryCards(state)
-            val columns = itemGroups.map { group ->
-                if (more) {
-                    sizes.menuColumns(innerWidth - cardPad * 2f).coerceAtLeast(PRIMARY_COLUMNS)
-                } else {
-                    PRIMARY_COLUMNS
-                }
-            }
-            val tileRows = itemGroups.mapIndexed { index, group ->
-                (group.size + columns[index] - 1) / columns[index]
+            val tileWant = sizes.dp(AutoUiSizes.MENU_TILE_HEIGHT_DP)
+            val tileFloor = sizes.dp(AutoUiSizes.MIN_TILE_HEIGHT_DP)
+
+            val itemRows: List<List<DrawerItem>>
+            val columns: Int
+            if (more) {
+                // As many columns as the width allows, and more once the rows would not fit at
+                // their minimum height — a scroll-free list beats wide tiles.
+                val items = moreItems(state.surface)
+                var cols = sizes.menuColumns(innerWidth).coerceAtLeast(PRIMARY_COLUMNS)
+                fun rowsFor(c: Int) = (items.size + c - 1) / c
+                while (cols < AutoUiSizes.MENU_COLUMNS_MAX &&
+                    rowsFor(cols) * tileFloor + tileGap * (rowsFor(cols) - 1) > visibleHeight
+                ) cols++
+                columns = cols
+                itemRows = items.chunked(cols)
+            } else {
+                columns = PRIMARY_COLUMNS
+                itemRows = primaryRows(state)
             }
 
-            // Fixed chrome: the gaps between bands and each card's own padding and inter-tile gaps.
-            // Whatever is left is what the bands below get to share.
-            val bandCount = 2 + itemGroups.size + (if (more) 0 else 1) // address + cards + toggle? + footer
-            val chrome = gap * (bandCount - 1) +
-                itemGroups.indices.sumOf { (cardPad * 2f + tileGap * (tileRows[it] - 1)).toDouble() }.toFloat()
-
-            // Each band declares what it wants and the least it will accept; see the class doc,
-            // rule 3. Tile rows are listed individually so they shrink in step with each other.
+            // Bands, top to bottom, each (preferred, minimum). See the class doc, rule 3.
             val bands = ArrayList<Pair<Float, Float>>()
-            bands += sizes.touchTarget to sizes.touchTarget * 0.8f // address
-            tileRows.forEach { rows ->
-                repeat(rows) {
-                    bands += sizes.dp(AutoUiSizes.MENU_TILE_HEIGHT_DP) to sizes.dp(AutoUiSizes.MIN_TILE_HEIGHT_DP)
-                }
+            if (!more) {
+                bands += sizes.touchTarget to sizes.touchTarget * 0.8f // address
+                bands += sizes.dp(64f) to sizes.touchTarget // primary button
             }
+            repeat(itemRows.size) { bands += tileWant to tileFloor }
             if (!more) bands += sizes.touchTarget to sizes.touchTarget * 0.8f // desktop switch
-            bands += sizes.touchTarget * 0.8f to sizes.dp(AutoUiSizes.MIN_FOOTER_HEIGHT_DP)
+
+            // Fixed chrome: a gap after the address, one either side of each divider (drawn in the
+            // middle of a doubled gap, as the phone's divider margins do), and the gaps between rows.
+            val dividerCount = if (more) 0 else 2
+            val chrome = (if (more) 0f else gap) + dividerCount * gap * 2f + tileGap * (itemRows.size - 1)
             val heights = distribute(bands, (visibleHeight - chrome).coerceAtLeast(0f))
 
             val contentHeight = heights.sum() + chrome
             val maxScroll = (contentHeight - visibleHeight).coerceAtLeast(0f)
             val offset = scrollOffset.coerceIn(0f, maxScroll)
 
-            // Top-aligned, not centred: the sheet reads as a stack of sections from the header
-            // down, and centring a short stack would float it away from the header it belongs to.
             var cursor = contentTop - offset
             var band = 0
             fun take(): Float = heights[band++]
+            val dividers = ArrayList<Float>(dividerCount)
+            fun divider() {
+                dividers += cursor + gap
+                cursor += gap * 2f
+            }
 
-            val addressHeight = take()
-            val addressBox = Box(innerLeft, cursor, innerRight, cursor + addressHeight)
-            val roundSide = (addressHeight - gap * 0.5f).coerceAtMost(sizes.touchTarget)
-            val goBox = Box(
-                addressBox.right - gap * 0.5f - roundSide, addressBox.centerY - roundSide / 2f,
-                addressBox.right - gap * 0.5f, addressBox.centerY + roundSide / 2f
-            )
-            val clearBox = Box(
-                goBox.left - gap * 0.5f - roundSide, addressBox.centerY - roundSide / 2f,
-                goBox.left - gap * 0.5f, addressBox.centerY + roundSide / 2f
-            )
-            val address = DrawerAddress(
-                addressBox, BrowserDisplayUrl.compact(state.url), state.secure, clearBox, goBox
-            )
-            cursor = addressBox.bottom + gap
+            var address: DrawerAddress? = null
+            var primary: DrawerRow? = null
+            if (!more) {
+                val addressHeight = take()
+                val addressBox = Box(innerLeft, cursor, innerRight, cursor + addressHeight)
+                val side = (addressHeight - gap * 0.5f).coerceAtMost(sizes.touchTarget)
+                val goBox = Box(
+                    addressBox.right - gap * 0.5f - side, addressBox.centerY - side / 2f,
+                    addressBox.right - gap * 0.5f, addressBox.centerY + side / 2f
+                )
+                val clearBox = Box(
+                    goBox.left - gap * 0.5f - side, addressBox.centerY - side / 2f,
+                    goBox.left - gap * 0.5f, addressBox.centerY + side / 2f
+                )
+                address = DrawerAddress(addressBox, BrowserDisplayUrl.compact(state.url), state.secure, clearBox, goBox)
+                cursor = addressBox.bottom + gap
 
-            val cards = ArrayList<DrawerCard>(itemGroups.size)
-            itemGroups.forEachIndexed { index, group ->
-                val rows = tileRows[index]
-                val tileHeights = (0 until rows).map { take() }
-                val cardHeight = tileHeights.sum() + cardPad * 2f + tileGap * (rows - 1)
-                val cardBox = Box(innerLeft, cursor, innerRight, cursor + cardHeight)
-                val cols = columns[index]
-                val tileWidth = (cardBox.width - cardPad * 2f - tileGap * (cols - 1)) / cols
-                val tiles = ArrayList<DrawerRow>(group.size)
-                group.forEachIndexed { position, item ->
-                    val column = position % cols
-                    val row = position / cols
-                    val tileTop = cardBox.top + cardPad +
-                        tileHeights.take(row).sum() + tileGap * row
-                    val tileLeft = cardBox.left + cardPad + column * (tileWidth + tileGap)
+                val primaryHeight = take()
+                primary = DrawerRow(
+                    primaryAction(state), Box(innerLeft, cursor, innerRight, cursor + primaryHeight),
+                    DrawerKind.PRIMARY
+                )
+                cursor += primaryHeight
+                divider()
+            }
+
+            val tiles = ArrayList<DrawerRow>()
+            val tileWidth = (innerWidth - tileGap * (columns - 1)) / columns
+            itemRows.forEachIndexed { rowIndex, row ->
+                val height = take()
+                row.forEachIndexed { column, item ->
+                    val tileLeft = innerLeft + column * (tileWidth + tileGap)
                     tiles += DrawerRow(
-                        item,
-                        Box(tileLeft, tileTop, tileLeft + tileWidth, tileTop + tileHeights[row]),
-                        DrawerKind.TILE
+                        item, Box(tileLeft, cursor, tileLeft + tileWidth, cursor + height), DrawerKind.TILE
                     )
                 }
-                cards += DrawerCard(cardBox, tiles)
-                cursor = cardBox.bottom + gap
+                cursor += height
+                if (rowIndex < itemRows.lastIndex) cursor += tileGap
             }
 
             val toggle = if (more) null else {
+                divider()
                 val height = take()
                 val box = Box(innerLeft, cursor, innerRight, cursor + height)
-                cursor = box.bottom + gap
+                cursor = box.bottom
                 DrawerRow(desktopToggle(state), box, DrawerKind.TOGGLE)
             }
-
-            val footerHeight = take()
-            val footer = Box(innerLeft, cursor, innerRight, cursor + footerHeight)
-            // Two pills, matching the reference footer's link-plus-icon pair. "More"/"Back" moves
-            // between the two lists; "Exit" is the car surface's only route out of the browser and
-            // therefore never lives behind another tap.
-            val pillHeight = (footerHeight - gap * 0.4f).coerceAtLeast(sizes.touchTarget * 0.6f)
-            val pillWidth = (sizes.touchTarget * 1.7f).coerceAtMost(footer.width * 0.3f)
-            val exitBox = Box(
-                footer.right - pillWidth, footer.centerY - pillHeight / 2f,
-                footer.right, footer.centerY + pillHeight / 2f
-            )
-            val moreBox = Box(
-                exitBox.left - gap * 0.75f - pillWidth, footer.centerY - pillHeight / 2f,
-                exitBox.left - gap * 0.75f, footer.centerY + pillHeight / 2f
-            )
-            val footerLinks = listOf(
-                DrawerRow(
-                    if (more) DrawerItem(DrawerAction.BACK_TO_MENU, "Back", "‹")
-                    else DrawerItem(DrawerAction.MORE, "More", "⋯"),
-                    moreBox, DrawerKind.PILL
-                ),
-                DrawerRow(
-                    DrawerItem(DrawerAction.APP_HOME, "Exit", "⏏"), exitBox, DrawerKind.PILL
-                ),
-            )
 
             return BrowserDrawerModel(
                 sizes = sizes,
                 panel = panel,
-                title = if (more) "More" else state.appName,
-                subtitle = if (more) "All browser actions" else state.pageTitle,
+                title = if (more) "More actions" else state.appName,
+                subtitle = if (more) "" else state.pageTitle,
                 grip = grip,
-                headerCard = headerCard,
+                header = header,
+                titleLeft = titleLeft,
                 closeButton = closeButton,
+                headerLinks = headerLinks,
                 address = address,
-                cards = cards,
+                primary = primary,
+                tiles = tiles,
+                dividers = dividers,
                 toggle = toggle,
-                footer = footer,
-                footerName = "${state.appName} — Browser",
-                footerVersion = state.version,
-                footerLinks = footerLinks,
                 headerBottom = headerBottom,
                 contentHeight = contentHeight,
                 visibleHeight = visibleHeight,
@@ -490,18 +495,21 @@ class BrowserDrawerModel private constructor(
 
     val maxScroll: Float get() = (contentHeight - visibleHeight).coerceAtLeast(0f)
 
-    /** Every tile on the sheet, across all cards. */
-    val tiles: List<DrawerRow> get() = cards.flatMap { it.tiles }
+    /** The last thing on the sheet, for "scrolled to the end" checks. */
+    val contentBottom: Float get() = (toggle ?: tiles.lastOrNull() ?: primary)?.bounds?.bottom ?: headerBottom
 
-    /** Everything that can be tapped below the header, in the order hit testing resolves them. */
+    /** Everything that can be tapped, in the order hit testing resolves them. */
     val rows: List<DrawerRow>
         get() = buildList {
-            add(DrawerRow(DrawerItem(DrawerAction.ADDRESS_CLEAR, "Clear", "✕"), address.clear, DrawerKind.ROUND))
-            add(DrawerRow(DrawerItem(DrawerAction.ADDRESS_KEYBOARD, "Search", "⌕"), address.go, DrawerKind.ROUND))
-            add(DrawerRow(DrawerItem(DrawerAction.ADDRESS_KEYBOARD, "Address", "🔒"), address.bounds, DrawerKind.ADDRESS))
+            addAll(headerLinks)
+            address?.let { address ->
+                add(DrawerRow(DrawerItem(DrawerAction.ADDRESS_CLEAR, "Clear", "✕"), address.clear, DrawerKind.ROUND))
+                add(DrawerRow(DrawerItem(DrawerAction.ADDRESS_KEYBOARD, "Search", "⌕"), address.go, DrawerKind.ROUND))
+                add(DrawerRow(DrawerItem(DrawerAction.ADDRESS_KEYBOARD, "Address", "🔒"), address.bounds, DrawerKind.ADDRESS))
+            }
+            primary?.let { add(it) }
             addAll(tiles)
             toggle?.let { add(it) }
-            addAll(footerLinks)
         }
 
     /** True when a tap landed on the header's close button. Checked before [actionAt]. */
@@ -511,14 +519,15 @@ class BrowserDrawerModel private constructor(
      * The entry under a tap, or null when the tap fell on the sheet's background.
      *
      * A disabled entry resolves to null rather than to its action: Back with no history behind it
-     * is drawn so the row keeps its shape, but it must not swallow the tap and do nothing, which
-     * reads as a broken button rather than an unavailable one.
+     * is drawn so the row keeps its shape, but it must not swallow the tap and do nothing.
      */
     fun rowAt(x: Float, y: Float): DrawerRow? {
         if (!panel.contains(x, y)) return null
+        // The header's own buttons never scroll, so they are resolved before the scroll boundary.
+        headerLinks.firstOrNull { it.bounds.contains(x, y) }?.let { return it }
         // Entries scrolled under the header must not be tappable even though their box overlaps it.
         if (y < headerBottom) return null
-        return rows.firstOrNull { it.item.enabled && it.bounds.contains(x, y) }
+        return rows.firstOrNull { it.item.enabled && it !in headerLinks && it.bounds.contains(x, y) }
     }
 
     /** Convenience for call sites that only need to know what a tap means. */

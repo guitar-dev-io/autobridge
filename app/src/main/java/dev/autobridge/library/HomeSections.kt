@@ -19,9 +19,10 @@ enum class HomeSection(
     TV("TV", "Live channels & VOD", Accents.TV),
     RADIO("Radio", "Audio streams", Accents.RADIO),
     WEB("Web browser", "Full page browsing", Accents.WEB),
-    YOUTUBE("Youtube", "Video on the web", Accents.VIDEO, "https://m.youtube.com"),
+    YOUTUBE("YouTube", "Video on the web", Accents.VIDEO, "https://m.youtube.com"),
     YOUTUBE_MUSIC("YouTube Music", "Streaming music", Accents.VIDEO, "https://music.youtube.com"),
-    YOUTUBE_KIDS("YouTube Kids", "Family content", Accents.VIDEO, "https://www.youtubekids.com"),
+    /** YouTube Kids, TikTok, Twitch and other web video sites; see [StreamingLinks]. */
+    STREAMING("Streaming", "Kids, TikTok, Twitch & more", Accents.VIDEO),
     FOLDERS("Folders", "On-device media", Accents.FILES),
     FAVORITES("Favorites", "Saved channels & pages", Accents.FAVORITE),
     PLAYLISTS("Playlists", "Your music", Accents.FILES),
@@ -41,6 +42,7 @@ enum class HomeSection(
             PLAYLISTS -> LibraryActivity.Section.PLAYLISTS
             GALLERY -> LibraryActivity.Section.GALLERY
             FAVORITES -> LibraryActivity.Section.FAVORITES
+            STREAMING -> LibraryActivity.Section.STREAMING
             else -> null
         }
 

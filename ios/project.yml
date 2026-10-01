@@ -1,0 +1,49 @@
+name: AutoBridge
+options:
+  bundleIdPrefix: dev.autobridge
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+
+targets:
+  AutoBridge:
+    type: application
+    platform: iOS
+    sources:
+      - path: AutoBridge
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.autobridge.ios
+        INFOPLIST_FILE: AutoBridge/Resources/Info.plist
+        CODE_SIGN_ENTITLEMENTS: AutoBridge/Resources/AutoBridge.entitlements
+        GENERATE_INFOPLIST_FILE: NO
+        TARGETED_DEVICE_FAMILY: "1,2"
+    info:
+      path: AutoBridge/Resources/Info.plist
+
+  AutoBridgeTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: AutoBridgeTests
+    dependencies:
+      - target: AutoBridge
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.autobridge.ios.tests
+
+schemes:
+  AutoBridge:
+    build:
+      targets:
+        AutoBridge: all
+        AutoBridgeTests: [test]
+    test:
+      targets:
+        - AutoBridgeTests

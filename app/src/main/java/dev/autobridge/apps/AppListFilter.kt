@@ -1,7 +1,7 @@
 package dev.autobridge.apps
 
 /**
- * What the Applications picker actually shows, given the search box and the Quick Apps / All apps
+ * What the Applications picker actually shows, given the search box and the Favorites / All apps
  * choice.
  *
  * This was previously inline in the screen and only ever applied the search term: the Quick Apps
@@ -31,8 +31,8 @@ object AppListFilter {
     /** Message for an empty result, phrased for the reason the list is empty. */
     fun emptyMessage(quickOnly: Boolean, query: String, hasQuickApps: Boolean): String = when {
         query.isNotBlank() -> "No apps match \"${query.trim()}\""
-        quickOnly && !hasQuickApps -> "No Quick Apps yet. Open All apps and tap ☆ to add one."
-        quickOnly -> "No Quick Apps match this filter."
+        quickOnly && !hasQuickApps -> "No favorites yet. Open All apps and tap ☆ to add one."
+        quickOnly -> "No favorites match this filter."
         else -> "No launchable apps found."
     }
 }

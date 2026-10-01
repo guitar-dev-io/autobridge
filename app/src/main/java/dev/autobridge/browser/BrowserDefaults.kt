@@ -94,7 +94,9 @@ object BrowserDefaults {
         // this the platform silently drops them and such links appear broken.
         settings.setSupportMultipleWindows(true)
         settings.javaScriptCanOpenWindowsAutomatically = false
-        settings.textZoom = 100
+        // Text zoom is the user's Display Scale, snapped to a fixed ladder (default 100%). Set here
+        // so a WebView opens at the chosen size rather than 100%-then-reflow after the sheet changes it.
+        settings.textZoom = BrowserDisplayScaleStore.percent(context)
         settings.userAgentString = BrowserUserAgentStore.resolve(context, WebSettings.getDefaultUserAgent(context))
         CookieManager.getInstance().setAcceptCookie(true)
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
@@ -110,6 +112,30 @@ object BrowserDefaults {
         val desktop = BrowserUserAgentStore.isDesktopIdentity(context)
         applyUserAgentMetadata(settings, desktop = desktop)
         DesktopSiteMode.apply(webView, desktop)
+        // The page colour-scheme preference (Appearance: Auto/Light/Dark). Scoped to this WebView.
+        BrowserAppearanceStore.apply(context, webView)
+        // Widevine level enforcement, if the user opted into L3 to work around black-screen playback.
+        applyDrmPreference(context)
+    }
+
+    /**
+     * Applies [BrowserDrmStore.enforceL3].
+     *
+     * When the user has asked to force Widevine L3, this requests the software security level on a
+     * [MediaDrm] handle for the Widevine scheme. Widevine's CDM is a shared, process-level
+     * component, so lowering its level here steers the level the WebView's own EME sessions then
+     * negotiate toward L3 — the known fix when hardware-backed L1 renders protected video as a
+     * black screen. It is best-effort: a device whose CDM refuses a level downgrade keeps its
+     * current level, and the call never throws into the caller.
+     */
+    fun applyDrmPreference(context: Context) {
+        if (!BrowserDrmStore.enforceL3(context)) return
+        runCatching {
+            android.media.MediaDrm(androidx.media3.common.C.WIDEVINE_UUID).use { drm ->
+                drm.setPropertyString("securityLevel", "L3")
+                Log.i(TAG_DRM, "Widevine security level forced to L3 (requested=${drm.getPropertyString("securityLevel")})")
+            }
+        }.onFailure { Log.w(TAG_DRM, "could not force Widevine L3 on this device", it) }
     }
 
     /**

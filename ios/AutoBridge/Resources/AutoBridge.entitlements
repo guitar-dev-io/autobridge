@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+      CarPlay audio entitlement. This is a managed entitlement: Apple must grant
+      `com.apple.developer.carplay-audio` to your App ID before it works on real hardware. Leave it
+      here so a provisioning profile with the grant links cleanly; the phone app runs without it.
+    -->
+    <key>com.apple.developer.carplay-audio</key>
+    <true/>
+</dict>
+</plist>

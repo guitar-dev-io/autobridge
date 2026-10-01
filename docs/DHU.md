@@ -44,6 +44,27 @@ cd ~/Library/Android/sdk/extras/google/auto/
 DHU 2.0 ใช้ `-i` / `--input` ไม่ใช่ `--input-mode` (ถ้าใส่ผิดมันจะพิมพ์ usage แล้วออกทันที)
 และค่าที่รับมีแค่ `touch|rotary|hybrid`
 
+### Config สำหรับเทสต์ (อยู่ใน `docs/dhu/`)
+
+| ไฟล์ | ขนาด | ใช้เช็กอะไร |
+|---|---|---|
+| `small.ini` | 800x480 @160 | จอเล็กสุด ดูว่าล้นจอหรือตัวหนังสือเบียดไหม |
+| `720.ini` | 1280x720 @160 | ขนาดที่รถส่วนใหญ่ใช้ ใช้เป็นตัวหลัก |
+| `720-hidpi.ini` | 1280x720 @240 | dpi สูง ดูว่าไอคอน/ปุ่มขยายหรือหดผิดไหม |
+
+```bash
+REPO=~/Documents/ChatGPT/AutoBridge
+cd ~/Library/Android/sdk/extras/google/auto/
+./desktop-head-unit -c "$REPO/docs/dhu/720.ini" -i touch
+```
+
+ไม่ต้องไล่เทสต์ทุกขนาดบน DHU เพราะ `BrowserViewportTest` (`HEAD_UNITS`) เช็กเรขาคณิตของทุกขนาดให้แล้ว
+รวมถึง 1024x600 กับ 1920x720 ที่ DHU ตั้งไม่ได้ ส่วน DHU เอาไว้ดูภาพจริง การ render ของ WebView
+การสัมผัส และ stable area ที่ host ส่งมาจริง ถ้าเจอบั๊กเฉพาะบางขนาด ให้เพิ่มขนาดนั้นลงใน `HEAD_UNITS`
+
+ในแอป Android Auto บนมือถือ ให้ตั้ง **ความละเอียดวิดีโอ** เป็น "อนุญาตให้รถยนต์และโทรศัพท์ทำงานร่วมกัน"
+ไม่งั้นความละเอียดจะถูกจำกัดตามค่าที่ตั้งไว้ในมือถือ และค่าจาก ini อาจไม่มีผล
+
 ## 4. เชื่อมต่อผ่าน Wi-Fi (ไม่ใช้ USB)
 
 ```bash
@@ -83,6 +104,41 @@ GH.ConnLoggerV2: Session ..., event 42, ..., USB_MONITOR_STOPPED
 ดังนั้นบนเครื่องที่ Android Auto เป็นรุ่นใหม่ **ต้องทดสอบกับ head unit จริง** หรือย้อนเวอร์ชัน
 Android Auto ลง (ซึ่งทำให้สภาพแวดล้อมต่างจากที่ผู้ใช้เจอจริง จึงไม่แนะนำสำหรับไล่บั๊ก)
 - ปิด DHU ด้วย `Ctrl + C` ที่หน้าต่าง terminal
+
+## Dialog "กำลังดูแบบเต็มหน้าจอ" (full-screen / immersive)
+
+เมื่อแอปของเราแสดงแบบเต็มหน้าจอบน Android Auto จะมี dialog ของระบบขึ้นมาว่า:
+
+> **กำลังดูแบบเต็มหน้าจอ**
+> หากต้องการออก ให้ปัดขึ้นหรือลงจากขอบด้านบนหรือด้านล่างของหน้าจอ
+> [ รับทราบ ]
+
+- เป็น dialog มาตรฐานของ Android Auto เอง (immersive mode notice) ไม่ใช่บั๊กของแอป
+- การขึ้น dialog นี้ยืนยันว่า **projection ทำงานและ DHU โปรเจกต์ภาพได้แล้ว** (ต่างจากกรณี
+  DHU 2.0 ที่ต่อไม่ติดด้านบน)
+- **ขึ้นแค่ครั้งเดียว** ตอนเข้า full screen ครั้งแรกเท่านั้น ไม่ขึ้นซ้ำทุกครั้งที่เข้า full screen
+  (Android Auto จำว่าแสดง notice ไปแล้ว) — เป็นพฤติกรรมปกติ ไม่ต้องแก้
+- แตะ **รับทราบ** เพื่อปิด dialog แล้วใช้งานต่อได้ตามปกติ
+- บน DHU: ออกจากโหมดเต็มหน้าจอโดย**ปัดจากขอบบนหรือขอบล่าง**ของหน้าต่าง DHU
+  (ลากเมาส์จากขอบเข้ามากลางจอ)
+
+### วิธีเข้า / ออก full screen ตอนทดสอบ
+
+แอปรองรับ full screen 2 ทางที่ควรเทสต์แยกกัน:
+
+1. **Full screen ของทั้งหน้า (แอปสั่งเอง)** — ผ่านคำสั่ง remote หรือ quick command
+   - สั่งเข้า: พูด/พิมพ์ `"fullscreen"`, `"เต็มหน้าจอ"`, `"เต็มจอ"` หรือกดปุ่ม quick command **Fullscreen (⛶)**
+   - สั่งออก: `"exit fullscreen"`, `"ออกเต็มจอ"`, `"ปิดเต็มจอ"`, `"ออกจากเต็มหน้าจอ"`
+   - เมื่อเข้าโหมดนี้ Android Auto จะขึ้น dialog "กำลังดูแบบเต็มหน้าจอ" ตามด้านบน
+
+2. **Full screen ของวิดีโอ HTML5 (`<video>` ในหน้าเว็บ)** — เกิดเมื่อหน้าเว็บเรียก fullscreen เอง
+   (เช่น กดปุ่มขยายวิดีโอใน YouTube) ผ่าน `WebChromeClient.onShowCustomView`
+   - ไม่ต้องสั่งอะไรเพิ่ม แค่เปิดหน้าเว็บที่มีวิดีโอแล้วกดปุ่ม fullscreen ของตัว player
+   - ออกโดยกดปุ่มย่อวิดีโอใน player (หน้าเว็บจะเรียก `onHideCustomView` เอง)
+
+> ทดสอบทั้งสองทางบน DHU เพราะเส้นทางโค้ดต่างกัน (page fullscreen ปรับ system bars ของ activity,
+> ส่วน video fullscreen โฮสต์ custom view ของ Chromium) — ดู `FullscreenVideoController` และ
+> `onShowCustomView` ใน `BrowserActivity` / `CarWebRenderer`
 
 
 

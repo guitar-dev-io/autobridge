@@ -32,7 +32,7 @@ object PhoneLauncherUi {
         entries: List<Entry>,
         grid: Boolean,
         home: (() -> Unit)? = null,
-        menu: () -> Unit,
+        menu: (() -> Unit)? = null,
         statusChip: String? = null,
         headerAction: Pair<String, () -> Unit>? = null,
         subtitle: String? = null,
@@ -45,10 +45,10 @@ object PhoneLauncherUi {
             subtitle = subtitle,
             onBack = home,
             chip = statusChip,
-            // The overflow menu always stays reachable but stays quiet; a screen-specific action
-            // (the home microphone) is the primary one.
+            // No overflow menu by default: it only repeated the bottom navigation. A screen-specific
+            // action (the home microphone) is the primary one.
             actions = listOfNotNull(
-                AutoBridgeDesign.HeaderAction("≡", menu),
+                menu?.let { AutoBridgeDesign.HeaderAction("≡", it) },
                 headerAction?.let { (glyph, handler) ->
                     AutoBridgeDesign.HeaderAction(glyph, handler, filled = true)
                 }

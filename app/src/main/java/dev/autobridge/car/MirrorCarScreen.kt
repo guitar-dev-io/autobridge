@@ -223,6 +223,7 @@ class MirrorCarScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
         surfaceWidth = surfaceContainer.width
         surfaceHeight = surfaceContainer.height
         Log.i(TAG, "Surface ${surfaceWidth}x${surfaceHeight} dpi=${surfaceContainer.dpi}")
+        CarDisplayInfo.record(surfaceWidth, surfaceHeight, surfaceContainer.dpi)
         val attached = surfaceManager.onSurfaceAvailable(surfaceContainer)
         if (!attached) {
             ProjectionService.onMirrorBindingFailed(

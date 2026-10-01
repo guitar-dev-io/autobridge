@@ -34,8 +34,8 @@ android {
         applicationId = "dev.autobridge"
         minSdk = 29
         targetSdk = 36
-        versionCode = 19
-        versionName = "0.4.5"
+        versionCode = 22
+        versionName = "0.4.8"
         // The faults that actually reach a head unit — viewport geometry, scroll bounds, WebView
         // state — only reproduce against a real WebView, so this module needs on-device tests as
         // well as JVM ones.
