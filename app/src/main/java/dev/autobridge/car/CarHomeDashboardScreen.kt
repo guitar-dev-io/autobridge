@@ -233,8 +233,23 @@ class CarHomeDashboardScreen(
 
     // --- Host-drawn grid, kept for hosts below Car API 5 and for any later page ---
 
+    /**
+     * The grid's running order: the six home cards, then what a driver reaches for next.
+     *
+     * Page one deliberately matches the surface-drawn cards, so a host that falls back to the grid
+     * shows the same home. After that [HomeSection]'s own order put Mirror and Quick Launch (APPS)
+     * at positions 12 and 13 of 14 — three pages in, on a head unit that fits five tiles a page.
+     * They are promoted here rather than by re-ordering the enum, which the phone launcher reads
+     * too and where the current order is right.
+     */
+    private fun gridOrder(): List<HomeSection> {
+        val lead = HomeMenuItem.primary.map { it.section } +
+            listOf(HomeSection.MIRROR, HomeSection.APPS)
+        return lead + HomeSection.carSections.filterNot { it in lead }
+    }
+
     private fun gridTemplate(): Template {
-        val sections = HomeSection.carSections
+        val sections = gridOrder()
         // Head units cap grid items (commonly six). One slot on every page but the last is spent on
         // "More", so the whole home fits without a template the host would reject.
         val limit = runCatching {

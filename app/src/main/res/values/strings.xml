@@ -1189,4 +1189,22 @@
     <string name="bridge_controller_tab_favorites">Favorites</string>
 
     <string name="bridge_controller_cancel_pending">Cancel</string>
+
+    <!-- Car "More" list, grouped by how often a driver reaches for something. -->
+    <string name="car_more_group_frequent">Used most</string>
+    <string name="car_more_group_content">Content</string>
+    <string name="car_more_group_device">On this phone</string>
+    <string name="car_more_group_other">Other</string>
+    <!-- On the car, HomeSection.APPS opens the Quick Launch shortcut list, not the phone\'s
+         installed-app list, so the car labels it for what it actually does. -->
+    <string name="car_more_quick_launch">Quick Launch</string>
+
+    <!-- Quick Launch: adding a shortcut. The feature labels are reused from the screens they open
+         so a pinned row and its destination read the same. -->
+    <string name="car_quicklaunch_add_title">Add a shortcut</string>
+    <string name="car_quicklaunch_add_group_feature">Feature</string>
+    <string name="car_quicklaunch_add_group_web">Web</string>
+    <string name="car_quicklaunch_add_website">Website or search…</string>
+    <string name="car_quicklaunch_add_website_caption">Type an address, or words to search for</string>
+    <string name="car_quicklaunch_added">Added %1$s</string>
 </resources>

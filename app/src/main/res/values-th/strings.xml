@@ -1169,4 +1169,19 @@
     <string name="bridge_controller_tab_favorites">รายการโปรด</string>
 
     <string name="bridge_controller_cancel_pending">ยกเลิก</string>
+
+    <!-- Car "More" list, grouped by how often a driver reaches for something -->
+    <string name="car_more_group_frequent">ใช้บ่อย</string>
+    <string name="car_more_group_content">เนื้อหา</string>
+    <string name="car_more_group_device">ในโทรศัพท์เครื่องนี้</string>
+    <string name="car_more_group_other">อื่น ๆ</string>
+    <string name="car_more_quick_launch">ทางลัด</string>
+
+    <!-- Quick Launch: adding a shortcut -->
+    <string name="car_quicklaunch_add_title">เพิ่มทางลัด</string>
+    <string name="car_quicklaunch_add_group_feature">ฟีเจอร์</string>
+    <string name="car_quicklaunch_add_group_web">เว็บ</string>
+    <string name="car_quicklaunch_add_website">เว็บไซต์หรือคำค้นหา…</string>
+    <string name="car_quicklaunch_add_website_caption">พิมพ์ที่อยู่เว็บ หรือคำที่ต้องการค้นหา</string>
+    <string name="car_quicklaunch_added">เพิ่ม %1$s แล้ว</string>
 </resources>

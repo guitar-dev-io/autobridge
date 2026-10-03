@@ -8,16 +8,22 @@ import androidx.car.app.model.Header
 import androidx.car.app.model.ItemList
 import androidx.car.app.model.ListTemplate
 import androidx.car.app.model.Row
+import androidx.car.app.model.SectionedItemList
 import androidx.car.app.model.Template
 import dev.autobridge.R
 import dev.autobridge.apps.QuickLaunchStore
 import dev.autobridge.core.state.RecentActivityStore
 
 /**
- * Manage + launch Quick Launch shortcuts. Tapping a shortcut runs it (open URL in the car browser,
- * trigger an internal feature, or launch a phone app). The "Manage" mode exposes remove / reorder;
- * "Add" pushes a text field to create a custom URL shortcut. All changes persist via
- * [QuickLaunchStore].
+ * Manage + launch Quick Launch shortcuts — the car's own pinned list, which is what
+ * [dev.autobridge.library.HomeSection.APPS] opens here (the phone's Apps tile is the installed-app
+ * list instead).
+ *
+ * Tapping a shortcut runs it: a URL opens in the car browser, an INTERNAL one runs an
+ * [dev.autobridge.agent.AgentCommandRouter.AgentAction], and an APP one launches a phone app.
+ * "Manage" exposes remove / reorder. "Add" offers a feature to pin or a web address to type; it
+ * used to offer only the address, which left the INTERNAL kind unreachable and meant Mirror or
+ * "resume what was playing" could not be pinned at all. All changes persist via [QuickLaunchStore].
  */
 class CarQuickLaunchScreen(carContext: CarContext, private val manage: Boolean = false) : Screen(carContext) {
 
@@ -87,7 +93,16 @@ class CarQuickLaunchScreen(carContext: CarContext, private val manage: Boolean =
                 )
             }
             QuickLaunchStore.Kind.INTERNAL -> {
-                val command = dev.autobridge.agent.AgentCommandRouter.parse(shortcut.payload)
+                // The payload is an AgentAction name. It used to be free text run back through
+                // AgentCommandParser, which is right for speech — where the words are whatever the
+                // driver said — but wrong for a row stored on disk: a parser tweak could silently
+                // stop a pinned shortcut from resolving. Text payloads still work, so anything
+                // written by an older build keeps launching.
+                val action = runCatching {
+                    dev.autobridge.agent.AgentCommandRouter.AgentAction.valueOf(shortcut.payload)
+                }.getOrNull()
+                val command = action?.let { dev.autobridge.agent.AgentCommandRouter.Command(it) }
+                    ?: dev.autobridge.agent.AgentCommandRouter.parse(shortcut.payload)
                 if (command != null) {
                     dev.autobridge.agent.AgentCommandRouter.execute(this, carContext, command)
                 }
@@ -146,7 +161,88 @@ class CarQuickLaunchScreen(carContext: CarContext, private val manage: Boolean =
         })
     }
 
+    /**
+     * What can be pinned besides a web address.
+     *
+     * These are the destinations worth one tap in a car: putting the phone on the screen, picking
+     * playback back up, and the three places content is reached from. Each label is the one its
+     * destination already uses, so a pinned row and the screen it opens read the same.
+     */
+    private fun pinnableFeatures(): List<Pair<Int, dev.autobridge.agent.AgentCommandRouter.AgentAction>> =
+        listOf(
+            R.string.section_mirror to
+                dev.autobridge.agent.AgentCommandRouter.AgentAction.OPEN_MIRROR,
+            R.string.car_media_resume to
+                dev.autobridge.agent.AgentCommandRouter.AgentAction.RESUME_MEDIA,
+            R.string.car_mirror_media to
+                dev.autobridge.agent.AgentCommandRouter.AgentAction.OPEN_MEDIA,
+            R.string.car_more_recent to
+                dev.autobridge.agent.AgentCommandRouter.AgentAction.OPEN_RECENT,
+            R.string.car_driving_browser to
+                dev.autobridge.agent.AgentCommandRouter.AgentAction.OPEN_BROWSER
+        )
+
+    /** Chooser for the "+" action: a feature, or the free-text web entry the screen always had. */
     private fun addShortcut() {
+        val features = ItemList.Builder()
+        pinnableFeatures().forEach { (labelRes, action) ->
+            val label = carContext.getString(labelRes)
+            features.addItem(
+                Row.Builder()
+                    .setTitle(label)
+                    .setOnClickListener {
+                        QuickLaunchStore.add(
+                            carContext, label, QuickLaunchStore.Kind.INTERNAL, action.name
+                        )
+                        CarToast.makeText(
+                            carContext,
+                            carContext.getString(R.string.car_quicklaunch_added, label),
+                            CarToast.LENGTH_SHORT
+                        ).show()
+                        screenManager.pop()
+                        invalidate()
+                    }
+                    .build()
+            )
+        }
+        val web = ItemList.Builder().addItem(
+            Row.Builder()
+                .setTitle(carContext.getString(R.string.car_quicklaunch_add_website))
+                .addText(carContext.getString(R.string.car_quicklaunch_add_website_caption))
+                .setBrowsable(true)
+                .setOnClickListener {
+                    screenManager.pop()
+                    addWebShortcut()
+                }
+                .build()
+        ).build()
+
+        screenManager.push(object : Screen(carContext) {
+            override fun onGetTemplate(): Template =
+                ListTemplate.Builder()
+                    .setHeader(
+                        Header.Builder()
+                            .setTitle(carContext.getString(R.string.car_quicklaunch_add_title))
+                            .setStartHeaderAction(Action.BACK)
+                            .build()
+                    )
+                    .addSectionedList(
+                        SectionedItemList.create(
+                            features.build(),
+                            carContext.getString(R.string.car_quicklaunch_add_group_feature)
+                        )
+                    )
+                    .addSectionedList(
+                        SectionedItemList.create(
+                            web,
+                            carContext.getString(R.string.car_quicklaunch_add_group_web)
+                        )
+                    )
+                    .build()
+        })
+    }
+
+    private fun addWebShortcut() {
         screenManager.pushForResult(CarBrowserSearchScreen(carContext, "")) { result ->
             val text = (result as? String)?.trim().orEmpty()
             if (text.isEmpty()) return@pushForResult
