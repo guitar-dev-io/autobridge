@@ -254,6 +254,19 @@ class CarWebRenderer(context: Context) {
     private var surfaceHeight = 0
     private var surfaceDpi = 0
     private var running = false
+
+    /**
+     * A page requested while no surface was attached, applied by the next [start].
+     *
+     * Home tiles and the streaming list call [load] *before* pushing the browser screen, so the
+     * request lands while the surface is detached and the WebView is paused (and its timers may be
+     * gated off process-wide by [WebViewTimerGate]). `loadUrl` on a WebView in that state does not
+     * reliably navigate, and [start] then takes its "keeping current page" branch because nothing
+     * told it a different page was wanted — so tapping TikTok while YouTube was left open re-opened
+     * YouTube. Holding the target here makes the hand-off explicit instead of depending on what a
+     * detached WebView does with a queued navigation.
+     */
+    private var pendingStartUrl: String? = null
     /** Bumped on every start()/stop(), so a late async check from an older stop() is dropped. */
     private var surfaceGeneration = 0
     private var currentUrl: String = BrowserDefaults.lastUrl(appContext)
@@ -726,8 +739,13 @@ class CarWebRenderer(context: Context) {
             // recreation/resize must re-fit the existing page, never reload and lose it. The
             // User-Agent is applied when the WebView is created and when the user changes it, not
             // on every re-attach — doing it here used to risk a reload on each foreground cycle.
+            // Taken before the branch below so a deferred request cannot survive into a later
+            // start() and reload a page the user has since navigated away from.
+            val deferred = pendingStartUrl
+            pendingStartUrl = null
             when {
                 startUrl != null -> load(startUrl)
+                deferred != null -> load(deferred)
                 firstStart -> load(tabs.active?.url ?: currentUrl)
                 // The mode was changed while this surface was away (phone browser, agent command,
                 // a screen pushed on top): the kept page still has the old identity and width.
@@ -891,6 +909,9 @@ class CarWebRenderer(context: Context) {
     fun destroy() {
         runOnMain {
             running = false
+            // A request that never reached a surface dies with the renderer; the next one restores
+            // its tabs rather than opening a page asked for in a previous session.
+            pendingStartUrl = null
             dev.autobridge.media.WebMediaHub.unregister(mediaSource)
             audioFocus.isPlaying = false
             audioFocus.abandon()
@@ -948,6 +969,13 @@ class CarWebRenderer(context: Context) {
             loadError = null
             if (tabs.tabs.isEmpty()) {
                 tabs = BrowserTabsState.single(target, id = nextTabId++)
+            }
+            if (!running) {
+                // No live surface: defer to start() rather than navigate a paused WebView. The
+                // tab/currentUrl bookkeeping above still applies, so the rest of the app already
+                // reports the page the user asked for.
+                pendingStartUrl = target
+                return@runOnMain
             }
             syncUserAgentFor(target)
             webView?.loadUrl(target)
