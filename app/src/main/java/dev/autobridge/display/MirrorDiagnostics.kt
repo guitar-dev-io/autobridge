@@ -13,6 +13,10 @@ object MirrorDiagnostics {
     data class Event(val label: String, val elapsedRealtimeMs: Long)
 
     private const val MAX_EVENTS = 50
+
+    /** [StructuredLog] tag every mirror lifecycle event is mirrored under; see [record]. */
+    private const val TAG = "MIRROR"
+
     private val events = ArrayDeque<Event>()
 
     @Volatile
@@ -36,8 +40,31 @@ object MirrorDiagnostics {
     private var fpsWindowStartMs = 0L
     private var fpsWindowRendered = 0L
 
-    @Synchronized
+    /**
+     * Records one mirror lifecycle event, in the ring the in-app screen reads *and* in
+     * [StructuredLog].
+     *
+     * The ring alone is held in memory and nowhere else, so the trail it carries — the very
+     * sequence `docs/DHU_SCENARIOS.md` asks to be confirmed, `car_surface_attached` through
+     * `virtual_display_created` — could only be read on a screen of the car's own, and vanished
+     * with the process. A mirror fault that takes the app down is exactly when that history is
+     * worth having. Through [StructuredLog] it reaches logcat and, via the sink
+     * [dev.autobridge.diagnostics.CrashReportStore] installs, the disk.
+     *
+     * Only these discrete lifecycle events are logged. The frame counters
+     * ([recordFrameCaptured], [recordFrameRendered]) stay out of it: at display rate they would
+     * bury everything else and cost more than they tell.
+     */
     fun record(label: String, nowMs: Long = SystemClock.elapsedRealtime()) {
+        addEvent(label, nowMs)
+        // Logged outside this object's lock. StructuredLog takes one of its own and hands every
+        // entry to a sink that is none of this object's business, so holding both would be a
+        // lock-ordering hazard for no gain.
+        StructuredLog.i(TAG, label)
+    }
+
+    @Synchronized
+    private fun addEvent(label: String, nowMs: Long) {
         events.addLast(Event(label, nowMs))
         while (events.size > MAX_EVENTS) events.removeFirst()
     }
