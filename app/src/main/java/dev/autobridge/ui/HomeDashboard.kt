@@ -50,7 +50,8 @@ data class HomeTileUi(val title: String, val icon: Int, val accent: Int, val onC
 fun HomeDashboard(
     tiles: List<HomeTileUi>,
     onOpenConnection: () -> Unit,
-    onEditQuickLaunch: () -> Unit
+    onEditQuickLaunch: () -> Unit,
+    onOpenController: () -> Unit
 ) {
     val history by CommandHistoryStore.entries.collectAsState()
     val lastResult = rememberLastCommandResult()
@@ -73,7 +74,15 @@ fun HomeDashboard(
             }
         }
 
-        SectionLabel("Send to Car")
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            SectionLabel("Send to Car", Modifier.weight(1f))
+            // The full controller: queue, recents, favorites and the transport bar. The field
+            // below stays because one-shot sending is the common case and should not need a
+            // navigation step; this is the way in when the driver wants to manage what is queued.
+            TextButton(onClick = onOpenController) {
+                Text("Open controller", color = ComposeTokens.Accent, fontSize = 13.sp)
+            }
+        }
         CommandField(placeholder = "Search or paste URL, or type text…")
         lastResult.value?.let { ResultBanner(it) }
 

@@ -34,6 +34,27 @@ VehicleStateSession --> SpeedGate(CAR_SPEED) or emulator LAB mock
 ParkingStateStore --> RuntimeContextStore --> FeaturePolicy
 ```
 
+## Media bridge
+
+Separate from the projection path above and with its own lifetime: a link arrives (share sheet,
+phone controller, queue), `AutoBridgeSessionManager` routes it through `ContentRouter` to one of
+three `PlaybackEngine`s, and the car draws either the minimal player or the existing browser
+surface. The phone is the controller, the car is the display.
+
+```text
+share / phone controller / queue
+        v
+AutoBridgeSessionManager  --(pending when disconnected)--> BridgeStore
+        v
+ContentRouter --> NativePlaybackEngine | BrowserPlaybackEngine | RemoteStreamPlaybackEngine
+        v
+CarBridgePlayerScreen (surface) | CarBrowserScreen (existing)
+```
+
+It reuses rather than replaces: the native engine drives `MediaPlaybackService`'s session, the
+browser engine drives `CarBrowserRuntime`/`WebMediaHub`, and the queue, favorites and recents
+stay in the stores that already held them. See [`MEDIA_BRIDGE.md`](MEDIA_BRIDGE.md).
+
 ## Ownership rules
 
 ### Phone
@@ -107,6 +128,11 @@ car surface                              phone window
 
 ## Feature layers
 
+- `bridge`: the media bridge — the share target, the single session manager, the content
+  router, and the three playback engines the router chooses between. See
+  [`MEDIA_BRIDGE.md`](MEDIA_BRIDGE.md);
+- `remotestream`: the experimental remote renderer — WebSocket transport, H.264 decode onto the
+  car surface, and the control channel back to the host. See [`REMOTE_STREAM.md`](REMOTE_STREAM.md);
 - `apps`: installed apps, Quick Apps, profiles, Smart Mode, launch/rotation cleanup;
 - `media`: Media3 player/session, source resolver, controller authorization;
 - `browser`: shared browser logic for both presentations — page identity/navigation
@@ -127,6 +153,7 @@ The app uses a `NavigationTemplate` custom surface because the official Android 
 
 ## Related documents
 
+- [`MEDIA_BRIDGE.md`](MEDIA_BRIDGE.md) and [`REMOTE_STREAM.md`](REMOTE_STREAM.md)
 - [`MODES.md`](MODES.md) and [`FEATURE_POLICY.md`](FEATURE_POLICY.md)
 - [`MIRROR_ENGINE.md`](MIRROR_ENGINE.md) and [`INPUT_SYSTEM.md`](INPUT_SYSTEM.md)
 - [`APP_PROFILES.md`](APP_PROFILES.md) and [`LAB_MODE.md`](LAB_MODE.md)

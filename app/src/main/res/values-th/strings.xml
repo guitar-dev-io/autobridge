@@ -1085,5 +1085,88 @@
     <string name="car_mirror_needs_input_touch">เปิดบริการช่วยการเข้าถึงของ AutoBridge หรือ Shizuku เพื่อใช้การสัมผัส</string>
 
     <!-- Bridge error classes -->
+    <string name="bridge_error_network">เข้าถึงแหล่งนี้ไม่ได้ ตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง</string>
+    <string name="bridge_error_unsupported">ไม่รองรับเนื้อหานี้</string>
+    <string name="bridge_error_playback">เล่นไม่สำเร็จ ลองแหล่งอื่น</string>
+    <string name="bridge_error_web_render">แสดงหน้าเว็บนี้บนจอรถไม่ได้</string>
+    <string name="bridge_error_remote_stream">เริ่มสตรีมจากระยะไกลไม่ได้</string>
+    <string name="bridge_error_drm">เนื้อหานี้มีการป้องกันการคัดลอก จึงเล่นที่นี่ไม่ได้</string>
+    <string name="bridge_error_not_connected">ยังไม่ได้เชื่อมต่อ Android Auto</string>
 
+    <!-- Media bridge: ข้อความแจ้งข้อผิดพลาดสำหรับผู้ใช้ -->
+
+    <!-- Media bridge: เครื่องเล่นในรถและปลายทางการแชร์ -->
+    <string name="bridge_car_player_title">เครื่องเล่น AutoBridge</string>
+    <string name="bridge_car_nothing_playing">ยังไม่มีอะไรเล่นอยู่ ส่งลิงก์จากโทรศัพท์ของคุณ</string>
+    <string name="bridge_car_loading">กำลังโหลด…</string>
+    <string name="bridge_share_no_link">ไม่พบลิงก์ในสิ่งที่คุณแชร์มา</string>
+    <string name="bridge_share_opened">กำลังเปิด %1$s บนรถ</string>
+    <string name="bridge_share_pending">บันทึก %1$s ไว้แล้ว จะเปิดเมื่อเชื่อมต่อ Android Auto</string>
+
+    <!-- Media bridge: ตัวควบคุมบนโทรศัพท์ -->
+    <string name="bridge_controller_title">ส่งไปที่รถ</string>
+    <string name="bridge_controller_close">ปิด</string>
+    <string name="bridge_controller_nothing_to_send">พิมพ์ลิงก์หรือคำค้นหา</string>
+    <string name="bridge_controller_sent">ส่งไปที่รถแล้ว</string>
+    <string name="bridge_controller_queued_for_connect">บันทึกไว้แล้ว จะเปิดเมื่อเชื่อมต่อ Android Auto</string>
+    <string name="bridge_controller_queued">เพิ่มลงคิวแล้ว</string>
+    <string name="bridge_controller_text_sent">ส่งข้อความไปที่รถแล้ว</string>
+    <string name="bridge_controller_text_failed">ตอนนี้ยังไม่มีอะไรบนรถที่รับข้อความได้</string>
+    <string name="bridge_controller_queue_empty">คิวว่าง</string>
+    <string name="bridge_controller_recent_empty">ยังไม่ได้ส่งอะไร</string>
+    <string name="bridge_controller_favorites_empty">ยังไม่มีรายการโปรด</string>
+    <string name="bridge_controller_play_next">เล่นรายการถัดไป</string>
+    <string name="bridge_controller_clear_queue">ล้างคิว</string>
+    <string name="bridge_controller_remove">นำออก</string>
+    <string name="bridge_controller_queue_action">เข้าคิว</string>
+    <string name="bridge_controller_connected">เชื่อมต่อ Android Auto แล้ว</string>
+    <string name="bridge_controller_disconnected">ยังไม่ได้เชื่อมต่อ Android Auto</string>
+    <string name="bridge_controller_pending">รอเปิดบนรถ: %1$s</string>
+    <string name="bridge_controller_input_label">ค้นหาหรือวางลิงก์</string>
+    <string name="bridge_controller_send">ส่ง</string>
+    <string name="bridge_controller_add_queue">เพิ่มลงคิว</string>
+    <string name="bridge_controller_keyboard_label">พิมพ์บนหน้าจอรถ</string>
+    <string name="bridge_controller_type">พิมพ์</string>
+    <string name="bridge_controller_type_submit">พิมพ์แล้วไป</string>
+    <string name="bridge_controller_seek">เลื่อนตำแหน่ง</string>
+    <string name="bridge_controller_previous">เริ่มใหม่</string>
+    <string name="bridge_controller_back_10">ถอยหลัง 10 วินาที</string>
+    <string name="bridge_controller_play">เล่น</string>
+    <string name="bridge_controller_pause">หยุดชั่วคราว</string>
+    <string name="bridge_controller_forward_10">เดินหน้า 10 วินาที</string>
+    <string name="bridge_controller_next">ถัดไป</string>
+    <string name="bridge_engine_native">เครื่องเล่น</string>
+    <string name="bridge_engine_browser">เบราว์เซอร์</string>
+    <string name="bridge_engine_remote">สตรีมระยะไกล</string>
+    <string name="bridge_engine_none">ไม่มีเอนจิน</string>
+
+    <string name="bridge_share_target_label">ส่งไปที่รถ (AutoBridge)</string>
+
+    <string name="car_more_now_playing">กำลังเล่น · %1$s</string>
+
+    <!-- Media bridge: โฮสต์สตรีมระยะไกล (ทดลอง) -->
+    <string name="bridge_remote_title">สตรีมระยะไกล (ทดลอง)</string>
+    <string name="bridge_remote_caption">ให้คอมพิวเตอร์อีกเครื่องเรนเดอร์หน้าเว็บแล้วส่งวิดีโอมาที่นี่ ต้องมีโฮสต์ที่คุณรันเอง บริการที่มีการป้องกันการคัดลอกจะไม่ถูกส่งผ่านเส้นทางนี้</string>
+    <string name="bridge_remote_endpoint_label">ที่อยู่โฮสต์ (ws://host:port)</string>
+    <string name="bridge_remote_endpoint_invalid">ไม่ใช่ที่อยู่แบบ ws:// หรือ wss://</string>
+    <string name="bridge_remote_saved">บันทึกที่อยู่โฮสต์แล้ว</string>
+    <string name="bridge_remote_save">บันทึก</string>
+    <string name="bridge_remote_enable">เปิด</string>
+    <string name="bridge_remote_disable">ปิด</string>
+    <string name="bridge_remote_ready">เปิดอยู่ — ใช้เป็นทางสำรองเมื่อหน้าเว็บแสดงบนรถไม่ได้</string>
+    <string name="bridge_remote_off">ปิดอยู่</string>
+
+    <!-- Media bridge: สถานะการเล่น -->
+    <string name="bridge_state_idle">ว่าง</string>
+    <string name="bridge_state_loading">กำลังโหลด</string>
+    <string name="bridge_state_playing">กำลังเล่น</string>
+    <string name="bridge_state_paused">หยุดชั่วคราว</string>
+    <string name="bridge_state_ended">เล่นจบแล้ว</string>
+    <string name="bridge_state_error">ข้อผิดพลาด</string>
+
+    <string name="bridge_controller_tab_queue">คิว</string>
+    <string name="bridge_controller_tab_recent">ล่าสุด</string>
+    <string name="bridge_controller_tab_favorites">รายการโปรด</string>
+
+    <string name="bridge_controller_cancel_pending">ยกเลิก</string>
 </resources>

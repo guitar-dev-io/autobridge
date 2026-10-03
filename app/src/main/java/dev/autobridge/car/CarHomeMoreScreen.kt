@@ -34,7 +34,27 @@ class CarHomeMoreScreen(
             Entry(s.title(carContext)) { CarHomeNavigator.open(carContext, screenManager, s, requestSafety) }
         }
         val secondary = HomeSection.carSections.filterNot { it in primary || it == HomeSection.SETTINGS }
-        val tools = listOf(
+        // The bridge player is listed only while it has something to show. An always-present row
+        // that opens an empty player is the kind of dead entry this screen is meant to avoid, and
+        // the player pushes itself to the front anyway whenever content is sent.
+        val bridge = dev.autobridge.bridge.AutoBridgeSessionManager.current
+            .takeIf { it.source != null }
+            ?.let { state ->
+                listOf(
+                    Entry(
+                        carContext.getString(
+                            R.string.car_more_now_playing,
+                            state.source?.displayTitle.orEmpty()
+                        )
+                    ) {
+                        CarNavigation.open(screenManager, "CarBridgePlayerScreen") {
+                            dev.autobridge.bridge.CarBridgePlayerScreen(carContext)
+                        }
+                    }
+                )
+            }
+            .orEmpty()
+        val tools = bridge + listOf(
             // Media Center is reached from here rather than the home grid, which leads with the
             // content sections shared with the phone launcher.
             Entry(carContext.getString(R.string.car_more_media_center)) { CarNavigation.open(screenManager, "CarMediaCenterScreen") { CarMediaCenterScreen(carContext) } },

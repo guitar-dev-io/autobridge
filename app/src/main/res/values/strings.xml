@@ -1105,5 +1105,88 @@
 
     <!-- Bridge error classes ([BridgeErrorType]): what the user is told when a source fails. The
          raw cause goes to the log, never to the screen. -->
+    <string name="bridge_error_network">Could not reach that source. Check the connection and try again.</string>
+    <string name="bridge_error_unsupported">This content is not supported.</string>
+    <string name="bridge_error_playback">Playback failed. Try another source.</string>
+    <string name="bridge_error_web_render">The page could not be rendered on the car screen.</string>
+    <string name="bridge_error_remote_stream">The remote stream could not be started.</string>
+    <string name="bridge_error_drm">This content is copy-protected and cannot play here.</string>
+    <string name="bridge_error_not_connected">Android Auto is not connected.</string>
 
+    <!-- Media bridge: user-facing error messages. Raw exceptions stay in the AutoBridge log. -->
+
+    <!-- Media bridge: car player and the share target. -->
+    <string name="bridge_car_player_title">AutoBridge player</string>
+    <string name="bridge_car_nothing_playing">Nothing is playing. Send a link from your phone.</string>
+    <string name="bridge_car_loading">Loading…</string>
+    <string name="bridge_share_no_link">No link was found in what you shared.</string>
+    <string name="bridge_share_opened">Opening %1$s on the car</string>
+    <string name="bridge_share_pending">%1$s saved — it opens when Android Auto connects</string>
+
+    <!-- Media bridge: the phone controller. -->
+    <string name="bridge_controller_title">Send to Car</string>
+    <string name="bridge_controller_close">Close</string>
+    <string name="bridge_controller_nothing_to_send">Type a link or something to search for.</string>
+    <string name="bridge_controller_sent">Sent to the car</string>
+    <string name="bridge_controller_queued_for_connect">Saved — it opens when Android Auto connects</string>
+    <string name="bridge_controller_queued">Added to the queue</string>
+    <string name="bridge_controller_text_sent">Text sent to the car</string>
+    <string name="bridge_controller_text_failed">Nothing on the car can take text right now</string>
+    <string name="bridge_controller_queue_empty">The queue is empty.</string>
+    <string name="bridge_controller_recent_empty">Nothing sent yet.</string>
+    <string name="bridge_controller_favorites_empty">No favorites saved.</string>
+    <string name="bridge_controller_play_next">Play next</string>
+    <string name="bridge_controller_clear_queue">Clear queue</string>
+    <string name="bridge_controller_remove">Remove</string>
+    <string name="bridge_controller_queue_action">Queue</string>
+    <string name="bridge_controller_connected">Android Auto connected</string>
+    <string name="bridge_controller_disconnected">Android Auto not connected</string>
+    <string name="bridge_controller_pending">Waiting to open on the car: %1$s</string>
+    <string name="bridge_controller_input_label">Search or paste a link</string>
+    <string name="bridge_controller_send">Send</string>
+    <string name="bridge_controller_add_queue">Add to queue</string>
+    <string name="bridge_controller_keyboard_label">Type on the car screen</string>
+    <string name="bridge_controller_type">Type</string>
+    <string name="bridge_controller_type_submit">Type and go</string>
+    <string name="bridge_controller_seek">Seek</string>
+    <string name="bridge_controller_previous">Restart</string>
+    <string name="bridge_controller_back_10">Back 10 seconds</string>
+    <string name="bridge_controller_play">Play</string>
+    <string name="bridge_controller_pause">Pause</string>
+    <string name="bridge_controller_forward_10">Forward 10 seconds</string>
+    <string name="bridge_controller_next">Next</string>
+    <string name="bridge_engine_native">Player</string>
+    <string name="bridge_engine_browser">Browser</string>
+    <string name="bridge_engine_remote">Remote stream</string>
+    <string name="bridge_engine_none">No engine</string>
+
+    <string name="bridge_share_target_label">Send to Car (AutoBridge)</string>
+
+    <string name="car_more_now_playing">Now playing · %1$s</string>
+
+    <!-- Media bridge: the experimental remote stream host. -->
+    <string name="bridge_remote_title">Remote stream (experimental)</string>
+    <string name="bridge_remote_caption">Let another computer render a page and send the video here. Needs a host you run yourself. Copy-protected services are never routed this way.</string>
+    <string name="bridge_remote_endpoint_label">Host address (ws://host:port)</string>
+    <string name="bridge_remote_endpoint_invalid">That is not a ws:// or wss:// address</string>
+    <string name="bridge_remote_saved">Host address saved</string>
+    <string name="bridge_remote_save">Save</string>
+    <string name="bridge_remote_enable">Turn on</string>
+    <string name="bridge_remote_disable">Turn off</string>
+    <string name="bridge_remote_ready">On — used as a fallback when a page will not render on the car</string>
+    <string name="bridge_remote_off">Off</string>
+
+    <!-- Media bridge: playback state labels. -->
+    <string name="bridge_state_idle">Idle</string>
+    <string name="bridge_state_loading">Loading</string>
+    <string name="bridge_state_playing">Playing</string>
+    <string name="bridge_state_paused">Paused</string>
+    <string name="bridge_state_ended">Finished</string>
+    <string name="bridge_state_error">Error</string>
+
+    <string name="bridge_controller_tab_queue">Queue</string>
+    <string name="bridge_controller_tab_recent">Recent</string>
+    <string name="bridge_controller_tab_favorites">Favorites</string>
+
+    <string name="bridge_controller_cancel_pending">Cancel</string>
 </resources>

@@ -2257,7 +2257,12 @@ class MainActivity : androidx.activity.ComponentActivity() {
                     dev.autobridge.ui.HomeDashboard(
                         tiles = tiles,
                         onOpenConnection = { showPhoneScreen(PhoneScreen.CAR_CONNECTION) },
-                        onEditQuickLaunch = { appsFavoritesOnly = true; showPhoneScreen(PhoneScreen.APPS) }
+                        onEditQuickLaunch = { appsFavoritesOnly = true; showPhoneScreen(PhoneScreen.APPS) },
+                        onOpenController = {
+                            startActivity(
+                                Intent(this@MainActivity, dev.autobridge.bridge.BridgeControllerActivity::class.java)
+                            )
+                        }
                     )
                 }
             }

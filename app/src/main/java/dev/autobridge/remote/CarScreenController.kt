@@ -25,6 +25,17 @@ object CarScreenController {
         /** Pushes the car's native video screen for [url], behind the same one-time disclaimer
          *  every other video entry point (library, IPTV) goes through. */
         fun pushVideo(url: String, title: String)
+
+        /**
+         * Brings up the bridge's minimal player
+         * ([dev.autobridge.bridge.CarBridgePlayerScreen]) and leaves it on top.
+         *
+         * Separate from [pushVideo] because that one is the library's entry point and carries the
+         * library's one-time disclaimer and its own URL; this is the surface the media bridge
+         * draws into, whose content is whatever
+         * [dev.autobridge.bridge.AutoBridgeSessionManager] currently holds.
+         */
+        fun pushBridgePlayer()
         fun pushAgent()
         fun popToHome()
         fun pushSettings()

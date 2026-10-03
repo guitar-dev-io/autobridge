@@ -32,6 +32,10 @@ class AutoBridgeSession : Session(), CarScreenController.Host {
                 // while the head unit was plainly running our screens.
                 RuntimeContextStore.setConnected(true)
                 dev.autobridge.display.StructuredLog.i(TAG, "car session connected")
+                // The bridge learns about the connection here rather than polling for it, and
+                // this is where a Send-to-Car that arrived while nothing was plugged in gets
+                // replayed onto the head unit.
+                dev.autobridge.bridge.AutoBridgeSessionManager.onCarConnected(carContext)
             }
 
             override fun onDestroy(owner: LifecycleOwner) {
@@ -41,6 +45,7 @@ class AutoBridgeSession : Session(), CarScreenController.Host {
                 val stillConnected = CarScreenController.isConnected
                 RuntimeContextStore.setConnected(stillConnected)
                 dev.autobridge.display.StructuredLog.i(TAG, "car session destroyed connected=$stillConnected")
+                dev.autobridge.bridge.AutoBridgeSessionManager.onCarDisconnected(carContext)
                 // The browser renderer outlives individual screens on purpose, so the session is
                 // the only correct place to tear its WebView down.
                 CarBrowserRuntime.release()
@@ -87,6 +92,17 @@ class AutoBridgeSession : Session(), CarScreenController.Host {
 
     override fun pushVideo(url: String, title: String) {
         carContext.mainExecutor.execute { CarVideoLauncher.open(screens, carContext, url, title) }
+    }
+
+    override fun pushBridgePlayer() {
+        carContext.mainExecutor.execute {
+            // Through CarNavigation like every other screen, so re-sending while the player is
+            // already up returns to it instead of stacking a second copy whose surface callback
+            // would fight the first one's.
+            CarNavigation.open(screens, "CarBridgePlayerScreen") {
+                dev.autobridge.bridge.CarBridgePlayerScreen(carContext)
+            }
+        }
     }
 
     override fun pushAgent() {

@@ -129,6 +129,44 @@
         <activity android:name=".entertainment.EntertainmentActivity" android:exported="false"
             android:windowSoftInputMode="adjustResize" />
 
+        <!-- Media bridge: "Share to AutoBridge".
+
+             Transparent and no-history on purpose. The user is sharing from another app and
+             should land back in it; a task left in Recents showing a blank AutoBridge screen is
+             the usual cost of getting this wrong. excludeFromRecents + noHistory together mean
+             the activity exists only for the length of one intent.
+
+             exported, because being a share target is the entire point. What it accepts is text
+             and http(s) links, and the only thing it does with either is hand it to
+             ShareIntake/ContentRouter — the same filtering BrowserActivity's VIEW path already
+             applies. -->
+        <activity android:name=".bridge.ShareToCarActivity" android:exported="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:launchMode="singleTask"
+            android:taskAffinity=""
+            android:label="@string/bridge_share_target_label">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            <!-- "Open with AutoBridge" on a link, which is how a browser hands one over when the
+                 share sheet is not involved. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:scheme="http" />
+            </intent-filter>
+        </activity>
+
+        <!-- Media bridge: the phone controller (search, queue, recents, favorites, transport). -->
+        <activity android:name=".bridge.BridgeControllerActivity" android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
         <!-- TV, Radio, Folders, Playlists, Gallery and Favorites for the phone home grid. -->
         <activity android:name=".library.LibraryActivity" android:exported="false"
             android:windowSoftInputMode="adjustResize" />
