@@ -9,6 +9,7 @@ import androidx.car.app.model.ItemList
 import androidx.car.app.model.ListTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
+import dev.autobridge.R
 import dev.autobridge.display.MirrorDiagnostics
 import dev.autobridge.display.StructuredLog
 
@@ -29,9 +30,9 @@ class CarLogScreen(carContext: CarContext) : Screen(carContext) {
         val paged = CarListPaging.page(carContext, entries, page)
 
         val items = ItemList.Builder()
-            .setNoItemsMessage("No log entries yet")
+            .setNoItemsMessage(carContext.getString(R.string.car_log_empty))
         if (page > 0) {
-            items.addItem(Row.Builder().setTitle("Previous").setOnClickListener { page--; invalidate() }.build())
+            items.addItem(Row.Builder().setTitle(carContext.getString(R.string.car_log_previous)).setOnClickListener { page--; invalidate() }.build())
         }
         paged.items.forEach { entry ->
             items.addItem(
@@ -42,13 +43,13 @@ class CarLogScreen(carContext: CarContext) : Screen(carContext) {
             )
         }
         if (paged.hasMore) {
-            items.addItem(Row.Builder().setTitle("More").setOnClickListener { page++; invalidate() }.build())
+            items.addItem(Row.Builder().setTitle(carContext.getString(R.string.car_log_more)).setOnClickListener { page++; invalidate() }.build())
         }
 
         return ListTemplate.Builder()
             .setHeader(
                 Header.Builder()
-                    .setTitle("App Log")
+                    .setTitle(carContext.getString(R.string.car_log_title))
                     .setStartHeaderAction(Action.BACK)
                     .addEndHeaderAction(
                         Action.Builder()
@@ -57,7 +58,7 @@ class CarLogScreen(carContext: CarContext) : Screen(carContext) {
                                 StructuredLog.clear()
                                 MirrorDiagnostics.clearEvents()
                                 page = 0
-                                CarToast.makeText(carContext, "Log cleared", CarToast.LENGTH_SHORT).show()
+                                CarToast.makeText(carContext, carContext.getString(R.string.car_log_cleared), CarToast.LENGTH_SHORT).show()
                                 invalidate()
                             }
                             .build()

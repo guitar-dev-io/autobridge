@@ -106,7 +106,7 @@ class MirrorCarScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
             .addAction(
                 Action.Builder()
                     .setIcon(carIcon(R.drawable.ic_car_panel))
-                    .setTitle("Controls")
+                    .setTitle(carContext.getString(R.string.car_mirror_controls))
                     .setOnClickListener { openControls() }
                     .build()
             )
@@ -125,7 +125,10 @@ class MirrorCarScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
                 vehicleStateSession.requestPermission { granted ->
                     CarToast.makeText(
                         carContext,
-                        if (granted) "Speed safety enabled" else "Speed permission denied",
+                        carContext.getString(
+                            if (granted) R.string.car_speed_enabled
+                            else R.string.car_speed_denied
+                        ),
                         CarToast.LENGTH_SHORT
                     ).show()
                     invalidate()
@@ -157,7 +160,10 @@ class MirrorCarScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
                 vehicleStateSession.requestPermission { granted ->
                     CarToast.makeText(
                         carContext,
-                        if (granted) "Speed safety enabled" else "Speed permission denied",
+                        carContext.getString(
+                            if (granted) R.string.car_speed_enabled
+                            else R.string.car_speed_denied
+                        ),
                         CarToast.LENGTH_SHORT
                     ).show()
                     invalidate()
@@ -176,7 +182,7 @@ class MirrorCarScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
         val sample = dev.autobridge.speed.SpeedManager.speed.value
         if (!sample.valid) return null
         return Action.Builder()
-            .setTitle("${sample.kmh.toInt()} km/h")
+            .setTitle(carContext.getString(R.string.car_speed_kmh, sample.kmh.toInt()))
             .setOnClickListener { invalidate() }
             .build()
     }
@@ -209,7 +215,7 @@ class MirrorCarScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
                 if (!TouchRouter.systemAction(action)) {
                     CarToast.makeText(
                         carContext,
-                        "Enable AutoBridge accessibility service or Shizuku for controls",
+                        carContext.getString(R.string.car_mirror_needs_input_backend),
                         CarToast.LENGTH_SHORT
                     ).show()
                 }
@@ -228,7 +234,7 @@ class MirrorCarScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
         if (!attached) {
             ProjectionService.onMirrorBindingFailed(
                 carContext,
-                "Android Auto mirror surface could not be attached"
+                carContext.getString(R.string.car_mirror_attach_failed)
             )
             return
         }
@@ -270,7 +276,7 @@ class MirrorCarScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
         if (!TouchRouter.tap(carContext, x, y, surfaceWidth, surfaceHeight)) {
             CarToast.makeText(
                 carContext,
-                "Enable AutoBridge accessibility service or Shizuku for touch",
+                carContext.getString(R.string.car_mirror_needs_input_touch),
                 CarToast.LENGTH_SHORT
             ).show()
         }

@@ -69,6 +69,16 @@ class ProjectionBrowserActivity : CarActivity() {
         }
         override fun pause() = audio.userPause()
         override fun seekTo(positionMs: Long) = audio.seekTo(positionMs)
+
+        /** Same queue as the template route: one list, whichever surface is showing it. */
+        override fun skipToNext(): Boolean {
+            val next = dev.autobridge.browser.BrowserPlayQueue.takeNext(
+                this@ProjectionBrowserActivity
+            ) ?: return false
+            StructuredLog.i("PROJECTION", "play queue -> ${next.url}")
+            webView?.loadUrl(next.url) ?: return false
+            return true
+        }
     }
 
     private val parkingListener: (ParkingStateStore.State) -> Unit = {

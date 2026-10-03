@@ -148,6 +148,7 @@ import androidx.car.app.model.Row
 import androidx.car.app.model.Template
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
+import dev.autobridge.R
 import dev.autobridge.input.InputBackend
 import dev.autobridge.input.TouchRouter
 import dev.autobridge.display.ScreenPowerController
@@ -185,50 +186,81 @@ class MirrorControlScreen(
 
     override fun onGetTemplate(): Template {
         val controls = ItemList.Builder()
-            .addItem(statusRow("Vehicle", vehicleLabel()))
+            .addItem(statusRow(carContext.getString(R.string.car_mirror_vehicle), vehicleLabel()))
             .addItem(
                 Row.Builder()
-                    .setTitle("Speed safety")
-                    .addText("Tap to request or refresh CAR_SPEED permission")
+                    .setTitle(carContext.getString(R.string.car_mirror_speed_safety))
+                    .addText(carContext.getString(R.string.car_mirror_speed_safety_caption))
                     .setOnClickListener { onSafetyRequested() }
                     .build()
             )
-            .addItem(statusRow("Mirror", if (MirrorCoordinator.isMirroring) "Active" else "Inactive"))
-            .addItem(statusRow("Phone display", ScreenPowerController.statusLabel()))
-            .addItem(navigationRow("Dim phone now", "Uses panel-off when enabled; otherwise dims the phone") {
+            .addItem(
+                statusRow(
+                    carContext.getString(R.string.car_mirror_status),
+                    carContext.getString(
+                        if (MirrorCoordinator.isMirroring) R.string.car_diag_active
+                        else R.string.car_diag_inactive
+                    )
+                )
+            )
+            .addItem(statusRow(carContext.getString(R.string.car_mirror_phone_display), ScreenPowerController.statusLabel()))
+            .addItem(
+                navigationRow(
+                    carContext.getString(R.string.car_mirror_dim_now),
+                    carContext.getString(R.string.car_mirror_dim_now_caption)
+                ) {
                 val applied = ScreenPowerController.dimNow()
                 CarToast.makeText(
                     carContext,
-                    if (applied) ScreenPowerController.statusLabel() else "Start mirroring first",
+                    if (applied) ScreenPowerController.statusLabel()
+                    else carContext.getString(R.string.mirror_start_first),
                     CarToast.LENGTH_SHORT
                 ).show()
                 invalidate()
             })
-            .addItem(navigationRow("Restore phone screen", "Restore the panel and restart the auto-dim timer") {
+            .addItem(
+                navigationRow(
+                    carContext.getString(R.string.car_mirror_restore),
+                    carContext.getString(R.string.car_mirror_restore_caption)
+                ) {
                 val restored = ScreenPowerController.restorePhoneScreen()
                 CarToast.makeText(
                     carContext,
-                    if (restored) "Phone display restored to configured policy" else ScreenPowerController.statusLabel(),
+                    if (restored) carContext.getString(R.string.mirror_display_restored)
+                    else ScreenPowerController.statusLabel(),
                     CarToast.LENGTH_SHORT
                 ).show()
                 invalidate()
             })
-            .addItem(navigationRow("Apps", "Open quick apps") {
+            .addItem(
+                navigationRow(carContext.getString(R.string.car_mirror_apps), carContext.getString(R.string.car_mirror_apps_caption)) {
                 CarNavigation.open(screenManager, "CarAppsScreen") { CarAppsScreen(carContext) }
-            })
-            .addItem(navigationRow("Media", "Playlists and MediaSession controls") {
+                }
+            )
+            .addItem(
+                navigationRow(carContext.getString(R.string.car_mirror_media), carContext.getString(R.string.car_mirror_media_caption)) {
                 CarNavigation.open(screenManager, "CarMediaScreen") { CarMediaScreen(carContext) }
-            })
-            .addItem(navigationRow("Settings", "Mirror, touch and safety settings") {
-                CarNavigation.open(screenManager, "CarSettingsScreen") { CarSettingsScreen(carContext, onSafetyRequested) }
-            })
-            .addItem(systemActionRow("Phone Back", InputBackend.SystemAction.BACK))
-            .addItem(systemActionRow("Phone Home", InputBackend.SystemAction.HOME))
-            .addItem(systemActionRow("Phone Recents", InputBackend.SystemAction.RECENTS))
+                }
+            )
+            .addItem(
+                navigationRow(carContext.getString(R.string.car_mirror_settings), carContext.getString(R.string.car_mirror_settings_caption)) {
+                CarNavigation.open(screenManager, "CarSettingsScreen") {
+                        CarSettingsScreen(carContext, onSafetyRequested)
+                    }
+                }
+            )
+            .addItem(systemActionRow(carContext.getString(R.string.car_mirror_phone_back), InputBackend.SystemAction.BACK))
+            .addItem(systemActionRow(carContext.getString(R.string.car_mirror_phone_home), InputBackend.SystemAction.HOME))
+            .addItem(
+                systemActionRow(
+                    carContext.getString(R.string.car_mirror_phone_recents),
+                    InputBackend.SystemAction.RECENTS
+                )
+            )
             .addItem(
                 Row.Builder()
-                    .setTitle("Stop mirroring")
-                    .addText("Stop projection and leave AutoBridge")
+                    .setTitle(carContext.getString(R.string.car_settings_stop_mirroring))
+                    .addText(carContext.getString(R.string.car_settings_stop_mirroring_caption))
                     .setOnClickListener {
                         ProjectionService.stop(carContext)
                         carContext.finishCarApp()
@@ -240,7 +272,7 @@ class MirrorControlScreen(
         return ListTemplate.Builder()
             .setHeader(
                 Header.Builder()
-                    .setTitle("AutoBridge")
+                    .setTitle(carContext.getString(R.string.app_name))
                     .setStartHeaderAction(androidx.car.app.model.Action.BACK)
                     .build()
             )
@@ -265,14 +297,14 @@ class MirrorControlScreen(
     private fun systemActionRow(title: String, action: InputBackend.SystemAction): Row =
         Row.Builder()
             .setTitle(title)
-            .addText("Send to phone")
+            .addText(carContext.getString(R.string.car_mirror_send_to_phone))
             .setOnClickListener {
                 ScreenPowerController.userActivity()
                 // Bypass: ตัดการเช็ก ParkingStateStore.isParked ออก เพื่อส่งปุ่มกดระบบได้ทุกสถานะ
                 if (!TouchRouter.systemAction(action)) {
                     CarToast.makeText(
                         carContext,
-                        "Enable AutoBridge accessibility service or Shizuku for controls",
+                        carContext.getString(R.string.car_mirror_needs_input_backend),
                         CarToast.LENGTH_SHORT
                     ).show()
                 }

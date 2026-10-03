@@ -1,5 +1,6 @@
 package dev.autobridge.car
 
+import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
@@ -15,19 +16,24 @@ internal enum class HomeMenuGlyph { TV, RADIO, GLOBE, YOUTUBE, YOUTUBE_MUSIC, ST
 /** One home menu entry: what it says, how it looks, and which existing section it opens. */
 internal data class HomeMenuItem(
     val section: HomeSection,
-    val title: String,
     val glyph: HomeMenuGlyph,
     val accent: Int
 ) {
+    /** The tile's label, from the shared [HomeSection] so the two launchers cannot drift apart. */
+    fun title(context: Context): String = section.title(context)
+
     companion object {
         /** The six primary destinations, in reading order (3 columns × 2 rows). */
         val primary: List<HomeMenuItem> = listOf(
-            HomeMenuItem(HomeSection.TV, "TV", HomeMenuGlyph.TV, HomeMenuTheme.ACCENT_TV),
-            HomeMenuItem(HomeSection.RADIO, "Radio", HomeMenuGlyph.RADIO, HomeMenuTheme.ACCENT_RADIO),
-            HomeMenuItem(HomeSection.WEB, "Web browser", HomeMenuGlyph.GLOBE, HomeMenuTheme.ACCENT_WEB),
-            HomeMenuItem(HomeSection.YOUTUBE, "YouTube", HomeMenuGlyph.YOUTUBE, HomeMenuTheme.ACCENT_YOUTUBE),
-            HomeMenuItem(HomeSection.YOUTUBE_MUSIC, "YouTube Music", HomeMenuGlyph.YOUTUBE_MUSIC, HomeMenuTheme.ACCENT_YOUTUBE_MUSIC),
-            HomeMenuItem(HomeSection.STREAMING, "Streaming", HomeMenuGlyph.STREAMING, HomeMenuTheme.ACCENT_STREAMING)
+            HomeMenuItem(HomeSection.TV, HomeMenuGlyph.TV, HomeMenuTheme.ACCENT_TV),
+            HomeMenuItem(HomeSection.RADIO, HomeMenuGlyph.RADIO, HomeMenuTheme.ACCENT_RADIO),
+            HomeMenuItem(HomeSection.WEB, HomeMenuGlyph.GLOBE, HomeMenuTheme.ACCENT_WEB),
+            HomeMenuItem(HomeSection.YOUTUBE, HomeMenuGlyph.YOUTUBE, HomeMenuTheme.ACCENT_YOUTUBE),
+            HomeMenuItem(
+                HomeSection.YOUTUBE_MUSIC, HomeMenuGlyph.YOUTUBE_MUSIC,
+                HomeMenuTheme.ACCENT_YOUTUBE_MUSIC
+            ),
+            HomeMenuItem(HomeSection.STREAMING, HomeMenuGlyph.STREAMING, HomeMenuTheme.ACCENT_STREAMING)
         )
     }
 }
@@ -55,7 +61,15 @@ internal class HomeMenuCard {
     private val rect = RectF()
     private val path = Path()
 
-    fun draw(canvas: Canvas, bounds: MenuBox, item: HomeMenuItem, layout: HomeMenuLayout, state: State) {
+    /** [title] is resolved by the caller, which is the half of this pair that holds a Context. */
+    fun draw(
+        canvas: Canvas,
+        bounds: MenuBox,
+        item: HomeMenuItem,
+        title: String,
+        layout: HomeMenuLayout,
+        state: State
+    ) {
         val d = layout.density
         val radius = layout.cornerRadius
         rect.set(bounds.left, bounds.top, bounds.right, bounds.bottom)
@@ -93,7 +107,8 @@ internal class HomeMenuCard {
         val iconLeft = bounds.centerX - icon / 2f
         drawIconTile(canvas, iconLeft, blockTop, icon, item, d)
 
-        val text = TextUtils.ellipsize(item.title, label, layout.labelMaxWidth, TextUtils.TruncateAt.END)
+        val text =
+            TextUtils.ellipsize(title, label, layout.labelMaxWidth, TextUtils.TruncateAt.END)
         val baseline = blockTop + icon + layout.iconLabelGap - metrics.ascent
         canvas.drawText(text, 0, text.length, bounds.centerX, baseline, label)
     }

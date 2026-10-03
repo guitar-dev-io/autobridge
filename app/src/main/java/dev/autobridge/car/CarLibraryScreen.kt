@@ -1,6 +1,7 @@
 package dev.autobridge.car
 
 import android.content.Intent
+import androidx.annotation.StringRes
 import androidx.car.app.CarContext
 import androidx.car.app.CarToast
 import androidx.car.app.Screen
@@ -13,6 +14,7 @@ import androidx.car.app.model.Row
 import androidx.car.app.model.Template
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
+import dev.autobridge.R
 import dev.autobridge.library.LibraryActivity
 import dev.autobridge.library.LocalMediaRepository
 import dev.autobridge.media.MediaPlaybackClient
@@ -31,10 +33,10 @@ class CarLibraryScreen(
     private val group: LocalMediaRepository.Group? = null,
     private val page: Int = 0
 ) : Screen(carContext) {
-    enum class Mode(val title: String, val section: LibraryActivity.Section) {
-        FOLDERS("Folders", LibraryActivity.Section.FOLDERS),
-        PLAYLISTS("Playlists", LibraryActivity.Section.PLAYLISTS),
-        GALLERY("Gallery", LibraryActivity.Section.GALLERY)
+    enum class Mode(@StringRes val titleRes: Int, val section: LibraryActivity.Section) {
+        FOLDERS(R.string.car_folders, LibraryActivity.Section.FOLDERS),
+        PLAYLISTS(R.string.car_playlists, LibraryActivity.Section.PLAYLISTS),
+        GALLERY(R.string.car_gallery, LibraryActivity.Section.GALLERY)
     }
 
     private val mediaPlayback = MediaPlaybackClient(carContext)
@@ -55,11 +57,19 @@ class CarLibraryScreen(
     override fun onGetTemplate(): Template {
         if (!LocalMediaRepository.hasPermission(carContext, requiredTypes)) {
             return MessageTemplate.Builder(
-                "${mode.title} needs media access.\nGrant it on the phone, then come back."
+                carContext.getString(R.string.car_needs_media_access, modeTitle())
             )
-                .setHeader(Header.Builder().setTitle(mode.title).setStartHeaderAction(Action.BACK).build())
+                .setHeader(
+                    Header.Builder()
+                        .setTitle(modeTitle())
+                        .setStartHeaderAction(Action.BACK)
+                        .build()
+                )
                 .addAction(
-                    Action.Builder().setTitle("Open on phone").setOnClickListener { openOnPhone() }.build()
+                    Action.Builder()
+                        .setTitle(carContext.getString(R.string.car_iptv_open_on_phone))
+                        .setOnClickListener { openOnPhone() }
+                        .build()
                 )
                 .build()
         }
@@ -69,12 +79,17 @@ class CarLibraryScreen(
     private fun groupTemplate(): Template {
         val groups = when (mode) {
             Mode.FOLDERS -> LocalMediaRepository.folders(carContext)
-            Mode.PLAYLISTS -> listOf(ALL_MUSIC) + LocalMediaRepository.playlists(carContext)
+            Mode.PLAYLISTS -> listOf(allMusicGroup()) + LocalMediaRepository.playlists(carContext)
             Mode.GALLERY -> LocalMediaRepository.galleryAlbums(carContext)
         }
         if (groups.isEmpty()) {
-            return MessageTemplate.Builder("Nothing found on this device.")
-                .setHeader(Header.Builder().setTitle(mode.title).setStartHeaderAction(Action.BACK).build())
+            return MessageTemplate.Builder(carContext.getString(R.string.car_nothing_found))
+                .setHeader(
+                    Header.Builder()
+                        .setTitle(modeTitle())
+                        .setStartHeaderAction(Action.BACK)
+                        .build()
+                )
                 .build()
         }
         val paged = CarListPaging.page(carContext, groups, page)
@@ -83,7 +98,13 @@ class CarLibraryScreen(
             list.addItem(
                 Row.Builder()
                     .setTitle(entry.name)
-                    .apply { if (entry.count > 0) addText("${entry.count} items") }
+                    .apply {
+                        if (entry.count > 0) addText(
+                            carContext.resources.getQuantityString(
+                                R.plurals.car_iptv_items, entry.count, entry.count
+                            )
+                        )
+                    }
                     .setBrowsable(true)
                     .setOnClickListener { screenManager.push(CarLibraryScreen(carContext, mode, entry)) }
                     .build()
@@ -91,7 +112,7 @@ class CarLibraryScreen(
         }
         if (paged.hasMore) {
             list.addItem(
-                Row.Builder().setTitle("Show more").setBrowsable(true)
+                Row.Builder().setTitle(carContext.getString(R.string.car_iptv_show_more)).setBrowsable(true)
                     .setOnClickListener {
                         screenManager.push(CarLibraryScreen(carContext, mode, null, page + 1))
                     }
@@ -99,20 +120,23 @@ class CarLibraryScreen(
             )
         }
         return ListTemplate.Builder()
-            .setHeader(Header.Builder().setTitle(mode.title).setStartHeaderAction(Action.BACK).build())
+            .setHeader(
+                Header.Builder().setTitle(modeTitle()).setStartHeaderAction(Action.BACK).build()
+            )
             .setSingleList(list.build())
             .build()
     }
 
     private fun itemTemplate(selected: LocalMediaRepository.Group): Template {
         val items = when {
-            mode == Mode.PLAYLISTS && selected.id == ALL_MUSIC.id -> LocalMediaRepository.allAudio(carContext)
+            mode == Mode.PLAYLISTS && selected.id == ALL_MUSIC_ID ->
+                LocalMediaRepository.allAudio(carContext)
             mode == Mode.PLAYLISTS -> LocalMediaRepository.playlistItems(carContext, selected.id)
             mode == Mode.GALLERY -> LocalMediaRepository.galleryItems(carContext, selected.id)
             else -> LocalMediaRepository.folderItems(carContext, selected.id)
         }
         if (items.isEmpty()) {
-            return MessageTemplate.Builder("Nothing to play here.")
+            return MessageTemplate.Builder(carContext.getString(R.string.car_nothing_to_play))
                 .setHeader(Header.Builder().setTitle(selected.name).setStartHeaderAction(Action.BACK).build())
                 .build()
         }
@@ -129,7 +153,7 @@ class CarLibraryScreen(
         }
         if (paged.hasMore) {
             list.addItem(
-                Row.Builder().setTitle("Show more").setBrowsable(true)
+                Row.Builder().setTitle(carContext.getString(R.string.car_iptv_show_more)).setBrowsable(true)
                     .setOnClickListener {
                         screenManager.push(CarLibraryScreen(carContext, mode, selected, page + 1))
                     }
@@ -149,15 +173,23 @@ class CarLibraryScreen(
     private fun play(items: List<LocalMediaRepository.Item>, index: Int) {
         val item = items.getOrNull(index) ?: return
         if (mode == Mode.GALLERY && item.durationMs <= 0L) {
-            CarToast.makeText(carContext, "Photos can only be viewed on the phone", CarToast.LENGTH_LONG).show()
+            CarToast.makeText(
+                carContext,
+                carContext.getString(R.string.car_photos_phone_only),
+                CarToast.LENGTH_LONG
+            ).show()
             return
         }
-        if (mode == Mode.GALLERY || (mode == Mode.FOLDERS && item.subtitle != "Audio")) {
+        if (mode == Mode.GALLERY || (mode == Mode.FOLDERS && !item.isAudio)) {
             CarVideoLauncher.open(screenManager, carContext, item.uri, item.title)
             return
         }
         if (!mediaPlayback.isConnected) {
-            CarToast.makeText(carContext, "Connecting to the player…", CarToast.LENGTH_SHORT).show()
+            CarToast.makeText(
+                carContext,
+                carContext.getString(R.string.car_connecting_player),
+                CarToast.LENGTH_SHORT
+            ).show()
             return
         }
         mediaPlayback.playPlaylist(items.map { it.uri }, index)
@@ -165,24 +197,43 @@ class CarLibraryScreen(
     }
 
     private fun subtitle(item: LocalMediaRepository.Item): String {
-        if (item.durationMs <= 0L) return if (mode == Mode.GALLERY) "Photo" else item.subtitle
+        if (item.durationMs <= 0L) {
+            return if (mode == Mode.GALLERY) carContext.getString(R.string.media_kind_photo)
+            else item.subtitle
+        }
         val totalSeconds = item.durationMs / 1000
         return "%d:%02d".format(totalSeconds / 60, totalSeconds % 60)
     }
+
+    private fun modeTitle(): String = carContext.getString(mode.titleRes)
+
+    /** Synthetic bucket so Playlists always has something to open on Android 11+. */
+    private fun allMusicGroup() = LocalMediaRepository.Group(
+        ALL_MUSIC_ID,
+        carContext.getString(R.string.car_all_music),
+        0
+    )
 
     private fun openOnPhone() {
         runCatching {
             carContext.startActivity(
                 LibraryActivity.intent(carContext, mode.section).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             )
-            CarToast.makeText(carContext, "Continue on the phone", CarToast.LENGTH_LONG).show()
+            CarToast.makeText(
+                carContext,
+                carContext.getString(R.string.car_iptv_continue_on_phone),
+                CarToast.LENGTH_LONG
+            ).show()
         }.onFailure {
-            CarToast.makeText(carContext, "Could not open the phone screen", CarToast.LENGTH_SHORT).show()
+            CarToast.makeText(
+                carContext,
+                carContext.getString(R.string.car_iptv_phone_screen_failed),
+                CarToast.LENGTH_SHORT
+            ).show()
         }
     }
 
     private companion object {
-        /** Synthetic bucket so Playlists always has something to open on Android 11+. */
-        val ALL_MUSIC = LocalMediaRepository.Group("__all_music__", "All music", 0)
+        const val ALL_MUSIC_ID = "__all_music__"
     }
 }

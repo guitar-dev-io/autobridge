@@ -10,6 +10,7 @@ import androidx.car.app.model.ItemList
 import androidx.car.app.model.ListTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
+import dev.autobridge.R
 import dev.autobridge.entertainment.WebBookmark
 import dev.autobridge.entertainment.WebBookmarkStore
 
@@ -19,16 +20,16 @@ class CarWebScreen(carContext: CarContext) : Screen(carContext) {
         val list = ItemList.Builder()
             .addItem(
                 Row.Builder()
-                    .setTitle("Open browser")
-                    .addText("Enter a website or search the web")
+                    .setTitle(carContext.getString(R.string.car_web_open_browser))
+                    .addText(carContext.getString(R.string.car_web_open_browser_caption))
                     .setBrowsable(true)
                     .setOnClickListener { openUrl("https://www.google.com") }
                     .build()
             )
             .addItem(
                 Row.Builder()
-                    .setTitle("YouTube")
-                    .addText("Open m.youtube.com on the car screen")
+                    .setTitle(carContext.getString(R.string.car_web_youtube))
+                    .addText(carContext.getString(R.string.car_web_youtube_caption))
                     .setOnClickListener { openUrl("https://m.youtube.com") }
                     .build()
             )
@@ -47,7 +48,7 @@ class CarWebScreen(carContext: CarContext) : Screen(carContext) {
         return ListTemplate.Builder()
             .setHeader(
                 Header.Builder()
-                    .setTitle("Browser & Favorites")
+                    .setTitle(carContext.getString(R.string.car_web_title))
                     .setStartHeaderAction(Action.BACK)
                     .addEndHeaderAction(
                         Action.Builder()
@@ -67,9 +68,9 @@ class CarWebScreen(carContext: CarContext) : Screen(carContext) {
         //
         // A site shortcut for a site already open is returned to rather than reloaded, which is what
         // keeps a playing page alive; a bookmark to a specific page always loads, because it is not
-        // a bare site root. [dev.autobridge.browser.CarBrowserEntry] draws that line.
+        // a bare site root. [dev.autobridge.browser.BrowserSiteEntry] draws that line.
         val renderer = dev.autobridge.browser.CarBrowserRuntime.renderer(carContext)
-        if (!dev.autobridge.browser.CarBrowserEntry.resumes(renderer.livePageUrl, url)) {
+        if (!dev.autobridge.browser.BrowserSiteEntry.resumes(renderer.livePageUrl, url)) {
             renderer.load(url)
         }
         CarNavigation.open(screenManager, "CarBrowserScreen") { CarBrowserScreen(carContext) }

@@ -3,12 +3,15 @@ package dev.autobridge.browser
 import java.net.URI
 
 /**
- * Whether a car entry point should re-open the browser as it stands, or navigate.
+ * Whether a site entry point should re-open the browser as it stands, or navigate.
+ *
+ * Used by both presentations: the car's home tiles, web shortcuts and streaming list, and the
+ * phone's Home tiles, which reach [BrowserActivity] as an intent carrying the same site root.
  *
  * ## The bug this fixes
  *
- * Every site tile on the car home — YouTube, YouTube Music, the Web shortcuts, the streaming list —
- * used to call `renderer.load(url)` unconditionally before opening the browser screen. So the
+ * Every site tile — the car home's YouTube, YouTube Music, Web shortcuts and streaming list, and the
+ * phone's Home grid — used to navigate unconditionally before showing the browser. So the
  * sequence "YouTube → play → Home → YouTube" did not return to the video: it loaded
  * `m.youtube.com` over the top of it, which threw the page away and started playback over.
  *
@@ -36,7 +39,7 @@ import java.net.URI
  * Pure and free of Android types so it is covered by a plain JVM test, like [BrowserInputResolver]
  * and [BrowserResumePoint].
  */
-object CarBrowserEntry {
+object BrowserSiteEntry {
     /**
      * True when the browser should simply be re-opened on [current] instead of loading [target].
      *

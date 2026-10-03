@@ -10,6 +10,7 @@ import androidx.car.app.model.Header
 import androidx.car.app.model.ItemList
 import androidx.car.app.model.Template
 import androidx.core.graphics.drawable.IconCompat
+import dev.autobridge.R
 import dev.autobridge.agent.AgentCommandRouter
 import dev.autobridge.core.state.UiModeStore
 
@@ -27,25 +28,25 @@ class CarDrivingModeScreen(carContext: CarContext) : Screen(carContext) {
 
     override fun onGetTemplate(): Template {
         val tiles = listOf(
-            Tile("Browser", dev.autobridge.R.drawable.ic_car_panel) {
+            Tile(carContext.getString(R.string.car_driving_browser), dev.autobridge.R.drawable.ic_car_panel) {
                 CarNavigation.open(screenManager, "CarBrowserScreen") { CarBrowserScreen(carContext) }
             },
-            Tile("Mirror", dev.autobridge.R.drawable.ic_car_home) {
+            Tile(carContext.getString(R.string.car_driving_mirror), dev.autobridge.R.drawable.ic_car_home) {
                 CarNavigation.open(screenManager, "MirrorCarScreen") { MirrorCarScreen(carContext) }
             },
-            Tile("Media", dev.autobridge.R.drawable.ic_car_panel) {
+            Tile(carContext.getString(R.string.car_driving_media), dev.autobridge.R.drawable.ic_car_panel) {
                 CarNavigation.open(screenManager, "CarMediaCenterScreen") { CarMediaCenterScreen(carContext) }
             },
-            Tile("Agent", dev.autobridge.R.drawable.ic_car_panel) {
+            Tile(carContext.getString(R.string.car_driving_agent), dev.autobridge.R.drawable.ic_car_panel) {
                 CarNavigation.open(screenManager, "CarAgentScreen") { CarAgentScreen(carContext) }
             },
-            Tile("Resume", dev.autobridge.R.drawable.ic_car_panel) {
+            Tile(carContext.getString(R.string.car_driving_resume), dev.autobridge.R.drawable.ic_car_panel) {
                 AgentCommandRouter.execute(
                     this, carContext,
                     AgentCommandRouter.Command(AgentCommandRouter.AgentAction.RESUME_MEDIA)
                 )
             },
-            Tile("Recent", dev.autobridge.R.drawable.ic_car_panel) {
+            Tile(carContext.getString(R.string.car_driving_recent), dev.autobridge.R.drawable.ic_car_panel) {
                 CarNavigation.open(screenManager, "CarRecentScreen") { CarRecentScreen(carContext) }
             }
         )
@@ -64,7 +65,7 @@ class CarDrivingModeScreen(carContext: CarContext) : Screen(carContext) {
         return GridTemplate.Builder()
             .setHeader(
                 Header.Builder()
-                    .setTitle("AutoBridge • Driving Mode")
+                    .setTitle(carContext.getString(R.string.car_driving_title))
                     .setStartHeaderAction(Action.APP_ICON)
                     .addEndHeaderAction(
                         Action.Builder()

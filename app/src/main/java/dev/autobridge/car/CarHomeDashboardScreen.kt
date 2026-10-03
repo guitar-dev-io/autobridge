@@ -20,6 +20,7 @@ import androidx.car.app.model.Template
 import androidx.car.app.navigation.model.NavigationTemplate
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
+import dev.autobridge.R
 import dev.autobridge.core.state.VehicleStateSession
 import dev.autobridge.display.StructuredLog
 import dev.autobridge.library.HomeSection
@@ -207,7 +208,7 @@ class CarHomeDashboardScreen(
         // The head unit's dpi, never the phone's: it decides every dp on this screen.
         val density = (if (surfaceDpi > 0) surfaceDpi else BASELINE_DPI) / BASELINE_DPI.toFloat()
         val layout = menuLayout ?: HomeMenuLayout.compute(
-            safeArea(), density, menuItems.map { it.title }, menuRenderer::measureLabel
+            safeArea(), density, menuItems.map { it.title(carContext) }, menuRenderer::measureLabel
         ).also {
             menuLayout = it
             scroll = scroll.coerceIn(0f, it.maxScroll)
@@ -248,7 +249,7 @@ class CarHomeDashboardScreen(
         visible.forEach { section ->
             grid.addItem(
                 GridItem.Builder()
-                    .setTitle(section.title)
+                    .setTitle(section.title(carContext))
                     // IMAGE_TYPE_ICON tells the host to tint the bitmap as a monochrome mask, which
                     // flattens this custom multi-color glyph+card artwork into a blank tinted square.
                     // IMAGE_TYPE_LARGE preserves the actual pixel colors.
@@ -261,7 +262,7 @@ class CarHomeDashboardScreen(
             GridItem.Builder()
                 // Always "More": the last page already carries its own Settings tile, and a second
                 // tile with the same label going somewhere else is just a trap.
-                .setTitle("More")
+                .setTitle(carContext.getString(R.string.car_home_more))
                 .setImage(
                     DashboardArtwork.icon(DashboardArtwork.Kind.MORE, compact = true),
                     GridItem.IMAGE_TYPE_LARGE
@@ -273,7 +274,9 @@ class CarHomeDashboardScreen(
                 .build()
         )
         val template = GridTemplate.Builder().setSingleList(grid.build())
-        val title = if (page == 0) "AutoBridge" else "AutoBridge · ${page + 1}"
+        val title =
+            if (page == 0) carContext.getString(R.string.app_name)
+            else carContext.getString(R.string.car_home_title_paged, page + 1)
         // Keep the header free of action buttons. Older hosts use the legacy header API.
         if (carContext.carAppApiLevel >= 7) {
             template.setHeader(Header.Builder().setTitle(title)
@@ -312,7 +315,7 @@ class CarHomeDashboardScreen(
         vehicleStateSession.requestPermission { granted ->
             CarToast.makeText(
                 carContext,
-                if (granted) "Speed safety enabled" else "Speed permission denied",
+                carContext.getString(if (granted) R.string.car_home_speed_safety_enabled else R.string.car_home_speed_permission_denied),
                 CarToast.LENGTH_SHORT
             ).show()
             invalidate()

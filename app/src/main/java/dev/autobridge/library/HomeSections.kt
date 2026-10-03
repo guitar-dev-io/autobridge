@@ -1,5 +1,9 @@
 package dev.autobridge.library
 
+import android.content.Context
+import androidx.annotation.StringRes
+import dev.autobridge.R
+
 /**
  * The single home-grid definition, shared by the phone launcher and the Android Auto dashboard.
  *
@@ -11,27 +15,42 @@ package dev.autobridge.library
  * surface-specific screen for that section.
  */
 enum class HomeSection(
-    val title: String,
-    val caption: String,
+    /**
+     * Name and second line as string *ids*, resolved per use with [title] and [caption]. An enum
+     * constant is built once per process, so text captured here would keep whatever language was
+     * in force at class-init and survive a language change unchanged.
+     */
+    @StringRes val titleRes: Int,
+    @StringRes val captionRes: Int,
     val accent: Int,
     val webUrl: String? = null
 ) {
-    TV("TV", "Live channels & VOD", Accents.TV),
-    RADIO("Radio", "Audio streams", Accents.RADIO),
-    WEB("Web browser", "Full page browsing", Accents.WEB),
-    YOUTUBE("YouTube", "Video on the web", Accents.VIDEO, "https://m.youtube.com"),
-    YOUTUBE_MUSIC("YouTube Music", "Streaming music", Accents.VIDEO, "https://music.youtube.com"),
+    TV(R.string.section_tv, R.string.section_tv_caption, Accents.TV),
+    RADIO(R.string.section_radio, R.string.section_radio_caption, Accents.RADIO),
+    WEB(R.string.section_web, R.string.section_web_caption, Accents.WEB),
+    YOUTUBE(
+        R.string.section_youtube, R.string.section_youtube_caption, Accents.VIDEO,
+        "https://m.youtube.com"
+    ),
+    YOUTUBE_MUSIC(
+        R.string.section_youtube_music, R.string.section_youtube_music_caption, Accents.VIDEO,
+        "https://music.youtube.com"
+    ),
     /** YouTube Kids, TikTok, Twitch and other web video sites; see [StreamingLinks]. */
-    STREAMING("Streaming", "Kids, TikTok, Twitch & more", Accents.VIDEO),
-    FOLDERS("Folders", "On-device media", Accents.FILES),
-    FAVORITES("Favorites", "Saved channels & pages", Accents.FAVORITE),
-    PLAYLISTS("Playlists", "Your music", Accents.FILES),
-    GALLERY("Gallery", "Photos & clips", Accents.WEB),
-    WEATHER("Weather", "Current conditions", Accents.WEATHER),
-    MIRROR("Mirror", "Share this screen", Accents.SYSTEM),
-    APPS("Apps", "Quick launch", Accents.SYSTEM),
-    REMOTE("Remote", "Drive the car screen", Accents.SYSTEM),
-    SETTINGS("Settings", "Modes & diagnostics", Accents.SYSTEM);
+    STREAMING(R.string.section_streaming, R.string.section_streaming_caption, Accents.VIDEO),
+    FOLDERS(R.string.section_folders, R.string.section_folders_caption, Accents.FILES),
+    FAVORITES(R.string.section_favorites, R.string.section_favorites_caption, Accents.FAVORITE),
+    PLAYLISTS(R.string.section_playlists, R.string.section_playlists_caption, Accents.FILES),
+    GALLERY(R.string.section_gallery, R.string.section_gallery_caption, Accents.WEB),
+    WEATHER(R.string.section_weather, R.string.section_weather_caption, Accents.WEATHER),
+    MIRROR(R.string.section_mirror, R.string.section_mirror_caption, Accents.SYSTEM),
+    APPS(R.string.section_apps, R.string.section_apps_caption, Accents.SYSTEM),
+    REMOTE(R.string.section_remote, R.string.section_remote_caption, Accents.SYSTEM),
+    SETTINGS(R.string.section_settings, R.string.section_settings_caption, Accents.SYSTEM);
+
+    fun title(context: Context): String = context.getString(titleRes)
+
+    fun caption(context: Context): String = context.getString(captionRes)
 
     /** The [LibraryActivity] section this tile opens, or null when it is not a library section. */
     val librarySection: LibraryActivity.Section?

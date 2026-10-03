@@ -9,6 +9,7 @@ import androidx.car.app.model.Pane
 import androidx.car.app.model.PaneTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
+import dev.autobridge.R
 import dev.autobridge.settings.VideoDisclaimerStore
 
 /**
@@ -31,30 +32,26 @@ class CarVideoDisclaimerScreen(
         val pane = Pane.Builder()
             .addRow(
                 Row.Builder()
-                    .setTitle("Watching video while driving is dangerous")
-                    .addText(
-                        "Video should only be watched while the vehicle is parked. AutoBridge blocks " +
-                            "playback while moving, but you are responsible for pulling over and " +
-                            "parking safely before watching."
-                    )
+                    .setTitle(carContext.getString(R.string.car_disclaimer_title))
+                    .addText(carContext.getString(R.string.car_disclaimer_body))
                     .build()
             )
             .addRow(
                 Row.Builder()
-                    .setTitle("By continuing you confirm")
-                    .addText("The vehicle is parked, and you will not watch video while driving.")
+                    .setTitle(carContext.getString(R.string.car_disclaimer_confirm_title))
+                    .addText(carContext.getString(R.string.car_disclaimer_confirm_body))
                     .build()
             )
             .addAction(
                 Action.Builder()
-                    .setTitle("I understand, continue")
+                    .setTitle(carContext.getString(R.string.car_disclaimer_continue))
                     .setBackgroundColor(CarColor.PRIMARY)
                     .setOnClickListener { accept() }
                     .build()
             )
             .addAction(
                 Action.Builder()
-                    .setTitle("Cancel")
+                    .setTitle(carContext.getString(R.string.action_cancel))
                     .setOnClickListener { screenManager.pop() }
                     .build()
             )
@@ -63,7 +60,7 @@ class CarVideoDisclaimerScreen(
         return PaneTemplate.Builder(pane)
             .setHeader(
                 Header.Builder()
-                    .setTitle("Before you watch")
+                    .setTitle(carContext.getString(R.string.car_disclaimer_header))
                     .setStartHeaderAction(Action.BACK)
                     .build()
             )

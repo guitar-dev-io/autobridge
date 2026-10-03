@@ -3,8 +3,12 @@ package dev.autobridge.browser
 import android.app.Presentation
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.PixelFormat
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
+import android.media.ImageReader
+import android.os.Handler
+import android.os.HandlerThread
 import android.view.Surface
 import android.view.View
 import android.view.ViewGroup
@@ -62,6 +66,12 @@ class CarHardwareWebWindow private constructor(
 
     private var released = false
 
+    /**
+     * Where frames go while the car has its surface back; null while the car surface is attached.
+     * See [setSurface] for why this exists rather than simply detaching.
+     */
+    private var parkedSink: ParkedSink? = null
+
     val displayId: Int get() = display.display.displayId
 
     /** Root view of the window, for display-id diagnostics. */
@@ -70,11 +80,48 @@ class CarHardwareWebWindow private constructor(
     fun matches(width: Int, height: Int, densityDpi: Int): Boolean =
         this.width == width && this.height == height && this.densityDpi == densityDpi
 
-    /** Points the display at a new car surface, or at nothing while the host has none. */
+    /**
+     * Points the display at a new car surface, or at a throwaway sink while the host has none.
+     *
+     * ## Why a sink and not `null`
+     *
+     * `display.surface = null` has "a similar effect to turning off the screen": the display goes
+     * off and the [Presentation]'s window loses the surface its hardware renderer draws into. The
+     * view tree does not know that. The WebView inside it is deliberately left running — that is the
+     * whole point of keeping the window alive while the car shows something else, and
+     * [BackgroundPlaybackMode] now stops the page pausing itself, so a playing page keeps producing
+     * frames the entire time. The next frame reached a renderer with no surface and the platform
+     * aborted the process outright:
+     *
+     * ```
+     * Abort message: 'drawRenderNode called on a context with no surface!'
+     * Fatal signal 6 (SIGABRT) in tid NNN (RenderThread)
+     * ```
+     *
+     * Not an exception that could be caught — SIGABRT on the RenderThread takes the whole app down,
+     * which is what was really happening behind "the music stopped when I left the browser" and
+     * "YouTube started over when I came back": the app had died and restarted.
+     *
+     * So the display always has somewhere to draw. The sink is an [ImageReader] that throws every
+     * frame away, which keeps the display on, the window's renderer valid, and the page playing. It
+     * is created at the display's own size so no scaling question arises, and released as soon as a
+     * real car surface is back.
+     */
     fun setSurface(surface: Surface?) {
-        display.surface = surface
+        if (surface != null) {
+            display.surface = surface
+            // Swapped first, so the display is never momentarily surface-less.
+            parkedSink?.release()
+            parkedSink = null
+        } else {
+            val sink = parkedSink ?: ParkedSink.create(width, height)?.also { parkedSink = it }
+            // A sink that could not be created is still better than a crash: fall through to the
+            // bare detach, which is only unsafe while something keeps drawing.
+            display.surface = sink?.surface
+        }
         AutoBridgeVideoLog.i(
-            "virtual-display setSurface displayId=$displayId attached=${surface != null} valid=${surface?.isValid}"
+            "virtual-display setSurface displayId=$displayId attached=${surface != null} " +
+                "valid=${surface?.isValid} parked=${parkedSink != null}"
         )
     }
 
@@ -110,7 +157,46 @@ class CarHardwareWebWindow private constructor(
             .onFailure { AutoBridgeVideoLog.w("presentation dismiss failed", it) }
         display.surface = null
         display.release()
+        parkedSink?.release()
+        parkedSink = null
         AutoBridgeVideoLog.i("hardware window released ${width}x$height")
+    }
+
+    /**
+     * A surface that accepts frames and discards them, so a display with nowhere real to draw is
+     * still a display that can be drawn to.
+     *
+     * The frames must actually be consumed: an [ImageReader] whose queue fills stops returning
+     * buffers, and the producer blocked on it here would be the window's RenderThread. They are
+     * drained on a thread of their own so a page playing video behind the car's own UI cannot add
+     * per-frame work to the main thread.
+     */
+    private class ParkedSink private constructor(
+        private val reader: ImageReader,
+        private val thread: HandlerThread,
+    ) {
+        val surface: Surface get() = reader.surface
+
+        fun release() {
+            runCatching { reader.close() }
+            runCatching { thread.quitSafely() }
+        }
+
+        companion object {
+            /** Two is enough to keep the producer from blocking while one frame is being dropped. */
+            private const val BUFFERS = 2
+
+            /** Null when the platform refuses the reader; the caller treats that as "no sink". */
+            fun create(width: Int, height: Int): ParkedSink? = runCatching {
+                val thread = HandlerThread("ab-car-parked-sink").apply { start() }
+                val reader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, BUFFERS)
+                reader.setOnImageAvailableListener(
+                    { r -> runCatching { r.acquireLatestImage()?.close() } },
+                    Handler(thread.looper)
+                )
+                ParkedSink(reader, thread)
+            }.onFailure { AutoBridgeVideoLog.w("parked sink unavailable", it) }.getOrNull()
+        }
     }
 
     /** A view whose only job is to run the renderer's chrome drawing on the hardware canvas. */

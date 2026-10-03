@@ -44,6 +44,24 @@ class MediaPlaybackClient(private val context: Context) {
     val isPlaying: Boolean
         get() = controller?.isPlaying == true
 
+    /** The index the shared session is currently on, or null when nothing is loaded. */
+    val currentIndex: Int?
+        get() = controller?.let { if (it.mediaItemCount > 0) it.currentMediaItemIndex else null }
+
+    /**
+     * The queue the session is currently playing, as the ordered list of each item's source URI.
+     * Empty when nothing is loaded. Used to tell whether a queue the phone is about to launch is
+     * already the live one, so it can be adopted instead of reset.
+     */
+    fun currentQueueUris(): List<String> {
+        val c = controller ?: return emptyList()
+        return (0 until c.mediaItemCount).map { i ->
+            c.getMediaItemAt(i).localConfiguration?.uri?.toString()
+                ?: c.getMediaItemAt(i).requestMetadata.mediaUri?.toString()
+                ?: ""
+        }
+    }
+
     val hasNext: Boolean
         get() = controller?.hasNextMediaItem() == true
 

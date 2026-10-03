@@ -103,4 +103,14 @@ object IptvCatalog {
         cache.remove(sourceId)
         episodeCache.keys.filter { it.startsWith("$sourceId:") }.forEach { episodeCache.remove(it) }
     }
+
+    /**
+     * Drops every in-memory catalog and episode list for a "clear cache" action. A load already in
+     * flight is left alone: it holds its own callback list and will repopulate the cache when it
+     * finishes, which is the same as any fresh load after clearing.
+     */
+    fun clearAll() {
+        cache.clear()
+        episodeCache.clear()
+    }
 }

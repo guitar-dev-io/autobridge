@@ -9,6 +9,7 @@ import android.webkit.CookieManager
 import android.webkit.DownloadListener
 import android.webkit.URLUtil
 import androidx.core.content.edit
+import dev.autobridge.R
 import dev.autobridge.entertainment.ContentAddress
 import org.json.JSONArray
 import org.json.JSONObject
@@ -46,7 +47,7 @@ object BrowserDownloads {
             val safe = ContentAddress.https(url)
             if (safe == null) {
                 Log.i(TAG, "declined non-https download scheme=${runCatching { Uri.parse(url).scheme }.getOrNull()}")
-                onResult("รองรับเฉพาะดาวน์โหลดผ่าน HTTPS")
+                onResult(context.getString(R.string.download_https_only))
                 return@DownloadListener
             }
             val fileName = URLUtil.guessFileName(safe, contentDisposition, mimeType)
@@ -69,12 +70,12 @@ object BrowserDownloads {
                 manager.enqueue(request)
             }.getOrElse { error ->
                 Log.w(TAG, "enqueue failed", error)
-                onResult("เริ่มดาวน์โหลดไม่สำเร็จ")
+                onResult(context.getString(R.string.download_start_failed))
                 return@DownloadListener
             }
             Log.i(TAG, "queued id=$queued name=$fileName bytes=$contentLength")
             record(context, BrowserDownload(queued, fileName, safe, System.currentTimeMillis()))
-            onResult("กำลังดาวน์โหลด $fileName")
+            onResult(context.getString(R.string.download_started, fileName))
         }
 
     fun list(context: Context): List<BrowserDownload> {
@@ -99,14 +100,17 @@ object BrowserDownloads {
         val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         manager.query(DownloadManager.Query().setFilterById(id)).use { cursor ->
             if (cursor == null || !cursor.moveToFirst()) return@runCatching null
-            when (cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))) {
-                DownloadManager.STATUS_SUCCESSFUL -> "เสร็จแล้ว"
-                DownloadManager.STATUS_FAILED -> "ไม่สำเร็จ"
-                DownloadManager.STATUS_PAUSED -> "หยุดชั่วคราว"
-                DownloadManager.STATUS_PENDING -> "รอคิว"
-                DownloadManager.STATUS_RUNNING -> "กำลังดาวน์โหลด"
-                else -> null
+            val label = when (
+                cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
+            ) {
+                DownloadManager.STATUS_SUCCESSFUL -> R.string.download_status_successful
+                DownloadManager.STATUS_FAILED -> R.string.download_status_failed
+                DownloadManager.STATUS_PAUSED -> R.string.download_status_paused
+                DownloadManager.STATUS_PENDING -> R.string.download_status_pending
+                DownloadManager.STATUS_RUNNING -> R.string.download_status_running
+                else -> return@runCatching null
             }
+            context.getString(label)
         }
     }.getOrNull()
 

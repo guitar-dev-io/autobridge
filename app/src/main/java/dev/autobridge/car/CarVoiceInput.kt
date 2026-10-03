@@ -21,6 +21,7 @@ import androidx.car.app.CarContext
 import androidx.car.app.media.CarAudioRecord
 import androidx.car.app.versioning.CarAppApiLevels
 import androidx.core.content.ContextCompat
+import dev.autobridge.R
 import dev.autobridge.display.StructuredLog
 import java.io.IOException
 
@@ -76,7 +77,7 @@ class CarVoiceInput(
     fun start() {
         if (isListening) return
         if (!SpeechRecognizer.isRecognitionAvailable(carContext)) {
-            listener.onError("ไม่พบบริการแปลงเสียงเป็นข้อความบนโทรศัพท์")
+            listener.onError(carContext.getString(R.string.voice_error_no_recognizer))
             return
         }
         if (ContextCompat.checkSelfPermission(carContext, Manifest.permission.RECORD_AUDIO)
@@ -88,12 +89,14 @@ class CarVoiceInput(
                 carContext.mainExecutor
             ) { granted, _ ->
                 if (Manifest.permission.RECORD_AUDIO in granted) start()
-                else listener.onError("ต้องอนุญาตไมโครโฟนบนโทรศัพท์ก่อน")
+                else listener.onError(
+                    carContext.getString(R.string.voice_error_needs_mic_permission)
+                )
             }
             return
         }
         if (!requestFocus()) {
-            listener.onError("ใช้ไมโครโฟนไม่ได้ในขณะนี้")
+            listener.onError(carContext.getString(R.string.voice_error_mic_busy))
             return
         }
         fellBackToPhone = false
@@ -118,7 +121,7 @@ class CarVoiceInput(
         ) {
             // start() already asked; re-checked here because the grant can be revoked in between.
             cancel()
-            listener.onError("ต้องอนุญาตไมโครโฟนบนโทรศัพท์ก่อน")
+            listener.onError(carContext.getString(R.string.voice_error_needs_mic_permission))
             return
         }
         val pipe = runCatching { ParcelFileDescriptor.createPipe() }.getOrNull()
@@ -156,7 +159,7 @@ class CarVoiceInput(
         val created = runCatching { SpeechRecognizer.createSpeechRecognizer(carContext) }.getOrNull()
         if (created == null) {
             cancel()
-            listener.onError("เริ่มฟังเสียงไม่ได้")
+            listener.onError(carContext.getString(R.string.voice_error_start_failed))
             return
         }
         this.source = source
@@ -170,7 +173,10 @@ class CarVoiceInput(
 
     private fun baseIntent() = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
         putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-        // Commands and hints are Thai; English site names still come through in Thai recognition.
+        // Deliberately not the UI language. What is recognised is what the driver *says*, and the
+        // command vocabularies in AgentCommandParser/CommandParser accept Thai and English either
+        // way; Thai recognition also passes English site names through intact, while English
+        // recognition does not survive Thai. Someone reading the English UI can still speak Thai.
         putExtra(RecognizerIntent.EXTRA_LANGUAGE, LANGUAGE)
         putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
         putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, carContext.packageName)
@@ -215,7 +221,9 @@ class CarVoiceInput(
                 ?.trim()
                 .orEmpty()
             cancel()
-            if (text.isEmpty()) listener.onError("ไม่ได้ยินคำสั่ง ลองพูดใหม่อีกครั้ง")
+            if (text.isEmpty()) {
+                listener.onError(carContext.getString(R.string.voice_error_nothing_heard))
+            }
             else listener.onResult(text)
         }
 
@@ -267,7 +275,7 @@ class CarVoiceInput(
                 ) {
                     if (isListening) {
                         cancel()
-                        listener.onError("หยุดฟังเพราะมีเสียงอื่นแทรก")
+                        listener.onError(carContext.getString(R.string.voice_error_interrupted))
                     }
                 }
             }, main)
@@ -283,16 +291,19 @@ class CarVoiceInput(
         focusRequest = null
     }
 
-    private fun messageFor(error: Int): String = when (error) {
-        SpeechRecognizer.ERROR_NO_MATCH,
-        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "ไม่ได้ยินคำสั่ง ลองพูดใหม่อีกครั้ง"
-        SpeechRecognizer.ERROR_NETWORK,
-        SpeechRecognizer.ERROR_NETWORK_TIMEOUT,
-        SpeechRecognizer.ERROR_SERVER -> "แปลงเสียงไม่ได้ ตรวจสอบอินเทอร์เน็ต"
-        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "ต้องอนุญาตไมโครโฟนบนโทรศัพท์ก่อน"
-        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "ระบบฟังเสียงกำลังทำงานอยู่ ลองอีกครั้ง"
-        else -> "ฟังเสียงไม่สำเร็จ ลองอีกครั้ง"
-    }
+    private fun messageFor(error: Int): String = carContext.getString(
+        when (error) {
+            SpeechRecognizer.ERROR_NO_MATCH,
+            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> R.string.voice_error_nothing_heard
+            SpeechRecognizer.ERROR_NETWORK,
+            SpeechRecognizer.ERROR_NETWORK_TIMEOUT,
+            SpeechRecognizer.ERROR_SERVER -> R.string.voice_error_server
+            SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS ->
+                R.string.voice_error_needs_mic_permission
+            SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> R.string.voice_error_recognizer_busy
+            else -> R.string.voice_error_generic
+        }
+    )
 
     private companion object {
         const val MAX_LISTEN_MS = 10_000L

@@ -40,10 +40,13 @@ class VoiceFeedback(context: Context) {
             StructuredLog.i("VOICE", "tts init failed status=$status")
             return
         }
-        val thai = Locale.forLanguageTag("th-TH")
-        val result = tts.setLanguage(thai)
+        // Follow the device/app language so the spoken reply matches the UI language the toast is
+        // shown in. The phrases themselves come from locale-aware string resources, so the voice
+        // and the text always agree. Falls back to the engine default when no voice is installed.
+        val locale = appLocale()
+        val result = tts.setLanguage(locale)
         if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-            StructuredLog.i("VOICE", "thai tts voice unavailable; using engine default")
+            StructuredLog.i("VOICE", "tts voice unavailable for ${locale.toLanguageTag()}; using engine default")
         }
         tts.setAudioAttributes(attributes)
         tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
@@ -77,6 +80,12 @@ class VoiceFeedback(context: Context) {
 
     private fun release() {
         audioManager?.abandonAudioFocusRequest(focusRequest)
+    }
+
+    /** The current app/device locale, honoring a per-app language override on Android 13+. */
+    private fun appLocale(): Locale {
+        val configLocales = appContext.resources.configuration.locales
+        return if (!configLocales.isEmpty) configLocales.get(0) else Locale.getDefault()
     }
 
     private companion object {

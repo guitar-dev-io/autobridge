@@ -63,7 +63,7 @@ class CarVideoScreen(
     private val listener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) {
             playbackFailure = player.playerError?.let {
-                "Unable to play this source. Return to the library and try another video."
+                carContext.getString(R.string.car_video_source_failed)
             }
             invalidate()
         }
@@ -99,7 +99,7 @@ class CarVideoScreen(
                     attach()
                     invalidate()
                 }, onError = {
-                    failure = "Cannot connect to the media player. Return to the library and try again."
+                    failure = carContext.getString(R.string.car_video_player_failed)
                     invalidate()
                 })
             }
@@ -129,7 +129,7 @@ class CarVideoScreen(
         val player = media.player ?: return
         if (!active || !allowed() || !output.isValid || !MirrorSurfaceOwnership.isOwner(this)) return
         if (!player.isCommandAvailable(Player.COMMAND_SET_VIDEO_SURFACE)) {
-            failure = "Video output is unavailable on this connection."
+            failure = carContext.getString(R.string.car_video_output_unavailable)
             invalidate()
             return
         }
@@ -189,24 +189,28 @@ class CarVideoScreen(
 
     override fun onGetTemplate(): Template {
         val message = failure ?: playbackFailure
-            ?: if (!allowed()) "Park the vehicle to watch video." else null
+            ?: if (!allowed()) carContext.getString(R.string.car_video_park_to_watch) else null
         if (message != null) {
             return PaneTemplate.Builder(Pane.Builder().addRow(Row.Builder().setTitle(title).addText(message).build()).build())
-                .setHeader(Header.Builder().setTitle("Video").setStartHeaderAction(Action.BACK).build()).build()
+                .setHeader(Header.Builder().setTitle(carContext.getString(R.string.car_video_title)).setStartHeaderAction(Action.BACK).build()).build()
         }
         val player = media.player
         return NavigationTemplate.Builder()
             .setActionStrip(ActionStrip.Builder()
                 .addAction(Action.BACK)
-                .addAction(control(R.drawable.ic_car_home, "Home") { screenManager.popToRoot() })
+                .addAction(control(R.drawable.ic_car_home, carContext.getString(R.string.car_video_home)) { screenManager.popToRoot() })
                 .addAction(control(if (media.isPlaying) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play,
-                    if (media.isPlaying) "Pause" else "Play", player?.isCommandAvailable(Player.COMMAND_PLAY_PAUSE) == true) {
+                    carContext.getString(
+                        if (media.isPlaying) R.string.car_now_pause else R.string.car_now_play
+                    ),
+                    player?.isCommandAvailable(Player.COMMAND_PLAY_PAUSE) == true
+                ) {
                     if (media.isPlaying) media.pause() else if (allowed()) media.resume()
                 })
                 .build())
             .setMapActionStrip(ActionStrip.Builder()
-                .addAction(control(android.R.drawable.ic_media_rew, "Back 10 seconds", player?.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM) == true, mapAction = true) { seek(-10_000L) })
-                .addAction(control(android.R.drawable.ic_media_ff, "Forward 10 seconds", player?.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM) == true, mapAction = true) { seek(10_000L) })
+                .addAction(control(android.R.drawable.ic_media_rew, carContext.getString(R.string.car_video_back_10), player?.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM) == true, mapAction = true) { seek(-10_000L) })
+                .addAction(control(android.R.drawable.ic_media_ff, carContext.getString(R.string.car_video_forward_10), player?.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM) == true, mapAction = true) { seek(10_000L) })
                 .build())
             .build()
     }

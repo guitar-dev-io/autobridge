@@ -8,6 +8,7 @@ import androidx.car.app.model.ItemList
 import androidx.car.app.model.ListTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
+import dev.autobridge.R
 import dev.autobridge.agent.AgentCommandRouter
 import dev.autobridge.core.state.RecentActivityStore
 
@@ -22,7 +23,7 @@ class CarRecentScreen(carContext: CarContext) : Screen(carContext) {
         val entries = RecentActivityStore.list(carContext)
         val list = ItemList.Builder()
         if (entries.isEmpty()) {
-            list.setNoItemsMessage("No recent activity yet")
+            list.setNoItemsMessage(carContext.getString(R.string.car_recent_empty))
         } else {
             entries.forEach { entry -> list.addItem(row(entry)) }
         }
@@ -30,7 +31,7 @@ class CarRecentScreen(carContext: CarContext) : Screen(carContext) {
         return ListTemplate.Builder()
             .setHeader(
                 Header.Builder()
-                    .setTitle("Recent")
+                    .setTitle(carContext.getString(R.string.car_recent_title))
                     .setStartHeaderAction(Action.BACK)
                     .addEndHeaderAction(
                         Action.Builder()

@@ -9,6 +9,7 @@ import androidx.car.app.model.ListTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.SectionedItemList
 import androidx.car.app.model.Template
+import dev.autobridge.R
 import dev.autobridge.library.StreamingLinks
 
 /**
@@ -20,7 +21,10 @@ import dev.autobridge.library.StreamingLinks
 class CarStreamingScreen(carContext: CarContext) : Screen(carContext) {
     override fun onGetTemplate(): Template {
         val template = ListTemplate.Builder()
-            .setHeader(Header.Builder().setTitle("Streaming").setStartHeaderAction(Action.BACK).build())
+            .setHeader(Header.Builder()
+                    .setTitle(carContext.getString(R.string.car_streaming_title))
+                    .setStartHeaderAction(Action.BACK)
+                    .build())
         // Sections share the host's row limit; keep the total within it.
         var budget = CarListPaging.limit(carContext)
         StreamingLinks.grouped().forEach { (group, links) ->
@@ -44,7 +48,7 @@ class CarStreamingScreen(carContext: CarContext) : Screen(carContext) {
     /** Same entry rule as the home tiles: a site already open is returned to, not reloaded. */
     private fun open(url: String) {
         val renderer = dev.autobridge.browser.CarBrowserRuntime.renderer(carContext)
-        if (!dev.autobridge.browser.CarBrowserEntry.resumes(renderer.livePageUrl, url)) {
+        if (!dev.autobridge.browser.BrowserSiteEntry.resumes(renderer.livePageUrl, url)) {
             renderer.load(url)
         }
         CarNavigation.open(screenManager, "CarBrowserScreen") { CarBrowserScreen(carContext) }

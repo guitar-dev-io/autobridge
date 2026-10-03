@@ -34,12 +34,14 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import dev.autobridge.R
 import dev.autobridge.core.model.Feature
 import dev.autobridge.core.policy.FeaturePolicy
 import dev.autobridge.entertainment.BrowserLauncher
 import dev.autobridge.entertainment.ContentAddress
 import dev.autobridge.entertainment.WebBookmarkStore
 import dev.autobridge.entertainment.WebHistoryStore
+import dev.autobridge.i18n.AppLocale
 import dev.autobridge.remote.CarScreenController
 import dev.autobridge.safety.ParkingStateStore
 
@@ -130,10 +132,14 @@ class BrowserActivity : Activity() {
      * page on one density; see [CarDisplayScaling].
      */
     override fun attachBaseContext(newBase: Context) {
-        // Two re-bases, for two unrelated reasons: the density one pins the page's CSS width, the
-        // appearance one puts the window in the night mode the user picked so the WebView built
-        // from this context reports the matching prefers-color-scheme.
-        super.attachBaseContext(BrowserAppearanceStore.rebase(CarDisplayScaling.rebase(newBase)))
+        // Three re-bases, for three unrelated reasons: the density one pins the page's CSS width,
+        // the appearance one puts the window in the night mode the user picked so the WebView
+        // built from this context reports the matching prefers-color-scheme, and the locale one
+        // applies the Settings > Language choice on API 29-32. Order does not matter: each
+        // overrides a different Configuration field.
+        super.attachBaseContext(
+            AppLocale.rebase(BrowserAppearanceStore.rebase(CarDisplayScaling.rebase(newBase)))
+        )
     }
 
     /**
@@ -170,7 +176,7 @@ class BrowserActivity : Activity() {
             gravity = Gravity.CENTER; setTextColor(BrowserTheme.textPrimary)
         }
         loadError = TextView(this).apply {
-            text = "โหลดหน้านี้ไม่สำเร็จ\nแตะเพื่อลองใหม่"
+            text = getString(R.string.browser_page_load_failed)
             gravity = Gravity.CENTER; setTextColor(BrowserTheme.errorAccent)
             setBackgroundColor(BrowserTheme.errorBackground)
             visibility = View.GONE
@@ -185,7 +191,7 @@ class BrowserActivity : Activity() {
             textSize = iconSp(AutoUiSizes.ICON_MEDIUM_DP)
             gravity = Gravity.CENTER
             setTextColor(BrowserTheme.iconEnabled)
-            contentDescription = "เมนูเบราว์เซอร์ (ลากเพื่อย้ายปุ่ม)"
+            contentDescription = getString(R.string.browser_fab_description)
             isFocusable = true
             background = GradientDrawable().apply {
                 setColor(0xE6101113.toInt())
@@ -349,7 +355,7 @@ class BrowserActivity : Activity() {
      * restores the previous address without touching the page.
      */
     private fun buildAddressField(): EditText = EditText(this).apply {
-        hint = HINT_IDLE
+        setHint(HINT_IDLE)
         setTextColor(BrowserTheme.textPrimary)
         setHintTextColor(BrowserTheme.textSecondary)
         textSize = iconSp(AutoUiSizes.ICON_SMALL_DP * 0.85f)
@@ -383,7 +389,7 @@ class BrowserActivity : Activity() {
                     .showSoftInput(this, InputMethodManager.SHOW_IMPLICIT)
             } else {
                 // Leaving edit mode collapses back to the compact hostname with no clear button.
-                hint = HINT_IDLE
+                setHint(HINT_IDLE)
                 setText(displayUrl(web.url.orEmpty()))
                 setClearButtonVisible(false)
             }
@@ -931,7 +937,48 @@ class BrowserActivity : Activity() {
                 sendToCar(BrowserInputResolver.resolveBrowserInput(input, selectedEngine))
             },
             onSendUrl = { url -> sendToCar(url) },
+            queue = playQueueAccess(),
         ).show()
+    }
+
+    /**
+     * The sheet's window onto [BrowserPlayQueue].
+     *
+     * Resolving lives here rather than in the sheet so "a URL, a bare host, or a search" has the one
+     * answer it has everywhere else ([BrowserInputResolver]), and so the only place that talks to the
+     * store is the activity. A queued page carries no resume position on purpose: sending a page is
+     * "carry on from here", queueing one is "play this next", which starts at the beginning.
+     */
+    private fun playQueueAccess() = object : SendToCarSheet.QueueAccess {
+        override fun items(): List<BrowserPlayQueue.Item> = BrowserPlayQueue.items(this@BrowserActivity)
+
+        override fun add(input: String?, engine: SearchEngine): Int? {
+            val url = if (input == null) {
+                currentPageUrl()
+            } else {
+                BrowserInputResolver.resolveBrowserInput(input, engine)
+            }
+            if (url == null) {
+                toast(getString(R.string.browser_nothing_to_queue))
+                return null
+            }
+            val title = if (input == null) web.title.orEmpty() else ""
+            val size = BrowserPlayQueue.add(this@BrowserActivity, url, title)
+            toast(
+            if (size == null) getString(R.string.browser_already_queued)
+            // A quantity, so a plural rather than a format string: English needs "1 item" and
+            // "2 items", and a language with more grammatical numbers needs its own forms.
+            else resources.getQuantityString(R.plurals.browser_queued, size, size)
+        )
+            return size
+        }
+
+        override fun remove(url: String) = BrowserPlayQueue.remove(this@BrowserActivity, url)
+
+        override fun clear() {
+            BrowserPlayQueue.clear(this@BrowserActivity)
+            toast(getString(R.string.browser_queue_cleared))
+        }
     }
 
     /** The page this activity is showing, as the one validated HTTPS form the car is given. */
@@ -953,14 +1000,14 @@ class BrowserActivity : Activity() {
      */
     private fun sendToCar(url: String?): Boolean {
         if (!allowed()) return false
-        if (url.isNullOrBlank()) { toast("ยังไม่มีหน้าหรือคำค้นให้ส่ง"); return false }
+        if (url.isNullOrBlank()) { toast(getString(R.string.browser_nothing_to_send)); return false }
         val target = CarScreenController.requireBrowser()
-        if (target == null) { toast("ยังไม่ได้เชื่อมต่อ Android Auto"); return false }
+        if (target == null) { toast(getString(R.string.browser_not_connected)); return false }
         if (url == currentPageUrl() && BrowserResumePoint.supports(url)) {
             sendWithResumePoint(url, target)
         } else {
             target.openUrl(url)
-            toast("ส่งไปที่จอรถแล้ว")
+            toast(getString(R.string.browser_sent_to_car))
         }
         return true
     }
@@ -982,8 +1029,11 @@ class BrowserActivity : Activity() {
                 // Naming the time is the whole confirmation: "it started over" was the complaint this
                 // path answers, and the user is looking at the phone, not yet at the car.
                 toast(
-                    if (resolved == url) "ส่งไปที่จอรถแล้ว"
-                    else "ส่งไปที่จอรถแล้ว · เล่นต่อที่ ${BrowserResumePoint.clock(positionMs)}"
+                    if (resolved == url) getString(R.string.browser_sent_to_car)
+                    else getString(
+                        R.string.browser_sent_to_car_resumed,
+                        BrowserResumePoint.clock(positionMs)
+                    )
                 )
             }
         }
@@ -1002,7 +1052,8 @@ class BrowserActivity : Activity() {
     /** Pulls whatever the car surface is showing back onto the phone. Unchanged behaviour. */
     private fun receiveFromCar() {
         val url = CarScreenController.activeBrowser?.currentUrl
-        if (url.isNullOrBlank()) toast("เปิด Browser บน Android Auto ก่อน") else navigate(url)
+        if (url.isNullOrBlank()) toast(getString(R.string.browser_open_car_browser_first))
+        else navigate(url)
     }
 
     /**
@@ -1034,7 +1085,9 @@ class BrowserActivity : Activity() {
             DrawerAction.RELOAD -> web.reload()
             DrawerAction.BOOKMARKS -> showBookmarks()
             DrawerAction.OPEN_EXTERNAL ->
-                if (!BrowserLauncher.openUrl(this, web.url.orEmpty())) toast("เปิดเบราว์เซอร์ไม่ได้")
+                if (!BrowserLauncher.openUrl(this, web.url.orEmpty())) {
+                toast(getString(R.string.browser_cannot_open_browser))
+            }
             DrawerAction.SETTINGS -> showBrowserSettings()
             DrawerAction.HOME -> navigate(BrowserStartupStore.homePage(this))
             DrawerAction.HISTORY -> showHistory()
@@ -1054,9 +1107,9 @@ class BrowserActivity : Activity() {
             DrawerAction.COPY_URL -> {
                 val manager = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                 manager.setPrimaryClip(ClipData.newPlainText("URL", web.url.orEmpty()))
-                toast("คัดลอก URL แล้ว")
+                toast(getString(R.string.browser_url_copied))
             }
-            DrawerAction.PASTE_AND_GO -> clipboardText()?.let { navigate(it) } ?: toast("คลิปบอร์ดว่าง")
+            DrawerAction.PASTE_AND_GO -> clipboardText()?.let { navigate(it) } ?: toast(getString(R.string.browser_clipboard_empty))
             DrawerAction.ZOOM_IN -> web.zoomBy(1.25f)
             DrawerAction.ZOOM_OUT -> web.zoomBy(0.8f)
             DrawerAction.CLEAR_DATA -> confirmClearBrowsingData()
@@ -1097,16 +1150,20 @@ class BrowserActivity : Activity() {
             true
         }.getOrDefault(false)
         if (!opened && !BrowserLauncher.openUrl(this, "https://github.com/guitar-dev-io/autobridge/blob/main/LICENSE")) {
-            toast("เปิดสัญญาอนุญาตไม่ได้")
+            toast(getString(R.string.browser_cannot_open_licenses))
         }
     }
 
     /** Saves the page on screen, the one action the phone menu could list bookmarks but not add to. */
     private fun bookmarkCurrentPage() {
         val url = web.url.orEmpty()
-        if (url.isBlank()) { toast("ยังไม่มีหน้าให้บันทึก"); return }
+        if (url.isBlank()) { toast(getString(R.string.browser_nothing_to_bookmark)); return }
         val added = WebBookmarkStore.add(this, web.title?.takeIf { it.isNotBlank() } ?: url, url)
-        toast(if (added) "บันทึกบุ๊กมาร์กแล้ว" else "บันทึกไม่สำเร็จ")
+        toast(
+            getString(
+                if (added) R.string.browser_bookmark_saved else R.string.browser_bookmark_failed
+            )
+        )
     }
 
     /**
@@ -1167,15 +1224,15 @@ class BrowserActivity : Activity() {
         AlertDialog.Builder(this)
             .setTitle("Home page")
             .setView(container)
-            .setPositiveButton("บันทึก") { _, _ ->
+            .setPositiveButton(R.string.action_save) { _, _ ->
                 if (BrowserStartupStore.setHomePage(this, field.text.toString())) {
-                    toast("ตั้งค่าหน้าแรกแล้ว")
+                    toast(getString(R.string.browser_home_page_set))
                     showBrowserSettings()
                 } else {
-                    toast("URL ไม่ถูกต้อง")
+                    toast(getString(R.string.browser_invalid_url))
                 }
             }
-            .setNegativeButton("ยกเลิก") { _, _ -> showBrowserSettings() }
+            .setNegativeButton(R.string.action_cancel) { _, _ -> showBrowserSettings() }
             .show()
     }
 
@@ -1188,14 +1245,14 @@ class BrowserActivity : Activity() {
     private fun confirmResetSitePermissions() {
         AlertDialog.Builder(this)
             .setTitle("Reset saved site permissions")
-            .setMessage("ล้างสิทธิ์ที่เว็บไซต์เคยได้รับ (เช่น ตำแหน่งที่ตั้ง) เว็บจะถามใหม่ครั้งถัดไป")
-            .setPositiveButton("รีเซ็ต") { _, _ ->
+            .setMessage(R.string.browser_reset_permissions_message)
+            .setPositiveButton(R.string.action_reset) { _, _ ->
                 @Suppress("DEPRECATION")
                 android.webkit.GeolocationPermissions.getInstance().clearAll()
                 showBrowserSettings()
-                toast("รีเซ็ตสิทธิ์แล้ว")
+                toast(getString(R.string.browser_permissions_reset))
             }
-            .setNegativeButton("ยกเลิก") { _, _ -> showBrowserSettings() }
+            .setNegativeButton(R.string.action_cancel) { _, _ -> showBrowserSettings() }
             .show()
     }
 
@@ -1203,15 +1260,15 @@ class BrowserActivity : Activity() {
     private fun confirmDeleteSiteData() {
         AlertDialog.Builder(this)
             .setTitle("Delete cookies and site data")
-            .setMessage("ลบคุกกี้และข้อมูลเว็บที่เก็บไว้ในเครื่อง (ประวัติและบุ๊กมาร์กจะไม่ถูกลบ)")
-            .setPositiveButton("ลบ") { _, _ ->
+            .setMessage(R.string.browser_delete_site_data_message)
+            .setPositiveButton(R.string.action_delete) { _, _ ->
                 CookieManager.getInstance().removeAllCookies(null)
                 CookieManager.getInstance().flush()
                 WebStorage.getInstance().deleteAllData()
-                toast("ลบคุกกี้และข้อมูลเว็บแล้ว")
+                toast(getString(R.string.browser_site_data_deleted))
                 showBrowserSettings()
             }
-            .setNegativeButton("ยกเลิก") { _, _ -> showBrowserSettings() }
+            .setNegativeButton(R.string.action_cancel) { _, _ -> showBrowserSettings() }
             .show()
     }
 
@@ -1227,7 +1284,13 @@ class BrowserActivity : Activity() {
         val labels = buildList {
             add(if (mode == BrowserUserAgentMode.MOBILE) "✓ Mobile" else "Mobile")
             add(if (mode == BrowserUserAgentMode.DESKTOP) "✓ Desktop" else "Desktop")
-            add(if (mode == BrowserUserAgentMode.CUSTOM) "✓ กำหนดเอง… (${custom.take(40)})" else "กำหนดเอง…")
+            add(
+                if (mode == BrowserUserAgentMode.CUSTOM) {
+                    getString(R.string.browser_ua_custom_selected, custom.take(40))
+                } else {
+                    getString(R.string.browser_ua_custom)
+                }
+            )
             presets.forEach { preset ->
                 val selected = mode == BrowserUserAgentMode.CUSTOM && preset.userAgent == custom
                 add(if (selected) "✓ ${preset.label}" else preset.label)
@@ -1246,7 +1309,7 @@ class BrowserActivity : Activity() {
                     }
                 }
             }
-            .setNegativeButton("ยกเลิก", null)
+            .setNegativeButton(R.string.action_cancel, null)
             .show()
     }
 
@@ -1263,16 +1326,16 @@ class BrowserActivity : Activity() {
             addView(field)
         }
         AlertDialog.Builder(this)
-            .setTitle("User-Agent กำหนดเอง")
+            .setTitle(R.string.browser_ua_custom_title)
             .setView(container)
-            .setPositiveButton("บันทึก") { _, _ ->
+            .setPositiveButton(R.string.action_save) { _, _ ->
                 if (BrowserUserAgentStore.saveCustom(this, field.text.toString())) {
                     applyUserAgentChange()
                 } else {
-                    toast("User-Agent ไม่ถูกต้อง (ว่าง, ยาวเกิน 512 ตัว หรือมีขึ้นบรรทัดใหม่)")
+                    toast(getString(R.string.browser_ua_invalid))
                 }
             }
-            .setNegativeButton("ยกเลิก", null)
+            .setNegativeButton(R.string.action_cancel, null)
             .show()
     }
 
@@ -1298,7 +1361,8 @@ class BrowserActivity : Activity() {
         const val ADDRESS_PILL_HEIGHT_DP = 34f
 
         /** Hint shown on the compact, unfocused pill. */
-        const val HINT_IDLE = "URL / ค้นหา"
+        /** The address bar's resting hint; a string id so it follows the UI language. */
+        val HINT_IDLE get() = R.string.browser_address_hint_idle
 
         /** Hint shown once the field is tapped and becomes a full editable omnibox. */
         const val HINT_EDITING = "Search or enter address"
@@ -1310,6 +1374,13 @@ class BrowserActivity : Activity() {
          * second or more the car's own page load takes.
          */
         const val RESUME_READ_TIMEOUT_MS = 500L
+
+        /**
+         * How often the foreground phone browser checks whether the page finished, while the play
+         * queue has something in it. The same cadence the car's media poll uses, and the delay a
+         * listener would never notice between one item ending and the next loading.
+         */
+        const val QUEUE_WATCH_MS = 1_000L
 
         /** Shared with [BrowserDefaults] and [BrowserUserAgentStore]: one browser preference file. */
         const val FAB_PREFS = "autobridge_browser"
@@ -1325,14 +1396,18 @@ class BrowserActivity : Activity() {
     }
 
     private fun showFindInPage() {
-        val query = EditText(this).apply { hint = "ค้นหาในหน้า"; setSingleLine() }
-        AlertDialog.Builder(this).setTitle("ค้นหาในหน้า").setView(query)
-            .setPositiveButton("ค้นหา") { _, _ ->
+        val query = EditText(this).apply {
+            hint = getString(R.string.browser_find_title)
+            setSingleLine()
+        }
+        AlertDialog.Builder(this).setTitle(R.string.browser_find_title).setView(query)
+            .setPositiveButton(R.string.action_search) { _, _ ->
                 if (!allowed()) return@setPositiveButton
                 web.findAllAsync(query.text.toString())
-                AlertDialog.Builder(this).setTitle("ค้นหาในหน้า")
-                    .setPositiveButton("ถัดไป", null).setNegativeButton("ก่อนหน้า", null)
-                    .setNeutralButton("ปิด") { _, _ -> web.clearMatches() }
+                AlertDialog.Builder(this).setTitle(R.string.browser_find_title)
+                    .setPositiveButton(R.string.action_next, null)
+                    .setNegativeButton(R.string.action_previous, null)
+                    .setNeutralButton(R.string.action_close) { _, _ -> web.clearMatches() }
                     .create().also { dialog ->
                         dialog.setOnShowListener {
                             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener { web.findNext(true) }
@@ -1340,7 +1415,7 @@ class BrowserActivity : Activity() {
                         }
                         dialog.show()
                     }
-            }.setNegativeButton("ยกเลิก", null).show()
+            }.setNegativeButton(R.string.action_cancel, null).show()
     }
 
     /**
@@ -1349,9 +1424,9 @@ class BrowserActivity : Activity() {
      */
     private fun confirmClearBrowsingData() {
         AlertDialog.Builder(this)
-            .setTitle("ล้างข้อมูลการท่องเว็บ")
-            .setMessage("ล้างแคช คุกกี้ ที่เก็บข้อมูลเว็บ และประวัติ (บุ๊กมาร์กจะไม่ถูกลบ)")
-            .setPositiveButton("ล้าง") { _, _ ->
+            .setTitle(R.string.browser_clear_data_title)
+            .setMessage(R.string.browser_clear_data_message)
+            .setPositiveButton(R.string.action_clear) { _, _ ->
                 CookieManager.getInstance().removeAllCookies(null)
                 CookieManager.getInstance().flush()
                 WebStorage.getInstance().deleteAllData()
@@ -1359,41 +1434,43 @@ class BrowserActivity : Activity() {
                 web.clearFormData()
                 web.clearHistory()
                 WebHistoryStore.clear(this)
-                toast("ล้างข้อมูลแล้ว")
+                toast(getString(R.string.browser_data_cleared))
             }
-            .setNegativeButton("ยกเลิก", null)
+            .setNegativeButton(R.string.action_cancel, null)
             .show()
     }
 
     private fun showDownloads() {
         val downloads = BrowserDownloads.list(this)
-        if (downloads.isEmpty()) { toast("ยังไม่มีไฟล์ที่ดาวน์โหลด"); return }
+        if (downloads.isEmpty()) { toast(getString(R.string.browser_no_downloads)); return }
         val labels = downloads.map { entry ->
             val status = BrowserDownloads.status(this, entry.id)
             if (status == null) entry.fileName else "${entry.fileName}  •  $status"
         }
-        AlertDialog.Builder(this).setTitle("ดาวน์โหลด")
+        AlertDialog.Builder(this).setTitle(R.string.browser_downloads_title)
             .setItems(labels.toTypedArray(), null)
-            .setNeutralButton("ล้างรายการ") { _, _ -> BrowserDownloads.clear(this) }
-            .setNegativeButton("ปิด", null)
+            .setNeutralButton(R.string.browser_downloads_clear_list) { _, _ ->
+                BrowserDownloads.clear(this)
+            }
+            .setNegativeButton(R.string.action_close, null)
             .show()
     }
 
     /** Tap opens the page; long-press removes it, matching the bookmarks long-press-to-remove pattern. */
     private fun showBookmarks() {
         val saved = WebBookmarkStore.list(this).toMutableList()
-        if (saved.isEmpty()) { toast("ยังไม่มีบุ๊กมาร์ก"); return }
+        if (saved.isEmpty()) { toast(getString(R.string.browser_no_bookmarks)); return }
         val adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, saved.map { it.title }.toMutableList())
-        val dialog = AlertDialog.Builder(this).setTitle("บุ๊กมาร์ก (กดค้างเพื่อลบ)")
+        val dialog = AlertDialog.Builder(this).setTitle(R.string.browser_bookmarks_title)
             .setAdapter(adapter) { _, i -> navigate(saved[i].url) }
-            .setNegativeButton("ปิด", null)
+            .setNegativeButton(R.string.action_close, null)
             .create()
         dialog.show()
         dialog.listView.setOnItemLongClickListener { _, _, i, _ ->
             WebBookmarkStore.remove(this, saved[i].url)
             saved.removeAt(i)
             adapter.remove(adapter.getItem(i))
-            toast("ลบบุ๊กมาร์กแล้ว")
+            toast(getString(R.string.browser_bookmark_removed))
             if (saved.isEmpty()) dialog.dismiss()
             true
         }
@@ -1402,12 +1479,15 @@ class BrowserActivity : Activity() {
     /** Tap opens the page; long-press removes just that entry. */
     private fun showHistory() {
         val visited = WebHistoryStore.list(this).toMutableList()
-        if (visited.isEmpty()) { toast("ยังไม่มีประวัติการเข้าชม"); return }
+        if (visited.isEmpty()) { toast(getString(R.string.browser_no_history)); return }
         val adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, visited.map { it.title }.toMutableList())
-        val dialog = AlertDialog.Builder(this).setTitle("ประวัติ (กดค้างเพื่อลบ)")
+        val dialog = AlertDialog.Builder(this).setTitle(R.string.browser_history_title)
             .setAdapter(adapter) { _, i -> navigate(visited[i].url) }
-            .setNeutralButton("ล้างทั้งหมด") { _, _ -> WebHistoryStore.clear(this); toast("ล้างประวัติแล้ว") }
-            .setNegativeButton("ปิด", null)
+            .setNeutralButton(R.string.browser_history_clear_all) { _, _ ->
+                WebHistoryStore.clear(this)
+                toast(getString(R.string.browser_history_cleared))
+            }
+            .setNegativeButton(R.string.action_close, null)
             .create()
         dialog.show()
         dialog.listView.setOnItemLongClickListener { _, _, i, _ ->
@@ -1427,12 +1507,14 @@ class BrowserActivity : Activity() {
      */
     private fun promptExternalSignIn(url: String) {
         AlertDialog.Builder(this)
-            .setTitle("เข้าสู่ระบบ")
-            .setMessage("เพื่อความปลอดภัย ผู้ให้บริการนี้ไม่อนุญาตให้ล็อกอินในเบราว์เซอร์ที่ฝังอยู่ในแอปอื่น")
-            .setPositiveButton("เข้าสู่ระบบ") { _, _ ->
-                if (!BrowserLauncher.openSignIn(this, url)) toast("เปิดเบราว์เซอร์ไม่ได้")
+            .setTitle(R.string.browser_signin_title)
+            .setMessage(R.string.browser_signin_message)
+            .setPositiveButton(R.string.action_sign_in) { _, _ ->
+                if (!BrowserLauncher.openSignIn(this, url)) {
+                    toast(getString(R.string.browser_cannot_open_browser))
+                }
             }
-            .setNegativeButton("ยกเลิก", null)
+            .setNegativeButton(R.string.action_cancel, null)
             .show()
     }
 
@@ -1449,7 +1531,13 @@ class BrowserActivity : Activity() {
             if (web.url != "about:blank") web.loadUrl("about:blank")
         } else if (resumed) {
             web.onResume()
-            pendingUrl?.let { pendingUrl = null; navigate(it) }
+            pendingUrl?.let { url ->
+                pendingUrl = null
+                // The phone's Home tiles arrive here as an intent carrying a site root, which is the
+                // same gesture as the car's tiles: a tile for the site already open means "show me
+                // that", and reloading would throw away the page and restart what is playing on it.
+                if (!BrowserSiteEntry.resumes(web.url, url)) navigate(url)
+            }
         }
     }
 
@@ -1491,8 +1579,49 @@ class BrowserActivity : Activity() {
         )
     }
 
+    /**
+     * Watches the page for the end of what it is playing, so [BrowserPlayQueue] advances on the
+     * phone as it does on the car.
+     *
+     * The car gets this from [dev.autobridge.media.MediaPlaybackService]'s one-second poll, which
+     * exists to feed the media session and only ever reads the car browser
+     * ([dev.autobridge.media.WebMediaHub] holds a single source). Registering this activity there
+     * instead would hand the car's media card the phone's page, so the phone keeps its own watch.
+     *
+     * It costs nothing until the queue is used: an empty queue is answered from preferences without
+     * asking the page anything. Edge-triggered for the same reason the service is — a finished page
+     * keeps saying so until something replaces it, and acting on the level would empty the whole
+     * queue into one page load.
+     */
+    private val queueWatch = object : Runnable {
+        override fun run() {
+            if (!resumed) return
+            if (BrowserPlayQueue.size(this@BrowserActivity) > 0) {
+                webAudio.readState { status ->
+                    val startedFinishing = status.ended && !pageHadFinished
+                    pageHadFinished = status.ended
+                    if (startedFinishing) advanceToQueuedPage()
+                }
+            }
+            web.postDelayed(this, QUEUE_WATCH_MS)
+        }
+    }
+
+    /** Whether the previous reading already said the page had finished; see [queueWatch]. */
+    private var pageHadFinished = false
+
+    private fun advanceToQueuedPage() {
+        val next = BrowserPlayQueue.takeNext(this) ?: return
+        // The next page has nothing playing yet, so its own end must read as a fresh transition.
+        pageHadFinished = false
+        toast(getString(R.string.browser_resumed_from_queue))
+        navigate(next.url)
+    }
+
     override fun onResume() {
         super.onResume(); resumed = true
+        web.removeCallbacks(queueWatch)
+        web.postDelayed(queueWatch, QUEUE_WATCH_MS)
         // Timers are process-wide; the car browser may have paused them while it was hidden.
         WebViewTimerGate.hold(TIMER_GATE_OWNER, web)
         val previousAgent = web.settings.userAgentString
@@ -1503,6 +1632,7 @@ class BrowserActivity : Activity() {
 
     override fun onPause() {
         resumed = false
+        web.removeCallbacks(queueWatch)
         web.onPause()
         WebViewTimerGate.release(TIMER_GATE_OWNER, web)
         // WebView writes cookies to disk lazily, so a session established moments ago can still be

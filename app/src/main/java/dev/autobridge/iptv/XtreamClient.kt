@@ -245,6 +245,9 @@ internal object XtreamClient {
         }
     }
 
+    // Matched against the names a provider gives its streams, so the words stay bilingual in code
+    // rather than moving to res/values-th: a Thai playlist has Thai channel names whatever language
+    // the UI happens to be in. Same reasoning as the voice-command vocabularies.
     private val RADIO_WORDS = listOf("radio", "fm ", " fm", "am ", "music", "audio", "วิทยุ")
     private val AUDIO_EXTENSIONS = listOf(".mp3", ".aac", ".m4a", ".ogg", ".opus", ".flac", ".wav")
 }

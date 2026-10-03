@@ -1,5 +1,8 @@
 package dev.autobridge.remote
 
+import android.content.Context
+import dev.autobridge.R
+
 /**
  * Abstraction for delivering text to a target on the car screen (spec §10).
  *
@@ -19,11 +22,18 @@ object TextInjectionController {
 
     /**
      * Sends [text] to [target]. [autoSubmit] presses Enter afterwards when supported (spec §11).
-     * Returns a [CommandResult]-friendly outcome.
+     * Returns a [CommandResult]-friendly outcome. [context] resolves the outcome message, which is
+     * shown to the user and so follows the UI language.
      */
-    fun send(text: String, target: Target, autoSubmit: Boolean): Outcome {
+    fun send(context: Context, text: String, target: Target, autoSubmit: Boolean): Outcome {
         val clean = sanitize(text)
-        if (clean.isEmpty()) return Outcome(false, "ไม่มีข้อความให้ส่ง", CommandFailureReason.INVALID_ARGUMENT)
+        if (clean.isEmpty()) {
+            return Outcome(
+                false,
+                context.getString(R.string.cmd_no_text),
+                CommandFailureReason.INVALID_ARGUMENT
+            )
+        }
 
         return when (target) {
             Target.AGENT -> {
@@ -31,16 +41,20 @@ object TextInjectionController {
                 AutoBridgeCommandBus.send(
                     AutoBridgeCommand(type = CommandType.OPEN_AGENT, payload = clean, source = CommandSource.MOBILE)
                 )
-                Outcome(true, "ส่งให้ Agent แล้ว")
+                Outcome(true, context.getString(R.string.cmd_text_sent_agent))
             }
             Target.FOCUSED_INPUT, Target.BROWSER_SEARCH -> {
                 val browser = CarScreenController.activeBrowser
                 if (browser == null) {
-                    Outcome(false, "ไม่มี Browser ที่กำลังเปิดอยู่", CommandFailureReason.PLATFORM_UNAVAILABLE)
+                    Outcome(
+                        false,
+                        context.getString(R.string.cmd_no_browser),
+                        CommandFailureReason.PLATFORM_UNAVAILABLE
+                    )
                 } else {
                     // The browser target prefers a focused field then falls back to the search box.
                     browser.sendTextToSearch(clean, autoSubmit)
-                    Outcome(true, "ส่งข้อความไปยัง Browser แล้ว")
+                    Outcome(true, context.getString(R.string.cmd_text_sent_browser))
                 }
             }
         }

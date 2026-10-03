@@ -1,6 +1,7 @@
 package dev.autobridge.remote
 
 import android.content.Context
+import dev.autobridge.R
 import dev.autobridge.core.model.Feature
 import dev.autobridge.core.policy.FeaturePolicy
 import dev.autobridge.core.state.RecentActivityStore
@@ -25,12 +26,15 @@ object AutoBridgeCommandRouter {
         command: AutoBridgeCommand,
         media: MediaPlaybackClient?
     ): CommandResult {
-        AutoBridgeCommandBus.emitProgress(command.id, "กำลังทำคำสั่ง…")
+        AutoBridgeCommandBus.emitProgress(command.id, context.getString(R.string.cmd_progress))
         val result = runCatching { dispatch(context, command, media) }
             .getOrElse { error ->
                 CommandResult.failure(
                     command.id,
-                    "เกิดข้อผิดพลาด: ${error.message ?: error.javaClass.simpleName}",
+                    context.getString(
+                        R.string.cmd_error,
+                        error.message ?: error.javaClass.simpleName
+                    ),
                     CommandFailureReason.ERROR
                 )
             }
@@ -40,7 +44,8 @@ object AutoBridgeCommandRouter {
         }
         // Reflect the result on the car surface as a non-blocking confirmation.
         CarScreenController.host()?.showFeedback(
-            if (result.isSuccess) "✓ ${result.message}\nจากคำสั่งบนมือถือ" else "✕ ${result.message}"
+            if (result.isSuccess) context.getString(R.string.cmd_feedback_success, result.message)
+            else context.getString(R.string.cmd_feedback_failure, result.message)
         )
         return result
     }
@@ -57,7 +62,7 @@ object AutoBridgeCommandRouter {
         // available even without a car host because it goes through the shared MediaSession.
         val needsCarHost = command.type !in MEDIA_TYPES
         if (needsCarHost && host == null) {
-            return CommandResult.failure(id, "Android Auto not connected", CommandFailureReason.NOT_CONNECTED)
+            return notConnected(context, id)
         }
 
         return when (command.type) {
@@ -65,7 +70,7 @@ object AutoBridgeCommandRouter {
                 if (!FeaturePolicy.app.isAvailable(Feature.BROWSER)) return denied(id, Feature.BROWSER)
                 host!!.pushBrowser()
                 AutoBridgeStateRepository.setCurrentScreen(RemoteScreen.BROWSER)
-                CommandResult.success(id, "เปิด Browser แล้ว")
+                CommandResult.success(id, context.getString(R.string.cmd_browser_opened))
             }
 
             CommandType.OPEN_URL, CommandType.SEARCH_WEB -> {
@@ -75,27 +80,34 @@ object AutoBridgeCommandRouter {
                     else -> command.payload?.let { CommandParser.normalizeUrl(it) }
                 }
                 if (url.isNullOrBlank()) {
-                    return CommandResult.failure(id, "URL ไม่ถูกต้อง", CommandFailureReason.INVALID_ARGUMENT)
+                    return CommandResult.failure(
+                        id,
+                        context.getString(R.string.cmd_invalid_url),
+                        CommandFailureReason.INVALID_ARGUMENT
+                    )
                 }
-                val browser = CarScreenController.requireBrowser()
-                    ?: return CommandResult.failure(id, "Android Auto not connected", CommandFailureReason.NOT_CONNECTED)
+                val browser = CarScreenController.requireBrowser() ?: return notConnected(context, id)
                 browser.openUrl(url)
                 RecentActivityStore.record(
                     context,
                     RecentActivityStore.Entry(RecentActivityStore.Kind.BROWSER, hostOf(url), data = url)
                 )
                 AutoBridgeStateRepository.setBrowserActive(url, null)
-                CommandResult.success(id, "เปิด ${hostOf(url)} แล้ว")
+                CommandResult.success(id, context.getString(R.string.cmd_opened_host, hostOf(url)))
             }
 
-            CommandType.GO_BACK -> withBrowser(id) { it.goBack(); "กลับหน้าก่อน" }
-            CommandType.GO_FORWARD -> withBrowser(id) { it.goForward(); "ไปหน้าถัดไป" }
-            CommandType.RELOAD -> withBrowser(id) { it.reload(); "รีเฟรชแล้ว" }
+            CommandType.GO_BACK -> withBrowser(context, id) { it.goBack(); R.string.cmd_went_back }
+            CommandType.GO_FORWARD -> withBrowser(context, id) { it.goForward(); R.string.cmd_went_forward }
+            CommandType.RELOAD -> withBrowser(context, id) { it.reload(); R.string.cmd_reloaded }
 
-            CommandType.ENTER_FULLSCREEN -> withBrowser(id) { it.setFullscreen(true); "เต็มหน้าจอ" }
-            CommandType.EXIT_FULLSCREEN -> withBrowser(id) { it.setFullscreen(false); "ออกจากเต็มหน้าจอ" }
-            CommandType.ENABLE_DESKTOP_MODE -> withBrowser(id) { it.setDesktopMode(true); "Desktop mode เปิด" }
-            CommandType.DISABLE_DESKTOP_MODE -> withBrowser(id) { it.setDesktopMode(false); "Desktop mode ปิด" }
+            CommandType.ENTER_FULLSCREEN ->
+                withBrowser(context, id) { it.setFullscreen(true); R.string.cmd_fullscreen_on }
+            CommandType.EXIT_FULLSCREEN ->
+                withBrowser(context, id) { it.setFullscreen(false); R.string.cmd_fullscreen_off }
+            CommandType.ENABLE_DESKTOP_MODE ->
+                withBrowser(context, id) { it.setDesktopMode(true); R.string.cmd_desktop_on }
+            CommandType.DISABLE_DESKTOP_MODE ->
+                withBrowser(context, id) { it.setDesktopMode(false); R.string.cmd_desktop_off }
 
             CommandType.OPEN_MIRROR -> {
                 if (!FeaturePolicy.app.isAvailable(Feature.MIRROR)) return denied(id, Feature.MIRROR)
@@ -103,7 +115,7 @@ object AutoBridgeCommandRouter {
                 AutoBridgeStateRepository.setMirrorStatus(
                     if (MirrorCoordinator.isMirroring) MirrorStatus.ACTIVE else MirrorStatus.READY
                 )
-                CommandResult.success(id, "เปิด Mirror แล้ว")
+                CommandResult.success(id, context.getString(R.string.cmd_mirror_opened))
             }
 
             CommandType.START_MIRROR -> {
@@ -112,30 +124,34 @@ object AutoBridgeCommandRouter {
                 if (!FeaturePolicy.app.isAvailable(Feature.MIRROR)) return denied(id, Feature.MIRROR)
                 host!!.pushMirror()
                 if (MirrorCoordinator.isMirroring) {
-                    CommandResult.success(id, "Mirror กำลังทำงาน")
+                    CommandResult.success(id, context.getString(R.string.cmd_mirror_running))
                 } else {
-                    CommandResult.success(id, "เปิดหน้า Mirror — เริ่มการสะท้อนจากมือถือเพื่ออนุญาต")
+                    CommandResult.success(id, context.getString(R.string.cmd_mirror_needs_consent))
                 }
             }
 
             CommandType.STOP_MIRROR -> {
                 dev.autobridge.mirror.ProjectionService.stop(context)
                 AutoBridgeStateRepository.setMirrorStatus(MirrorStatus.INACTIVE)
-                CommandResult.success(id, "หยุด Mirror แล้ว")
+                CommandResult.success(id, context.getString(R.string.cmd_mirror_stopped))
             }
 
             CommandType.OPEN_MEDIA -> {
                 if (!FeaturePolicy.app.isAvailable(Feature.MEDIA)) return denied(id, Feature.MEDIA)
                 host!!.pushMedia()
                 AutoBridgeStateRepository.setCurrentScreen(RemoteScreen.MEDIA)
-                CommandResult.success(id, "เปิด Media แล้ว")
+                CommandResult.success(id, context.getString(R.string.cmd_media_opened))
             }
 
             CommandType.PLAY_VIDEO -> {
                 if (!FeaturePolicy.app.isAvailable(Feature.VIDEO)) return denied(id, Feature.VIDEO)
                 val url = command.payload?.trim()
                 if (url.isNullOrBlank()) {
-                    return CommandResult.failure(id, "ไม่พบลิงก์วิดีโอ", CommandFailureReason.INVALID_ARGUMENT)
+                    return CommandResult.failure(
+                        id,
+                        context.getString(R.string.cmd_no_video_link),
+                        CommandFailureReason.INVALID_ARGUMENT
+                    )
                 }
                 val title = command.extras["title"]?.takeIf { it.isNotBlank() } ?: "Video"
                 host!!.pushVideo(url, title)
@@ -144,13 +160,14 @@ object AutoBridgeCommandRouter {
                     RecentActivityStore.Entry(RecentActivityStore.Kind.MEDIA, title, data = url)
                 )
                 AutoBridgeStateRepository.setCurrentScreen(RemoteScreen.MEDIA)
-                CommandResult.success(id, "ส่ง \"$title\" ไปที่รถแล้ว")
+                CommandResult.success(id, context.getString(R.string.cmd_video_sent, title))
             }
 
-            CommandType.PLAY -> mediaAction(id, media) { it.resume(); "เล่นเพลง" }
-            CommandType.PAUSE -> mediaAction(id, media) { it.pause(); "หยุดเพลง" }
-            CommandType.NEXT -> mediaAction(id, media) { it.next(); "เพลงถัดไป" }
-            CommandType.PREVIOUS -> mediaAction(id, media) { it.previous(); "เพลงก่อนหน้า" }
+            CommandType.PLAY -> mediaAction(context, id, media) { it.resume(); R.string.cmd_play }
+            CommandType.PAUSE -> mediaAction(context, id, media) { it.pause(); R.string.cmd_pause }
+            CommandType.NEXT -> mediaAction(context, id, media) { it.next(); R.string.cmd_next }
+            CommandType.PREVIOUS ->
+                mediaAction(context, id, media) { it.previous(); R.string.cmd_previous }
 
             CommandType.OPEN_AGENT -> {
                 host!!.pushAgent()
@@ -159,20 +176,22 @@ object AutoBridgeCommandRouter {
                     context,
                     RecentActivityStore.Entry(RecentActivityStore.Kind.AGENT, command.payload ?: "Agent")
                 )
-                val msg = command.payload?.takeIf { it.isNotBlank() }?.let { "Agent: $it" } ?: "เปิด Agent แล้ว"
+                val msg = command.payload?.takeIf { it.isNotBlank() }
+                    ?.let { context.getString(R.string.cmd_agent_with_text, it) }
+                    ?: context.getString(R.string.cmd_agent_opened)
                 CommandResult.success(id, msg)
             }
 
             CommandType.OPEN_HOME -> {
                 host!!.popToHome()
                 AutoBridgeStateRepository.setCurrentScreen(RemoteScreen.HOME)
-                CommandResult.success(id, "หน้าหลัก")
+                CommandResult.success(id, context.getString(R.string.cmd_home))
             }
 
             CommandType.OPEN_SETTINGS -> {
                 host!!.pushSettings()
                 AutoBridgeStateRepository.setCurrentScreen(RemoteScreen.SETTINGS)
-                CommandResult.success(id, "เปิดตั้งค่าแล้ว")
+                CommandResult.success(id, context.getString(R.string.cmd_settings_opened))
             }
 
             CommandType.SEND_TEXT_TO_SCREEN -> {
@@ -180,47 +199,69 @@ object AutoBridgeCommandRouter {
                 val autoSubmit = command.extras["autoSubmit"]?.toBoolean() ?: RemoteSettingsStore.current.autoSubmitText
                 val target = runCatching { TextInjectionController.Target.valueOf(targetName) }
                     .getOrDefault(TextInjectionController.Target.BROWSER_SEARCH)
-                val outcome = TextInjectionController.send(command.payload.orEmpty(), target, autoSubmit)
+                val outcome =
+                    TextInjectionController.send(context, command.payload.orEmpty(), target, autoSubmit)
                 if (outcome.success) CommandResult.success(id, outcome.message)
                 else CommandResult.failure(id, outcome.message, outcome.reason)
             }
 
             CommandType.FOCUS_INPUT -> {
                 val browser = CarScreenController.activeBrowser
-                    ?: return CommandResult.failure(id, "ไม่มี Browser ที่กำลังเปิดอยู่", CommandFailureReason.PLATFORM_UNAVAILABLE)
+                    ?: return CommandResult.failure(
+                        id,
+                        context.getString(R.string.cmd_no_browser),
+                        CommandFailureReason.PLATFORM_UNAVAILABLE
+                    )
                 browser.sendTextToSearch("", autoSubmit = false)
-                CommandResult.success(id, "เปิดช่องพิมพ์แล้ว")
+                CommandResult.success(id, context.getString(R.string.cmd_input_focused))
             }
         }
     }
 
+    /**
+     * [action] returns the string *id* of its confirmation rather than the text, so the message is
+     * resolved against [context] here and every caller stays one line long.
+     */
     private inline fun withBrowser(
+        context: Context,
         id: String,
-        action: (CarScreenController.BrowserTarget) -> String
+        action: (CarScreenController.BrowserTarget) -> Int
     ): CommandResult {
         if (!FeaturePolicy.app.isAvailable(Feature.BROWSER)) return denied(id, Feature.BROWSER)
         // Browser display commands act on the live browser, opening one if needed so the request
         // always lands on a real action (same approach as AgentCommandRouter).
-        val browser = CarScreenController.requireBrowser()
-            ?: return CommandResult.failure(id, "Android Auto not connected", CommandFailureReason.NOT_CONNECTED)
-        val message = action(browser)
+        val browser = CarScreenController.requireBrowser() ?: return notConnected(context, id)
+        val message = context.getString(action(browser))
         AutoBridgeStateRepository.setBrowserActive(browser.currentUrl, AutoBridgeStateRepository.current.browserTitle)
         return CommandResult.success(id, message)
     }
 
+    /** As [withBrowser]: [action] returns the string id of its confirmation. */
     private inline fun mediaAction(
+        context: Context,
         id: String,
         media: MediaPlaybackClient?,
-        action: (MediaPlaybackClient) -> String
+        action: (MediaPlaybackClient) -> Int
     ): CommandResult {
         if (!FeaturePolicy.app.isAvailable(Feature.MEDIA)) return denied(id, Feature.MEDIA)
         if (media == null || !media.isConnected) {
-            return CommandResult.failure(id, "Media ยังไม่พร้อม", CommandFailureReason.PLATFORM_UNAVAILABLE)
+            return CommandResult.failure(
+                id,
+                context.getString(R.string.cmd_media_unavailable),
+                CommandFailureReason.PLATFORM_UNAVAILABLE
+            )
         }
-        val message = action(media)
+        val message = context.getString(action(media))
         AutoBridgeStateRepository.setMedia(media.currentTitle, media.currentArtist, media.isPlaying)
         return CommandResult.success(id, message)
     }
+
+    private fun notConnected(context: Context, id: String): CommandResult =
+        CommandResult.failure(
+            id,
+            context.getString(R.string.cmd_not_connected),
+            CommandFailureReason.NOT_CONNECTED
+        )
 
     private fun denied(id: String, feature: Feature): CommandResult =
         CommandResult.failure(id, FeaturePolicy.app.denialMessage(feature), CommandFailureReason.FEATURE_DENIED)

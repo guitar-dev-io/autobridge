@@ -11,6 +11,7 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.Switch
 import android.widget.TextView
+import dev.autobridge.R
 
 /**
  * The phone's main browser sheet, redesigned around the one action the phone browser exists for:
@@ -124,7 +125,7 @@ class BrowserMenuSheet(
             setText(current.url)
             setSingleLine()
             setSelectAllOnFocus(true)
-            hint = "URL / ค้นหา"
+            hint = activity.getString(R.string.browser_address_hint)
             setHintTextColor(BrowserTheme.iconDisabled)
             setTextColor(BrowserTheme.textPrimary)
             textSize = shell.sp(AutoUiSizes.ICON_SMALL_DP * 0.9f)
@@ -157,7 +158,7 @@ class BrowserMenuSheet(
             gravity = Gravity.CENTER
             textSize = shell.sp(AutoUiSizes.ICON_SMALL_DP * 0.9f)
             setTextColor(BrowserTheme.textSecondary)
-            contentDescription = "ล้าง URL"
+            contentDescription = activity.getString(R.string.browser_clear_url)
             val side = sizes.dpInt(AutoUiSizes.SHEET_URL_FIELD_HEIGHT_DP * 0.78f)
             layoutParams = LinearLayout.LayoutParams(side, side)
             setOnClickListener { field.setText(""); field.requestFocus() }
@@ -201,7 +202,7 @@ class BrowserMenuSheet(
                 setTextColor(BrowserTheme.onPrimary)
             })
             addView(TextView(activity).apply {
-                text = "ส่งหน้าเว็บหรือคำค้นไปที่หน้าจอรถ"
+                text = activity.getString(R.string.browser_send_to_car_detail)
                 textSize = shell.sp(AutoUiSizes.ICON_SMALL_DP * 0.78f)
                 setTextColor(BrowserTheme.onPrimary)
             })

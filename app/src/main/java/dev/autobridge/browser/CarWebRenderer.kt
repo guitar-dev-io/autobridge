@@ -35,6 +35,7 @@ import android.webkit.WebSettings
 import android.webkit.WebStorage
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import dev.autobridge.R
 import dev.autobridge.entertainment.ContentAddress
 import dev.autobridge.entertainment.WebHistoryStore
 import kotlin.math.abs
@@ -440,6 +441,21 @@ class CarWebRenderer(context: Context) {
         override fun pause() = webAudio.userPause()
 
         override fun seekTo(positionMs: Long) = webAudio.seekTo(positionMs)
+
+        /**
+         * Takes the next page off [BrowserPlayQueue] and loads it over the finished one.
+         *
+         * Loading is all it takes: the new page starts its own playback, and because
+         * `mediaPlaybackRequiresUserGesture` is off for this browser ([BrowserDefaults.configure])
+         * it does not need a tap to begin. Navigating also leaves whatever the site would have
+         * auto-played next unreached, which is the point of having a queue of our own.
+         */
+        override fun skipToNext(): Boolean {
+            val next = BrowserPlayQueue.takeNext(appContext) ?: return false
+            dev.autobridge.display.StructuredLog.i("MEDIA", "play queue -> ${next.url}")
+            load(next.url)
+            return true
+        }
     }
 
     var onFindResult: ((activeMatch: Int, matchCount: Int) -> Unit)? = null
@@ -565,7 +581,7 @@ class CarWebRenderer(context: Context) {
      * The page a live WebView is actually showing, or null when there is none yet.
      *
      * Unlike [url] this never falls back to the remembered URL of a previous session, which is the
-     * distinction [CarBrowserEntry.resumes] turns on: a remembered address is not a page anyone can
+     * distinction [BrowserSiteEntry.resumes] turns on: a remembered address is not a page anyone can
      * be sent back to.
      */
     val livePageUrl: String? get() = if (sideActive) sideView?.url else webView?.url
@@ -635,10 +651,11 @@ class CarWebRenderer(context: Context) {
         val next = splitLayout.next()
         BrowserSplitStore.setLayout(appContext, next)
         applyControlSettings()
+        val label = next.label(appContext)
         val message = when {
-            next == BrowserSplitLayout.SINGLE || isSplit -> next.label
-            !hardwareMode -> "${next.label}: ใช้ไม่ได้ในโหมดเรนเดอร์ legacy"
-            else -> "${next.label}: จอนี้แคบเกินไป"
+            next == BrowserSplitLayout.SINGLE || isSplit -> label
+            !hardwareMode -> appContext.getString(R.string.car_split_unavailable_legacy, label)
+            else -> appContext.getString(R.string.car_split_too_narrow, label)
         }
         host?.showMessage(message)
     }
@@ -1619,16 +1636,24 @@ class CarWebRenderer(context: Context) {
             DrawerAction.FIND_IN_PAGE -> target?.openFindInPage()
             DrawerAction.AGENT -> target?.openAgent()
             DrawerAction.COPY_URL ->
-                target?.showMessage(if (copyUrl()) "คัดลอก URL แล้ว" else "คัดลอกไม่สำเร็จ")
+                target?.showMessage(
+                    appContext.getString(
+                        if (copyUrl()) R.string.car_url_copied else R.string.car_copy_failed
+                    )
+                )
             DrawerAction.PASTE_AND_GO -> clipboardText()?.let { load(it) }
                 // Covers both an empty clipboard and the platform refusing the read because the
                 // app is not focused on the phone; the user gets a reason either way.
-                ?: target?.showMessage("อ่านคลิปบอร์ดไม่ได้ หรือคลิปบอร์ดว่าง")
+                ?: target?.showMessage(appContext.getString(R.string.car_clipboard_unreadable))
             DrawerAction.BOOKMARK_PAGE -> {
                 val added = dev.autobridge.entertainment.WebBookmarkStore.add(
                     appContext, title?.takeIf { it.isNotBlank() } ?: url, url
                 )
-                target?.showMessage(if (added) "บันทึกบุ๊กมาร์กแล้ว" else "บันทึกไม่สำเร็จ")
+                target?.showMessage(
+                    appContext.getString(
+                        if (added) R.string.car_bookmark_saved else R.string.car_bookmark_failed
+                    )
+                )
             }
             DrawerAction.TOGGLE_DESKTOP -> toggleDesktopMode(appContext)
             DrawerAction.TOGGLE_FULLSCREEN -> toggleFullscreen()
@@ -1641,7 +1666,7 @@ class CarWebRenderer(context: Context) {
             DrawerAction.SETTINGS -> target?.openSettings()
             DrawerAction.CLEAR_DATA -> {
                 clearBrowsingData()
-                target?.showMessage("ล้างข้อมูลการท่องเว็บแล้ว")
+                target?.showMessage(appContext.getString(R.string.car_browsing_data_cleared))
             }
             DrawerAction.DIAGNOSTICS -> target?.openDiagnostics()
             // Handled directly in onSurfaceClick before performDrawerAction is called, since these
@@ -1776,7 +1801,9 @@ class CarWebRenderer(context: Context) {
                 callback: GeolocationPermissions.Callback,
             ) = BrowserGeolocation.answerForCar(appContext, origin, callback) {
                 mainHandler.post {
-                    host?.showMessage("เปิดสิทธิ์ตำแหน่งให้ AutoBridge บนมือถือก่อน แล้วโหลดหน้านี้ใหม่")
+                    host?.showMessage(
+                        appContext.getString(R.string.car_needs_location_permission)
+                    )
                 }
             }
 
@@ -1898,7 +1925,7 @@ class CarWebRenderer(context: Context) {
 
             override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
                 if (!request.isForMainFrame) return
-                loadError = "โหลดหน้านี้ไม่สำเร็จ"
+                loadError = appContext.getString(R.string.car_page_load_failed)
                 onPageChanged?.invoke(currentUrl, currentTitle)
             }
         }
@@ -2171,7 +2198,9 @@ class CarWebRenderer(context: Context) {
                 callback: GeolocationPermissions.Callback,
             ) = BrowserGeolocation.answerForCar(appContext, origin, callback) {
                 mainHandler.post {
-                    host?.showMessage("เปิดสิทธิ์ตำแหน่งให้ AutoBridge บนมือถือก่อน แล้วโหลดหน้านี้ใหม่")
+                    host?.showMessage(
+                        appContext.getString(R.string.car_needs_location_permission)
+                    )
                 }
             }
 
@@ -2754,7 +2783,7 @@ class CarWebRenderer(context: Context) {
             } else {
                 glyphPaint.textSize = (sizes.iconSmall * 0.8f).coerceAtMost(box.height * 0.42f)
                 drawCentered(
-                    canvas, glyphPaint, "${link.item.glyph} ${link.item.label}",
+                    canvas, glyphPaint, "${link.item.glyph} ${link.item.label(appContext)}",
                     box.centerX, box.centerY + glyphPaint.textSize * 0.36f
                 )
             }
@@ -2840,7 +2869,7 @@ class CarWebRenderer(context: Context) {
         detailPaint.textSize = labelSize
         drawCentered(
             canvas, detailPaint,
-            fit(row.item.label, detailPaint, tile.width - sizes.contentGap),
+            fit(row.item.label(appContext), detailPaint, tile.width - sizes.contentGap),
             tile.centerX, blockTop + glyphSize + spacing + labelSize * 0.85f
         )
 
@@ -2891,16 +2920,20 @@ class CarWebRenderer(context: Context) {
         val limit = textRight - textLeft
         val titleSize = sizes.iconMedium.coerceAtMost(box.height * 0.32f)
         val subSize = (sizes.iconSmall * 0.78f).coerceAtMost(box.height * 0.22f)
-        val hasDetail = row.item.detail.isNotBlank()
+        val detail = row.item.detail(appContext)
+        val hasDetail = detail.isNotBlank()
         val blockTop = box.centerY - (titleSize + if (hasDetail) subSize * 1.35f else 0f) / 2f
         titlePaint.color = BrowserTheme.dark.onPrimary
         titlePaint.textSize = titleSize
-        canvas.drawText(fit(row.item.label, titlePaint, limit), textLeft, blockTop + titleSize * 0.9f, titlePaint)
+        canvas.drawText(
+            fit(row.item.label(appContext), titlePaint, limit), textLeft,
+            blockTop + titleSize * 0.9f, titlePaint
+        )
         if (hasDetail) {
             detailPaint.color = BrowserTheme.dark.onPrimary
             detailPaint.textSize = subSize
             canvas.drawText(
-                fit(row.item.detail, detailPaint, limit), textLeft,
+                fit(detail, detailPaint, limit), textLeft,
                 blockTop + titleSize + subSize * 1.2f, detailPaint
             )
         }
@@ -2933,7 +2966,7 @@ class CarWebRenderer(context: Context) {
         titlePaint.textSize = (sizes.iconSmall * 0.9f).coerceAtMost(box.height * 0.42f)
         val labelLeft = glyphX + glyphPaint.textSize / 2f + sizes.horizontalPadding
         canvas.drawText(
-            fit(row.item.label, titlePaint, trackLeft - labelLeft - sizes.contentGap),
+            fit(row.item.label(appContext), titlePaint, trackLeft - labelLeft - sizes.contentGap),
             labelLeft, box.centerY + titlePaint.textSize * 0.34f, titlePaint
         )
 
@@ -3050,7 +3083,7 @@ class CarWebRenderer(context: Context) {
         canvas.drawText(message, (w - titlePaint.measureText(message)) / 2f, h / 2f - sizes.contentGap, titlePaint)
         detailPaint.color = BrowserTheme.dark.textSecondary
         detailPaint.textSize = sizes.iconSmall * 0.9f
-        val hint = "แตะเพื่อลองใหม่"
+        val hint = appContext.getString(R.string.car_tap_to_retry)
         canvas.drawText(hint, (w - detailPaint.measureText(hint)) / 2f, h / 2f + sizes.iconMedium, detailPaint)
     }
 

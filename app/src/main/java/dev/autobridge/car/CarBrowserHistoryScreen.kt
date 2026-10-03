@@ -8,6 +8,7 @@ import androidx.car.app.model.ItemList
 import androidx.car.app.model.ListTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
+import dev.autobridge.R
 import dev.autobridge.browser.BrowserDisplayUrl
 import dev.autobridge.core.state.RecentActivityStore
 import dev.autobridge.entertainment.WebHistoryStore
@@ -17,11 +18,11 @@ class CarBrowserHistoryScreen(carContext: CarContext) : Screen(carContext) {
     private var page = 0
 
     override fun onGetTemplate(): Template {
-        val items = ItemList.Builder().setNoItemsMessage("Pages you visit will show up here")
+        val items = ItemList.Builder().setNoItemsMessage(carContext.getString(R.string.car_browser_history_empty))
         val visited = WebHistoryStore.list(carContext)
         page = page.coerceAtMost((visited.size - 1).coerceAtLeast(0) / 4)
         if (page > 0) {
-            items.addItem(Row.Builder().setTitle("Previous")
+            items.addItem(Row.Builder().setTitle(carContext.getString(R.string.car_browser_history_previous))
                 .setOnClickListener { page--; invalidate() }.build())
         }
         visited.drop(page * 4).take(4).forEach { entry ->
@@ -42,13 +43,13 @@ class CarBrowserHistoryScreen(carContext: CarContext) : Screen(carContext) {
             )
         }
         if ((page + 1) * 4 < visited.size) {
-            items.addItem(Row.Builder().setTitle("More")
+            items.addItem(Row.Builder().setTitle(carContext.getString(R.string.car_browser_history_more))
                 .setOnClickListener { page++; invalidate() }.build())
         }
         return ListTemplate.Builder()
             .setHeader(
                 Header.Builder()
-                    .setTitle("History")
+                    .setTitle(carContext.getString(R.string.car_browser_history_title))
                     .setStartHeaderAction(Action.BACK)
                     .addEndHeaderAction(
                         Action.Builder()

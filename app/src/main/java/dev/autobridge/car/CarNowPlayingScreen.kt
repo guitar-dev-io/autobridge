@@ -17,6 +17,7 @@ import androidx.car.app.model.Template
 import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
+import dev.autobridge.R
 import dev.autobridge.media.MediaPlaybackClient
 
 /**
@@ -57,7 +58,7 @@ class CarNowPlayingScreen(carContext: CarContext) : Screen(carContext) {
     override fun onGetTemplate(): Template {
         val connected = mediaPlayback.isConnected
         val playing = mediaPlayback.isPlaying
-        val title = mediaPlayback.currentTitle ?: "Nothing playing"
+        val title = mediaPlayback.currentTitle ?: carContext.getString(R.string.car_lib_nothing_playing)
         val subtitle = buildSubtitle(connected, playing)
 
         val nowPlayingRow = Row.Builder()
@@ -70,7 +71,11 @@ class CarNowPlayingScreen(carContext: CarContext) : Screen(carContext) {
             .addRow(nowPlayingRow)
             .addAction(
                 Action.Builder()
-                    .setTitle(if (playing) "Pause" else "Play")
+                    .setTitle(
+                        carContext.getString(
+                            if (playing) R.string.car_now_pause else R.string.car_now_play
+                        )
+                    )
                     .setBackgroundColor(CarColor.PRIMARY)
                     .setEnabled(connected)
                     .setOnClickListener {
@@ -89,7 +94,7 @@ class CarNowPlayingScreen(carContext: CarContext) : Screen(carContext) {
             // rest of the transport live on the Full controls (CarMediaScreen) screen.
             .addAction(
                 Action.Builder()
-                    .setTitle("Next")
+                    .setTitle(carContext.getString(R.string.car_now_next))
                     .setEnabled(connected)
                     .setOnClickListener {
                         mediaPlayback.next()
@@ -102,7 +107,7 @@ class CarNowPlayingScreen(carContext: CarContext) : Screen(carContext) {
         return PaneTemplate.Builder(pane)
             .setHeader(
                 Header.Builder()
-                    .setTitle("Now Playing")
+                    .setTitle(carContext.getString(R.string.car_now_playing_title))
                     .setStartHeaderAction(Action.BACK)
                     .addEndHeaderAction(
                         Action.Builder()
@@ -124,18 +129,25 @@ class CarNowPlayingScreen(carContext: CarContext) : Screen(carContext) {
     private fun buildSubtitle(connected: Boolean, playing: Boolean): String {
         if (!connected) {
             return when (mediaPlayback.connectionState) {
-                MediaPlaybackClient.ConnectionState.CONNECTING -> "Connecting to media session…"
-                MediaPlaybackClient.ConnectionState.ERROR ->
-                    "Session unavailable: ${mediaPlayback.lastErrorMessage ?: "unknown error"}"
-                else -> "Media session disconnected • tap Play to start the sample playlist"
+                MediaPlaybackClient.ConnectionState.CONNECTING ->
+                    carContext.getString(R.string.car_lib_connecting_session)
+                MediaPlaybackClient.ConnectionState.ERROR -> carContext.getString(
+                    R.string.car_media_session_error,
+                    mediaPlayback.lastErrorMessage
+                        ?: carContext.getString(R.string.car_media_session_unknown_error)
+                )
+                else -> carContext.getString(R.string.car_now_disconnected)
             }
         }
         val artist = mediaPlayback.currentArtist
-        val state = if (playing) "Playing" else "Paused"
+        val state = carContext.getString(
+            if (playing) R.string.car_lib_playing else R.string.car_lib_paused
+        )
         return when {
-            mediaPlayback.currentTitle != null && artist != null -> "$artist • $state"
+            mediaPlayback.currentTitle != null && artist != null ->
+                carContext.getString(R.string.car_lib_title_state, artist, state)
             mediaPlayback.currentTitle != null -> state
-            else -> "Ready • tap Play for the sample playlist"
+            else -> carContext.getString(R.string.car_now_ready)
         }
     }
 

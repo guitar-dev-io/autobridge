@@ -11,6 +11,7 @@ import androidx.car.app.model.ItemList
 import androidx.car.app.model.ListTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
+import dev.autobridge.R
 import dev.autobridge.entertainment.WebBookmark
 import dev.autobridge.entertainment.WebBookmarkStore
 
@@ -40,10 +41,14 @@ class CarBookmarksScreen(carContext: CarContext) : Screen(carContext) {
             list.addItem(
                 Row.Builder()
                     .setTitle(bookmark.title)
-                    .addText("Tap to remove • ${host(bookmark.url)}")
+                    .addText(carContext.getString(R.string.car_bookmarks_tap_to_remove, host(bookmark.url)))
                     .setOnClickListener {
                         WebBookmarkStore.remove(carContext, bookmark.url)
-                        CarToast.makeText(carContext, "Removed ${bookmark.title}", CarToast.LENGTH_SHORT).show()
+                        CarToast.makeText(
+                            carContext,
+                            carContext.getString(R.string.car_bookmarks_removed, bookmark.title),
+                            CarToast.LENGTH_SHORT
+                        ).show()
                         invalidate()
                     }
                     .build()
@@ -53,14 +58,22 @@ class CarBookmarksScreen(carContext: CarContext) : Screen(carContext) {
         suggestions.filterNot { it.url in savedUrls }.take(6 - saved.size.coerceAtMost(6)).forEach { suggestion ->
             list.addItem(
                 Row.Builder()
-                    .setTitle("Add ${suggestion.title}")
+                    .setTitle(carContext.getString(R.string.car_bookmarks_add, suggestion.title))
                     .addText(host(suggestion.url))
                     .setOnClickListener {
                         if (WebBookmarkStore.add(carContext, suggestion.title, suggestion.url)) {
-                            CarToast.makeText(carContext, "Added ${suggestion.title}", CarToast.LENGTH_SHORT).show()
+                            CarToast.makeText(
+                                carContext,
+                                carContext.getString(R.string.car_bookmarks_added, suggestion.title),
+                                CarToast.LENGTH_SHORT
+                            ).show()
                             invalidate()
                         } else {
-                            CarToast.makeText(carContext, "Invalid address", CarToast.LENGTH_SHORT).show()
+                            CarToast.makeText(
+                                carContext,
+                                carContext.getString(R.string.car_bookmarks_invalid),
+                                CarToast.LENGTH_SHORT
+                            ).show()
                         }
                     }
                     .build()
@@ -70,7 +83,7 @@ class CarBookmarksScreen(carContext: CarContext) : Screen(carContext) {
         return ListTemplate.Builder()
             .setHeader(
                 Header.Builder()
-                    .setTitle("Manage bookmarks")
+                    .setTitle(carContext.getString(R.string.car_bookmarks_title))
                     .setStartHeaderAction(Action.BACK)
                     .build()
             )

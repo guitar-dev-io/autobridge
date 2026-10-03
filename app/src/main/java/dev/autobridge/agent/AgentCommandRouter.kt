@@ -9,6 +9,7 @@ import dev.autobridge.car.CarMediaCenterScreen
 import dev.autobridge.car.CarNowPlayingScreen
 import dev.autobridge.car.CarRecentScreen
 import dev.autobridge.car.MirrorCarScreen
+import dev.autobridge.R
 import dev.autobridge.core.state.RecentActivityStore
 import dev.autobridge.entertainment.ContentAddress
 
@@ -50,12 +51,20 @@ object AgentCommandRouter {
         return when (command.action) {
             AgentAction.OPEN_BROWSER -> {
                 screenManager.push(CarBrowserScreen(carContext))
-                Result(true, "Opening Browser", "กำลังเปิดเบราว์เซอร์")
+                Result(
+                    true,
+                    carContext.getString(R.string.agent_toast_opening_browser),
+                    carContext.getString(R.string.agent_spoken_opening_browser)
+                )
             }
             AgentAction.OPEN_URL -> {
                 val url = ContentAddress.https(command.argument ?: "")
                 if (url == null) {
-                    Result(false, "Please provide a valid website", "ไม่พบเว็บไซต์นี้ ลองพูดใหม่อีกครั้ง")
+                    Result(
+                        false,
+                        carContext.getString(R.string.agent_toast_invalid_website),
+                        carContext.getString(R.string.agent_spoken_invalid_website)
+                    )
                 } else {
                     val browser = CarBrowserScreen(carContext)
                     screenManager.push(browser)
@@ -64,40 +73,76 @@ object AgentCommandRouter {
                         carContext,
                         RecentActivityStore.Entry(RecentActivityStore.Kind.BROWSER, hostOf(url), data = url)
                     )
-                    Result(true, "Opening $url", spokenForUrl(url))
+                    Result(
+                        true,
+                        carContext.getString(R.string.agent_toast_opening_url, url),
+                        spokenForUrl(carContext, url)
+                    )
                 }
             }
             AgentAction.OPEN_MIRROR -> {
                 screenManager.push(MirrorCarScreen(carContext))
-                Result(true, "Opening Mirror", "กำลังเปิดมิเรอร์")
+                Result(
+                    true,
+                    carContext.getString(R.string.agent_toast_opening_mirror),
+                    carContext.getString(R.string.agent_spoken_opening_mirror)
+                )
             }
             AgentAction.OPEN_MEDIA -> {
                 screenManager.push(CarMediaCenterScreen(carContext))
-                Result(true, "Opening Media", "กำลังเปิดมีเดีย")
+                Result(
+                    true,
+                    carContext.getString(R.string.agent_toast_opening_media),
+                    carContext.getString(R.string.agent_spoken_opening_media)
+                )
             }
             AgentAction.RESUME_MEDIA -> {
                 screenManager.push(CarNowPlayingScreen(carContext))
-                Result(true, "Resuming playback", "เล่นต่อ")
+                Result(
+                    true,
+                    carContext.getString(R.string.agent_toast_resuming_playback),
+                    carContext.getString(R.string.agent_spoken_resuming_playback)
+                )
             }
             AgentAction.OPEN_RECENT -> {
                 screenManager.push(CarRecentScreen(carContext))
-                Result(true, "Showing recent activity", "รายการล่าสุด")
+                Result(
+                    true,
+                    carContext.getString(R.string.agent_toast_recent_activity),
+                    carContext.getString(R.string.agent_spoken_recent_activity)
+                )
             }
             AgentAction.ENABLE_DESKTOP -> {
                 BrowserUserAgentStore.select(carContext, BrowserUserAgentMode.DESKTOP)
-                Result(true, "Desktop mode on for the browser", "เปิดโหมดเดสก์ท็อปแล้ว")
+                Result(
+                    true,
+                    carContext.getString(R.string.agent_toast_desktop_on),
+                    carContext.getString(R.string.agent_spoken_desktop_on)
+                )
             }
             AgentAction.DISABLE_DESKTOP -> {
                 BrowserUserAgentStore.select(carContext, BrowserUserAgentMode.MOBILE)
-                Result(true, "Desktop mode off for the browser", "ปิดโหมดเดสก์ท็อปแล้ว")
+                Result(
+                    true,
+                    carContext.getString(R.string.agent_toast_desktop_off),
+                    carContext.getString(R.string.agent_spoken_desktop_off)
+                )
             }
             AgentAction.ENTER_FULLSCREEN,
             AgentAction.EXIT_FULLSCREEN -> {
                 // Fullscreen is a live-browser state; open the browser so the request is actionable.
                 screenManager.push(CarBrowserScreen(carContext))
                 val on = command.action == AgentAction.ENTER_FULLSCREEN
-                if (on) Result(true, "Browser fullscreen", "เต็มจอ")
-                else Result(true, "Exit browser fullscreen", "ออกจากเต็มจอ")
+                if (on) Result(
+                    true,
+                    carContext.getString(R.string.agent_toast_fullscreen_on),
+                    carContext.getString(R.string.agent_spoken_fullscreen_on)
+                )
+                else Result(
+                    true,
+                    carContext.getString(R.string.agent_toast_fullscreen_off),
+                    carContext.getString(R.string.agent_spoken_fullscreen_off)
+                )
             }
         }
     }
@@ -108,9 +153,13 @@ object AgentCommandRouter {
      */
     fun parse(input: String): Command? = AgentCommandParser.parse(input)
 
-    private fun spokenForUrl(url: String): String = when {
-        url.contains("/search?") || url.contains("/results?") -> "กำลังค้นหา"
-        else -> "กำลังเปิด ${hostOf(url).removePrefix("www.").removePrefix("m.")}"
+    private fun spokenForUrl(carContext: CarContext, url: String): String = when {
+        url.contains("/search?") || url.contains("/results?") ->
+            carContext.getString(R.string.agent_spoken_searching)
+        else -> carContext.getString(
+            R.string.agent_spoken_opening_host,
+            hostOf(url).removePrefix("www.").removePrefix("m.")
+        )
     }
 
     private fun hostOf(url: String): String =

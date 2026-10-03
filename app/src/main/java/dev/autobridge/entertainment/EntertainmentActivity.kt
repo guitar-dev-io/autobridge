@@ -2,6 +2,7 @@ package dev.autobridge.entertainment
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.media.AudioAttributes
@@ -22,11 +23,13 @@ import android.webkit.WebViewClient
 import android.widget.*
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import dev.autobridge.R
 import dev.autobridge.browser.BrowserAdBlock
 import dev.autobridge.browser.BrowserDefaults
 import dev.autobridge.browser.BrowserGeolocation
 import dev.autobridge.browser.FullscreenVideoController
 import dev.autobridge.core.policy.FeaturePolicy
+import dev.autobridge.i18n.AppLocale
 import dev.autobridge.media.MediaPlaybackClient
 import dev.autobridge.safety.ParkingStateStore
 
@@ -75,8 +78,13 @@ class EntertainmentActivity : Activity() {
     private val parkingListener: (ParkingStateStore.State) -> Unit = { runOnUiThread { enforceParking() } }
     private val playerListener = object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) {
-            status.text = "เล่นไม่ได้: ${error.errorCodeName} — ตรวจ URL หรือเลือกแหล่งอื่น"
+            status.text = getString(R.string.ent_playback_failed, error.errorCodeName)
         }
+    }
+
+    /** Applies the Settings &gt; Language choice; see [AppLocale.rebase]. */
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AppLocale.rebase(newBase))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -113,7 +121,9 @@ class EntertainmentActivity : Activity() {
         status = TextView(this).apply { setTextColor(Color.WHITE); textSize = 15f }
         root.addView(status)
         address = EditText(this).apply {
-            hint = if (browserMode) "ค้นหาเว็บบนจอรถ หรือวาง HTTPS URL" else "ค้นหา YouTube หรือวาง HTTPS URL"
+            hint = getString(
+                if (browserMode) R.string.ent_hint_web else R.string.ent_hint_youtube
+            )
             setTextColor(Color.WHITE); setHintTextColor(Color.LTGRAY)
             setSingleLine()
         }
@@ -131,29 +141,40 @@ class EntertainmentActivity : Activity() {
         }
         row(
             "YouTube" to { open(ContentAddress.youtubeSearch(address.text.toString()), ContentKind.WEB) },
-            "เว็บ" to { openAddress(ContentKind.WEB) },
-            "TV / วิดีโอ" to { openAddress(ContentKind.VIDEO) },
-            "เสียง" to { voiceSearch() }
+            getString(R.string.ent_btn_web) to { openAddress(ContentKind.WEB) },
+            getString(R.string.ent_btn_video) to { openAddress(ContentKind.VIDEO) },
+            getString(R.string.ent_btn_voice) to { voiceSearch() }
         )
-        row("เปิด Browser" to { openExternalBrowser() })
+        row(getString(R.string.ent_btn_open_browser) to { openExternalBrowser() })
         row(
-            "โปรด" to { favorites() },
-            "บันทึก" to { saveFavorite() },
-            "เล่นต่อ" to { restoreLast() },
-            "ไฟล์" to { chooseFile() }
+            getString(R.string.ent_btn_favorites) to { favorites() },
+            getString(R.string.ent_btn_save) to { saveFavorite() },
+            getString(R.string.ent_btn_resume) to { restoreLast() },
+            getString(R.string.ent_btn_file) to { chooseFile() }
         )
         row(
-            "ย้อนกลับ" to { if (contentKind == ContentKind.WEB && browser.canGoBack()) browser.goBack() else finish() },
-            "ก่อนหน้า" to { if (contentKind == ContentKind.AUDIO || contentKind == ContentKind.VIDEO) client.previous() },
-            "เล่น / พัก" to {
+            getString(R.string.ent_btn_back) to {
+                if (contentKind == ContentKind.WEB && browser.canGoBack()) browser.goBack()
+                else finish()
+            },
+            getString(R.string.ent_btn_previous) to {
+                if (contentKind == ContentKind.AUDIO || contentKind == ContentKind.VIDEO) {
+                    client.previous()
+                }
+            },
+            getString(R.string.ent_btn_play_pause) to {
                 if (contentKind == ContentKind.AUDIO || contentKind == ContentKind.VIDEO) {
                     if (client.isPlaying) client.pause() else client.resume()
                 }
             },
-            "ถัดไป" to { if (contentKind == ContentKind.AUDIO || contentKind == ContentKind.VIDEO) client.next() }
+            getString(R.string.ent_btn_next) to {
+                if (contentKind == ContentKind.AUDIO || contentKind == ContentKind.VIDEO) {
+                    client.next()
+                }
+            }
         )
         root.addView(CheckBox(this).apply {
-            text = "เปิดรายการล่าสุดเมื่อกลับมาจอด (ขณะหน้านี้เปิดอยู่)"
+            text = getString(R.string.ent_auto_resume)
             setTextColor(Color.WHITE)
             isChecked = prefs.getBoolean("autoResume", false)
             setOnCheckedChangeListener { _, checked -> prefs.edit().putBoolean("autoResume", checked).apply() }
@@ -279,7 +300,7 @@ YouTube · TV · Web
             }
             enforceParking()
         }, onError = {
-            status.text = "เชื่อมต่อเครื่องเล่นไม่สำเร็จ ลองเปิดหน้านี้ใหม่"
+            status.text = getString(R.string.ent_player_connect_failed)
             enforceParking()
         })
         ParkingStateStore.addListener(parkingListener)
@@ -292,7 +313,7 @@ YouTube · TV · Web
     private fun openAddress(kind: ContentKind) {
         val url = ContentAddress.https(address.text.toString())
         if (url == null) {
-            message("ใช้ HTTPS URL ที่ถูกต้อง")
+            message(getString(R.string.ent_need_valid_url))
         } else {
             open(url, kind)
         }
@@ -300,7 +321,7 @@ YouTube · TV · Web
 
     private fun openExternalBrowser() {
         if (!resumed) {
-            message("รอหน้า Entertainment พร้อมใช้งาน")
+            message(getString(R.string.ent_wait_for_ready))
             return
         }
         if (!FeaturePolicy.app.isAvailable(ContentKind.WEB.requiredFeature)) {
@@ -310,11 +331,11 @@ YouTube · TV · Web
         val url = ContentAddress.https(address.text.toString())
             ?: source.takeIf { it.isNotBlank() && contentKind == ContentKind.WEB }
         if (url == null) {
-            message("กรอก HTTPS URL ก่อนเปิด Browser")
+            message(getString(R.string.ent_need_url_for_browser))
             return
         }
         if (!BrowserLauncher.openUrl(this, url)) {
-            message("เปิด Browser ไม่สำเร็จ — ตรวจว่ามี Browser และใช้ HTTPS URL")
+            message(getString(R.string.ent_browser_failed))
         }
     }
 
@@ -326,7 +347,7 @@ YouTube · TV · Web
         }
         val needsPlayer = kind == ContentKind.AUDIO || kind == ContentKind.VIDEO
         if (needsPlayer && client.player == null) {
-            message("กำลังเชื่อมต่อเครื่องเล่น ลองอีกครั้ง")
+            message(getString(R.string.ent_connecting_retry))
             return
         }
         persistPosition()
@@ -367,23 +388,28 @@ YouTube · TV · Web
             browser.stopLoading()
             browser.loadUrl("about:blank")
             message(FeaturePolicy.app.denialMessage(feature))
-            emptyState.text = "โหมดเสียง\n\nควบคุมเล่น / พัก ผ่านการแจ้งเตือนหรือปุ่มสื่อ\nวิดีโอและเว็บเปิดได้เมื่อโหมดและรถอนุญาต"
+            emptyState.text = getString(R.string.ent_empty_audio)
         } else {
             when (contentKind) {
                 ContentKind.WEB -> {
-                    emptyState.text = "AutoBridge\n\nYouTube · TV · Web\n\nจอดแล้ว เลือกเนื้อหาจากปุ่มด้านบน"
+                    emptyState.text = getString(R.string.ent_empty_parked)
                     browser.onResume()
-                    message("AutoBridge • YouTube / Web • จอดแล้ว")
+                    message(getString(R.string.ent_status_parked_web))
                 }
                 ContentKind.VIDEO -> {
-                    emptyState.text = "AutoBridge Video\n\nจอดแล้ว วิดีโอพร้อมเล่น"
+                    emptyState.text = getString(R.string.ent_empty_video)
                     browser.onPause()
-                    message("AutoBridge • Video • จอดแล้ว")
+                    message(getString(R.string.ent_status_parked_video))
                 }
                 ContentKind.AUDIO -> {
-                    emptyState.text = "AutoBridge Audio\n\nเสียงยังเล่นต่อได้ แม้ฟีเจอร์วิดีโอจะถูกล็อก"
+                    emptyState.text = getString(R.string.ent_empty_audio_locked)
                     browser.onPause()
-                    message(if (client.isConnected) "AutoBridge • Audio" else "กำลังเชื่อมต่อ MediaSession…")
+                    message(
+                getString(
+                    if (client.isConnected) R.string.ent_status_audio
+                    else R.string.ent_status_connecting
+                )
+            )
                 }
             }
             if (becameAllowed && !client.isPlaying && pendingSource == null &&
@@ -413,23 +439,23 @@ YouTube · TV · Web
     }
 
     private fun restoreLast() {
-        val last = prefs.getString("last", null) ?: return message("ยังไม่มีรายการล่าสุด")
+        val last = prefs.getString("last", null) ?: return message(getString(R.string.ent_no_recent))
         val kind = decodeKind(prefs.getString("kind", null), prefs.getBoolean("stream", false))
         open(last, kind, prefs.getLong("position:$last", 0L))
     }
 
     private fun saveFavorite() {
-        if (source.isEmpty()) return message("เปิดเนื้อหาก่อนบันทึก")
+        if (source.isEmpty()) return message(getString(R.string.ent_open_before_saving))
         val items = prefs.getStringSet("favorites", emptySet()).orEmpty().toMutableSet()
         items.add("${contentKind.name}|$source")
         prefs.edit().putStringSet("favorites", items).apply()
-        message("บันทึกรายการโปรดแล้ว")
+        message(getString(R.string.ent_favorite_saved))
     }
 
     private fun favorites() {
         val items = prefs.getStringSet("favorites", emptySet()).orEmpty().sorted()
-        if (items.isEmpty()) return message("ยังไม่มีรายการโปรด")
-        AlertDialog.Builder(this).setTitle("รายการโปรด")
+        if (items.isEmpty()) return message(getString(R.string.ent_no_favorites))
+        AlertDialog.Builder(this).setTitle(R.string.ent_favorites_title)
             .setItems(items.toTypedArray()) { _, index ->
                 val item = items[index]
                 val separator = item.indexOf('|')
@@ -441,7 +467,7 @@ YouTube · TV · Web
                     else -> decodeKind(prefix, false)
                 }
                 open(url, kind)
-            }.setNegativeButton("ปิด", null).show()
+            }.setNegativeButton(R.string.action_close, null).show()
     }
 
     private fun voiceSearch() {
@@ -451,9 +477,9 @@ YouTube · TV · Web
         runCatching {
             startActivityForResult(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                putExtra(RecognizerIntent.EXTRA_PROMPT, "ค้นหา YouTube")
+                putExtra(RecognizerIntent.EXTRA_PROMPT, getString(R.string.ent_voice_prompt))
             }, 3101)
-        }.onFailure { message("ไม่พบบริการค้นหาด้วยเสียงบนโทรศัพท์") }
+        }.onFailure { message(getString(R.string.ent_no_voice_service)) }
     }
 
     private fun chooseFile() {
@@ -489,7 +515,7 @@ YouTube · TV · Web
             }
             val kind = ContentKindResolver.classify(uri.toString(), contentResolver.getType(uri))
             if (kind == null || kind == ContentKind.WEB) {
-                message("เลือกไฟล์เสียงหรือวิดีโอที่รองรับ")
+                message(getString(R.string.ent_unsupported_file))
             } else {
                 pendingSource = uri.toString() to kind
             }

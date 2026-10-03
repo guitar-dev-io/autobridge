@@ -15,6 +15,7 @@ import androidx.car.app.model.Header
 import androidx.car.app.model.ItemList
 import androidx.car.app.model.Template
 import androidx.core.graphics.drawable.IconCompat
+import dev.autobridge.R
 import dev.autobridge.apps.InstalledApp
 import dev.autobridge.apps.InstalledAppRepository
 import dev.autobridge.apps.QuickAppLauncher
@@ -56,7 +57,7 @@ class CarLauncherScreen(carContext: CarContext) : Screen(carContext) {
         return GridTemplate.Builder()
             .setHeader(
                 Header.Builder()
-                    .setTitle("AutoBridge")
+                    .setTitle(carContext.getString(R.string.car_launcher_title))
                     .setStartHeaderAction(Action.APP_ICON)
                     .addEndHeaderAction(
                         Action.Builder()
@@ -71,16 +72,16 @@ class CarLauncherScreen(carContext: CarContext) : Screen(carContext) {
     }
 
     private fun builtinShortcuts(): List<Shortcut> = listOf(
-        Shortcut("Now Playing", dev.autobridge.R.drawable.ic_car_panel) {
+        Shortcut(carContext.getString(R.string.car_now_playing_title), dev.autobridge.R.drawable.ic_car_panel) {
             CarNavigation.open(screenManager, "CarNowPlayingScreen") { CarNowPlayingScreen(carContext) }
         },
-        Shortcut("Media", dev.autobridge.R.drawable.ic_car_panel) {
+        Shortcut(carContext.getString(R.string.car_media_title), dev.autobridge.R.drawable.ic_car_panel) {
             CarNavigation.open(screenManager, "CarMediaLibraryScreen") { CarMediaLibraryScreen(carContext) }
         },
-        Shortcut("Web / Video", dev.autobridge.R.drawable.ic_car_panel) {
+        Shortcut(carContext.getString(R.string.car_launcher_web_video), dev.autobridge.R.drawable.ic_car_panel) {
             CarNavigation.open(screenManager, "CarWebScreen") { CarWebScreen(carContext) }
         },
-        Shortcut("Mirror", dev.autobridge.R.drawable.ic_car_home) {
+        Shortcut(carContext.getString(R.string.car_mirror_intro_title), dev.autobridge.R.drawable.ic_car_home) {
             CarNavigation.open(screenManager, "MirrorCarScreen") { MirrorCarScreen(carContext) }
         }
     )
@@ -90,7 +91,11 @@ class CarLauncherScreen(carContext: CarContext) : Screen(carContext) {
             .setTitle(app.label)
             .setOnClickListener {
                 if (!QuickAppLauncher.launch(carContext, app.packageName)) {
-                    CarToast.makeText(carContext, "Could not launch ${app.label}", CarToast.LENGTH_SHORT).show()
+                    CarToast.makeText(
+                        carContext,
+                        carContext.getString(R.string.car_could_not_launch, app.label),
+                        CarToast.LENGTH_SHORT
+                    ).show()
                 }
             }
         val icon = appIcon(app.packageName)

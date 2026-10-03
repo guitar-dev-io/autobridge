@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import androidx.core.content.ContextCompat
+import dev.autobridge.R
 
 /**
  * MediaStore-backed on-device library for the Folders, Playlists and Gallery sections.
@@ -22,9 +23,16 @@ object LocalMediaRepository {
     data class Item(
         val id: Long,
         val title: String,
+        /**
+         * The second line to show: an artist, or a media-kind label. Display text only — callers
+         * deciding *how* to play an item must read [isAudio], never match on this. It used to be
+         * both, and a translated label would have routed every audio file to the video player.
+         */
         val subtitle: String,
         val uri: String,
-        val durationMs: Long = 0L
+        val durationMs: Long = 0L,
+        /** True for an audio track: queue it on the MediaSession rather than opening a player. */
+        val isAudio: Boolean = false
     )
 
     /** A bucket of items: a storage folder, a MediaStore playlist, or a gallery album. */
@@ -161,7 +169,8 @@ object LocalMediaRepository {
                         uri = ContentUris.withAppendedId(
                             MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, audioId
                         ).toString(),
-                        durationMs = cursor.getLong(durationColumn)
+                        durationMs = cursor.getLong(durationColumn),
+                        isAudio = true
                     )
                 }
             }
@@ -244,9 +253,12 @@ object LocalMediaRepository {
                 items += Item(
                     id = id,
                     title = title,
-                    subtitle = if (audio) "Audio" else "Media",
+                    subtitle = context.getString(
+                        if (audio) R.string.media_kind_audio else R.string.media_kind_media
+                    ),
                     uri = ContentUris.withAppendedId(collection, id).toString(),
-                    durationMs = cursor.getLong(durationColumn)
+                    durationMs = cursor.getLong(durationColumn),
+                    isAudio = audio
                 )
             }
         }

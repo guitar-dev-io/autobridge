@@ -1,6 +1,7 @@
 package dev.autobridge.car
 
 import android.webkit.WebSettings
+import androidx.annotation.StringRes
 import androidx.car.app.CarContext
 import androidx.car.app.CarToast
 import androidx.car.app.Screen
@@ -13,6 +14,7 @@ import androidx.car.app.model.SearchTemplate
 import androidx.car.app.model.SectionedItemList
 import androidx.car.app.model.Template
 import androidx.car.app.model.Toggle
+import dev.autobridge.R
 import dev.autobridge.audio.AudioPlaybackStore
 import dev.autobridge.browser.BrowserAdBlock
 import dev.autobridge.browser.BrowserControlsStore
@@ -39,8 +41,8 @@ class CarBrowserSettingsScreen(carContext: CarContext) : Screen(carContext) {
         val controls = ItemList.Builder()
             .addItem(
                 Row.Builder()
-                    .setTitle("Hide URL bar")
-                    .addText("Remove the address bar completely; use the floating button for the menu")
+                    .setTitle(carContext.getString(R.string.car_browser_hide_url_bar))
+                    .addText(carContext.getString(R.string.car_browser_hide_url_bar_caption))
                     .setToggle(
                         Toggle.Builder { checked ->
                             BrowserControlsStore.setHideUrlBar(carContext, checked)
@@ -54,8 +56,8 @@ class CarBrowserSettingsScreen(carContext: CarContext) : Screen(carContext) {
             )
             .addItem(
                 Row.Builder()
-                    .setTitle("Always show URL bar")
-                    .addText("Keep the address bar over the page instead of letting it fade away")
+                    .setTitle(carContext.getString(R.string.car_browser_always_url_bar))
+                    .addText(carContext.getString(R.string.car_browser_always_url_bar_caption))
                     // Hiding the bar wins over pinning it, so this row is disabled while the bar is
                     // hidden rather than offering a contradictory choice.
                     .setEnabled(!hideBar)
@@ -72,8 +74,8 @@ class CarBrowserSettingsScreen(carContext: CarContext) : Screen(carContext) {
             )
             .addItem(
                 Row.Builder()
-                    .setTitle("Always show floating button")
-                    .addText("Keep the button on screen instead of fading it out with the toolbar")
+                    .setTitle(carContext.getString(R.string.car_browser_always_fab))
+                    .addText(carContext.getString(R.string.car_browser_always_fab_caption))
                     .setToggle(
                         Toggle.Builder { checked ->
                             BrowserControlsStore.setAlwaysShowFloatingButton(carContext, checked)
@@ -87,16 +89,16 @@ class CarBrowserSettingsScreen(carContext: CarContext) : Screen(carContext) {
             )
             .addItem(
                 Row.Builder()
-                    .setTitle("Floating button action")
-                    .addText(BrowserControlsStore.floatingButtonAction(carContext).label)
+                    .setTitle(carContext.getString(R.string.car_browser_fab_action))
+                    .addText(BrowserControlsStore.floatingButtonAction(carContext).label(carContext))
                     .setBrowsable(true)
                     .setOnClickListener { openFloatingActionPicker() }
                     .build()
             )
             .addItem(
                 Row.Builder()
-                    .setTitle("Floating button on left")
-                    .addText("Move the button to the bottom-left corner instead of the bottom-right")
+                    .setTitle(carContext.getString(R.string.car_browser_fab_left))
+                    .addText(carContext.getString(R.string.car_browser_fab_left_caption))
                     .setToggle(
                         Toggle.Builder { checked ->
                             BrowserControlsStore.setFloatingButtonOnLeft(carContext, checked)
@@ -110,16 +112,16 @@ class CarBrowserSettingsScreen(carContext: CarContext) : Screen(carContext) {
             )
             .addItem(
                 Row.Builder()
-                    .setTitle("Split screen")
-                    .addText(BrowserSplitStore.layout(carContext).label)
+                    .setTitle(carContext.getString(R.string.car_browser_split))
+                    .addText(BrowserSplitStore.layout(carContext).label(carContext))
                     .setBrowsable(true)
                     .setOnClickListener { openSplitLayoutPicker() }
                     .build()
             )
             .addItem(
                 Row.Builder()
-                    .setTitle("Keep music playing in reverse")
-                    .addText("Don't pause for the reverse chime — also stops phone calls and nav prompts pausing it")
+                    .setTitle(carContext.getString(R.string.car_browser_reverse_music))
+                    .addText(carContext.getString(R.string.car_browser_reverse_music_caption))
                     .setToggle(
                         Toggle.Builder { checked ->
                             AudioPlaybackStore.setKeepPlayingThroughFocusLoss(carContext, checked)
@@ -136,8 +138,8 @@ class CarBrowserSettingsScreen(carContext: CarContext) : Screen(carContext) {
         val blocking = ItemList.Builder()
             .addItem(
                 Row.Builder()
-                    .setTitle("Block ads and trackers")
-                    .addText("Drops requests to known ad hosts. Not YouTube's in-video ads — those share a host with the video")
+                    .setTitle(carContext.getString(R.string.car_browser_block_ads))
+                    .addText(carContext.getString(R.string.car_browser_block_ads_caption))
                     .setToggle(
                         Toggle.Builder { checked ->
                             BrowserAdBlock.setEnabled(carContext, checked)
@@ -151,8 +153,8 @@ class CarBrowserSettingsScreen(carContext: CarContext) : Screen(carContext) {
             )
             .addItem(
                 Row.Builder()
-                    .setTitle("Skip YouTube video ads")
-                    .addText("Presses Skip, or seeks past an unskippable ad. YouTube may notice and ask you to turn it off")
+                    .setTitle(carContext.getString(R.string.car_browser_skip_yt_ads))
+                    .addText(carContext.getString(R.string.car_browser_skip_yt_ads_caption))
                     .setToggle(
                         Toggle.Builder { checked ->
                             YouTubeSettings.setAdSkipEnabled(carContext, checked)
@@ -171,7 +173,7 @@ class CarBrowserSettingsScreen(carContext: CarContext) : Screen(carContext) {
         val identity = ItemList.Builder()
             .addItem(
                 Row.Builder()
-                    .setTitle("Browser identity")
+                    .setTitle(carContext.getString(R.string.car_browser_identity))
                     .addText(identitySummary())
                     .setBrowsable(true)
                     .setOnClickListener { openIdentityPicker() }
@@ -182,13 +184,13 @@ class CarBrowserSettingsScreen(carContext: CarContext) : Screen(carContext) {
         return ListTemplate.Builder()
             .setHeader(
                 Header.Builder()
-                    .setTitle("Browser settings")
+                    .setTitle(carContext.getString(R.string.car_browser_settings_title))
                     .setStartHeaderAction(Action.BACK)
                     .build()
             )
-            .addSectionedList(SectionedItemList.create(controls, "In-app controls"))
-            .addSectionedList(SectionedItemList.create(blocking, "Content blocking"))
-            .addSectionedList(SectionedItemList.create(identity, "Identity"))
+            .addSectionedList(SectionedItemList.create(controls, carContext.getString(R.string.car_browser_section_controls)))
+            .addSectionedList(SectionedItemList.create(blocking, carContext.getString(R.string.car_browser_section_blocking)))
+            .addSectionedList(SectionedItemList.create(identity, carContext.getString(R.string.car_browser_section_identity)))
             .build()
     }
 
@@ -215,7 +217,12 @@ class CarBrowserSettingsScreen(carContext: CarContext) : Screen(carContext) {
         val label = BrowserUserAgentStore.label(carContext)
         if (BrowserUserAgentStore.mode(carContext) != BrowserUserAgentMode.CUSTOM) return label
         val ua = BrowserUserAgentStore.custom(carContext)
-        return if (ua.isBlank()) label else "$label · " + if (ua.length <= 48) ua else ua.take(45) + "…"
+        if (ua.isBlank()) return label
+        return carContext.getString(
+            R.string.car_browser_identity_custom_summary,
+            label,
+            if (ua.length <= 48) ua else ua.take(45) + "…"
+        )
     }
 
     private fun openIdentityPicker() {
@@ -252,8 +259,12 @@ private class CarSplitLayoutScreen(carContext: CarContext) : Screen(carContext) 
         BrowserSplitLayout.entries.forEach { layout ->
             list.addItem(
                 Row.Builder()
-                    .setTitle(if (layout == current) "${layout.label}  •  Selected" else layout.label)
-                    .addText(description(layout))
+                    .setTitle(
+                        layout.label(carContext).let {
+                            if (layout == current) selectedLabel(it) else it
+                        }
+                    )
+                    .addText(carContext.getString(description(layout)))
                     .setOnClickListener {
                         BrowserSplitStore.setLayout(carContext, layout)
                         setResult(true)
@@ -266,8 +277,8 @@ private class CarSplitLayoutScreen(carContext: CarContext) : Screen(carContext) 
         // some hosts enforce.
         list.addItem(
             Row.Builder()
-                .setTitle("Side page on right")
-                .addText("Put the side page (map) on the right instead of the left")
+                .setTitle(carContext.getString(R.string.car_browser_side_right))
+                .addText(carContext.getString(R.string.car_browser_side_right_caption))
                 .setToggle(
                     Toggle.Builder { checked ->
                         BrowserSplitStore.setSideOnRight(carContext, checked)
@@ -282,7 +293,7 @@ private class CarSplitLayoutScreen(carContext: CarContext) : Screen(carContext) 
         return ListTemplate.Builder()
             .setHeader(
                 Header.Builder()
-                    .setTitle("Split screen")
+                    .setTitle(carContext.getString(R.string.car_browser_split))
                     .setStartHeaderAction(Action.BACK)
                     .build()
             )
@@ -290,12 +301,13 @@ private class CarSplitLayoutScreen(carContext: CarContext) : Screen(carContext) 
             .build()
     }
 
-    private fun description(layout: BrowserSplitLayout): String = when (layout) {
-        BrowserSplitLayout.SINGLE -> "One page on the whole screen"
-        BrowserSplitLayout.HALF -> "Side page and main page, equal width"
-        BrowserSplitLayout.FORTY_SIXTY -> "Side page 40%, main page 60%"
-        BrowserSplitLayout.SIXTY_FIVE_THIRTY_FIVE -> "Main page 65% (video), side page 35% (map)"
-        BrowserSplitLayout.PORTRAIT_LANDSCAPE -> "Tall side page (map) + 16:9 main page (video)"
+    @StringRes
+    private fun description(layout: BrowserSplitLayout): Int = when (layout) {
+        BrowserSplitLayout.SINGLE -> R.string.car_split_desc_single
+        BrowserSplitLayout.HALF -> R.string.car_split_desc_half
+        BrowserSplitLayout.FORTY_SIXTY -> R.string.car_split_desc_forty_sixty
+        BrowserSplitLayout.SIXTY_FIVE_THIRTY_FIVE -> R.string.car_split_desc_sixty_five
+        BrowserSplitLayout.PORTRAIT_LANDSCAPE -> R.string.car_split_desc_portrait_landscape
     }
 }
 
@@ -307,7 +319,11 @@ private class CarFloatingButtonActionScreen(carContext: CarContext) : Screen(car
         FloatingButtonAction.values().forEach { action ->
             list.addItem(
                 Row.Builder()
-                    .setTitle(if (action == current) "${action.label}  •  Selected" else action.label)
+                    .setTitle(
+                        action.label(carContext).let {
+                            if (action == current) selectedLabel(it) else it
+                        }
+                    )
                     .setOnClickListener {
                         BrowserControlsStore.setFloatingButtonAction(carContext, action)
                         setResult(true)
@@ -319,7 +335,7 @@ private class CarFloatingButtonActionScreen(carContext: CarContext) : Screen(car
         return ListTemplate.Builder()
             .setHeader(
                 Header.Builder()
-                    .setTitle("Floating button action")
+                    .setTitle(carContext.getString(R.string.car_browser_fab_action))
                     .setStartHeaderAction(Action.BACK)
                     .build()
             )
@@ -333,11 +349,29 @@ private class CarBrowserIdentityScreen(carContext: CarContext) : Screen(carConte
     override fun onGetTemplate(): Template {
         val current = BrowserUserAgentStore.mode(carContext)
         val list = ItemList.Builder()
-            .addItem(modeRow("Mobile", "Use the phone browser identity", BrowserUserAgentMode.MOBILE, current))
-            .addItem(modeRow("Desktop", "Request desktop versions of websites", BrowserUserAgentMode.DESKTOP, current))
+            .addItem(
+                modeRow(
+                    carContext.getString(R.string.car_ua_mobile),
+                    carContext.getString(R.string.car_ua_mobile_caption),
+                    BrowserUserAgentMode.MOBILE,
+                    current
+                )
+            )
+            .addItem(
+                modeRow(
+                    carContext.getString(R.string.car_ua_desktop),
+                    carContext.getString(R.string.car_ua_desktop_caption),
+                    BrowserUserAgentMode.DESKTOP,
+                    current
+                )
+            )
             .addItem(
                 Row.Builder()
-                    .setTitle(if (current == BrowserUserAgentMode.CUSTOM) "Custom  •  Selected" else "Custom")
+                    .setTitle(
+                        carContext.getString(R.string.car_ua_custom).let {
+                            if (current == BrowserUserAgentMode.CUSTOM) selectedLabel(it) else it
+                        }
+                    )
                     .addText(customSummary())
                     .setBrowsable(true)
                     .setOnClickListener { openCustomEditor() }
@@ -345,8 +379,8 @@ private class CarBrowserIdentityScreen(carContext: CarContext) : Screen(carConte
             )
             .addItem(
                 Row.Builder()
-                    .setTitle("Custom presets")
-                    .addText("Windows, macOS, iPad, iPhone… without typing")
+                    .setTitle(carContext.getString(R.string.car_ua_presets))
+                    .addText(carContext.getString(R.string.car_ua_presets_caption))
                     .setBrowsable(true)
                     .setOnClickListener { openPresets() }
                     .build()
@@ -356,7 +390,7 @@ private class CarBrowserIdentityScreen(carContext: CarContext) : Screen(carConte
         return ListTemplate.Builder()
             .setHeader(
                 Header.Builder()
-                    .setTitle("Browser identity")
+                    .setTitle(carContext.getString(R.string.car_browser_identity))
                     .setStartHeaderAction(Action.BACK)
                     .build()
             )
@@ -370,7 +404,7 @@ private class CarBrowserIdentityScreen(carContext: CarContext) : Screen(carConte
         mode: BrowserUserAgentMode,
         current: BrowserUserAgentMode
     ): Row = Row.Builder()
-        .setTitle(if (mode == current) "$title  •  Selected" else title)
+        .setTitle(if (mode == current) selectedLabel(title) else title)
         .addText(subtitle)
         .setOnClickListener {
             BrowserUserAgentStore.select(carContext, mode)
@@ -382,7 +416,7 @@ private class CarBrowserIdentityScreen(carContext: CarContext) : Screen(carConte
     private fun customSummary(): String = BrowserUserAgentStore.custom(carContext)
         .takeIf { it.isNotBlank() }
         ?.let { if (it.length <= 54) it else it.take(51) + "…" }
-        ?: "Enter a custom User-Agent string"
+        ?: carContext.getString(R.string.car_ua_custom_empty)
 
     private fun openPresets() {
         screenManager.pushForResult(CarUserAgentPresetScreen(carContext)) { changed ->
@@ -402,7 +436,11 @@ private class CarBrowserIdentityScreen(carContext: CarContext) : Screen(carConte
                 setResult(true)
                 screenManager.pop()
             } else {
-                CarToast.makeText(carContext, "Enter a valid User-Agent", CarToast.LENGTH_SHORT).show()
+                CarToast.makeText(
+                    carContext,
+                    carContext.getString(R.string.car_ua_invalid),
+                    CarToast.LENGTH_SHORT
+                ).show()
             }
         }
     }
@@ -425,7 +463,7 @@ private class CarUserAgentPresetScreen(carContext: CarContext) : Screen(carConte
             val selected = isCustom && preset.userAgent == current
             list.addItem(
                 Row.Builder()
-                    .setTitle(if (selected) "${preset.label}  •  Selected" else preset.label)
+                    .setTitle(if (selected) selectedLabel(preset.label) else preset.label)
                     .addText(preset.userAgent.let { if (it.length <= 54) it else it.take(51) + "…" })
                     .setOnClickListener {
                         if (BrowserUserAgentStore.saveCustom(carContext, preset.userAgent)) {
@@ -439,7 +477,7 @@ private class CarUserAgentPresetScreen(carContext: CarContext) : Screen(carConte
         return ListTemplate.Builder()
             .setHeader(
                 Header.Builder()
-                    .setTitle("User-Agent presets")
+                    .setTitle(carContext.getString(R.string.car_ua_presets_title))
                     .setStartHeaderAction(Action.BACK)
                     .build()
             )
@@ -467,11 +505,16 @@ private class CarUserAgentInputScreen(
     )
         .setHeaderAction(Action.BACK)
         .setInitialSearchText(initialValue)
-        .setSearchHint("Custom User-Agent")
+        .setSearchHint(carContext.getString(R.string.car_ua_input_hint))
         .setShowKeyboardByDefault(true)
         .setActionStrip(
             androidx.car.app.model.ActionStrip.Builder()
-                .addAction(Action.Builder().setTitle("Save").setOnClickListener { submit(pendingValue) }.build())
+                .addAction(
+                    Action.Builder()
+                        .setTitle(carContext.getString(R.string.action_save))
+                        .setOnClickListener { submit(pendingValue) }
+                        .build()
+                )
                 .build()
         )
         .build()
@@ -481,3 +524,10 @@ private class CarUserAgentInputScreen(
         screenManager.pop()
     }
 }
+
+/**
+ * Marks the active entry in a car picker. Shared across the four pickers in this file so the
+ * decoration, and the one string behind it, are defined once rather than per picker.
+ */
+private fun Screen.selectedLabel(title: String): String =
+    carContext.getString(R.string.car_selected, title)

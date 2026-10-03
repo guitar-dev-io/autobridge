@@ -37,7 +37,8 @@ object SafetyEnforcement {
      * Anything that displays the vehicle state must read [ParkingStateStore] directly instead, or
      * it will report PARKED to the driver while the car is moving.
      */
-    fun gateParked(actual: Boolean = ParkingStateStore.isParked): Boolean = actual || !BLOCK_WHEN_MOVING
+    fun gateParked(actual: Boolean = ParkingStateStore.isParked): Boolean =
+        actual || !BLOCK_WHEN_MOVING || BypassPolicyStore.overridesParked
 
     /** How the current state reads in a status row, including whether it is being acted on. */
     fun statusLabel(state: ParkingStateStore.State = ParkingStateStore.state): String = when (state) {

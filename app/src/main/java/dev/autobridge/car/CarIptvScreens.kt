@@ -13,6 +13,7 @@ import androidx.car.app.model.Row
 import androidx.car.app.model.Template
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
+import dev.autobridge.R
 import dev.autobridge.browser.CarBrowserRuntime
 import dev.autobridge.core.state.RecentActivityStore
 import dev.autobridge.iptv.IptvCatalog
@@ -41,18 +42,19 @@ class CarIptvSourcesScreen(
     carContext: CarContext,
     private val kind: IptvKind
 ) : Screen(carContext) {
-    private val title = if (kind == IptvKind.RADIO) "Radio" else "TV"
+    private val title = carContext.getString(
+        if (kind == IptvKind.RADIO) R.string.car_iptv_radio else R.string.car_iptv_tv
+    )
 
     override fun onGetTemplate(): Template {
         val sources = IptvSourceStore.list(carContext, kind)
         if (sources.isEmpty()) {
             return MessageTemplate.Builder(
-                "No $title source yet.\nPick a free public list, or add an Xtream account or an " +
-                    "M3U playlist, on the phone."
+                carContext.getString(R.string.car_iptv_no_source, title)
             )
                 .setHeader(Header.Builder().setTitle(title).setStartHeaderAction(Action.BACK).build())
                 .addAction(
-                    Action.Builder().setTitle("Open on phone")
+                    Action.Builder().setTitle(carContext.getString(R.string.car_iptv_open_on_phone))
                         .setOnClickListener { openOnPhone() }
                         .build()
                 )
@@ -64,8 +66,12 @@ class CarIptvSourcesScreen(
         if (recent.isNotEmpty()) {
             list.addItem(
                 Row.Builder()
-                    .setTitle("Recently played")
-                    .addText("${recent.size} items")
+                    .setTitle(carContext.getString(R.string.car_iptv_recent))
+                    .addText(
+                        carContext.resources.getQuantityString(
+                            R.plurals.car_iptv_items, recent.size, recent.size
+                        )
+                    )
                     .setBrowsable(true)
                     .setOnClickListener { screenManager.push(CarIptvRecentScreen(carContext, kind)) }
                     .build()
@@ -78,9 +84,14 @@ class CarIptvSourcesScreen(
                     .setTitle(source.name)
                     .addText(
                         when {
-                            IptvCatalog.isLoading(source.id) -> "Loading…"
-                            cached != null -> "${cached.entries.size} entries"
-                            else -> "Tap to load"
+                            IptvCatalog.isLoading(source.id) ->
+                                carContext.getString(R.string.car_iptv_loading)
+                            cached != null -> carContext.resources.getQuantityString(
+                                R.plurals.car_iptv_entries,
+                                cached.entries.size,
+                                cached.entries.size
+                            )
+                            else -> carContext.getString(R.string.car_iptv_tap_to_load)
                         }
                     )
                     .setBrowsable(true)
@@ -100,7 +111,11 @@ class CarIptvSourcesScreen(
             screenManager.push(CarIptvCategoriesScreen(carContext, source, data))
             return
         }
-        CarToast.makeText(carContext, "Loading ${source.name}…", CarToast.LENGTH_SHORT).show()
+        CarToast.makeText(
+            carContext,
+            carContext.getString(R.string.car_iptv_loading_named, source.name),
+            CarToast.LENGTH_SHORT
+        ).show()
         IptvCatalog.load(carContext, source) { result ->
             when (result) {
                 is IptvCatalog.Result.Ready ->
@@ -119,9 +134,17 @@ class CarIptvSourcesScreen(
             carContext.startActivity(
                 LibraryActivity.intent(carContext, section).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             )
-            CarToast.makeText(carContext, "Continue on the phone", CarToast.LENGTH_LONG).show()
+            CarToast.makeText(
+                carContext,
+                carContext.getString(R.string.car_iptv_continue_on_phone),
+                CarToast.LENGTH_LONG
+            ).show()
         }.onFailure {
-            CarToast.makeText(carContext, "Could not open the phone screen", CarToast.LENGTH_SHORT).show()
+            CarToast.makeText(
+                carContext,
+                carContext.getString(R.string.car_iptv_phone_screen_failed),
+                CarToast.LENGTH_SHORT
+            ).show()
         }
     }
 }
@@ -140,7 +163,11 @@ class CarIptvCategoriesScreen(
             list.addItem(
                 Row.Builder()
                     .setTitle(category.name)
-                    .addText("${category.count} entries")
+                    .addText(
+                        carContext.resources.getQuantityString(
+                            R.plurals.car_iptv_entries, category.count, category.count
+                        )
+                    )
                     .setBrowsable(true)
                     .setOnClickListener {
                         screenManager.push(
@@ -155,7 +182,7 @@ class CarIptvCategoriesScreen(
         if (paged.hasMore) {
             list.addItem(
                 Row.Builder()
-                    .setTitle("Show more")
+                    .setTitle(carContext.getString(R.string.car_iptv_show_more))
                     .setBrowsable(true)
                     .setOnClickListener {
                         screenManager.push(CarIptvCategoriesScreen(carContext, source, data, page + 1))
@@ -198,10 +225,13 @@ class CarIptvEntriesScreen(
                     .addText(
                         listOfNotNull(
                             entry.subtitle.takeIf { it.isNotBlank() },
-                            "Opens in browser".takeIf { entry.isWebPage },
-                            "Favourite".takeIf { favorite },
-                            "Catch-up".takeIf { entry.supportsCatchup }
-                        ).joinToString(" • ").ifBlank { "Tap to play" }
+                            carContext.getString(R.string.car_iptv_opens_in_browser)
+                                .takeIf { entry.isWebPage },
+                            carContext.getString(R.string.car_iptv_favourite).takeIf { favorite },
+                            carContext.getString(R.string.car_iptv_catchup)
+                                .takeIf { entry.supportsCatchup }
+                        ).joinToString(" • ")
+                            .ifBlank { carContext.getString(R.string.car_iptv_tap_to_play) }
                     )
                     .setBrowsable(entry.isSeriesFolder)
                     .setOnClickListener { open(entry) }
@@ -211,7 +241,7 @@ class CarIptvEntriesScreen(
         if (paged.hasMore) {
             list.addItem(
                 Row.Builder()
-                    .setTitle("Show more")
+                    .setTitle(carContext.getString(R.string.car_iptv_show_more))
                     .setBrowsable(true)
                     .setOnClickListener {
                         screenManager.push(
@@ -229,10 +259,18 @@ class CarIptvEntriesScreen(
 
     private fun open(entry: IptvEntry) {
         if (entry.isSeriesFolder) {
-            CarToast.makeText(carContext, "Loading ${entry.title}…", CarToast.LENGTH_SHORT).show()
+            CarToast.makeText(
+                carContext,
+                carContext.getString(R.string.car_iptv_loading_named, entry.title),
+                CarToast.LENGTH_SHORT
+            ).show()
             IptvCatalog.loadEpisodes(source, entry) { episodes ->
                 if (episodes.isEmpty()) {
-                    CarToast.makeText(carContext, "No episodes available", CarToast.LENGTH_SHORT).show()
+                    CarToast.makeText(
+                        carContext,
+                        carContext.getString(R.string.car_iptv_no_episodes),
+                        CarToast.LENGTH_SHORT
+                    ).show()
                 } else {
                     screenManager.push(
                         CarIptvEntriesScreen(carContext, source, episodes, entry.title)
@@ -278,7 +316,10 @@ class CarIptvRecentScreen(carContext: CarContext, private val kind: IptvKind) : 
         }
         return ListTemplate.Builder()
             .setHeader(
-                Header.Builder().setTitle("Recently played").setStartHeaderAction(Action.BACK).build()
+                Header.Builder()
+                    .setTitle(carContext.getString(R.string.car_iptv_recent))
+                    .setStartHeaderAction(Action.BACK)
+                    .build()
             )
             .setSingleList(list.build())
             .build()
@@ -303,7 +344,11 @@ internal object CarIptvPlayback {
         playback: IptvPlayback = IptvPlayback.STREAM
     ) {
         if (url.isBlank()) {
-            CarToast.makeText(carContext, "This entry has no stream address", CarToast.LENGTH_SHORT).show()
+            CarToast.makeText(
+                carContext,
+                carContext.getString(R.string.car_iptv_no_stream),
+                CarToast.LENGTH_SHORT
+            ).show()
             return
         }
         if (playback == IptvPlayback.WEB_PAGE) {
@@ -313,13 +358,22 @@ internal object CarIptvPlayback {
         RecentActivityStore.record(
             carContext,
             RecentActivityStore.Entry(
-                RecentActivityStore.Kind.MEDIA, title, if (kind == IptvKind.RADIO) "Radio" else "TV", url
+                RecentActivityStore.Kind.MEDIA,
+                title,
+                carContext.getString(
+                    if (kind == IptvKind.RADIO) R.string.car_iptv_radio else R.string.car_iptv_tv
+                ),
+                url
             )
         )
         val screens = screen.screenManager
         if (kind == IptvKind.RADIO) {
             if (!mediaPlayback.isConnected) {
-                CarToast.makeText(carContext, "Connecting to the player…", CarToast.LENGTH_SHORT).show()
+                CarToast.makeText(
+                    carContext,
+                    carContext.getString(R.string.car_iptv_connecting),
+                    CarToast.LENGTH_SHORT
+                ).show()
                 return
             }
             mediaPlayback.play(url, title)
@@ -340,7 +394,10 @@ internal object CarIptvPlayback {
             carContext,
             RecentActivityStore.Entry(
                 RecentActivityStore.Kind.BROWSER, title,
-                if (kind == IptvKind.RADIO) "Radio" else "TV", url
+                carContext.getString(
+                    if (kind == IptvKind.RADIO) R.string.car_iptv_radio else R.string.car_iptv_tv
+                ),
+                url
             )
         )
         // The renderer is session-scoped, so loading through it works whether the browser screen is

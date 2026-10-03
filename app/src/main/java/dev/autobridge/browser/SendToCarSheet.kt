@@ -11,6 +11,7 @@ import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
+import dev.autobridge.R
 
 /**
  * The focused "Send to car" sheet.
@@ -26,9 +27,15 @@ import android.widget.TextView
  * mostly to put media on the car. The resolve/engine logic is [BrowserInputResolver], shared with
  * the address bar, so "is this a page or a search?" has one answer across the app.
  *
+ * Beside "send it now" sits "play it after this one": the same resolved address can go into
+ * [BrowserPlayQueue] instead, which is why both buttons live on one sheet. Sending replaces what the
+ * car is showing; queueing leaves it alone and takes over when it finishes. The queue itself is
+ * listed here too, because a queue nothing can show or empty is a queue nobody trusts.
+ *
  * @param onSend given the raw text and the chosen engine; the caller resolves and sends, returning
  *   true on success so the sheet closes only when the car accepted it.
  * @param onSendUrl given an already-resolved URL (the current-page card), for the same send path.
+ * @param queue read/write access to the play queue, so this sheet holds no store logic of its own.
  */
 class SendToCarSheet(
     private val activity: Activity,
@@ -39,7 +46,28 @@ class SendToCarSheet(
     private val onEngineChange: (SearchEngine) -> Unit,
     private val onSend: (input: String, engine: SearchEngine) -> Boolean,
     private val onSendUrl: (url: String) -> Boolean,
+    private val queue: QueueAccess,
 ) {
+    /**
+     * What this sheet may do to the play queue. An interface rather than four more lambdas, and
+     * implemented by the activity so the queue store is reached from one place.
+     */
+    interface QueueAccess {
+        fun items(): List<BrowserPlayQueue.Item>
+
+        /**
+         * Queues [input], or the page the browser is on when it is null.
+         *
+         * @return the queue's new length, or null when nothing was added — an unusable address, or
+         *   one already in the queue.
+         */
+        fun add(input: String?, engine: SearchEngine): Int?
+
+        fun remove(url: String)
+
+        fun clear()
+    }
+
     private val shell = BrowserSheetShell(activity, sizes)
 
     /** Which tab is active. "Send URL" shows the current page; "Search" focuses the query field. */
@@ -64,15 +92,25 @@ class SendToCarSheet(
 
         val url = currentUrl()
         if (mode == Mode.URL && url != null) {
-            container.addView(sectionLabel("หน้าปัจจุบัน", "Current page"))
+            container.addView(sectionLabel(activity.getString(R.string.send_section_current_page)))
             container.addView(currentPageCard(url))
         }
 
-        container.addView(sectionLabel("หรือพิมพ์ URL / คำค้นหา", "Or enter URL or search query"))
+        container.addView(sectionLabel(activity.getString(R.string.send_section_or_type)))
         container.addView(inputField())
-        container.addView(sectionLabel("เครื่องมือค้นหา", "Search engine"))
+        container.addView(sectionLabel(activity.getString(R.string.send_section_search_engine)))
         container.addView(engineRow())
         container.addView(primaryButton())
+        container.addView(queueButton())
+
+        val queued = queue.items()
+        if (queued.isNotEmpty()) {
+            container.addView(
+                sectionLabel(activity.getString(R.string.send_section_queue, queued.size))
+            )
+            queued.forEach { container.addView(queueRow(it)) }
+            container.addView(clearQueueButton())
+        }
     }
 
     // -------------------------------------------------------------------------- header + tabs
@@ -165,7 +203,7 @@ class SendToCarSheet(
             gravity = Gravity.CENTER_VERTICAL
             background = shell.rounded(BrowserTheme.sheetCardBackground, shell.cornerRadius())
             setPadding(shell.pad(), shell.gap(), shell.pad(), shell.gap())
-            contentDescription = "ส่งหน้าปัจจุบันไปที่รถ"
+            contentDescription = activity.getString(R.string.send_current_page_action)
             addView(favicon)
             addView(texts, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
             // The mockup's filled "selected" radio on the right; the whole row is the tap target.
@@ -189,7 +227,7 @@ class SendToCarSheet(
         }
         input = EditText(activity).apply {
             setSingleLine()
-            hint = "เพลง bodyslam ล่าสุด หรือ youtube.com"
+            hint = activity.getString(R.string.send_input_hint)
             setHintTextColor(BrowserTheme.iconDisabled)
             setTextColor(BrowserTheme.textPrimary)
             textSize = shell.sp(AutoUiSizes.ICON_SMALL_DP * 0.9f)
@@ -206,7 +244,7 @@ class SendToCarSheet(
             gravity = Gravity.CENTER
             textSize = shell.sp(AutoUiSizes.ICON_SMALL_DP)
             setTextColor(BrowserTheme.textSecondary)
-            contentDescription = "ล้างข้อความ"
+            contentDescription = activity.getString(R.string.send_clear_text)
             val side = sizes.dpInt(AutoUiSizes.TOUCH_TARGET_DP * 0.8f)
             layoutParams = LinearLayout.LayoutParams(side, side)
             setOnClickListener { input.setText(""); input.requestFocus() }
@@ -253,7 +291,10 @@ class SendToCarSheet(
                 setTextColor(if (active) BrowserTheme.onPrimaryContainer else BrowserTheme.textPrimary)
             })
             addView(TextView(activity).apply {
-                text = if (candidate == SearchEngine.YOUTUBE) "ค้นหาบน YouTube" else "ค้นหาบน Google"
+                text = activity.getString(
+                if (candidate == SearchEngine.YOUTUBE) R.string.send_search_youtube
+                else R.string.send_search_google
+            )
                 textSize = shell.sp(AutoUiSizes.ICON_SMALL_DP * 0.7f)
                 setTextColor(if (active) BrowserTheme.onPrimaryContainer else BrowserTheme.textSecondary)
             })
@@ -303,13 +344,13 @@ class SendToCarSheet(
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_VERTICAL
             addView(TextView(activity).apply {
-                text = "Send to car"
+                text = activity.getString(R.string.send_now_title)
                 textSize = shell.sp(AutoUiSizes.ICON_MEDIUM_DP)
                 setTypeface(typeface, Typeface.BOLD)
                 setTextColor(BrowserTheme.onPrimary)
             })
             addView(TextView(activity).apply {
-                text = "ส่งไปที่หน้าจอรถทันที"
+                text = activity.getString(R.string.send_now_caption)
                 textSize = shell.sp(AutoUiSizes.ICON_SMALL_DP * 0.78f)
                 setTextColor(BrowserTheme.onPrimary)
             })
@@ -318,6 +359,105 @@ class SendToCarSheet(
         layoutParams = LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, sizes.dpInt(AutoUiSizes.SHEET_PRIMARY_CTA_HEIGHT_DP)
         ).apply { topMargin = shell.gap() }
+    }
+
+    /** The secondary action: queue instead of replacing what the car is showing. */
+    private fun queueButton(): View = LinearLayout(activity).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER
+        background = GradientDrawable().apply {
+            setColor(BrowserTheme.sheetCardBackground)
+            cornerRadius = shell.cornerRadius()
+            setStroke(sizes.dpInt(1.5f), BrowserTheme.accent)
+        }
+        contentDescription = "Add to queue"
+        addView(TextView(activity).apply {
+            text = "≡"
+            textSize = shell.sp(AutoUiSizes.SHEET_ICON_DP * 0.9f)
+            setTextColor(BrowserTheme.accent)
+            setPadding(0, 0, shell.pad(), 0)
+        })
+        addView(LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_VERTICAL
+            addView(TextView(activity).apply {
+                text = activity.getString(R.string.send_queue_title)
+                textSize = shell.sp(AutoUiSizes.ICON_SMALL_DP)
+                setTypeface(typeface, Typeface.BOLD)
+                setTextColor(BrowserTheme.textPrimary)
+            })
+            addView(TextView(activity).apply {
+                text = activity.getString(R.string.send_queue_caption)
+                textSize = shell.sp(AutoUiSizes.ICON_SMALL_DP * 0.78f)
+                setTextColor(BrowserTheme.textSecondary)
+            })
+        })
+        setOnClickListener { queueTyped() }
+        layoutParams = LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, sizes.dpInt(AutoUiSizes.SHEET_PRIMARY_CTA_HEIGHT_DP * 0.8f)
+        ).apply { topMargin = shell.gap() }
+    }
+
+    /** One queued page: what it is, and a way to take it back out. */
+    private fun queueRow(item: BrowserPlayQueue.Item): View {
+        val label = item.title.ifBlank { BrowserDisplayUrl.compact(item.url, max = 48) }
+        return LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = shell.rounded(BrowserTheme.sheetCardBackground, shell.cornerRadius())
+            setPadding(shell.pad(), shell.gap(), sizes.dpInt(6f), shell.gap())
+            addView(TextView(activity).apply {
+                text = label
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+                textSize = shell.sp(AutoUiSizes.ICON_SMALL_DP * 0.85f)
+                setTextColor(BrowserTheme.textPrimary)
+                layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            })
+            addView(TextView(activity).apply {
+                text = "✕"
+                gravity = Gravity.CENTER
+                textSize = shell.sp(AutoUiSizes.ICON_SMALL_DP)
+                setTextColor(BrowserTheme.textSecondary)
+                contentDescription = activity.getString(R.string.send_queue_remove)
+                val side = sizes.dpInt(AutoUiSizes.TOUCH_TARGET_DP * 0.8f)
+                layoutParams = LinearLayout.LayoutParams(side, side)
+                setOnClickListener {
+                    queue.remove(item.url)
+                    render()
+                }
+            })
+            layoutParams = rowParams()
+        }
+    }
+
+    private fun clearQueueButton(): View = TextView(activity).apply {
+        text = activity.getString(R.string.send_queue_clear)
+        gravity = Gravity.CENTER
+        textSize = shell.sp(AutoUiSizes.ICON_SMALL_DP * 0.85f)
+        setTextColor(BrowserTheme.textSecondary)
+        contentDescription = activity.getString(R.string.send_queue_clear)
+        minHeight = sizes.dpInt(AutoUiSizes.TOUCH_TARGET_DP * 0.85f)
+        setOnClickListener {
+            queue.clear()
+            render()
+        }
+        layoutParams = rowParams()
+    }
+
+    /**
+     * Queues what the text field holds, or the current page when it is empty — the same fallback
+     * [sendTyped] uses, so both buttons act on the same thing.
+     *
+     * The sheet deliberately stays open: queueing several things in a row is the normal way to use a
+     * queue, and the list below updates so each one is visible as it lands. The field is cleared so
+     * the next entry starts fresh.
+     */
+    private fun queueTyped() {
+        val typed = input.text.toString().trim()
+        queue.add(typed.takeIf { it.isNotEmpty() }, selectedEngine)
+        if (typed.isNotEmpty()) input.setText("")
+        render()
     }
 
     /**
@@ -336,9 +476,8 @@ class SendToCarSheet(
 
     // ------------------------------------------------------------------------------------ helpers
 
-    private fun sectionLabel(thai: String, english: String): View = TextView(activity).apply {
-        text = thai
-        contentDescription = english
+    private fun sectionLabel(text: String): View = TextView(activity).apply {
+        this.text = text
         textSize = shell.sp(AutoUiSizes.ICON_SMALL_DP * 0.8f)
         setTypeface(typeface, Typeface.BOLD)
         setTextColor(BrowserTheme.textSecondary)

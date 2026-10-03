@@ -25,9 +25,9 @@ internal object CarHomeNavigator {
             url != null -> {
                 // Tapping a site tile that is already open means "take me back to it", not "start
                 // over": loading the root again would throw the page away and restart whatever is
-                // playing on it. See [dev.autobridge.browser.CarBrowserEntry].
+                // playing on it. See [dev.autobridge.browser.BrowserSiteEntry].
                 val renderer = dev.autobridge.browser.CarBrowserRuntime.renderer(carContext)
-                if (!dev.autobridge.browser.CarBrowserEntry.resumes(renderer.livePageUrl, url)) {
+                if (!dev.autobridge.browser.BrowserSiteEntry.resumes(renderer.livePageUrl, url)) {
                     renderer.load(url)
                 }
                 CarNavigation.open(screenManager, "CarBrowserScreen") { CarBrowserScreen(carContext) }

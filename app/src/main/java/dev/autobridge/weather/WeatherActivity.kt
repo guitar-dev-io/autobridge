@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
+import dev.autobridge.i18n.AppLocale
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.stack
 
@@ -24,6 +25,11 @@ class WeatherActivity : Activity() {
     private var searchQuery = ""
     private var searchResults: List<WeatherPlace> = emptyList()
     private var searching = false
+
+    /** Applies the Settings &gt; Language choice; see [AppLocale.rebase]. */
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AppLocale.rebase(newBase))
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

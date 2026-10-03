@@ -1840,6 +1840,7 @@ package dev.autobridge
 
 import android.Manifest
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -1890,6 +1891,7 @@ import dev.autobridge.core.model.ScaleMode
 import dev.autobridge.core.model.VehicleState
 import dev.autobridge.core.policy.FeaturePolicy
 import dev.autobridge.core.state.RuntimeContextStore
+import dev.autobridge.i18n.AppLocale
 import dev.autobridge.ui.AutoBridgePhoneTheme
 import dev.autobridge.remote.RemoteRuntime
 import dev.autobridge.display.MirrorDiagnostics
@@ -1989,12 +1991,23 @@ class MainActivity : androidx.activity.ComponentActivity() {
             val granted = grantResult == PackageManager.PERMISSION_GRANTED
             Toast.makeText(
                 this,
-                if (granted) "Shizuku touch enabled" else "Shizuku permission denied",
+                getString(
+                    if (granted) R.string.input_shizuku_enabled
+                    else R.string.input_shizuku_denied
+                ),
                 Toast.LENGTH_SHORT
             ).show()
             if (granted) ShizukuInputBackend.bind(this)
             refreshStatus()
         }
+    }
+
+    /**
+     * Applies the Settings &gt; Language choice before any view or string is resolved. A no-op on
+     * API 33+, where the platform has already picked the locale; see [AppLocale.rebase].
+     */
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AppLocale.rebase(newBase))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -2274,8 +2287,8 @@ class MainActivity : androidx.activity.ComponentActivity() {
             context = this,
             header = design.header(
                 context = this,
-                title = "AutoBridge",
-                subtitle = "Your Car. Smarter.",
+                title = getString(R.string.app_name),
+                subtitle = getString(R.string.home_tagline),
                 // Outdoor temperature when a Weather place is saved; the connection itself is
                 // the status card right below, so the chip no longer repeats it.
                 chip = homeStatusChip(),
@@ -2295,9 +2308,9 @@ class MainActivity : androidx.activity.ComponentActivity() {
             subtitle = subtitle,
             entries = sections.map { section ->
                 dev.autobridge.ui.PhoneLauncherUi.Entry(
-                    title = section.title,
+                    title = section.title(this),
                     icon = tileIcon(section),
-                    caption = section.caption,
+                    caption = section.caption(this),
                     accent = section.accent,
                     open = { openHomeSection(section) }
                 )
@@ -2389,11 +2402,15 @@ class MainActivity : androidx.activity.ComponentActivity() {
                 android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL,
                 android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
             )
-            putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "พูดคำสั่งหรือคำค้นหา")
+            putExtra(
+                android.speech.RecognizerIntent.EXTRA_PROMPT,
+                getString(R.string.voice_prompt_say_command)
+            )
         }
         val started = runCatching { startActivityForResult(intent, REQUEST_VOICE_SEARCH) }.isSuccess
         if (!started) {
-            Toast.makeText(this, "No speech recognizer on this phone", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.voice_no_recognizer), Toast.LENGTH_SHORT)
+                .show()
             openBrowserOnCar()
         }
     }
@@ -2427,23 +2444,38 @@ class MainActivity : androidx.activity.ComponentActivity() {
                 )
             dev.autobridge.agent.AgentCommandRouter.AgentAction.RESUME_MEDIA -> {
                 mediaPlayback.resume()
-                toast("เล่นต่อ")
+                toast(getString(R.string.agent_toast_resuming_playback))
             }
             dev.autobridge.agent.AgentCommandRouter.AgentAction.OPEN_RECENT ->
-                toast("รายการล่าสุดอยู่บนจอรถ")
+                toast(getString(R.string.car_agent_recent_on_car))
             dev.autobridge.agent.AgentCommandRouter.AgentAction.ENABLE_DESKTOP -> {
                 dev.autobridge.browser.BrowserUserAgentStore.select(
                     this, dev.autobridge.browser.BrowserUserAgentMode.DESKTOP
                 )
-                toast("เปิดโหมดเดสก์ท็อปแล้ว")
+                toast(getString(R.string.agent_toast_desktop_on))
             }
             dev.autobridge.agent.AgentCommandRouter.AgentAction.DISABLE_DESKTOP -> {
                 dev.autobridge.browser.BrowserUserAgentStore.select(
                     this, dev.autobridge.browser.BrowserUserAgentMode.MOBILE
                 )
-                toast("ปิดโหมดเดสก์ท็อปแล้ว")
+                toast(getString(R.string.agent_toast_desktop_off))
             }
         }
+    }
+
+    /**
+     * Opens the language choice.
+     *
+     * Android 13+ has a per-app language screen of its own, populated from
+     * `res/xml/locales_config.xml`, and that is where users look for it — it also scales to any
+     * number of languages for free. Below that the platform offers nothing, so the row cycles
+     * [AppLocale.OPTIONS] in place and restarts the shell to redraw it, which is the same
+     * tap-to-cycle shape the rest of these settings use.
+     */
+    private fun chooseLanguage() {
+        if (AppLocale.openSystemPicker(this)) return
+        val next = AppLocale.nextOption(this)
+        if (AppLocale.select(this, next.tag)) recreate() else showPhoneScreen(PhoneScreen.SETTINGS)
     }
 
     /** One titled group of rows on a settings-style list page. */
@@ -2502,44 +2534,87 @@ class MainActivity : androidx.activity.ComponentActivity() {
      * top-level rows: they live in Car & Connection, Advanced and the Control tab respectively.
      */
     private fun buildSettingsMenu(): View = settingsListPage(
-        title = "Settings",
+        title = getString(R.string.settings_title),
         subtitle = null,
         back = null,
         groups = listOf(
-            SettingsGroup("Display & control", listOf(
-                settingsEntry("Display & Mirror", "Renderer, rotation and fullscreen", R.drawable.ic_tile_mirror) {
+            SettingsGroup(getString(R.string.settings_group_display), listOf(
+                settingsEntry(
+                    getString(R.string.settings_display_mirror),
+                    getString(R.string.settings_display_mirror_caption),
+                    R.drawable.ic_tile_mirror
+                ) {
                     showPhoneScreen(PhoneScreen.MIRROR_SETTINGS)
                 },
-                settingsEntry("Input & Touch", "Touch backend and permissions", R.drawable.ic_tile_touch) {
+                settingsEntry(
+                    getString(R.string.settings_input_touch),
+                    getString(R.string.settings_input_touch_caption),
+                    R.drawable.ic_tile_touch
+                ) {
                     showPhoneScreen(PhoneScreen.INPUT_TOUCH)
-                }
+                },
+                settingsEntry(
+                    getString(R.string.settings_language),
+                    // The caption names the language in force, so the row answers "what am I set
+                    // to" without having to be opened.
+                    getString(AppLocale.selectedOption(this).labelRes),
+                    R.drawable.ic_tile_language
+                ) { chooseLanguage() }
             )),
-            SettingsGroup("Car & apps", listOf(
-                settingsEntry("Car & Connection", "Android Auto, Bluetooth and startup", R.drawable.ic_tile_car) {
+            SettingsGroup(getString(R.string.settings_group_car), listOf(
+                settingsEntry(
+                    getString(R.string.settings_car_connection),
+                    getString(R.string.settings_car_connection_caption),
+                    R.drawable.ic_tile_car
+                ) {
                     showPhoneScreen(PhoneScreen.CAR_CONNECTION)
                 },
-                settingsEntry("App Profiles", "Per-app display and audio", R.drawable.ic_tile_apps) {
+                settingsEntry(
+                    getString(R.string.settings_app_profiles),
+                    getString(R.string.settings_app_profiles_caption),
+                    R.drawable.ic_tile_apps
+                ) {
                     showPhoneScreen(PhoneScreen.PROFILES)
                 }
             )),
-            SettingsGroup("Features", listOf(
-                settingsEntry("Video", "Player, layout, aspect ratio and picture", R.drawable.ic_tile_tv) {
+            SettingsGroup(getString(R.string.settings_group_features), listOf(
+                settingsEntry(
+                    getString(R.string.settings_video),
+                    getString(R.string.settings_video_caption),
+                    R.drawable.ic_tile_tv
+                ) {
                     startActivity(dev.autobridge.library.VideoSettingsActivity.intent(this))
                 },
-                settingsEntry("YouTube", "SponsorBlock and playback quality", R.drawable.ic_tile_youtube) {
+                settingsEntry(
+                    getString(R.string.settings_youtube),
+                    getString(R.string.settings_youtube_caption),
+                    R.drawable.ic_tile_youtube
+                ) {
                     startActivity(dev.autobridge.youtube.YouTubeSettingsActivity.intent(this))
                 },
-                settingsEntry("Agent & Commands", "Commands, history and automation", R.drawable.ic_tile_remote) {
+                settingsEntry(
+                    getString(R.string.agent_screen_title),
+                    getString(R.string.agent_screen_subtitle),
+                    R.drawable.ic_tile_remote
+                ) {
                     showPhoneScreen(PhoneScreen.AGENT_COMMANDS)
                 }
             )),
-            SettingsGroup("Advanced", listOf(
-                settingsEntry("Advanced", "Diagnostics and debug tools", R.drawable.ic_tile_debug) {
+            SettingsGroup(getString(R.string.settings_group_advanced), listOf(
+                settingsEntry(
+                    getString(R.string.settings_advanced),
+                    getString(R.string.settings_advanced_caption),
+                    R.drawable.ic_tile_debug
+                ) {
                     showPhoneScreen(PhoneScreen.ADVANCED)
                 }
             )),
-            SettingsGroup("About", listOf(
-                settingsEntry("About", "Version, licenses and support", R.drawable.ic_tile_settings) {
+            SettingsGroup(getString(R.string.settings_group_about), listOf(
+                settingsEntry(
+                    getString(R.string.settings_about),
+                    getString(R.string.settings_about_caption),
+                    R.drawable.ic_tile_settings
+                ) {
                     showPhoneScreen(PhoneScreen.ABOUT)
                 }
             ))
@@ -2548,16 +2623,49 @@ class MainActivity : androidx.activity.ComponentActivity() {
 
     /** Settings > Advanced: the developer tools, kept out of the main Settings list. */
     private fun buildAdvancedScreen(): View = settingsListPage(
-        title = "Advanced",
-        subtitle = "Developer tools",
+        title = getString(R.string.settings_advanced),
+        subtitle = getString(R.string.advanced_subtitle),
         back = { goBack() },
         groups = listOf(
             SettingsGroup("", listOf(
-                settingsEntry("Diagnostics", "Logs, crash reports and mirror events", R.drawable.ic_tile_debug) {
+                settingsEntry(
+                    getString(R.string.advanced_diagnostics),
+                    getString(R.string.advanced_diagnostics_caption),
+                    R.drawable.ic_tile_debug
+                ) {
                     showPhoneScreen(PhoneScreen.DEVELOPER)
                 },
-                settingsEntry("Debug", "Internal runtime state", R.drawable.ic_tile_settings) {
+                settingsEntry(
+                    getString(R.string.advanced_debug),
+                    getString(R.string.advanced_debug_caption),
+                    R.drawable.ic_tile_settings
+                ) {
                     showPhoneScreen(PhoneScreen.DEBUG)
+                },
+                settingsEntry(
+                    getString(R.string.advanced_storage),
+                    getString(R.string.advanced_storage_caption),
+                    R.drawable.ic_tile_settings
+                ) {
+                    startActivity(dev.autobridge.library.StorageSettingsActivity.intent(this))
+                },
+                settingsEntry(
+                    getString(R.string.bypass_setting_title),
+                    getString(
+                        if (dev.autobridge.safety.BypassPolicyStore.enabled)
+                            R.string.bypass_setting_summary_on
+                        else R.string.bypass_setting_summary_off
+                    ),
+                    R.drawable.ic_tile_settings
+                ) {
+                    val nowOn = dev.autobridge.safety.BypassPolicyStore.toggle()
+                    Toast.makeText(
+                        this,
+                        getString(if (nowOn) R.string.bypass_toast_on else R.string.bypass_toast_off),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    // Rebuild so the row caption reflects the new state immediately.
+                    showPhoneScreen(PhoneScreen.ADVANCED, force = true)
                 }
             ))
         )
@@ -2565,22 +2673,34 @@ class MainActivity : androidx.activity.ComponentActivity() {
 
     /** Settings > About: support, licenses, source and version (moved from the old Remote options). */
     private fun buildAboutScreen(): View = settingsListPage(
-        title = "About",
+        title = getString(R.string.settings_about),
         subtitle = "AutoBridge ${BuildConfig.VERSION_NAME}",
         back = { goBack() },
         groups = listOf(
             SettingsGroup("", listOf(
-                settingsEntry("Support AutoBridge", "Buy me a coffee", R.drawable.ic_tile_favorite) {
+                settingsEntry(
+                    getString(R.string.about_support),
+                    getString(R.string.about_support_caption),
+                    R.drawable.ic_tile_favorite
+                ) {
                     openExternalUrl(SUPPORT_URL)
                 },
-                settingsEntry("Open-source licenses", "View third-party notices", R.drawable.ic_tile_folder) {
+                settingsEntry(
+                    getString(R.string.about_licenses),
+                    getString(R.string.about_licenses_caption),
+                    R.drawable.ic_tile_folder
+                ) {
                     showOpenSourceLicenses()
                 },
-                settingsEntry("GitHub", "github.com/guitar-dev-io/autobridge", R.drawable.ic_tile_web) {
+                settingsEntry(
+                    getString(R.string.about_github),
+                    "github.com/guitar-dev-io/autobridge",
+                    R.drawable.ic_tile_web
+                ) {
                     openExternalUrl(GITHUB_URL)
                 },
                 settingsEntry(
-                    "Version",
+                    getString(R.string.about_version),
                     "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}) · ${BuildConfig.AUTOBRIDGE_MODE.lowercase()}",
                     R.drawable.ic_tile_settings
                 ) {
@@ -2595,7 +2715,9 @@ class MainActivity : androidx.activity.ComponentActivity() {
             startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
             true
         }.getOrDefault(false)
-        if (!opened) Toast.makeText(this, "No browser available", Toast.LENGTH_SHORT).show()
+        if (!opened) {
+            Toast.makeText(this, getString(R.string.about_no_browser), Toast.LENGTH_SHORT).show()
+        }
     }
 
     /**
@@ -2617,7 +2739,13 @@ class MainActivity : androidx.activity.ComponentActivity() {
      */
     private fun buildDebugScreen(): View {
         val content = screenContent()
-        content.addView(screenHeader("Debug", "INTERNAL STATE", back = { goBack() }))
+        content.addView(
+            screenHeader(
+                getString(R.string.advanced_debug),
+                getString(R.string.advanced_debug_subtitle),
+                back = { goBack() }
+            )
+        )
         val state = TextView(this).apply {
             debugStateView = this
             textSize = 13f
@@ -2628,7 +2756,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
             text = debugStateText()
         }
         addCard(content, state, top = 4)
-        addCard(content, actionCard("COPY DIAGNOSTICS") { copyDiagnosticsToClipboard() }, top = 12)
+        addCard(content, actionCard(getString(R.string.diag_copy)) { copyDiagnosticsToClipboard() }, top = 12)
         return screenScroll(content)
     }
 
@@ -2680,14 +2808,20 @@ class MainActivity : androidx.activity.ComponentActivity() {
      */
     private fun buildInputTouchScreen(): View {
         val content = screenContent()
-        content.addView(screenHeader("Input & Touch", "TOUCH BACKEND AND PERMISSIONS", back = { goBack() }))
-        content.addView(sectionLabel("TOUCH"))
+        content.addView(
+            screenHeader(
+                getString(R.string.settings_input_touch),
+                getString(R.string.input_subtitle),
+                back = { goBack() }
+            )
+        )
+        content.addView(sectionLabel(getString(R.string.input_section_touch)))
         addCard(
             content,
             settingRow(
-                "Touch control",
-                "Accessibility service used to inject car touches",
-                "Open",
+                getString(R.string.input_touch_control),
+                getString(R.string.input_touch_control_caption),
+                getString(R.string.input_open),
                 onClick = { openTouchSettings() }
             ),
             top = 4
@@ -2695,8 +2829,8 @@ class MainActivity : androidx.activity.ComponentActivity() {
         addCard(
             content,
             settingRow(
-                "Input backend",
-                "Accessibility preferred, Shizuku optional",
+                getString(R.string.input_backend),
+                getString(R.string.input_backend_caption),
                 inputBackendLabel(),
                 onClick = { openTouchSettings() }
             ),
@@ -2705,8 +2839,8 @@ class MainActivity : androidx.activity.ComponentActivity() {
         addCard(
             content,
             settingSwitchRow(
-                "Real touch injection",
-                "Privileged pointer sink; Android Auto must provide a raw pointer stream",
+                getString(R.string.input_real_touch),
+                getString(R.string.input_real_touch_caption),
                 checked = MirrorSettings.realTouchEnabled,
                 enabled = ShizukuInputBackend.isRealTouchAvailable || MirrorSettings.realTouchEnabled
             ) { enabled -> onRealTouchToggled(enabled) },
@@ -2720,10 +2854,12 @@ class MainActivity : androidx.activity.ComponentActivity() {
         val content = screenContent()
         // "App launcher" was misleading: tapping a row opens that app's profile, it does not launch
         // it. The star on each row is what adds it to Favorites (stored in QuickAppsStore, the one favorites list).
-        content.addView(screenHeader("Applications", "TAP ☆ TO ADD A FAVORITE"))
+        content.addView(
+            screenHeader(getString(R.string.apps_title), getString(R.string.apps_subtitle))
+        )
 
         val search = EditText(this).apply {
-            hint = "Search apps…"
+            hint = getString(R.string.apps_search_hint)
             textSize = 14f
             isSingleLine = true
             setTextColor(COLOR_TEXT)
@@ -2744,8 +2880,12 @@ class MainActivity : androidx.activity.ComponentActivity() {
             val quickCount = QuickAppsStore.enabledInstalledApps(this, installed).size
             if (appsFavoritesOnly && quickCount == 0) appsFavoritesOnly = false
             // The counts say up front whether switching tabs will show anything.
-            styleFilter(favorites, "Favorites · $quickCount", appsFavoritesOnly)
-            styleFilter(allApps, "All apps · ${installed.size}", !appsFavoritesOnly)
+            styleFilter(favorites, getString(R.string.apps_filter_favorites, quickCount), appsFavoritesOnly)
+            styleFilter(
+                allApps,
+                getString(R.string.apps_filter_all, installed.size),
+                !appsFavoritesOnly
+            )
         }
         appsFilterRefresh = ::refreshAppFilter
         favorites.setOnClickListener {
@@ -2777,17 +2917,28 @@ class MainActivity : androidx.activity.ComponentActivity() {
 
     private fun buildProfilesScreen(): View {
         val content = screenContent()
-        content.addView(screenHeader("App Profiles", "PER-APP DISPLAY AND AUDIO", back = { goBack() }))
         content.addView(
-            mutedText("Per-app settings are applied when launched."),
+            screenHeader(
+                getString(R.string.settings_app_profiles),
+                getString(R.string.profiles_subtitle),
+                back = { goBack() }
+            )
+        )
+        content.addView(
+            mutedText(getString(R.string.profiles_applied_on_launch)),
             LinearLayout.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT).apply { bottomMargin = dp(12) }
         )
         val installedApps = InstalledAppRepository.listLaunchableApps(this)
         QuickAppsStore.syncFavorites(this, installedApps)
         val apps = QuickAppsStore.enabledInstalledApps(this, installedApps)
         if (apps.isEmpty()) {
-            addCard(content, mutedText("No favorite apps yet. Star one in Apps to give it a profile here."))
-            addCard(content, actionCard("BROWSE ALL APPS") { showPhoneScreen(PhoneScreen.APPS) })
+            addCard(content, mutedText(getString(R.string.profiles_empty)))
+            addCard(
+                content,
+                actionCard(getString(R.string.apps_browse_all)) {
+                    showPhoneScreen(PhoneScreen.APPS)
+                }
+            )
         } else {
             // Everything listed here is already a Quick App, and removing one from this screen is
             // what the star does; the screen is rebuilt so the row disappears with it.
@@ -2796,7 +2947,11 @@ class MainActivity : androidx.activity.ComponentActivity() {
                     content,
                     appListRow(app, isQuickApp = true) {
                         QuickAppsStore.setEnabled(this, app, false)
-                        Toast.makeText(this, "Removed from Favorites", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(
+                            this,
+                            getString(R.string.profiles_removed_from_favorites),
+                            Toast.LENGTH_SHORT
+                        ).show()
                         showPhoneScreen(PhoneScreen.PROFILES)
                     },
                     top = 8
@@ -2823,7 +2978,10 @@ class MainActivity : androidx.activity.ComponentActivity() {
                     QuickAppsStore.setEnabled(this, app, !isQuickApp, profileId)
                     Toast.makeText(
                         this,
-                        if (isQuickApp) "Removed from Favorites" else "Added to Favorites",
+                        getString(
+                            if (isQuickApp) R.string.profiles_removed_from_favorites
+                            else R.string.profiles_added_to_favorites
+                        ),
                         Toast.LENGTH_SHORT
                     ).show()
                     showPhoneScreen(PhoneScreen.PROFILE)
@@ -2847,21 +3005,33 @@ class MainActivity : androidx.activity.ComponentActivity() {
         identity.addView(identityText, LinearLayout.LayoutParams(0, -2, 1f))
         addCard(content, identity, top = 4)
 
-        addCard(content, settingRow("Smart mode", decision.reason, decision.mode.name), top = 8)
+        addCard(
+            content,
+            settingRow(
+                getString(R.string.profiles_smart_mode),
+                decision.reason,
+                decision.mode.name
+            ),
+            top = 8
+        )
         
         // ปลดล็อกการเรียกเปิดแอปโดยตรง
-        addCard(content, actionCard("USE THIS PROFILE", primary = true) {
+        addCard(content, actionCard(getString(R.string.profiles_use_profile), primary = true) {
             if (!QuickAppLauncher.launch(this, app.packageName, profileId)) {
-                Toast.makeText(this, "Could not launch ${app.label}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    this,
+                    getString(R.string.profiles_launch_failed, app.label),
+                    Toast.LENGTH_SHORT
+                ).show()
             }
         }, top = 12)
 
-        content.addView(sectionLabel("LAUNCH & MIRROR"))
+        content.addView(sectionLabel(getString(R.string.profiles_section_launch)))
         addCard(
             content,
             settingSwitchRow(
-                "Auto mirror",
-                "Store the mirror intent; capture consent is still required",
+                getString(R.string.profiles_auto_mirror),
+                getString(R.string.profiles_auto_mirror_caption),
                 checked = profile.autoMirror,
                 enabled = true
             ) { enabled ->
@@ -2873,8 +3043,8 @@ class MainActivity : androidx.activity.ComponentActivity() {
         addCard(
             content,
             settingSwitchRow(
-                "Auto fullscreen",
-                "Persist the preference; the target app controls its own system bars",
+                getString(R.string.profiles_auto_fullscreen),
+                getString(R.string.profiles_auto_fullscreen_caption),
                 checked = profile.autoFullscreen,
                 enabled = true
             ) { enabled ->
@@ -2884,18 +3054,22 @@ class MainActivity : androidx.activity.ComponentActivity() {
             top = 8
         )
 
-        content.addView(sectionLabel("DISPLAY"))
+        content.addView(sectionLabel(getString(R.string.mirror_section_display)))
         addCard(
             content,
             settingSwitchRow(
-                "Force landscape",
-                "Lock the phone to landscape while this profile is active",
+                getString(R.string.profiles_force_landscape),
+                getString(R.string.profiles_force_landscape_caption),
                 checked = profile.rotationMode == RotationMode.LANDSCAPE,
                 enabled = true
             ) { enabled ->
                 PerAppProfileStore.setForceLandscape(this, app.packageName, enabled, profileId)
                 if (enabled && !QuickAppLauncher.hasLandscapePermission(this)) {
-                    Toast.makeText(this, "Grant Modify system settings to apply landscape", Toast.LENGTH_LONG).show()
+                    Toast.makeText(
+                        this,
+                        getString(R.string.profiles_needs_write_settings),
+                        Toast.LENGTH_LONG
+                    ).show()
                     QuickAppLauncher.requestLandscapePermission(this)
                 }
             },
@@ -2904,8 +3078,8 @@ class MainActivity : androidx.activity.ComponentActivity() {
         addCard(
             content,
             settingRow(
-                "Scale",
-                "Stored preference",
+                getString(R.string.profiles_scale),
+                getString(R.string.profiles_stored_preference),
                 profile.scaleMode.name,
                 onClick = { cycleProfileScale(app.packageName, profileId) }
             ),
@@ -2914,8 +3088,8 @@ class MainActivity : androidx.activity.ComponentActivity() {
         addCard(
             content,
             settingRow(
-                "Resolution",
-                "Stored preference",
+                getString(R.string.profiles_resolution),
+                getString(R.string.profiles_stored_preference),
                 profile.preferredResolution?.name ?: ResolutionPreset.AUTO.name,
                 onClick = { cycleProfileResolution(app.packageName, profileId) }
             ),
@@ -2924,20 +3098,20 @@ class MainActivity : androidx.activity.ComponentActivity() {
         addCard(
             content,
             settingRow(
-                "Frame rate",
-                "Stored renderer target",
-                profile.preferredFps?.let { "${it} FPS" } ?: "System",
+                getString(R.string.profiles_frame_rate),
+                getString(R.string.profiles_stored_renderer_target),
+                profile.preferredFps?.let { "$it FPS" } ?: getString(R.string.profiles_fps_system),
                 onClick = { cycleProfileFps(app.packageName, profileId) }
             ),
             top = 8
         )
 
-        content.addView(sectionLabel("TOUCH & AUDIO"))
+        content.addView(sectionLabel(getString(R.string.profiles_section_touch_audio)))
         addCard(
             content,
             settingSwitchRow(
-                "Touch control",
-                "Desired input backend: ${inputBackendLabel()}",
+                getString(R.string.input_touch_control),
+                getString(R.string.profiles_touch_backend_caption, inputBackendLabel()),
                 checked = profile.touchEnabled,
                 enabled = true
             ) { enabled ->
@@ -2949,8 +3123,8 @@ class MainActivity : androidx.activity.ComponentActivity() {
         addCard(
             content,
             settingRow(
-                "Audio output",
-                "Stored Smart Mode preference",
+                getString(R.string.profiles_audio_output),
+                getString(R.string.profiles_audio_output_caption),
                 profile.audioMode.name,
                 onClick = { cycleProfileAudio(app.packageName, profileId) }
             ),
@@ -2959,8 +3133,8 @@ class MainActivity : androidx.activity.ComponentActivity() {
         addCard(
             content,
             settingSwitchRow(
-                "Keep screen on",
-                "Preference is applied by the active display pipeline",
+                getString(R.string.profiles_keep_screen_on),
+                getString(R.string.profiles_keep_screen_on_caption),
                 checked = profile.keepPhoneScreenOn,
                 enabled = true
             ) { enabled ->
@@ -2971,9 +3145,13 @@ class MainActivity : androidx.activity.ComponentActivity() {
         )
         addCard(
             content,
-            actionCard("RESET PROFILE", destructive = true) {
+            actionCard(getString(R.string.profiles_reset), destructive = true) {
                 PerAppProfileStore.reset(this, app.packageName, profileId)
-                Toast.makeText(this, "Profile reset to defaults", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    this,
+                    getString(R.string.profiles_reset_done),
+                    Toast.LENGTH_SHORT
+                ).show()
                 showPhoneScreen(PhoneScreen.PROFILE)
             },
             top = 16
@@ -2984,31 +3162,49 @@ class MainActivity : androidx.activity.ComponentActivity() {
     private fun buildMirrorSettingsScreen(): View {
         val content = screenContent()
         content.addView(
-            screenHeader("Display & Mirror", "RENDERER, ROTATION AND FULLSCREEN", back = { goBack() })
+            screenHeader(
+                getString(R.string.settings_display_mirror),
+                getString(R.string.mirror_subtitle),
+                back = { goBack() }
+            )
         )
 
         // Phone-side projection start (needs the MediaProjection consent prompt on this phone).
         // It used to be the Control Center's START MIRROR button.
         addCard(
             content,
-            actionCard(if (MirrorCoordinator.isMirroring) "▣   MIRRORING" else "▣   START MIRROR", primary = true) {
+            actionCard(
+                getString(
+                    if (MirrorCoordinator.isMirroring) R.string.mirror_mirroring
+                    else R.string.mirror_start
+                ),
+                primary = true
+            ) {
                 requestScreenCapture()
             },
             top = 4
         )
 
-        content.addView(sectionLabel("DISPLAY"))
-        addCard(content, settingRow("Resolution", "The connected car surface chooses the size", "Auto"), top = 4)
+        content.addView(sectionLabel(getString(R.string.mirror_section_display)))
         addCard(
             content,
-            settingRow("Frame rate", frameRateSubtitle(), frameRateValue()),
+            settingRow(
+                getString(R.string.mirror_resolution),
+                getString(R.string.mirror_resolution_caption),
+                getString(R.string.mirror_value_auto)
+            ),
+            top = 4
+        )
+        addCard(
+            content,
+            settingRow(getString(R.string.mirror_frame_rate), frameRateSubtitle(), frameRateValue()),
             top = 8
         )
         addCard(
             content,
             settingRow(
-                "Renderer pipeline",
-                "SELF_DRAWN enables app-controlled transform and frame accounting",
+                getString(R.string.mirror_renderer),
+                getString(R.string.mirror_renderer_caption),
                 ScreenOffController.pipelineMode.name,
                 onClick = { cyclePipelineMode() }
             ),
@@ -3018,7 +3214,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
         addCard(
             content,
             settingRow(
-                "Mirror rotation",
+                getString(R.string.mirror_rotation),
                 mirrorRotationSubtitle(),
                 mirrorRotationValue(),
                 onClick = { cycleMirrorRotation() }
@@ -3028,20 +3224,28 @@ class MainActivity : androidx.activity.ComponentActivity() {
         addCard(
             content,
             settingSwitchRow(
-                "Landscape mirror (global)",
-                "Legacy fallback: rotates the whole phone. Prefer SELF_DRAWN + Mirror rotation",
+                getString(R.string.mirror_landscape_global),
+                getString(R.string.mirror_landscape_global_caption),
                 checked = MirrorOrientationController.isEnabled,
                 enabled = true
             ) { toggleLandscapeMirror() },
             top = 8
         )
-        addCard(content, settingRow("Crop", "Aspect-preserving output", "Auto"), top = 8)
-
-        content.addView(sectionLabel("ADVANCED"))
         addCard(
             content,
             settingRow(
-                "Head-unit profile",
+                getString(R.string.mirror_crop),
+                getString(R.string.mirror_crop_caption),
+                getString(R.string.mirror_value_auto)
+            ),
+            top = 8
+        )
+
+        content.addView(sectionLabel(getString(R.string.mirror_section_advanced)))
+        addCard(
+            content,
+            settingRow(
+                getString(R.string.mirror_head_unit_profile),
                 headUnitProfileSubtitle(),
                 SurfaceProfile.active.displayLabel,
                 onClick = { toggleSurfaceProfile() }
@@ -3051,7 +3255,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
         addCard(
             content,
             settingRow(
-                "Screen-off behavior",
+                getString(R.string.mirror_screen_off),
                 ScreenOffController.statusLabel(),
                 screenOffBehaviorValue()
             ),
@@ -3060,41 +3264,51 @@ class MainActivity : androidx.activity.ComponentActivity() {
         addCard(
             content,
             settingSwitchRow(
-                "Panel off on auto-dim",
-                "ScreenOnAuto-style panel-only power-off; requires Shizuku/root and falls back to dim",
+                getString(R.string.mirror_panel_off),
+                getString(R.string.mirror_panel_off_caption),
                 checked = MirrorSettings.screenOffOnAutoDim,
                 enabled = ScreenOffController.panelOffAvailable() || MirrorSettings.screenOffOnAutoDim
             ) { enabled -> onPanelOffToggled(enabled) },
             top = 8
         )
         addCard(content, settingRow(
-            "Dim phone now", ScreenPowerController.statusLabel(), "Apply",
+            getString(R.string.mirror_dim_now),
+            ScreenPowerController.statusLabel(),
+            getString(R.string.mirror_apply),
             onClick = {
                 val applied = ScreenPowerController.dimNow()
-                Toast.makeText(this,
-                    if (applied) ScreenPowerController.statusLabel() else "Start mirroring first",
-                    Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    this,
+                    if (applied) ScreenPowerController.statusLabel()
+                    else getString(R.string.mirror_start_first),
+                    Toast.LENGTH_SHORT
+                ).show()
                 showPhoneScreen(PhoneScreen.MIRROR_SETTINGS)
             }
         ), top = 8)
         addCard(content, settingRow(
-            "Restore phone screen", "Restore display and restart the auto-dim timer", "Restore",
+            getString(R.string.mirror_restore_screen),
+            getString(R.string.mirror_restore_screen_caption),
+            getString(R.string.mirror_restore),
             onClick = {
                 val restored = ScreenPowerController.restorePhoneScreen()
-                Toast.makeText(this,
-                    if (restored) "Phone display restored to configured policy" else ScreenPowerController.statusLabel(),
-                    Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    this,
+                    if (restored) getString(R.string.mirror_display_restored)
+                    else ScreenPowerController.statusLabel(),
+                    Toast.LENGTH_SHORT
+                ).show()
                 showPhoneScreen(PhoneScreen.MIRROR_SETTINGS)
             }
         ), top = 8)
         // Real touch injection, Input backend and the Shizuku card moved to Settings > Input & Touch.
 
-        content.addView(sectionLabel("AUTOMATION"))
+        content.addView(sectionLabel(getString(R.string.mirror_section_automation)))
         addCard(
             content,
             settingSwitchRow(
-                "Prevent sleep",
-                "Keep the phone panel awake while projection is active",
+                getString(R.string.mirror_prevent_sleep),
+                getString(R.string.mirror_prevent_sleep_caption),
                 checked = MirrorSettings.preventScreenSleep,
                 enabled = true
             ) { enabled ->
@@ -3107,8 +3321,8 @@ class MainActivity : androidx.activity.ComponentActivity() {
         addCard(
             content,
             settingRow(
-                "Auto dim",
-                "Dim after inactivity; car touch starts the timer again",
+                getString(R.string.mirror_auto_dim),
+                getString(R.string.mirror_auto_dim_caption),
                 MirrorSettings.autoDimDelay.label,
                 onClick = { cycleAutoDimDelay() }
             ),
@@ -3117,8 +3331,8 @@ class MainActivity : androidx.activity.ComponentActivity() {
         addCard(
             content,
             settingSwitchRow(
-                "Stop on disconnect",
-                "Stop projection after Android Auto stays disconnected for 2 seconds",
+                getString(R.string.mirror_stop_on_disconnect),
+                getString(R.string.mirror_stop_on_disconnect_caption),
                 checked = MirrorSettings.stopOnDisconnect,
                 enabled = true
             ) { enabled ->
@@ -3132,16 +3346,22 @@ class MainActivity : androidx.activity.ComponentActivity() {
 
     private fun buildDeveloperScreen(): View {
         val content = screenContent()
-        content.addView(screenHeader("Diagnostics", "LOGS, CRASHES AND MIRROR EVENTS", back = { goBack() }))
+        content.addView(
+            screenHeader(
+                getString(R.string.advanced_diagnostics),
+                getString(R.string.diag_subtitle),
+                back = { goBack() }
+            )
+        )
 
-        content.addView(sectionLabel("APP LOG"))
+        content.addView(sectionLabel(getString(R.string.diag_section_log)))
         val logView = TextView(this).apply {
             developerLogView = this
             textSize = 12f
             setTextColor(COLOR_TEXT)
             setPadding(dp(12), dp(12), dp(12), dp(12))
             background = roundedBackground(COLOR_SURFACE, COLOR_BORDER)
-            text = StructuredLog.format(limit = 30).ifEmpty { "No log entries yet" }
+            text = StructuredLog.format(limit = 30).ifEmpty { getString(R.string.diag_no_log) }
         }
         addCard(content, logView, top = 4)
 
@@ -3195,14 +3415,14 @@ class MainActivity : androidx.activity.ComponentActivity() {
         )
         addCard(content, crashActions, top = 8)
 
-        content.addView(sectionLabel("MIRROR EVENTS"))
+        content.addView(sectionLabel(getString(R.string.diag_section_mirror_events)))
         val mirrorEventsView = TextView(this).apply {
             developerMirrorEventsView = this
             textSize = 12f
             setTextColor(COLOR_TEXT)
             setPadding(dp(12), dp(12), dp(12), dp(12))
             background = roundedBackground(COLOR_SURFACE, COLOR_BORDER)
-            text = MirrorDiagnostics.format(limit = 30).ifEmpty { "No mirror events yet" }
+            text = MirrorDiagnostics.format(limit = 30).ifEmpty { getString(R.string.diag_no_mirror_events) }
         }
         addCard(content, mirrorEventsView, top = 4)
 
@@ -3215,7 +3435,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
             background = roundedBackground(COLOR_SURFACE, COLOR_BORDER)
         }
         addCard(content, drmView, top = 4)
-        addCard(content, mutedText("แสดงความสามารถของ WebView/MediaDrm บนอุปกรณ์นี้เท่านั้น ไม่ได้ยืนยันว่าเว็บไซต์ใดจะเล่นวิดีโอ DRM ได้จริง"), top = 4)
+        addCard(content, mutedText(getString(R.string.drm_diagnostics_disclaimer)), top = 4)
         return screenScroll(content)
     }
 
@@ -3391,7 +3611,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
             })
             if (isQuickApp) {
                 textColumn.addView(TextView(context).apply {
-                    text = "Favorite"
+                    text = getString(R.string.favorite)
                     textSize = 11f
                     setTextColor(COLOR_ACCENT)
                 })
@@ -3441,7 +3661,10 @@ class MainActivity : androidx.activity.ComponentActivity() {
                     QuickAppsStore.setEnabled(this, app, !isQuickApp)
                     Toast.makeText(
                         this,
-                        if (isQuickApp) "Removed from Favorites" else "Added to Favorites",
+                        getString(
+                            if (isQuickApp) R.string.profiles_removed_from_favorites
+                            else R.string.profiles_added_to_favorites
+                        ),
                         Toast.LENGTH_SHORT
                     ).show()
                     renderAppGrid(container)
@@ -3524,22 +3747,23 @@ class MainActivity : androidx.activity.ComponentActivity() {
         if (requestCode == REQUEST_CAPTURE) {
             if (resultCode == Activity.RESULT_OK && data != null) {
                 ProjectionService.start(this, resultCode, data)
-                Toast.makeText(this, "Mirroring Started", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.mirror_started), Toast.LENGTH_SHORT).show()
                 if (pendingEntertainmentLaunch) {
                     pendingEntertainmentLaunch = false
                     startActivity(browserScreenIntent())
                 }
             } else {
                 pendingEntertainmentLaunch = false
-                Toast.makeText(this, "Screen capture permission denied", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.mirror_capture_denied), Toast.LENGTH_SHORT)
+                    .show()
             }
         }
     }
 
     private fun refreshStatus() {
         debugStateView?.text = debugStateText()
-        developerLogView?.text = StructuredLog.format(limit = 30).ifEmpty { "No log entries yet" }
-        developerMirrorEventsView?.text = MirrorDiagnostics.format(limit = 30).ifEmpty { "No mirror events yet" }
+        developerLogView?.text = StructuredLog.format(limit = 30).ifEmpty { getString(R.string.diag_no_log) }
+        developerMirrorEventsView?.text = MirrorDiagnostics.format(limit = 30).ifEmpty { getString(R.string.diag_no_mirror_events) }
     }
 
     /**
@@ -3566,7 +3790,10 @@ class MainActivity : androidx.activity.ComponentActivity() {
             putExtra(Intent.EXTRA_TEXT, text)
         }
         runCatching { startActivity(Intent.createChooser(intent, "Share diagnostics")) }
-            .onFailure { Toast.makeText(this, "No app available to share with", Toast.LENGTH_SHORT).show() }
+            .onFailure {
+                Toast.makeText(this, getString(R.string.diag_no_share_target), Toast.LENGTH_SHORT)
+                    .show()
+            }
     }
 
     private fun copyDiagnosticsToClipboard() {
@@ -3579,18 +3806,19 @@ class MainActivity : androidx.activity.ComponentActivity() {
             appendLine("Mirroring: ${MirrorCoordinator.isMirroring}")
             appendLine()
             appendLine("--- App log ---")
-            appendLine(StructuredLog.format(limit = 60).ifEmpty { "No log entries yet" })
+            appendLine(StructuredLog.format(limit = 60).ifEmpty { getString(R.string.diag_no_log) })
             appendLine()
             appendLine("--- Mirror events ---")
-            appendLine(MirrorDiagnostics.format(limit = 60).ifEmpty { "No mirror events yet" })
+            appendLine(MirrorDiagnostics.format(limit = 60).ifEmpty { getString(R.string.diag_no_mirror_events) })
         }
         val manager = getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
         if (manager == null) {
-            Toast.makeText(this, "Clipboard unavailable", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.diag_clipboard_unavailable), Toast.LENGTH_SHORT)
+                .show()
             return
         }
         manager.setPrimaryClip(android.content.ClipData.newPlainText("AutoBridge diagnostics", text))
-        Toast.makeText(this, "Diagnostics copied", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, getString(R.string.diag_copied), Toast.LENGTH_SHORT).show()
     }
 
     private fun requestNotificationPermissionIfNeeded() {
@@ -3615,7 +3843,11 @@ class MainActivity : androidx.activity.ComponentActivity() {
      */
     private fun cyclePipelineMode() {
         if (MirrorCoordinator.isProjectionReady) {
-            Toast.makeText(this, "Stop mirroring before changing the renderer", Toast.LENGTH_SHORT).show()
+            Toast.makeText(
+                this,
+                getString(R.string.mirror_stop_before_renderer),
+                Toast.LENGTH_SHORT
+            ).show()
             return
         }
         val next = when (ScreenOffController.pipelineMode) {
@@ -3624,7 +3856,11 @@ class MainActivity : androidx.activity.ComponentActivity() {
             ScreenOffController.PipelineMode.OWN_CONTENT -> ScreenOffController.PipelineMode.AUTO_MIRROR
         }
         if (!MirrorCoordinator.setPipelineMode(next)) {
-            Toast.makeText(this, "Renderer pipeline is not available", Toast.LENGTH_SHORT).show()
+            Toast.makeText(
+                this,
+                getString(R.string.mirror_renderer_unavailable),
+                Toast.LENGTH_SHORT
+            ).show()
             return
         }
         val hint = if (next == ScreenOffController.PipelineMode.SELF_DRAWN) {
@@ -3655,7 +3891,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
         ) {
             Toast.makeText(
                 this,
-                "Switch renderer to SELF_DRAWN so rotation applies to the car only",
+                getString(R.string.mirror_needs_self_drawn),
                 Toast.LENGTH_LONG
             ).show()
         }
@@ -3687,7 +3923,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
             setPadding(dp(16), dp(12), dp(16), dp(12))
             background = roundedBackground(COLOR_SURFACE, COLOR_BORDER)
         }
-        row.addView(boldText("Scale mode", 14f))
+        row.addView(boldText(getString(R.string.mirror_scale_mode), 14f))
         row.addView(
             mutedText(
                 if (selfDrawn) {
@@ -3743,7 +3979,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
         ) {
             Toast.makeText(
                 this,
-                "Grant Modify system settings to use the global landscape lock",
+                getString(R.string.mirror_needs_write_settings),
                 Toast.LENGTH_LONG
             ).show()
             startActivity(
@@ -3756,11 +3992,15 @@ class MainActivity : androidx.activity.ComponentActivity() {
         }
         val enable = !MirrorOrientationController.isEnabled
         if (!MirrorOrientationController.setEnabled(this, enable)) {
-            Toast.makeText(this, "Landscape mirror could not be changed", Toast.LENGTH_LONG).show()
+            Toast.makeText(
+                this,
+                getString(R.string.mirror_landscape_failed),
+                Toast.LENGTH_LONG
+            ).show()
         } else if (enable) {
             Toast.makeText(
                 this,
-                "Global lock rotates the phone too; use SELF_DRAWN + Mirror rotation to keep the phone upright",
+                getString(R.string.mirror_global_lock_warning),
                 Toast.LENGTH_LONG
             ).show()
         }

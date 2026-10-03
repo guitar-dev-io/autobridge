@@ -9,6 +9,7 @@ import androidx.car.app.model.ItemList
 import androidx.car.app.model.ListTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
+import dev.autobridge.R
 import dev.autobridge.display.MirrorDiagnostics
 import dev.autobridge.mirror.MirrorCoordinator
 import dev.autobridge.mirror.ReconnectTracker
@@ -26,42 +27,60 @@ class CarDiagnosticsScreen(carContext: CarContext) : Screen(carContext) {
             dev.autobridge.display.ScreenOffController.PipelineMode.SELF_DRAWN
 
         val carSurface = CarDisplayInfo.last
-        val carDisplayText = CarDisplayInfo.label(carSurface) +
+        val carDisplayLabel = CarDisplayInfo.label(carContext, carSurface)
+        val carDisplayText =
             if (carSurface != null && CarDisplayInfo.isLowestStream(carSurface)) {
                 // The head unit stretches this stream to its panel, so everything looks enlarged.
-                " • Lowest Android Auto resolution. If the car supports it: Android Auto ▸ " +
-                    "Developer settings ▸ Video resolution ▸ 720p, then reconnect"
-            } else ""
+                carContext.getString(R.string.car_diag_lowest_resolution, carDisplayLabel)
+            } else {
+                carDisplayLabel
+            }
 
         val list = ItemList.Builder()
-            .addItem(statusRow("Car display", carDisplayText))
-            .addItem(statusRow("Pipeline", MirrorCoordinator.activePipelineMode.name))
-            .addItem(statusRow("Mirror", if (MirrorCoordinator.isMirroring) "Active" else "Inactive"))
-            .addItem(statusRow("Uptime", uptimeLabel()))
-            .addItem(statusRow("Source size", sourceSizeLabel()))
-            .addItem(statusRow("Reconnects", ReconnectTracker.reconnectCount.toString()))
+            .addItem(statusRow(carContext.getString(R.string.car_diag_car_display), carDisplayText))
+            .addItem(statusRow(carContext.getString(R.string.car_diag_pipeline), MirrorCoordinator.activePipelineMode.name))
             .addItem(
                 statusRow(
-                    "Frame rate",
-                    if (selfDrawn) fpsLabel(stats) else "n/a • AUTO_MIRROR is OS-owned"
+                    carContext.getString(R.string.car_diag_mirror),
+                    carContext.getString(
+                        if (MirrorCoordinator.isMirroring) R.string.car_diag_active
+                        else R.string.car_diag_inactive
+                    )
+                )
+            )
+            .addItem(statusRow(carContext.getString(R.string.car_diag_uptime), uptimeLabel()))
+            .addItem(statusRow(carContext.getString(R.string.car_diag_source_size), sourceSizeLabel()))
+            .addItem(
+                statusRow(
+                    carContext.getString(R.string.car_diag_reconnects),
+                    ReconnectTracker.reconnectCount.toString()
                 )
             )
             .addItem(
                 statusRow(
-                    "Frames (r/d/c)",
-                    if (selfDrawn) "${stats.rendered} / ${stats.dropped} / ${stats.captured}" else "n/a"
+                    carContext.getString(R.string.car_diag_frame_rate),
+                    if (selfDrawn) fpsLabel(stats)
+                    else carContext.getString(R.string.car_diag_os_owned)
                 )
             )
             .addItem(
                 statusRow(
-                    "Last latency",
-                    if (selfDrawn) stats.lastLatencyMs?.let { "${it} ms" } ?: "—" else "n/a"
+                    carContext.getString(R.string.car_diag_frames),
+                    if (selfDrawn) "${stats.rendered} / ${stats.dropped} / ${stats.captured}"
+                    else carContext.getString(R.string.car_diag_not_applicable)
+                )
+            )
+            .addItem(
+                statusRow(
+                    carContext.getString(R.string.car_diag_last_latency),
+                    if (selfDrawn) stats.lastLatencyMs?.let { "$it ms" } ?: "—"
+                    else carContext.getString(R.string.car_diag_not_applicable)
                 )
             )
             .addItem(
                 Row.Builder()
-                    .setTitle("Audio")
-                    .addText("Focus, route, volume, session and web audio state")
+                    .setTitle(carContext.getString(R.string.car_diag_audio))
+                    .addText(carContext.getString(R.string.car_diag_audio_caption))
                     .setBrowsable(true)
                     .setOnClickListener {
                         CarNavigation.open(screenManager, "CarAudioDiagnosticsScreen") {
@@ -72,18 +91,22 @@ class CarDiagnosticsScreen(carContext: CarContext) : Screen(carContext) {
             )
             .addItem(
                 Row.Builder()
-                    .setTitle("Refresh")
-                    .addText("Re-read live diagnostics")
+                    .setTitle(carContext.getString(R.string.car_diag_refresh))
+                    .addText(carContext.getString(R.string.car_diag_refresh_caption))
                     .setOnClickListener { invalidate() }
                     .build()
             )
             .addItem(
                 Row.Builder()
-                    .setTitle("Clear events")
-                    .addText("Reset the diagnostics event ring")
+                    .setTitle(carContext.getString(R.string.car_diag_clear))
+                    .addText(carContext.getString(R.string.car_diag_clear_caption))
                     .setOnClickListener {
                         MirrorDiagnostics.clearEvents()
-                        CarToast.makeText(carContext, "Diagnostics events cleared", CarToast.LENGTH_SHORT).show()
+                        CarToast.makeText(
+                            carContext,
+                            carContext.getString(R.string.car_diag_cleared),
+                            CarToast.LENGTH_SHORT
+                        ).show()
                         invalidate()
                     }
                     .build()
@@ -93,7 +116,7 @@ class CarDiagnosticsScreen(carContext: CarContext) : Screen(carContext) {
         return ListTemplate.Builder()
             .setHeader(
                 Header.Builder()
-                    .setTitle("Diagnostics")
+                    .setTitle(carContext.getString(R.string.car_diag_title))
                     .setStartHeaderAction(Action.BACK)
                     .build()
             )
@@ -109,7 +132,8 @@ class CarDiagnosticsScreen(carContext: CarContext) : Screen(carContext) {
             .build()
 
     private fun fpsLabel(stats: MirrorDiagnostics.FrameStats): String =
-        if (stats.rendered > 0) "%.1f FPS".format(stats.measuredFps) else "measuring…"
+        if (stats.rendered > 0) "%.1f FPS".format(stats.measuredFps)
+        else carContext.getString(R.string.car_diag_measuring)
 
     private fun uptimeLabel(): String {
         val ms = MirrorDiagnostics.currentMirroringUptimeMs() ?: return "—"

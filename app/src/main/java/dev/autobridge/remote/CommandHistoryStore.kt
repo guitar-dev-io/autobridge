@@ -2,6 +2,7 @@ package dev.autobridge.remote
 
 import android.content.Context
 import androidx.core.content.edit
+import dev.autobridge.R
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -40,7 +41,7 @@ object CommandHistoryStore {
             commandId = command.id,
             type = command.type,
             payload = command.payload,
-            label = labelFor(command, result),
+            label = labelFor(context, command, result),
             success = result.isSuccess,
             timestamp = System.currentTimeMillis()
         )
@@ -54,32 +55,36 @@ object CommandHistoryStore {
         prefs(context).edit { remove(KEY_ITEMS) }
     }
 
-    private fun labelFor(command: AutoBridgeCommand, result: CommandResult): String {
+    private fun labelFor(context: Context, command: AutoBridgeCommand, result: CommandResult): String {
+        val res = context.resources
         val base = when (command.type) {
-            CommandType.OPEN_URL -> "เปิด ${shortUrl(command.payload)}"
-            CommandType.SEARCH_WEB -> "ค้นหา ${command.payload.orEmpty()}"
-            CommandType.SEND_TEXT_TO_SCREEN -> "ส่งข้อความ: ${command.payload.orEmpty()}"
-            CommandType.RELOAD -> "Reload"
-            CommandType.GO_BACK -> "กลับหน้าก่อน"
-            CommandType.GO_FORWARD -> "ไปหน้าถัดไป"
-            CommandType.ENTER_FULLSCREEN -> "Fullscreen"
-            CommandType.EXIT_FULLSCREEN -> "Exit fullscreen"
-            CommandType.ENABLE_DESKTOP_MODE -> "Desktop mode on"
-            CommandType.DISABLE_DESKTOP_MODE -> "Desktop mode off"
-            CommandType.OPEN_BROWSER -> "เปิด Browser"
-            CommandType.OPEN_MIRROR -> "เปิด Mirror"
-            CommandType.START_MIRROR -> "Start Mirror"
-            CommandType.STOP_MIRROR -> "Stop Mirror"
-            CommandType.OPEN_MEDIA -> "เปิด Media"
-            CommandType.PLAY_VIDEO -> "ส่งวิดีโอไปที่รถ: ${command.extras["title"] ?: shortUrl(command.payload)}"
-            CommandType.PLAY -> "เล่นเพลง"
-            CommandType.PAUSE -> "หยุดเพลง"
-            CommandType.NEXT -> "เพลงถัดไป"
-            CommandType.PREVIOUS -> "เพลงก่อนหน้า"
-            CommandType.OPEN_AGENT -> "Agent: ${command.payload.orEmpty()}"
-            CommandType.OPEN_HOME -> "หน้าหลัก"
-            CommandType.OPEN_SETTINGS -> "ตั้งค่า"
-            CommandType.FOCUS_INPUT -> "Focus input"
+            CommandType.OPEN_URL -> res.getString(R.string.history_open_url, shortUrl(command.payload))
+            CommandType.SEARCH_WEB -> res.getString(R.string.history_search_web, command.payload.orEmpty())
+            CommandType.SEND_TEXT_TO_SCREEN -> res.getString(R.string.history_send_text, command.payload.orEmpty())
+            CommandType.RELOAD -> res.getString(R.string.history_reload)
+            CommandType.GO_BACK -> res.getString(R.string.history_go_back)
+            CommandType.GO_FORWARD -> res.getString(R.string.history_go_forward)
+            CommandType.ENTER_FULLSCREEN -> res.getString(R.string.history_enter_fullscreen)
+            CommandType.EXIT_FULLSCREEN -> res.getString(R.string.history_exit_fullscreen)
+            CommandType.ENABLE_DESKTOP_MODE -> res.getString(R.string.history_enable_desktop)
+            CommandType.DISABLE_DESKTOP_MODE -> res.getString(R.string.history_disable_desktop)
+            CommandType.OPEN_BROWSER -> res.getString(R.string.history_open_browser)
+            CommandType.OPEN_MIRROR -> res.getString(R.string.history_open_mirror)
+            CommandType.START_MIRROR -> res.getString(R.string.history_start_mirror)
+            CommandType.STOP_MIRROR -> res.getString(R.string.history_stop_mirror)
+            CommandType.OPEN_MEDIA -> res.getString(R.string.history_open_media)
+            CommandType.PLAY_VIDEO -> res.getString(
+                R.string.history_play_video,
+                command.extras["title"] ?: shortUrl(command.payload)
+            )
+            CommandType.PLAY -> res.getString(R.string.history_play)
+            CommandType.PAUSE -> res.getString(R.string.history_pause)
+            CommandType.NEXT -> res.getString(R.string.history_next)
+            CommandType.PREVIOUS -> res.getString(R.string.history_previous)
+            CommandType.OPEN_AGENT -> res.getString(R.string.history_open_agent, command.payload.orEmpty())
+            CommandType.OPEN_HOME -> res.getString(R.string.history_open_home)
+            CommandType.OPEN_SETTINGS -> res.getString(R.string.history_open_settings)
+            CommandType.FOCUS_INPUT -> res.getString(R.string.history_focus_input)
         }
         return base.trim()
     }

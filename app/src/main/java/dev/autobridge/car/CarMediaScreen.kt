@@ -13,6 +13,7 @@ import androidx.car.app.model.Template
 import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
+import dev.autobridge.R
 import dev.autobridge.media.MediaPlaybackClient
 
 /** Car-native media controls backed by the same Media3 MediaSession as the phone UI. */
@@ -29,16 +30,25 @@ class CarMediaScreen(carContext: CarContext) : Screen(carContext) {
     }
 
     override fun onGetTemplate(): Template {
-        val state = if (mediaPlayback.isPlaying) "Playing" else "Paused / stopped"
+        val state = carContext.getString(
+            if (mediaPlayback.isPlaying) R.string.car_media_playing else R.string.car_media_paused
+        )
         val connection = when (mediaPlayback.connectionState) {
-            MediaPlaybackClient.ConnectionState.CONNECTED -> "Session connected"
-            MediaPlaybackClient.ConnectionState.CONNECTING -> "Connecting to MediaSession…"
-            MediaPlaybackClient.ConnectionState.ERROR -> "Session unavailable: ${mediaPlayback.lastErrorMessage ?: "unknown error"}"
-            MediaPlaybackClient.ConnectionState.DISCONNECTED -> "Session disconnected"
+            MediaPlaybackClient.ConnectionState.CONNECTED ->
+                carContext.getString(R.string.car_media_session_connected)
+            MediaPlaybackClient.ConnectionState.CONNECTING ->
+                carContext.getString(R.string.car_media_session_connecting)
+            MediaPlaybackClient.ConnectionState.ERROR -> carContext.getString(
+                R.string.car_media_session_error,
+                mediaPlayback.lastErrorMessage
+                    ?: carContext.getString(R.string.car_media_session_unknown_error)
+            )
+            MediaPlaybackClient.ConnectionState.DISCONNECTED ->
+                carContext.getString(R.string.car_media_session_disconnected)
         }
         val canControl = mediaPlayback.isConnected
         val nowPlayingRow = Row.Builder()
-            .setTitle(mediaPlayback.currentTitle ?: "AutoBridge Media")
+            .setTitle(mediaPlayback.currentTitle ?: carContext.getString(R.string.car_media_default_title))
             .addText(nowPlayingSubtitle(state, connection))
             .setEnabled(false)
             .apply { artworkIcon()?.let { setImage(it) } }
@@ -47,8 +57,8 @@ class CarMediaScreen(carContext: CarContext) : Screen(carContext) {
             .addItem(nowPlayingRow)
             .addItem(
                 Row.Builder()
-                    .setTitle("Play sample playlist")
-                    .addText("Jazz, progressive audio and test media")
+                    .setTitle(carContext.getString(R.string.car_media_sample))
+                    .addText(carContext.getString(R.string.car_media_sample_caption))
                     .setEnabled(canControl)
                     .setOnClickListener {
                         mediaPlayback.playPlaylist(samplePlaylist())
@@ -58,8 +68,13 @@ class CarMediaScreen(carContext: CarContext) : Screen(carContext) {
             )
             .addItem(
                 Row.Builder()
-                    .setTitle(if (mediaPlayback.isPlaying) "Pause" else "Resume")
-                    .addText("MediaSession play/pause")
+                    .setTitle(
+                        carContext.getString(
+                            if (mediaPlayback.isPlaying) R.string.car_media_pause
+                            else R.string.car_media_resume
+                        )
+                    )
+                    .addText(carContext.getString(R.string.car_media_play_pause_caption))
                     .setEnabled(canControl)
                     .setOnClickListener {
                         if (mediaPlayback.isPlaying) mediaPlayback.pause() else mediaPlayback.resume()
@@ -69,8 +84,8 @@ class CarMediaScreen(carContext: CarContext) : Screen(carContext) {
             )
             .addItem(
                 Row.Builder()
-                    .setTitle("Previous track")
-                    .addText("Previous item in the current queue")
+                    .setTitle(carContext.getString(R.string.car_media_previous))
+                    .addText(carContext.getString(R.string.car_media_previous_caption))
                     .setEnabled(canControl)
                     .setOnClickListener {
                         mediaPlayback.previous()
@@ -80,8 +95,8 @@ class CarMediaScreen(carContext: CarContext) : Screen(carContext) {
             )
             .addItem(
                 Row.Builder()
-                    .setTitle("Next track")
-                    .addText("Next item in the current queue")
+                    .setTitle(carContext.getString(R.string.car_media_next))
+                    .addText(carContext.getString(R.string.car_media_next_caption))
                     .setEnabled(canControl)
                     .setOnClickListener {
                         mediaPlayback.next()
@@ -91,8 +106,8 @@ class CarMediaScreen(carContext: CarContext) : Screen(carContext) {
             )
             .addItem(
                 Row.Builder()
-                    .setTitle("Stop")
-                    .addText("Stop audio playback")
+                    .setTitle(carContext.getString(R.string.car_media_stop))
+                    .addText(carContext.getString(R.string.car_media_stop_caption))
                     .setEnabled(canControl)
                     .setOnClickListener {
                         mediaPlayback.stop()
@@ -105,7 +120,7 @@ class CarMediaScreen(carContext: CarContext) : Screen(carContext) {
         return ListTemplate.Builder()
             .setHeader(
                 Header.Builder()
-                    .setTitle("Media")
+                    .setTitle(carContext.getString(R.string.car_media_title))
                     .setStartHeaderAction(androidx.car.app.model.Action.BACK)
                     .build()
             )
@@ -116,9 +131,10 @@ class CarMediaScreen(carContext: CarContext) : Screen(carContext) {
     private fun nowPlayingSubtitle(state: String, connection: String): String {
         val artist = mediaPlayback.currentArtist
         return when {
-            mediaPlayback.currentTitle != null && artist != null -> "$artist • $state"
+            mediaPlayback.currentTitle != null && artist != null ->
+                carContext.getString(R.string.car_media_artist_state, artist, state)
             mediaPlayback.currentTitle != null -> state
-            else -> "$state • $connection"
+            else -> carContext.getString(R.string.car_media_state_connection, state, connection)
         }
     }
 

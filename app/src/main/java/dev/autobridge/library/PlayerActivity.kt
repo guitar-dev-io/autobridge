@@ -30,6 +30,7 @@ import androidx.media3.common.VideoSize
 import dev.autobridge.core.model.Feature
 import dev.autobridge.core.policy.FeaturePolicy
 import dev.autobridge.entertainment.ContentKind
+import dev.autobridge.i18n.AppLocale
 import dev.autobridge.media.MediaPlaybackClient
 import dev.autobridge.media.VideoAspect
 import dev.autobridge.safety.ParkingStateStore
@@ -208,6 +209,11 @@ class PlayerActivity : Activity() {
         override fun onVideoSizeChanged(videoSize: VideoSize) = runOnUiThread { applyVideoGeometry() }
     }
 
+    /** Applies the Settings &gt; Language choice; see [AppLocale.rebase]. */
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AppLocale.rebase(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -256,6 +262,7 @@ class PlayerActivity : Activity() {
             subtitle = subtitleText.ifBlank { if (kind == ContentKind.AUDIO) "Audio" else "Video" },
             onBack = { finish() },
             actions = listOf(
+                AutoBridgeDesign.HeaderAction("💬", { startActivity(SubtitleSettingsActivity.intent(this)) }),
                 AutoBridgeDesign.HeaderAction("⚙", { startActivity(VideoSettingsActivity.intent(this)) })
             )
         )
@@ -632,10 +639,30 @@ class PlayerActivity : Activity() {
         // Video queues the list too, now that a channel list is what Next/Previous, the channel
         // gesture and "Auto next channel" all walk.
         if (queue.size > 1) {
+            // If the shared session is already playing this exact queue (e.g. it was started on
+            // the car and has since advanced several tracks), re-issuing setMediaItems would snap
+            // the live index back to the tapped row at 00:00. Adopt the session's current position
+            // instead, so the phone follows wherever the car got to.
+            if (sessionAlreadyPlayingThisQueue()) return
             playback.playPlaylist(queue, queueIndex, queueTitles)
         } else {
             playback.play(url, title)
         }
+    }
+
+    /**
+     * True when the live session's queue is the same ordered list of sources this screen was asked
+     * to play. Compared through [MediaSourceResolver] so a bare path and its normalized `file://`
+     * form match the way they are stored in the session. When true, the caller leaves the session
+     * untouched and simply reflects its current track/position.
+     */
+    private fun sessionAlreadyPlayingThisQueue(): Boolean {
+        val live = playback.currentQueueUris()
+        if (live.isEmpty() || live.size != queue.size) return false
+        val wanted = queue.map {
+            dev.autobridge.media.MediaSourceResolver.resolve(it)?.uri ?: it.trim()
+        }
+        return live == wanted
     }
 
     /** Re-issues the original request after a failure. */

@@ -16,6 +16,15 @@ interface WebMediaSource {
     fun play()
     fun pause()
     fun seekTo(positionMs: Long)
+
+    /**
+     * Loads the next page in [dev.autobridge.browser.BrowserPlayQueue], consuming it.
+     *
+     * The queue belongs to this app, so unlike a site's own "up next" this is something the native
+     * layer can actually act on. Returns false when the queue is empty, which is how the caller
+     * knows to leave the finished page where it is.
+     */
+    fun skipToNext(): Boolean
 }
 
 /**

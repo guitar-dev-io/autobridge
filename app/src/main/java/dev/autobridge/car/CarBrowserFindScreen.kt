@@ -11,6 +11,7 @@ import androidx.car.app.model.Header
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
 import androidx.core.graphics.drawable.IconCompat
+import dev.autobridge.R
 import dev.autobridge.browser.CarWebRenderer
 
 /**
@@ -43,7 +44,7 @@ class CarBrowserFindScreen(
         val counter = if (renderer.findMatchCount > 0) {
             "${renderer.findActiveMatch}/${renderer.findMatchCount}"
         } else if (query.isNotBlank()) {
-            "No matches"
+            carContext.getString(R.string.car_find_no_matches)
         } else {
             ""
         }
@@ -51,8 +52,14 @@ class CarBrowserFindScreen(
         val list = ItemList.Builder()
             .addItem(
                 Row.Builder()
-                    .setTitle(if (query.isBlank()) "Find in page" else "\"$query\"")
-                    .addText(if (counter.isBlank()) "Type a term to search this page" else counter)
+                    .setTitle(
+                        if (query.isBlank()) carContext.getString(R.string.car_find_title)
+                        else carContext.getString(R.string.car_find_quoted, query)
+                    )
+                    .addText(
+                        if (counter.isBlank()) carContext.getString(R.string.car_find_hint)
+                        else counter
+                    )
                     .setBrowsable(true)
                     .setOnClickListener { editQuery() }
                     .build()
@@ -71,7 +78,10 @@ class CarBrowserFindScreen(
         return ListTemplate.Builder()
             .setHeader(
                 Header.Builder()
-                    .setTitle(if (counter.isBlank()) "Find in page" else "Find  •  $counter")
+                    .setTitle(
+                        if (counter.isBlank()) carContext.getString(R.string.car_find_title)
+                        else carContext.getString(R.string.car_find_header_counter, counter)
+                    )
                     .setStartHeaderAction(Action.BACK)
                     .build()
             )

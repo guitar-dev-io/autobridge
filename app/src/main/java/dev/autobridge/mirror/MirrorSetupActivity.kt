@@ -13,6 +13,7 @@ import android.os.PowerManager
 import android.provider.Settings
 import android.view.View
 import android.widget.Toast
+import dev.autobridge.i18n.AppLocale
 import dev.autobridge.input.AccessibilityInputBackend
 import dev.autobridge.input.ShizukuInputBackend
 import dev.autobridge.media.MediaAutoStart
@@ -41,6 +42,11 @@ class MirrorSetupActivity : Activity() {
     }
 
     private val accent = AutoBridgeDesign.ACCENT_SYSTEM
+
+    /** Applies the Settings &gt; Language choice; see [AppLocale.rebase]. */
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AppLocale.rebase(newBase))
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

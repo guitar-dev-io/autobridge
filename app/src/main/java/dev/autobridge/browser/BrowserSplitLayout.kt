@@ -1,7 +1,9 @@
 package dev.autobridge.browser
 
 import android.content.Context
+import androidx.annotation.StringRes
 import androidx.core.content.edit
+import dev.autobridge.R
 import kotlin.math.roundToInt
 
 /**
@@ -10,10 +12,10 @@ import kotlin.math.roundToInt
  * The main page is the full browser (tabs, toolbar, history); the side page is a second, simpler
  * page — typically a map — shown next to it. Fractions are the side pane's share of the width.
  */
-enum class BrowserSplitLayout(val label: String, val glyph: String) {
-    SINGLE("เต็มจอ (100)", "▭"),
-    HALF("แบ่ง 50/50", "◫"),
-    FORTY_SIXTY("แบ่ง 40/60", "◧"),
+enum class BrowserSplitLayout(@StringRes val labelRes: Int, val glyph: String) {
+    SINGLE(R.string.split_single, "▭"),
+    HALF(R.string.split_half, "◫"),
+    FORTY_SIXTY(R.string.split_forty_sixty, "◧"),
 
     /**
      * The main pane takes 65% (video / web), the side pane 35% (map / navigation / info). This is
@@ -21,15 +23,18 @@ enum class BrowserSplitLayout(val label: String, val glyph: String) {
      * usable navigation strip, without pinning either pane to a fixed aspect the way
      * [PORTRAIT_LANDSCAPE] does.
      */
-    SIXTY_FIVE_THIRTY_FIVE("แบ่ง 65/35", "◧"),
+    SIXTY_FIVE_THIRTY_FIVE(R.string.split_sixty_five_thirty_five, "◧"),
 
     /**
      * A tall side pane next to a 16:9 main pane: e.g. a portrait map beside a landscape video. The
      * main pane is sized to exactly 16:9 where the surface allows, the side pane takes the rest.
      */
-    PORTRAIT_LANDSCAPE("แนวตั้ง + แนวนอน", "▯▭");
+    PORTRAIT_LANDSCAPE(R.string.split_portrait_landscape, "▯▭");
 
     fun next(): BrowserSplitLayout = entries[(ordinal + 1) % entries.size]
+
+    /** The name to show for this layout; a string id for the reason [FloatingButtonAction] gives. */
+    fun label(context: Context): String = context.getString(labelRes)
 }
 
 /** A pane rectangle in car-surface pixels. Plain ints so the geometry is testable on the JVM. */

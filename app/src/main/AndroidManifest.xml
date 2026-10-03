@@ -68,7 +68,7 @@
     <!-- IPTV portals and set-top playlists are overwhelmingly plain http, so cleartext has to be
          permitted for user-entered hosts. The network security config keeps that explicit and
          reviewable instead of hiding it behind a blanket attribute. -->
-    <application android:name=".AutoBridgeApplication" android:networkSecurityConfig="@xml/network_security_config" android:allowBackup="true" android:icon="@drawable/ic_autobridge_launcher" android:label="AutoBridge" android:roundIcon="@drawable/ic_autobridge_launcher" android:supportsRtl="true" android:theme="@style/AppTheme">
+    <application android:name=".AutoBridgeApplication" android:networkSecurityConfig="@xml/network_security_config" android:allowBackup="true" android:icon="@drawable/ic_autobridge_launcher" android:label="@string/app_name" android:localeConfig="@xml/locales_config" android:roundIcon="@drawable/ic_autobridge_launcher" android:supportsRtl="true" android:theme="@style/AppTheme">
 
         <meta-data android:name="com.google.android.gms.car.application" android:resource="@xml/automotive_app_desc" />
         <meta-data android:name="androidx.car.app.theme" android:resource="@style/CarAppTheme" />
@@ -146,6 +146,10 @@
         <!-- Video settings for the player above, and its enhancement sub-screen. -->
         <activity android:name=".library.VideoSettingsActivity" android:exported="false" />
         <activity android:name=".library.VideoEnhancementActivity" android:exported="false" />
+        <!-- On-device subtitle translation settings and Opus-MT model management. -->
+        <activity android:name=".library.SubtitleSettingsActivity" android:exported="false" />
+        <!-- Clear cache / reset app data. -->
+        <activity android:name=".library.StorageSettingsActivity" android:exported="false" />
 
         <!-- Step-by-step permissions and car-connection options. -->
         <activity android:name=".mirror.MirrorSetupActivity" android:exported="false" />
@@ -155,6 +159,18 @@
             tools:ignore="ExportedReceiver">
             <intent-filter>
                 <action android:name="android.bluetooth.device.action.ACL_CONNECTED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Runtime safety-bypass control. exported so the notification actions, the Settings
+             toggle and an `adb shell am broadcast` all drive the same store. Only flips a local
+             preference; reads no device data. -->
+        <receiver android:name=".safety.BypassControlReceiver" android:exported="true"
+            tools:ignore="ExportedReceiver">
+            <intent-filter>
+                <action android:name="dev.autobridge.BYPASS_ON" />
+                <action android:name="dev.autobridge.BYPASS_OFF" />
+                <action android:name="dev.autobridge.BYPASS_TOGGLE" />
             </intent-filter>
         </receiver>
 

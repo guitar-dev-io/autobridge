@@ -9,6 +9,7 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.Switch
 import android.widget.TextView
+import dev.autobridge.R
 
 /**
  * The browser's Settings sheet, built on the shared [BrowserSheetShell] so it reads as one surface
@@ -159,7 +160,7 @@ class BrowserSettingsSheet(
             gravity = Gravity.CENTER
             textSize = shell.sp(AutoUiSizes.ICON_LARGE_DP)
             setTextColor(BrowserTheme.textPrimary)
-            contentDescription = "ย้อนกลับ"
+            contentDescription = activity.getString(R.string.browser_back)
             val side = sizes.dpInt(AutoUiSizes.SHEET_CLOSE_BUTTON_DP)
             background = shell.rounded(BrowserTheme.sheetCardBackground, side / 2f)
             layoutParams = LinearLayout.LayoutParams(side, side).apply { marginEnd = shell.pad() }
@@ -259,7 +260,7 @@ class BrowserSettingsSheet(
 
     private fun floatingActionRow(): View {
         val action = BrowserControlsStore.floatingButtonAction(activity)
-        return navRow("Floating button action", "${action.glyph}  ${action.label}") {
+        return navRow("Floating button action", "${action.glyph}  ${action.label(activity)}") {
             cycleFloatingAction(action)
         }
     }

@@ -10,6 +10,7 @@ import androidx.car.app.model.ListTemplate
 import androidx.car.app.model.MessageTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
+import dev.autobridge.R
 import dev.autobridge.weather.WeatherLocationStore
 import dev.autobridge.weather.WeatherRepository
 import kotlin.math.roundToInt
@@ -28,31 +29,31 @@ class CarWeatherScreen(carContext: CarContext) : Screen(carContext) {
 
     override fun onGetTemplate(): Template {
         val place = WeatherLocationStore.place(carContext)
-        val header = Header.Builder().setTitle("Weather").setStartHeaderAction(Action.BACK).build()
+        val header = Header.Builder().setTitle(carContext.getString(R.string.car_weather_title)).setStartHeaderAction(Action.BACK).build()
 
         if (place == null) {
             return MessageTemplate.Builder(
-                "No location set.\nOpen Weather on the phone to search for a city."
+                carContext.getString(R.string.car_weather_no_location)
             ).setHeader(header).build()
         }
 
         val snapshot = WeatherRepository.cachedSnapshot()
         val list = ItemList.Builder()
         if (snapshot != null && snapshot.place == place) {
-            list.addItem(row("Now", "${snapshot.temperatureC.round()}°C · ${snapshot.condition}"))
-            if (snapshot.feelsLikeC != null) list.addItem(row("Feels like", "${snapshot.feelsLikeC.round()}°C"))
+            list.addItem(row(carContext.getString(R.string.car_weather_now), "${snapshot.temperatureC.round()}°C · ${snapshot.condition}"))
+            if (snapshot.feelsLikeC != null) list.addItem(row(carContext.getString(R.string.car_weather_feels_like), "${snapshot.feelsLikeC.round()}°C"))
             if (snapshot.todayHighC != null && snapshot.todayLowC != null) {
-                list.addItem(row("Today", "H:${snapshot.todayHighC.round()}° L:${snapshot.todayLowC.round()}°"))
+                list.addItem(row(carContext.getString(R.string.car_weather_today), "H:${snapshot.todayHighC.round()}° L:${snapshot.todayLowC.round()}°"))
             }
-            list.addItem(row("Wind", "${snapshot.windKph.round()} km/h"))
+            list.addItem(row(carContext.getString(R.string.car_weather_wind), "${snapshot.windKph.round()} km/h"))
         } else {
-            list.addItem(row(place.displayName, if (loading) "Loading…" else "Tap refresh to load"))
+            list.addItem(row(place.displayName, carContext.getString(if (loading) R.string.car_weather_loading else R.string.car_weather_tap_refresh)))
         }
 
         return ListTemplate.Builder()
             .setHeader(
                 Header.Builder()
-                    .setTitle("Weather")
+                    .setTitle(carContext.getString(R.string.car_weather_title))
                     .setStartHeaderAction(Action.BACK)
                     .addEndHeaderAction(
                         Action.Builder()

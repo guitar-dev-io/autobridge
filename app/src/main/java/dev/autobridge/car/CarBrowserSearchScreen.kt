@@ -5,6 +5,7 @@ import androidx.car.app.Screen
 import androidx.car.app.model.Action
 import androidx.car.app.model.SearchTemplate
 import androidx.car.app.model.Template
+import dev.autobridge.R
 
 /**
  * Lets the user type a URL or search query on the car display and returns it to
@@ -32,13 +33,13 @@ class CarBrowserSearchScreen(
         )
             .setHeaderAction(Action.BACK)
             .setInitialSearchText(initialQuery)
-            .setSearchHint("Type a URL or search")
+            .setSearchHint(carContext.getString(R.string.car_browser_search_hint))
             .setShowKeyboardByDefault(true)
             .setActionStrip(
                 androidx.car.app.model.ActionStrip.Builder()
                     .addAction(
                         Action.Builder()
-                            .setTitle("Go")
+                            .setTitle(carContext.getString(R.string.car_browser_search_go))
                             .setOnClickListener { submit(pendingText) }
                             .build()
                     )

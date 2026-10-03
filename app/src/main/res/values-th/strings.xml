@@ -1,0 +1,1089 @@
+<resources>
+    <string name="accessibility_description">อนุญาตให้ส่งการสัมผัสจากจอรถไปยังโทรศัพท์เฉพาะตอนจอดเท่านั้น</string>
+
+    <!-- Language picker -->
+    <string name="settings_language">ภาษา</string>
+    <string name="language_system">ตามภาษาเครื่อง</string>
+
+    <!-- Projection foreground service notification -->
+    <string name="projection_notification_title">AutoBridge</string>
+    <string name="projection_notification_text">กำลังแชร์หน้าจออยู่</string>
+    <string name="projection_notification_stop">หยุด</string>
+    <string name="projection_channel_name">การแชร์หน้าจอ AutoBridge</string>
+
+    <!-- Safety bypass toggle + notification -->
+    <string name="bypass_channel_name">ปลดล็อกข้อจำกัดความปลอดภัย AutoBridge</string>
+    <string name="bypass_notification_title_on">เปิดการปลดล็อกข้อจำกัดแล้ว</string>
+    <string name="bypass_notification_title_off">ปิดการปลดล็อกข้อจำกัดแล้ว</string>
+    <string name="bypass_notification_text_on">ข้ามการเช็กจอดรถ/โหมดแล้ว ใช้งานฟีเจอร์ได้ทุกสถานะ</string>
+    <string name="bypass_notification_text_off">กลับมาใช้การเช็กความปลอดภัยแบบมาตรฐาน</string>
+    <string name="bypass_notification_action_turn_off">ปิด</string>
+    <string name="bypass_notification_action_turn_on">เปิด</string>
+    <string name="bypass_setting_title">ปลดล็อกข้อจำกัดความปลอดภัย</string>
+    <string name="bypass_setting_summary_on">เปิด — ข้ามการเช็กจอดรถ/โหมด</string>
+    <string name="bypass_setting_summary_off">ปิด — ใช้การเช็กจอดรถ/โหมดตามปกติ</string>
+    <string name="bypass_toast_on">เปิดการปลดล็อกข้อจำกัดแล้ว</string>
+    <string name="bypass_toast_off">ปิดการปลดล็อกข้อจำกัดแล้ว</string>
+
+    <!-- Agent spoken + toast confirmations -->
+    <string name="agent_toast_opening_browser">กำลังเปิดเบราว์เซอร์</string>
+    <string name="agent_spoken_opening_browser">กำลังเปิดเบราว์เซอร์</string>
+    <string name="agent_toast_invalid_website">ไม่พบเว็บไซต์นี้ ลองพูดใหม่อีกครั้ง</string>
+    <string name="agent_spoken_invalid_website">ไม่พบเว็บไซต์นี้ ลองพูดใหม่อีกครั้ง</string>
+    <string name="agent_toast_opening_url">กำลังเปิด %1$s</string>
+    <string name="agent_toast_opening_mirror">กำลังเปิดมิเรอร์</string>
+    <string name="agent_spoken_opening_mirror">กำลังเปิดมิเรอร์</string>
+    <string name="agent_toast_opening_media">กำลังเปิดมีเดีย</string>
+    <string name="agent_spoken_opening_media">กำลังเปิดมีเดีย</string>
+    <string name="agent_toast_resuming_playback">เล่นต่อ</string>
+    <string name="agent_spoken_resuming_playback">เล่นต่อ</string>
+    <string name="agent_toast_recent_activity">รายการล่าสุด</string>
+    <string name="agent_spoken_recent_activity">รายการล่าสุด</string>
+    <string name="agent_toast_desktop_on">เปิดโหมดเดสก์ท็อปแล้ว</string>
+    <string name="agent_spoken_desktop_on">เปิดโหมดเดสก์ท็อปแล้ว</string>
+    <string name="agent_toast_desktop_off">ปิดโหมดเดสก์ท็อปแล้ว</string>
+    <string name="agent_spoken_desktop_off">ปิดโหมดเดสก์ท็อปแล้ว</string>
+    <string name="agent_toast_fullscreen_on">เต็มจอ</string>
+    <string name="agent_spoken_fullscreen_on">เต็มจอ</string>
+    <string name="agent_toast_fullscreen_off">ออกจากเต็มจอ</string>
+    <string name="agent_spoken_fullscreen_off">ออกจากเต็มจอ</string>
+    <string name="agent_spoken_searching">กำลังค้นหา</string>
+    <string name="agent_spoken_opening_host">กำลังเปิด %1$s</string>
+    <string name="agent_prompt_say_command">บอกสิ่งที่อยากให้ AutoBridge ทำ</string>
+
+    <!-- Command history row labels -->
+    <string name="history_open_url">เปิด %1$s</string>
+    <string name="history_search_web">ค้นหา %1$s</string>
+    <string name="history_send_text">ส่งข้อความ: %1$s</string>
+    <string name="history_reload">โหลดใหม่</string>
+    <string name="history_go_back">กลับหน้าก่อน</string>
+    <string name="history_go_forward">ไปหน้าถัดไป</string>
+    <string name="history_enter_fullscreen">เต็มจอ</string>
+    <string name="history_exit_fullscreen">ออกจากเต็มจอ</string>
+    <string name="history_enable_desktop">เปิดโหมดเดสก์ท็อป</string>
+    <string name="history_disable_desktop">ปิดโหมดเดสก์ท็อป</string>
+    <string name="history_open_browser">เปิด Browser</string>
+    <string name="history_open_mirror">เปิด Mirror</string>
+    <string name="history_start_mirror">เริ่ม Mirror</string>
+    <string name="history_stop_mirror">หยุด Mirror</string>
+    <string name="history_open_media">เปิด Media</string>
+    <string name="history_play_video">ส่งวิดีโอไปที่รถ: %1$s</string>
+    <string name="history_play">เล่นเพลง</string>
+    <string name="history_pause">หยุดเพลง</string>
+    <string name="history_next">เพลงถัดไป</string>
+    <string name="history_previous">เพลงก่อนหน้า</string>
+    <string name="history_open_agent">Agent: %1$s</string>
+    <string name="history_open_home">หน้าหลัก</string>
+    <string name="history_open_settings">ตั้งค่า</string>
+    <string name="history_focus_input">โฟกัสช่องกรอก</string>
+
+    <!-- Control screen -->
+    <string name="control_title">ควบคุม</string>
+    <string name="control_history_action">ประวัติ</string>
+    <string name="control_android_auto">Android Auto</string>
+    <string name="control_section_command_or_url">คำสั่งหรือ URL</string>
+    <string name="control_command_placeholder">เปิด google.com</string>
+    <string name="control_section_quick_actions">คำสั่งด่วน</string>
+    <string name="control_section_current_screen">หน้าจอปัจจุบัน</string>
+    <string name="control_section_send_text">ส่งข้อความไปที่รถ</string>
+    <string name="control_send_text_placeholder">พิมพ์ข้อความที่จะส่ง</string>
+    <string name="control_send">ส่ง</string>
+    <string name="control_auto_submit_hint">กด Enter อัตโนมัติหลังส่ง</string>
+    <string name="control_result_sent">ส่งคำสั่งแล้ว</string>
+    <string name="control_result_failed">ส่งคำสั่งไม่สำเร็จ</string>
+
+    <!-- Command history screen -->
+    <string name="history_title">ประวัติ</string>
+    <string name="history_subtitle">คำสั่งล่าสุด</string>
+    <string name="history_clear">ล้างประวัติ</string>
+    <string name="history_empty">ยังไม่มีคำสั่ง</string>
+
+    <!-- Agent &amp; Commands settings screen -->
+    <string name="agent_screen_title">Agent และคำสั่ง</string>
+    <string name="agent_screen_subtitle">คำสั่ง ประวัติ และการทำงานอัตโนมัติ</string>
+    <string name="agent_section_commands">คำสั่ง</string>
+    <string name="agent_toggle_show_confirmation">แสดงการยืนยันคำสั่ง</string>
+    <string name="agent_toggle_show_confirmation_caption">แสดงผลลัพธ์หลังทุกคำสั่ง</string>
+    <string name="agent_toggle_haptic">การสั่นตอบสนอง</string>
+    <string name="agent_toggle_haptic_caption">สั่นเมื่อส่งคำสั่ง</string>
+    <string name="agent_toggle_auto_submit">ส่งข้อความอัตโนมัติ</string>
+    <string name="agent_toggle_auto_submit_caption">กด Enter หลังส่งข้อความไปที่รถ</string>
+    <string name="agent_section_agent">Agent</string>
+    <string name="agent_toggle_prefer_agent">ให้ Agent จัดการข้อความที่ไม่รู้จัก</string>
+    <string name="agent_toggle_prefer_agent_caption">ส่งข้อความที่ไม่รู้จักให้ Agent</string>
+    <string name="agent_toggle_resume_last">เปิดฟีเจอร์ล่าสุดต่อ</string>
+    <string name="agent_toggle_resume_last_caption">เปิดสิ่งที่ใช้งานล่าสุดอีกครั้ง</string>
+    <string name="agent_section_history">ประวัติ</string>
+    <string name="agent_toggle_remember_history">จดจำประวัติคำสั่ง</string>
+    <string name="agent_toggle_remember_history_caption">เก็บคำสั่ง 20 รายการล่าสุด</string>
+    <string name="agent_command_history">ประวัติคำสั่ง</string>
+    <string name="agent_command_history_caption">ดูและเรียกใช้คำสั่งล่าสุดอีกครั้ง</string>
+
+    <!-- Results of a command sent from the phone to the car -->
+    <string name="cmd_progress">กำลังทำคำสั่ง…</string>
+    <string name="cmd_error">เกิดข้อผิดพลาด: %1$s</string>
+    <string name="cmd_feedback_success">✓ %1$s\nจากคำสั่งบนมือถือ</string>
+    <string name="cmd_feedback_failure">✕ %1$s</string>
+    <string name="cmd_not_connected">ยังไม่ได้เชื่อมต่อ Android Auto</string>
+    <string name="cmd_browser_opened">เปิด Browser แล้ว</string>
+    <string name="cmd_invalid_url">URL ไม่ถูกต้อง</string>
+    <string name="cmd_opened_host">เปิด %1$s แล้ว</string>
+    <string name="cmd_went_back">กลับหน้าก่อน</string>
+    <string name="cmd_went_forward">ไปหน้าถัดไป</string>
+    <string name="cmd_reloaded">รีเฟรชแล้ว</string>
+    <string name="cmd_fullscreen_on">เต็มหน้าจอ</string>
+    <string name="cmd_fullscreen_off">ออกจากเต็มหน้าจอ</string>
+    <string name="cmd_desktop_on">เปิดโหมดเดสก์ท็อป</string>
+    <string name="cmd_desktop_off">ปิดโหมดเดสก์ท็อป</string>
+    <string name="cmd_mirror_opened">เปิด Mirror แล้ว</string>
+    <string name="cmd_mirror_running">Mirror กำลังทำงานอยู่</string>
+    <string name="cmd_mirror_needs_consent">เปิดหน้า Mirror แล้ว — เริ่มการสะท้อนจอจากมือถือเพื่ออนุยาต</string>
+    <string name="cmd_mirror_stopped">หยุด Mirror แล้ว</string>
+    <string name="cmd_media_opened">เปิด Media แล้ว</string>
+    <string name="cmd_media_unavailable">Media ยังไม่พร้อม</string>
+    <string name="cmd_no_video_link">ไม่พบลิงก์วิดีโอ</string>
+    <string name="cmd_video_sent">ส่ง \"%1$s\" ไปที่รถแล้ว</string>
+    <string name="cmd_play">เล่นเพลง</string>
+    <string name="cmd_pause">หยุดเพลง</string>
+    <string name="cmd_next">เพลงถัดไป</string>
+    <string name="cmd_previous">เพลงก่อนหน้า</string>
+    <string name="cmd_agent_with_text">Agent: %1$s</string>
+    <string name="cmd_agent_opened">เปิด Agent แล้ว</string>
+    <string name="cmd_home">หน้าหลัก</string>
+    <string name="cmd_settings_opened">เปิดตั้งค่าแล้ว</string>
+    <string name="cmd_no_browser">ไม่มี Browser ที่กำลังเปิดอยู่</string>
+    <string name="cmd_input_focused">เปิดช่องพิมพ์แล้ว</string>
+    <string name="cmd_no_text">ไม่มีข้อความให้ส่ง</string>
+    <string name="cmd_text_sent_agent">ส่งให้ Agent แล้ว</string>
+    <string name="cmd_text_sent_browser">ส่งข้อความไปยัง Browser แล้ว</string>
+
+    <!-- Car Agent speech-to-text and the phone's own voice search -->
+    <string name="voice_prompt_say_command">พูดคำสั่งหรือคำค้นหา</string>
+    <string name="voice_error_no_recognizer">ไม่พบบริการแปลงเสียงเป็นข้อความบนโทรหักถือ</string>
+    <string name="voice_error_needs_mic_permission">ต้องอนุยาตไมโครโฟนบนโทรศัพท์ก่อน</string>
+    <string name="voice_error_mic_busy">ใช้ไมโครโฟนไม่ได้ในขณะนี้</string>
+    <string name="voice_error_start_failed">เริ่มฟังเสียงไม่ได้</string>
+    <string name="voice_error_nothing_heard">ไม่ได้ยินคำสั่ง ลองพูดใหม่อีกครั้ง</string>
+    <string name="voice_error_interrupted">หยุดฟังเพราะมีเสียงอื่นแทรก</string>
+    <string name="voice_error_server">แปลงเสียงไม่ได้ ตรวจสอบอินเทอร์เน็ต</string>
+    <string name="voice_error_recognizer_busy">ระบบฟังเสียงกำลังทำงานอยู่ ลองอีกครั้ง</string>
+    <string name="voice_error_generic">ฟังเสียงไม่สำเร็จ ลองอีกครั้ง</string>
+
+    <!-- Car Agent screen -->
+    <string name="car_agent_hint_listening">กำลังฟัง… พูดได้เลย</string>
+    <string name="car_agent_hint_idle">แตะไมค์แล้วพูด หรือพิมพ์คำสั่ง…</string>
+    <string name="car_agent_chip_resume">เล่นเพลงต่อ</string>
+    <string name="car_agent_recent_on_car">รายการล่าสุดอยู่บนจอรถ</string>
+
+    <!-- Car Browser screen -->
+    <string name="car_browser_signin_external">เข้าสู่ระบบต้องใช้เบราว์เรอร์ภายนอก</string>
+
+    <!-- Advanced &gt; Debug -->
+    <string name="drm_diagnostics_disclaimer">แสดงความสามารถของ WebView/MediaDrm บนอุปกรณ์นี้เท่านั้น ไม่ได้ยืนยันว่าเว็บไซต์ใดจะเล่นวิดีโอ DRM ได้จริง</string>
+
+    <!-- Browser: what the floating button can be bound to -->
+    <string name="fab_action_menu">เปิดเมนู</string>
+    <string name="fab_action_tabs">สลับแท็บ</string>
+    <string name="fab_action_new_tab">แท็บใหม่</string>
+    <string name="fab_action_home">หน้าแรก</string>
+    <string name="fab_action_address">ช่อง URL / คีย์บอร์ด</string>
+    <string name="fab_action_fullscreen">สลับเต็มหน้าจอ</string>
+
+    <!-- Browser: how the car surface is divided between the two pages -->
+    <string name="split_single">เต็มจอ (100)</string>
+    <string name="split_half">แบ่ง 50/50</string>
+    <string name="split_forty_sixty">แบ่ง 40/60</string>
+    <string name="split_sixty_five_thirty_five">แบ่ง 65/35</string>
+    <string name="split_portrait_landscape">แนวตั้ง + แนวนอน</string>
+
+    <!-- Browser chrome -->
+    <string name="browser_close">ปิด</string>
+    <string name="browser_back">ย้อนกลับ</string>
+    <string name="browser_address_hint">URL / ค้นหา</string>
+    <string name="browser_clear_url">ล้าง URL</string>
+    <string name="browser_tabs_detail">สลับแท็บหรือเปิดแท็บใหม่</string>
+    <string name="browser_send_to_car_detail">ส่งหน้าเว็บหรือคำค้นไปที่หน้าจอรถ</string>
+
+    <!-- Car browser surface: one-line confirmations drawn over the page -->
+    <string name="car_split_unavailable_legacy">%1$s: ใช้ไม่ได้ในโหมดเรนเดอร์ legacy</string>
+    <string name="car_split_too_narrow">%1$s: จอนี้แคบเกินไป</string>
+    <string name="car_url_copied">คัดลอก URL แล้ว</string>
+    <string name="car_copy_failed">คัดลอกไม่สำเร็จ</string>
+    <string name="car_clipboard_unreadable">อ่านคลิปบอร์ดไม่ได้ หรือคลิปบอร์ดว่าง</string>
+    <string name="car_bookmark_saved">บันทึกบุ๊กมาร์กแล้ว</string>
+    <string name="car_bookmark_failed">บันทึกไม่สำเร็จ</string>
+    <string name="car_browsing_data_cleared">ล้างข้อมูลการท่องเว็บแล้ว</string>
+    <string name="car_needs_location_permission">เปิดสิทธิ์ตำแหน่งให้ AutoBridge บนมือถือก่อน แล้วโหลดหน้านี้ใหม่</string>
+    <string name="car_page_load_failed">โหลดหน้านี้ไม่สำเร็จ</string>
+    <string name="car_tap_to_retry">แตะเพื่อลองใหม่</string>
+
+    <!-- Phone browser: the "More actions" sheet -->
+    <string name="more_title">คำสั่งเพิ่มเติม</string>
+    <string name="more_get_from_car">ดึงจากจอรถ</string>
+    <string name="more_get_from_car_caption">ดึง URL จากจอรถมาที่โทรศัพท์</string>
+    <string name="more_find_in_page">ค้นหาในหน้า</string>
+    <string name="more_find_in_page_caption">ค้นหาข้อความในหน้าเว็บ</string>
+    <string name="more_copy_url">คัดลอก URL</string>
+    <string name="more_copy_url_caption">คัดลอกลิงก์หน้าปัจจุบัน</string>
+    <string name="more_paste_and_go">วางแล้วไป</string>
+    <string name="more_paste_and_go_caption">วางลิงก์แล้วเปิดหน้าเว็บ</string>
+    <string name="more_open_external">เปิดในแอปอื่น</string>
+    <string name="more_open_external_caption">เปิดลิงก์ในเบราว์เธอร์ภายนอก</string>
+    <string name="more_start_page">หน้าเริ่มต้น</string>
+    <string name="more_start_page_caption">ไปที่หน้าเริ่มต้น</string>
+    <string name="more_history">ประวัติ</string>
+    <string name="more_history_caption">ประวัติการเข้าชม</string>
+    <string name="more_downloads">ดาวน์โหลด</string>
+    <string name="more_downloads_caption">ไฟล์ที่ดาวน์โหลด</string>
+    <string name="more_support">สนับสนุน AutoBridge</string>
+    <string name="more_support_caption">สนับสนุนผู้พัฒนา (Buy Me a Coffee)</string>
+    <string name="more_licenses">สักพิธิ์โอเพนซอร์ส</string>
+    <string name="more_licenses_caption">สัมมาอนุยาตของซอฟต์แวร์จากผู้พัฒนาอื่น</string>
+    <string name="more_github">GitHub</string>
+    <string name="more_github_caption">ซอร์สโค้ดบน GitHub</string>
+    <string name="more_zoom">การย่อขยาย</string>
+    <string name="more_zoom_caption">ขยาย / ย่อหน้าเว็บ</string>
+
+    <!-- Browser menu sheet entries -->
+    <string name="drawer_tabs">แท็บ</string>
+    <string name="drawer_send_to_car">ส่งไปที่รถ</string>
+    <string name="drawer_back">ย้อนกลับ</string>
+    <string name="drawer_reload">โหลดใหม่</string>
+    <string name="drawer_forward">ไปหน้าถัดไป</string>
+    <string name="drawer_bookmarks">บุ๊กมาร์ก</string>
+    <string name="drawer_settings">ตั้งค่า</string>
+    <string name="drawer_more">เพิ่มเติม</string>
+    <string name="drawer_request_desktop">ขอเวอร์ชันเดสก์ท็อป</string>
+    <string name="drawer_fullscreen">เต็มหน้าจอ</string>
+    <string name="drawer_split">แบ่งจอ</string>
+    <string name="drawer_new_tab">แท็บใหม่</string>
+    <string name="drawer_start_page">หน้าเริ่มต้น</string>
+    <string name="drawer_history">ประวัติ</string>
+    <string name="drawer_downloads">ดาวน์โหลด</string>
+    <string name="drawer_bookmark">บุ๊กมาร์ก</string>
+    <string name="drawer_find">ค้นหา</string>
+    <string name="drawer_copy_url">คัดลอก URL</string>
+    <string name="drawer_paste_and_go">วางแล้วไป</string>
+    <string name="drawer_external">แอปอื่น</string>
+    <string name="drawer_zoom_in">ขยาย</string>
+    <string name="drawer_zoom_out">ย่อ</string>
+    <string name="drawer_agent">Agent</string>
+    <string name="drawer_media">มีเดีย</string>
+    <string name="drawer_now_playing">กำลังเล่น</string>
+    <string name="drawer_library">คลัง</string>
+    <string name="drawer_clear_data">ล้างข้อมูล</string>
+    <string name="drawer_about">เกี่ยวกับ</string>
+    <string name="drawer_get_from_car">ดึงจากจอรถ</string>
+    <string name="drawer_support">สนับสนุน</string>
+    <string name="drawer_licenses">สัญญาอนุญาต</string>
+    <string name="drawer_github">GitHub</string>
+    <string name="drawer_exit">ออก</string>
+    <string name="drawer_clear">ล้าง</string>
+    <string name="drawer_search">ค้นหา</string>
+    <string name="drawer_address">ที่อยู่เว็บ</string>
+
+    <!-- Browser downloads -->
+    <string name="download_https_only">รองรับเฉพาะดาวน์โหลดผ่าน HTTPS</string>
+    <string name="download_start_failed">เริ่มดาวน์โหลดไม่สำเร็จ</string>
+    <string name="download_started">กำลังดาวน์โหลด %1$s</string>
+    <string name="download_status_successful">เสร็จแล้ว</string>
+    <string name="download_status_failed">ไม่สำเร็จ</string>
+    <string name="download_status_paused">หยุดชั่วคราว</string>
+    <string name="download_status_pending">รอคิว</string>
+    <string name="download_status_running">กำลังดาวน์โหลด</string>
+
+    <!-- A page asking for the device location -->
+    <string name="geo_title">ขอใช้ตำแหน่ง</string>
+    <string name="geo_message">อนุยาตให้ %1$s ใช้ตำแหน่ง (GPS) ของคุณหรือไม่</string>
+    <string name="geo_allow">อนุมัติ</string>
+    <string name="geo_deny">ไม่อนุมัติ</string>
+    <string name="geo_permission_denied">ไม่ได้รับสิทธิ์ตำแหน่ง เปิดได้ที่ การตั้งค่า &gt; แอป &gt; AutoBridge</string>
+
+    <!-- Phone browser: the "Send to car" sheet -->
+    <string name="send_section_current_page">หน้าปัจจุบัน</string>
+    <string name="send_section_or_type">หรือพิมพ์ URL / คำค้นหา</string>
+    <string name="send_section_search_engine">เครื่องมือค้นหา</string>
+    <string name="send_section_queue">คิวเล่นถัดไป (%1$d)</string>
+    <string name="send_current_page_action">ส่งหน้าปัจจุบันไปที่รถ</string>
+    <string name="send_input_hint">เพลง bodyslam ล่าสุด หรือ youtube.com</string>
+    <string name="send_clear_text">ล้างข้อความ</string>
+    <string name="send_search_youtube">ค้นหาบน YouTube</string>
+    <string name="send_search_google">ค้นหาบน Google</string>
+    <string name="send_now_title">ส่งไปที่รถ</string>
+    <string name="send_now_caption">ส่งไปที่หน้าจอรถทันที</string>
+    <string name="send_queue_title">เพิ่มในคิว</string>
+    <string name="send_queue_caption">เล่นต่อเมื่อเพลงนี้จบ</string>
+    <string name="send_queue_remove">เอาออกจากคิว</string>
+    <string name="send_queue_clear">ล้างคิว</string>
+
+    <!-- Dialog buttons shared across the app -->
+    <string name="action_cancel">ยกเลิก</string>
+    <string name="action_save">บันทึก</string>
+    <string name="action_close">ปิด</string>
+    <string name="action_clear">ล้าง</string>
+    <string name="action_reset">รีเซ็ต</string>
+    <string name="action_delete">ลบ</string>
+    <string name="action_search">ค้นหา</string>
+    <string name="action_next">ถัดไป</string>
+    <string name="action_previous">ก่อนหน้า</string>
+    <string name="action_sign_in">เข้าสู่ระบบ</string>
+
+    <!-- Phone browser: page chrome, confirmations and dialogs -->
+    <string name="browser_page_load_failed">โหลดหน้านี้ไม่สำเร็จ\nแตะเพื่อลองใหม่</string>
+    <string name="browser_fab_description">เมนูเบราว์เซอร์ (ลากเพื่อย้ายปุ่ม)</string>
+    <string name="browser_nothing_to_queue">ยังไม่มีหน้าหรือคำค้นให้เพิ่ม</string>
+    <string name="browser_already_queued">มีอยู่ในคิวแล้ว</string>
+    <plurals name="browser_queued">
+        <item quantity="other">เพิ่มในคิวแล้ว · %1$d รายการ</item>
+    </plurals>
+    <string name="browser_queue_cleared">ล้างคิวแล้ว</string>
+    <string name="browser_nothing_to_send">ยังไม่มีหน้าหรือคำค้นให้ส่ง</string>
+    <string name="browser_not_connected">ยังไม่ได้เชื่อมต่อ Android Auto</string>
+    <string name="browser_sent_to_car">ส่งไปที่จอรถแล้ว</string>
+    <string name="browser_sent_to_car_resumed">ส่งไปที่จอรถแล้ว · เล่นต่อที่ %1$s</string>
+    <string name="browser_open_car_browser_first">เปิด Browser บน Android Auto ก่อน</string>
+    <string name="browser_cannot_open_browser">เปิดเบราว์เซอร์ไม่ได้</string>
+    <string name="browser_url_copied">คัดลอก URL แล้ว</string>
+    <string name="browser_clipboard_empty">คลิปบอร์ดว่าง</string>
+    <string name="browser_cannot_open_licenses">เปิดสัญญาอนุญาตไม่ได้</string>
+    <string name="browser_nothing_to_bookmark">ยังไม่มีหน้าให้บันทึก</string>
+    <string name="browser_bookmark_saved">บันทึกบุ๊กมาร์กแล้ว</string>
+    <string name="browser_bookmark_failed">บันทึกไม่สำเร็จ</string>
+    <string name="browser_bookmark_removed">ลบบุ๊กมาร์กแล้ว</string>
+    <string name="browser_home_page_set">ตั้งค่าหน้าแรกแล้ว</string>
+    <string name="browser_invalid_url">URL ไม่ถูกต้อง</string>
+    <string name="browser_reset_permissions_message">ล้างสิทธิ์ที่เว็บไซต์เคยได้รับ (เช่น ตำแหน่งที่ตั้ง) เว็บจะถามใหม่ครั้งถัดไป</string>
+    <string name="browser_permissions_reset">รีเซ็ตสิทธิ์แล้ว</string>
+    <string name="browser_delete_site_data_message">ลบคุกกี้และข้อมูลเว็บที่เก็บไว้ในเครื่อง (ประวัติและบุ๊กมาร์กจะไม่ถูกลบ)</string>
+    <string name="browser_site_data_deleted">ลบคุกกี้และข้อมูลเว็บแล้ว</string>
+    <string name="browser_ua_custom_selected">✓ กำหนดเอง… (%1$s)</string>
+    <string name="browser_ua_custom">กำหนดเอง…</string>
+    <string name="browser_ua_custom_title">User-Agent กำหนดเอง</string>
+    <string name="browser_ua_invalid">User-Agent ไม่ถูกต้อง (ว่าง, ยาวเกิน 512 ตัว หรือมีขึ้นบรรทัดใหม่)</string>
+    <string name="browser_address_hint_idle">URL / ค้นหา</string>
+    <string name="browser_find_title">ค้นหาในหน้า</string>
+    <string name="browser_clear_data_title">ล้างข้อมูลการท่องเว็บ</string>
+    <string name="browser_clear_data_message">ล้างแคช คุกกี้ ที่เก็บข้อมูลเว็บ และประวัติ (บุ๊กมาร์กจะไม่ถูกลบ)</string>
+    <string name="browser_data_cleared">ล้างข้อมูลแล้ว</string>
+    <string name="browser_no_downloads">ยังไม่มีไฟล์ที่ดาวน์โหลด</string>
+    <string name="browser_downloads_title">ดาวน์โหลด</string>
+    <string name="browser_downloads_clear_list">ล้างรายการ</string>
+    <string name="browser_no_bookmarks">ยังไม่มีบุ๊กมาร์ก</string>
+    <string name="browser_bookmarks_title">บุ๊กมาร์ก (กดค้างเพื่อลบ)</string>
+    <string name="browser_no_history">ยังไม่มีประวัติการเข้าชม</string>
+    <string name="browser_history_title">ประวัติ (กดค้างเพื่อลบ)</string>
+    <string name="browser_history_clear_all">ล้างทั้งหมด</string>
+    <string name="browser_history_cleared">ล้างประวัติแล้ว</string>
+    <string name="browser_signin_title">เข้าสู่ระบบ</string>
+    <string name="browser_signin_message">เพื่อความปลอดภัย ผู้ให้บริการนี้ไม่อนุญาตให้ล็อกอินในเบราว์เซอร์ที่ฝังอยู่ในแอปอื่น</string>
+    <string name="browser_resumed_from_queue">เล่นต่อจากคิว</string>
+
+    <!-- Entertainment screen: the parked-only content launcher -->
+    <string name="ent_playback_failed">เล่นไม่ได้: %1$s — ตรวจ URL หรือเลือกแหล่งอื่น</string>
+    <string name="ent_hint_web">ค้นหาเว็บบนจอรถ หรือวาง HTTPS URL</string>
+    <string name="ent_hint_youtube">ค้นหา YouTube หรือวาง HTTPS URL</string>
+    <string name="ent_btn_web">เว็บ</string>
+    <string name="ent_btn_video">TV / วิดีโอ</string>
+    <string name="ent_btn_voice">เสียง</string>
+    <string name="ent_btn_open_browser">เปิด Browser</string>
+    <string name="ent_btn_favorites">โปรด</string>
+    <string name="ent_btn_save">บันทึก</string>
+    <string name="ent_btn_resume">เล่นต่อ</string>
+    <string name="ent_btn_file">ไฟล์</string>
+    <string name="ent_btn_back">ย้อนกลับ</string>
+    <string name="ent_btn_previous">ก่อนหน้า</string>
+    <string name="ent_btn_play_pause">เล่น / พัก</string>
+    <string name="ent_btn_next">ถัดไป</string>
+    <string name="ent_auto_resume">เปิดรายการล่าสุดเมื่อกลับมาจอด (ขณะหน้านี้เปิดอยู่)</string>
+    <string name="ent_player_connect_failed">เชื่อมต่อเครื่องเล่นไม่สำเร็จ ลองเปิดหน้านี้ใหม่</string>
+    <string name="ent_need_valid_url">ใช้ HTTPS URL ที่ถูกต้อง</string>
+    <string name="ent_wait_for_ready">รอหน้า Entertainment พร้อมใช้งาน</string>
+    <string name="ent_need_url_for_browser">กรอก HTTPS URL ก่อนเปิด Browser</string>
+    <string name="ent_browser_failed">เปิด Browser ไม่สำเร็จ — ตรวจว่ามี Browser และใช้ HTTPS URL</string>
+    <string name="ent_connecting_retry">กำลังเชื่อมต่อเครื่องเล่น ลองอีกครั้ง</string>
+    <string name="ent_empty_audio">โหมดเสียง\n\nควบคุมเล่น / พัก ผ่านการแจ้งเตือนหรือปุ่มสื่อ\nวิดีโอและเว็บเปิดได้เมื่อโหมดและรถอนุญาต</string>
+    <string name="ent_empty_parked">AutoBridge\n\nYouTube · TV · Web\n\nจอดแล้ว เลือกเนื้อหาจากปุ่มด้านบน</string>
+    <string name="ent_status_parked_web">AutoBridge • YouTube / Web • จอดแล้ว</string>
+    <string name="ent_empty_video">AutoBridge Video\n\nจอดแล้ว วิดีโอพร้อมเล่น</string>
+    <string name="ent_status_parked_video">AutoBridge • Video • จอดแล้ว</string>
+    <string name="ent_empty_audio_locked">AutoBridge Audio\n\nเสียงยังเล่นต่อได้ แม้ฟีเจอร์วิดีโอจะถูกล็อก</string>
+    <string name="ent_status_audio">AutoBridge • Audio</string>
+    <string name="ent_status_connecting">กำลังเชื่อมต่อ MediaSession…</string>
+    <string name="ent_no_recent">ยังไม่มีรายการล่าสุด</string>
+    <string name="ent_open_before_saving">เปิดเนื้อหาก่อนบันทึก</string>
+    <string name="ent_favorite_saved">บันทึกรายการโปรดแล้ว</string>
+    <string name="ent_no_favorites">ยังไม่มีรายการโปรด</string>
+    <string name="ent_favorites_title">รายการโปรด</string>
+    <string name="ent_voice_prompt">ค้นหา YouTube</string>
+    <string name="ent_no_voice_service">ไม่พบบริการค้นหาด้วยเสียงบนโทรศัพท์</string>
+    <string name="ent_unsupported_file">เลือกไฟล์เสียงหรือวิดีโอที่รองรับ</string>
+
+    <!-- Settings navigation: the root list, Advanced and About -->
+    <string name="settings_title">ตั้งค่า</string>
+    <string name="settings_group_display">การแสดงผลและการควบคุม</string>
+    <string name="settings_display_mirror">การแสดงผลและมิเรอร์</string>
+    <string name="settings_display_mirror_caption">ตัวเรนเดอร์ การหมุนจอ และเต็มหน้าจอ</string>
+    <string name="settings_input_touch">การสัมผัสและการป้อนข้อมูล</string>
+    <string name="settings_input_touch_caption">ระบบสัมผัสและสิทธิ์ที่ต้องใช้</string>
+    <string name="settings_group_car">รถและแอป</string>
+    <string name="settings_car_connection">รถและการเชื่อมต่อ</string>
+    <string name="settings_car_connection_caption">Android Auto บลูทูธ และการเริ่มต้น</string>
+    <string name="settings_app_profiles">โปรไฟล์แต่ละแอป</string>
+    <string name="settings_app_profiles_caption">การแสดงผลและเสียงแยกตามแอป</string>
+    <string name="settings_group_features">ฟีเจอร์</string>
+    <string name="settings_video">วิดีโอ</string>
+    <string name="settings_video_caption">เครื่องเล่น เลย์เอาต์ สัดส่วนภาพ และคุณภาพภาพ</string>
+    <string name="settings_youtube">YouTube</string>
+    <string name="settings_youtube_caption">SponsorBlock และคุณภาพการเล่น</string>
+    <string name="settings_group_advanced">ขั้นสูง</string>
+    <string name="settings_advanced">ขั้นสูง</string>
+    <string name="settings_advanced_caption">เครื่องมือวินิจฉัยและดีบัก</string>
+    <string name="settings_group_about">เกี่ยวกับ</string>
+    <string name="settings_about">เกี่ยวกับ</string>
+    <string name="settings_about_caption">เวอร์ชัน สัญญาอนุญาต และการสนับสนุน</string>
+    <string name="advanced_subtitle">เครื่องมือสำหรับนักพัฒนา</string>
+    <string name="advanced_diagnostics">การวินิจฉัย</string>
+    <string name="advanced_diagnostics_caption">บันทึก รายงานข้อขัดข้อง และเหตุการณ์มิเรอร์</string>
+    <string name="advanced_debug">ดีบัก</string>
+    <string name="advanced_debug_caption">สถานะภายในของระบบ</string>
+    <string name="advanced_storage">ที่เก็บข้อมูล</string>
+    <string name="advanced_storage_caption">ล้างแคชหรือรีเซ็ตข้อมูลแอป</string>
+    <string name="advanced_debug_subtitle">สถานะภายใน</string>
+    <string name="about_support">สนับสนุน AutoBridge</string>
+    <string name="about_support_caption">เลี้ยงกาแฟผู้พัฒนา</string>
+    <string name="about_licenses">สัญญาอนุญาตโอเพนซอร์ส</string>
+    <string name="about_licenses_caption">ดูสัญญาอนุญาตจากผู้พัฒนาอื่น</string>
+    <string name="about_github">GitHub</string>
+    <string name="about_version">เวอร์ชัน</string>
+    <string name="about_no_browser">ไม่พบเบราว์เซอร์ในเครื่อง</string>
+    <string name="home_tagline">รถคุณ ฉลาดขึ้น</string>
+    <string name="voice_no_recognizer">ไม่พบระบบแปลงเสียงเป็นข้อความบนโทรศัพท์นี้</string>
+
+    <!-- Settings > Input & Touch -->
+    <string name="input_subtitle">ระบบสัมผัสและสิทธิ์ที่ต้องใช้</string>
+    <string name="input_section_touch">การสัมผัส</string>
+    <string name="input_touch_control">การควบคุมด้วยการสัมผัส</string>
+    <string name="input_touch_control_caption">บริการช่วยการเข้าถึงที่ใช้ส่งการสัมผัสจากจอรถ</string>
+    <string name="input_open">เปิด</string>
+    <string name="input_backend">ระบบรับการสัมผัส</string>
+    <string name="input_backend_caption">ใช้บริการช่วยการเข้าถึงเป็นหลัก Shizuku เป็นตัวเลือกเสริม</string>
+    <string name="input_real_touch">ส่งการสัมผัสจริง</string>
+    <string name="input_real_touch_caption">ต้องมีสิทธิ์ระดับสูง และ Android Auto ต้องส่งข้อมูลตำแหน่งนิ้วดิบมาให้</string>
+    <string name="input_shizuku_enabled">เปิดการสัมผัสผ่าน Shizuku แล้ว</string>
+    <string name="input_shizuku_denied">ไม่ได้รับสิทธิ์ Shizuku</string>
+
+    <!-- Applications and App Profiles -->
+    <string name="apps_title">แอปพลิเคชัน</string>
+    <string name="apps_subtitle">แตะ ☆ เพื่อเพิ่มในรายการโปรด</string>
+    <string name="apps_search_hint">ค้นหาแอป…</string>
+    <string name="apps_filter_favorites">รายการโปรด · %1$d</string>
+    <string name="apps_filter_all">ทุกแอป · %1$d</string>
+    <string name="apps_browse_all">ดูแอปทั้งหมด</string>
+    <string name="profiles_subtitle">การแสดงผลและเสียงแยกตามแอป</string>
+    <string name="profiles_applied_on_launch">การตั้งค่าแยกตามแอปจะมีผลเมื่อเปิดแอปนั้น</string>
+    <string name="profiles_empty">ยังไม่มีแอปโปรด กดดาวที่แอปในหน้าแอปพลิเคชันเพื่อตั้งโปรไฟล์ที่นี่</string>
+    <string name="profiles_removed_from_favorites">เอาออกจากรายการโปรดแล้ว</string>
+    <string name="profiles_added_to_favorites">เพิ่มในรายการโปรดแล้ว</string>
+    <string name="profiles_smart_mode">โหมดอัตโนมัติ</string>
+    <string name="profiles_use_profile">ใช้โปรไฟล์นี้</string>
+    <string name="profiles_launch_failed">เปิด %1$s ไม่ได้</string>
+    <string name="profiles_section_launch">การเปิดและมิเรอร์</string>
+    <string name="profiles_auto_mirror">มิเรอร์อัตโนมัติ</string>
+    <string name="profiles_auto_mirror_caption">บันทึกคำสั่งมิเรอร์ไว้ แต่ยังต้องอนุญาตการบันทึกหน้าจอทุกครั้ง</string>
+    <string name="profiles_auto_fullscreen">เต็มหน้าจออัตโนมัติ</string>
+    <string name="profiles_auto_fullscreen_caption">จำค่าที่ตั้งไว้ แต่แถบระบบขึ้นอยู่กับแอปปลายทาง</string>
+    <string name="profiles_force_landscape">บังคับแนวนอน</string>
+    <string name="profiles_force_landscape_caption">ล็อกโทรศัพท์เป็นแนวนอนขณะใช้โปรไฟล์นี้</string>
+    <string name="profiles_needs_write_settings">ต้องให้สิทธิ์แก้ไขการตั้งค่าระบบก่อนจึงจะบังคับแนวนอนได้</string>
+    <string name="profiles_scale">การย่อขยาย</string>
+    <string name="profiles_stored_preference">ค่าที่บันทึกไว้</string>
+    <string name="profiles_resolution">ความละเอียด</string>
+    <string name="profiles_frame_rate">อัตราเฟรม</string>
+    <string name="profiles_stored_renderer_target">ค่าเป้าหมายของตัวเรนเดอร์ที่บันทึกไว้</string>
+    <string name="profiles_fps_system">ตามระบบ</string>
+    <string name="profiles_section_touch_audio">การสัมผัสและเสียง</string>
+    <string name="profiles_touch_backend_caption">ระบบรับการสัมผัสที่ต้องการ: %1$s</string>
+    <string name="profiles_audio_output">เอาต์พุตเสียง</string>
+    <string name="profiles_audio_output_caption">ค่าโหมดอัตโนมัติที่บันทึกไว้</string>
+    <string name="profiles_keep_screen_on">เปิดหน้าจอค้างไว้</string>
+    <string name="profiles_keep_screen_on_caption">ค่านี้ถูกใช้โดยไปป์ไลน์การแสดงผลที่ทำงานอยู่</string>
+    <string name="profiles_reset">รีเซ็ตโปรไฟล์</string>
+    <string name="profiles_reset_done">รีเซ็ตโปรไฟล์เป็นค่าเริ่มต้นแล้ว</string>
+
+    <!-- Settings > Display & Mirror -->
+    <string name="mirror_subtitle">ตัวเรนเดอร์ การหมุนจอ และเต็มหน้าจอ</string>
+    <string name="mirror_mirroring">▣   กำลังมิเรอร์</string>
+    <string name="mirror_start">▣   เริ่มมิเรอร์</string>
+    <string name="mirror_section_display">การแสดงผล</string>
+    <string name="mirror_resolution">ความละเอียด</string>
+    <string name="mirror_resolution_caption">จอรถที่เชื่อมต่อเป็นผู้กำหนดขนาด</string>
+    <string name="mirror_value_auto">อัตโนมัติ</string>
+    <string name="mirror_frame_rate">อัตราเฟรม</string>
+    <string name="mirror_renderer">ไปป์ไลน์ตัวเรนเดอร์</string>
+    <string name="mirror_renderer_caption">SELF_DRAWN ให้แอปควบคุมการแปลงภาพและการนับเฟรมเอง</string>
+    <string name="mirror_rotation">การหมุนภาพมิเรอร์</string>
+    <string name="mirror_landscape_global">ล็อกแนวนอนทั้งเครื่อง</string>
+    <string name="mirror_landscape_global_caption">วิธีสำรองแบบเดิม: หมุนทั้งโทรศัพท์ แนะนำให้ใช้ SELF_DRAWN ร่วมกับการหมุนภาพมิเรอร์</string>
+    <string name="mirror_crop">การตัดขอบภาพ</string>
+    <string name="mirror_crop_caption">รักษาสัดส่วนภาพเดิม</string>
+    <string name="mirror_section_advanced">ขั้นสูง</string>
+    <string name="mirror_head_unit_profile">โปรไฟล์จอรถ</string>
+    <string name="mirror_screen_off">พฤติกรรมเมื่อปิดหน้าจอ</string>
+    <string name="mirror_panel_off">ปิดแผงจอเมื่อหน้าจอหรี่อัตโนมัติ</string>
+    <string name="mirror_panel_off_caption">ปิดเฉพาะแผงจอแบบ ScreenOnAuto ต้องมี Shizuku หรือ root ถ้าไม่มีจะใช้การหรี่จอแทน</string>
+    <string name="mirror_dim_now">หรี่จอโทรศัพท์เดี๋ยวนี้</string>
+    <string name="mirror_apply">ใช้งาน</string>
+    <string name="mirror_start_first">เริ่มมิเรอร์ก่อน</string>
+    <string name="mirror_restore_screen">คืนค่าหน้าจอโทรศัพท์</string>
+    <string name="mirror_restore_screen_caption">คืนค่าการแสดงผลและเริ่มจับเวลาหรี่จออัตโนมัติใหม่</string>
+    <string name="mirror_restore">คืนค่า</string>
+    <string name="mirror_display_restored">คืนค่าหน้าจอโทรศัพท์ตามที่ตั้งไว้แล้ว</string>
+    <string name="mirror_section_automation">การทำงานอัตโนมัติ</string>
+    <string name="mirror_prevent_sleep">ไม่ให้หน้าจอดับ</string>
+    <string name="mirror_prevent_sleep_caption">เปิดแผงจอโทรศัพท์ค้างไว้ขณะแชร์หน้าจอ</string>
+    <string name="mirror_auto_dim">หรี่จออัตโนมัติ</string>
+    <string name="mirror_auto_dim_caption">หรี่จอเมื่อไม่มีการใช้งาน การแตะจอรถจะเริ่มจับเวลาใหม่</string>
+    <string name="mirror_stop_on_disconnect">หยุดเมื่อตัดการเชื่อมต่อ</string>
+    <string name="mirror_stop_on_disconnect_caption">หยุดแชร์หน้าจอเมื่อ Android Auto หลุดการเชื่อมต่อเกิน 2 วินาที</string>
+    <string name="mirror_scale_mode">โหมดการย่อขยาย</string>
+    <string name="mirror_started">เริ่มมิเรอร์แล้ว</string>
+    <string name="mirror_capture_denied">ไม่ได้รับสิทธิ์บันทึกหน้าจอ</string>
+    <string name="mirror_stop_before_renderer">หยุดมิเรอร์ก่อนเปลี่ยนตัวเรนเดอร์</string>
+    <string name="mirror_renderer_unavailable">ไปป์ไลน์ตัวเรนเดอร์นี้ใช้ไม่ได้</string>
+    <string name="mirror_needs_self_drawn">เปลี่ยนตัวเรนเดอร์เป็น SELF_DRAWN เพื่อให้การหมุนมีผลกับจอรถเท่านั้น</string>
+    <string name="mirror_needs_write_settings">ต้องให้สิทธิ์แก้ไขการตั้งค่าระบบก่อนจึงจะล็อกแนวนอนทั้งเครื่องได้</string>
+    <string name="mirror_landscape_failed">เปลี่ยนการล็อกแนวนอนไม่ได้</string>
+    <string name="mirror_global_lock_warning">การล็อกทั้งเครื่องจะหมุนโทรศัพท์ด้วย ใช้ SELF_DRAWN ร่วมกับการหมุนภาพมิเรอร์เพื่อให้โทรศัพท์ตั้งตรง</string>
+
+    <!-- Settings > Advanced > Diagnostics -->
+    <string name="diag_subtitle">บันทึก ข้อขัดข้อง และเหตุการณ์มิเรอร์</string>
+    <string name="diag_section_log">บันทึกของแอป</string>
+    <string name="diag_no_log">ยังไม่มีรายการบันทึก</string>
+    <string name="diag_copy">คัดลอกข้อมูลวินิจฉัย</string>
+    <string name="diag_clipboard_unavailable">ใช้คลิปบอร์ดไม่ได้</string>
+    <string name="diag_copied">คัดลอกข้อมูลวินิจฉัยแล้ว</string>
+    <string name="diag_no_share_target">ไม่มีแอปที่แชร์ไปได้</string>
+    <string name="favorite">รายการโปรด</string>
+    <string name="diag_no_mirror_events">ยังไม่มีเหตุการณ์มิเรอร์</string>
+    <string name="diag_section_mirror_events">เหตุการณ์มิเรอร์</string>
+
+    <!-- Car Settings screen -->
+    <string name="car_settings_title">ตั้งค่า</string>
+    <string name="car_settings_section_general">ทั่วไป</string>
+    <string name="car_settings_section_driving">โหมดขับขี่</string>
+    <string name="car_settings_section_mirror">มิเรอร์และการแสดงผล</string>
+    <string name="car_settings_resume_session">เปิดการใช้งานล่าสุดต่อ</string>
+    <string name="car_settings_resume_session_caption">คืนค่าหน้าจอและสถานะล่าสุดเมื่อเปิดแอป</string>
+    <string name="car_settings_driving_ui">เปิด UI สำหรับขณะขับขี่</string>
+    <string name="car_settings_driving_ui_caption">ปุ่มใหญ่ขึ้นและลดรายละเอียดขณะรถวิ่ง</string>
+    <string name="car_settings_larger_controls">ปุ่มขนาดใหญ่</string>
+    <string name="car_settings_prefer_voice">เน้นสั่งงานด้วยเสียง</string>
+    <string name="car_settings_reduce_clutter">ลดรายละเอียดบนหน้าจอ</string>
+    <string name="car_settings_display_profile">โปรไฟล์การแสดงผล</string>
+    <string name="car_settings_profile_toast">โปรไฟล์: %1$s</string>
+    <string name="car_settings_renderer">ไปป์ไลน์ตัวเรนเดอร์</string>
+    <string name="car_settings_rotation">การหมุนภาพมิเรอร์</string>
+    <string name="car_settings_scale">โหมดการย่อขยาย</string>
+    <string name="car_settings_landscape_global">ล็อกแนวนอนทั้งเครื่อง</string>
+    <string name="car_settings_landscape_on">เปิดอยู่: หมุนทั้งโทรศัพท์</string>
+    <string name="car_settings_landscape_off">ปิดอยู่</string>
+    <string name="car_settings_touch">การควบคุมด้วยการสัมผัส</string>
+    <string name="car_settings_screen_off">พฤติกรรมเมื่อปิดหน้าจอ</string>
+    <string name="car_settings_screen_off_panel">ปิดแผงจอเมื่อหรี่อัตโนมัติ (ต้องมีสิทธิ์พิเศษ)</string>
+    <string name="car_settings_screen_off_follows">หยุดตามหน้าจอโทรศัพท์</string>
+    <string name="car_settings_screen_off_partial">ไม่รับประกัน ภาพต้นทางยังขึ้นกับหน้าจอโทรศัพท์</string>
+    <string name="car_settings_screen_off_unavailable">ใช้ไม่ได้ ต้องมีจอแสดงผลแยก</string>
+    <string name="car_settings_diagnostics">การวินิจฉัย</string>
+    <string name="car_settings_diagnostics_caption">FPS สด เวลาทำงาน การเชื่อมต่อใหม่ และสถิติเฟรม</string>
+    <string name="car_settings_log">บันทึกของแอป</string>
+    <string name="car_settings_log_caption">เหตุการณ์ล่าสุด รวมถึงจุดที่เปิดหน้าจอไม่สำเร็จ</string>
+    <string name="car_settings_speed_safety">ความปลอดภัยตามความเร็ว</string>
+    <string name="car_settings_stop_mirroring">หยุดมิเรอร์</string>
+    <string name="car_settings_stop_mirroring_caption">หยุดแชร์หน้าจอและออกจาก AutoBridge</string>
+    <string name="car_vehicle_parked">จอดอยู่</string>
+    <string name="car_vehicle_moving">กำลังวิ่ง (ถูกบล็อก)</string>
+    <string name="car_vehicle_unknown">ไม่ทราบสถานะ (ถูกบล็อก)</string>
+    <string name="car_pipeline_auto_mirror">AUTO_MIRROR • ไม่คัดลอกบัฟเฟอร์ ใช้ได้แค่ FIT</string>
+    <string name="car_pipeline_self_drawn">SELF_DRAWN • แอปควบคุมการหมุนและย่อขยายเอง</string>
+    <string name="car_pipeline_own_content">OWN_CONTENT • ใช้ไม่ได้</string>
+    <string name="car_rotation_auto">อัตโนมัติ</string>
+    <string name="car_rotation_phone">ตามโทรศัพท์</string>
+    <string name="car_rotation_portrait">แนวตั้ง</string>
+    <string name="car_rotation_landscape">แนวนอน</string>
+    <string name="car_rotation_car_only">%1$s • เฉพาะจอรถ</string>
+    <string name="car_rotation_needs_self_drawn">%1$s • ต้องใช้ SELF_DRAWN</string>
+    <string name="car_scale_needs_self_drawn">FIT • ต้องใช้ SELF_DRAWN</string>
+    <string name="car_stop_before_renderer">หยุดมิเรอร์ก่อนเปลี่ยนตัวเรนเดอร์</string>
+    <string name="car_renderer_unavailable">ไปป์ไลน์ตัวเรนเดอร์นี้ใช้ไม่ได้</string>
+    <string name="car_needs_self_drawn_rotation">เปลี่ยนตัวเรนเดอร์เป็น SELF_DRAWN เพื่อให้การหมุนมีผลกับจอรถเท่านั้น</string>
+    <string name="car_scale_requires_self_drawn">%1$s ต้องใช้ตัวเรนเดอร์ SELF_DRAWN</string>
+
+    <!-- Car Browser settings and its pickers -->
+    <string name="car_selected">%1$s  •  เลือกอยู่</string>
+    <string name="car_browser_settings_title">ตั้งค่าเบราว์เซอร์</string>
+    <string name="car_browser_section_controls">การควบคุมในแอป</string>
+    <string name="car_browser_section_blocking">การบล็อกเนื้อหา</string>
+    <string name="car_browser_section_identity">ตัวตนของเบราว์เซอร์</string>
+    <string name="car_browser_hide_url_bar">ซ่อนแถบ URL</string>
+    <string name="car_browser_hide_url_bar_caption">เอาแถบที่อยู่ออกทั้งหมด ใช้ปุ่มลอยเปิดเมนูแทน</string>
+    <string name="car_browser_always_url_bar">แสดงแถบ URL ตลอด</string>
+    <string name="car_browser_always_url_bar_caption">ค้างแถบที่อยู่ไว้บนหน้าเว็บ ไม่ให้ค่อย ๆ จางหาย</string>
+    <string name="car_browser_always_fab">แสดงปุ่มลอยตลอด</string>
+    <string name="car_browser_always_fab_caption">ค้างปุ่มไว้บนหน้าจอ ไม่ให้จางหายไปพร้อมแถบเครื่องมือ</string>
+    <string name="car_browser_fab_action">การทำงานของปุ่มลอย</string>
+    <string name="car_browser_fab_left">วางปุ่มลอยไว้ซ้าย</string>
+    <string name="car_browser_fab_left_caption">ย้ายปุ่มไปมุมซ้ายล่างแทนมุมขวาล่าง</string>
+    <string name="car_browser_split">แบ่งหน้าจอ</string>
+    <string name="car_browser_reverse_music">เล่นเพลงต่อตอนเข้าเกียร์ถอย</string>
+    <string name="car_browser_reverse_music_caption">ไม่หยุดเพลงเพราะเสียงเตือนถอยรถ และไม่หยุดเพราะสายโทรเข้าหรือเสียงนำทางด้วย</string>
+    <string name="car_browser_block_ads">บล็อกโฆษณาและตัวติดตาม</string>
+    <string name="car_browser_block_ads_caption">ตัดการเรียกไปยังโฮสต์โฆษณาที่รู้จัก ไม่รวมโฆษณาในวิดีโอ YouTube เพราะใช้โฮสต์เดียวกับตัววิดีโอ</string>
+    <string name="car_browser_skip_yt_ads">ข้ามโฆษณาวิดีโอ YouTube</string>
+    <string name="car_browser_skip_yt_ads_caption">กดข้าม หรือเลื่อนผ่านโฆษณาที่ข้ามไม่ได้ YouTube อาจตรวจพบและขอให้ปิดฟีเจอร์นี้</string>
+    <string name="car_browser_identity">ตัวตนของเบราว์เซอร์</string>
+    <string name="car_browser_identity_custom_summary">%1$s · %2$s</string>
+    <string name="car_browser_side_right">วางหน้าเสริมไว้ขวา</string>
+    <string name="car_browser_side_right_caption">วางหน้าเสริม (แผนที่) ไว้ด้านขวาแทนด้านซ้าย</string>
+    <string name="car_split_desc_single">หน้าเดียวเต็มจอ</string>
+    <string name="car_split_desc_half">หน้าเสริมและหน้าหลัก กว้างเท่ากัน</string>
+    <string name="car_split_desc_forty_sixty">หน้าเสริม 40% หน้าหลัก 60%</string>
+    <string name="car_split_desc_sixty_five">หน้าหลัก 65% (วิดีโอ) หน้าเสริม 35% (แผนที่)</string>
+    <string name="car_split_desc_portrait_landscape">หน้าเสริมแนวตั้ง (แผนที่) + หน้าหลัก 16:9 (วิดีโอ)</string>
+    <string name="car_ua_mobile">มือถือ</string>
+    <string name="car_ua_mobile_caption">ใช้ตัวตนแบบเบราว์เซอร์บนโทรศัพท์</string>
+    <string name="car_ua_desktop">เดสก์ท็อป</string>
+    <string name="car_ua_desktop_caption">ขอเว็บไซต์เวอร์ชันเดสก์ท็อป</string>
+    <string name="car_ua_custom">กำหนดเอง</string>
+    <string name="car_ua_custom_empty">กรอกข้อความ User-Agent ที่ต้องการ</string>
+    <string name="car_ua_presets">ค่าที่ตั้งไว้ให้</string>
+    <string name="car_ua_presets_caption">Windows, macOS, iPad, iPhone… โดยไม่ต้องพิมพ์</string>
+    <string name="car_ua_presets_title">ค่า User-Agent ที่ตั้งไว้ให้</string>
+    <string name="car_ua_invalid">กรอก User-Agent ที่ถูกต้อง</string>
+    <string name="car_ua_input_hint">User-Agent กำหนดเอง</string>
+
+    <!-- Car IPTV screens -->
+    <string name="car_iptv_tv">ทีวี</string>
+    <string name="car_iptv_radio">วิทยุ</string>
+    <string name="car_iptv_no_source">ยังไม่มีแหล่ง%1$s\nเลือกรายการสาธารณะฟรี หรือเพิ่มบัญชี Xtream หรือเพลย์ลิสต์ M3U จากโทรศัพท์</string>
+    <string name="car_iptv_open_on_phone">เปิดบนโทรศัพท์</string>
+    <string name="car_iptv_recent">เล่นล่าสุด</string>
+    <string name="car_iptv_loading">กำลังโหลด…</string>
+    <string name="car_iptv_tap_to_load">แตะเพื่อโหลด</string>
+    <string name="car_iptv_loading_named">กำลังโหลด %1$s…</string>
+    <string name="car_iptv_continue_on_phone">ทำต่อบนโทรศัพท์</string>
+    <string name="car_iptv_phone_screen_failed">เปิดหน้าจอบนโทรศัพท์ไม่ได้</string>
+    <string name="car_iptv_show_more">ดูเพิ่ม</string>
+    <string name="car_iptv_opens_in_browser">เปิดในเบราว์เซอร์</string>
+    <string name="car_iptv_favourite">รายการโปรด</string>
+    <string name="car_iptv_catchup">ดูย้อนหลัง</string>
+    <string name="car_iptv_tap_to_play">แตะเพื่อเล่น</string>
+    <string name="car_iptv_no_episodes">ไม่มีตอนให้เล่น</string>
+    <string name="car_iptv_no_stream">รายการนี้ไม่มีที่อยู่สตรีม</string>
+    <string name="car_iptv_connecting">กำลังเชื่อมต่อเครื่องเล่น…</string>
+    <plurals name="car_iptv_items">
+        <item quantity="other">%1$d รายการ</item>
+    </plurals>
+    <plurals name="car_iptv_entries">
+        <item quantity="other">%1$d รายการ</item>
+    </plurals>
+
+    <!-- Car Media screen -->
+    <string name="car_media_title">มีเดีย</string>
+    <string name="car_media_default_title">AutoBridge Media</string>
+    <string name="car_media_playing">กำลังเล่น</string>
+    <string name="car_media_paused">หยุดอยู่</string>
+    <string name="car_media_session_connected">เชื่อมต่อเซสชันแล้ว</string>
+    <string name="car_media_session_connecting">กำลังเชื่อมต่อ MediaSession…</string>
+    <string name="car_media_session_error">ใช้เซสชันไม่ได้: %1$s</string>
+    <string name="car_media_session_unknown_error">ข้อผิดพลาดที่ไม่ทราบสาเหตุ</string>
+    <string name="car_media_session_disconnected">เซสชันหลุดการเชื่อมต่อ</string>
+    <string name="car_media_sample">เล่นเพลย์ลิสต์ตัวอย่าง</string>
+    <string name="car_media_sample_caption">แจ๊ส เพลงโปรเกรสซีฟ และสื่อสำหรับทดสอบ</string>
+    <string name="car_media_pause">หยุดชั่วคราว</string>
+    <string name="car_media_resume">เล่นต่อ</string>
+    <string name="car_media_play_pause_caption">เล่น/หยุด ผ่าน MediaSession</string>
+    <string name="car_media_previous">เพลงก่อนหน้า</string>
+    <string name="car_media_previous_caption">รายการก่อนหน้าในคิวปัจจุบัน</string>
+    <string name="car_media_next">เพลงถัดไป</string>
+    <string name="car_media_next_caption">รายการถัดไปในคิวปัจจุบัน</string>
+    <string name="car_media_stop">หยุด</string>
+    <string name="car_media_stop_caption">หยุดเล่นเสียง</string>
+    <string name="car_media_artist_state">%1$s • %2$s</string>
+    <string name="car_media_state_connection">%1$s • %2$s</string>
+
+    <!-- Car Diagnostics screen -->
+    <string name="car_diag_title">การวินิจฉัย</string>
+    <string name="car_diag_lowest_resolution">%1$s • ความละเอียดต่ำสุดของ Android Auto ถ้ารถรองรับ ให้ไปที่ Android Auto ▸ การตั้งค่านักพัฒนา ▸ ความละเอียดวิดีโอ ▸ 720p แล้วเชื่อมต่อใหม่</string>
+    <string name="car_diag_car_display">จอรถ</string>
+    <string name="car_diag_pipeline">ไปป์ไลน์</string>
+    <string name="car_diag_mirror">มิเรอร์</string>
+    <string name="car_diag_active">ทำงานอยู่</string>
+    <string name="car_diag_inactive">ไม่ทำงาน</string>
+    <string name="car_diag_uptime">เวลาทำงาน</string>
+    <string name="car_diag_source_size">ขนาดภาพต้นทาง</string>
+    <string name="car_diag_reconnects">จำนวนการเชื่อมต่อใหม่</string>
+    <string name="car_diag_frame_rate">อัตราเฟรม</string>
+    <string name="car_diag_os_owned">ไม่มีข้อมูล • AUTO_MIRROR ระบบปฏิบัติการควบคุมเอง</string>
+    <string name="car_diag_frames">เฟรม (เรนเดอร์/ตก/จับ)</string>
+    <string name="car_diag_last_latency">ดีเลย์ครั้งล่าสุด</string>
+    <string name="car_diag_not_applicable">ไม่มีข้อมูล</string>
+    <string name="car_diag_audio">เสียง</string>
+    <string name="car_diag_audio_caption">โฟกัสเสียง เส้นทางเสียง ระดับเสียง เซสชัน และสถานะเสียงจากเว็บ</string>
+    <string name="car_diag_refresh">รีเฟรช</string>
+    <string name="car_diag_refresh_caption">อ่านข้อมูลวินิจฉัยใหม่</string>
+    <string name="car_diag_clear">ล้างเหตุการณ์</string>
+    <string name="car_diag_clear_caption">ล้างบัฟเฟอร์เหตุการณ์วินิจฉัย</string>
+    <string name="car_diag_cleared">ล้างเหตุการณ์วินิจฉัยแล้ว</string>
+    <string name="car_diag_measuring">กำลังวัด…</string>
+
+    <!-- On-device media: the kind shown as an item's second line -->
+    <string name="media_kind_audio">เสียง</string>
+    <string name="media_kind_media">สื่อ</string>
+    <string name="media_kind_photo">รูปภาพ</string>
+
+    <!-- Car mirror control screen -->
+    <string name="car_mirror_vehicle">สถานะรถ</string>
+    <string name="car_mirror_speed_safety">ความปลอดภัยตามความเร็ว</string>
+    <string name="car_mirror_speed_safety_caption">แตะเพื่อขอหรือรีเฟรชสิทธิ์ CAR_SPEED</string>
+    <string name="car_mirror_status">มิเรอร์</string>
+    <string name="car_mirror_phone_display">หน้าจอโทรศัพท์</string>
+    <string name="car_mirror_dim_now">หรี่จอโทรศัพท์เดี๋ยวนี้</string>
+    <string name="car_mirror_dim_now_caption">ใช้การปิดแผงจอถ้าเปิดไว้ ถ้าไม่ก็หรี่จอโทรศัพท์</string>
+    <string name="car_mirror_restore">คืนค่าหน้าจอโทรศัพท์</string>
+    <string name="car_mirror_restore_caption">คืนค่าแผงจอและเริ่มจับเวลาหรี่จออัตโนมัติใหม่</string>
+    <string name="car_mirror_apps">แอป</string>
+    <string name="car_mirror_apps_caption">เปิดแอปที่ใช้บ่อย</string>
+    <string name="car_mirror_media">มีเดีย</string>
+    <string name="car_mirror_media_caption">เพลย์ลิสต์และการควบคุม MediaSession</string>
+    <string name="car_mirror_settings">ตั้งค่า</string>
+    <string name="car_mirror_settings_caption">ตั้งค่ามิเรอร์ การสัมผัส และความปลอดภัย</string>
+    <string name="car_mirror_phone_back">ย้อนกลับบนโทรศัพท์</string>
+    <string name="car_mirror_phone_home">หน้าหลักบนโทรศัพท์</string>
+    <string name="car_mirror_phone_recents">แอปล่าสุดบนโทรศัพท์</string>
+    <string name="car_mirror_send_to_phone">ส่งไปที่โทรศัพท์</string>
+    <string name="car_mirror_needs_input_backend">เปิดบริการช่วยการเข้าถึงของ AutoBridge หรือ Shizuku เพื่อใช้การควบคุม</string>
+
+    <!-- Car media library -->
+    <string name="car_lib_sample_audio">เสียงตัวอย่าง • MP3</string>
+    <string name="car_lib_sample_video">วิดีโอตัวอย่าง • MP4</string>
+    <string name="car_lib_adaptive_video">วิดีโอปรับคุณภาพอัตโนมัติ • MPD</string>
+    <string name="car_lib_open_video_link">เปิดลิงก์วิดีโอ</string>
+    <string name="car_lib_open_video_link_caption">สตรีมแบบ MP4, HLS หรือ DASH</string>
+    <string name="car_lib_video_stream">สตรีมวิดีโอ</string>
+    <string name="car_lib_invalid_video_link">กรอกลิงก์วิดีโอแบบ HTTPS ที่ถูกต้อง</string>
+    <string name="car_lib_open_file">เปิดไฟล์จากโทรศัพท์</string>
+    <string name="car_lib_open_file_caption">เลือกไฟล์เสียงหรือวิดีโอจากที่เก็บข้อมูลในเครื่อง</string>
+    <string name="car_lib_now_playing">กำลังเล่น</string>
+    <string name="car_lib_video">วิดีโอ</string>
+    <string name="car_lib_music">เพลง</string>
+    <string name="car_lib_media_library">คลังสื่อ</string>
+    <string name="car_lib_section_library">คลัง</string>
+    <string name="car_lib_section_audio">เสียง</string>
+    <string name="car_lib_section_video">วิดีโอ</string>
+    <string name="car_lib_connecting_session">กำลังเชื่อมต่อเซสชันสื่อ…</string>
+    <string name="car_lib_nothing_playing">ไม่มีอะไรเล่นอยู่</string>
+    <string name="car_lib_playing">กำลังเล่น</string>
+    <string name="car_lib_paused">หยุดชั่วคราว</string>
+    <string name="car_lib_title_state">%1$s • %2$s</string>
+    <string name="car_lib_pick_on_phone">เลือกไฟล์บนโทรศัพท์</string>
+    <string name="car_lib_picker_failed">เปิดตัวเลือกไฟล์สื่อไม่ได้</string>
+
+    <!-- Car on-device library -->
+    <string name="car_folders">โฟลเดอร์</string>
+    <string name="car_playlists">เพลย์ลิสต์</string>
+    <string name="car_gallery">แกลเลอรี</string>
+    <string name="car_all_music">เพลงทั้งหมด</string>
+    <string name="car_needs_media_access">%1$s ต้องได้รับสิทธิ์เข้าถึงสื่อ\nให้สิทธิ์บนโทรศัพท์แล้วกลับมาอีกครั้ง</string>
+    <string name="car_nothing_found">ไม่พบอะไรในเครื่องนี้</string>
+    <string name="car_nothing_to_play">ไม่มีอะไรให้เล่นที่นี่</string>
+    <string name="car_photos_phone_only">ดูรูปภาพได้บนโทรศัพท์เท่านั้น</string>
+    <string name="car_connecting_player">กำลังเชื่อมต่อเครื่องเล่น…</string>
+
+    <!-- Car video disclaimer -->
+    <string name="car_disclaimer_header">ก่อนรับชม</string>
+    <string name="car_disclaimer_title">การดูวิดีโอขณะขับรถเป็นอันตราย</string>
+    <string name="car_disclaimer_body">ควรดูวิดีโอเฉพาะเมื่อจอดรถแล้ว AutoBridge จะบล็อกการเล่นขณะรถวิ่ง แต่คุณเป็นผู้รับผิดชอบในการจอดรถในที่ปลอดภัยก่อนรับชม</string>
+    <string name="car_disclaimer_confirm_title">การกดต่อไปถือว่าคุณยืนยันว่า</string>
+    <string name="car_disclaimer_confirm_body">รถจอดอยู่ และคุณจะไม่ดูวิดีโอขณะขับรถ</string>
+    <string name="car_disclaimer_continue">เข้าใจแล้ว ดำเนินการต่อ</string>
+
+    <!-- Car mirror intro -->
+    <string name="car_intro_title">มิเรอร์</string>
+    <string name="car_intro_fit">พอดีหน้าจอ</string>
+    <string name="car_intro_fit_on">เปิด • มีขอบดำ</string>
+    <string name="car_intro_fit_off">ปิด • เต็มพื้นที่</string>
+    <string name="car_intro_quality">คุณภาพ</string>
+    <string name="car_intro_quality_value">สูง (1080p)</string>
+    <string name="car_intro_start">เริ่มมิเรอร์</string>
+    <string name="car_intro_running">กำลังมิเรอร์อยู่</string>
+    <string name="car_intro_start_caption">แสดงหน้าจอโทรศัพท์บนจอรถ</string>
+    <string name="car_intro_phone_screen">หน้าจอโทรศัพท์</string>
+    <string name="car_intro_needs_consent">อนุญาตการแชร์หน้าจอบนโทรศัพท์เพื่อเริ่มมิเรอร์</string>
+    <string name="car_intro_active">กำลังมิเรอร์</string>
+    <string name="car_intro_ready">พร้อมมิเรอร์</string>
+    <string name="car_intro_connected_caption">เชื่อมต่อโทรศัพท์แล้ว • แสดงหน้าจอโทรศัพท์บน Android Auto</string>
+    <string name="car_intro_disconnected_caption">แสดงหน้าจอโทรศัพท์บน Android Auto</string>
+
+    <!-- Car bookmarks -->
+    <string name="car_bookmarks_title">จัดการบุ๊กมาร์ก</string>
+    <string name="car_bookmarks_tap_to_remove">แตะเพื่อลบ • %1$s</string>
+    <string name="car_bookmarks_removed">ลบ %1$s แล้ว</string>
+    <string name="car_bookmarks_add">เพิ่ม %1$s</string>
+    <string name="car_bookmarks_added">เพิ่ม %1$s แล้ว</string>
+    <string name="car_bookmarks_invalid">ที่อยู่ไม่ถูกต้อง</string>
+
+    <!-- Car Media Center -->
+    <string name="car_media_center_tab_music">เพลง</string>
+    <string name="car_media_center_tab_video">วิดีโอ</string>
+    <string name="car_media_center_tab_streaming">สตรีมมิง</string>
+    <string name="car_media_center_now_playing">กำลังเล่น</string>
+    <string name="car_media_center_open_stream">เปิดลิงก์สตรีม</string>
+    <string name="car_media_center_open_stream_caption">URL แบบ MP4, HLS หรือ DASH</string>
+    <string name="car_media_center_open_browser">เปิดในเบราว์เซอร์</string>
+    <string name="car_media_center_open_browser_caption">สำหรับเว็บเพลเยอร์ (YouTube ฯลฯ)</string>
+    <string name="car_media_center_invalid_link">กรอกลิงก์ HTTPS ที่ถูกต้อง</string>
+    <string name="car_media_center_video_stream">สตรีมวิดีโอ</string>
+
+    <!-- Car Now Playing -->
+    <string name="car_now_playing_title">กำลังเล่น</string>
+    <string name="car_now_playing_next">ถัดไป</string>
+
+    <!-- Shared launcher / apps / quick-launch -->
+    <string name="car_could_not_launch">เปิด %1$s ไม่สำเร็จ</string>
+
+    <!-- Car Launcher -->
+    <string name="car_launcher_title">AutoBridge</string>
+    <string name="car_launcher_web_video">เว็บ / วิดีโอ</string>
+
+    <!-- Car Apps grid -->
+    <string name="car_apps_title">แอปด่วน</string>
+    <string name="car_apps_empty_title">ยังไม่มีแอปด่วน</string>
+    <string name="car_apps_empty_text">เปิดใช้งานแอปบนโทรศัพท์</string>
+
+    <!-- Car Quick Launch list -->
+    <string name="car_quicklaunch_title">เปิดด่วน</string>
+    <string name="car_quicklaunch_manage_title">จัดการเปิดด่วน</string>
+    <string name="car_quicklaunch_internal">การทำงาน AutoBridge</string>
+    <string name="car_quicklaunch_app_subtitle">แอป • %1$s</string>
+    <string name="car_quicklaunch_empty">ยังไม่มีทางลัด — แตะเพิ่ม</string>
+    <string name="car_quicklaunch_move_up">เลื่อนขึ้น</string>
+    <string name="car_quicklaunch_move_down">เลื่อนลง</string>
+    <string name="car_quicklaunch_remove">ลบ</string>
+
+    <!-- Car Browser screen -->
+    <string name="car_browser_title">เบราว์เซอร์</string>
+    <string name="car_browser_park_to_browse">จอดรถก่อนจึงจะเปิดเว็บได้</string>
+    <string name="car_browser_user_agent_label">User-Agent: %1$s</string>
+    <string name="car_browser_no_external">ไม่มีเบราว์เซอร์ภายนอก</string>
+
+    <!-- Car Browser search -->
+    <string name="car_browser_search_go">ไป</string>
+    <string name="car_browser_search_hint">พิมพ์ URL หรือคำค้นหา</string>
+
+    <!-- Car Browser bookmarks list -->
+    <string name="car_browser_bookmarks_title">บุ๊กมาร์ก</string>
+    <string name="car_browser_bookmarks_empty">บันทึกหน้าด้วยไอคอนดาวในแถบเครื่องมือเบราว์เซอร์</string>
+    <string name="car_browser_bookmarks_removed">ลบ %1$s แล้ว</string>
+    <string name="car_browser_bookmarks_previous">บุ๊กมาร์กก่อนหน้า</string>
+    <string name="car_browser_bookmarks_more">บุ๊กมาร์กเพิ่มเติม</string>
+
+    <!-- Car Browser history list -->
+    <string name="car_browser_history_title">ประวัติ</string>
+    <string name="car_browser_history_empty">หน้าที่คุณเข้าชมจะแสดงที่นี่</string>
+    <string name="car_browser_history_previous">ก่อนหน้า</string>
+    <string name="car_browser_history_more">เพิ่มเติม</string>
+
+    <!-- Car Browser downloads list -->
+    <string name="car_browser_downloads_title">ดาวน์โหลด</string>
+    <string name="car_browser_downloads_empty">ไฟล์ที่คุณดาวน์โหลดจะแสดงที่นี่</string>
+    <string name="car_browser_downloads_previous">ก่อนหน้า</string>
+    <string name="car_browser_downloads_more">เพิ่มเติม</string>
+
+    <!-- Car Favorites -->
+    <string name="car_favorites_title">รายการโปรด</string>
+    <string name="car_favorites_empty">กดดาวที่ช่องหรือบันทึกเว็บเพื่อให้แสดงที่นี่</string>
+    <string name="car_favorites_channels">ช่อง</string>
+    <string name="car_favorites_web">เว็บ</string>
+
+    <!-- Car Log screen -->
+    <string name="car_log_title">บันทึกแอป</string>
+    <string name="car_log_empty">ยังไม่มีรายการบันทึก</string>
+    <string name="car_log_previous">ก่อนหน้า</string>
+    <string name="car_log_more">เพิ่มเติม</string>
+    <string name="car_log_cleared">ล้างบันทึกแล้ว</string>
+
+    <!-- Car Recent activity -->
+    <string name="car_recent_title">ล่าสุด</string>
+    <string name="car_recent_empty">ยังไม่มีกิจกรรมล่าสุด</string>
+
+    <!-- Car Weather -->
+    <string name="car_weather_title">สภาพอากาศ</string>
+    <string name="car_weather_no_location">ยังไม่ได้ตั้งสถานที่\nเปิดสภาพอากาศบนโทรศัพท์เพื่อค้นหาเมือง</string>
+    <string name="car_weather_now">ตอนนี้</string>
+    <string name="car_weather_feels_like">รู้สึกเหมือน</string>
+    <string name="car_weather_today">วันนี้</string>
+    <string name="car_weather_wind">ลม</string>
+    <string name="car_weather_loading">กำลังโหลด…</string>
+    <string name="car_weather_tap_refresh">แตะรีเฟรชเพื่อโหลด</string>
+
+    <!-- Car Video -->
+    <string name="car_video_title">วิดีโอ</string>
+    <string name="car_video_park_to_watch">จอดรถก่อนจึงจะดูวิดีโอได้</string>
+
+    <!-- Car Mirror intro -->
+    <string name="car_mirror_intro_title">มิเรอร์</string>
+    <string name="car_mirror_intro_fit">พอดีหน้าจอ</string>
+    <string name="car_mirror_intro_fit_on">เปิด • มีขอบดำ</string>
+    <string name="car_mirror_intro_fit_off">ปิด • เต็มจอ</string>
+    <string name="car_mirror_intro_quality">คุณภาพ</string>
+    <string name="car_mirror_intro_quality_value">สูง (1080p)</string>
+    <string name="car_mirror_intro_start">เริ่มมิเรอร์</string>
+    <string name="car_mirror_intro_running">กำลังมิเรอร์อยู่</string>
+    <string name="car_mirror_intro_start_caption">แสดงหน้าจอโทรศัพท์บนรถ</string>
+    <string name="car_mirror_intro_grant">อนุญาตการแชร์หน้าจอบนโทรศัพท์เพื่อเริ่มมิเรอร์</string>
+    <string name="car_mirror_intro_status_active">กำลังมิเรอร์</string>
+    <string name="car_mirror_intro_status_ready">พร้อมมิเรอร์</string>
+    <string name="car_mirror_intro_device_connected">เชื่อมต่อโทรศัพท์แล้ว • แสดงโทรศัพท์บน Android Auto</string>
+    <string name="car_mirror_intro_device_disconnected">แสดงหน้าจอโทรศัพท์บน Android Auto</string>
+
+    <!-- Car Home dashboard -->
+    <string name="car_home_more">เพิ่มเติม</string>
+    <string name="car_home_speed_safety_enabled">เปิดระบบความปลอดภัยตามความเร็วแล้ว</string>
+    <string name="car_home_speed_permission_denied">ไม่ได้รับสิทธิ์อ่านความเร็ว</string>
+
+    <!-- Home sections, shared by the phone launcher and the car dashboard -->
+    <string name="section_tv">ทีวี</string>
+    <string name="section_tv_caption">ช่องสดและวิดีโอตามสั่ง</string>
+    <string name="section_radio">วิทยุ</string>
+    <string name="section_radio_caption">สตรีมเสียง</string>
+    <string name="section_web">เว็บเบราว์เซอร์</string>
+    <string name="section_web_caption">ท่องเว็บแบบเต็มหน้า</string>
+    <string name="section_youtube">YouTube</string>
+    <string name="section_youtube_caption">วิดีโอบนเว็บ</string>
+    <string name="section_youtube_music">YouTube Music</string>
+    <string name="section_youtube_music_caption">สตรีมเพลง</string>
+    <string name="section_streaming">สตรีมมิง</string>
+    <string name="section_streaming_caption">Kids, TikTok, Twitch และอื่น ๆ</string>
+    <string name="section_folders">โฟลเดอร์</string>
+    <string name="section_folders_caption">สื่อในเครื่อง</string>
+    <string name="section_favorites">รายการโปรด</string>
+    <string name="section_favorites_caption">ช่องและหน้าเว็บที่บันทึกไว้</string>
+    <string name="section_playlists">เพลย์ลิสต์</string>
+    <string name="section_playlists_caption">เพลงของคุณ</string>
+    <string name="section_gallery">แกลเลอรี</string>
+    <string name="section_gallery_caption">รูปภาพและคลิป</string>
+    <string name="section_weather">สภาพอากาศ</string>
+    <string name="section_weather_caption">สภาพอากาศปัจจุบัน</string>
+    <string name="section_mirror">มิเรอร์</string>
+    <string name="section_mirror_caption">แชร์หน้าจอนี้</string>
+    <string name="section_apps">แอป</string>
+    <string name="section_apps_caption">เปิดใช้งานด่วน</string>
+    <string name="section_remote">รีโมต</string>
+    <string name="section_remote_caption">ควบคุมหน้าจอรถ</string>
+    <string name="section_settings">ตั้งค่า</string>
+    <string name="section_settings_caption">โหมดและการวินิจฉัย</string>
+
+    <!-- Car video disclaimer -->
+    <string name="car_disclaimer_cancel">ยกเลิก</string>
+
+    <!-- Car web entry -->
+    <string name="car_web_title">เบราว์เซอร์และรายการโปรด</string>
+    <string name="car_web_open_browser">เปิดเบราว์เซอร์</string>
+    <string name="car_web_open_browser_caption">กรอกที่อยู่เว็บหรือค้นหาบนเว็บ</string>
+    <string name="car_web_youtube">YouTube</string>
+    <string name="car_web_youtube_caption">เปิด m.youtube.com บนจอรถ</string>
+
+    <!-- Car streaming list -->
+    <string name="car_streaming_title">สตรีมมิง</string>
+
+    <!-- Car display info -->
+    <string name="car_display_none">— (เปิด Browser หรือ Mirror ก่อน)</string>
+
+    <!-- Car audio diagnostics -->
+    <string name="car_audio_title">เสียง</string>
+    <string name="car_audio_focus">โฟกัสเสียง</string>
+    <string name="car_audio_device">อุปกรณ์</string>
+    <string name="car_audio_route">เส้นทางเสียง</string>
+    <string name="car_audio_usage">ประเภทการใช้งาน</string>
+    <string name="car_audio_content">ประเภทเนื้อหา</string>
+    <string name="car_audio_state">สถานะ</string>
+    <string name="car_audio_volume">ระดับเสียง</string>
+    <string name="car_audio_session">เซสชัน</string>
+    <string name="car_audio_bluetooth">บลูทูธ</string>
+    <string name="car_audio_latency">ดีเลย์เอาต์พุต</string>
+    <string name="car_audio_web">เสียงจากเว็บ</string>
+    <string name="car_audio_outputs">เอาต์พุตที่พบ</string>
+    <string name="car_audio_playing">กำลังเล่น</string>
+    <string name="car_audio_paused">หยุดชั่วคราว</string>
+    <string name="car_audio_stopped">หยุดแล้ว</string>
+    <string name="car_audio_active">ทำงานอยู่</string>
+    <string name="car_audio_inactive">ไม่ทำงาน</string>
+    <string name="car_audio_a2dp_on">เปิด A2DP</string>
+    <string name="car_audio_a2dp_off">ปิด</string>
+    <string name="car_audio_latency_hint">~%1$d มิลลิวินาที (ค่าประมาณ)</string>
+    <string name="car_audio_not_reported">ไม่มีรายงาน</string>
+    <string name="car_audio_reading">กำลังอ่าน…</string>
+    <string name="car_audio_no_outputs">ไม่มีรายงาน</string>
+    <string name="car_audio_web_line">%1$s • %2$s — %3$s</string>
+    <string name="car_audio_web_no_metadata">%1$s • ไม่มีข้อมูลเพลง</string>
+    <string name="car_audio_volume_fixed">%1$d%% • ถูกกำหนดโดยเส้นทางเสียง</string>
+    <string name="car_audio_volume_index">%1$d%%  (%2$d/%3$d)</string>
+
+    <!-- Car find in page -->
+    <string name="car_find_title">ค้นหาในหน้า</string>
+    <string name="car_find_no_matches">ไม่พบผลลัพธ์</string>
+    <string name="car_find_hint">พิมพ์คำที่ต้องการค้นหาในหน้านี้</string>
+    <string name="car_find_quoted">\"%1$s\"</string>
+    <string name="car_find_header_counter">ค้นหา  •  %1$s</string>
+
+    <!-- Car driving mode -->
+    <string name="car_driving_title">AutoBridge • โหมดขับขี่</string>
+    <string name="car_driving_browser">เบราว์เซอร์</string>
+    <string name="car_driving_mirror">มิเรอร์</string>
+    <string name="car_driving_media">มีเดีย</string>
+    <string name="car_driving_agent">Agent</string>
+    <string name="car_driving_resume">เล่นต่อ</string>
+    <string name="car_driving_recent">ล่าสุด</string>
+
+    <!-- Car "More" list -->
+    <string name="car_more_title">เพิ่มเติม</string>
+    <string name="car_more_title_paged">เพิ่มเติม · %1$d</string>
+    <string name="car_more_media_center">ศูนย์สื่อ</string>
+    <string name="car_more_bookmarks">จัดการบุ๊กมาร์ก</string>
+    <string name="car_more_agent">Agent</string>
+    <string name="car_more_recent">ล่าสุด</string>
+    <string name="car_more_driving">โหมดขับขี่</string>
+
+    <!-- Car home dashboard title -->
+    <string name="car_home_title_paged">AutoBridge · %1$d</string>
+
+    <!-- Car Now Playing and Media Center -->
+    <string name="car_now_play">เล่น</string>
+    <string name="car_now_pause">หยุดชั่วคราว</string>
+    <string name="car_now_next">ถัดไป</string>
+    <string name="car_now_disconnected">เซสชันสื่อหลุดการเชื่อมต่อ • แตะเล่นเพื่อเริ่มเพลย์ลิสต์ตัวอย่าง</string>
+    <string name="car_now_ready">พร้อมแล้ว • แตะเล่นเพื่อเริ่มเพลย์ลิสต์ตัวอย่าง</string>
+    <string name="car_recent_kind_music">เพลง</string>
+    <string name="car_recent_kind_video">วิดีโอ</string>
+    <string name="car_recent_kind_streaming">สตรีมมิง</string>
+    <string name="car_recent_stream">สตรีม</string>
+
+    <!-- Car video player -->
+    <string name="car_video_source_failed">เล่นแหล่งนี้ไม่ได้ กลับไปที่คลังแล้วลองวิดีโออื่น</string>
+    <string name="car_video_player_failed">เชื่อมต่อเครื่องเล่นสื่อไม่ได้ กลับไปที่คลังแล้วลองอีกครั้ง</string>
+    <string name="car_video_output_unavailable">การเชื่อมต่อนี้ไม่รองรับการแสดงวิดีโอ</string>
+    <string name="car_video_home">หน้าหลัก</string>
+    <string name="car_video_back_10">ถอยหลัง 10 วินาที</string>
+    <string name="car_video_forward_10">เดินหน้า 10 วินาที</string>
+
+    <!-- Car mirror surface -->
+    <string name="car_mirror_controls">การควบคุม</string>
+    <string name="car_speed_enabled">เปิดความปลอดภัยตามความเร็วแล้ว</string>
+    <string name="car_speed_denied">ไม่ได้รับสิทธิ์อ่านความเร็ว</string>
+    <string name="car_speed_kmh">%1$d กม./ชม.</string>
+    <string name="car_mirror_attach_failed">เชื่อมต่อพื้นผิวมิเรอร์ของ Android Auto ไม่ได้</string>
+    <string name="car_mirror_needs_input_touch">เปิดบริการช่วยการเข้าถึงของ AutoBridge หรือ Shizuku เพื่อใช้การสัมผัส</string>
+
+    <!-- Bridge error classes -->
+
+</resources>

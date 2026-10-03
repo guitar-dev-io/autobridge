@@ -2,6 +2,7 @@ package dev.autobridge.library
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -12,6 +13,7 @@ import android.widget.Toast
 import dev.autobridge.entertainment.ContentKind
 import dev.autobridge.entertainment.EntertainmentActivity
 import dev.autobridge.entertainment.WebBookmarkStore
+import dev.autobridge.i18n.AppLocale
 import dev.autobridge.iptv.IptvCatalog
 import dev.autobridge.iptv.IptvCatalogData
 import dev.autobridge.iptv.IptvDirectory
@@ -79,6 +81,11 @@ class LibraryActivity : Activity() {
 
     /** Rendered pages, most recent last. Back pops one; popping the root finishes the Activity. */
     private val stack = ArrayDeque<() -> Unit>()
+
+    /** Applies the Settings &gt; Language choice; see [AppLocale.rebase]. */
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AppLocale.rebase(newBase))
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

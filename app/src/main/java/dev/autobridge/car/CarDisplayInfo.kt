@@ -1,5 +1,8 @@
 package dev.autobridge.car
 
+import android.content.Context
+import dev.autobridge.R
+
 /**
  * The car surface geometry Android Auto last handed this app, for diagnostics.
  *
@@ -32,6 +35,8 @@ object CarDisplayInfo {
         maxOf(surface.width, surface.height) <= MIN_STREAM_LONG_EDGE &&
             minOf(surface.width, surface.height) <= MIN_STREAM_SHORT_EDGE
 
-    fun label(surface: Surface?): String =
-        surface?.let { "${it.width} x ${it.height} @ ${it.dpi} dpi" } ?: "— (open Browser or Mirror first)"
+    /** [context] resolves the "nothing connected yet" placeholder, which is shown to the user. */
+    fun label(context: Context, surface: Surface?): String =
+        surface?.let { "${it.width} x ${it.height} @ ${it.dpi} dpi" }
+            ?: context.getString(R.string.car_display_none)
 }

@@ -15,7 +15,7 @@ import dev.autobridge.R
  * buttons. Android Auto's own chrome (rail / bottom bar) lives outside this surface and is never
  * drawn or imitated here.
  */
-internal class HomeMenuRenderer(context: Context) {
+internal class HomeMenuRenderer(private val context: Context) {
     data class State(val focused: Int = -1, val pressed: Int = -1, val scroll: Float = 0f)
 
     private val logo: Drawable? = ContextCompat.getDrawable(context, R.drawable.ic_autobridge_launcher)
@@ -53,7 +53,7 @@ internal class HomeMenuRenderer(context: Context) {
                 state.focused -> HomeMenuCard.State.FOCUSED
                 else -> HomeMenuCard.State.NORMAL
             }
-            card.draw(canvas, bounds, item, layout, cardState)
+            card.draw(canvas, bounds, item, item.title(context), layout, cardState)
         }
         canvas.restore()
 

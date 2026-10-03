@@ -7,6 +7,8 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.annotation.StringRes
+import dev.autobridge.R
 
 /**
  * The secondary "More actions" sheet.
@@ -34,27 +36,32 @@ class MoreActionsSheet(
 ) {
     private val shell = BrowserSheetShell(activity, sizes)
 
-    /** One list entry. [chevron] marks rows that open another screen (History, Downloads, …). */
+    /**
+     * One list entry. [chevron] marks rows that open another screen (History, Downloads, …).
+     *
+     * The two texts are string *ids*: [rows] is a property of this sheet, built once, so holding
+     * the resolved text would pin whatever language was in force when the sheet was constructed.
+     */
     private data class Row(
         val action: DrawerAction,
         val glyph: String,
-        val title: String,
-        val subtitle: String,
+        @StringRes val titleRes: Int,
+        @StringRes val subtitleRes: Int,
         val chevron: Boolean,
     )
 
     private val rows = listOf(
-        Row(DrawerAction.RECEIVE_FROM_CAR, "◀", "Get from car", "ดึง URL จากจอรถมาที่โทรศัพท์", chevron = false),
-        Row(DrawerAction.FIND_IN_PAGE, "⌕", "Find in page", "ค้นหาข้อความในหน้าเว็บ", chevron = true),
-        Row(DrawerAction.COPY_URL, "⧉", "Copy URL", "คัดลอกลิงก์หน้าปัจจุบัน", chevron = false),
-        Row(DrawerAction.PASTE_AND_GO, "⎘", "Paste & go", "วางลิงก์แล้วเปิดหน้าเว็บ", chevron = false),
-        Row(DrawerAction.OPEN_EXTERNAL, "↗", "Open external", "เปิดลิงก์ในเบราว์เซอร์ภายนอก", chevron = true),
-        Row(DrawerAction.HOME, "⌂", "Start page", "ไปที่หน้าเริ่มต้น", chevron = false),
-        Row(DrawerAction.HISTORY, "↺", "History", "ประวัติการเข้าชม", chevron = true),
-        Row(DrawerAction.DOWNLOADS, "↓", "Downloads", "ไฟล์ที่ดาวน์โหลด", chevron = true),
-        Row(DrawerAction.SUPPORT, "☕", "Support AutoBridge", "สนับสนุนผู้พัฒนา (Buy Me a Coffee)", chevron = true),
-        Row(DrawerAction.LICENSES, "⚖", "Open-source licenses", "สัญญาอนุญาตโอเพนซอร์ส", chevron = true),
-        Row(DrawerAction.GITHUB, "⌥", "GitHub", "ซอร์สโค้ดบน GitHub", chevron = true),
+        Row(DrawerAction.RECEIVE_FROM_CAR, "◀", R.string.more_get_from_car, R.string.more_get_from_car_caption, chevron = false),
+        Row(DrawerAction.FIND_IN_PAGE, "⌕", R.string.more_find_in_page, R.string.more_find_in_page_caption, chevron = true),
+        Row(DrawerAction.COPY_URL, "⧉", R.string.more_copy_url, R.string.more_copy_url_caption, chevron = false),
+        Row(DrawerAction.PASTE_AND_GO, "⎘", R.string.more_paste_and_go, R.string.more_paste_and_go_caption, chevron = false),
+        Row(DrawerAction.OPEN_EXTERNAL, "↗", R.string.more_open_external, R.string.more_open_external_caption, chevron = true),
+        Row(DrawerAction.HOME, "⌂", R.string.more_start_page, R.string.more_start_page_caption, chevron = false),
+        Row(DrawerAction.HISTORY, "↺", R.string.more_history, R.string.more_history_caption, chevron = true),
+        Row(DrawerAction.DOWNLOADS, "↓", R.string.more_downloads, R.string.more_downloads_caption, chevron = true),
+        Row(DrawerAction.SUPPORT, "☕", R.string.more_support, R.string.more_support_caption, chevron = true),
+        Row(DrawerAction.LICENSES, "⚖", R.string.more_licenses, R.string.more_licenses_caption, chevron = true),
+        Row(DrawerAction.GITHUB, "⌥", R.string.more_github, R.string.more_github_caption, chevron = true),
     )
 
     fun show() {
@@ -77,14 +84,14 @@ class MoreActionsSheet(
             gravity = Gravity.CENTER
             textSize = shell.sp(AutoUiSizes.ICON_LARGE_DP)
             setTextColor(BrowserTheme.textPrimary)
-            contentDescription = "ย้อนกลับ"
+            contentDescription = activity.getString(R.string.browser_back)
             val side = sizes.dpInt(AutoUiSizes.SHEET_CLOSE_BUTTON_DP)
             background = shell.rounded(BrowserTheme.sheetCardBackground, side / 2f)
             layoutParams = LinearLayout.LayoutParams(side, side).apply { marginEnd = shell.pad() }
             setOnClickListener { shell.dismiss(); onBack?.invoke() }
         }
         val title = TextView(activity).apply {
-            text = "More actions"
+            text = activity.getString(R.string.more_title)
             textSize = shell.sp(AutoUiSizes.ICON_LARGE_DP * 0.9f)
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(BrowserTheme.textPrimary)
@@ -100,17 +107,18 @@ class MoreActionsSheet(
 
     private fun listRow(row: Row): View {
         val icon = circularIcon(row.glyph)
+        val title = activity.getString(row.titleRes)
         val texts = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             addView(TextView(activity).apply {
-                text = row.title
+                text = title
                 textSize = shell.sp(AutoUiSizes.ICON_SMALL_DP * 0.95f)
                 setTypeface(typeface, Typeface.BOLD)
                 setTextColor(BrowserTheme.textPrimary)
             })
-            if (row.subtitle.isNotBlank()) {
+            activity.getString(row.subtitleRes).takeIf { it.isNotBlank() }?.let { subtitle ->
                 addView(TextView(activity).apply {
-                    text = row.subtitle
+                    text = subtitle
                     maxLines = 1
                     ellipsize = android.text.TextUtils.TruncateAt.END
                     textSize = shell.sp(AutoUiSizes.ICON_SMALL_DP * 0.72f)
@@ -123,7 +131,7 @@ class MoreActionsSheet(
             gravity = Gravity.CENTER_VERTICAL
             background = shell.rounded(BrowserTheme.sheetCardBackground, shell.cornerRadius())
             setPadding(shell.pad(), 0, shell.pad(), 0)
-            contentDescription = row.title
+            contentDescription = title
             addView(icon)
             addView(texts, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
             if (row.chevron) {
@@ -157,13 +165,13 @@ class MoreActionsSheet(
         val texts = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             addView(TextView(activity).apply {
-                text = "Zoom"
+                text = activity.getString(R.string.more_zoom)
                 textSize = shell.sp(AutoUiSizes.ICON_SMALL_DP * 0.95f)
                 setTypeface(typeface, Typeface.BOLD)
                 setTextColor(BrowserTheme.textPrimary)
             })
             addView(TextView(activity).apply {
-                text = "ขยาย / ย่อหน้าเว็บ"
+                text = activity.getString(R.string.more_zoom_caption)
                 textSize = shell.sp(AutoUiSizes.ICON_SMALL_DP * 0.72f)
                 setTextColor(BrowserTheme.textSecondary)
             })

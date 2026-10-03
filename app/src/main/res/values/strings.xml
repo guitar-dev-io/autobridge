@@ -1,4 +1,1109 @@
 <resources>
-    <string name="app_name">AutoBridge</string>
+    <!-- The launcher label and the brand; the same word in every language. -->
+    <string name="app_name" translatable="false">AutoBridge</string>
     <string name="accessibility_description">Allows parked-only touch forwarding from the car display to the phone.</string>
+
+    <!-- Language picker (Settings &gt; Display &amp; control). The language names are endonyms —
+         each written in its own language — so they read the same whatever the UI language is and
+         are not translated. Adding a language means a res/values-&lt;tag&gt; directory, an entry in
+         res/xml/locales_config.xml, the resourceConfigurations set in app/build.gradle.kts, and an
+         AppLocale.OPTIONS entry pointing at a name added here. -->
+    <string name="settings_language">Language</string>
+    <string name="language_system">Device language</string>
+    <string name="language_en" translatable="false">English</string>
+    <string name="language_th" translatable="false">ไทย</string>
+
+    <!-- Projection foreground service notification -->
+    <string name="projection_notification_title">AutoBridge</string>
+    <string name="projection_notification_text">Screen projection session is active</string>
+    <string name="projection_notification_stop">Stop</string>
+    <string name="projection_channel_name">AutoBridge Projection</string>
+
+    <!-- Safety bypass toggle + notification -->
+    <string name="bypass_channel_name">AutoBridge Safety Bypass</string>
+    <string name="bypass_notification_title_on">Safety bypass ON</string>
+    <string name="bypass_notification_title_off">Safety bypass OFF</string>
+    <string name="bypass_notification_text_on">Parked/mode gate overridden. Features open in any vehicle state.</string>
+    <string name="bypass_notification_text_off">Stock safety gate restored.</string>
+    <string name="bypass_notification_action_turn_off">Turn off</string>
+    <string name="bypass_notification_action_turn_on">Turn on</string>
+    <string name="bypass_setting_title">Safety bypass</string>
+    <string name="bypass_setting_summary_on">On — parked/mode gate is overridden</string>
+    <string name="bypass_setting_summary_off">Off — stock parked/mode gate applies</string>
+    <string name="bypass_toast_on">Safety bypass enabled</string>
+    <string name="bypass_toast_off">Safety bypass disabled</string>
+
+    <!-- Agent spoken + toast confirmations. toast_* are read on screen, spoken_* are read aloud. -->
+    <string name="agent_toast_opening_browser">Opening Browser</string>
+    <string name="agent_spoken_opening_browser">Opening browser</string>
+    <string name="agent_toast_invalid_website">Please provide a valid website</string>
+    <string name="agent_spoken_invalid_website">That website was not found, please try again</string>
+    <string name="agent_toast_opening_url">Opening %1$s</string>
+    <string name="agent_toast_opening_mirror">Opening Mirror</string>
+    <string name="agent_spoken_opening_mirror">Opening mirror</string>
+    <string name="agent_toast_opening_media">Opening Media</string>
+    <string name="agent_spoken_opening_media">Opening media</string>
+    <string name="agent_toast_resuming_playback">Resuming playback</string>
+    <string name="agent_spoken_resuming_playback">Resuming</string>
+    <string name="agent_toast_recent_activity">Showing recent activity</string>
+    <string name="agent_spoken_recent_activity">Recent activity</string>
+    <string name="agent_toast_desktop_on">Desktop mode on for the browser</string>
+    <string name="agent_spoken_desktop_on">Desktop mode on</string>
+    <string name="agent_toast_desktop_off">Desktop mode off for the browser</string>
+    <string name="agent_spoken_desktop_off">Desktop mode off</string>
+    <string name="agent_toast_fullscreen_on">Browser fullscreen</string>
+    <string name="agent_spoken_fullscreen_on">Fullscreen</string>
+    <string name="agent_toast_fullscreen_off">Exit browser fullscreen</string>
+    <string name="agent_spoken_fullscreen_off">Exit fullscreen</string>
+    <string name="agent_spoken_searching">Searching</string>
+    <string name="agent_spoken_opening_host">Opening %1$s</string>
+    <string name="agent_prompt_say_command">Tell AutoBridge what to do</string>
+
+    <!-- Command history row labels (one per CommandType) -->
+    <string name="history_open_url">Open %1$s</string>
+    <string name="history_search_web">Search %1$s</string>
+    <string name="history_send_text">Send text: %1$s</string>
+    <string name="history_reload">Reload</string>
+    <string name="history_go_back">Back</string>
+    <string name="history_go_forward">Forward</string>
+    <string name="history_enter_fullscreen">Fullscreen</string>
+    <string name="history_exit_fullscreen">Exit fullscreen</string>
+    <string name="history_enable_desktop">Desktop mode on</string>
+    <string name="history_disable_desktop">Desktop mode off</string>
+    <string name="history_open_browser">Open Browser</string>
+    <string name="history_open_mirror">Open Mirror</string>
+    <string name="history_start_mirror">Start Mirror</string>
+    <string name="history_stop_mirror">Stop Mirror</string>
+    <string name="history_open_media">Open Media</string>
+    <string name="history_play_video">Send video to car: %1$s</string>
+    <string name="history_play">Play</string>
+    <string name="history_pause">Pause</string>
+    <string name="history_next">Next track</string>
+    <string name="history_previous">Previous track</string>
+    <string name="history_open_agent">Agent: %1$s</string>
+    <string name="history_open_home">Home</string>
+    <string name="history_open_settings">Settings</string>
+    <string name="history_focus_input">Focus input</string>
+
+    <!-- Control screen -->
+    <string name="control_title">Control</string>
+    <string name="control_history_action">History</string>
+    <string name="control_android_auto">Android Auto</string>
+    <string name="control_section_command_or_url">Command or URL</string>
+    <string name="control_command_placeholder">open google.com</string>
+    <string name="control_section_quick_actions">Quick Actions</string>
+    <string name="control_section_current_screen">Current Screen</string>
+    <string name="control_section_send_text">Send Text to Car</string>
+    <string name="control_send_text_placeholder">Type text to send</string>
+    <string name="control_send">Send</string>
+    <string name="control_auto_submit_hint">Press Enter automatically after sending</string>
+    <string name="control_result_sent">Command sent</string>
+    <string name="control_result_failed">Command failed</string>
+
+    <!-- Command history screen -->
+    <string name="history_title">History</string>
+    <string name="history_subtitle">Recent commands</string>
+    <string name="history_clear">Clear history</string>
+    <string name="history_empty">No commands yet.</string>
+
+    <!-- Agent &amp; Commands settings screen -->
+    <string name="agent_screen_title">Agent &amp; Commands</string>
+    <string name="agent_screen_subtitle">Commands, history and automation</string>
+    <string name="agent_section_commands">Commands</string>
+    <string name="agent_toggle_show_confirmation">Show command confirmation</string>
+    <string name="agent_toggle_show_confirmation_caption">Show the result after each command</string>
+    <string name="agent_toggle_haptic">Haptic feedback</string>
+    <string name="agent_toggle_haptic_caption">Vibrate when a command is sent</string>
+    <string name="agent_toggle_auto_submit">Auto submit text</string>
+    <string name="agent_toggle_auto_submit_caption">Press Enter after Send Text to Car</string>
+    <string name="agent_section_agent">Agent</string>
+    <string name="agent_toggle_prefer_agent">Prefer Agent for unknown text</string>
+    <string name="agent_toggle_prefer_agent_caption">Hand unrecognised text to the Agent</string>
+    <string name="agent_toggle_resume_last">Resume last feature</string>
+    <string name="agent_toggle_resume_last_caption">Reopen what was running last time</string>
+    <string name="agent_section_history">History</string>
+    <string name="agent_toggle_remember_history">Remember command history</string>
+    <string name="agent_toggle_remember_history_caption">Keep the last 20 commands</string>
+    <string name="agent_command_history">Command history</string>
+    <string name="agent_command_history_caption">View and re-run recent commands</string>
+
+    <!-- Results of a command sent from the phone to the car ([AutoBridgeCommandRouter]). Shown as
+         the confirmation on the car surface and recorded in the command history. -->
+    <string name="cmd_progress">Running command…</string>
+    <string name="cmd_error">Something went wrong: %1$s</string>
+    <string name="cmd_feedback_success">✓ %1$s\nFrom a phone command</string>
+    <string name="cmd_feedback_failure">✕ %1$s</string>
+    <string name="cmd_not_connected">Android Auto is not connected</string>
+    <string name="cmd_browser_opened">Browser open</string>
+    <string name="cmd_invalid_url">That URL is not valid</string>
+    <string name="cmd_opened_host">Opened %1$s</string>
+    <string name="cmd_went_back">Went back</string>
+    <string name="cmd_went_forward">Went forward</string>
+    <string name="cmd_reloaded">Reloaded</string>
+    <string name="cmd_fullscreen_on">Fullscreen</string>
+    <string name="cmd_fullscreen_off">Left fullscreen</string>
+    <string name="cmd_desktop_on">Desktop mode on</string>
+    <string name="cmd_desktop_off">Desktop mode off</string>
+    <string name="cmd_mirror_opened">Mirror open</string>
+    <string name="cmd_mirror_running">Mirror is already running</string>
+    <string name="cmd_mirror_needs_consent">Mirror screen open — start projecting from the phone to allow it</string>
+    <string name="cmd_mirror_stopped">Mirror stopped</string>
+    <string name="cmd_media_opened">Media open</string>
+    <string name="cmd_media_unavailable">Media is not ready yet</string>
+    <string name="cmd_no_video_link">No video link in that command</string>
+    <string name="cmd_video_sent">Sent \"%1$s\" to the car</string>
+    <string name="cmd_play">Playing</string>
+    <string name="cmd_pause">Paused</string>
+    <string name="cmd_next">Next track</string>
+    <string name="cmd_previous">Previous track</string>
+    <string name="cmd_agent_with_text">Agent: %1$s</string>
+    <string name="cmd_agent_opened">Agent open</string>
+    <string name="cmd_home">Home</string>
+    <string name="cmd_settings_opened">Settings open</string>
+    <string name="cmd_no_browser">No browser is open</string>
+    <string name="cmd_input_focused">Input focused</string>
+    <string name="cmd_no_text">No text to send</string>
+    <string name="cmd_text_sent_agent">Sent to the Agent</string>
+    <string name="cmd_text_sent_browser">Sent to the browser</string>
+
+    <!-- Car Agent speech-to-text ([CarVoiceInput]) and the phone's own voice search. Shown on the
+         car screen, so they stay short enough to read at a glance. -->
+    <string name="voice_prompt_say_command">Say a command or a search</string>
+    <string name="voice_error_no_recognizer">No speech-to-text service on the phone</string>
+    <string name="voice_error_needs_mic_permission">Allow microphone access on the phone first</string>
+    <string name="voice_error_mic_busy">The microphone is not available right now</string>
+    <string name="voice_error_start_failed">Could not start listening</string>
+    <string name="voice_error_nothing_heard">Did not catch that — please say it again</string>
+    <string name="voice_error_interrupted">Stopped listening — another sound cut in</string>
+    <string name="voice_error_server">Could not transcribe — check the internet connection</string>
+    <string name="voice_error_recognizer_busy">Speech recognition is already running — try again</string>
+    <string name="voice_error_generic">Speech recognition failed — try again</string>
+
+    <!-- Car Agent screen -->
+    <string name="car_agent_hint_listening">Listening… go ahead</string>
+    <string name="car_agent_hint_idle">Tap the mic and speak, or type a command…</string>
+    <string name="car_agent_chip_resume">Resume playback</string>
+    <string name="car_agent_recent_on_car">Recent activity is on the car screen</string>
+
+    <!-- Car Browser screen -->
+    <string name="car_browser_signin_external">Signing in needs an external browser</string>
+
+    <!-- Advanced &gt; Debug: what the WebView/MediaDrm report does and does not tell you. -->
+    <string name="drm_diagnostics_disclaimer">Reports what WebView and MediaDrm support on this device only. It is not a promise that any particular site will play its DRM video.</string>
+
+    <!-- Browser: what the floating button can be bound to ([FloatingButtonAction]). -->
+    <string name="fab_action_menu">Open menu</string>
+    <string name="fab_action_tabs">Switch tabs</string>
+    <string name="fab_action_new_tab">New tab</string>
+    <string name="fab_action_home">Start page</string>
+    <string name="fab_action_address">Address bar / keyboard</string>
+    <string name="fab_action_fullscreen">Toggle fullscreen</string>
+
+    <!-- Browser: how the car surface is divided between the two pages ([BrowserSplitLayout]). -->
+    <string name="split_single">Full width (100)</string>
+    <string name="split_half">Split 50/50</string>
+    <string name="split_forty_sixty">Split 40/60</string>
+    <string name="split_sixty_five_thirty_five">Split 65/35</string>
+    <string name="split_portrait_landscape">Portrait + landscape</string>
+
+    <!-- Browser chrome: spoken by TalkBack for icon-only controls, and the address field. -->
+    <string name="browser_close">Close</string>
+    <string name="browser_back">Back</string>
+    <string name="browser_address_hint">URL / search</string>
+    <string name="browser_clear_url">Clear URL</string>
+    <string name="browser_tabs_detail">Switch tabs or open a new one</string>
+    <string name="browser_send_to_car_detail">Send the page or a search to the car screen</string>
+
+    <!-- Car browser surface ([CarWebRenderer]): one-line confirmations drawn over the page. -->
+    <string name="car_split_unavailable_legacy">%1$s: not available in the legacy renderer</string>
+    <string name="car_split_too_narrow">%1$s: this display is too narrow</string>
+    <string name="car_url_copied">URL copied</string>
+    <string name="car_copy_failed">Could not copy</string>
+    <string name="car_clipboard_unreadable">The clipboard is empty, or cannot be read from the car</string>
+    <string name="car_bookmark_saved">Bookmark saved</string>
+    <string name="car_bookmark_failed">Could not save the bookmark</string>
+    <string name="car_browsing_data_cleared">Browsing data cleared</string>
+    <string name="car_needs_location_permission">Allow location for AutoBridge on the phone, then reload this page</string>
+    <string name="car_page_load_failed">This page did not load</string>
+    <string name="car_tap_to_retry">Tap to try again</string>
+
+    <!-- Phone browser: the "More actions" sheet ([MoreActionsSheet]). -->
+    <string name="more_title">More actions</string>
+    <string name="more_get_from_car">Get from car</string>
+    <string name="more_get_from_car_caption">Bring the car screen\'s URL back to the phone</string>
+    <string name="more_find_in_page">Find in page</string>
+    <string name="more_find_in_page_caption">Search for text on this page</string>
+    <string name="more_copy_url">Copy URL</string>
+    <string name="more_copy_url_caption">Copy the current page\'s link</string>
+    <string name="more_paste_and_go">Paste &amp; go</string>
+    <string name="more_paste_and_go_caption">Paste a link and open it</string>
+    <string name="more_open_external">Open external</string>
+    <string name="more_open_external_caption">Open the link in another browser</string>
+    <string name="more_start_page">Start page</string>
+    <string name="more_start_page_caption">Go to the start page</string>
+    <string name="more_history">History</string>
+    <string name="more_history_caption">Pages visited</string>
+    <string name="more_downloads">Downloads</string>
+    <string name="more_downloads_caption">Downloaded files</string>
+    <string name="more_support">Support AutoBridge</string>
+    <string name="more_support_caption">Support the developer (Buy Me a Coffee)</string>
+    <string name="more_licenses">Open-source licenses</string>
+    <string name="more_licenses_caption">Third-party license notices</string>
+    <string name="more_github">GitHub</string>
+    <string name="more_github_caption">The source code on GitHub</string>
+    <string name="more_zoom">Zoom</string>
+    <string name="more_zoom_caption">Make the page bigger or smaller</string>
+
+    <!-- Browser menu sheet entries ([BrowserDrawerModel]). Drawn on the car surface by
+         [CarWebRenderer] and listed on the phone, so one label serves both. -->
+    <string name="drawer_tabs">Tabs</string>
+    <string name="drawer_send_to_car">Send to car</string>
+    <string name="drawer_back">Back</string>
+    <string name="drawer_reload">Reload</string>
+    <string name="drawer_forward">Forward</string>
+    <string name="drawer_bookmarks">Bookmarks</string>
+    <string name="drawer_settings">Settings</string>
+    <string name="drawer_more">More</string>
+    <string name="drawer_request_desktop">Request desktop site</string>
+    <string name="drawer_fullscreen">Fullscreen</string>
+    <string name="drawer_split">Split</string>
+    <string name="drawer_new_tab">New tab</string>
+    <string name="drawer_start_page">Start page</string>
+    <string name="drawer_history">History</string>
+    <string name="drawer_downloads">Downloads</string>
+    <string name="drawer_bookmark">Bookmark</string>
+    <string name="drawer_find">Find</string>
+    <string name="drawer_copy_url">Copy URL</string>
+    <string name="drawer_paste_and_go">Paste &amp; go</string>
+    <string name="drawer_external">External</string>
+    <string name="drawer_zoom_in">Zoom in</string>
+    <string name="drawer_zoom_out">Zoom out</string>
+    <string name="drawer_agent">Agent</string>
+    <string name="drawer_media">Media</string>
+    <string name="drawer_now_playing">Now playing</string>
+    <string name="drawer_library">Library</string>
+    <string name="drawer_clear_data">Clear data</string>
+    <string name="drawer_about">About</string>
+    <string name="drawer_get_from_car">Get from car</string>
+    <string name="drawer_support">Support</string>
+    <string name="drawer_licenses">Licenses</string>
+    <string name="drawer_github">GitHub</string>
+    <string name="drawer_exit">Exit</string>
+    <string name="drawer_clear">Clear</string>
+    <string name="drawer_search">Search</string>
+    <string name="drawer_address">Address</string>
+
+    <!-- Browser downloads ([BrowserDownloads]). -->
+    <string name="download_https_only">Only HTTPS downloads are supported</string>
+    <string name="download_start_failed">Could not start the download</string>
+    <string name="download_started">Downloading %1$s</string>
+    <string name="download_status_successful">Done</string>
+    <string name="download_status_failed">Failed</string>
+    <string name="download_status_paused">Paused</string>
+    <string name="download_status_pending">Queued</string>
+    <string name="download_status_running">Downloading</string>
+
+    <!-- A page asking for the device location ([BrowserGeolocation]). -->
+    <string name="geo_title">Location request</string>
+    <string name="geo_message">Allow %1$s to use your location (GPS)?</string>
+    <string name="geo_allow">Allow</string>
+    <string name="geo_deny">Don\'t allow</string>
+    <string name="geo_permission_denied">Location permission was not granted. Turn it on in Settings &gt; Apps &gt; AutoBridge</string>
+
+    <!-- Phone browser: the "Send to car" sheet ([SendToCarSheet]). -->
+    <string name="send_section_current_page">Current page</string>
+    <string name="send_section_or_type">Or enter a URL or search</string>
+    <string name="send_section_search_engine">Search engine</string>
+    <string name="send_section_queue">Up next in the queue (%1$d)</string>
+    <string name="send_current_page_action">Send the current page to the car</string>
+    <string name="send_input_hint">latest bodyslam song, or youtube.com</string>
+    <string name="send_clear_text">Clear the text</string>
+    <string name="send_search_youtube">Search YouTube</string>
+    <string name="send_search_google">Search Google</string>
+    <string name="send_now_title">Send to car</string>
+    <string name="send_now_caption">Put it on the car screen right away</string>
+    <string name="send_queue_title">Add to queue</string>
+    <string name="send_queue_caption">Plays when the current track ends</string>
+    <string name="send_queue_remove">Remove from the queue</string>
+    <string name="send_queue_clear">Clear the queue</string>
+
+    <!-- Dialog buttons shared across the app, so one word is translated once. -->
+    <string name="action_cancel">Cancel</string>
+    <string name="action_save">Save</string>
+    <string name="action_close">Close</string>
+    <string name="action_clear">Clear</string>
+    <string name="action_reset">Reset</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_search">Search</string>
+    <string name="action_next">Next</string>
+    <string name="action_previous">Previous</string>
+    <string name="action_sign_in">Sign in</string>
+
+    <!-- Phone browser ([BrowserActivity]): page chrome, confirmations and dialogs. -->
+    <string name="browser_page_load_failed">This page did not load\nTap to try again</string>
+    <string name="browser_fab_description">Browser menu (drag to move the button)</string>
+    <string name="browser_nothing_to_queue">No page or search to add yet</string>
+    <string name="browser_already_queued">Already in the queue</string>
+    <!-- Thai has one grammatical number, so values-th carries only "other"; the guard script
+         compares the <plurals> name, not the per-quantity items, for exactly that reason. -->
+    <plurals name="browser_queued">
+        <item quantity="one">Added to the queue · %1$d item</item>
+        <item quantity="other">Added to the queue · %1$d items</item>
+    </plurals>
+    <string name="browser_queue_cleared">Queue cleared</string>
+    <string name="browser_nothing_to_send">No page or search to send yet</string>
+    <string name="browser_not_connected">Android Auto is not connected</string>
+    <string name="browser_sent_to_car">Sent to the car screen</string>
+    <string name="browser_sent_to_car_resumed">Sent to the car screen · resuming at %1$s</string>
+    <string name="browser_open_car_browser_first">Open the browser on Android Auto first</string>
+    <string name="browser_cannot_open_browser">Could not open a browser</string>
+    <string name="browser_url_copied">URL copied</string>
+    <string name="browser_clipboard_empty">The clipboard is empty</string>
+    <string name="browser_cannot_open_licenses">Could not open the licenses</string>
+    <string name="browser_nothing_to_bookmark">No page to bookmark yet</string>
+    <string name="browser_bookmark_saved">Bookmark saved</string>
+    <string name="browser_bookmark_failed">Could not save the bookmark</string>
+    <string name="browser_bookmark_removed">Bookmark removed</string>
+    <string name="browser_home_page_set">Start page set</string>
+    <string name="browser_invalid_url">That URL is not valid</string>
+    <string name="browser_reset_permissions_message">Clears the permissions sites were given (location, for example). They will ask again next time.</string>
+    <string name="browser_permissions_reset">Site permissions reset</string>
+    <string name="browser_delete_site_data_message">Deletes cookies and site data stored on this device. History and bookmarks are kept.</string>
+    <string name="browser_site_data_deleted">Cookies and site data deleted</string>
+    <string name="browser_ua_custom_selected">✓ Custom… (%1$s)</string>
+    <string name="browser_ua_custom">Custom…</string>
+    <string name="browser_ua_custom_title">Custom User-Agent</string>
+    <string name="browser_ua_invalid">Not a valid User-Agent (empty, over 512 characters, or contains a line break)</string>
+    <string name="browser_address_hint_idle">URL / search</string>
+    <string name="browser_find_title">Find in page</string>
+    <string name="browser_clear_data_title">Clear browsing data</string>
+    <string name="browser_clear_data_message">Clears the cache, cookies, web storage and history. Bookmarks are kept.</string>
+    <string name="browser_data_cleared">Browsing data cleared</string>
+    <string name="browser_no_downloads">Nothing has been downloaded yet</string>
+    <string name="browser_downloads_title">Downloads</string>
+    <string name="browser_downloads_clear_list">Clear the list</string>
+    <string name="browser_no_bookmarks">No bookmarks yet</string>
+    <string name="browser_bookmarks_title">Bookmarks (long-press to remove)</string>
+    <string name="browser_no_history">No pages visited yet</string>
+    <string name="browser_history_title">History (long-press to remove)</string>
+    <string name="browser_history_clear_all">Clear all</string>
+    <string name="browser_history_cleared">History cleared</string>
+    <string name="browser_signin_title">Sign in</string>
+    <string name="browser_signin_message">For security, this provider does not allow signing in from a browser embedded in another app.</string>
+    <string name="browser_resumed_from_queue">Playing the next item in the queue</string>
+
+    <!-- Entertainment screen ([EntertainmentActivity]): the parked-only content launcher. -->
+    <string name="ent_playback_failed">Cannot play: %1$s — check the URL or pick another source</string>
+    <string name="ent_hint_web">Search the web on the car screen, or paste an HTTPS URL</string>
+    <string name="ent_hint_youtube">Search YouTube, or paste an HTTPS URL</string>
+    <string name="ent_btn_web">Web</string>
+    <string name="ent_btn_video">TV / video</string>
+    <string name="ent_btn_voice">Voice</string>
+    <string name="ent_btn_open_browser">Open Browser</string>
+    <string name="ent_btn_favorites">Favorites</string>
+    <string name="ent_btn_save">Save</string>
+    <string name="ent_btn_resume">Resume</string>
+    <string name="ent_btn_file">File</string>
+    <string name="ent_btn_back">Back</string>
+    <string name="ent_btn_previous">Previous</string>
+    <string name="ent_btn_play_pause">Play / pause</string>
+    <string name="ent_btn_next">Next</string>
+    <string name="ent_auto_resume">Reopen the last item when parked again (while this screen is open)</string>
+    <string name="ent_player_connect_failed">Could not reach the player. Try reopening this screen.</string>
+    <string name="ent_need_valid_url">Enter a valid HTTPS URL</string>
+    <string name="ent_wait_for_ready">Waiting for the Entertainment screen to be ready</string>
+    <string name="ent_need_url_for_browser">Enter an HTTPS URL before opening the browser</string>
+    <string name="ent_browser_failed">Could not open the browser — check that one is installed and the URL is HTTPS</string>
+    <string name="ent_connecting_retry">Connecting to the player — try again</string>
+    <string name="ent_empty_audio">Audio mode\n\nPlay and pause from the notification or the media keys\nVideo and web open when the mode and the car allow it</string>
+    <string name="ent_empty_parked">AutoBridge\n\nYouTube · TV · Web\n\nParked — pick something from the buttons above</string>
+    <string name="ent_status_parked_web">AutoBridge • YouTube / Web • parked</string>
+    <string name="ent_empty_video">AutoBridge Video\n\nParked — video is ready</string>
+    <string name="ent_status_parked_video">AutoBridge • Video • parked</string>
+    <string name="ent_empty_audio_locked">AutoBridge Audio\n\nAudio keeps playing even while the video features are locked</string>
+    <string name="ent_status_audio">AutoBridge • Audio</string>
+    <string name="ent_status_connecting">Connecting to the MediaSession…</string>
+    <string name="ent_no_recent">Nothing has been opened yet</string>
+    <string name="ent_open_before_saving">Open something before saving it</string>
+    <string name="ent_favorite_saved">Saved to favorites</string>
+    <string name="ent_no_favorites">No favorites yet</string>
+    <string name="ent_favorites_title">Favorites</string>
+    <string name="ent_voice_prompt">Search YouTube</string>
+    <string name="ent_no_voice_service">No voice search service on the phone</string>
+    <string name="ent_unsupported_file">Pick a supported audio or video file</string>
+
+    <!-- Settings navigation: the root list, Advanced and About ([MainActivity]). -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_group_display">Display &amp; control</string>
+    <string name="settings_display_mirror">Display &amp; Mirror</string>
+    <string name="settings_display_mirror_caption">Renderer, rotation and fullscreen</string>
+    <string name="settings_input_touch">Input &amp; Touch</string>
+    <string name="settings_input_touch_caption">Touch backend and permissions</string>
+    <string name="settings_group_car">Car &amp; apps</string>
+    <string name="settings_car_connection">Car &amp; Connection</string>
+    <string name="settings_car_connection_caption">Android Auto, Bluetooth and startup</string>
+    <string name="settings_app_profiles">App Profiles</string>
+    <string name="settings_app_profiles_caption">Per-app display and audio</string>
+    <string name="settings_group_features">Features</string>
+    <string name="settings_video">Video</string>
+    <string name="settings_video_caption">Player, layout, aspect ratio and picture</string>
+    <string name="settings_youtube">YouTube</string>
+    <string name="settings_youtube_caption">SponsorBlock and playback quality</string>
+    <string name="settings_group_advanced">Advanced</string>
+    <string name="settings_advanced">Advanced</string>
+    <string name="settings_advanced_caption">Diagnostics and debug tools</string>
+    <string name="settings_group_about">About</string>
+    <string name="settings_about">About</string>
+    <string name="settings_about_caption">Version, licenses and support</string>
+    <string name="advanced_subtitle">Developer tools</string>
+    <string name="advanced_diagnostics">Diagnostics</string>
+    <string name="advanced_diagnostics_caption">Logs, crash reports and mirror events</string>
+    <string name="advanced_debug">Debug</string>
+    <string name="advanced_debug_caption">Internal runtime state</string>
+    <string name="advanced_storage">Storage</string>
+    <string name="advanced_storage_caption">Clear cache or reset app data</string>
+    <string name="advanced_debug_subtitle">INTERNAL STATE</string>
+    <string name="about_support">Support AutoBridge</string>
+    <string name="about_support_caption">Buy me a coffee</string>
+    <string name="about_licenses">Open-source licenses</string>
+    <string name="about_licenses_caption">View third-party notices</string>
+    <string name="about_github">GitHub</string>
+    <string name="about_version">Version</string>
+    <string name="about_no_browser">No browser available</string>
+    <string name="home_tagline">Your Car. Smarter.</string>
+    <string name="voice_no_recognizer">No speech recognizer on this phone</string>
+
+    <!-- Settings &gt; Input &amp; Touch -->
+    <string name="input_subtitle">TOUCH BACKEND AND PERMISSIONS</string>
+    <string name="input_section_touch">TOUCH</string>
+    <string name="input_touch_control">Touch control</string>
+    <string name="input_touch_control_caption">Accessibility service used to inject car touches</string>
+    <string name="input_open">Open</string>
+    <string name="input_backend">Input backend</string>
+    <string name="input_backend_caption">Accessibility preferred, Shizuku optional</string>
+    <string name="input_real_touch">Real touch injection</string>
+    <string name="input_real_touch_caption">Privileged pointer sink; Android Auto must provide a raw pointer stream</string>
+    <string name="input_shizuku_enabled">Shizuku touch enabled</string>
+    <string name="input_shizuku_denied">Shizuku permission denied</string>
+
+    <!-- Applications and App Profiles -->
+    <string name="apps_title">Applications</string>
+    <string name="apps_subtitle">TAP ☆ TO ADD A FAVORITE</string>
+    <string name="apps_search_hint">Search apps…</string>
+    <string name="apps_filter_favorites">Favorites · %1$d</string>
+    <string name="apps_filter_all">All apps · %1$d</string>
+    <string name="apps_browse_all">BROWSE ALL APPS</string>
+    <string name="profiles_subtitle">PER-APP DISPLAY AND AUDIO</string>
+    <string name="profiles_applied_on_launch">Per-app settings are applied when launched.</string>
+    <string name="profiles_empty">No favorite apps yet. Star one in Apps to give it a profile here.</string>
+    <string name="profiles_removed_from_favorites">Removed from Favorites</string>
+    <string name="profiles_added_to_favorites">Added to Favorites</string>
+    <string name="profiles_smart_mode">Smart mode</string>
+    <string name="profiles_use_profile">USE THIS PROFILE</string>
+    <string name="profiles_launch_failed">Could not launch %1$s</string>
+    <string name="profiles_section_launch">LAUNCH &amp; MIRROR</string>
+    <string name="profiles_auto_mirror">Auto mirror</string>
+    <string name="profiles_auto_mirror_caption">Store the mirror intent; capture consent is still required</string>
+    <string name="profiles_auto_fullscreen">Auto fullscreen</string>
+    <string name="profiles_auto_fullscreen_caption">Persist the preference; the target app controls its own system bars</string>
+    <string name="profiles_force_landscape">Force landscape</string>
+    <string name="profiles_force_landscape_caption">Lock the phone to landscape while this profile is active</string>
+    <string name="profiles_needs_write_settings">Grant Modify system settings to apply landscape</string>
+    <string name="profiles_scale">Scale</string>
+    <string name="profiles_stored_preference">Stored preference</string>
+    <string name="profiles_resolution">Resolution</string>
+    <string name="profiles_frame_rate">Frame rate</string>
+    <string name="profiles_stored_renderer_target">Stored renderer target</string>
+    <string name="profiles_fps_system">System</string>
+    <string name="profiles_section_touch_audio">TOUCH &amp; AUDIO</string>
+    <string name="profiles_touch_backend_caption">Desired input backend: %1$s</string>
+    <string name="profiles_audio_output">Audio output</string>
+    <string name="profiles_audio_output_caption">Stored Smart Mode preference</string>
+    <string name="profiles_keep_screen_on">Keep screen on</string>
+    <string name="profiles_keep_screen_on_caption">Preference is applied by the active display pipeline</string>
+    <string name="profiles_reset">RESET PROFILE</string>
+    <string name="profiles_reset_done">Profile reset to defaults</string>
+
+    <!-- Settings &gt; Display &amp; Mirror -->
+    <string name="mirror_subtitle">RENDERER, ROTATION AND FULLSCREEN</string>
+    <string name="mirror_mirroring">▣   MIRRORING</string>
+    <string name="mirror_start">▣   START MIRROR</string>
+    <string name="mirror_section_display">DISPLAY</string>
+    <string name="mirror_resolution">Resolution</string>
+    <string name="mirror_resolution_caption">The connected car surface chooses the size</string>
+    <string name="mirror_value_auto">Auto</string>
+    <string name="mirror_frame_rate">Frame rate</string>
+    <string name="mirror_renderer">Renderer pipeline</string>
+    <string name="mirror_renderer_caption">SELF_DRAWN enables app-controlled transform and frame accounting</string>
+    <string name="mirror_rotation">Mirror rotation</string>
+    <string name="mirror_landscape_global">Landscape mirror (global)</string>
+    <string name="mirror_landscape_global_caption">Legacy fallback: rotates the whole phone. Prefer SELF_DRAWN + Mirror rotation</string>
+    <string name="mirror_crop">Crop</string>
+    <string name="mirror_crop_caption">Aspect-preserving output</string>
+    <string name="mirror_section_advanced">ADVANCED</string>
+    <string name="mirror_head_unit_profile">Head-unit profile</string>
+    <string name="mirror_screen_off">Screen-off behavior</string>
+    <string name="mirror_panel_off">Panel off on auto-dim</string>
+    <string name="mirror_panel_off_caption">ScreenOnAuto-style panel-only power-off; requires Shizuku/root and falls back to dim</string>
+    <string name="mirror_dim_now">Dim phone now</string>
+    <string name="mirror_apply">Apply</string>
+    <string name="mirror_start_first">Start mirroring first</string>
+    <string name="mirror_restore_screen">Restore phone screen</string>
+    <string name="mirror_restore_screen_caption">Restore display and restart the auto-dim timer</string>
+    <string name="mirror_restore">Restore</string>
+    <string name="mirror_display_restored">Phone display restored to the configured policy</string>
+    <string name="mirror_section_automation">AUTOMATION</string>
+    <string name="mirror_prevent_sleep">Prevent sleep</string>
+    <string name="mirror_prevent_sleep_caption">Keep the phone panel awake while projection is active</string>
+    <string name="mirror_auto_dim">Auto dim</string>
+    <string name="mirror_auto_dim_caption">Dim after inactivity; car touch starts the timer again</string>
+    <string name="mirror_stop_on_disconnect">Stop on disconnect</string>
+    <string name="mirror_stop_on_disconnect_caption">Stop projection after Android Auto stays disconnected for 2 seconds</string>
+    <string name="mirror_scale_mode">Scale mode</string>
+    <string name="mirror_started">Mirroring Started</string>
+    <string name="mirror_capture_denied">Screen capture permission denied</string>
+    <string name="mirror_stop_before_renderer">Stop mirroring before changing the renderer</string>
+    <string name="mirror_renderer_unavailable">Renderer pipeline is not available</string>
+    <string name="mirror_needs_self_drawn">Switch the renderer to SELF_DRAWN so rotation applies to the car only</string>
+    <string name="mirror_needs_write_settings">Grant Modify system settings to use the global landscape lock</string>
+    <string name="mirror_landscape_failed">Landscape mirror could not be changed</string>
+    <string name="mirror_global_lock_warning">The global lock rotates the phone too; use SELF_DRAWN + Mirror rotation to keep the phone upright</string>
+
+    <!-- Settings &gt; Advanced &gt; Diagnostics -->
+    <string name="diag_subtitle">LOGS, CRASHES AND MIRROR EVENTS</string>
+    <string name="diag_section_log">APP LOG</string>
+    <string name="diag_no_log">No log entries yet</string>
+    <string name="diag_copy">COPY DIAGNOSTICS</string>
+    <string name="diag_clipboard_unavailable">The clipboard is not available</string>
+    <string name="diag_copied">Diagnostics copied</string>
+    <string name="diag_no_share_target">No app available to share with</string>
+    <string name="favorite">Favorite</string>
+    <string name="diag_no_mirror_events">No mirror events yet</string>
+    <string name="diag_section_mirror_events">MIRROR EVENTS</string>
+
+    <!-- Car Settings screen ([CarSettingsScreen]). Read on a head unit at a glance, so the titles
+         stay short and the second line carries the explanation. -->
+    <string name="car_settings_title">Settings</string>
+    <string name="car_settings_section_general">General</string>
+    <string name="car_settings_section_driving">Driving Mode</string>
+    <string name="car_settings_section_mirror">Mirror &amp; Display</string>
+    <string name="car_settings_resume_session">Resume last session</string>
+    <string name="car_settings_resume_session_caption">Restore the last screen and state on launch</string>
+    <string name="car_settings_driving_ui">Enable driving-aware UI</string>
+    <string name="car_settings_driving_ui_caption">Bigger, decluttered controls while driving</string>
+    <string name="car_settings_larger_controls">Larger controls</string>
+    <string name="car_settings_prefer_voice">Prefer voice actions</string>
+    <string name="car_settings_reduce_clutter">Reduce visual clutter</string>
+    <string name="car_settings_display_profile">Display profile</string>
+    <string name="car_settings_profile_toast">Profile: %1$s</string>
+    <string name="car_settings_renderer">Renderer pipeline</string>
+    <string name="car_settings_rotation">Mirror rotation</string>
+    <string name="car_settings_scale">Scale mode</string>
+    <string name="car_settings_landscape_global">Landscape mirror (global)</string>
+    <string name="car_settings_landscape_on">Enabled: rotates the whole phone</string>
+    <string name="car_settings_landscape_off">Disabled</string>
+    <string name="car_settings_touch">Touch control</string>
+    <string name="car_settings_screen_off">Screen-off behavior</string>
+    <string name="car_settings_screen_off_panel">Panel off on auto-dim (privileged)</string>
+    <string name="car_settings_screen_off_follows">Pauses with the phone display</string>
+    <string name="car_settings_screen_off_partial">Not guaranteed; the source still follows the phone display</string>
+    <string name="car_settings_screen_off_unavailable">Unavailable; a dedicated display is required</string>
+    <string name="car_settings_diagnostics">Diagnostics</string>
+    <string name="car_settings_diagnostics_caption">Live FPS, uptime, reconnects and frame stats</string>
+    <string name="car_settings_log">App Log</string>
+    <string name="car_settings_log_caption">Recent events, including where a screen failed to open</string>
+    <string name="car_settings_speed_safety">Speed safety</string>
+    <string name="car_settings_stop_mirroring">Stop mirroring</string>
+    <string name="car_settings_stop_mirroring_caption">Stop projection and leave AutoBridge</string>
+    <string name="car_vehicle_parked">PARKED</string>
+    <string name="car_vehicle_moving">MOVING (blocked)</string>
+    <string name="car_vehicle_unknown">UNKNOWN (blocked)</string>
+    <string name="car_pipeline_auto_mirror">AUTO_MIRROR • zero-copy, FIT only</string>
+    <string name="car_pipeline_self_drawn">SELF_DRAWN • app-controlled rotation/scale</string>
+    <string name="car_pipeline_own_content">OWN_CONTENT • unavailable</string>
+    <string name="car_rotation_auto">Auto</string>
+    <string name="car_rotation_phone">Follow phone</string>
+    <string name="car_rotation_portrait">Portrait</string>
+    <string name="car_rotation_landscape">Landscape</string>
+    <string name="car_rotation_car_only">%1$s • car only</string>
+    <string name="car_rotation_needs_self_drawn">%1$s • needs SELF_DRAWN</string>
+    <string name="car_scale_needs_self_drawn">FIT • needs SELF_DRAWN</string>
+    <string name="car_stop_before_renderer">Stop mirroring before changing the renderer</string>
+    <string name="car_renderer_unavailable">Renderer pipeline is not available</string>
+    <string name="car_needs_self_drawn_rotation">Switch the renderer to SELF_DRAWN so rotation applies to the car only</string>
+    <string name="car_scale_requires_self_drawn">%1$s requires the SELF_DRAWN renderer</string>
+
+    <!-- Car Browser settings ([CarBrowserSettingsScreen]) and its pickers. -->
+    <string name="car_selected">%1$s  •  Selected</string>
+    <string name="car_browser_settings_title">Browser settings</string>
+    <string name="car_browser_section_controls">In-app controls</string>
+    <string name="car_browser_section_blocking">Content blocking</string>
+    <string name="car_browser_section_identity">Identity</string>
+    <string name="car_browser_hide_url_bar">Hide URL bar</string>
+    <string name="car_browser_hide_url_bar_caption">Remove the address bar completely; use the floating button for the menu</string>
+    <string name="car_browser_always_url_bar">Always show URL bar</string>
+    <string name="car_browser_always_url_bar_caption">Keep the address bar over the page instead of letting it fade away</string>
+    <string name="car_browser_always_fab">Always show floating button</string>
+    <string name="car_browser_always_fab_caption">Keep the button on screen instead of fading it out with the toolbar</string>
+    <string name="car_browser_fab_action">Floating button action</string>
+    <string name="car_browser_fab_left">Floating button on left</string>
+    <string name="car_browser_fab_left_caption">Move the button to the bottom-left corner instead of the bottom-right</string>
+    <string name="car_browser_split">Split screen</string>
+    <string name="car_browser_reverse_music">Keep music playing in reverse</string>
+    <string name="car_browser_reverse_music_caption">Don\'t pause for the reverse chime — also stops phone calls and nav prompts pausing it</string>
+    <string name="car_browser_block_ads">Block ads and trackers</string>
+    <string name="car_browser_block_ads_caption">Drops requests to known ad hosts. Not YouTube\'s in-video ads — those share a host with the video</string>
+    <string name="car_browser_skip_yt_ads">Skip YouTube video ads</string>
+    <string name="car_browser_skip_yt_ads_caption">Presses Skip, or seeks past an unskippable ad. YouTube may notice and ask you to turn it off</string>
+    <string name="car_browser_identity">Browser identity</string>
+    <string name="car_browser_identity_custom_summary">%1$s · %2$s</string>
+    <string name="car_browser_side_right">Side page on right</string>
+    <string name="car_browser_side_right_caption">Put the side page (map) on the right instead of the left</string>
+    <string name="car_split_desc_single">One page on the whole screen</string>
+    <string name="car_split_desc_half">Side page and main page, equal width</string>
+    <string name="car_split_desc_forty_sixty">Side page 40%, main page 60%</string>
+    <string name="car_split_desc_sixty_five">Main page 65% (video), side page 35% (map)</string>
+    <string name="car_split_desc_portrait_landscape">Tall side page (map) + 16:9 main page (video)</string>
+    <string name="car_ua_mobile">Mobile</string>
+    <string name="car_ua_mobile_caption">Use the phone browser identity</string>
+    <string name="car_ua_desktop">Desktop</string>
+    <string name="car_ua_desktop_caption">Request desktop versions of websites</string>
+    <string name="car_ua_custom">Custom</string>
+    <string name="car_ua_custom_empty">Enter a custom User-Agent string</string>
+    <string name="car_ua_presets">Custom presets</string>
+    <string name="car_ua_presets_caption">Windows, macOS, iPad, iPhone… without typing</string>
+    <string name="car_ua_presets_title">User-Agent presets</string>
+    <string name="car_ua_invalid">Enter a valid User-Agent</string>
+    <string name="car_ua_input_hint">Custom User-Agent</string>
+
+    <!-- Car IPTV screens ([CarIptvScreens]): TV and radio sources, categories and entries. -->
+    <string name="car_iptv_tv">TV</string>
+    <string name="car_iptv_radio">Radio</string>
+    <string name="car_iptv_no_source">No %1$s source yet.\nPick a free public list, or add an Xtream account or an M3U playlist, on the phone.</string>
+    <string name="car_iptv_open_on_phone">Open on phone</string>
+    <string name="car_iptv_recent">Recently played</string>
+    <string name="car_iptv_loading">Loading…</string>
+    <string name="car_iptv_tap_to_load">Tap to load</string>
+    <string name="car_iptv_loading_named">Loading %1$s…</string>
+    <string name="car_iptv_continue_on_phone">Continue on the phone</string>
+    <string name="car_iptv_phone_screen_failed">Could not open the phone screen</string>
+    <string name="car_iptv_show_more">Show more</string>
+    <string name="car_iptv_opens_in_browser">Opens in browser</string>
+    <string name="car_iptv_favourite">Favourite</string>
+    <string name="car_iptv_catchup">Catch-up</string>
+    <string name="car_iptv_tap_to_play">Tap to play</string>
+    <string name="car_iptv_no_episodes">No episodes available</string>
+    <string name="car_iptv_no_stream">This entry has no stream address</string>
+    <string name="car_iptv_connecting">Connecting to the player…</string>
+    <plurals name="car_iptv_items">
+        <item quantity="one">%1$d item</item>
+        <item quantity="other">%1$d items</item>
+    </plurals>
+    <plurals name="car_iptv_entries">
+        <item quantity="one">%1$d entry</item>
+        <item quantity="other">%1$d entries</item>
+    </plurals>
+
+    <!-- Car Media screen ([CarMediaScreen]). -->
+    <string name="car_media_title">Media</string>
+    <string name="car_media_default_title">AutoBridge Media</string>
+    <string name="car_media_playing">Playing</string>
+    <string name="car_media_paused">Paused / stopped</string>
+    <string name="car_media_session_connected">Session connected</string>
+    <string name="car_media_session_connecting">Connecting to the MediaSession…</string>
+    <string name="car_media_session_error">Session unavailable: %1$s</string>
+    <string name="car_media_session_unknown_error">unknown error</string>
+    <string name="car_media_session_disconnected">Session disconnected</string>
+    <string name="car_media_sample">Play sample playlist</string>
+    <string name="car_media_sample_caption">Jazz, progressive audio and test media</string>
+    <string name="car_media_pause">Pause</string>
+    <string name="car_media_resume">Resume</string>
+    <string name="car_media_play_pause_caption">MediaSession play/pause</string>
+    <string name="car_media_previous">Previous track</string>
+    <string name="car_media_previous_caption">Previous item in the current queue</string>
+    <string name="car_media_next">Next track</string>
+    <string name="car_media_next_caption">Next item in the current queue</string>
+    <string name="car_media_stop">Stop</string>
+    <string name="car_media_stop_caption">Stop audio playback</string>
+    <string name="car_media_artist_state">%1$s • %2$s</string>
+    <string name="car_media_state_connection">%1$s • %2$s</string>
+
+    <!-- Car Diagnostics screen ([CarDiagnosticsScreen]). -->
+    <string name="car_diag_title">Diagnostics</string>
+    <string name="car_diag_lowest_resolution">%1$s • Lowest Android Auto resolution. If the car supports it: Android Auto ▸ Developer settings ▸ Video resolution ▸ 720p, then reconnect</string>
+    <string name="car_diag_car_display">Car display</string>
+    <string name="car_diag_pipeline">Pipeline</string>
+    <string name="car_diag_mirror">Mirror</string>
+    <string name="car_diag_active">Active</string>
+    <string name="car_diag_inactive">Inactive</string>
+    <string name="car_diag_uptime">Uptime</string>
+    <string name="car_diag_source_size">Source size</string>
+    <string name="car_diag_reconnects">Reconnects</string>
+    <string name="car_diag_frame_rate">Frame rate</string>
+    <string name="car_diag_os_owned">n/a • AUTO_MIRROR is OS-owned</string>
+    <string name="car_diag_frames">Frames (r/d/c)</string>
+    <string name="car_diag_last_latency">Last latency</string>
+    <string name="car_diag_not_applicable">n/a</string>
+    <string name="car_diag_audio">Audio</string>
+    <string name="car_diag_audio_caption">Focus, route, volume, session and web audio state</string>
+    <string name="car_diag_refresh">Refresh</string>
+    <string name="car_diag_refresh_caption">Re-read live diagnostics</string>
+    <string name="car_diag_clear">Clear events</string>
+    <string name="car_diag_clear_caption">Reset the diagnostics event ring</string>
+    <string name="car_diag_cleared">Diagnostics events cleared</string>
+    <string name="car_diag_measuring">measuring…</string>
+
+    <!-- On-device media: the kind shown as an item\'s second line. Display only — the audio/video
+         routing reads LocalMediaRepository.Item.isAudio, not this text. -->
+    <string name="media_kind_audio">Audio</string>
+    <string name="media_kind_media">Media</string>
+    <string name="media_kind_photo">Photo</string>
+
+    <!-- Car mirror control screen ([MirrorControlScreen]). -->
+    <string name="car_mirror_vehicle">Vehicle</string>
+    <string name="car_mirror_speed_safety">Speed safety</string>
+    <string name="car_mirror_speed_safety_caption">Tap to request or refresh CAR_SPEED permission</string>
+    <string name="car_mirror_status">Mirror</string>
+    <string name="car_mirror_phone_display">Phone display</string>
+    <string name="car_mirror_dim_now">Dim phone now</string>
+    <string name="car_mirror_dim_now_caption">Uses panel-off when enabled; otherwise dims the phone</string>
+    <string name="car_mirror_restore">Restore phone screen</string>
+    <string name="car_mirror_restore_caption">Restore the panel and restart the auto-dim timer</string>
+    <string name="car_mirror_apps">Apps</string>
+    <string name="car_mirror_apps_caption">Open quick apps</string>
+    <string name="car_mirror_media">Media</string>
+    <string name="car_mirror_media_caption">Playlists and MediaSession controls</string>
+    <string name="car_mirror_settings">Settings</string>
+    <string name="car_mirror_settings_caption">Mirror, touch and safety settings</string>
+    <string name="car_mirror_phone_back">Phone Back</string>
+    <string name="car_mirror_phone_home">Phone Home</string>
+    <string name="car_mirror_phone_recents">Phone Recents</string>
+    <string name="car_mirror_send_to_phone">Send to phone</string>
+    <string name="car_mirror_needs_input_backend">Enable the AutoBridge accessibility service or Shizuku for controls</string>
+
+    <!-- Car media library ([CarMediaLibraryScreen]). The sample track names are content from a
+         public test bucket, so they are not translated; the kind labels are. -->
+    <string name="car_lib_sample_audio">Sample audio • MP3</string>
+    <string name="car_lib_sample_video">Sample video • MP4</string>
+    <string name="car_lib_adaptive_video">Adaptive video • MPD</string>
+    <string name="car_lib_open_video_link">Open video link</string>
+    <string name="car_lib_open_video_link_caption">MP4, HLS or DASH stream</string>
+    <string name="car_lib_video_stream">Video stream</string>
+    <string name="car_lib_invalid_video_link">Enter a valid HTTPS video link</string>
+    <string name="car_lib_open_file">Open file from phone</string>
+    <string name="car_lib_open_file_caption">Pick audio or video from device storage</string>
+    <string name="car_lib_now_playing">Now Playing</string>
+    <string name="car_lib_video">Video</string>
+    <string name="car_lib_music">Music</string>
+    <string name="car_lib_media_library">Media Library</string>
+    <string name="car_lib_section_library">Library</string>
+    <string name="car_lib_section_audio">Audio</string>
+    <string name="car_lib_section_video">Video</string>
+    <string name="car_lib_connecting_session">Connecting to the media session…</string>
+    <string name="car_lib_nothing_playing">Nothing playing</string>
+    <string name="car_lib_playing">Playing</string>
+    <string name="car_lib_paused">Paused</string>
+    <string name="car_lib_title_state">%1$s • %2$s</string>
+    <string name="car_lib_pick_on_phone">Pick a file on the phone</string>
+    <string name="car_lib_picker_failed">Could not open the media picker</string>
+
+    <!-- Car on-device library ([CarLibraryScreen]). -->
+    <string name="car_folders">Folders</string>
+    <string name="car_playlists">Playlists</string>
+    <string name="car_gallery">Gallery</string>
+    <string name="car_all_music">All music</string>
+    <string name="car_needs_media_access">%1$s needs media access.\nGrant it on the phone, then come back.</string>
+    <string name="car_nothing_found">Nothing found on this device.</string>
+    <string name="car_nothing_to_play">Nothing to play here.</string>
+    <string name="car_photos_phone_only">Photos can only be viewed on the phone</string>
+    <string name="car_connecting_player">Connecting to the player…</string>
+
+    <!-- Car video disclaimer ([CarVideoDisclaimerScreen]). -->
+    <string name="car_disclaimer_header">Before you watch</string>
+    <string name="car_disclaimer_title">Watching video while driving is dangerous</string>
+    <string name="car_disclaimer_body">Video should only be watched while the vehicle is parked. AutoBridge blocks playback while moving, but you are responsible for pulling over and parking safely before watching.</string>
+    <string name="car_disclaimer_confirm_title">By continuing you confirm</string>
+    <string name="car_disclaimer_confirm_body">The vehicle is parked, and you will not watch video while driving.</string>
+    <string name="car_disclaimer_continue">I understand, continue</string>
+
+    <!-- Car mirror intro ([CarMirrorIntroScreen]). -->
+    <string name="car_intro_title">Mirror</string>
+    <string name="car_intro_fit">Fit to screen</string>
+    <string name="car_intro_fit_on">On • letterboxed</string>
+    <string name="car_intro_fit_off">Off • fill</string>
+    <string name="car_intro_quality">Quality</string>
+    <string name="car_intro_quality_value">High (1080p)</string>
+    <string name="car_intro_start">Start Mirroring</string>
+    <string name="car_intro_running">Mirroring is running</string>
+    <string name="car_intro_start_caption">Show the phone screen on the car</string>
+    <string name="car_intro_phone_screen">Phone screen</string>
+    <string name="car_intro_needs_consent">Grant screen sharing on your phone to start mirroring</string>
+    <string name="car_intro_active">Mirroring active</string>
+    <string name="car_intro_ready">Ready to mirror</string>
+    <string name="car_intro_connected_caption">Phone connected • show your phone on Android Auto</string>
+    <string name="car_intro_disconnected_caption">Show your phone screen on Android Auto</string>
+
+    <!-- Car bookmarks ([CarBookmarksScreen]). Site names are brands and stay as they are. -->
+    <string name="car_bookmarks_title">Manage bookmarks</string>
+    <string name="car_bookmarks_tap_to_remove">Tap to remove • %1$s</string>
+    <string name="car_bookmarks_removed">Removed %1$s</string>
+    <string name="car_bookmarks_add">Add %1$s</string>
+    <string name="car_bookmarks_added">Added %1$s</string>
+    <string name="car_bookmarks_invalid">Invalid address</string>
+
+    <!-- Car Media Center ([CarMediaCenterScreen]): tabs, rows and the stream-link entry. -->
+    <string name="car_media_center_tab_music">Music</string>
+    <string name="car_media_center_tab_video">Video</string>
+    <string name="car_media_center_tab_streaming">Streaming</string>
+    <string name="car_media_center_now_playing">Now Playing</string>
+    <string name="car_media_center_open_stream">Open stream link</string>
+    <string name="car_media_center_open_stream_caption">MP4, HLS or DASH URL</string>
+    <string name="car_media_center_open_browser">Open in Browser</string>
+    <string name="car_media_center_open_browser_caption">For web players (YouTube, etc.)</string>
+    <string name="car_media_center_invalid_link">Enter a valid HTTPS link</string>
+    <string name="car_media_center_video_stream">Video stream</string>
+
+    <!-- Car Now Playing ([CarNowPlayingScreen]). -->
+    <string name="car_now_playing_title">Now Playing</string>
+    <string name="car_now_playing_next">Next</string>
+
+    <!-- Shared across the car launcher, apps grid and quick-launch list. -->
+    <string name="car_could_not_launch">Could not launch %1$s</string>
+
+    <!-- Car Launcher ([CarLauncherScreen]). -->
+    <string name="car_launcher_title">AutoBridge</string>
+    <string name="car_launcher_web_video">Web / Video</string>
+
+    <!-- Car Apps grid ([CarAppsScreen]). -->
+    <string name="car_apps_title">Quick Apps</string>
+    <string name="car_apps_empty_title">No Quick Apps</string>
+    <string name="car_apps_empty_text">Enable apps on the phone</string>
+
+    <!-- Car Quick Launch list ([CarQuickLaunchScreen]). -->
+    <string name="car_quicklaunch_title">Quick Launch</string>
+    <string name="car_quicklaunch_manage_title">Manage Quick Launch</string>
+    <string name="car_quicklaunch_internal">AutoBridge action</string>
+    <string name="car_quicklaunch_app_subtitle">App • %1$s</string>
+    <string name="car_quicklaunch_empty">No shortcuts yet — tap Add</string>
+    <string name="car_quicklaunch_move_up">Move up</string>
+    <string name="car_quicklaunch_move_down">Move down</string>
+    <string name="car_quicklaunch_remove">Remove</string>
+
+    <!-- Car Browser screen ([CarBrowserScreen]). -->
+    <string name="car_browser_title">Browser</string>
+    <string name="car_browser_park_to_browse">Park the vehicle to browse websites.</string>
+    <string name="car_browser_user_agent_label">User-Agent: %1$s</string>
+    <string name="car_browser_no_external">No external browser available</string>
+
+    <!-- Car Browser search ([CarBrowserSearchScreen]). -->
+    <string name="car_browser_search_go">Go</string>
+    <string name="car_browser_search_hint">Type a URL or search</string>
+
+    <!-- Car Browser bookmarks list ([CarBrowserBookmarksScreen]). -->
+    <string name="car_browser_bookmarks_title">Bookmarks</string>
+    <string name="car_browser_bookmarks_empty">Save a page with the star in the browser toolbar</string>
+    <string name="car_browser_bookmarks_removed">Removed %1$s</string>
+    <string name="car_browser_bookmarks_previous">Previous bookmarks</string>
+    <string name="car_browser_bookmarks_more">More bookmarks</string>
+
+    <!-- Car Browser history list ([CarBrowserHistoryScreen]). -->
+    <string name="car_browser_history_title">History</string>
+    <string name="car_browser_history_empty">Pages you visit will show up here</string>
+    <string name="car_browser_history_previous">Previous</string>
+    <string name="car_browser_history_more">More</string>
+
+    <!-- Car Browser downloads list ([CarBrowserDownloadsScreen]). -->
+    <string name="car_browser_downloads_title">Downloads</string>
+    <string name="car_browser_downloads_empty">Files you download will show up here</string>
+    <string name="car_browser_downloads_previous">Previous</string>
+    <string name="car_browser_downloads_more">More</string>
+
+    <!-- Car Favorites ([CarFavoritesScreen]). -->
+    <string name="car_favorites_title">Favorites</string>
+    <string name="car_favorites_empty">Star a channel or save a web page to see it here.</string>
+    <string name="car_favorites_channels">Channels</string>
+    <string name="car_favorites_web">Web</string>
+
+    <!-- Car Log screen ([CarLogScreen]). -->
+    <string name="car_log_title">App Log</string>
+    <string name="car_log_empty">No log entries yet</string>
+    <string name="car_log_previous">Previous</string>
+    <string name="car_log_more">More</string>
+    <string name="car_log_cleared">Log cleared</string>
+
+    <!-- Car Recent activity ([CarRecentScreen]). -->
+    <string name="car_recent_title">Recent</string>
+    <string name="car_recent_empty">No recent activity yet</string>
+
+    <!-- Car Weather ([CarWeatherScreen]). -->
+    <string name="car_weather_title">Weather</string>
+    <string name="car_weather_no_location">No location set.\nOpen Weather on the phone to search for a city.</string>
+    <string name="car_weather_now">Now</string>
+    <string name="car_weather_feels_like">Feels like</string>
+    <string name="car_weather_today">Today</string>
+    <string name="car_weather_wind">Wind</string>
+    <string name="car_weather_loading">Loading…</string>
+    <string name="car_weather_tap_refresh">Tap refresh to load</string>
+
+    <!-- Car Video ([CarVideoScreen]). -->
+    <string name="car_video_title">Video</string>
+    <string name="car_video_park_to_watch">Park the vehicle to watch video.</string>
+
+    <!-- Car Mirror intro ([CarMirrorIntroScreen]). -->
+    <string name="car_mirror_intro_title">Mirror</string>
+    <string name="car_mirror_intro_fit">Fit to screen</string>
+    <string name="car_mirror_intro_fit_on">On • letterboxed</string>
+    <string name="car_mirror_intro_fit_off">Off • fill</string>
+    <string name="car_mirror_intro_quality">Quality</string>
+    <string name="car_mirror_intro_quality_value">High (1080p)</string>
+    <string name="car_mirror_intro_start">Start Mirroring</string>
+    <string name="car_mirror_intro_running">Mirroring is running</string>
+    <string name="car_mirror_intro_start_caption">Show the phone screen on the car</string>
+    <string name="car_mirror_intro_grant">Grant screen sharing on your phone to start mirroring</string>
+    <string name="car_mirror_intro_status_active">Mirroring active</string>
+    <string name="car_mirror_intro_status_ready">Ready to mirror</string>
+    <string name="car_mirror_intro_device_connected">Phone connected • show your phone on Android Auto</string>
+    <string name="car_mirror_intro_device_disconnected">Show your phone screen on Android Auto</string>
+
+    <!-- Car Home dashboard ([CarHomeDashboardScreen]). -->
+    <string name="car_home_more">More</string>
+    <string name="car_home_speed_safety_enabled">Speed safety enabled</string>
+    <string name="car_home_speed_permission_denied">Speed permission denied</string>
+
+    <!-- Home sections, shared by the phone launcher and the car dashboard ([HomeSection]). -->
+    <string name="section_tv">TV</string>
+    <string name="section_tv_caption">Live channels &amp; VOD</string>
+    <string name="section_radio">Radio</string>
+    <string name="section_radio_caption">Audio streams</string>
+    <string name="section_web">Web browser</string>
+    <string name="section_web_caption">Full page browsing</string>
+    <string name="section_youtube">YouTube</string>
+    <string name="section_youtube_caption">Video on the web</string>
+    <string name="section_youtube_music">YouTube Music</string>
+    <string name="section_youtube_music_caption">Streaming music</string>
+    <string name="section_streaming">Streaming</string>
+    <string name="section_streaming_caption">Kids, TikTok, Twitch &amp; more</string>
+    <string name="section_folders">Folders</string>
+    <string name="section_folders_caption">On-device media</string>
+    <string name="section_favorites">Favorites</string>
+    <string name="section_favorites_caption">Saved channels &amp; pages</string>
+    <string name="section_playlists">Playlists</string>
+    <string name="section_playlists_caption">Your music</string>
+    <string name="section_gallery">Gallery</string>
+    <string name="section_gallery_caption">Photos &amp; clips</string>
+    <string name="section_weather">Weather</string>
+    <string name="section_weather_caption">Current conditions</string>
+    <string name="section_mirror">Mirror</string>
+    <string name="section_mirror_caption">Share this screen</string>
+    <string name="section_apps">Apps</string>
+    <string name="section_apps_caption">Quick launch</string>
+    <string name="section_remote">Remote</string>
+    <string name="section_remote_caption">Drive the car screen</string>
+    <string name="section_settings">Settings</string>
+    <string name="section_settings_caption">Modes &amp; diagnostics</string>
+
+    <!-- Car video disclaimer ([CarVideoDisclaimerScreen]). -->
+    <string name="car_disclaimer_cancel">Cancel</string>
+
+    <!-- Car web entry ([CarWebScreen]). -->
+    <string name="car_web_title">Browser &amp; Favorites</string>
+    <string name="car_web_open_browser">Open browser</string>
+    <string name="car_web_open_browser_caption">Enter a website or search the web</string>
+    <string name="car_web_youtube">YouTube</string>
+    <string name="car_web_youtube_caption">Open m.youtube.com on the car screen</string>
+
+    <!-- Car streaming list ([CarStreamingScreen]). -->
+    <string name="car_streaming_title">Streaming</string>
+
+    <!-- Car display info ([CarDisplayInfo]). -->
+    <string name="car_display_none">— (open Browser or Mirror first)</string>
+
+    <!-- Car audio diagnostics ([CarAudioDiagnosticsScreen]). -->
+    <string name="car_audio_title">Audio</string>
+    <string name="car_audio_focus">Focus</string>
+    <string name="car_audio_device">Device</string>
+    <string name="car_audio_route">Route</string>
+    <string name="car_audio_usage">Usage</string>
+    <string name="car_audio_content">Content</string>
+    <string name="car_audio_state">State</string>
+    <string name="car_audio_volume">Volume</string>
+    <string name="car_audio_session">Session</string>
+    <string name="car_audio_bluetooth">Bluetooth</string>
+    <string name="car_audio_latency">Output latency</string>
+    <string name="car_audio_web">Web audio</string>
+    <string name="car_audio_outputs">Outputs seen</string>
+    <string name="car_audio_playing">PLAYING</string>
+    <string name="car_audio_paused">PAUSED</string>
+    <string name="car_audio_stopped">STOPPED</string>
+    <string name="car_audio_active">ACTIVE</string>
+    <string name="car_audio_inactive">INACTIVE</string>
+    <string name="car_audio_a2dp_on">A2DP on</string>
+    <string name="car_audio_a2dp_off">off</string>
+    <string name="car_audio_latency_hint">~%1$d ms (hint)</string>
+    <string name="car_audio_not_reported">not reported</string>
+    <string name="car_audio_reading">reading…</string>
+    <string name="car_audio_no_outputs">none reported</string>
+    <string name="car_audio_web_line">%1$s • %2$s — %3$s</string>
+    <string name="car_audio_web_no_metadata">%1$s • no metadata</string>
+    <string name="car_audio_volume_fixed">%1$d%% • fixed by route</string>
+    <string name="car_audio_volume_index">%1$d%%  (%2$d/%3$d)</string>
+
+    <!-- Car find in page ([CarBrowserFindScreen]). -->
+    <string name="car_find_title">Find in page</string>
+    <string name="car_find_no_matches">No matches</string>
+    <string name="car_find_hint">Type a term to search this page</string>
+    <string name="car_find_quoted">\"%1$s\"</string>
+    <string name="car_find_header_counter">Find  •  %1$s</string>
+
+    <!-- Car driving mode ([CarDrivingModeScreen]). -->
+    <string name="car_driving_title">AutoBridge • Driving Mode</string>
+    <string name="car_driving_browser">Browser</string>
+    <string name="car_driving_mirror">Mirror</string>
+    <string name="car_driving_media">Media</string>
+    <string name="car_driving_agent">Agent</string>
+    <string name="car_driving_resume">Resume</string>
+    <string name="car_driving_recent">Recent</string>
+
+    <!-- Car "More" list ([CarHomeMoreScreen]). -->
+    <string name="car_more_title">More</string>
+    <string name="car_more_title_paged">More · %1$d</string>
+    <string name="car_more_media_center">Media Center</string>
+    <string name="car_more_bookmarks">Manage bookmarks</string>
+    <string name="car_more_agent">Agent</string>
+    <string name="car_more_recent">Recent</string>
+    <string name="car_more_driving">Driving</string>
+
+    <!-- Car home dashboard title ([CarHomeDashboardScreen]). -->
+    <string name="car_home_title_paged">AutoBridge · %1$d</string>
+
+    <!-- Car Now Playing ([CarNowPlayingScreen]) and Media Center ([CarMediaCenterScreen]). -->
+    <string name="car_now_play">Play</string>
+    <string name="car_now_pause">Pause</string>
+    <string name="car_now_next">Next</string>
+    <string name="car_now_disconnected">Media session disconnected • tap Play to start the sample playlist</string>
+    <string name="car_now_ready">Ready • tap Play for the sample playlist</string>
+    <string name="car_recent_kind_music">Music</string>
+    <string name="car_recent_kind_video">Video</string>
+    <string name="car_recent_kind_streaming">Streaming</string>
+    <string name="car_recent_stream">Stream</string>
+
+    <!-- Car video player ([CarVideoScreen]). -->
+    <string name="car_video_source_failed">Unable to play this source. Return to the library and try another video.</string>
+    <string name="car_video_player_failed">Cannot connect to the media player. Return to the library and try again.</string>
+    <string name="car_video_output_unavailable">Video output is unavailable on this connection.</string>
+    <string name="car_video_home">Home</string>
+    <string name="car_video_back_10">Back 10 seconds</string>
+    <string name="car_video_forward_10">Forward 10 seconds</string>
+
+    <!-- Car mirror surface ([MirrorCarScreen]). -->
+    <string name="car_mirror_controls">Controls</string>
+    <string name="car_speed_enabled">Speed safety enabled</string>
+    <string name="car_speed_denied">Speed permission denied</string>
+    <string name="car_speed_kmh">%1$d km/h</string>
+    <string name="car_mirror_attach_failed">The Android Auto mirror surface could not be attached</string>
+    <string name="car_mirror_needs_input_touch">Enable the AutoBridge accessibility service or Shizuku for touch</string>
+
+    <!-- Bridge error classes ([BridgeErrorType]): what the user is told when a source fails. The
+         raw cause goes to the log, never to the screen. -->
+
 </resources>

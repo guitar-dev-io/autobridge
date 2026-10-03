@@ -11,6 +11,7 @@ import androidx.car.app.model.Template
 import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
+import dev.autobridge.R
 import dev.autobridge.agent.AgentCommandRouter
 import dev.autobridge.audio.VoiceFeedback
 import dev.autobridge.core.state.RecentActivityStore
@@ -91,7 +92,12 @@ class CarAgentScreen(carContext: CarContext) : Screen(carContext) {
             }
         )
             .setHeaderAction(Action.BACK)
-            .setSearchHint(if (listening) "กำลังฟัง… พูดได้เลย" else "แตะไมค์แล้วพูด หรือพิมพ์คำสั่ง…")
+            .setSearchHint(
+                carContext.getString(
+                    if (listening) R.string.car_agent_hint_listening
+                    else R.string.car_agent_hint_idle
+                )
+            )
             .setShowKeyboardByDefault(false)
             // ACTIONS_CONSTRAINTS_SIMPLE: at most two actions and at most ONE with a custom title.
             // Either limit exceeded throws in setActionStrip and kills the app as the screen opens
@@ -99,7 +105,7 @@ class CarAgentScreen(carContext: CarContext) : Screen(carContext) {
             .setActionStrip(
                 ActionStrip.Builder()
                     .addAction(micAction())
-                    .addAction(chip("เล่นเพลงต่อ") {
+                    .addAction(chip(carContext.getString(R.string.car_agent_chip_resume)) {
                         runCommand(
                             AgentCommandRouter.Command(AgentCommandRouter.AgentAction.RESUME_MEDIA),
                             fromVoice = false
@@ -114,7 +120,7 @@ class CarAgentScreen(carContext: CarContext) : Screen(carContext) {
         Action.Builder()
             .setIcon(
                 CarIcon.Builder(
-                    IconCompat.createWithResource(carContext, dev.autobridge.R.drawable.ic_car_mic)
+                    IconCompat.createWithResource(carContext, R.drawable.ic_car_mic)
                 ).build()
             )
             // Icon only: the SearchTemplate strip allows one titled action, and "resume" has it.
@@ -135,7 +141,8 @@ class CarAgentScreen(carContext: CarContext) : Screen(carContext) {
     private fun run(input: String, fromVoice: Boolean) {
         val command = AgentCommandRouter.parse(input)
         if (command == null) {
-            val prompt = "บอกสิ่งที่อยากให้ AutoBridge ทำ"
+            // Same prompt the phone shows for unparseable input; see AgentCommandRouter.
+            val prompt = carContext.getString(R.string.agent_prompt_say_command)
             CarToast.makeText(carContext, prompt, CarToast.LENGTH_SHORT).show()
             if (fromVoice) feedback.speak(prompt)
             return

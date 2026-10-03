@@ -131,6 +131,22 @@ object ImageLoader {
         return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
     }
 
+    /**
+     * Drops every cached logo, in memory and on disk, and clears the dead-URL set so previously
+     * failed addresses are tried again. Returns the number of disk files removed.
+     *
+     * The disk directory itself is left in place; a later load recreates its contents. Safe to call
+     * from any thread — [LruCache] and the failed set are already concurrent, and the file walk only
+     * touches this loader's own cache subdirectory.
+     */
+    fun clearCache(context: Context): Int {
+        memory.evictAll()
+        failed.clear()
+        val directory = File(context.applicationContext.cacheDir, CACHE_DIRECTORY)
+        val files = directory.listFiles() ?: return 0
+        return files.count { it.isFile && it.delete() }
+    }
+
     private fun cacheFile(context: Context, url: String): File =
         File(File(context.cacheDir, CACHE_DIRECTORY), url.hashCode().toUInt().toString(16))
 

@@ -10,6 +10,7 @@ import androidx.car.app.model.Row
 import androidx.car.app.model.SectionedItemList
 import androidx.car.app.model.Template
 import androidx.car.app.model.Toggle
+import dev.autobridge.R
 import dev.autobridge.settings.AppPreferences
 import dev.autobridge.core.model.Feature
 import dev.autobridge.core.model.RotationMode
@@ -37,8 +38,8 @@ class CarSettingsScreen(
         val generalList = ItemList.Builder()
             .addItem(
                 Row.Builder()
-                    .setTitle("Resume last session")
-                    .addText("Restore the last screen and state on launch")
+                    .setTitle(carContext.getString(R.string.car_settings_resume_session))
+                    .addText(carContext.getString(R.string.car_settings_resume_session_caption))
                     .setToggle(
                         Toggle.Builder { checked ->
                             AppPreferences.setResumeLastSession(carContext, checked)
@@ -54,8 +55,8 @@ class CarSettingsScreen(
         val drivingList = ItemList.Builder()
             .addItem(
                 Row.Builder()
-                    .setTitle("Enable driving-aware UI")
-                    .addText("Bigger, decluttered controls while driving")
+                    .setTitle(carContext.getString(R.string.car_settings_driving_ui))
+                    .addText(carContext.getString(R.string.car_settings_driving_ui_caption))
                     .setToggle(
                         Toggle.Builder { checked ->
                             AppPreferences.setDrivingAwareUi(carContext, checked)
@@ -65,7 +66,7 @@ class CarSettingsScreen(
             )
             .addItem(
                 Row.Builder()
-                    .setTitle("Larger controls")
+                    .setTitle(carContext.getString(R.string.car_settings_larger_controls))
                     .setToggle(
                         Toggle.Builder { checked ->
                             AppPreferences.setLargerControls(carContext, checked)
@@ -75,7 +76,7 @@ class CarSettingsScreen(
             )
             .addItem(
                 Row.Builder()
-                    .setTitle("Prefer voice actions")
+                    .setTitle(carContext.getString(R.string.car_settings_prefer_voice))
                     .setToggle(
                         Toggle.Builder { checked ->
                             AppPreferences.setPreferVoice(carContext, checked)
@@ -85,7 +86,7 @@ class CarSettingsScreen(
             )
             .addItem(
                 Row.Builder()
-                    .setTitle("Reduce visual clutter")
+                    .setTitle(carContext.getString(R.string.car_settings_reduce_clutter))
                     .setToggle(
                         Toggle.Builder { checked ->
                             AppPreferences.setReduceClutter(carContext, checked)
@@ -98,7 +99,7 @@ class CarSettingsScreen(
         val list = ItemList.Builder()
             .addItem(
                 Row.Builder()
-                    .setTitle("Display profile")
+                    .setTitle(carContext.getString(R.string.car_settings_display_profile))
                     .addText(SurfaceProfile.active.displayLabel)
                     .setOnClickListener {
                         SurfaceProfile.active = if (SurfaceProfile.active == SurfaceProfile.DEFAULT) {
@@ -109,7 +110,10 @@ class CarSettingsScreen(
                         SettingsStore.persistSurfaceProfile(carContext, SurfaceProfile.active)
                         CarToast.makeText(
                             carContext,
-                            "Profile: ${SurfaceProfile.active.displayLabel}",
+                            carContext.getString(
+                                R.string.car_settings_profile_toast,
+                                SurfaceProfile.active.displayLabel
+                            ),
                             CarToast.LENGTH_SHORT
                         ).show()
                         invalidate()
@@ -118,35 +122,40 @@ class CarSettingsScreen(
             )
             .addItem(
                 Row.Builder()
-                    .setTitle("Renderer pipeline")
+                    .setTitle(carContext.getString(R.string.car_settings_renderer))
                     .addText(pipelineSubtitle())
                     .setOnClickListener { cyclePipeline() }
                     .build()
             )
             .addItem(
                 Row.Builder()
-                    .setTitle("Mirror rotation")
+                    .setTitle(carContext.getString(R.string.car_settings_rotation))
                     .addText(rotationSubtitle())
                     .setOnClickListener { cycleRotation() }
                     .build()
             )
             .addItem(
                 Row.Builder()
-                    .setTitle("Scale mode")
+                    .setTitle(carContext.getString(R.string.car_settings_scale))
                     .addText(scaleSubtitle())
                     .setOnClickListener { cycleScale() }
                     .build()
             )
             .addItem(
                 Row.Builder()
-                    .setTitle("Landscape mirror (global)")
-                    .addText(if (MirrorOrientationController.isEnabled) "Enabled: rotates the whole phone" else "Disabled")
+                    .setTitle(carContext.getString(R.string.car_settings_landscape_global))
+                    .addText(
+                        carContext.getString(
+                            if (MirrorOrientationController.isEnabled) R.string.car_settings_landscape_on
+                            else R.string.car_settings_landscape_off
+                        )
+                    )
                     .setEnabled(false)
                     .build()
             )
             .addItem(
                 Row.Builder()
-                    .setTitle("Touch control")
+                    .setTitle(carContext.getString(R.string.car_settings_touch))
                     .addText(
                         when {
                             !FeaturePolicy.app.isAvailable(Feature.TOUCH) ->
@@ -159,46 +168,46 @@ class CarSettingsScreen(
             )
             .addItem(
                 Row.Builder()
-                    .setTitle("Screen-off behavior")
+                    .setTitle(carContext.getString(R.string.car_settings_screen_off))
                     .addText(
                         when {
                             MirrorSettings.screenOffOnAutoDim && ScreenOffController.panelOffAvailable() ->
-                                "Panel off on auto-dim (privileged)"
+                                R.string.car_settings_screen_off_panel
                             ScreenOffController.pipelineMode == ScreenOffController.PipelineMode.AUTO_MIRROR ->
-                                "Pauses with phone display"
+                                R.string.car_settings_screen_off_follows
                             ScreenOffController.pipelineMode == ScreenOffController.PipelineMode.SELF_DRAWN ->
-                                "Not guaranteed; source still follows phone display"
-                            else -> "Unavailable; dedicated display required"
-                        }
+                                R.string.car_settings_screen_off_partial
+                            else -> R.string.car_settings_screen_off_unavailable
+                        }.let { carContext.getString(it) }
                     )
                     .setEnabled(false)
                     .build()
             )
             .addItem(
                 Row.Builder()
-                    .setTitle("Diagnostics")
-                    .addText("Live FPS, uptime, reconnects and frame stats")
+                    .setTitle(carContext.getString(R.string.car_settings_diagnostics))
+                    .addText(carContext.getString(R.string.car_settings_diagnostics_caption))
                     .setOnClickListener { CarNavigation.open(screenManager, "CarDiagnosticsScreen") { CarDiagnosticsScreen(carContext) } }
                     .build()
             )
             .addItem(
                 Row.Builder()
-                    .setTitle("App Log")
-                    .addText("Recent events, including where a screen failed to open")
+                    .setTitle(carContext.getString(R.string.car_settings_log))
+                    .addText(carContext.getString(R.string.car_settings_log_caption))
                     .setOnClickListener { CarNavigation.open(screenManager, "CarLogScreen") { CarLogScreen(carContext) } }
                     .build()
             )
             .addItem(
                 Row.Builder()
-                    .setTitle("Speed safety")
+                    .setTitle(carContext.getString(R.string.car_settings_speed_safety))
                     .addText(vehicleLabel())
                     .setOnClickListener { onSafetyRequested() }
                     .build()
             )
             .addItem(
                 Row.Builder()
-                    .setTitle("Stop mirroring")
-                    .addText("Stop projection and leave AutoBridge")
+                    .setTitle(carContext.getString(R.string.car_settings_stop_mirroring))
+                    .addText(carContext.getString(R.string.car_settings_stop_mirroring_caption))
                     .setOnClickListener {
                         ProjectionService.stop(carContext)
                         carContext.finishCarApp()
@@ -210,47 +219,62 @@ class CarSettingsScreen(
         return ListTemplate.Builder()
             .setHeader(
                 Header.Builder()
-                    .setTitle("Settings")
+                    .setTitle(carContext.getString(R.string.car_settings_title))
                     .setStartHeaderAction(androidx.car.app.model.Action.BACK)
                     .build()
             )
-            .addSectionedList(SectionedItemList.create(generalList, "General"))
-            .addSectionedList(SectionedItemList.create(drivingList, "Driving Mode"))
-            .addSectionedList(SectionedItemList.create(list, "Mirror & Display"))
+            .addSectionedList(SectionedItemList.create(generalList, carContext.getString(R.string.car_settings_section_general)))
+            .addSectionedList(SectionedItemList.create(drivingList, carContext.getString(R.string.car_settings_section_driving)))
+            .addSectionedList(SectionedItemList.create(list, carContext.getString(R.string.car_settings_section_mirror)))
             .build()
     }
 
-    private fun vehicleLabel(): String = when (RuntimeContextStore.vehicleState) {
-        VehicleState.PARKED -> "PARKED"
-        VehicleState.MOVING -> "MOVING (blocked)"
-        VehicleState.UNKNOWN -> "UNKNOWN (blocked)"
-    }
+    private fun vehicleLabel(): String = carContext.getString(
+        when (RuntimeContextStore.vehicleState) {
+            VehicleState.PARKED -> R.string.car_vehicle_parked
+            VehicleState.MOVING -> R.string.car_vehicle_moving
+            VehicleState.UNKNOWN -> R.string.car_vehicle_unknown
+        }
+    )
 
     private fun selfDrawnActive(): Boolean =
         ScreenOffController.pipelineMode == ScreenOffController.PipelineMode.SELF_DRAWN
 
-    private fun pipelineSubtitle(): String = when (ScreenOffController.pipelineMode) {
-        ScreenOffController.PipelineMode.AUTO_MIRROR -> "AUTO_MIRROR • zero-copy, FIT only"
-        ScreenOffController.PipelineMode.SELF_DRAWN -> "SELF_DRAWN • app-controlled rotation/scale"
-        ScreenOffController.PipelineMode.OWN_CONTENT -> "OWN_CONTENT • unavailable"
-    }
+    private fun pipelineSubtitle(): String = carContext.getString(
+        when (ScreenOffController.pipelineMode) {
+            ScreenOffController.PipelineMode.AUTO_MIRROR -> R.string.car_pipeline_auto_mirror
+            ScreenOffController.PipelineMode.SELF_DRAWN -> R.string.car_pipeline_self_drawn
+            ScreenOffController.PipelineMode.OWN_CONTENT -> R.string.car_pipeline_own_content
+        }
+    )
 
     private fun rotationSubtitle(): String {
-        val value = when (MirrorCoordinator.activeRotationMode) {
-            RotationMode.AUTO -> "Auto"
-            RotationMode.PHONE -> "Follow phone"
-            RotationMode.PORTRAIT -> "Portrait"
-            RotationMode.LANDSCAPE -> "Landscape"
-        }
-        return if (selfDrawnActive()) "$value • car only" else "$value • needs SELF_DRAWN"
+        val value = carContext.getString(
+            when (MirrorCoordinator.activeRotationMode) {
+                RotationMode.AUTO -> R.string.car_rotation_auto
+                RotationMode.PHONE -> R.string.car_rotation_phone
+                RotationMode.PORTRAIT -> R.string.car_rotation_portrait
+                RotationMode.LANDSCAPE -> R.string.car_rotation_landscape
+            }
+        )
+        return carContext.getString(
+            if (selfDrawnActive()) R.string.car_rotation_car_only
+            else R.string.car_rotation_needs_self_drawn,
+            value
+        )
     }
 
     private fun scaleSubtitle(): String =
-        if (selfDrawnActive()) MirrorCoordinator.requestedScale.name else "FIT • needs SELF_DRAWN"
+        if (selfDrawnActive()) MirrorCoordinator.requestedScale.name
+        else carContext.getString(R.string.car_scale_needs_self_drawn)
 
     private fun cyclePipeline() {
         if (MirrorCoordinator.isProjectionReady) {
-            CarToast.makeText(carContext, "Stop mirroring before changing the renderer", CarToast.LENGTH_SHORT).show()
+            CarToast.makeText(
+                carContext,
+                carContext.getString(R.string.car_stop_before_renderer),
+                CarToast.LENGTH_SHORT
+            ).show()
             return
         }
         val next = when (ScreenOffController.pipelineMode) {
@@ -259,7 +283,11 @@ class CarSettingsScreen(
             ScreenOffController.PipelineMode.OWN_CONTENT -> ScreenOffController.PipelineMode.AUTO_MIRROR
         }
         if (!MirrorCoordinator.setPipelineMode(next)) {
-            CarToast.makeText(carContext, "Renderer pipeline is not available", CarToast.LENGTH_SHORT).show()
+            CarToast.makeText(
+                carContext,
+                carContext.getString(R.string.car_renderer_unavailable),
+                CarToast.LENGTH_SHORT
+            ).show()
             return
         }
         invalidate()
@@ -276,7 +304,7 @@ class CarSettingsScreen(
         if (!selfDrawnActive() && next != RotationMode.AUTO && next != RotationMode.PHONE) {
             CarToast.makeText(
                 carContext,
-                "Switch renderer to SELF_DRAWN so rotation applies to the car only",
+                carContext.getString(R.string.car_needs_self_drawn_rotation),
                 CarToast.LENGTH_LONG
             ).show()
         }
@@ -288,7 +316,11 @@ class CarSettingsScreen(
         val next = modes[(modes.indexOf(MirrorCoordinator.requestedScale) + 1) % modes.size]
         MirrorCoordinator.setScaleMode(next)
         if (!selfDrawnActive() && next != ScaleMode.FIT) {
-            CarToast.makeText(carContext, "${next.name} requires the SELF_DRAWN renderer", CarToast.LENGTH_SHORT).show()
+            CarToast.makeText(
+                carContext,
+                carContext.getString(R.string.car_scale_requires_self_drawn, next.name),
+                CarToast.LENGTH_SHORT
+            ).show()
         }
         invalidate()
     }

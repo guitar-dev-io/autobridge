@@ -6,6 +6,7 @@ import dev.autobridge.core.model.Feature
 import dev.autobridge.core.model.RuntimeContext
 import dev.autobridge.core.model.VehicleState
 import dev.autobridge.core.state.RuntimeContextStore
+import dev.autobridge.safety.BypassPolicyStore
 import dev.autobridge.safety.SafetyEnforcement
 
 /** Result of evaluating a feature at a specific point in the runtime lifecycle. */
@@ -50,7 +51,13 @@ class FeaturePolicy(
 
     fun decide(feature: Feature, context: RuntimeContext = contextProvider()): FeatureDecision {
         val requiresParked = feature in parkedOnlyFeatures
-        val modeAllows = when (context.mode) {
+
+        // Runtime bypass (BypassPolicyStore) sits on top of the stock gate. When it is off, the
+        // original mode + PARKED logic below runs unchanged, so the safety defaults are intact.
+        val bypassMode = BypassPolicyStore.overridesMode
+        val bypassParked = BypassPolicyStore.overridesParked
+
+        val modeAllows = bypassMode || when (context.mode) {
             AutoBridgeMode.SAFE -> feature in setOf(Feature.MEDIA, Feature.QUICK_APPS)
             AutoBridgeMode.PERSONAL -> true
             AutoBridgeMode.LAB -> true
@@ -62,10 +69,13 @@ class FeaturePolicy(
 
         if (requiresParked && context.vehicleState != VehicleState.PARKED) {
             val state = context.vehicleState.name.lowercase()
-            return if (enforceParkedOnly) {
-                FeatureDecision(feature, false, "${feature.name} requires PARKED; vehicle is $state", true)
-            } else {
-                FeatureDecision(feature, true, "Vehicle is $state; parked-only gate is reporting, not blocking", true)
+            return when {
+                bypassParked ->
+                    FeatureDecision(feature, true, "Vehicle is $state; bypass override active", true)
+                enforceParkedOnly ->
+                    FeatureDecision(feature, false, "${feature.name} requires PARKED; vehicle is $state", true)
+                else ->
+                    FeatureDecision(feature, true, "Vehicle is $state; parked-only gate is reporting, not blocking", true)
             }
         }
 
@@ -75,7 +85,8 @@ class FeaturePolicy(
             return FeatureDecision(feature, true, "LAB on real car; real vehicle state enforced", requiresParked)
         }
 
-        return FeatureDecision(feature, true, "Enabled by ${context.mode.name}", requiresParked)
+        val reason = if (bypassMode) "Bypass override active" else "Enabled by ${context.mode.name}"
+        return FeatureDecision(feature, true, reason, requiresParked)
     }
 
     fun isAvailable(feature: Feature, context: RuntimeContext = contextProvider()): Boolean =

@@ -9,6 +9,7 @@ import androidx.car.app.model.ItemList
 import androidx.car.app.model.ListTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
+import dev.autobridge.R
 import dev.autobridge.apps.QuickLaunchStore
 import dev.autobridge.core.state.RecentActivityStore
 
@@ -24,13 +25,14 @@ class CarQuickLaunchScreen(carContext: CarContext, private val manage: Boolean =
         val shortcuts = QuickLaunchStore.list(carContext)
         val list = ItemList.Builder()
         if (shortcuts.isEmpty()) {
-            list.setNoItemsMessage("No shortcuts yet — tap Add")
+            list.setNoItemsMessage(carContext.getString(R.string.car_quicklaunch_empty))
         } else {
             shortcuts.forEachIndexed { index, shortcut ->
                 val subtitle = when (shortcut.kind) {
                     QuickLaunchStore.Kind.URL -> shortcut.payload
-                    QuickLaunchStore.Kind.INTERNAL -> "AutoBridge action"
-                    QuickLaunchStore.Kind.APP -> "App • ${shortcut.payload}"
+                    QuickLaunchStore.Kind.INTERNAL -> carContext.getString(R.string.car_quicklaunch_internal)
+                    QuickLaunchStore.Kind.APP ->
+                        carContext.getString(R.string.car_quicklaunch_app_subtitle, shortcut.payload)
                 }
                 val row = Row.Builder().setTitle(shortcut.label).addText(subtitle)
                 if (manage) {
@@ -45,7 +47,9 @@ class CarQuickLaunchScreen(carContext: CarContext, private val manage: Boolean =
         return ListTemplate.Builder()
             .setHeader(
                 Header.Builder()
-                    .setTitle(if (manage) "Manage Quick Launch" else "Quick Launch")
+                    .setTitle(carContext.getString(
+                        if (manage) R.string.car_quicklaunch_manage_title else R.string.car_quicklaunch_title
+                    ))
                     .setStartHeaderAction(Action.BACK)
                     .addEndHeaderAction(
                         Action.Builder()
@@ -90,7 +94,11 @@ class CarQuickLaunchScreen(carContext: CarContext, private val manage: Boolean =
             }
             QuickLaunchStore.Kind.APP -> {
                 if (!dev.autobridge.apps.QuickAppLauncher.launch(carContext, shortcut.payload)) {
-                    CarToast.makeText(carContext, "Could not launch ${shortcut.label}", CarToast.LENGTH_SHORT).show()
+                    CarToast.makeText(
+                        carContext,
+                        carContext.getString(R.string.car_could_not_launch, shortcut.label),
+                        CarToast.LENGTH_SHORT
+                    ).show()
                 }
             }
         }
@@ -100,7 +108,7 @@ class CarQuickLaunchScreen(carContext: CarContext, private val manage: Boolean =
         val list = ItemList.Builder()
         if (index > 0) {
             list.addItem(
-                Row.Builder().setTitle("Move up").setOnClickListener {
+                Row.Builder().setTitle(carContext.getString(R.string.car_quicklaunch_move_up)).setOnClickListener {
                     QuickLaunchStore.move(carContext, shortcut.id, up = true)
                     screenManager.pop()
                     invalidate()
@@ -109,7 +117,7 @@ class CarQuickLaunchScreen(carContext: CarContext, private val manage: Boolean =
         }
         if (index < count - 1) {
             list.addItem(
-                Row.Builder().setTitle("Move down").setOnClickListener {
+                Row.Builder().setTitle(carContext.getString(R.string.car_quicklaunch_move_down)).setOnClickListener {
                     QuickLaunchStore.move(carContext, shortcut.id, up = false)
                     screenManager.pop()
                     invalidate()
@@ -117,7 +125,7 @@ class CarQuickLaunchScreen(carContext: CarContext, private val manage: Boolean =
             )
         }
         list.addItem(
-            Row.Builder().setTitle("Remove").setOnClickListener {
+            Row.Builder().setTitle(carContext.getString(R.string.car_quicklaunch_remove)).setOnClickListener {
                 QuickLaunchStore.remove(carContext, shortcut.id)
                 screenManager.pop()
                 invalidate()

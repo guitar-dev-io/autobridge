@@ -34,12 +34,16 @@ android {
         applicationId = "dev.autobridge"
         minSdk = 29
         targetSdk = 36
-        versionCode = 25
-        versionName = "0.4.11"
+        versionCode = 26
+        versionName = "0.4.12"
         // The faults that actually reach a head unit — viewport geometry, scroll bounds, WebView
         // state — only reproduce against a real WebView, so this module needs on-device tests as
         // well as JVM ones.
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // The UI ships English (default res/values) and Thai (res/values-th). Declaring the set
+        // keeps libraries from dragging in other partial translations and lets Android resolve the
+        // car/phone UI by the device/app language automatically.
+        resourceConfigurations += setOf("en", "th")
     }
 
     flavorDimensions += "mode"
@@ -100,6 +104,19 @@ android {
         aidl = true
         buildConfig = true
         compose = true
+    }
+
+    lint {
+        // A string that exists in res/values but not in every res/values-<tag> renders in English
+        // for that locale, which reads as a bug rather than a missing translation. Promoted to an
+        // error so it cannot ride along in a release; scripts/check-i18n.sh reports the same gap
+        // with the key names, without needing the SDK.
+        error += "MissingTranslation"
+        // The inverse — a translation for a key the default locale dropped — is dead weight and
+        // the usual sign of a rename that only landed in one file.
+        error += "ExtraTranslation"
+        // Hardcoded UI text. Only reaches XML layouts; the Kotlin side is scripts/check-i18n.sh.
+        warning += "HardcodedText"
     }
 }
 

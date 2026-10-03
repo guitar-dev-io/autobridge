@@ -40,6 +40,7 @@ import com.google.common.util.concurrent.ListenableFuture
 import dev.autobridge.MainActivity
 import dev.autobridge.core.model.Feature
 import dev.autobridge.core.policy.FeaturePolicy
+import dev.autobridge.audio.WebMediaStatus
 import dev.autobridge.display.StructuredLog
 import dev.autobridge.safety.ParkingStateStore
 import dev.autobridge.settings.PreferredPlayer
@@ -92,6 +93,7 @@ class MediaPlaybackService : MediaLibraryService() {
                     composite.select(
                         SessionSourceArbiter.choose(composite.source, exoActive, true, status.playing)
                     )
+                    advanceQueueIfFinished(source, status)
                 }
             }
             mainHandler.postDelayed(this, WEB_POLL_MS)
@@ -99,6 +101,38 @@ class MediaPlaybackService : MediaLibraryService() {
     }
     private val mainHandler = Handler(Looper.getMainLooper())
     private var lastLiveRecoveryMs = 0L
+
+    /**
+     * Whether the previous reading already said the page had finished, so the queue advances on the
+     * *transition* into finished and not once per second afterwards.
+     *
+     * A page that has ended keeps reporting that it has ended for as long as it stays loaded, which
+     * is until the next item replaces it. Acting on the level rather than the edge would empty the
+     * whole queue into one page load, each item replacing the last before it could be heard.
+     */
+    private var webHadFinished = false
+
+    /**
+     * Loads the next queued page when the current one reaches its end.
+     *
+     * This lives here because the one-second poll is the only steady reading of what the page is
+     * doing, and it already has the browser in hand. The decision is kept to "it finished, is there
+     * a next one" — what next *means* belongs to the browser, which owns the queue and the
+     * navigation ([WebMediaSource.skipToNext]).
+     */
+    private fun advanceQueueIfFinished(source: WebMediaSource, status: WebMediaStatus) {
+        val finished = status.ended
+        val startedFinishing = finished && !webHadFinished
+        webHadFinished = finished
+        if (!startedFinishing) return
+        // Not every ended page has a successor; most do not, and then nothing should happen at all.
+        if (source.skipToNext()) {
+            StructuredLog.i("MEDIA", "page finished; advanced the play queue")
+            // The next page is loading and has no media yet. Clearing this now means its own end is
+            // seen as a fresh transition rather than a continuation of this one.
+            webHadFinished = false
+        }
+    }
 
     /**
      * Translates the text-track cues ExoPlayer decodes and publishes them to [SubtitleHub], which
@@ -431,6 +465,12 @@ class MediaPlaybackService : MediaLibraryService() {
             // and the phone UI agree.
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
+        // Wrap the queue so steering-wheel Next/Previous stay live at both ends: without this,
+        // Next is dead on the last item and Previous is dead on the first, and the head unit
+        // greys those buttons out because hasNext/hasPreviousMediaItem() report false there. For a
+        // channel/track list this is the expected behaviour - Next past the end returns to the
+        // start. A single-item queue still has nowhere to go, which is correct.
+        exoPlayer.repeatMode = Player.REPEAT_MODE_ALL
         player = exoPlayer
         subtitles = SubtitleController(this).also { it.start() }
         exoPlayer.addListener(playerListener)

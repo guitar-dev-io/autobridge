@@ -1,7 +1,9 @@
 package dev.autobridge.browser
 
 import android.content.Context
+import androidx.annotation.StringRes
 import androidx.core.content.edit
+import dev.autobridge.R
 
 /**
  * What the floating button does when it is tapped.
@@ -11,13 +13,21 @@ import androidx.core.content.edit
  * [MENU]; someone who switches between two sites all day wants [TABS] and never opens the menu at
  * all. Fixing it to one behaviour makes the other user press two things for every one.
  */
-enum class FloatingButtonAction(val label: String, val glyph: String) {
-    MENU("เปิดเมนู", "☰"),
-    TABS("สลับแท็บ", "▣"),
-    NEW_TAB("แท็บใหม่", "+"),
-    HOME("หน้าแรก", "⌂"),
-    ADDRESS("ช่อง URL / คีย์บอร์ด", "⌨"),
-    FULLSCREEN("สลับเต็มหน้าจอ", "⛶"),
+enum class FloatingButtonAction(@StringRes val labelRes: Int, val glyph: String) {
+    MENU(R.string.fab_action_menu, "☰"),
+    TABS(R.string.fab_action_tabs, "▣"),
+    NEW_TAB(R.string.fab_action_new_tab, "+"),
+    HOME(R.string.fab_action_home, "⌂"),
+    ADDRESS(R.string.fab_action_address, "⌨"),
+    FULLSCREEN(R.string.fab_action_fullscreen, "⛶"),
+    ;
+
+    /**
+     * The name to show for this action. A string *id* rather than the text, because an enum
+     * constant is built once per process: a label captured at class-init would keep whatever
+     * language was in force then and survive a language change unchanged.
+     */
+    fun label(context: Context): String = context.getString(labelRes)
 }
 
 /**

@@ -636,7 +636,7 @@ class BrowserDrawerModelTest {
                 // Header buttons live above the scroll boundary by design.
                 (model.rows - model.headerLinks.toSet()).forEach { row ->
                     assertTrue(
-                        "${row.item.label} falls outside the sheet at ${width}x$height @$dpi",
+                        "${row.item.action} falls outside the sheet at ${width}x$height @$dpi",
                         row.bounds.top >= model.headerBottom - 0.01f &&
                             row.bounds.bottom <= model.panel.bottom + 0.01f
                     )
@@ -731,7 +731,7 @@ class BrowserDrawerModelTest {
             val minimum = sizes.touchTarget * sizes.touchTarget
             modelFor(width, height, dpi).tiles.forEach { row ->
                 assertTrue(
-                    "tile ${row.item.label} too small at ${width}x$height",
+                    "tile ${row.item.action} too small at ${width}x$height",
                     row.bounds.width * row.bounds.height >= minimum * 1.5f
                 )
                 assertTrue(row.bounds.height >= sizes.touchTarget)
@@ -752,7 +752,7 @@ class BrowserDrawerModelTest {
                             other.bounds.left < row.bounds.right &&
                             row.bounds.top < other.bounds.bottom &&
                             other.bounds.top < row.bounds.bottom
-                        assertTrue("${row.item.label} overlaps ${other.item.label}", !overlaps)
+                        assertTrue("${row.item.action} overlaps ${other.item.action}", !overlaps)
                     }
                 }
             }
@@ -775,7 +775,7 @@ class BrowserDrawerModelTest {
             model.rows.filter { it.item.enabled }.forEach { row ->
                 val hit = model.rowAt(row.bounds.centerX, row.bounds.centerY)
                 assertEquals(
-                    "${row.item.label} is not tappable at its own centre",
+                    "${row.item.action} is not tappable at its own centre",
                     row.item.action, hit?.item?.action
                 )
             }

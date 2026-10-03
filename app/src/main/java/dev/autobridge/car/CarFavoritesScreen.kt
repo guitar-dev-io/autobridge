@@ -12,6 +12,7 @@ import androidx.car.app.model.SectionedItemList
 import androidx.car.app.model.Template
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
+import dev.autobridge.R
 import dev.autobridge.entertainment.WebBookmarkStore
 import dev.autobridge.iptv.IptvHistoryStore
 import dev.autobridge.iptv.IptvKind
@@ -37,13 +38,13 @@ class CarFavoritesScreen(carContext: CarContext) : Screen(carContext) {
         val channels = IptvHistoryStore.favorites(carContext)
         val bookmarks = WebBookmarkStore.list(carContext)
         if (channels.isEmpty() && bookmarks.isEmpty()) {
-            return MessageTemplate.Builder("Star a channel or save a web page to see it here.")
-                .setHeader(Header.Builder().setTitle("Favorites").setStartHeaderAction(Action.BACK).build())
+            return MessageTemplate.Builder(carContext.getString(R.string.car_favorites_empty))
+                .setHeader(Header.Builder().setTitle(carContext.getString(R.string.car_favorites_title)).setStartHeaderAction(Action.BACK).build())
                 .build()
         }
 
         val template = ListTemplate.Builder()
-            .setHeader(Header.Builder().setTitle("Favorites").setStartHeaderAction(Action.BACK).build())
+            .setHeader(Header.Builder().setTitle(carContext.getString(R.string.car_favorites_title)).setStartHeaderAction(Action.BACK).build())
 
         if (channels.isNotEmpty()) {
             val list = ItemList.Builder()
@@ -51,7 +52,7 @@ class CarFavoritesScreen(carContext: CarContext) : Screen(carContext) {
                 list.addItem(
                     Row.Builder()
                         .setTitle(item.title)
-                        .addText(if (item.kind == IptvKind.RADIO) "Radio" else "TV")
+                        .addText(carContext.getString(if (item.kind == IptvKind.RADIO) R.string.car_iptv_radio else R.string.car_iptv_tv))
                         .setOnClickListener {
                             CarIptvPlayback.play(
                                 this, carContext, mediaPlayback, item.title, item.url, item.kind
@@ -60,7 +61,7 @@ class CarFavoritesScreen(carContext: CarContext) : Screen(carContext) {
                         .build()
                 )
             }
-            template.addSectionedList(SectionedItemList.create(list.build(), "Channels"))
+            template.addSectionedList(SectionedItemList.create(list.build(), carContext.getString(R.string.car_favorites_channels)))
         }
 
         if (bookmarks.isNotEmpty()) {
@@ -79,7 +80,7 @@ class CarFavoritesScreen(carContext: CarContext) : Screen(carContext) {
                         .build()
                 )
             }
-            template.addSectionedList(SectionedItemList.create(list.build(), "Web"))
+            template.addSectionedList(SectionedItemList.create(list.build(), carContext.getString(R.string.car_favorites_web)))
         }
 
         return template.build()

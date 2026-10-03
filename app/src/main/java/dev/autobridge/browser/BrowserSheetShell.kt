@@ -14,6 +14,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import dev.autobridge.R
 
 /**
  * The bottom-sheet chrome shared by every phone browser sheet.
@@ -71,7 +72,7 @@ internal class BrowserSheetShell(
         gravity = Gravity.CENTER
         textSize = sp(AutoUiSizes.ICON_SMALL_DP)
         setTextColor(BrowserTheme.textSecondary)
-        contentDescription = "ปิด"
+        contentDescription = activity.getString(R.string.browser_close)
         val side = sizes.dpInt(AutoUiSizes.SHEET_CLOSE_BUTTON_DP)
         background = rounded(BrowserTheme.sheetCardBackground, side / 2f)
         layoutParams = LinearLayout.LayoutParams(side, side)

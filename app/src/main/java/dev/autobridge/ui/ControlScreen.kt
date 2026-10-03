@@ -37,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -97,21 +98,21 @@ fun ControlScreen(
 
     Column(Modifier.fillMaxSize().background(ComposeTokens.Ink)) {
         PhoneHeader(
-            title = "Control",
-            action = HeaderButton("↺", "History", onOpenHistory)
+            title = stringResource(R.string.control_title),
+            action = HeaderButton("↺", stringResource(R.string.control_history_action), onOpenHistory)
         )
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState())
                 .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            AndroidAutoStatusCard(title = "Android Auto", onClick = onOpenConnection)
+            AndroidAutoStatusCard(title = stringResource(R.string.control_android_auto), onClick = onOpenConnection)
 
-            SectionLabel("Command or URL")
-            CommandField(placeholder = "open google.com")
+            SectionLabel(stringResource(R.string.control_section_command_or_url))
+            CommandField(placeholder = stringResource(R.string.control_command_placeholder))
             lastResult.value?.let { ResultBanner(it) }
 
-            SectionLabel("Quick Actions")
+            SectionLabel(stringResource(R.string.control_section_quick_actions))
             // Same persisted, user-customisable quick commands as before, all routed through the bus.
             quickCommands.chunked(3).forEach { rowItems ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -126,16 +127,16 @@ fun ControlScreen(
                 }
             }
 
-            SectionLabel("Current Screen")
+            SectionLabel(stringResource(R.string.control_section_current_screen))
             CurrentScreenCard(state)
 
-            SectionLabel("Send Text to Car")
+            SectionLabel(stringResource(R.string.control_section_send_text))
             Card {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(
                         value = sendText,
                         onValueChange = { sendText = it },
-                        placeholder = { Text("Type text to send", color = TextMuted) },
+                        placeholder = { Text(stringResource(R.string.control_send_text_placeholder), color = TextMuted) },
                         singleLine = true,
                         modifier = Modifier.weight(1f)
                     )
@@ -152,14 +153,14 @@ fun ControlScreen(
                             )
                         )
                         sendText = ""
-                    }) { Text("Send", color = Accent) }
+                    }) { Text(stringResource(R.string.control_send), color = Accent) }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(
                         checked = settings.autoSubmitText,
                         onCheckedChange = { RemoteSettingsStore.update(context) { s -> s.copy(autoSubmitText = it) } }
                     )
-                    Text("Press Enter automatically after sending", color = TextMuted, fontSize = 13.sp)
+                    Text(stringResource(R.string.control_auto_submit_hint), color = TextMuted, fontSize = 13.sp)
                 }
             }
         }
@@ -174,17 +175,17 @@ fun CommandHistoryScreen(context: android.content.Context, onBack: () -> Unit) {
     val history by CommandHistoryStore.entries.collectAsState()
     Column(Modifier.fillMaxSize().background(ComposeTokens.Ink)) {
         PhoneHeader(
-            title = "History",
-            subtitle = "Recent commands",
+            title = stringResource(R.string.history_title),
+            subtitle = stringResource(R.string.history_subtitle),
             onBack = onBack,
-            action = HeaderButton("⌫", "Clear history") { CommandHistoryStore.clear(context) }
+            action = HeaderButton("⌫", stringResource(R.string.history_clear)) { CommandHistoryStore.clear(context) }
         )
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState())
                 .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            if (history.isEmpty()) Text("No commands yet.", color = TextMuted, fontSize = 13.sp)
+            if (history.isEmpty()) Text(stringResource(R.string.history_empty), color = TextMuted, fontSize = 13.sp)
             history.forEach { entry ->
                 Card(onClick = {
                     // Run again through the same bus (new id so dedup does not block the re-run).
@@ -227,44 +228,72 @@ fun AgentCommandsScreen(
 ) {
     val settings by RemoteSettingsStore.settings.collectAsState()
     Column(Modifier.fillMaxSize().background(ComposeTokens.Ink)) {
-        PhoneHeader(title = "Agent & Commands", subtitle = "Commands, history and automation", onBack = onBack)
+        PhoneHeader(
+            title = stringResource(R.string.agent_screen_title),
+            subtitle = stringResource(R.string.agent_screen_subtitle),
+            onBack = onBack
+        )
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState())
                 .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            SectionLabel("Commands")
+            SectionLabel(stringResource(R.string.agent_section_commands))
             Card {
-                ToggleRow("Show command confirmation", "Show the result after each command", settings.showConfirmation) {
+                ToggleRow(
+                    stringResource(R.string.agent_toggle_show_confirmation),
+                    stringResource(R.string.agent_toggle_show_confirmation_caption),
+                    settings.showConfirmation
+                ) {
                     RemoteSettingsStore.update(context) { s -> s.copy(showConfirmation = it) }
                 }
-                ToggleRow("Haptic feedback", "Vibrate when a command is sent", settings.hapticFeedback) {
+                ToggleRow(
+                    stringResource(R.string.agent_toggle_haptic),
+                    stringResource(R.string.agent_toggle_haptic_caption),
+                    settings.hapticFeedback
+                ) {
                     RemoteSettingsStore.update(context) { s -> s.copy(hapticFeedback = it) }
                 }
-                ToggleRow("Auto submit text", "Press Enter after Send Text to Car", settings.autoSubmitText) {
+                ToggleRow(
+                    stringResource(R.string.agent_toggle_auto_submit),
+                    stringResource(R.string.agent_toggle_auto_submit_caption),
+                    settings.autoSubmitText
+                ) {
                     RemoteSettingsStore.update(context) { s -> s.copy(autoSubmitText = it) }
                 }
             }
-            SectionLabel("Agent")
+            SectionLabel(stringResource(R.string.agent_section_agent))
             Card {
-                ToggleRow("Prefer Agent for unknown text", "Hand unrecognised text to the Agent", settings.preferAgentForUnknown) {
+                ToggleRow(
+                    stringResource(R.string.agent_toggle_prefer_agent),
+                    stringResource(R.string.agent_toggle_prefer_agent_caption),
+                    settings.preferAgentForUnknown
+                ) {
                     RemoteSettingsStore.update(context) { s -> s.copy(preferAgentForUnknown = it) }
                 }
-                ToggleRow("Resume last feature", "Reopen what was running last time", settings.resumeLastFeature) {
+                ToggleRow(
+                    stringResource(R.string.agent_toggle_resume_last),
+                    stringResource(R.string.agent_toggle_resume_last_caption),
+                    settings.resumeLastFeature
+                ) {
                     RemoteSettingsStore.update(context) { s -> s.copy(resumeLastFeature = it) }
                 }
             }
-            SectionLabel("History")
+            SectionLabel(stringResource(R.string.agent_section_history))
             Card {
-                ToggleRow("Remember command history", "Keep the last 20 commands", settings.rememberHistory) {
+                ToggleRow(
+                    stringResource(R.string.agent_toggle_remember_history),
+                    stringResource(R.string.agent_toggle_remember_history_caption),
+                    settings.rememberHistory
+                ) {
                     RemoteSettingsStore.update(context) { s -> s.copy(rememberHistory = it) }
                 }
             }
             Card(onClick = onOpenHistory) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("Command history", color = TextPrimary, fontSize = 15.sp)
-                        Text("View and re-run recent commands", color = TextMuted, fontSize = 12.sp)
+                        Text(stringResource(R.string.agent_command_history), color = TextPrimary, fontSize = 15.sp)
+                        Text(stringResource(R.string.agent_command_history_caption), color = TextMuted, fontSize = 12.sp)
                     }
                     Text("›", color = TextMuted, fontSize = 22.sp)
                 }
@@ -388,7 +417,7 @@ fun ResultBanner(result: CommandResult) {
     Surface(color = CardAltColor, shape = RoundedCornerShape(12.dp)) {
         Column(Modifier.fillMaxWidth().padding(12.dp)) {
             Text(
-                if (ok) "Command sent" else "Command failed",
+                stringResource(if (ok) R.string.control_result_sent else R.string.control_result_failed),
                 color = if (ok) AccentGreen else ComposeTokens.Danger,
                 fontWeight = FontWeight.SemiBold
             )

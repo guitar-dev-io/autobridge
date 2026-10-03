@@ -102,7 +102,11 @@ class CarBrowserScreen(carContext: CarContext) :
                 // real external browser instead of letting the car surface hit their block page.
                 renderer.onExternalSignInRequired = { url ->
                     carContext.mainExecutor.execute {
-                        CarToast.makeText(carContext, "เข้าสู่ระบบต้องใช้เบราว์เซอร์ภายนอก", CarToast.LENGTH_LONG).show()
+                        CarToast.makeText(
+                    carContext,
+                    carContext.getString(R.string.car_browser_signin_external),
+                    CarToast.LENGTH_LONG
+                ).show()
                         openExternal(url)
                     }
                 }
@@ -173,10 +177,10 @@ class CarBrowserScreen(carContext: CarContext) :
     override fun onGetTemplate(): Template {
         if (!allowed()) return PaneTemplate.Builder(
             Pane.Builder().addRow(
-                Row.Builder().setTitle("Browser")
-                    .addText("Park the vehicle to browse websites.").build()
+                Row.Builder().setTitle(carContext.getString(R.string.car_browser_title))
+                    .addText(carContext.getString(R.string.car_browser_park_to_browse)).build()
             ).build()
-        ).setHeader(Header.Builder().setTitle("Browser").setStartHeaderAction(Action.BACK).build()).build()
+        ).setHeader(Header.Builder().setTitle(carContext.getString(R.string.car_browser_title)).setStartHeaderAction(Action.BACK).build()).build()
         // No dedicated back button and no second menu button: the on-canvas hamburger menu, already
         // drawn by the renderer in its own toolbar, is the single entry point into browser
         // navigation — Home, Bookmarks, History, Settings, etc. NavigationTemplate still requires a
@@ -279,7 +283,7 @@ class CarBrowserScreen(carContext: CarContext) :
                     renderer.applyUserAgentAndReload()
                     CarToast.makeText(
                         carContext,
-                        "User-Agent: ${BrowserUserAgentStore.label(carContext)}",
+                        carContext.getString(R.string.car_browser_user_agent_label, BrowserUserAgentStore.label(carContext)),
                         CarToast.LENGTH_SHORT
                     ).show()
                     invalidate()
@@ -318,7 +322,11 @@ class CarBrowserScreen(carContext: CarContext) :
             true
         }.getOrDefault(false)
         if (!opened) {
-            CarToast.makeText(carContext, "No external browser available", CarToast.LENGTH_SHORT).show()
+            CarToast.makeText(
+                carContext,
+                carContext.getString(R.string.car_browser_no_external),
+                CarToast.LENGTH_SHORT
+            ).show()
         }
     }
 

@@ -9,6 +9,7 @@ import androidx.car.app.model.ItemList
 import androidx.car.app.model.ListTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
+import dev.autobridge.R
 import dev.autobridge.core.model.ScaleMode
 import dev.autobridge.core.state.RecentActivityStore
 import dev.autobridge.mirror.MirrorCoordinator
@@ -29,8 +30,8 @@ class CarMirrorIntroScreen(carContext: CarContext) : Screen(carContext) {
             .build()
 
         val fitRow = Row.Builder()
-            .setTitle("Fit to screen")
-            .addText(if (MirrorCoordinator.requestedScale == ScaleMode.FIT) "On • letterboxed" else "Off • fill")
+            .setTitle(carContext.getString(R.string.car_mirror_intro_fit))
+            .addText(carContext.getString(if (MirrorCoordinator.requestedScale == ScaleMode.FIT) R.string.car_mirror_intro_fit_on else R.string.car_mirror_intro_fit_off))
             .setOnClickListener {
                 val next = if (MirrorCoordinator.requestedScale == ScaleMode.FIT) ScaleMode.FILL else ScaleMode.FIT
                 MirrorCoordinator.setScaleMode(next)
@@ -39,8 +40,8 @@ class CarMirrorIntroScreen(carContext: CarContext) : Screen(carContext) {
             .build()
 
         val qualityRow = Row.Builder()
-            .setTitle("Quality")
-            .addText("High (1080p)")
+            .setTitle(carContext.getString(R.string.car_mirror_intro_quality))
+            .addText(carContext.getString(R.string.car_mirror_intro_quality_value))
             .setOnClickListener {
                 CarNavigation.open(screenManager, "CarSettingsScreen") { CarSettingsScreen(carContext) {} }
             }
@@ -56,8 +57,8 @@ class CarMirrorIntroScreen(carContext: CarContext) : Screen(carContext) {
         // requireActionIcons), and ListTemplate.setActionStrip is deprecated. Both alternatives
         // risk the same kind of constraint violation this screen is being fixed for.
         val startRow = Row.Builder()
-            .setTitle("Start Mirroring")
-            .addText(if (MirrorCoordinator.isMirroring) "Mirroring is running" else "Show the phone screen on the car")
+            .setTitle(carContext.getString(R.string.car_mirror_intro_start))
+            .addText(carContext.getString(if (MirrorCoordinator.isMirroring) R.string.car_mirror_intro_running else R.string.car_mirror_intro_start_caption))
             .setOnClickListener { startMirroring() }
             .build()
 
@@ -72,7 +73,7 @@ class CarMirrorIntroScreen(carContext: CarContext) : Screen(carContext) {
             .setSingleList(items)
             .setHeader(
                 Header.Builder()
-                    .setTitle("Mirror")
+                    .setTitle(carContext.getString(R.string.car_mirror_intro_title))
                     .setStartHeaderAction(Action.BACK)
                     .build()
             )
@@ -82,27 +83,32 @@ class CarMirrorIntroScreen(carContext: CarContext) : Screen(carContext) {
     private fun startMirroring() {
         RecentActivityStore.record(
             carContext,
-            RecentActivityStore.Entry(RecentActivityStore.Kind.MIRROR, "Phone screen", "Mirror")
+            RecentActivityStore.Entry(
+                RecentActivityStore.Kind.MIRROR,
+                carContext.getString(R.string.car_intro_phone_screen),
+                carContext.getString(R.string.section_mirror)
+            )
         )
         if (!MirrorCoordinator.isProjectionReady) {
             CarToast.makeText(
                 carContext,
-                "Grant screen sharing on your phone to start mirroring",
+                carContext.getString(R.string.car_mirror_intro_grant),
                 CarToast.LENGTH_LONG
             ).show()
         }
         CarNavigation.open(screenManager, "MirrorCarScreen") { MirrorCarScreen(carContext) }
     }
 
-    private fun statusTitle(): String = when {
-        MirrorCoordinator.isMirroring -> "Mirroring active"
-        MirrorCoordinator.isProjectionReady -> "Ready to mirror"
-        else -> "Ready to mirror"
-    }
+    private fun statusTitle(): String = carContext.getString(
+        if (MirrorCoordinator.isMirroring) R.string.car_mirror_intro_status_active
+        else R.string.car_mirror_intro_status_ready
+    )
 
     private fun deviceLine(): String {
         val connected = dev.autobridge.core.state.RuntimeContextStore.context.value.connected
-        return if (connected) "Phone connected • show your phone on Android Auto"
-        else "Show your phone screen on Android Auto"
+        return carContext.getString(
+            if (connected) R.string.car_mirror_intro_device_connected
+            else R.string.car_mirror_intro_device_disconnected
+        )
     }
 }

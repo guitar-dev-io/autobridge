@@ -18,3 +18,8 @@ if [[ -n "${ANDROID_HOME:-}" ]]; then
 else
   echo "ANDROID_HOME is not set. Android Studio can manage the SDK automatically."
 fi
+
+echo
+echo "Translation set"
+echo "---------------"
+"$(dirname "$0")/scripts/check-i18n.sh" || true

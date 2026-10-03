@@ -9,6 +9,7 @@ import androidx.car.app.model.ItemList
 import androidx.car.app.model.ListTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
+import dev.autobridge.R
 import dev.autobridge.browser.BrowserDisplayUrl
 import dev.autobridge.entertainment.WebBookmarkStore
 
@@ -22,11 +23,11 @@ class CarBrowserBookmarksScreen(carContext: CarContext) : Screen(carContext) {
     private var manageMode = false
 
     override fun onGetTemplate(): Template {
-        val items = ItemList.Builder().setNoItemsMessage("Save a page with the star in the browser toolbar")
+        val items = ItemList.Builder().setNoItemsMessage(carContext.getString(R.string.car_browser_bookmarks_empty))
         val saved = WebBookmarkStore.list(carContext)
         page = page.coerceAtMost((saved.size - 1).coerceAtLeast(0) / 4)
         if (page > 0) {
-            items.addItem(Row.Builder().setTitle("Previous bookmarks")
+            items.addItem(Row.Builder().setTitle(carContext.getString(R.string.car_browser_bookmarks_previous))
                 .setOnClickListener { page--; invalidate() }.build())
         }
         saved.drop(page * 4).take(4).forEach { bookmark ->
@@ -35,13 +36,17 @@ class CarBrowserBookmarksScreen(carContext: CarContext) : Screen(carContext) {
                     .setTitle(bookmark.title)
                     .addText(
                         BrowserDisplayUrl.compact(bookmark.url).let {
-                            if (manageMode) "Tap to remove  •  $it" else it
+                            if (manageMode) carContext.getString(R.string.car_bookmarks_tap_to_remove, it) else it
                         }
                     )
                     .setOnClickListener {
                         if (manageMode) {
                             WebBookmarkStore.remove(carContext, bookmark.url)
-                            CarToast.makeText(carContext, "Removed ${bookmark.title}", CarToast.LENGTH_SHORT).show()
+                            CarToast.makeText(
+                                carContext,
+                                carContext.getString(R.string.car_browser_bookmarks_removed, bookmark.title),
+                                CarToast.LENGTH_SHORT
+                            ).show()
                             invalidate()
                         } else {
                             setResult(bookmark.url)
@@ -52,13 +57,13 @@ class CarBrowserBookmarksScreen(carContext: CarContext) : Screen(carContext) {
             )
         }
         if ((page + 1) * 4 < saved.size) {
-            items.addItem(Row.Builder().setTitle("More bookmarks")
+            items.addItem(Row.Builder().setTitle(carContext.getString(R.string.car_browser_bookmarks_more))
                 .setOnClickListener { page++; invalidate() }.build())
         }
         return ListTemplate.Builder()
             .setHeader(
                 Header.Builder()
-                    .setTitle("Bookmarks")
+                    .setTitle(carContext.getString(R.string.car_browser_bookmarks_title))
                     .setStartHeaderAction(Action.BACK)
                     .addEndHeaderAction(
                         Action.Builder()

@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.util.Log
 import android.webkit.GeolocationPermissions
+import dev.autobridge.R
 
 /**
  * Web geolocation (`navigator.geolocation`) for the app's WebViews.
@@ -87,10 +88,10 @@ object BrowserGeolocation {
             pendingOrigin = origin
             pendingCallback = callback
             dialog = AlertDialog.Builder(activity)
-                .setTitle("ขอใช้ตำแหน่ง")
-                .setMessage("อนุญาตให้ ${displayHost(origin)} ใช้ตำแหน่ง (GPS) ของคุณหรือไม่")
-                .setPositiveButton("อนุญาต") { _, _ -> onUserAllowed() }
-                .setNegativeButton("ไม่อนุญาต") { _, _ -> finish(granted = false) }
+                .setTitle(R.string.geo_title)
+                .setMessage(activity.getString(R.string.geo_message, displayHost(origin)))
+                .setPositiveButton(R.string.geo_allow) { _, _ -> onUserAllowed() }
+                .setNegativeButton(R.string.geo_deny) { _, _ -> finish(granted = false) }
                 .setOnCancelListener { finish(granted = false) }
                 .show()
         }
@@ -145,7 +146,9 @@ object BrowserGeolocation {
 
         private fun toastDenied() {
             android.widget.Toast.makeText(
-                activity, "ไม่ได้รับสิทธิ์ตำแหน่ง เปิดได้ที่ การตั้งค่า > แอป > AutoBridge", android.widget.Toast.LENGTH_LONG
+                activity,
+                activity.getString(R.string.geo_permission_denied),
+                android.widget.Toast.LENGTH_LONG
             ).show()
         }
     }

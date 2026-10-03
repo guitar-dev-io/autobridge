@@ -19,6 +19,7 @@ import dev.autobridge.apps.InstalledApp
 import dev.autobridge.apps.InstalledAppRepository
 import dev.autobridge.apps.QuickAppLauncher
 import dev.autobridge.apps.QuickAppsStore
+import dev.autobridge.R
 import dev.autobridge.core.model.Feature
 import dev.autobridge.core.policy.FeaturePolicy
 
@@ -39,8 +40,8 @@ class CarAppsScreen(carContext: CarContext) : Screen(carContext) {
         if (apps.isEmpty()) {
             grid.addItem(
                 GridItem.Builder()
-                    .setTitle("No Quick Apps")
-                    .setText("Enable apps on the phone")
+                    .setTitle(carContext.getString(R.string.car_apps_empty_title))
+                    .setText(carContext.getString(R.string.car_apps_empty_text))
                     .setImage(fallbackIcon())
                     .build()
             )
@@ -59,7 +60,7 @@ class CarAppsScreen(carContext: CarContext) : Screen(carContext) {
         return GridTemplate.Builder()
             .setHeader(
                 Header.Builder()
-                    .setTitle("Quick Apps")
+                    .setTitle(carContext.getString(R.string.car_apps_title))
                     .setStartHeaderAction(Action.BACK)
                     .build()
             )
@@ -77,7 +78,11 @@ class CarAppsScreen(carContext: CarContext) : Screen(carContext) {
             return
         }
         if (!QuickAppLauncher.launch(carContext, app.packageName)) {
-            CarToast.makeText(carContext, "Could not launch ${app.label}", CarToast.LENGTH_SHORT).show()
+            CarToast.makeText(
+                carContext,
+                carContext.getString(R.string.car_could_not_launch, app.label),
+                CarToast.LENGTH_SHORT
+            ).show()
         }
     }
 

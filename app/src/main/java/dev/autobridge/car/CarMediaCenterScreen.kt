@@ -1,5 +1,6 @@
 package dev.autobridge.car
 
+import androidx.annotation.StringRes
 import androidx.car.app.CarContext
 import androidx.car.app.CarToast
 import androidx.car.app.model.Action
@@ -13,6 +14,7 @@ import androidx.car.app.model.ListTemplate
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.car.app.Screen
+import dev.autobridge.R
 import dev.autobridge.core.state.RecentActivityStore
 import dev.autobridge.media.MediaPlaybackClient
 
@@ -23,20 +25,44 @@ import dev.autobridge.media.MediaPlaybackClient
  * standalone library screen remains available.
  */
 class CarMediaCenterScreen(carContext: CarContext) : Screen(carContext) {
-    private data class Track(val title: String, val subtitle: String, val uri: String)
+    private data class Track(
+        val title: String,
+        @StringRes val subtitleRes: Int,
+        val uri: String
+    )
 
     private val mediaPlayback = MediaPlaybackClient(carContext)
     private var activeTab = TAB_MUSIC
 
     private val audioLibrary = listOf(
-        Track("Jazz in Paris", "Sample audio • MP3", "https://storage.googleapis.com/exoplayer-test-media-0/Jazz_In_Paris.mp3"),
-        Track("Play", "Sample audio • MP3", "https://storage.googleapis.com/exoplayer-test-media-0/play.mp3"),
-        Track("Wonderful World", "Sample audio • MP3", "https://storage.googleapis.com/exoplayer-test-media-0/wonderful_world.mp3")
+        Track(
+            "Jazz in Paris",
+            R.string.car_lib_sample_audio,
+            "https://storage.googleapis.com/exoplayer-test-media-0/Jazz_In_Paris.mp3"
+        ),
+        Track(
+            "Play",
+            R.string.car_lib_sample_audio,
+            "https://storage.googleapis.com/exoplayer-test-media-0/play.mp3"
+        ),
+        Track(
+            "Wonderful World",
+            R.string.car_lib_sample_audio,
+            "https://storage.googleapis.com/exoplayer-test-media-0/wonderful_world.mp3"
+        )
     )
 
     private val videoLibrary = listOf(
-        Track("Frame counter", "Sample video • MP4", "https://storage.googleapis.com/exoplayer-test-media-1/mp4/frame-counter-one-hour.mp4"),
-        Track("Tears of Steel (DASH)", "Adaptive video • MPD", "https://storage.googleapis.com/exoplayer-test-media-1/gen-3/screens/dash/tears-of-steel-multi-lang.mpd")
+        Track(
+            "Frame counter",
+            R.string.car_lib_sample_video,
+            "https://storage.googleapis.com/exoplayer-test-media-1/mp4/frame-counter-one-hour.mp4"
+        ),
+        Track(
+            "Tears of Steel (DASH)",
+            R.string.car_lib_adaptive_video,
+            "https://storage.googleapis.com/exoplayer-test-media-1/gen-3/screens/dash/tears-of-steel-multi-lang.mpd"
+        )
     )
 
     init {
@@ -61,9 +87,9 @@ class CarMediaCenterScreen(carContext: CarContext) : Screen(carContext) {
             // "Missing required action types: APP_ICON", which crashed the app the moment Media
             // Center was opened on the head unit. The host draws its own back affordance.
             .setHeaderAction(Action.APP_ICON)
-            .addTab(tab("Music", TAB_MUSIC, DashboardArtwork.Kind.MEDIA))
-            .addTab(tab("Video", TAB_VIDEO, DashboardArtwork.Kind.YOUTUBE))
-            .addTab(tab("Streaming", TAB_STREAMING, DashboardArtwork.Kind.BROWSER))
+            .addTab(tab(carContext.getString(R.string.car_media_center_tab_music), TAB_MUSIC, DashboardArtwork.Kind.MEDIA))
+            .addTab(tab(carContext.getString(R.string.car_media_center_tab_video), TAB_VIDEO, DashboardArtwork.Kind.YOUTUBE))
+            .addTab(tab(carContext.getString(R.string.car_media_center_tab_streaming), TAB_STREAMING, DashboardArtwork.Kind.BROWSER))
             .setActiveTabContentId(activeTab)
             .setTabContents(TabContents.Builder(contentFor(activeTab)).build())
 
@@ -93,7 +119,7 @@ class CarMediaCenterScreen(carContext: CarContext) : Screen(carContext) {
         val list = ItemList.Builder()
         list.addItem(
             Row.Builder()
-                .setTitle("Now Playing")
+                .setTitle(carContext.getString(R.string.car_media_center_now_playing))
                 .addText(nowPlayingSubtitle(connected))
                 .setBrowsable(true)
                 .setOnClickListener { CarNavigation.open(screenManager, "CarNowPlayingScreen") { CarNowPlayingScreen(carContext) } }
@@ -103,14 +129,17 @@ class CarMediaCenterScreen(carContext: CarContext) : Screen(carContext) {
             list.addItem(
                 Row.Builder()
                     .setTitle(track.title)
-                    .addText(track.subtitle)
+                    .addText(carContext.getString(track.subtitleRes))
                     .setEnabled(connected)
                     .setOnClickListener {
                         mediaPlayback.play(track.uri, track.title)
                         RecentActivityStore.record(
                             carContext,
                             RecentActivityStore.Entry(
-                                RecentActivityStore.Kind.MEDIA, track.title, "Music", track.uri
+                                RecentActivityStore.Kind.MEDIA,
+                                track.title,
+                                carContext.getString(R.string.car_recent_kind_music),
+                                track.uri
                             )
                         )
                         CarNavigation.open(screenManager, "CarNowPlayingScreen") { CarNowPlayingScreen(carContext) }
@@ -127,12 +156,15 @@ class CarMediaCenterScreen(carContext: CarContext) : Screen(carContext) {
             list.addItem(
                 Row.Builder()
                     .setTitle(track.title)
-                    .addText(track.subtitle)
+                    .addText(carContext.getString(track.subtitleRes))
                     .setOnClickListener {
                         RecentActivityStore.record(
                             carContext,
                             RecentActivityStore.Entry(
-                                RecentActivityStore.Kind.MEDIA, track.title, "Video", track.uri
+                                RecentActivityStore.Kind.MEDIA,
+                                track.title,
+                                carContext.getString(R.string.car_recent_kind_video),
+                                track.uri
                             )
                         )
                         CarVideoLauncher.open(screenManager, carContext, track.uri, track.title)
@@ -147,8 +179,8 @@ class CarMediaCenterScreen(carContext: CarContext) : Screen(carContext) {
         val list = ItemList.Builder()
             .addItem(
                 Row.Builder()
-                    .setTitle("Open stream link")
-                    .addText("MP4, HLS or DASH URL")
+                    .setTitle(carContext.getString(R.string.car_media_center_open_stream))
+                    .addText(carContext.getString(R.string.car_media_center_open_stream_caption))
                     .setBrowsable(true)
                     .setOnClickListener {
                         screenManager.pushForResult(CarBrowserSearchScreen(carContext, "")) { result ->
@@ -157,12 +189,22 @@ class CarMediaCenterScreen(carContext: CarContext) : Screen(carContext) {
                                 RecentActivityStore.record(
                                     carContext,
                                     RecentActivityStore.Entry(
-                                        RecentActivityStore.Kind.MEDIA, "Stream", "Streaming", url
+                                        RecentActivityStore.Kind.MEDIA,
+                                        carContext.getString(R.string.car_recent_stream),
+                                        carContext.getString(R.string.car_recent_kind_streaming),
+                                        url
                                     )
                                 )
-                                CarVideoLauncher.open(screenManager, carContext, url, "Video stream")
+                                CarVideoLauncher.open(
+                                    screenManager, carContext, url,
+                                    carContext.getString(R.string.car_media_center_video_stream)
+                                )
                             } else {
-                                CarToast.makeText(carContext, "Enter a valid HTTPS link", CarToast.LENGTH_SHORT).show()
+                                CarToast.makeText(
+                                    carContext,
+                                    carContext.getString(R.string.car_media_center_invalid_link),
+                                    CarToast.LENGTH_SHORT
+                                ).show()
                             }
                         }
                     }
@@ -170,8 +212,8 @@ class CarMediaCenterScreen(carContext: CarContext) : Screen(carContext) {
             )
             .addItem(
                 Row.Builder()
-                    .setTitle("Open in Browser")
-                    .addText("For web players (YouTube, etc.)")
+                    .setTitle(carContext.getString(R.string.car_media_center_open_browser))
+                    .addText(carContext.getString(R.string.car_media_center_open_browser_caption))
                     .setBrowsable(true)
                     .setOnClickListener { CarNavigation.open(screenManager, "CarBrowserScreen") { CarBrowserScreen(carContext) } }
                     .build()
@@ -181,10 +223,13 @@ class CarMediaCenterScreen(carContext: CarContext) : Screen(carContext) {
     }
 
     private fun nowPlayingSubtitle(connected: Boolean): String {
-        if (!connected) return "Connecting to media session…"
-        val title = mediaPlayback.currentTitle ?: return "Nothing playing"
-        val state = if (mediaPlayback.isPlaying) "Playing" else "Paused"
-        return "$title • $state"
+        if (!connected) return carContext.getString(R.string.car_lib_connecting_session)
+        val title = mediaPlayback.currentTitle
+            ?: return carContext.getString(R.string.car_lib_nothing_playing)
+        val state = carContext.getString(
+            if (mediaPlayback.isPlaying) R.string.car_lib_playing else R.string.car_lib_paused
+        )
+        return carContext.getString(R.string.car_lib_title_state, title, state)
     }
 
     private companion object {

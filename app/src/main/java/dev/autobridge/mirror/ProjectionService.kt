@@ -16,6 +16,7 @@ import android.os.IBinder
 import android.os.Looper
 import android.util.Log
 import dev.autobridge.MainActivity
+import dev.autobridge.R
 import dev.autobridge.apps.AppRotationController
 import dev.autobridge.apps.QuickAppLauncher
 import dev.autobridge.display.MirrorDiagnostics
@@ -256,10 +257,14 @@ class ProjectionService : Service() {
 
         return Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_menu_view)
-            .setContentTitle("AutoBridge")
-            .setContentText("Screen projection session is active")
+            .setContentTitle(getString(R.string.projection_notification_title))
+            .setContentText(getString(R.string.projection_notification_text))
             .setContentIntent(openIntent)
-            .addAction(Notification.Action.Builder(null, "Stop", stopIntent).build())
+            .addAction(
+                Notification.Action.Builder(
+                    null, getString(R.string.projection_notification_stop), stopIntent
+                ).build()
+            )
             .setOngoing(true)
             .build()
     }
@@ -269,7 +274,7 @@ class ProjectionService : Service() {
         manager.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_ID,
-                "AutoBridge Projection",
+                getString(R.string.projection_channel_name),
                 NotificationManager.IMPORTANCE_LOW
             )
         )

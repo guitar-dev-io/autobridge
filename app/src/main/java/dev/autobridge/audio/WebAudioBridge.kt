@@ -293,7 +293,7 @@ class WebAudioBridge(private val webViewProvider: () -> WebView?) {
             PLAY_TRACKING_SCRIPT.trimIndent() + "\n" +
             """
             (function(){
-              var playing = false, dur = 0, pos = 0, held = null;
+              var playing = false, dur = 0, pos = 0, held = null, finished = null;
               document.querySelectorAll('audio,video').forEach(function(m){
                 if (!m.paused && !m.ended) {
                   playing = true;
@@ -301,6 +301,11 @@ class WebAudioBridge(private val webViewProvider: () -> WebView?) {
                   pos = m.currentTime;
                 } else if (held === null && m.currentSrc && !m.ended) {
                   held = m;
+                } else if (finished === null && m.currentSrc && m.ended) {
+                  // What "the clip finished" means, straight from the element. Read rather than
+                  // inferred from position vs duration, which is wrong for a stream and for a page
+                  // that reports a duration it has not loaded yet.
+                  finished = m;
                 }
               });
               // Nothing playing: report where the paused element stands, so a paused card still
@@ -312,6 +317,10 @@ class WebAudioBridge(private val webViewProvider: () -> WebView?) {
               var md = (navigator.mediaSession && navigator.mediaSession.metadata) || null;
               return JSON.stringify({
                 playing: playing,
+                // Only while nothing else is going: an element that ended beside one still playing
+                // (an ad that handed over to the feature, a second player on the page) has not
+                // finished anything the listener would call finished.
+                ended: !playing && finished !== null,
                 duration: Math.round(dur * 1000),
                 position: Math.round(pos * 1000),
                 title: md ? md.title : '',
@@ -349,6 +358,12 @@ class WebAudioBridge(private val webViewProvider: () -> WebView?) {
 /** Media state read back out of a page, in native terms. */
 data class WebMediaStatus(
     val playing: Boolean = false,
+    /**
+     * The page had something playing and it reached its end. The signal
+     * [dev.autobridge.browser.BrowserPlayQueue] advances on; see [WebAudioBridge.readState] for why
+     * it comes from the element rather than from comparing position with duration.
+     */
+    val ended: Boolean = false,
     val durationMs: Long = 0,
     val positionMs: Long = 0,
     val title: String = "",
@@ -373,6 +388,7 @@ data class WebMediaStatus(
             if (!text.startsWith("{") || !text.endsWith("}")) return WebMediaStatus()
             return WebMediaStatus(
                 playing = boolean(text, "playing"),
+                ended = boolean(text, "ended"),
                 durationMs = number(text, "duration"),
                 positionMs = number(text, "position"),
                 title = string(text, "title"),

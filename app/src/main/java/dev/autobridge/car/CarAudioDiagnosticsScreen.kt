@@ -8,6 +8,7 @@ import androidx.car.app.model.ItemList
 import androidx.car.app.model.ListTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
+import dev.autobridge.R
 import dev.autobridge.audio.AudioEnvironment
 import dev.autobridge.audio.AudioFocusState
 import dev.autobridge.browser.CarBrowserRuntime
@@ -48,10 +49,15 @@ class CarAudioDiagnosticsScreen(carContext: CarContext) : Screen(carContext) {
 
         // Ask the page each time the screen is built; the answer lands on the next invalidate.
         renderer?.readWebMediaStatus { status ->
+            val playState = carContext.getString(
+                if (status.playing) R.string.car_audio_playing else R.string.car_audio_paused
+            )
             val line = if (status.hasMetadata) {
-                "${if (status.playing) "PLAYING" else "PAUSED"} • ${status.title} — ${status.artist}"
+                carContext.getString(
+                    R.string.car_audio_web_line, playState, status.title, status.artist
+                )
             } else {
-                if (status.playing) "PLAYING • no metadata" else "PAUSED • no metadata"
+                carContext.getString(R.string.car_audio_web_no_metadata, playState)
             }
             if (line != webStatusLine) {
                 webStatusLine = line
@@ -60,24 +66,52 @@ class CarAudioDiagnosticsScreen(carContext: CarContext) : Screen(carContext) {
         }
 
         val list = ItemList.Builder()
-            .addItem(row("Focus", snapshot.focus.name))
-            .addItem(row("Device", snapshot.deviceName))
-            .addItem(row("Route", snapshot.route.label))
-            .addItem(row("Usage", snapshot.usage))
-            .addItem(row("Content", snapshot.contentType))
-            .addItem(row("State", playbackStateLabel()))
-            .addItem(row("Volume", volumeLabel(snapshot)))
-            .addItem(row("Session", if (mediaClient.isConnected) "ACTIVE" else "INACTIVE"))
-            .addItem(row("Bluetooth", if (snapshot.bluetoothA2dpOn) "A2DP on" else "off"))
-            .addItem(row("Output latency", snapshot.outputLatencyHintMs?.let { "~${it}ms (hint)" } ?: "not reported"))
-            .addItem(row("Web audio", webStatusLine ?: "reading…"))
-            .addItem(row("Outputs seen", outputsLabel()))
+            .addItem(row(carContext.getString(R.string.car_audio_focus), snapshot.focus.name))
+            .addItem(row(carContext.getString(R.string.car_audio_device), snapshot.deviceName))
+            .addItem(row(carContext.getString(R.string.car_audio_route), snapshot.route.label))
+            .addItem(row(carContext.getString(R.string.car_audio_usage), snapshot.usage))
+            .addItem(row(carContext.getString(R.string.car_audio_content), snapshot.contentType))
+            .addItem(row(carContext.getString(R.string.car_audio_state), playbackStateLabel()))
+            .addItem(row(carContext.getString(R.string.car_audio_volume), volumeLabel(snapshot)))
+            .addItem(
+                row(
+                    carContext.getString(R.string.car_audio_session),
+                    carContext.getString(
+                        if (mediaClient.isConnected) R.string.car_audio_active
+                        else R.string.car_audio_inactive
+                    )
+                )
+            )
+            .addItem(
+                row(
+                    carContext.getString(R.string.car_audio_bluetooth),
+                    carContext.getString(
+                        if (snapshot.bluetoothA2dpOn) R.string.car_audio_a2dp_on
+                        else R.string.car_audio_a2dp_off
+                    )
+                )
+            )
+            .addItem(
+                row(
+                    carContext.getString(R.string.car_audio_latency),
+                    snapshot.outputLatencyHintMs
+                        ?.let { carContext.getString(R.string.car_audio_latency_hint, it) }
+                        ?: carContext.getString(R.string.car_audio_not_reported)
+                )
+            )
+            .addItem(
+                row(
+                    carContext.getString(R.string.car_audio_web),
+                    webStatusLine ?: carContext.getString(R.string.car_audio_reading)
+                )
+            )
+            .addItem(row(carContext.getString(R.string.car_audio_outputs), outputsLabel()))
             .build()
 
         return ListTemplate.Builder()
             .setHeader(
                 Header.Builder()
-                    .setTitle("Audio")
+                    .setTitle(carContext.getString(R.string.car_audio_title))
                     .setStartHeaderAction(Action.BACK)
                     .build()
             )
@@ -85,11 +119,13 @@ class CarAudioDiagnosticsScreen(carContext: CarContext) : Screen(carContext) {
             .build()
     }
 
-    private fun playbackStateLabel(): String = when {
-        mediaClient.isPlaying -> "PLAYING"
-        mediaClient.isConnected -> "PAUSED"
-        else -> "STOPPED"
-    }
+    private fun playbackStateLabel(): String = carContext.getString(
+        when {
+            mediaClient.isPlaying -> R.string.car_audio_playing
+            mediaClient.isConnected -> R.string.car_audio_paused
+            else -> R.string.car_audio_stopped
+        }
+    )
 
     /**
      * A head unit usually owns the volume curve and reports the stream as fixed; saying so is more
@@ -97,14 +133,17 @@ class CarAudioDiagnosticsScreen(carContext: CarContext) : Screen(carContext) {
      */
     private fun volumeLabel(snapshot: dev.autobridge.audio.AudioSnapshot): String =
         if (snapshot.fixedVolume) {
-            "${snapshot.volumePercent}% • fixed by route"
+            carContext.getString(R.string.car_audio_volume_fixed, snapshot.volumePercent)
         } else {
-            "${snapshot.volumePercent}%  (${snapshot.volumeIndex}/${snapshot.volumeMax})"
+            carContext.getString(
+                R.string.car_audio_volume_index,
+                snapshot.volumePercent, snapshot.volumeIndex, snapshot.volumeMax
+            )
         }
 
     private fun outputsLabel(): String {
         val devices = environment.outputDevices()
-        if (devices.isEmpty()) return "none reported"
+        if (devices.isEmpty()) return carContext.getString(R.string.car_audio_no_outputs)
         return devices.joinToString("  •  ") { (kind, name) ->
             if (name.isBlank()) kind.label else "${kind.label} ($name)"
         }.take(120)
