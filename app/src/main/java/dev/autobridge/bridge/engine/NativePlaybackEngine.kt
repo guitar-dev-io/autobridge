@@ -164,12 +164,17 @@ class NativePlaybackEngine(context: Context) : PlaybackEngine {
         if (released) return
         released = true
         VideoOutputGeometry.clear()
-        media.player?.let { player ->
-            player.removeListener(listener)
-            if (player.isCommandAvailable(Player.COMMAND_SET_VIDEO_SURFACE)) player.clearVideoSurface()
-        }
-        media.pause()
-        media.disconnect()
+        // Teardown runs while the car session is going away, so every step here races something
+        // the platform is also tearing down. A throw on the way out would take the process with
+        // it for no gain - whatever is being released is going away regardless.
+        runCatching {
+            media.player?.let { player ->
+                player.removeListener(listener)
+                if (player.isCommandAvailable(Player.COMMAND_SET_VIDEO_SURFACE)) player.clearVideoSurface()
+            }
+            media.pause()
+            media.disconnect()
+        }.onFailure { BridgeLog.w("native.release_failed", "reason" to it.message) }
         surface = null
         connected = false
         playback = BridgePlaybackState.IDLE

@@ -185,17 +185,27 @@ class CarBridgePlayerScreen(carContext: CarContext) : Screen(carContext), Surfac
      * The one line to show instead of the picture, or null when the picture should be shown.
      *
      * Ordered by what the user can do about it: a safety gate first (park), then a refusal
-     * (nothing will change until they send something else), then a wait (loading), then the
-     * empty state.
+     * (nothing will change until they send something else), then the empty state.
+     *
+     * ## Loading is deliberately NOT in this list
+     *
+     * The message is rendered by a [PaneTemplate], and a `PaneTemplate` has no surface. So any
+     * condition that is *caused by* the surface being absent cannot be allowed to select it: the
+     * first version of this checked `!hasSurface` and latched solid — no surface meant a Pane,
+     * and a Pane meant the host had no surface to hand back, forever. A DHU run showed the video
+     * decoding happily (`positionMs` advancing) with nowhere to draw.
+     *
+     * Loading is the same trap one step removed. An engine reports LOADING before its first
+     * frame, which is exactly when it needs the surface it is about to draw into, so swapping the
+     * template away at that moment takes the surface from under it. A brief black surface is the
+     * correct thing to show while a video opens; every other player does the same.
      */
     private fun statusMessage(state: AutoBridgeSessionManager.SessionState): String? = when {
         !allowed() -> carContext.getString(R.string.car_video_park_to_watch)
         state.error != null -> carContext.getString(state.error.messageRes)
         state.source == null -> carContext.getString(R.string.bridge_car_nothing_playing)
-        state.playback == BridgePlaybackState.LOADING ->
-            carContext.getString(R.string.bridge_car_loading)
-        !state.hasSurface && state.engine != EngineKind.BROWSER ->
-            carContext.getString(R.string.bridge_car_loading)
+        // The browser draws through its own screen, so this one has nothing to show for it.
+        state.engine == EngineKind.BROWSER -> carContext.getString(R.string.bridge_car_loading)
         else -> null
     }
 

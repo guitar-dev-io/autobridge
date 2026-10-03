@@ -275,10 +275,23 @@ object AutoBridgeSessionManager {
         val existing = engine
         if (existing != null && existing.kind == kind) return existing
         existing?.release()
+        // The APPLICATION context, never the CarContext that was passed in.
+        //
+        // An engine outlives the screen that triggered it and, for the media session, outlives
+        // the car session itself. Built against a CarContext, the MediaController's service
+        // binding is registered on a context that is torn down when Android Auto disconnects,
+        // and Media3's release then unbinds from a dead service dispatcher:
+        //
+        //   java.lang.IllegalArgumentException: Service not registered:
+        //     androidx.media3.session.MediaControllerImplBase$SessionServiceConnection
+        //
+        // which killed the app on every disconnect. It also stopped this process-global object
+        // holding a reference to a dead car session.
+        val engineContext = context.applicationContext
         val created: PlaybackEngine = when (kind) {
-            EngineKind.NATIVE -> NativePlaybackEngine(context)
-            EngineKind.BROWSER -> BrowserPlaybackEngine(context)
-            EngineKind.REMOTE_STREAM -> RemoteStreamPlaybackEngine(context)
+            EngineKind.NATIVE -> NativePlaybackEngine(engineContext)
+            EngineKind.BROWSER -> BrowserPlaybackEngine(engineContext)
+            EngineKind.REMOTE_STREAM -> RemoteStreamPlaybackEngine(engineContext)
             EngineKind.UNSUPPORTED -> error("no engine for UNSUPPORTED")
         }
         created.onStateChanged = { engineState -> onEngineState(engineState) }
