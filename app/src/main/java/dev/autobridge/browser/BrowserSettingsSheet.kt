@@ -241,10 +241,15 @@ class BrowserSettingsSheet(
 
     // ---------------------------------------------------------------------------------- Start up
 
-    private fun homePageRow(): View =
-        navRow("Home page", BrowserDisplayUrl.compact(BrowserStartupStore.homePage(activity), max = 42)) {
-            onEditHomePage()
+    private fun homePageRow(): View {
+        val home = BrowserStartupStore.homePage(activity)
+        val subtitle = if (home == BrowserStartupStore.START_PAGE) {
+            activity.getString(R.string.browser_start_page_label)
+        } else {
+            BrowserDisplayUrl.compact(home, max = 42)
         }
+        return navRow("Home page", subtitle) { onEditHomePage() }
+    }
 
     private fun launchBehaviorRow(): View {
         val current = BrowserStartupStore.launchBehavior(activity)

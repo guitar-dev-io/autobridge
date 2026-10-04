@@ -228,6 +228,10 @@ object BrowserDefaults {
     fun lastUrl(context: Context): String = context.getSharedPreferences("autobridge_browser", Context.MODE_PRIVATE)
         .getString("last_url", HOME)?.let(ContentAddress::https) ?: HOME
 
+    /** True once any page has been visited; see [BrowserStartupStore.coldStartUrl]. */
+    fun hasLastUrl(context: Context): Boolean = context
+        .getSharedPreferences("autobridge_browser", Context.MODE_PRIVATE).contains("last_url")
+
     fun remember(context: Context, url: String) {
         val valid = ContentAddress.https(url) ?: return
         context.getSharedPreferences("autobridge_browser", Context.MODE_PRIVATE)

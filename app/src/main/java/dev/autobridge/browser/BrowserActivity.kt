@@ -1,5 +1,6 @@
 package dev.autobridge.browser
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.ClipData
@@ -10,6 +11,8 @@ import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.Bundle
 import android.view.Display
@@ -34,6 +37,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import dev.autobridge.R
 import dev.autobridge.core.model.Feature
 import dev.autobridge.core.policy.FeaturePolicy
@@ -82,11 +86,17 @@ class BrowserActivity : Activity() {
     private lateinit var handle: TextView
     private lateinit var menuButton: TextView
     private lateinit var toolbarMenuButton: Button
+    private lateinit var backButton: Button
+    private lateinit var forwardButton: Button
     private lateinit var stopReload: Button
     private lateinit var fullscreenButton: Button
     private lateinit var progress: ProgressBar
     private lateinit var blocked: TextView
-    private lateinit var loadError: TextView
+    private lateinit var loadError: LinearLayout
+    private lateinit var errorMessage: TextView
+    private lateinit var swipeRefresh: SwipeRefreshLayout
+    private lateinit var startPage: View
+    private var showingStartPage = false
     private lateinit var content: FrameLayout
 
     /** The window root, held so entering fullscreen can re-request the page's top inset. */
@@ -167,24 +177,48 @@ class BrowserActivity : Activity() {
         BrowserAppearanceStore.syncChrome(this)
         setTheme(BrowserAppearanceStore.activityTheme(this))
         super.onCreate(savedInstanceState)
+        releaseBack = dev.autobridge.ui.SystemBack.register(this) { goBack() }
         root = FrameLayout(this)
         applyStartPageBackground()
 
         content = FrameLayout(this)
         web = createWebView()
+        swipeRefresh = SwipeRefreshLayout(this).apply {
+            setColorSchemeColors(BrowserTheme.accent)
+            setProgressBackgroundColorSchemeColor(BrowserTheme.toolbarBackground)
+            setOnRefreshListener { web.reload() }
+            addView(web, FrameLayout.LayoutParams(-1, -1))
+        }
         blocked = TextView(this).apply {
             gravity = Gravity.CENTER; setTextColor(BrowserTheme.textPrimary)
         }
-        loadError = TextView(this).apply {
-            text = getString(R.string.browser_page_load_failed)
+        errorMessage = TextView(this).apply {
             gravity = Gravity.CENTER; setTextColor(BrowserTheme.errorAccent)
+        }
+        loadError = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
             setBackgroundColor(BrowserTheme.errorBackground)
             visibility = View.GONE
-            setOnClickListener { visibility = View.GONE; web.reload() }
+            addView(
+                errorMessage,
+                LinearLayout.LayoutParams(-2, -2).apply {
+                    bottomMargin = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP)
+                }
+            )
+            addView(
+                Button(this@BrowserActivity).apply {
+                    text = getString(R.string.action_retry)
+                    setTextColor(BrowserTheme.iconEnabled)
+                    setOnClickListener { loadError.visibility = View.GONE; web.reload() }
+                }
+            )
         }
-        content.addView(web, FrameLayout.LayoutParams(-1, -1))
+        content.addView(swipeRefresh, FrameLayout.LayoutParams(-1, -1))
         content.addView(blocked, FrameLayout.LayoutParams(-1, -1))
         content.addView(loadError, FrameLayout.LayoutParams(-1, -1))
+        startPage = BrowserStartPage.build(this, sizes) { navigate(it) }.apply { visibility = View.GONE }
+        content.addView(startPage, FrameLayout.LayoutParams(-1, -1))
 
         menuButton = TextView(this).apply {
             text = "☰"
@@ -304,8 +338,8 @@ class BrowserActivity : Activity() {
                 )
             )
         }
-        control("‹", "Back") { if (web.canGoBack()) web.goBack() }
-        control("›", "Forward") { if (web.canGoForward()) web.goForward() }
+        backButton = control("‹", "Back") { if (web.canGoBack()) web.goBack() }
+        forwardButton = control("›", "Forward") { if (web.canGoForward()) web.goForward() }
         stopReload = control("↻", "Reload") {
             if (web.progress < 100) web.stopLoading() else web.reload()
             updateNavigation()
@@ -379,19 +413,21 @@ class BrowserActivity : Activity() {
         setOnFocusChangeListener { _, hasFocus ->
             if (hasFocus) {
                 // Remember what to fall back to, then switch inline into edit mode: full URL,
-                // search-or-address hint, all text selected, clear button, keyboard up.
-                addressBeforeEdit = displayUrl(web.url.orEmpty())
+                // search-or-address hint, all text selected, clear button, keyboard up. On the
+                // start page there is no URL to edit yet, so this starts blank rather than at
+                // whatever page was showing before Home was opened.
+                addressBeforeEdit = if (showingStartPage) "" else displayUrl(web.url.orEmpty())
                 hint = HINT_EDITING
-                setText(web.url.orEmpty())
+                setText(if (showingStartPage) "" else web.url.orEmpty())
                 setSelection(0, text.length)
-                updateAddressClearButton()
+                updateAddressDecorations()
                 (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager)
                     .showSoftInput(this, InputMethodManager.SHOW_IMPLICIT)
             } else {
                 // Leaving edit mode collapses back to the compact hostname with no clear button.
                 setHint(HINT_IDLE)
-                setText(displayUrl(web.url.orEmpty()))
-                setClearButtonVisible(false)
+                setText(if (showingStartPage) "" else displayUrl(web.url.orEmpty()))
+                updateAddressDecorations()
             }
         }
         // Keep the clear (X) button in step with the text while editing.
@@ -399,14 +435,14 @@ class BrowserActivity : Activity() {
             override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) = Unit
             override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) = Unit
             override fun afterTextChanged(s: android.text.Editable?) {
-                if (hasFocus()) updateAddressClearButton()
+                if (hasFocus()) updateAddressDecorations()
             }
         })
         // Tap on the trailing X clears the field; the rest of the field behaves normally.
         setOnTouchListener { _, event ->
             if (event.action == android.view.MotionEvent.ACTION_UP && isClearButtonHit(event)) {
                 setText("")
-                updateAddressClearButton()
+                updateAddressDecorations()
                 performClick()
                 true
             } else false
@@ -439,34 +475,36 @@ class BrowserActivity : Activity() {
         return event.x >= width - hit
     }
 
-    /** Shows the inline clear (X) button only while editing with non-empty text. */
-    private fun updateAddressClearButton() {
-        address.setClearButtonVisible(address.hasFocus() && address.text.isNotEmpty())
-    }
-
     /**
-     * Draws (or removes) the trailing clear glyph inside the pill.
-     *
-     * The glyph is painted as text ("✕"), the same way the toolbar draws "☰"/"⛶", so it needs no
-     * drawable resource or appcompat dependency and tints the same way on every API level.
+     * Keeps the pill's two glyphs in step with its state: a leading lock while idle on an https
+     * page (never while editing, where the real URL in the field already answers that question),
+     * and a trailing clear (X) only while editing with non-empty text.
      */
-    private fun EditText.setClearButtonVisible(visible: Boolean) {
-        setCompoundDrawablesRelative(null, null, if (visible) clearGlyphDrawable else null, null)
+    private fun updateAddressDecorations() {
+        val editing = address.hasFocus()
+        val secure = !editing && !showingStartPage && web.url.orEmpty().startsWith("https://", ignoreCase = true)
+        val hasText = editing && address.text.isNotEmpty()
+        address.setCompoundDrawablesRelative(
+            if (secure) lockGlyphDrawable else null,
+            null,
+            if (hasText) clearGlyphDrawable else null,
+            null
+        )
     }
 
-    /** The "✕" glyph used as the inline clear button, built once and tinted to the chrome icons. */
-    private val clearGlyphDrawable by lazy {
+    /** Paints a short glyph as text, the same way the toolbar draws "☰"/"⛶" — no drawable resource. */
+    private fun buildGlyphDrawable(glyph: String, color: Int): android.graphics.drawable.Drawable {
         val size = sizes.dpInt(AutoUiSizes.ICON_SMALL_DP)
         val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            color = BrowserTheme.iconEnabled
+            this.color = color
             textAlign = android.graphics.Paint.Align.CENTER
             textSize = size * 0.9f
         }
-        object : android.graphics.drawable.Drawable() {
+        return object : android.graphics.drawable.Drawable() {
             override fun draw(canvas: android.graphics.Canvas) {
                 val b = bounds
                 val y = b.exactCenterY() - (paint.descent() + paint.ascent()) / 2f
-                canvas.drawText("✕", b.exactCenterX(), y, paint)
+                canvas.drawText(glyph, b.exactCenterX(), y, paint)
             }
             override fun setAlpha(alpha: Int) { paint.alpha = alpha }
             override fun setColorFilter(cf: android.graphics.ColorFilter?) { paint.colorFilter = cf }
@@ -474,6 +512,12 @@ class BrowserActivity : Activity() {
             override fun getOpacity() = android.graphics.PixelFormat.TRANSLUCENT
         }.apply { setBounds(0, 0, size, size) }
     }
+
+    /** The "✕" glyph used as the inline clear button, built once and tinted to the chrome icons. */
+    private val clearGlyphDrawable by lazy { buildGlyphDrawable("✕", BrowserTheme.iconEnabled) }
+
+    /** The "🔒" glyph shown at the start of the pill for an https page; see [updateAddressDecorations]. */
+    private val lockGlyphDrawable by lazy { buildGlyphDrawable("🔒", BrowserTheme.secureBadge) }
 
     /** Enter/Go path: drop focus and (optionally) the keyboard, collapsing back to compact display. */
     private fun collapseAddressEditing(hideKeyboard: Boolean) {
@@ -619,6 +663,7 @@ class BrowserActivity : Activity() {
                 WebVideoDiagnostics.logState(
                     "BrowserActivity", view, "stage=onPageFinished onCarDisplay=$onCarDisplay"
                 )
+                swipeRefresh.isRefreshing = false
                 if (allowed()) {
                     BrowserDefaults.remember(this@BrowserActivity, url)
                     WebHistoryStore.record(this@BrowserActivity, view.title, url)
@@ -637,6 +682,8 @@ class BrowserActivity : Activity() {
 
             override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
                 if (!request.isForMainFrame) return
+                swipeRefresh.isRefreshing = false
+                errorMessage.text = pageLoadErrorMessage(error.errorCode)
                 loadError.visibility = View.VISIBLE
             }
         }
@@ -680,21 +727,52 @@ class BrowserActivity : Activity() {
             WebVideoDiagnostics.logState("BrowserActivity", web, "stage=load-test-page onCarDisplay=$onCarDisplay")
             return
         }
+        if (input == BrowserStartupStore.START_PAGE) {
+            showStartPage()
+            return
+        }
         if (input.isNotBlank()) {
             // One shared resolver for the whole browser: a valid http/https URL (or a bare host
             // like youtube.com, normalised to https://youtube.com) opens as-is; free text runs on
             // the user's current/default search engine. See BrowserInputResolver.
             val url = BrowserInputResolver.resolveBrowserInput(input, SearchEngineStore.engine(this))
+            hideStartPage()
             // Collapse straight to the compact hostname; focus is cleared by the caller on Enter.
             address.setText(if (address.hasFocus()) url else displayUrl(url))
             web.loadUrl(url)
         }
     }
 
+    /** Shows the native start page in place of the page; see [BrowserStartupStore.START_PAGE]. */
+    private fun showStartPage() {
+        showingStartPage = true
+        startPage.visibility = View.VISIBLE
+        updateNavigation()
+    }
+
+    /** Leaves the start page. A no-op once it is already hidden. */
+    private fun hideStartPage() {
+        if (!showingStartPage) return
+        showingStartPage = false
+        startPage.visibility = View.GONE
+    }
+
     private fun updateNavigation() {
         stopReload.text = if (web.progress < 100) "×" else "↻"
         stopReload.contentDescription = if (web.progress < 100) "Stop loading" else "Reload"
-        if (!address.hasFocus()) address.setText(displayUrl(web.url.orEmpty()))
+        backButton.isEnabled = web.canGoBack()
+        backButton.alpha = if (backButton.isEnabled) 1f else DISABLED_NAV_ALPHA
+        forwardButton.isEnabled = web.canGoForward()
+        forwardButton.alpha = if (forwardButton.isEnabled) 1f else DISABLED_NAV_ALPHA
+        if (!address.hasFocus()) {
+            if (showingStartPage) {
+                address.setText("")
+                address.setCompoundDrawablesRelative(null, null, null, null)
+            } else {
+                address.setText(displayUrl(web.url.orEmpty()))
+                updateAddressDecorations()
+            }
+        }
     }
 
     /**
@@ -713,6 +791,25 @@ class BrowserActivity : Activity() {
         val host = runCatching { android.net.Uri.parse(url).host }.getOrNull()
         return host?.removePrefix("www.")?.takeIf { it.isNotBlank() }
             ?: BrowserDisplayUrl.compact(url, max = 32)
+    }
+
+    /**
+     * Picks which of the three reasons a failed main-frame load gets shown. Order matters: a dead
+     * radio answers every lookup with [WebViewClient.ERROR_HOST_LOOKUP] on some devices, so
+     * connectivity is checked first and only a real DNS failure with a network present is reported
+     * as "site not found".
+     */
+    private fun pageLoadErrorMessage(errorCode: Int): String = when {
+        !hasInternetConnection() -> getString(R.string.browser_error_no_internet)
+        errorCode == WebViewClient.ERROR_HOST_LOOKUP -> getString(R.string.browser_error_host_not_found)
+        else -> getString(R.string.browser_error_blocked)
+    }
+
+    private fun hasInternetConnection(): Boolean {
+        val manager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val network = manager.activeNetwork ?: return false
+        val capabilities = manager.getNetworkCapabilities(network) ?: return false
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 
     private fun setFullscreen(enabled: Boolean) {
@@ -888,8 +985,12 @@ class BrowserActivity : Activity() {
      */
     private fun menuState() = BrowserMenuState(
         appName = "AutoBridge",
-        pageTitle = web.title?.takeIf { it.isNotBlank() } ?: displayUrl(web.url.orEmpty()),
-        url = web.url.orEmpty(),
+        pageTitle = if (showingStartPage) {
+            getString(R.string.browser_start_page_label)
+        } else {
+            web.title?.takeIf { it.isNotBlank() } ?: displayUrl(web.url.orEmpty())
+        },
+        url = if (showingStartPage) "" else web.url.orEmpty(),
         isDesktop = BrowserUserAgentStore.mode(this) == BrowserUserAgentMode.DESKTOP,
         canGoBack = web.canGoBack(),
         canGoForward = web.canGoForward(),
@@ -1207,11 +1308,16 @@ class BrowserActivity : Activity() {
         ).show()
     }
 
-    /** Edits the configured Home page. A URL field, validated through [BrowserStartupStore]. */
+    /**
+     * Edits the configured Home page. A URL field, validated through [BrowserStartupStore];
+     * clearing it back to blank resets Home to the native start page rather than failing to
+     * validate, since the field is pre-filled blank for that case to begin with.
+     */
     private fun showHomePageEditor() {
+        val current = BrowserStartupStore.homePage(this@BrowserActivity)
         val field = EditText(this).apply {
-            setText(BrowserStartupStore.homePage(this@BrowserActivity))
-            hint = "https://…"
+            setText(current.takeUnless { it == BrowserStartupStore.START_PAGE }.orEmpty())
+            hint = getString(R.string.browser_start_page_label)
             setSingleLine()
             setSelectAllOnFocus(true)
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
@@ -1225,11 +1331,18 @@ class BrowserActivity : Activity() {
             .setTitle("Home page")
             .setView(container)
             .setPositiveButton(R.string.action_save) { _, _ ->
-                if (BrowserStartupStore.setHomePage(this, field.text.toString())) {
-                    toast(getString(R.string.browser_home_page_set))
-                    showBrowserSettings()
-                } else {
-                    toast(getString(R.string.browser_invalid_url))
+                val input = field.text.toString().trim()
+                when {
+                    input.isEmpty() -> {
+                        BrowserStartupStore.resetHomePage(this)
+                        toast(getString(R.string.browser_home_page_set))
+                        showBrowserSettings()
+                    }
+                    BrowserStartupStore.setHomePage(this, input) -> {
+                        toast(getString(R.string.browser_home_page_set))
+                        showBrowserSettings()
+                    }
+                    else -> toast(getString(R.string.browser_invalid_url))
                 }
             }
             .setNegativeButton(R.string.action_cancel) { _, _ -> showBrowserSettings() }
@@ -1359,6 +1472,9 @@ class BrowserActivity : Activity() {
          * field, while still clearing the minimum a finger can hit.
          */
         const val ADDRESS_PILL_HEIGHT_DP = 34f
+
+        /** Opacity of a `‹`/`›` button when the page has nothing to go back/forward to. */
+        const val DISABLED_NAV_ALPHA = 0.35f
 
         /** Hint shown on the compact, unfocused pill. */
         /** The address bar's resting hint; a string id so it follows the UI language. */
@@ -1643,13 +1759,32 @@ class BrowserActivity : Activity() {
         super.onPause()
     }
 
-    @Deprecated("Deprecated in Java")
-    override fun onBackPressed() {
+    /**
+     * Back walks out of the page before it walks out of the browser: a fullscreen video, then the
+     * browser's own fullscreen, then the web history, and only then the screen.
+     */
+    private fun goBack() {
         if (fullscreenController.onBackPressed()) return
         if (fullscreen) { setFullscreen(false); return }
+        if (showingStartPage) {
+            if (allowed() && web.canGoBack()) { hideStartPage(); web.goBack(); return }
+            dev.autobridge.ui.SystemBack.finishFromBack(this)
+            return
+        }
         if (allowed() && web.canGoBack()) { web.goBack(); return }
-        super.onBackPressed()
+        dev.autobridge.ui.SystemBack.finishFromBack(this)
     }
+
+    // Pre-33 devices only; everything newer comes through [dev.autobridge.ui.SystemBack].
+    @Deprecated("Back is handled by SystemBack on API 33+", ReplaceWith("goBack()"))
+    @Suppress("DEPRECATION")
+    // The lint check wants this gone, but it is still the only Back a pre-33 device delivers;
+    // SystemBack carries the versions that no longer call it.
+    @SuppressLint("GestureBackNavigation")
+    override fun onBackPressed() = goBack()
+
+    /** Undoes the Back registration; see [dev.autobridge.ui.SystemBack]. */
+    private var releaseBack: () -> Unit = {}
 
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putBundle("web", Bundle().also { web.saveState(it) })
@@ -1668,6 +1803,7 @@ class BrowserActivity : Activity() {
     }
 
     override fun onDestroy() {
+        releaseBack()
         ParkingStateStore.removeListener(parkingListener)
         youtube.release()
         geolocation.release()

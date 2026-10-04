@@ -327,9 +327,15 @@
     <string name="action_next">ถัดไป</string>
     <string name="action_previous">ก่อนหน้า</string>
     <string name="action_sign_in">เข้าสู่ระบบ</string>
+    <string name="action_retry">ลองใหม่</string>
 
     <!-- Phone browser: page chrome, confirmations and dialogs -->
-    <string name="browser_page_load_failed">โหลดหน้านี้ไม่สำเร็จ\nแตะเพื่อลองใหม่</string>
+    <string name="browser_start_page_title">AutoBridge</string>
+    <string name="browser_start_page_search_hint">ค้นหาหรือป้อนที่อยู่เว็บ</string>
+    <string name="browser_start_page_label">หน้าแรกของเบราว์เซอร์</string>
+    <string name="browser_error_no_internet">ไม่มีการเชื่อมต่ออินเทอร์เน็ต</string>
+    <string name="browser_error_host_not_found">หาเว็บไซต์นี้ไม่พบ\nตรวจสอบที่อยู่แล้วลองใหม่</string>
+    <string name="browser_error_blocked">ตอนนี้เปิดหน้านี้ไม่ได้</string>
     <string name="browser_fab_description">เมนูเบราว์เซอร์ (ลากเพื่อย้ายปุ่ม)</string>
     <string name="browser_nothing_to_queue">ยังไม่มีหน้าหรือคำค้นให้เพิ่ม</string>
     <string name="browser_already_queued">มีอยู่ในคิวแล้ว</string>
