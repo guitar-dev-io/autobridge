@@ -473,12 +473,12 @@ AutoBridge is sideloaded today. How you install it changes what the **car** can 
 
 ปัจจุบัน AutoBridge เป็นแอป sideload วิธีติดตั้งมีผลกับสิ่งที่ทำได้บน **จอรถ** ส่วนแอปบน **มือถือ** ทำงานได้เหมือนกันทั้งสองแบบ
 
-| | APK ปกติ (plain sideload) | APK + Shizuku/Play-origin | Google Play (เมื่อผ่านนโยบาย) |
+| | APK ปกติ (plain sideload) | APK + KingInstaller (Play-origin) | Google Play (เมื่อผ่านนโยบาย) |
 |---|---|---|---|
 | **Phone / มือถือ** | ✅ ใช้ได้เต็ม (home, IPTV, media, browser, settings) | ✅ ใช้ได้เต็ม | ✅ ใช้ได้เต็ม |
 | **Car launcher / แสดงบนจอรถ** | ❌ Android Auto มักไม่แสดงไอคอน | ✅ มักแสดง (ตั้ง installer origin เป็น Play + เปิด Unknown sources) | ✅ แสดงปกติ |
-| **Updates / อัปเดต** | ผู้ใช้โหลด APK เอง + In-app "Check for updates" | เหมือนกัน แต่ติดตั้งผ่าน Shizuku | อัปเดตผ่าน Play อัตโนมัติ |
-| **Setup effort / ความยุ่งยาก** | ต่ำ | ปานกลาง (ต้องตั้ง Shizuku ครั้งแรก) | ต่ำที่สุด |
+| **Updates / อัปเดต** | ผู้ใช้โหลด APK เอง + In-app "Check for updates" | เหมือนกัน แต่ลงทับผ่าน KingInstaller ทุกครั้ง | อัปเดตผ่าน Play อัตโนมัติ |
+| **Setup effort / ความยุ่งยาก** | ต่ำ | ต่ำ–ปานกลาง (วิธี Classic ไม่ต้องตั้งอะไร, Shizuku/root เฉพาะเมื่อไม่ผ่าน) | ต่ำที่สุด |
 | **Status / สถานะ** | ใช้ได้วันนี้ | ใช้ได้วันนี้ (วิธีที่แนะนำสำหรับจอรถ) | ยังไม่การันตี — ขึ้นกับนโยบาย Android Auto |
 
 **Why the difference / ทำไมต่างกัน:**
@@ -505,47 +505,70 @@ Google's Android Auto policy does not generally recognise an app installed by pl
 3. เปิดไฟล์ APK แล้วกด **ติดตั้ง**
 4. เปิด AutoBridge หน้าโฮม, IPTV/สื่อ และเบราว์เซอร์บนมือถือใช้ได้ทันที แต่จอรถอาจยังไม่แสดงไอคอน ให้ทำตามหัวข้อ B ต่อสำหรับจอรถ
 
-### B. Show it on the car (Shizuku + Play-origin install) / ให้แสดงบนจอรถ
+### B. Show it on the car (KingInstaller + Play-origin install) / ให้แสดงบนจอรถ
 
-This is the recommended path to make Android Auto show AutoBridge, without rooting the phone.
-วิธีที่แนะนำเพื่อให้ Android Auto แสดง AutoBridge โดยไม่ต้องรูทเครื่อง
+This is the recommended path to make Android Auto show AutoBridge. Follow
+[KingInstaller](https://github.com/fcaronte/KingInstaller)'s own three-step order and start with the
+method that needs no privileges at all: on most phones the **Classic** method is enough, and Shizuku
+or root only come into it if that fails.
+
+วิธีที่แนะนำเพื่อให้ Android Auto แสดง AutoBridge โดยทำตามลำดับ 3 ขั้นของ
+[KingInstaller](https://github.com/fcaronte/KingInstaller) เอง เริ่มจากวิธีที่ไม่ต้องใช้สิทธิ์พิเศษเลย —
+บนเครื่องส่วนใหญ่แค่วิธี **Classic** ก็พอ ส่วน Shizuku หรือ root จะใช้ก็ต่อเมื่อวิธีแรกไม่ผ่าน
 
 #### Tools to download first / เครื่องมือที่ต้องโหลดก่อน
 
-Two third-party apps do the privileged part. Neither is written by, bundled with, or affiliated with
-AutoBridge — download them from their own projects only, and check the source before installing
-anything that claims to be either of them.
+KingInstaller is the one app you always need; Shizuku only comes in for the **Shizuku Trick**, the
+second of its three methods, and is not needed at all if the first one works. Neither is
+written by, bundled with, or affiliated with AutoBridge — download them from their own projects
+only, and check the source before installing anything that claims to be either of them.
 
-สองแอปนี้เป็นของผู้พัฒนาอื่น ไม่ได้มาพร้อม AutoBridge และไม่มีความเกี่ยวข้องกัน ให้โหลดจากโปรเจกต์ต้นทางเท่านั้น
+KingInstaller เป็นแอปเดียวที่ต้องใช้แน่ ๆ ส่วน Shizuku ใช้เฉพาะตอนถอยไปวิธี **Shizuku Trick** (วิธีที่ 2 จาก 3 วิธีของมัน)
+ถ้าวิธีแรกผ่านก็ไม่ต้องลงเลย ทั้งคู่เป็นของผู้พัฒนาอื่น
+ไม่ได้มาพร้อม AutoBridge และไม่มีความเกี่ยวข้องกัน ให้โหลดจากโปรเจกต์ต้นทางเท่านั้น
 
 | Tool | Source / download | What it does / ใช้ทำอะไร |
 |---|---|---|
-| **Shizuku** by RikkaApps<br>`moe.shizuku.privileged.api` | [Source](https://github.com/RikkaApps/Shizuku) · [Releases (APK)](https://github.com/RikkaApps/Shizuku/releases/latest) · [Google Play](https://play.google.com/store/apps/details?id=moe.shizuku.privileged.api) · [IzzyOnDroid F-Droid repo](https://apt.izzysoft.de/fdroid/index/apk/moe.shizuku.privileged.api) · [shizuku.rikka.app](https://shizuku.rikka.app/) | Hands ADB-level privileges to apps that ask, started over Android 11+ wireless debugging with no PC and no root. AutoBridge uses it for the Play-origin install and, optionally, as a touch-input backend / ให้สิทธิ์ระดับ ADB กับแอปที่ขอ เริ่มผ่าน wireless debugging ของ Android 11+ ไม่ต้องใช้คอมและไม่ต้องรูท |
-| **KingInstaller** by fcaronte | [Source](https://github.com/fcaronte/KingInstaller) · [Releases (APK)](https://github.com/fcaronte/KingInstaller/releases/latest) | Installs an APK while recording the Play Store as its installer, which is what makes Android Auto list a sideloaded app. APK only — it is not on Google Play. Also carries its own Android Auto diagnostics / ติดตั้ง APK โดยบันทึกค่า installer เป็น Play Store ซึ่งเป็นเงื่อนไขที่ทำให้ Android Auto ยอมแสดงแอปที่ sideload มา มีเฉพาะไฟล์ APK ไม่มีบน Play |
+| **KingInstaller** by fcaronte<br>_required / ต้องใช้_ | [Source](https://github.com/fcaronte/KingInstaller) · [Releases (APK)](https://github.com/fcaronte/KingInstaller/releases/latest) | Installs an APK while recording the Play Store as its installer, which is what makes Android Auto list a sideloaded app. Carries three install methods (Classic / Shizuku Trick / Root Trick), an **App Diagnostic Checker** and an **Auto-Fixer**. APK only — it is not on Google Play / ติดตั้ง APK โดยบันทึกค่า installer เป็น Play Store ซึ่งเป็นเงื่อนไขที่ทำให้ Android Auto ยอมแสดงแอปที่ sideload มา มีสามวิธีในตัว (Classic / Shizuku Trick / Root Trick) พร้อมเครื่องมือตรวจสถานะแอปและตัวซ่อมค่า installer อัตโนมัติ มีเฉพาะไฟล์ APK ไม่มีบน Play |
+| **Shizuku** by RikkaApps<br>`moe.shizuku.privileged.api`<br>_only if Classic fails / เฉพาะเมื่อ Classic ไม่ผ่าน_ | [Source](https://github.com/RikkaApps/Shizuku) · [Releases (APK)](https://github.com/RikkaApps/Shizuku/releases/latest) · [Google Play](https://play.google.com/store/apps/details?id=moe.shizuku.privileged.api) · [IzzyOnDroid F-Droid repo](https://apt.izzysoft.de/fdroid/index/apk/moe.shizuku.privileged.api) · [shizuku.rikka.app](https://shizuku.rikka.app/)<br>**Shizuku-Next** by rushiranpise: [Source](https://github.com/rushiranpise/Shizuku-Next) | Hands ADB-level privileges to apps that ask, started over Android 11+ wireless debugging with no PC and no root. Feeds KingInstaller's Shizuku Trick, and is optionally AutoBridge's touch-input backend. KingInstaller recommends the **Shizuku-Next** fork, which can start again without Wi-Fi / ให้สิทธิ์ระดับ ADB กับแอปที่ขอ เริ่มผ่าน wireless debugging ของ Android 11+ ไม่ต้องใช้คอมและไม่ต้องรูท ใช้กับ Shizuku Trick ของ KingInstaller และเป็น input backend ของ AutoBridge ได้ด้วย ทาง KingInstaller แนะนำ **Shizuku-Next** เพราะเริ่มเองได้แม้ไม่มี Wi-Fi |
 
 Versions seen on 2026-10-05: Shizuku `v13.6.0`, KingInstaller `v2.3` (`KingInstaller-v2.3.apk`).
 The links above point at each project's *latest* release, so they stay correct as those projects move
-on. Xiaomi/POCO/Redmi (MIUI, HyperOS) phones need KingInstaller's **Root Trick** — its Shizuku Trick
-does not work there, as KingInstaller itself states.
+on. KingInstaller states that the Classic method works on many stock devices and custom ROMs on
+Android 10–16; on Xiaomi/POCO/Redmi (MIUI, HyperOS) it says Shizuku **usually fails** and root is
+currently the only reliable method, so those phones go straight to the **Root Trick**.
 
 เวอร์ชันที่ตรวจเมื่อ 2026-10-05: Shizuku `v13.6.0`, KingInstaller `v2.3` — ลิงก์ด้านบนชี้ที่ release ล่าสุดของแต่ละโปรเจกต์
-เครื่อง Xiaomi/POCO/Redmi (MIUI, HyperOS) ต้องใช้ **Root Trick** ของ KingInstaller เพราะ Shizuku Trick ใช้ไม่ได้บนเครื่องกลุ่มนี้
+KingInstaller ระบุว่าวิธี Classic ใช้ได้กับเครื่อง stock และ custom ROM จำนวนมากบน Android 10–16 ส่วนเครื่อง
+Xiaomi/POCO/Redmi (MIUI, HyperOS) ทาง Shizuku **มักไม่ผ่าน** และตอนนี้ root เป็นวิธีเดียวที่เชื่อถือได้ เครื่องกลุ่มนี้จึงข้ามไปใช้ **Root Trick** ได้เลย
 
 **English**
-1. **Enable Developer Options:** Settings → About phone → tap **Build number** 7 times.
-2. **Set up Shizuku via Wireless Debugging:** turn on **Wireless debugging** in Developer Options, then in the Shizuku app pair with the pairing code and tap **Start**. Shizuku should report "running". (Android 11+ needs no PC.)
-3. **Install with a Play-store origin:** use an installer that works through Shizuku (e.g. KingInstaller) to install the AutoBridge APK so the install origin is recorded as the Play Store. Grant it Shizuku access ("Allow all the time").
-4. **Enable Unknown sources in Android Auto:** open Android Auto settings → tap **Version** 10 times → **Developer settings** → check **Unknown sources**.
-5. **Connect to the car** (USB or wireless Android Auto) and open the Android Auto launcher — AutoBridge should now appear. If not, check **Customize launcher** in Android Auto.
-6. Shizuku is only needed for installing/updating; you do **not** need it running while using the app in the car.
+1. **Install KingInstaller and point it at the APK:** install `KingInstaller-v*.apk` from its [Releases](https://github.com/fcaronte/KingInstaller/releases/latest), open it, tap the folder icon and pick the AutoBridge APK (the car route is compiled into `personal`/`lab` only).
+2. **Step 1 — Classic (try this first):** "just select your APK and hit **Install** normally (without enabling any switches)". No Shizuku, no root. KingInstaller says this is enough on many stock devices and custom ROMs on Android 10–16, where the system installer records the origin by itself.
+3. **Step 2 — Shizuku Trick (only if Classic fails):** if the app is not flagged as coming from the Play Store, or Android Auto still rejects it, start Shizuku and install again with the **Shizuku** switch on.
+   - Enable Developer Options: Settings → About phone → tap **Build number** 7 times.
+   - Turn on **Wireless debugging**, pair in the Shizuku app with the pairing code, tap **Start** until it reports "running" (Android 11+ needs no PC).
+   - Grant KingInstaller Shizuku access — **Allow all the time**.
+   - KingInstaller recommends the [Shizuku-Next](https://github.com/rushiranpise/Shizuku-Next) fork, which can start again even without Wi-Fi.
+4. **Step 3 — Root Trick (last resort):** turn the **Root** switch on when both of the above fail against heavy vendor restrictions. On Xiaomi/POCO/Redmi (MIUI, HyperOS) go here directly: KingInstaller states Shizuku usually fails there and root is currently the only reliable method.
+5. **Verify with the Golden Rule:** open KingInstaller's **App Diagnostic Checker** and look at AutoBridge — **"Installed by" MUST be the Play Store**, and "Requested by" should ideally be the Package Installer. If it is wrong, reinstall one step further down the list; KingInstaller's **Auto-Fixer** also repairs the installer identity right after an install whenever Shizuku or root is available.
+6. **Enable Unknown sources in Android Auto:** open Android Auto settings → tap **Version** 10 times → **Developer settings** → check **Unknown sources**.
+7. **Connect to the car** (USB or wireless Android Auto) and open the Android Auto launcher — AutoBridge should now appear. If not, check **Customize launcher** in Android Auto.
+8. Shizuku (or root) is only needed for installing/updating; you do **not** need it running while using the app in the car. A later plain reinstall over the top resets the recorded installer, so update through KingInstaller too.
 
 **ไทย**
-1. **เปิด Developer Options:** ตั้งค่า → เกี่ยวกับโทรศัพท์ → แตะ **หมายเลขบิลด์ (Build number)** 7 ครั้ง
-2. **ตั้งค่า Shizuku ผ่าน Wireless Debugging:** เปิด **Wireless debugging** ใน Developer Options จากนั้นในแอป Shizuku จับคู่ด้วยรหัส pairing แล้วกด **Start** จนขึ้นสถานะ "running" (Android 11+ ไม่ต้องใช้คอมพิวเตอร์)
-3. **ติดตั้งแบบ origin เป็น Play Store:** ใช้ตัวติดตั้งที่ทำงานผ่าน Shizuku (เช่น KingInstaller) ติดตั้งไฟล์ APK ของ AutoBridge เพื่อให้ origin การติดตั้งถูกบันทึกเป็น Play Store และอนุญาต Shizuku แบบ "Allow all the time"
-4. **เปิด Unknown sources ใน Android Auto:** เปิดการตั้งค่า Android Auto → แตะ **Version** 10 ครั้ง → **Developer settings** → ติ๊ก **Unknown sources**
-5. **เชื่อมต่อกับรถ** (ผ่าน USB หรือ Wireless Android Auto) แล้วเปิด launcher ของ Android Auto จะเห็นไอคอน AutoBridge หากไม่เห็นให้เช็ก **Customize launcher** ใน Android Auto
-6. Shizuku จำเป็นเฉพาะตอนติดตั้ง/อัปเดตเท่านั้น ตอนใช้งานในรถ **ไม่ต้อง** เปิด Shizuku ค้างไว้
+1. **ลง KingInstaller แล้วเลือกไฟล์ APK:** ติดตั้ง `KingInstaller-v*.apk` จาก [Releases](https://github.com/fcaronte/KingInstaller/releases/latest) เปิดแอป → แตะไอคอนโฟลเดอร์ → เลือกไฟล์ APK ของ AutoBridge (เส้นทางจอรถคอมไพล์เข้าเฉพาะ `personal`/`lab`)
+2. **ขั้น 1 — Classic (ลองอันนี้ก่อน):** เลือกไฟล์ APK แล้วกด **Install** ตามปกติ **โดยไม่เปิดสวิตช์ใด ๆ** ไม่ต้องใช้ Shizuku ไม่ต้องรูท ทาง KingInstaller ระบุว่าวิธีนี้พอแล้วสำหรับเครื่อง stock และ custom ROM จำนวนมากบน Android 10–16 เพราะ system installer บันทึกค่า origin ให้เอง
+3. **ขั้น 2 — Shizuku Trick (เฉพาะเมื่อ Classic ไม่ผ่าน):** ถ้าค่า installer ไม่ขึ้นเป็น Play Store หรือ Android Auto ยังไม่ยอมรับ ให้เริ่ม Shizuku แล้วติดตั้งใหม่โดยเปิดสวิตช์ **Shizuku**
+   - เปิด Developer Options: ตั้งค่า → เกี่ยวกับโทรศัพท์ → แตะ **หมายเลขบิลด์ (Build number)** 7 ครั้ง
+   - เปิด **Wireless debugging** → จับคู่ในแอป Shizuku ด้วยรหัส pairing → กด **Start** จนขึ้นสถานะ "running" (Android 11+ ไม่ต้องใช้คอมพิวเตอร์)
+   - อนุญาตให้ KingInstaller ใช้ Shizuku แบบ **Allow all the time**
+   - ทาง KingInstaller แนะนำ [Shizuku-Next](https://github.com/rushiranpise/Shizuku-Next) เพราะเริ่มเองได้แม้ไม่มี Wi-Fi
+4. **ขั้น 3 — Root Trick (ทางสุดท้าย):** เปิดสวิตช์ **Root** เมื่อสองวิธีแรกไม่ผ่านเพราะข้อจำกัดของผู้ผลิต เครื่อง Xiaomi/POCO/Redmi (MIUI, HyperOS) ข้ามมาขั้นนี้ได้เลย เพราะ KingInstaller ระบุว่า Shizuku มักไม่ผ่านบนเครื่องกลุ่มนี้ และตอนนี้ root เป็นวิธีเดียวที่เชื่อถือได้
+5. **ตรวจด้วย Golden Rule:** เปิด **App Diagnostic Checker** ใน KingInstaller แล้วดูที่ AutoBridge — ช่อง **"Installed by" ต้องเป็น Play Store เท่านั้น** ส่วน "Requested by" ควรเป็น Package Installer ถ้ายังไม่ถูกให้ติดตั้งซ้ำด้วยวิธีขั้นถัดไป ทั้งนี้ **Auto-Fixer** ของ KingInstaller จะซ่อมค่า installer ให้อัตโนมัติหลังติดตั้งเสร็จถ้ามี Shizuku หรือ root อยู่แล้ว
+6. **เปิด Unknown sources ใน Android Auto:** เปิดการตั้งค่า Android Auto → แตะ **Version** 10 ครั้ง → **Developer settings** → ติ๊ก **Unknown sources**
+7. **เชื่อมต่อกับรถ** (ผ่าน USB หรือ Wireless Android Auto) แล้วเปิด launcher ของ Android Auto จะเห็นไอคอน AutoBridge หากไม่เห็นให้เช็ก **Customize launcher** ใน Android Auto
+8. Shizuku (หรือ root) จำเป็นเฉพาะตอนติดตั้ง/อัปเดตเท่านั้น ตอนใช้งานในรถ **ไม่ต้อง** เปิดค้างไว้ และถ้าภายหลังลงทับด้วยวิธีปกติ ค่า installer จะถูกรีเซ็ต จึงควรอัปเดตผ่าน KingInstaller ทุกครั้ง
 
 > **Step-by-step guide:** [quick-install.md](quick-install.md) covers this in full — which flavor to build (the car route is compiled into `personal`/`lab` only), KingInstaller's Classic → Shizuku Trick → Root Trick order (Xiaomi/MIUI needs the Root Trick), the in-app **Enable on Android Auto** button for a build that is already installed, Play Protect, and how to verify the recorded installer.
 > **คู่มือละเอียด:** [quick-install.md](quick-install.md) อธิบายครบ — ต้อง build flavor ไหน (เส้นทางจอรถคอมไพล์เข้าเฉพาะ `personal`/`lab`), ลำดับ Classic → Shizuku Trick → Root Trick ของ KingInstaller (Xiaomi/MIUI ต้องใช้ Root Trick), ปุ่ม **Enable on Android Auto** ในแอปสำหรับเครื่องที่ลงไปแล้ว, Play Protect และวิธีตรวจค่า installer ที่ระบบบันทึกไว้

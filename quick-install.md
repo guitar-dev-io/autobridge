@@ -35,14 +35,15 @@
 
 | เครื่องมือ | แหล่งดาวน์โหลด | ใช้ทำอะไรในคู่มือนี้ |
 |---|---|---|
-| **Shizuku** (RikkaApps)<br>`moe.shizuku.privileged.api` | [ซอร์สโค้ด](https://github.com/RikkaApps/Shizuku) · [Releases — APK](https://github.com/RikkaApps/Shizuku/releases/latest) · [Google Play](https://play.google.com/store/apps/details?id=moe.shizuku.privileged.api) · [IzzyOnDroid (F-Droid repo)](https://apt.izzysoft.de/fdroid/index/apk/moe.shizuku.privileged.api) · [เว็บโปรเจกต์](https://shizuku.rikka.app/) | ให้สิทธิ์ระดับ ADB กับแอปที่ขอ เริ่มผ่าน **wireless debugging** ของ Android 11+ ไม่ต้องใช้คอม ไม่ต้องรูท — ใช้ทั้งใน **Shizuku Trick** ของ KingInstaller (ข้อ 3) และปุ่มในแอป (ข้อ 4) |
+| **Shizuku** (RikkaApps)<br>`moe.shizuku.privileged.api` | [ซอร์สโค้ด](https://github.com/RikkaApps/Shizuku) · [Releases — APK](https://github.com/RikkaApps/Shizuku/releases/latest) · [Google Play](https://play.google.com/store/apps/details?id=moe.shizuku.privileged.api) · [IzzyOnDroid (F-Droid repo)](https://apt.izzysoft.de/fdroid/index/apk/moe.shizuku.privileged.api) · [เว็บโปรเจกต์](https://shizuku.rikka.app/) · fork ที่ KingInstaller แนะนำ: [Shizuku-Next](https://github.com/rushiranpise/Shizuku-Next) | ให้สิทธิ์ระดับ ADB กับแอปที่ขอ เริ่มผ่าน **wireless debugging** ของ Android 11+ ไม่ต้องใช้คอม ไม่ต้องรูท — ใช้ทั้งใน **Shizuku Trick** ของ KingInstaller (ข้อ 3) และปุ่มในแอป (ข้อ 4) |
 | **KingInstaller** (fcaronte) | [ซอร์สโค้ด](https://github.com/fcaronte/KingInstaller) · [Releases — APK](https://github.com/fcaronte/KingInstaller/releases/latest) | ติดตั้ง APK โดยบันทึกค่า installer เป็น Play Store ซึ่งเป็นเงื่อนไขที่ทำให้ Android Auto ยอมแสดงแอปที่ sideload มา (ข้อ 3) มีเฉพาะไฟล์ APK **ไม่มีบน Google Play** |
 
 เวอร์ชันที่ตรวจเมื่อ 2026-10-05: Shizuku `v13.6.0`, KingInstaller `v2.3` (ไฟล์ `KingInstaller-v2.3.apk`)
 ลิงก์ข้างบนชี้ที่ release ล่าสุดของแต่ละโปรเจกต์ จึงไม่ต้องแก้คู่มือเมื่อทั้งสองออกเวอร์ชันใหม่
 
-> ทั้งสองตัวต้องเปิด "ติดตั้งแอปที่ไม่รู้จัก" ให้เบราว์เซอร์หรือตัวจัดการไฟล์ก่อน และบนเครื่อง Xiaomi/POCO/Redmi
-> (MIUI, HyperOS) Shizuku Trick ใช้ไม่ได้ ต้องใช้ **Root Trick** ของ KingInstaller — ดูข้อ 3
+> ทั้งสองตัวต้องเปิด "ติดตั้งแอปที่ไม่รู้จัก" ให้เบราว์เซอร์หรือตัวจัดการไฟล์ก่อน ส่วน Shizuku จะได้ใช้ก็ต่อเมื่อวิธี
+> **Classic** ของ KingInstaller ไม่ผ่าน และบนเครื่อง Xiaomi/POCO/Redmi (MIUI, HyperOS) Shizuku มักไม่ผ่าน
+> ต้องใช้ **Root Trick** ของ KingInstaller — ดูข้อ 3
 
 ---
 
@@ -105,13 +106,18 @@ Fermata ใช้
    แล้วอนุญาตให้เบราว์เซอร์/ตัวจัดการไฟล์ติดตั้งแอปที่ไม่รู้จัก
 2. เปิด KingInstaller → แตะไอคอนโฟลเดอร์ → เลือก `app-personal-release.apk`
 3. ลองตามลำดับนี้ (KingInstaller ออกแบบมาให้ไล่ขึ้นทีละขั้น):
-   - **Classic** — ไม่เปิดสวิตช์อะไร ใช้แฟล็กของ system installer เอง ผ่านบนเครื่อง stock ส่วนใหญ่
+   - **Classic** — ไม่เปิดสวิตช์อะไร ใช้แฟล็กของ system installer เอง KingInstaller ระบุว่าผ่านบนเครื่อง stock
+     และ custom ROM จำนวนมากบน Android 10–16
    - **Shizuku Trick** — เปิดสวิตช์นี้เมื่อ Classic ไม่ผ่าน (ต้องเริ่ม Shizuku ไว้ก่อน — ดูขั้นตอนในหัวข้อถัดไป)
+     ทาง KingInstaller แนะนำ [Shizuku-Next](https://github.com/rushiranpise/Shizuku-Next) เพราะเริ่มเองได้แม้ไม่มี Wi-Fi
    - **Root Trick** — เปิดเมื่อสองอันแรกไม่ผ่าน
 4. กด Install แล้วยืนยันในหน้าติดตั้งของระบบ
+5. ตรวจผลด้วย **App Diagnostic Checker** ในตัว KingInstaller — ตาม "Golden Rule" ของมัน ช่อง
+   **"Installed by" ต้องเป็น Play Store เท่านั้น** ส่วน "Requested by" ควรเป็น Package Installer
+   ถ้ายังไม่ถูกให้ลงซ้ำด้วยวิธีขั้นถัดไป (ตัว **Auto-Fixer** จะซ่อมค่านี้ให้เองหลังติดตั้ง ถ้ามี Shizuku หรือ root อยู่)
 
-> **Xiaomi / POCO / Redmi (MIUI, HyperOS):** ทาง Shizuku Trick ใช้ไม่ได้ ต้องใช้ **Root Trick**
-> ตามที่ KingInstaller ระบุไว้เอง — ถ้าเครื่องคุณลงผ่าน KingInstaller ได้แล้ว นั่นคือทางนี้
+> **Xiaomi / POCO / Redmi (MIUI, HyperOS):** KingInstaller ระบุเองว่า Shizuku **มักไม่ผ่าน** บนเครื่องกลุ่มนี้
+> และตอนนี้ root เป็นวิธีเดียวที่เชื่อถือได้ จึงข้ามไปใช้ **Root Trick** ได้เลย — ถ้าเครื่องคุณลงผ่าน KingInstaller ได้แล้ว นั่นคือทางนี้
 > เสร็จแล้ว **ข้ามส่วนที่ 4 ได้เลย** เพราะ installer ถูกบันทึกเป็น Play Store ตั้งแต่ตอนลง
 
 **ข้อควรระวังเวลาอัปเดตเวอร์ชันถัดไป:** ถ้าลงทับด้วยตัวจัดการไฟล์หรือ adb ธรรมดา ค่า installer
