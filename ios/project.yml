@@ -8,8 +8,10 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    MARKETING_VERSION: "0.1.0"
-    CURRENT_PROJECT_VERSION: "1"
+    # Kept in step with ../version.properties, which is the one place
+    # AutoBridge's version is set for the Android app.
+    MARKETING_VERSION: "0.4.21"
+    CURRENT_PROJECT_VERSION: "35"
     DEVELOPMENT_TEAM: "V9Q6ZN9L53"
     CODE_SIGN_STYLE: Automatic
 
@@ -26,8 +28,9 @@ targets:
         CODE_SIGN_ENTITLEMENTS: AutoBridge/Resources/AutoBridge.entitlements
         GENERATE_INFOPLIST_FILE: NO
         TARGETED_DEVICE_FAMILY: "1,2"
-    info:
-      path: AutoBridge/Resources/Info.plist
+    # No `info:` block on purpose: XcodeGen *generates* the plist at `info.path` and would
+    # overwrite the hand-written one, which carries the CarPlay scene manifest, the audio
+    # background mode and the ATS exception. INFOPLIST_FILE above is what points at it.
 
   AutoBridgeTests:
     type: bundle.unit-test
@@ -39,6 +42,10 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.autobridge.ios.tests
+        GENERATE_INFOPLIST_FILE: YES
+        # The app ships to iOS 16; XCTest.framework in current Xcode is built for 17, and only the
+        # test bundle links it. Raising it here keeps the link warning-free without moving the app.
+        IPHONEOS_DEPLOYMENT_TARGET: "17.0"
 
 schemes:
   AutoBridge:
@@ -49,3 +56,9 @@ schemes:
     test:
       targets:
         - AutoBridgeTests
+      # Off by default, so the suite stays hermetic. Tick it in Xcode's Test action (or flip
+      # isEnabled here) to also run `PublicPlaylistLiveTests` against the real public playlists.
+      environmentVariables:
+        - variable: AUTOBRIDGE_NETWORK_TESTS
+          value: "1"
+          isEnabled: false

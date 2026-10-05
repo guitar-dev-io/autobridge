@@ -3,9 +3,11 @@ import Foundation
 /// Minimal `#EXTM3U` reader for IPTV playlists, including the `m3u_plus` attribute form Xtream
 /// portals serve from `get.php`.
 ///
-/// Only the attributes AutoBridge actually shows are read (`group-title`, `tvg-logo`, `tvg-name`);
+/// Only the attributes AutoBridge actually shows are read (`group-title`, the logo, `tvg-name`);
 /// anything else on the line is ignored rather than rejected, because provider playlists routinely
-/// carry vendor-specific extras. Pure string work, so it is unit-testable without a network.
+/// carry vendor-specific extras. Which attribute carries the logo, and what makes its address
+/// usable, is `IptvLogos`' business — the value arrives here however the provider wrote it.
+/// Pure string work, so it is unit-testable without a network.
 public enum M3UParser {
     /// One playlist line pair: its `#EXTINF` metadata plus the URL that follows it.
     public struct Channel: Equatable {
@@ -20,30 +22,40 @@ public enum M3UParser {
             self.group = group
             self.logo = logo
         }
+
+        func with(url: String? = nil, group: String? = nil, logo: String? = nil) -> Channel {
+            Channel(
+                name: name,
+                url: url ?? self.url,
+                group: group ?? self.group,
+                logo: logo ?? self.logo
+            )
+        }
     }
 
     public static func parse(_ text: String) -> [Channel] {
         var channels: [Channel] = []
         var pending: Channel?
 
-        for rawLine in text.split(separator: "\n", omittingEmptySubsequences: false) {
+        for rawLine in text.split(whereSeparator: \.isNewline) {
             let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
-            if line.isEmpty {
-                continue
-            }
-            if line.lowercased().hasPrefix("#extinf") {
+            if line.isEmpty { continue }
+            let lower = line.lowercased()
+            if lower.hasPrefix("#extinf") {
                 pending = parseExtInf(line)
-            } else if line.lowercased().hasPrefix("#extgrp:") {
-                let group = String(line.drop(while: { $0 != ":" }).dropFirst())
-                    .trimmingCharacters(in: .whitespaces)
-                if let current = pending {
-                    pending = Channel(name: current.name, url: current.url, group: group, logo: current.logo)
-                }
+            // Other directives (#EXTGRP, #EXTIMG, #EXTVLCOPT, #EXTM3U) refine or precede it.
+            } else if lower.hasPrefix("#extgrp:") {
+                pending = pending?.with(group: valueAfterColon(line))
+            // Some generators put the logo on its own line instead of in an attribute; an
+            // #EXTINF that carried one too keeps it, because the attribute is the convention.
+            } else if lower.hasPrefix("#extimg:") {
+                let logo = valueAfterColon(line)
+                pending = pending.map { $0.logo.isEmpty ? $0.with(logo: logo) : $0 }
             } else if line.hasPrefix("#") {
                 continue
             } else {
                 if let entry = pending, !entry.name.isEmpty {
-                    channels.append(Channel(name: entry.name, url: line, group: entry.group, logo: entry.logo))
+                    channels.append(entry.with(url: line))
                 }
                 pending = nil
             }
@@ -58,7 +70,7 @@ public enum M3UParser {
         let nameStart = lastUnquotedComma(payload)
         let name: String
         let attributeSource: String
-        if let nameStart = nameStart {
+        if let nameStart {
             let nameIndex = payload.index(after: nameStart)
             name = String(payload[nameIndex...]).trimmingCharacters(in: .whitespaces)
             attributeSource = String(payload[payload.startIndex..<nameStart])
@@ -72,8 +84,12 @@ public enum M3UParser {
             name: resolvedName,
             url: "",
             group: attributes["group-title"] ?? "",
-            logo: attributes["tvg-logo"] ?? ""
+            logo: IptvLogos.pick(attributes)
         )
+    }
+
+    private static func valueAfterColon(_ line: String) -> String {
+        substringAfterFirst(line, separator: ":").trimmingCharacters(in: .whitespaces)
     }
 
     private static func substringAfterFirst(_ value: String, separator: Character) -> String {
@@ -103,7 +119,7 @@ public enum M3UParser {
         guard let regex = try? NSRegularExpression(pattern: pattern) else { return attributes }
         let range = NSRange(value.startIndex..<value.endIndex, in: value)
         regex.enumerateMatches(in: value, range: range) { match, _, _ in
-            guard let match = match,
+            guard let match,
                   let keyRange = Range(match.range(at: 1), in: value),
                   let valueRange = Range(match.range(at: 2), in: value) else { return }
             attributes[value[keyRange].lowercased()] = String(value[valueRange])

@@ -12,10 +12,10 @@ enum StreamingGroup: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .video: return "Video"
-        case .music: return "Music"
-        case .live: return "Live / Gaming"
-        case .anime: return "Anime"
+        case .video: return NSLocalizedString("Video", comment: "Streaming group")
+        case .music: return NSLocalizedString("Music", comment: "Streaming group")
+        case .live: return NSLocalizedString("Live / Gaming", comment: "Streaming group")
+        case .anime: return NSLocalizedString("Anime", comment: "Streaming group")
         }
     }
 }

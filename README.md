@@ -685,6 +685,16 @@ The following are kept as internal development notes under `docs/` in the workin
 - `docs/CARVIEW_PARITY.md` — product-reference comparison
 - `docs/PROGRESS.md` — current verification record
 
+## iOS companion app / แอปคู่ฝั่ง iOS
+
+**English**
+
+A separate SwiftUI app lives in [`ios/`](ios/README.md). It is not a port of the mirroring runtime — iOS blocks that outright — but it now carries the whole entertainment surface: TV and Radio over Xtream Codes and M3U (live, VOD and series), source management and the public-list picker, channel logos, the automatic channel check, favourites and recently-played, the in-app browser with the same opt-in YouTube add-ons, a shared player with lock-screen controls and background audio, and a CarPlay **audio** scene for the car. Credentials live in the keychain, the UI is English and Thai, and the ported logic is pinned down by the same rules the Android tests assert. What iOS cannot do — screen mirroring, touch injection, an arbitrary video surface on the car display — is stated in the app's own Settings rather than left to be discovered.
+
+**ไทย**
+
+แอป SwiftUI แยกต่างหากอยู่ใน [`ios/`](ios/README.md) ไม่ใช่การพอร์ตระบบมิเรอร์ (iOS ทำไม่ได้โดยตรง) แต่ตอนนี้มีส่วนความบันเทิงครบแล้ว ได้แก่ ทีวีและวิทยุผ่าน Xtream Codes และ M3U (ช่องสด หนัง และซีรีส์) การจัดการแหล่งข้อมูลและตัวเลือกรายการสาธารณะ โลโก้ช่อง การตรวจสอบช่องอัตโนมัติ รายการโปรดและรายการที่เล่นล่าสุด เบราว์เซอร์ในแอปพร้อมส่วนเสริม YouTube แบบเลือกเปิดเอง เครื่องเล่นกลางที่ควบคุมจากหน้าจอล็อกและเล่นเสียงเบื้องหลังได้ และหน้าจอ CarPlay แบบ **เสียง** สำหรับในรถ ข้อมูลรับรองเก็บใน keychain หน้าตาแอปมีทั้งภาษาอังกฤษและไทย และตรรกะที่พอร์ตมาถูกยืนยันด้วยกฎชุดเดียวกับที่เทสต์ฝั่ง Android ตรวจไว้ ส่วนที่ iOS ทำไม่ได้ — มิเรอร์หน้าจอ ส่งคำสั่งแตะ และแสดงวิดีโออิสระบนจอรถ — ระบุไว้ในหน้าตั้งค่าของแอปเอง ไม่ปล่อยให้ผู้ใช้ไปค้นพบเอง
+
 ## Support
 
 AutoBridge is a personal, non-commercial project. If it is useful to you and you would like to buy the developer a coffee, support is welcome but entirely optional.

@@ -1,144 +1,107 @@
 import SwiftUI
 
-/// The AutoBridge iOS home: a dashboard grid (TV, Radio, Web browser) plus a recently-played strip.
-/// Mirrors the shape of the Android `HomeSection` dashboard, limited to the sections iOS supports.
+/// The AutoBridge iOS home: the shared `HomeSection` dashboard as a two-column grid, with the
+/// now-playing bar pinned under it and Settings in the navigation bar.
+///
+/// Settings is not a tile for the same reason the Android phone grid leaves it out: it is reachable
+/// from every screen already, and listing it twice pushes the actual content further down.
 struct HomeView: View {
     @EnvironmentObject private var sourceStore: IptvSourceStore
-    @EnvironmentObject private var historyStore: PlaybackHistoryStore
+    @EnvironmentObject private var historyStore: IptvHistoryStore
 
-    private let columns = [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
+    private let columns = [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)]
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    dashboard
-                    if !historyStore.recentlyPlayed.isEmpty {
-                        recentStrip
-                    }
-                    if !historyStore.favorites.isEmpty {
-                        favoritesStrip
+            PageShell(title: "AutoBridge", subtitle: subtitle) {
+                LazyVGrid(columns: columns, spacing: 14) {
+                    ForEach(HomeSection.allCases) { section in
+                        NavigationLink {
+                            SectionDestination(section: section)
+                        } label: {
+                            card(section)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
-                .padding(20)
+                .padding(.top, 2)
             }
-            .background(AutoBridgeDesign.ink.ignoresSafeArea())
-            .navigationTitle("AutoBridge")
-            .navigationDestination(for: HomeSection.self) { section in
-                destination(for: section)
-            }
-            .navigationDestination(for: IptvEntry.self) { entry in
-                PlayerOrBrowser(entry: entry)
-            }
-        }
-        .tint(.white)
-    }
-
-    private var dashboard: some View {
-        LazyVGrid(columns: columns, spacing: 16) {
-            ForEach(HomeSection.allCases) { section in
-                NavigationLink(value: section) {
-                    sectionCard(section)
+            .safeAreaInset(edge: .bottom) { MiniPlayerBar() }
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    NavigationLink {
+                        SettingsView()
+                    } label: {
+                        Image(systemName: "gearshape")
+                    }
                 }
-                .buttonStyle(.plain)
             }
         }
+        .tint(AutoBridgeDesign.accent)
     }
 
-    private func sectionCard(_ section: HomeSection) -> some View {
-        InkCard(accent: AutoBridgeDesign.accent(for: section)) {
-            VStack(alignment: .leading, spacing: 12) {
+    private var subtitle: String {
+        let sources = plural(sourceStore.sources.count, "source")
+        let favorites = plural(historyStore.favorites.count, "favorite")
+        return "\(sources) • \(favorites)"
+    }
+
+    private func card(_ section: HomeSection) -> some View {
+        InkCard(accent: section.accent) {
+            VStack(alignment: .leading, spacing: 10) {
                 Image(systemName: section.systemImage)
-                    .font(.system(size: 28, weight: .semibold))
-                    .foregroundStyle(AutoBridgeDesign.accent(for: section))
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(section.accent)
+                Spacer(minLength: 0)
                 Text(section.title)
                     .font(.headline)
                     .foregroundStyle(AutoBridgeDesign.primaryText)
-                if let kind = section.iptvKind {
-                    Text("\(sourceStore.sources(kind: kind).count) source(s)")
-                        .font(.caption)
-                        .foregroundStyle(AutoBridgeDesign.secondaryText)
-                } else {
-                    Text(section.caption)
-                        .font(.caption)
-                        .foregroundStyle(AutoBridgeDesign.secondaryText)
-                }
+                Text(detail(section))
+                    .font(.caption)
+                    .foregroundStyle(AutoBridgeDesign.secondaryText)
+                    .lineLimit(2, reservesSpace: true)
             }
-            .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
-            .padding(16)
+            .frame(maxWidth: .infinity, minHeight: 124, alignment: .topLeading)
+            .padding(14)
         }
     }
 
-    private var recentStrip: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Recently played")
-                .font(.headline)
-                .foregroundStyle(AutoBridgeDesign.primaryText)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    ForEach(historyStore.recentlyPlayed) { entry in
-                        NavigationLink(value: entry) {
-                            EntryChip(entry: entry)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
+    /// The card's second line: a live count where there is one to show, the section caption
+    /// otherwise. Mirrors the Android dashboard, which counts sources on TV and Radio.
+    private func detail(_ section: HomeSection) -> LocalizedStringKey {
+        if let kind = section.iptvKind {
+            let count = sourceStore.sources(kind: kind).count
+            return count == 0 ? "No source yet" : "\(count) source(s)"
         }
-    }
-
-    private var favoritesStrip: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Favorites")
-                .font(.headline)
-                .foregroundStyle(AutoBridgeDesign.primaryText)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    ForEach(historyStore.favorites) { entry in
-                        NavigationLink(value: entry) {
-                            EntryChip(entry: entry)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
+        if section == .favorites {
+            let count = historyStore.favorites.count
+            return count == 0 ? section.caption : "\(count) saved"
         }
-    }
-
-    @ViewBuilder
-    private func destination(for section: HomeSection) -> some View {
-        switch section {
-        case .tv:
-            CatalogView(section: section)
-        case .radio:
-            CatalogView(section: section)
-        case .streaming:
-            StreamingView()
-        case .browser:
-            BrowserView(initialURL: URL(string: "https://www.youtube.com"))
-                .navigationTitle("Web browser")
-        }
+        return section.caption
     }
 }
 
-/// A compact entry tile used in the Home horizontal strips.
-struct EntryChip: View {
-    let entry: IptvEntry
+/// Routes a home tile to its screen. Kept out of `HomeView` so the CarPlay scene and the Settings
+/// screen can reach the same destinations.
+struct SectionDestination: View {
+    let section: HomeSection
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(AutoBridgeDesign.surface)
-                .frame(width: 140, height: 80)
-                .overlay {
-                    Image(systemName: entry.isWebPage ? "globe" : "play.tv")
-                        .foregroundStyle(AutoBridgeDesign.secondaryText)
-                }
-            Text(entry.title)
-                .font(.caption)
-                .lineLimit(1)
-                .foregroundStyle(AutoBridgeDesign.primaryText)
+        switch section {
+        case .tv, .radio:
+            SourcesView(kind: section.iptvKind ?? .tv, accent: section.accent)
+        case .web:
+            BrowserView(initialURL: nil, title: section.plainTitle)
+        case .youtube, .youtubeMusic:
+            BrowserView(initialURL: section.webUrl, title: section.plainTitle)
+        case .streaming:
+            StreamingView()
+        case .folders:
+            LocalMediaView(mode: .files)
+        case .gallery:
+            LocalMediaView(mode: .gallery)
+        case .favorites:
+            FavoritesView()
         }
-        .frame(width: 140, alignment: .leading)
     }
 }
