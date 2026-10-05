@@ -4,8 +4,8 @@ Updated: 2026-10-05
 
 What has to be written into the Play Console for the **safe** flavor, which is the only one Play
 ever sees (`personal` and `lab` carry the unofficial Android Auto SDK, Duo Screen and
-`QUERY_ALL_PACKAGES`, and are sideload-only — see [docs/SIDELOAD.md](docs/SIDELOAD.md) and
-[docs/MODES.md](docs/MODES.md)).
+`QUERY_ALL_PACKAGES`, and are sideload-only — see [quick-install.md](quick-install.md); the `docs/`
+notes are untracked).
 
 Three things have to agree, and nothing in the build checks the first two:
 

@@ -1,4 +1,4 @@
-**Version:** `0.4.17` &nbsp;·&nbsp; **Build (versionCode):** `31`
+**Version:** `0.4.18` &nbsp;·&nbsp; **Build (versionCode):** `32`
 
 AutoBridge is a personal/development Android project for experimenting with a parked-only phone-to-Android-Auto surface bridge. It is an independent codebase, not a merge of the reference projects tracked in the project's internal `docs/` notes.
 
@@ -65,13 +65,17 @@ AutoBridge ยังมีความสามารถที่เป็นท
 - Entertainment routing that distinguishes HTTPS web pages, audio, and video instead of treating all sources as browser content.
 - A Fermata-Xtream-style home on both surfaces: one shared `HomeSection` list renders as the phone launcher grid and as the Android Auto dashboard (TV, Radio, Web browser, Youtube, YouTube Music, , Folders, Favorites, Playlists, Gallery, then Mirror/Apps/Remote/Settings).
 - Xtream Codes and M3U IPTV sources for the TV and Radio sections, with unit-tested credential/playlist parsing, a shared catalog cache, host-aware list paging, favourites and a recently-played list.
-- Built-in free public playlists ([Free-TV](https://github.com/Free-TV/IPTV), iptv-org, radio-browser): TV and Radio start with default lists so there are channels to browse out of the box, further lists are one tap away in the picker, and any of them can be removed for good. AutoBridge stores addresses only and fetches each list live from the project that publishes it; nothing is hosted, bundled or redistributed here. Community-playlist conventions are read rather than ignored: a channel whose entry is a YouTube/Twitch watch page opens in the browser instead of failing inside the player, and Free-TV's `Ⓢ`/`Ⓖ`/`Ⓨ` name markers become subtitle hints.
+- Built-in free public playlists so TV and Radio have channels out of the box. A fresh install seeds these defaults (each can be removed for good — removal is remembered per URL, so a deleted default never comes back):
+  - TV: **Free-TV** ([Free-TV/IPTV](https://github.com/Free-TV/IPTV), ~2,000 free-to-air channels grouped by country) and **Thai (dearbulut)** (Thai-language channels).
+  - Radio: **radio-browser · Thailand** (Thai stations from the [radio-browser](https://www.radio-browser.info/) community database).
+
+  Two more lists are one tap away in the picker without being seeded: **iptv-org · All countries** ([iptv-org](https://github.com/iptv-org/iptv), very large; the first load takes a while) for TV, and **radio-browser · Top voted** (the 100 highest-voted stations worldwide) for Radio. AutoBridge stores addresses only and fetches each list live from the project that publishes it under that project's own terms; nothing is hosted, bundled, or redistributed here, and nothing is added without an explicit action. Community-playlist conventions are read rather than ignored: a channel whose entry is a YouTube/Twitch watch page opens in the browser instead of failing inside the player, and Free-TV's `Ⓢ`/`Ⓖ`/`Ⓨ` name markers become subtitle hints.
 - Channel logos from the playlist on both the phone and the head unit, including the lists that spell the attribute differently or write the address relative to themselves. The phone shows channels as a two-column grid of logo tiles; the car shows them as list rows with the logo beside them.
 - A ping check that runs by itself when a channel list opens, on both surfaces and with nothing to press: each channel reads `88 ms` in green, a slow answer in amber, or `HTTP 404` / `No answer` in red, so a retired or geo-blocked channel is visible before it is opened rather than as a player that spins.
 - MediaStore-backed Folders, Playlists and Gallery sections on the phone and in the car, reusing the existing MediaSession and car video surface.
 - An AutoBridge phone design language (`AutoBridgeDesign`): ink surfaces, hairline borders, a per-section accent that carries from the home card into that section's screens and player, a dependency-free cached image loader for channel logos, a shared now-playing bar, and a designed player with a scrubber and a LIVE state.
 - A step-by-step car setup screen: notifications, an input backend (Shizuku or accessibility) and screen capture in the order they happen, each with its live state and one action, plus an optional Bluetooth media-session start.
-- Optional YouTube add-ons for the in-app browser, off by default: SponsorBlock segment skipping with per-category switches and a privacy-preserving hash-prefix lookup, and an auto-highest-quality setting. Both run in the phone and car browsers from one implementation.
+- Optional YouTube add-ons for the in-app browser, off by default: SponsorBlock segment skipping with per-category switches and a privacy-preserving hash-prefix lookup, an auto-highest-quality setting, and ad-skip. All of them run in the phone and car browsers from one implementation — see [YouTube add-ons](#youtube-add-ons--ส่วนเสริม-youtube) for what each one can and cannot do.
 - Bounded Compose phone control-center content embedded in the existing Activity; Android Auto remains host-managed through Car App templates.
 - ScreenOnAuto-inspired mirror automation: optional prevent-sleep, timed auto-dim, opt-in panel-only screen-off, stop-on-disconnect, last-app auto-launch, consented auto-open, Shizuku onboarding, and explicit self-drawn renderer selection.
 
@@ -128,23 +132,24 @@ Optional lint tasks, when available in the local Android toolchain:
 ./gradlew lintSafeDebug lintPersonalDebug lintLabDebug
 ```
 
-### Building without the translation engines
+### Building with the translation engines (off by default)
 
 On-device subtitle translation is the one feature with heavyweight dependencies behind it: ML Kit
 Translate and ONNX Runtime (the Opus-MT/Marian engine). Both are mostly native code shipped per
-ABI, about 17 MB of the packaged APK between them. `autobridge.subtitleTranslation` in
-`gradle.properties` turns the feature off and leaves both libraries out of the build entirely —
-no dependency, no `.so`, and neither of the two engine classes compiled:
+ABI, about 17 MB of the packaged APK between them. For that reason `autobridge.subtitleTranslation`
+in `gradle.properties` is **`false` by default**, so a standard build leaves both libraries out
+entirely — no dependency, no `.so`, and neither of the two engine classes compiled. Opt in to
+compile the feature back in with the flag set to `true`:
 
 ```bash
-./gradlew assembleSafeRelease -Pautobridge.subtitleTranslation=false
-AUTOBRIDGE_SUBTITLE_TRANSLATION=false ./gradlew assembleSafeRelease
+./gradlew assembleSafeRelease -Pautobridge.subtitleTranslation=true
+AUTOBRIDGE_SUBTITLE_TRANSLATION=true ./gradlew assembleSafeRelease
 ```
 
-Subtitles themselves are unaffected — a track still decodes and renders, only untranslated. In
-such a build `SubtitleSettings.enabled()` is false regardless of the stored preference, so a phone
-that had translation on before the switch does not route cues at an engine that is no longer
-there, and the player hides the button that opens the translation settings.
+Subtitles themselves are unaffected — a track still decodes and renders, only untranslated. When
+the feature is left off, `SubtitleSettings.enabled()` is false regardless of the stored preference,
+so a phone that had translation on before does not route cues at an engine that is no longer there,
+and the player hides the button that opens the translation settings.
 
 ### Setting the version
 
@@ -224,7 +229,7 @@ Upload this file in Play Console:
 app/build/outputs/bundle/personalRelease/app-personal-release.aab
 ```
 
-The bundle is signed with the AutoBridge release keystore and contains `dev.autobridge`, version `0.4.17`, and `versionCode 31`. Increment `versionCode` for every later upload with `./scripts/set-version.sh` (see [Setting the version](#setting-the-version)); keep the same keystore for updates. Start with Internal testing/App Sharing before attempting production release. The current Android Auto surface is a development/personal-use POC using a `NavigationTemplate` for mirroring, so Play/Android Auto policy approval is not guaranteed.
+The bundle is signed with the AutoBridge release keystore and contains `dev.autobridge`, version `0.4.18`, and `versionCode 32`. Increment `versionCode` for every later upload with `./scripts/set-version.sh` (see [Setting the version](#setting-the-version)); keep the same keystore for updates. Start with Internal testing/App Sharing before attempting production release. The current Android Auto surface is a development/personal-use POC using a `NavigationTemplate` for mirroring, so Play/Android Auto policy approval is not guaranteed.
 
 ### Deobfuscation (R8 mapping) files
 
@@ -359,12 +364,12 @@ _Media player & subtitles_
 - Built-in Media3/ExoPlayer with a scrubber, LIVE indicator, previous/next, and a 10-second skip; it keeps playing when the screen is left (background playback) and supports picture-in-picture.
 - Player options: preferred decoder (Auto/Hardware/Software), aspect ratio (Auto/Fill/Stretch/16:9/4:3), split layout, channel-change gesture, player-control density, show-delay, and picture enhancement (brightness/contrast/saturation).
 - Plays on-device files and MP4/HLS/DASH stream links; MediaStore Folders, Playlists, and a photo/clip Gallery.
-- On-device subtitle translation (_optional_): translate a subtitle track entirely on the phone with ML Kit or Opus-MT (ONNX Runtime), pick source/target language, show-original, and Wi-Fi-only model downloads. The whole translation stack can be compiled out at build time with `-Pautobridge.subtitleTranslation=false`, in which case subtitles still render untranslated.
+- On-device subtitle translation (_optional, off by default_): when compiled in, it translates a subtitle track entirely on the phone with ML Kit or Opus-MT (ONNX Runtime), with source/target language, show-original, and Wi-Fi-only model downloads. The translation stack is left out of a standard build and is only compiled in when `-Pautobridge.subtitleTranslation=true` is set; otherwise subtitles still render untranslated.
 
 _Browser & YouTube add-ons_
 - Full phone web browser: tabs, address/search bar, history, bookmarks, downloads, find-in-page, desktop-site request, custom User-Agent, clear browsing data, and reset site permissions.
 - "Send to car" and a play queue: push the current page or a search to the car screen, or queue items to play next.
-- YouTube add-ons (all off by default): SponsorBlock segment skipping by category, auto-highest-quality, and YouTube ad-skip.
+- YouTube add-ons (all off by default): SponsorBlock segment skipping by category, auto-highest-quality, and YouTube ad-skip — what each one does, and how to tell whether it is working, is in [YouTube add-ons](#youtube-add-ons--ส่วนเสริม-youtube).
 
 _Mirroring & projection control_ (_parked-only_, _flavor-gated_)
 - Screen mirroring/projection to the car with a foreground-service notification and a Stop action; renderer pipeline choice (AUTO_MIRROR / SELF_DRAWN), mirror rotation, crop/fit, resolution and frame-rate targets, and a head-unit profile.
@@ -410,12 +415,12 @@ _เครื่องเล่นสื่อและซับไตเติ�
 - เครื่องเล่นในตัวด้วย Media3/ExoPlayer มีแถบเลื่อน (scrubber), ตัวบอก LIVE, ก่อนหน้า/ถัดไป และข้าม 10 วินาที เล่นต่อได้แม้ออกจากหน้าจอ (เล่นเบื้องหลัง) และรองรับ picture-in-picture
 - ตัวเลือกเครื่องเล่น: ตัวถอดรหัสที่เลือก (Auto/Hardware/Software), อัตราส่วนภาพ (Auto/Fill/Stretch/16:9/4:3), เลย์เอาต์แบบแบ่งจอ, ท่าทางเปลี่ยนช่อง, ความหนาแน่นของปุ่มควบคุม, การแสดง delay และการปรับภาพ (ความสว่าง/คอนทราสต์/ความอิ่มสี)
 - เล่นไฟล์บนเครื่อง และลิงก์สตรีม MP4/HLS/DASH รวมถึง โฟลเดอร์, เพลย์ลิสต์ และแกลเลอรีรูป/คลิป จาก MediaStore
-- การแปลซับไตเติลบนเครื่อง (_ทางเลือก_): แปลแทร็กซับไตเติลบนมือถือล้วน ๆ ด้วย ML Kit หรือ Opus-MT (ONNX Runtime) เลือกภาษาต้นทาง/ปลายทาง, แสดงต้นฉบับ และดาวน์โหลดโมเดลเฉพาะตอนต่อ Wi-Fi ทั้งชุดการแปลสามารถถอดออกตอน build ได้ด้วย `-Pautobridge.subtitleTranslation=false` ซึ่งซับไตเติลจะยังแสดงแบบไม่แปล
+- การแปลซับไตเติลบนเครื่อง (_ทางเลือก, ปิดเป็นค่าเริ่มต้น_): เมื่อ build รวมเข้ามา จะแปลแทร็กซับไตเติลบนมือถือล้วน ๆ ด้วย ML Kit หรือ Opus-MT (ONNX Runtime) เลือกภาษาต้นทาง/ปลายทาง, แสดงต้นฉบับ และดาวน์โหลดโมเดลเฉพาะตอนต่อ Wi-Fi โดยค่าเริ่มต้นชุดการแปลจะไม่ถูก build เข้ามา และจะรวมเข้าเฉพาะเมื่อตั้ง `-Pautobridge.subtitleTranslation=true` เท่านั้น มิฉะนั้นซับไตเติลจะยังแสดงแบบไม่แปล
 
 _เบราว์เซอร์และส่วนเสริม YouTube_
 - เบราว์เซอร์บนมือถือเต็มรูปแบบ: แท็บ, แถบที่อยู่/ค้นหา, ประวัติ, บุ๊กมาร์ก, ดาวน์โหลด, ค้นหาในหน้า, ขอหน้าแบบเดสก์ท็อป, กำหนด User-Agent เอง, ล้างข้อมูลการท่องเว็บ และรีเซ็ตสิทธิ์เว็บไซต์
 - "ส่งไปจอรถ" และคิวเล่น: ส่งหน้าปัจจุบันหรือการค้นหาขึ้นจอรถ หรือเพิ่มเข้าคิวให้เล่นถัดไป
-- ส่วนเสริม YouTube (ปิดไว้โดยค่าเริ่มต้นทั้งหมด): ข้ามช่วงด้วย SponsorBlock ตามหมวดหมู่, เลือกคุณภาพสูงสุดอัตโนมัติ และข้ามโฆษณา YouTube
+- ส่วนเสริม YouTube (ปิดไว้โดยค่าเริ่มต้นทั้งหมด): ข้ามช่วงด้วย SponsorBlock ตามหมวดหมู่, เลือกคุณภาพสูงสุดอัตโนมัติ และข้ามโฆษณา YouTube — รายละเอียดแต่ละตัวและวิธีเช็กว่าทำงานหรือไม่ อยู่ที่ [YouTube add-ons](#youtube-add-ons--ส่วนเสริม-youtube)
 
 _การ Mirror และควบคุมการฉายภาพ_ (_parked-only_, _flavor-gated_)
 - Mirror/ฉายหน้าจอขึ้นจอรถ พร้อม notification ของ foreground service และปุ่ม Stop เลือก renderer pipeline (AUTO_MIRROR / SELF_DRAWN), การหมุนภาพ, crop/fit, เป้าหมายความละเอียดและเฟรมเรต และโปรไฟล์ head-unit
@@ -505,6 +510,27 @@ Google's Android Auto policy does not generally recognise an app installed by pl
 This is the recommended path to make Android Auto show AutoBridge, without rooting the phone.
 วิธีที่แนะนำเพื่อให้ Android Auto แสดง AutoBridge โดยไม่ต้องรูทเครื่อง
 
+#### Tools to download first / เครื่องมือที่ต้องโหลดก่อน
+
+Two third-party apps do the privileged part. Neither is written by, bundled with, or affiliated with
+AutoBridge — download them from their own projects only, and check the source before installing
+anything that claims to be either of them.
+
+สองแอปนี้เป็นของผู้พัฒนาอื่น ไม่ได้มาพร้อม AutoBridge และไม่มีความเกี่ยวข้องกัน ให้โหลดจากโปรเจกต์ต้นทางเท่านั้น
+
+| Tool | Source / download | What it does / ใช้ทำอะไร |
+|---|---|---|
+| **Shizuku** by RikkaApps<br>`moe.shizuku.privileged.api` | [Source](https://github.com/RikkaApps/Shizuku) · [Releases (APK)](https://github.com/RikkaApps/Shizuku/releases/latest) · [Google Play](https://play.google.com/store/apps/details?id=moe.shizuku.privileged.api) · [IzzyOnDroid F-Droid repo](https://apt.izzysoft.de/fdroid/index/apk/moe.shizuku.privileged.api) · [shizuku.rikka.app](https://shizuku.rikka.app/) | Hands ADB-level privileges to apps that ask, started over Android 11+ wireless debugging with no PC and no root. AutoBridge uses it for the Play-origin install and, optionally, as a touch-input backend / ให้สิทธิ์ระดับ ADB กับแอปที่ขอ เริ่มผ่าน wireless debugging ของ Android 11+ ไม่ต้องใช้คอมและไม่ต้องรูท |
+| **KingInstaller** by fcaronte | [Source](https://github.com/fcaronte/KingInstaller) · [Releases (APK)](https://github.com/fcaronte/KingInstaller/releases/latest) | Installs an APK while recording the Play Store as its installer, which is what makes Android Auto list a sideloaded app. APK only — it is not on Google Play. Also carries its own Android Auto diagnostics / ติดตั้ง APK โดยบันทึกค่า installer เป็น Play Store ซึ่งเป็นเงื่อนไขที่ทำให้ Android Auto ยอมแสดงแอปที่ sideload มา มีเฉพาะไฟล์ APK ไม่มีบน Play |
+
+Versions seen on 2026-10-05: Shizuku `v13.6.0`, KingInstaller `v2.3` (`KingInstaller-v2.3.apk`).
+The links above point at each project's *latest* release, so they stay correct as those projects move
+on. Xiaomi/POCO/Redmi (MIUI, HyperOS) phones need KingInstaller's **Root Trick** — its Shizuku Trick
+does not work there, as KingInstaller itself states.
+
+เวอร์ชันที่ตรวจเมื่อ 2026-10-05: Shizuku `v13.6.0`, KingInstaller `v2.3` — ลิงก์ด้านบนชี้ที่ release ล่าสุดของแต่ละโปรเจกต์
+เครื่อง Xiaomi/POCO/Redmi (MIUI, HyperOS) ต้องใช้ **Root Trick** ของ KingInstaller เพราะ Shizuku Trick ใช้ไม่ได้บนเครื่องกลุ่มนี้
+
 **English**
 1. **Enable Developer Options:** Settings → About phone → tap **Build number** 7 times.
 2. **Set up Shizuku via Wireless Debugging:** turn on **Wireless debugging** in Developer Options, then in the Shizuku app pair with the pairing code and tap **Start**. Shizuku should report "running". (Android 11+ needs no PC.)
@@ -521,6 +547,9 @@ This is the recommended path to make Android Auto show AutoBridge, without rooti
 5. **เชื่อมต่อกับรถ** (ผ่าน USB หรือ Wireless Android Auto) แล้วเปิด launcher ของ Android Auto จะเห็นไอคอน AutoBridge หากไม่เห็นให้เช็ก **Customize launcher** ใน Android Auto
 6. Shizuku จำเป็นเฉพาะตอนติดตั้ง/อัปเดตเท่านั้น ตอนใช้งานในรถ **ไม่ต้อง** เปิด Shizuku ค้างไว้
 
+> **Step-by-step guide:** [quick-install.md](quick-install.md) covers this in full — which flavor to build (the car route is compiled into `personal`/`lab` only), KingInstaller's Classic → Shizuku Trick → Root Trick order (Xiaomi/MIUI needs the Root Trick), the in-app **Enable on Android Auto** button for a build that is already installed, Play Protect, and how to verify the recorded installer.
+> **คู่มือละเอียด:** [quick-install.md](quick-install.md) อธิบายครบ — ต้อง build flavor ไหน (เส้นทางจอรถคอมไพล์เข้าเฉพาะ `personal`/`lab`), ลำดับ Classic → Shizuku Trick → Root Trick ของ KingInstaller (Xiaomi/MIUI ต้องใช้ Root Trick), ปุ่ม **Enable on Android Auto** ในแอปสำหรับเครื่องที่ลงไปแล้ว, Play Protect และวิธีตรวจค่า installer ที่ระบบบันทึกไว้
+
 > Developer/signed APK details, keystore, and release signing are in [Installing on a physical phone](#installing-on-a-physical-phone) and [Google Play upload](#google-play-upload).
 > รายละเอียด APK แบบ debug/signed, keystore และการเซ็น release อยู่ที่หัวข้อ [Installing on a physical phone](#installing-on-a-physical-phone) และ [Google Play upload](#google-play-upload)
 
@@ -529,6 +558,110 @@ This is the recommended path to make Android Auto show AutoBridge, without rooti
 **Settings → About → Check for updates** asks GitHub for the latest release and offers the APK and release page when a newer `versionName` exists. It only runs when tapped, sends no identity beyond an `AutoBridge/<version>` User-Agent, and never replaces itself — installing stays with the browser and the package installer.
 
 **ตั้งค่า → เกี่ยวกับ → ตรวจหาอัปเดต** จะถาม GitHub หาเวอร์ชันล่าสุด และเสนอ APK กับหน้า release เมื่อมี `versionName` ใหม่กว่า ทำงานเฉพาะตอนกดเท่านั้น ไม่ส่งข้อมูลระบุตัวตนใดนอกจาก User-Agent `AutoBridge/<version>` และไม่ติดตั้งทับตัวเอง การติดตั้งยังทำผ่านเบราว์เซอร์และตัวติดตั้งแพ็กเกจตามปกติ
+
+## Permissions / สิทธิ์ที่แอปขอ
+
+Updated: 2026-10-05. Every runtime permission below is asked for at the moment the feature that
+needs it is used — the one exception is the notification permission, which the phone app asks for on
+first launch because the playback and mirroring services cannot run without a notification. Each
+sensitive permission shows an in-app explanation before Android's own prompt. The app runs without
+any of the optional ones: the feature behind it is what stops working, not the app. The Play Console
+wording and the Data safety answers live in [PLAY_DECLARATIONS.md](PLAY_DECLARATIONS.md).
+
+ทุกสิทธิ์ด้านล่างจะขอ **ตอนใช้ฟีเจอร์นั้นจริง ๆ** ยกเว้นสิทธิ์การแจ้งเตือนที่ขอตอนเปิดแอปครั้งแรก เพราะเซอร์วิสเล่นสื่อ
+และฉายจอทำงานไม่ได้ถ้าไม่มีการแจ้งเตือน และสิทธิ์ที่อ่อนไหวจะมีคำอธิบายในแอปก่อนขึ้นกล่องของระบบ
+ถ้าไม่ให้สิทธิ์ที่เป็น "ทางเลือก" แอปยังใช้งานได้ปกติ เพียงแต่ฟีเจอร์นั้นจะไม่ทำงาน
+
+| Permission | What it is used for / ใช้กับอะไร | Asked when / ขอเมื่อ | Required? |
+|---|---|---|---|
+| `INTERNET`, `ACCESS_NETWORK_STATE` | IPTV playlists and streams, the browser, weather, SponsorBlock lookups, update checks / เพลย์ลิสต์และสตรีม IPTV, เบราว์เซอร์, สภาพอากาศ, SponsorBlock, ตรวจอัปเดต | Install time (normal permission) | Yes |
+| `POST_NOTIFICATIONS` | The playback and mirroring notifications that keep their foreground services alive / การแจ้งเตือนของการเล่นสื่อและการฉายจอ ซึ่งเป็นตัวค้ำ foreground service | First launch of the phone app, and again from the car setup screen if it was denied | Effectively yes |
+| `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MEDIA_PLAYBACK` | Audio/video that keeps playing with the screen off or another app in front / เล่นเสียง-วิดีโอต่อเมื่อปิดจอหรือสลับแอป | Install time | Yes |
+| `FOREGROUND_SERVICE_MEDIA_PROJECTION` + screen-capture consent | Mirroring the phone screen onto the car display; Android asks for capture consent per session and it cannot be remembered / ฉายจอมือถือขึ้นจอรถ — ระบบขอยืนยันการจับภาพทุกครั้งที่เริ่ม และจำค่าไว้ไม่ได้ | Each time mirroring starts | Mirroring only |
+| `WAKE_LOCK` | Prevent-sleep and auto-dim while a car session runs / กันเครื่องหลับและหรี่จออัตโนมัติระหว่างต่อรถ | Install time | Mirroring only |
+| `RECORD_AUDIO` | Voice commands on the car Agent screen, through the car microphone where the head unit offers one. Recording starts on the mic press and ends on a result, an error or a timeout; nothing is stored or sent to this project / คำสั่งเสียงบนหน้า Agent ในรถ ใช้ไมค์ของรถถ้ามี เริ่มอัดเมื่อกดไมค์และหยุดเมื่อได้ผล/ผิดพลาด/หมดเวลา ไม่เก็บและไม่ส่งไปที่ไหน | First mic press | Voice only |
+| `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION` | Two separate uses, foreground only, never in the background: a web page calling `navigator.geolocation` (asked per HTTPS site), and the opt-in **GPS speed** fallback for the parked/moving decision on head units that report no speed / สองกรณีและเฉพาะตอนเปิดแอป ไม่มีการใช้เบื้องหลัง: หน้าเว็บเรียก `navigator.geolocation` (ถามแยกต่อเว็บไซต์) และ **GPS speed** ที่ผู้ใช้เปิดเองสำหรับตัดสินว่ารถจอดหรือวิ่ง เมื่อจอรถไม่รายงานความเร็ว | On the page's request, or on enabling GPS speed | Optional |
+| `READ_MEDIA_AUDIO` / `_VIDEO` / `_IMAGES` (`READ_EXTERNAL_STORAGE` on Android 12L and older) | Read-only listing for the Folders, Playlists and Gallery sections / อ่านรายการไฟล์สำหรับหัวข้อ โฟลเดอร์, เพลย์ลิสต์ และแกลเลอรี (อ่านเท่านั้น) | Opening one of those sections | Optional |
+| `BLUETOOTH_CONNECT` | Only so Android delivers the `ACL_CONNECTED` broadcast, which is what the "start media when the car connects" option listens for. No device is read and nothing is scanned / มีไว้ให้ระบบส่ง broadcast `ACL_CONNECTED` มาเท่านั้น ซึ่งเป็นตัวจุดออปชัน "เริ่มเล่นสื่อเมื่อต่อรถ" ไม่อ่านข้อมูลอุปกรณ์และไม่สแกนหาอะไร | Enabling Bluetooth media auto-start | Optional |
+| `BIND_ACCESSIBILITY_SERVICE` (special) | The input path back from the car screen: it performs the taps, swipes and Back/Home that are made on the car display, on the phone. Subscribes to `typeWindowStateChanged` only, reads no screen content, and nothing from it leaves the device. Shizuku is offered first where available; without either, mirroring is view-only / ทางส่งอินพุตกลับจากจอรถ — แตะ/ปัด/Back/Home ที่ทำบนจอรถ ให้ไปเกิดบนมือถือ รับเฉพาะ `typeWindowStateChanged` ไม่อ่านเนื้อหาบนหน้าจอ และไม่มีข้อมูลออกจากเครื่อง ถ้ามี Shizuku จะเสนอ Shizuku ก่อน ถ้าไม่ให้ทั้งคู่ การฉายจอจะเป็นแบบดูได้แต่กดไม่ได้ | Turning on touch control | Touch control only |
+| `WRITE_SETTINGS` (special) | The per-app force-landscape profile, which writes the rotation setting while a quick app is open / โปรไฟล์บังคับแนวนอนต่อแอป ซึ่งต้องเขียนค่าการหมุนจอตอนเปิดแอปนั้น | Turning that profile on | Optional |
+| `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` | Shows Android's "allow background activity" prompt from the car setup screen. Some OEM battery managers (MIUI/HyperOS and similar) kill the mirroring and playback services without it, even though both are declared and started correctly / เรียกกล่อง "อนุญาตให้ทำงานเบื้องหลัง" ของระบบจากหน้าตั้งค่ารถ เพราะตัวจัดการแบตของบางยี่ห้อ (MIUI/HyperOS ฯลฯ) ฆ่าเซอร์วิสฉายจอ/เล่นสื่อ แม้จะประกาศและเริ่มถูกต้องแล้ว | Optional step in car setup | Optional |
+| `androidx.car.app.ACCESS_SURFACE`, `NAVIGATION_TEMPLATES`, `com.google.android.gms.permission.CAR_SPEED` | The Android Auto surface itself: drawing on the car video surface, the templates that route needs, and the host's own speed value for the parked/moving decision / ตัวหน้าจอ Android Auto เอง — วาดบน surface วิดีโอของรถ, เทมเพลตที่เส้นทางนี้ต้องใช้ และค่าความเร็วจาก host สำหรับตัดสินจอด/วิ่ง | Install time | Car surface |
+| `QUERY_ALL_PACKAGES` | **Sideload builds only** (`personal`/`lab`): Duo Screen's pane picker lists every launchable app, which package visibility hides on Android 11+. The Play (`safe`) build has neither the picker nor this permission / **เฉพาะบิลด์ sideload** (`personal`/`lab`) — ตัวเลือกแอปของ Duo Screen ต้องเห็นรายการแอปทั้งหมด ซึ่ง Android 11+ ซ่อนไว้ บิลด์ `safe` ที่ขึ้น Play ไม่มีทั้งฟีเจอร์และสิทธิ์นี้ | Install time, sideload flavors | No (not in Play build) |
+
+Not requested at all: contacts, call logs, SMS, background location, `MANAGE_EXTERNAL_STORAGE`,
+`REQUEST_INSTALL_PACKAGES` (the update check hands the APK to the browser and the system installer
+instead), and anything that would let the app install or update itself.
+
+ไม่ได้ขอเลย: รายชื่อผู้ติดต่อ, ประวัติการโทร, SMS, ตำแหน่งเบื้องหลัง, `MANAGE_EXTERNAL_STORAGE`,
+`REQUEST_INSTALL_PACKAGES` (ตัวตรวจอัปเดตส่งไฟล์ APK ให้เบราว์เซอร์กับตัวติดตั้งของระบบทำต่อ)
+และอะไรที่จะทำให้แอปติดตั้งหรืออัปเดตตัวเองได้
+
+## YouTube add-ons / ส่วนเสริม YouTube
+
+All three are **off by default** in Settings → YouTube, and all three run inside the app's own
+WebView — on the phone and on the car screen — from one implementation. None of them is a
+guarantee: each one drives YouTube's page from the outside, and YouTube can change that page at any
+time.
+
+ทั้งสามอย่าง **ปิดเป็นค่าเริ่มต้น** (ตั้งค่า → YouTube) และทำงานใน WebView ของแอปเอง ทั้งบนมือถือและบนจอรถ
+ด้วยโค้ดชุดเดียวกัน แต่ไม่มีอะไรรับประกันได้ 100% เพราะทุกตัวสั่งหน้าเว็บ YouTube จากภายนอก และ YouTube
+เปลี่ยนหน้าเว็บของตัวเองได้ทุกเมื่อ
+
+**SponsorBlock** asks the public [SponsorBlock](https://sponsor.ajay.app/) database which stretches
+of the video other people marked as sponsor reads, self-promotion, "like and subscribe" and so on,
+then skips them. Only `sponsor`, `selfpromo` and `interaction` are on when the feature is switched
+on; intro, outro, preview, non-music and filler are opt-in, because skipping those by default would
+cut content people came to watch. The request carries the **first four hex characters of the
+SHA-256 of the video id**, not the id: the server answers with every video in that bucket — roughly
+1 in 65,536 — and the match is made on the phone. Only `skip` segments are acted on; `mute` and
+`full` are ignored.
+
+How the skipping is wired, and what it survives:
+
+- The listener sits on the **document in the capture phase**, not on one `<video>` element, so a
+  player YouTube builds or swaps out after the lookup finished is still covered. (An earlier
+  version attached to whatever `<video>` existed at the moment it armed, and never retried — on a
+  slow connection that was the common case, and nothing was skipped at all.)
+- The jump prefers the player's own `seekTo`, which carries the progress bar with it, and falls back
+  to writing `currentTime`.
+- A segment the player refuses to leave — an unbuffered range on a stream still loading — is tried
+  four times and then left alone, instead of re-seeking four times a second for its whole length.
+- Nothing is skipped while the page is on a different video than the one that was looked up, or
+  while an ad is playing: the ad has its own clock, and the previous video's timestamps must not cut
+  into the next one.
+- A failed lookup is not cached, so reopening the video asks again. There is one retry, 1.5 s apart;
+  beyond that nothing polls, because the database is a free public service.
+
+**Auto-highest-quality** asks the page's own player for its quality list and selects the first
+entry, once per video, about a second after the page settles. On a metered connection that is a
+deliberate data cost, which is why it is off by default.
+
+**Ad-skip** presses YouTube's own Skip button when there is one and otherwise seeks the ad to its
+end, and hides the feed/watch-page ad slots with a stylesheet. It cannot block the ad request
+itself: YouTube serves ad video from the same `googlevideo.com` host as the video asked for, and
+describes the break inside the same `/youtubei/v1/player` reply that carries the stream URLs — drop
+either and there is no playback. So an ad may flash up for a frame or two before the seek lands, and
+YouTube may answer ad blocking with an interstitial of its own, which nothing here tries to defeat.
+
+**If an add-on seems to do nothing.** Every selector and player call above is YouTube's own internal
+naming, and a change there stops a skip quietly. Each attempt is logged under the `YOUTUBE` tag, and
+the entries are readable without a computer — the phone's **Developer tools** screen and the car's
+own log screen show the same ring — or with `adb logcat -s YOUTUBE:I`. What the lines mean:
+
+| Line | Meaning |
+|---|---|
+| `SponsorBlock 3 segment(s) -> armed` | The page accepted the script and the skipper is live. |
+| `… -> updated` | Already armed on this document; only the segment list was replaced. |
+| `SponsorBlock: no segments` | The database knows nothing for this video — common outside large English-language channels. Not a bug. |
+| `SponsorBlock lookup failed (1/2): …` | Network, not the page. It retries once and asks again next time the video is opened. |
+| `auto quality -> no-player` | The script ran before the player existed; the next navigation tries again. |
+
+**ถ้ารู้สึกว่าส่วนเสริมไม่ทำงาน** — ชื่อ selector และ API ที่ใช้เป็นของภายใน YouTube ทั้งหมด พอ YouTube แก้
+การข้ามก็จะหยุดเงียบ ๆ แอปเขียน log ทุกครั้งที่พยายามไว้ใต้แท็ก `YOUTUBE` ซึ่งดูได้ในแอปเลยที่หน้า
+**Developer tools** บนมือถือ หรือหน้า log บนจอรถ (ข้อมูลชุดเดียวกัน) หรือใช้ `adb logcat -s YOUTUBE:I`
+ความหมายของแต่ละบรรทัดอยู่ในตารางด้านบน: `armed` คือหน้าเว็บรับสคริปต์แล้ว, `updated` คืออาร์มไว้ก่อนแล้ว,
+`no segments` คือฐานข้อมูลไม่มีข้อมูลของคลิปนี้ (ไม่ใช่บั๊ก) และ `lookup failed` คือปัญหาที่เน็ต ไม่ใช่ที่หน้าเว็บ
 
 ## Documentation
 
