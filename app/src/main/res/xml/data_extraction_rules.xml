@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Backup and transfer rules for Android 12+ (android:dataExtractionRules).
+
+     The app still backs up: settings, bookmarks, layouts and the rest are worth carrying to a new
+     phone. What never leaves the device are the two IPTV files, because they hold provider
+     credentials:
+       - autobridge_iptv_sources.xml holds each source's username, password and portal URL;
+       - autobridge_iptv_history.xml holds playable URLs, and an Xtream stream URL embeds the
+         username and password in its path (see XtreamCredentials).
+
+     Both are encrypted on disk with a key held in the Android Keystore (see SecretText), so even a
+     copy of them is unreadable elsewhere. They are excluded anyway, in both sections:
+
+       - cloud-backup, because that is what would place the credentials in the user's Google
+         account - the exposure the encryption alone would not prevent from existing, only from
+         being readable;
+       - device-transfer, because the key cannot travel with the file. Carrying ciphertext to a new
+         phone would decrypt to nothing there and the user would find their sources silently empty;
+         leaving the file behind means they re-enter the account knowingly instead.
+
+     Everything not named here is still backed up and still transferred. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="autobridge_iptv_sources.xml" />
+        <exclude domain="sharedpref" path="autobridge_iptv_history.xml" />
+    </cloud-backup>
+
+    <device-transfer>
+        <exclude domain="sharedpref" path="autobridge_iptv_sources.xml" />
+        <exclude domain="sharedpref" path="autobridge_iptv_history.xml" />
+    </device-transfer>
+</data-extraction-rules>

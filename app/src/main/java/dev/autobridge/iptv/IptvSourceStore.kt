@@ -2,15 +2,26 @@ package dev.autobridge.iptv
 
 import android.content.Context
 import androidx.core.content.edit
+import dev.autobridge.core.crypto.SecretPrefs
 import org.json.JSONArray
 import org.json.JSONObject
 
 /**
  * Persisted IPTV sources, split by [IptvKind] so the TV and Radio grids stay independent.
  *
- * Credentials live in the app's private SharedPreferences, exactly like the existing bookmark and
- * profile stores. They are never logged and never leave the device except as part of the stream
- * URLs the user's own provider requires.
+ * Credentials never touch the disk in the clear. The whole source list is written through
+ * [SecretPrefs], so the username, the password and the portal URL that embeds both are encrypted
+ * with a key held in the Android Keystore. Three consequences, which together are the credential
+ * policy for this app:
+ *
+ *  - uninstalling removes the key with the app, so the stored credentials are unrecoverable
+ *    afterwards even from a copy of this file taken beforehand;
+ *  - the file is excluded from both cloud backup and device-to-device transfer
+ *    (res/xml/data_extraction_rules.xml), so it never reaches a Google account or another handset;
+ *  - a list written by an older build in plaintext is migrated on the first read.
+ *
+ * They are also never logged. Any new key added here holds credentials too - the seeding marker is
+ * the only value in this file written in the clear, and it holds URLs of public playlists only.
  *
  * The public lists [IptvDirectory] marks as defaults are created on first read, so TV and Radio
  * have channels before anything is configured. They are ordinary sources afterwards: editable,
@@ -55,7 +66,7 @@ object IptvSourceStore {
 
     /** The stored sources, without the default-seeding pass [list] performs. */
     private fun stored(context: Context): List<IptvSource> {
-        val raw = prefs(context).getString(KEY_ITEMS, null).orEmpty()
+        val raw = SecretPrefs.read(prefs(context), PREFS_NAME, KEY_ITEMS)
         if (raw.isBlank()) return emptyList()
         return runCatching {
             val array = JSONArray(raw)
@@ -97,7 +108,7 @@ object IptvSourceStore {
                     .put("password", source.password)
             )
         }
-        prefs(context).edit { putString(KEY_ITEMS, array.toString()) }
+        SecretPrefs.write(prefs(context), PREFS_NAME, KEY_ITEMS, array.toString())
     }
 
     private fun decode(json: JSONObject?): IptvSource? {

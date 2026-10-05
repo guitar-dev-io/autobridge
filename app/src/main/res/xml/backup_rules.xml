@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The same exclusions for Android 11 and below (android:fullBackupContent), which ignores
+     dataExtractionRules. minSdk is 29, so these versions are still in range. This also covers
+     `adb backup`, which honours fullBackupContent too.
+
+     See data_extraction_rules.xml for why these two files are excluded. -->
+<full-backup-content>
+    <exclude domain="sharedpref" path="autobridge_iptv_sources.xml" />
+    <exclude domain="sharedpref" path="autobridge_iptv_history.xml" />
+</full-backup-content>

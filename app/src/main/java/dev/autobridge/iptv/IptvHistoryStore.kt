@@ -1,7 +1,7 @@
 package dev.autobridge.iptv
 
 import android.content.Context
-import androidx.core.content.edit
+import dev.autobridge.core.crypto.SecretPrefs
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -10,6 +10,10 @@ import org.json.JSONObject
  *
  * The playable URL is stored alongside the title so a recent item replays without reloading the
  * whole portal catalog — which is the slow step on large Xtream accounts.
+ *
+ * Those URLs are credentials. An Xtream stream URL carries the account's username and password in
+ * its own path (see [XtreamCredentials]), so this file is written through [SecretPrefs] and excluded
+ * from backup exactly like [IptvSourceStore], rather than being treated as ordinary history.
  */
 object IptvHistoryStore {
     /** A remembered entry. [sourceId] is kept so the row can say where it came from. */
@@ -81,7 +85,7 @@ object IptvHistoryStore {
     fun clearRecent(context: Context) = write(context, KEY_RECENT, emptyList())
 
     private fun read(context: Context, key: String): List<Item> {
-        val raw = prefs(context).getString(key, null).orEmpty()
+        val raw = SecretPrefs.read(prefs(context), PREFS_NAME, key)
         if (raw.isBlank()) return emptyList()
         return runCatching {
             val array = JSONArray(raw)
@@ -120,7 +124,7 @@ object IptvHistoryStore {
                     .put("logo", item.logo)
             )
         }
-        prefs(context).edit { putString(key, array.toString()) }
+        SecretPrefs.write(prefs(context), PREFS_NAME, key, array.toString())
     }
 
     private fun prefs(context: Context) =

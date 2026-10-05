@@ -1,6 +1,7 @@
 package dev.autobridge.core.state
 
 import android.content.Context
+import dev.autobridge.core.crypto.SecretText
 import dev.autobridge.diagnostics.CrashReportStore
 import dev.autobridge.logging.StructuredLog
 import dev.autobridge.iptv.IptvCatalog
@@ -20,8 +21,9 @@ import java.io.File
  *    web history, command history, crash reports. Clearing it is a privacy action and is
  *    reversible only in the sense that it rebuilds as the app is used again.
  *  - **All data** — every `autobridge_*` SharedPreferences file plus the above: favorites,
- *    bookmarks, IPTV sources, per-app profiles, every setting. This returns the app to a
- *    first-launch state and is NOT reversible. Callers must confirm with the user first.
+ *    bookmarks, IPTV sources, per-app profiles, every setting, and the Keystore key that encrypts
+ *    the IPTV credentials. This returns the app to a first-launch state and is NOT reversible.
+ *    Callers must confirm with the user first.
  *
  * Everything here operates on this app's own private storage only. It does not touch other apps,
  * MediaStore, or the system; "clear data" here is an in-app reset, not the system Settings action.
@@ -82,6 +84,10 @@ object AppDataManager {
         IptvCatalog.clearAll()
         val cacheFiles = clearCacheDir(app)
         val prefsCleared = clearAllPreferences(app)
+        // Dropping the Keystore key is what makes the wipe final: the encrypted IPTV credentials
+        // are already gone with the prefs files above, and without the key a copy of those files
+        // taken before the wipe cannot be read either.
+        SecretText.forget()
         // CrashReportStore owns the diagnostics directory and guards it with its own lock, so clear
         // it through that API rather than walking the directory here.
         CrashReportStore.clear(app)
