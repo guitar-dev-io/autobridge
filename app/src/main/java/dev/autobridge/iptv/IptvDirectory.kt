@@ -36,10 +36,10 @@ object IptvDirectory {
             seeded = true
         ),
         Entry(
-            name = "iptv-org · Thailand",
-            url = "https://iptv-org.github.io/iptv/countries/th.m3u",
+            name = "Thai (dearbulut)",
+            url = "https://dearbulut.github.io/iptv/playlists/language/tha.m3u",
             kind = IptvKind.TV,
-            note = "Thai channels only — a small list to test with",
+            note = "Thai-language channels",
             seeded = true
         ),
         Entry(

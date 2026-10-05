@@ -8,7 +8,7 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
 import dev.autobridge.audio.WebMediaStatus
-import dev.autobridge.display.StructuredLog
+import dev.autobridge.logging.StructuredLog
 
 /** A browser surface whose page audio the media session can read and control. */
 interface WebMediaSource {

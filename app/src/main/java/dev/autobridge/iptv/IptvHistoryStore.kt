@@ -22,7 +22,10 @@ object IptvHistoryStore {
         val timestampMs: Long = System.currentTimeMillis(),
         // Replaying has to reach the same destination as the first play, and a YouTube page
         // handed to the player would only fail there.
-        val playback: IptvPlayback = IptvPlayback.STREAM
+        val playback: IptvPlayback = IptvPlayback.STREAM,
+        // Kept so a remembered row looks like the row it was played from. An item stored by an
+        // older version has none, and the row falls back to its accent initial as it always did.
+        val logo: String = ""
     )
 
     private const val PREFS_NAME = "autobridge_iptv_history"
@@ -46,7 +49,8 @@ object IptvHistoryStore {
     fun recordPlayback(context: Context, source: IptvSource, entry: IptvEntry) {
         if (entry.url.isBlank()) return
         val item = Item(
-            source.id, entry.title, entry.url, entry.type, source.kind, playback = entry.playback
+            source.id, entry.title, entry.url, entry.type, source.kind,
+            playback = entry.playback, logo = entry.logo
         )
         val updated = (listOf(item) + read(context, KEY_RECENT).filterNot { it.url == item.url })
             .take(MAX_RECENT)
@@ -63,7 +67,7 @@ object IptvHistoryStore {
         } else {
             current + Item(
                 source.id, entry.title, entry.url, entry.type, source.kind,
-                playback = entry.playback
+                playback = entry.playback, logo = entry.logo
             )
         }
         write(context, KEY_FAVORITES, updated)
@@ -94,7 +98,8 @@ object IptvHistoryStore {
                         .getOrDefault(IptvKind.TV),
                     timestampMs = item.optLong("timestampMs"),
                     playback = runCatching { IptvPlayback.valueOf(item.optString("playback")) }
-                        .getOrDefault(IptvPlayback.STREAM)
+                        .getOrDefault(IptvPlayback.STREAM),
+                    logo = item.optString("logo")
                 )
             }
         }.getOrDefault(emptyList())
@@ -112,6 +117,7 @@ object IptvHistoryStore {
                     .put("kind", item.kind.name)
                     .put("timestampMs", item.timestampMs)
                     .put("playback", item.playback.name)
+                    .put("logo", item.logo)
             )
         }
         prefs(context).edit { putString(key, array.toString()) }

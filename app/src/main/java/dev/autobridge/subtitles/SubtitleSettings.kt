@@ -2,6 +2,7 @@ package dev.autobridge.subtitles
 
 import android.content.Context
 import androidx.core.content.edit
+import dev.autobridge.BuildConfig
 import java.util.Locale
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -104,7 +105,19 @@ object SubtitleSettings {
         listeners.remove(listener)
     }
 
-    fun enabled(context: Context): Boolean = prefs(context).getBoolean(KEY_ENABLED, false)
+    /**
+     * Whether a cue should be sent to an engine at all.
+     *
+     * The build flag comes first and is not overridable from the app: a build made with
+     * `-Pautobridge.subtitleTranslation=false` has no engines compiled in, and the stored
+     * preference outlives that change - someone who had translation on, then installed a build
+     * without it, would otherwise have every line routed to a factory that can only pass it back.
+     */
+    fun enabled(context: Context): Boolean =
+        BuildConfig.SUBTITLE_TRANSLATION && prefs(context).getBoolean(KEY_ENABLED, false)
+
+    /** True when this build has the translation engines in it; see [enabled]. */
+    val isSupported: Boolean get() = BuildConfig.SUBTITLE_TRANSLATION
 
     fun setEnabled(context: Context, value: Boolean) = putBoolean(context, KEY_ENABLED, value)
 

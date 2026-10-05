@@ -1,6 +1,6 @@
 package dev.autobridge.core.logging
 
-import dev.autobridge.display.StructuredLog
+import dev.autobridge.logging.StructuredLog
 
 /** Shared structured categories used by policy and lifecycle code. */
 enum class LogCategory {

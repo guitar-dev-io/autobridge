@@ -20,6 +20,32 @@ Path ของ DHU บน macOS โดยทั่วไปคือ:
 2. เข้า **ตั้งค่า** → แตะ **เวอร์ชัน** หลาย ๆ ครั้งจนปลดล็อก Developer mode
 3. เปิดเมนู (จุดสามจุดมุมขวาบน) → **Start head unit server**
 
+## วิธีลัด: build + install + เปิด DHU ในคำสั่งเดียว
+
+มี script รวบยอด `scripts/dhu-run.sh` ที่ assemble+install variant → ตั้ง `adb forward`
+→ เปิด DHU พร้อม config ให้ รันในคำสั่งเดียว (ต้องรันใน Terminal.app/iTerm จริง ไม่ใช่
+ใน task runner ของ IDE เพราะ DHU ต้องการสิทธิ์ Screen Recording)
+
+```bash
+# safe debug, config 720, input touch (ค่า default)
+scripts/dhu-run.sh
+
+# เลือก flavor / config / input mode
+scripts/dhu-run.sh personal                 # personal debug
+scripts/dhu-run.sh safe 720-hidpi           # เลือกไฟล์ docs/dhu/*.ini
+scripts/dhu-run.sh lab small rotary         # flavor + config + input
+
+# ข้ามการ build (install แล้ว แค่ต่อ DHU ใหม่)
+scripts/dhu-run.sh --no-build safe
+```
+
+ก่อนรัน: เปิด **Start head unit server** บนมือถือก่อน (ดูข้อ 1) ถ้า DHU หลุด ให้หยุด+เริ่ม
+server ใหม่แล้วรันซ้ำด้วย `--no-build` ปิด DHU ด้วย `Ctrl + C` ที่หน้าต่างนี้
+
+override ได้ด้วย env: `ANDROID_SERIAL` (serial มือถือ), `DHU_HOME` (ที่อยู่ DHU)
+
+ขั้นตอนแบบ manual ทั้งหมดอยู่ด้านล่าง
+
 ## 2. คำสั่งเปิด DHU
 
 ```bash

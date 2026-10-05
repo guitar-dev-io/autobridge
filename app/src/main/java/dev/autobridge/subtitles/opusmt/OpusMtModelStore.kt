@@ -3,7 +3,7 @@ package dev.autobridge.subtitles.opusmt
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
-import dev.autobridge.display.StructuredLog
+import dev.autobridge.logging.StructuredLog
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.IOException
@@ -179,7 +179,12 @@ object OpusMtModelStore {
         }
         try {
             val status = connection.responseCode
-            if (status == HttpURLConnection.HTTP_NOT_FOUND) {
+            // Hugging Face answers an anonymous request for a repository that does not exist with
+            // 401 (or 403 for gated ones), not 404, so all three mean "no such export".
+            if (status == HttpURLConnection.HTTP_NOT_FOUND ||
+                status == HttpURLConnection.HTTP_UNAUTHORIZED ||
+                status == HttpURLConnection.HTTP_FORBIDDEN
+            ) {
                 throw FileNotFoundException("No published Opus-MT export at $url")
             }
             if (status !in 200..299) {

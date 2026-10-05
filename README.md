@@ -1,4 +1,4 @@
-**Version:** `0.4.12` &nbsp;·&nbsp; **Build (versionCode):** `26`
+**Version:** `0.4.16` &nbsp;·&nbsp; **Build (versionCode):** `30`
 
 AutoBridge is a personal/development Android project for experimenting with a parked-only phone-to-Android-Auto surface bridge. It is an independent codebase, not a merge of the reference projects listed in [`docs/REFERENCE_PROJECTS.md`](docs/REFERENCE_PROJECTS.md).
 
@@ -17,9 +17,11 @@ AutoBridge is a personal/development Android project for experimenting with a pa
 - Quick Apps, installed-app filtering, legacy-favorite migration, per-app profiles, Smart Mode, force-landscape cleanup, and explicit session resume/forget actions.
 - Media3 progressive/HLS/DASH/local playback through a MediaSession, with controller authorization and independent audio/video policy.
 - Entertainment routing that distinguishes HTTPS web pages, audio, and video instead of treating all sources as browser content.
-- A Fermata-Xtream-style home on both surfaces: one shared `HomeSection` list renders as the phone launcher grid and as the Android Auto dashboard (TV, Radio, Web browser, Youtube, YouTube Music, YouTube Kids, Folders, Favorites, Playlists, Gallery, then Mirror/Apps/Remote/Settings).
+- A Fermata-Xtream-style home on both surfaces: one shared `HomeSection` list renders as the phone launcher grid and as the Android Auto dashboard (TV, Radio, Web browser, Youtube, YouTube Music, , Folders, Favorites, Playlists, Gallery, then Mirror/Apps/Remote/Settings).
 - Xtream Codes and M3U IPTV sources for the TV and Radio sections, with unit-tested credential/playlist parsing, a shared catalog cache, host-aware list paging, favourites and a recently-played list. See [`docs/IPTV_SECTIONS.md`](docs/IPTV_SECTIONS.md).
 - Built-in free public playlists ([Free-TV](https://github.com/Free-TV/IPTV), iptv-org, radio-browser): TV and Radio start with default lists so there are channels to browse out of the box, further lists are one tap away in the picker, and any of them can be removed for good. AutoBridge stores addresses only and fetches each list live from the project that publishes it; nothing is hosted, bundled or redistributed here. Community-playlist conventions are read rather than ignored: a channel whose entry is a YouTube/Twitch watch page opens in the browser instead of failing inside the player, and Free-TV's `Ⓢ`/`Ⓖ`/`Ⓨ` name markers become subtitle hints.
+- Channel logos from the playlist on both the phone and the head unit, including the lists that spell the attribute differently or write the address relative to themselves. The phone shows channels as a two-column grid of logo tiles; the car shows them as list rows with the logo beside them.
+- A ping check that runs by itself when a channel list opens, on both surfaces and with nothing to press: each channel reads `88 ms` in green, a slow answer in amber, or `HTTP 404` / `No answer` in red, so a retired or geo-blocked channel is visible before it is opened rather than as a player that spins.
 - MediaStore-backed Folders, Playlists and Gallery sections on the phone and in the car, reusing the existing MediaSession and car video surface.
 - An AutoBridge phone design language (`AutoBridgeDesign`): ink surfaces, hairline borders, a per-section accent that carries from the home card into that section's screens and player, a dependency-free cached image loader for channel logos, a shared now-playing bar, and a designed player with a scrubber and a LIVE state. See [`docs/PHONE_UI.md`](docs/PHONE_UI.md).
 - A step-by-step car setup screen: notifications, an input backend (Shizuku or accessibility) and screen capture in the order they happen, each with its live state and one action, plus an optional Bluetooth media-session start. See [`docs/MIRROR_ENGINE.md`](docs/MIRROR_ENGINE.md).
@@ -80,6 +82,66 @@ Optional lint tasks, when available in the local Android toolchain:
 ./gradlew lintSafeDebug lintPersonalDebug lintLabDebug
 ```
 
+### Building without the translation engines
+
+On-device subtitle translation is the one feature with heavyweight dependencies behind it: ML Kit
+Translate and ONNX Runtime (the Opus-MT/Marian engine). Both are mostly native code shipped per
+ABI, about 17 MB of the packaged APK between them. `autobridge.subtitleTranslation` in
+`gradle.properties` turns the feature off and leaves both libraries out of the build entirely —
+no dependency, no `.so`, and neither of the two engine classes compiled:
+
+```bash
+./gradlew assembleSafeRelease -Pautobridge.subtitleTranslation=false
+AUTOBRIDGE_SUBTITLE_TRANSLATION=false ./gradlew assembleSafeRelease
+```
+
+Subtitles themselves are unaffected — a track still decodes and renders, only untranslated. In
+such a build `SubtitleSettings.enabled()` is false regardless of the stored preference, so a phone
+that had translation on before the switch does not route cues at an engine that is no longer
+there, and the player hides the button that opens the translation settings.
+
+### Setting the version
+
+`version.properties` at the repo root is the only place the version is written; `app/build.gradle.kts`
+reads it, so no build file holds a literal version number. Bump it with the script, which keeps
+`versionCode` increasing and syncs the numbers into this README:
+
+```bash
+./scripts/set-version.sh 0.5.0      # explicit versionName, versionCode + 1
+./scripts/set-version.sh patch      # 0.4.12 -> 0.4.13
+./scripts/set-version.sh minor      # 0.4.12 -> 0.5.0
+./scripts/set-version.sh major      # 0.4.12 -> 1.0.0
+./scripts/set-version.sh 0.5.0 --code 30   # pin versionCode too
+./scripts/set-version.sh --show     # what is set right now
+./scripts/set-version.sh minor --tag       # bump and create the v0.5.0 tag
+```
+
+A single build can override either value without editing a file — a Gradle property wins over an
+environment variable, which wins over `version.properties`:
+
+```bash
+./gradlew assembleSafeRelease -PversionName=0.5.0-rc1 -PversionCode=27
+AUTOBRIDGE_VERSION_NAME=0.5.0-rc1 ./gradlew assembleSafeRelease
+./gradlew -q :app:printVersion   # prints "0.4.12 26" — what a build would stamp
+```
+
+Pushing a `v*` tag runs `.github/workflows/release.yml`, which builds the signed safe AAB + APK and
+publishes a GitHub Release. The workflow fails early if the tag and `version.properties` disagree,
+so `set-version.sh` (or an equivalent commit) has to land before the tag.
+
+### Checking for updates in the app
+
+AutoBridge is sideloaded, so nothing tells the user that a newer build exists. **Settings > About >
+Check for updates** asks GitHub for the latest published release, compares its tag with the running
+`versionName`, and offers the attached APK and the release page when it is newer. It only runs when
+that row is tapped — never on launch or in the background — the request carries no identity beyond
+an `AutoBridge/<version>` User-Agent, and the result is cached so the row shows what it last found.
+Installing stays with the browser and the package installer; the app never replaces itself.
+
+Version comparison and the release parsing are unit-tested in
+`app/src/test/java/dev/autobridge/update/UpdateCheckTest.kt`, which is where a tag shape that the
+check should understand (`v0.5.0`, `0.5.0-rc1`) belongs.
+
 ### Installing on a physical phone
 
 The debug variants are signed with the local Android debug key and can be installed directly for development:
@@ -120,7 +182,46 @@ Upload this file in Play Console:
 app/build/outputs/bundle/personalRelease/app-personal-release.aab
 ```
 
-The bundle is signed with the AutoBridge release keystore and contains `dev.autobridge`, version `0.4.12`, and `versionCode 26`. Increment `versionCode` for every later upload; keep the same keystore for updates. Start with Internal testing/App Sharing before attempting production release. The current Android Auto surface is a development/personal-use POC using a `NavigationTemplate` for mirroring, so Play/Android Auto policy approval is not guaranteed.
+The bundle is signed with the AutoBridge release keystore and contains `dev.autobridge`, version `0.4.16`, and `versionCode 30`. Increment `versionCode` for every later upload with `./scripts/set-version.sh` (see [Setting the version](#setting-the-version)); keep the same keystore for updates. Start with Internal testing/App Sharing before attempting production release. The current Android Auto surface is a development/personal-use POC using a `NavigationTemplate` for mirroring, so Play/Android Auto policy approval is not guaranteed.
+
+### Deobfuscation (R8 mapping) files
+
+Release builds run R8, so Play Console gets the deobfuscation file it asks for and uploaded crashes
+and ANRs retrace to real class and method names. Nothing to do by hand for a bundle: AGP writes the
+mapping into the `.aab` itself, at
+`BUNDLE-METADATA/com.android.tools.build.obfuscation/proguard.map`, and Play reads it on upload.
+Confirm it is there before uploading with:
+
+```bash
+unzip -l app/build/outputs/bundle/safeRelease/app-safe-release.aab | grep obfuscation
+```
+
+Each variant also leaves its own copy on disk, which is what the sideloaded `personal` and `lab`
+APKs need — they never go through Play, so a stack trace from one is unreadable without it:
+
+```text
+app/build/outputs/mapping/<variant>Release/mapping.txt
+```
+
+R8's output is not reproducible from a later build, so keep the file for any build handed to
+someone else; the release workflow uploads all three as the `autobridge-release-mapping` artifact.
+To read a trace back:
+
+```bash
+"$ANDROID_HOME/cmdline-tools/latest/bin/retrace" \
+  app/build/outputs/mapping/safeRelease/mapping.txt crash.txt
+```
+
+It resolves inlined frames too, so one obfuscated line can come back as the two or three real ones
+R8 collapsed into it.
+
+What R8 is allowed to rename is bounded by `app/proguard-rules.pro`, which pins the places the app
+is reached by name instead of by reference (JNI into ONNX Runtime, the Shizuku user service, the
+Android Auto host instantiating a `CarActivity`). Add a rule there — with the reason — if a release
+build hits a `ClassNotFoundException` or `NoSuchMethodError` that the debug build does not.
+Resource shrinking is intentionally left off: `play-services-oss-licenses` resolves its generated
+notices through `Resources.getIdentifier()`, so the Settings "Open-source licenses" screen would
+silently come up empty.
 
 ## Development flow
 
@@ -207,6 +308,14 @@ For ownership and lifecycle details see [`docs/ARCHITECTURE.md`](docs/ARCHITECTU
 - [`docs/FORD_TEST.md`](docs/FORD_TEST.md) — DHU/Ford safety checklist
 - [`docs/CARVIEW_PARITY.md`](docs/CARVIEW_PARITY.md) — product-reference comparison
 - [`docs/PROGRESS.md`](docs/PROGRESS.md) — current verification record
+
+## License
+
+AutoBridge is MIT licensed — see [`LICENSE`](LICENSE). The same file covers the separate [`ios/`](ios/README.md) tree.
+
+MIT is a deliberate choice, not a leftover. Two of the reference projects in [`docs/REFERENCE_PROJECTS.md`](docs/REFERENCE_PROJECTS.md) (MirrorMobile, Fermata) are GPL-3.0, and they informed behaviour and architecture only: no upstream source or asset was copied into this tree, so their terms stay independent of this repository. Anything that would change that — pasted copyleft source, a vendored upstream file, a decompiled asset — has to be raised before it lands, because it would force a relicense rather than just a review comment.
+
+Third-party dependencies keep their own terms. The in-app list is generated at build time by the `oss-licenses` Gradle plugin from the dependency POMs and opens from the Settings "Open-source licenses" row.
 
 
 

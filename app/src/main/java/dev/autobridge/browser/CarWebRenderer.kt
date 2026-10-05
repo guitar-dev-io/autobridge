@@ -152,6 +152,22 @@ class CarWebRenderer(context: Context) {
         const val SPLIT_MIN_PANE_DP = 180f
 
         /**
+         * How far either side of the divider a tap still grabs it. The gap itself is 4dp, which no
+         * one can hit from a moving car, so the grab target is a finger's width around it.
+         */
+        const val SPLIT_GRAB_DP = 24f
+
+        /** Width of the handle drawn on the divider, and how far the grabbed one widens to. */
+        const val SPLIT_HANDLE_DP = 4f
+        const val SPLIT_HANDLE_GRABBED_DP = 10f
+
+        /** Length of the handle, as a share of the pane height. */
+        const val SPLIT_HANDLE_LENGTH_FRACTION = 0.18f
+
+        /** How often a divider drag is allowed to re-measure the panes. See `dragDivider`. */
+        const val DIVIDER_LAYOUT_INTERVAL_MS = 80L
+
+        /**
          * Window over which a burst of host stable-area callbacks is coalesced into one layout.
          * Long enough to swallow the connect-time storm, short enough that a genuine host chrome
          * change still lands before the user notices.
@@ -314,6 +330,22 @@ class CarWebRenderer(context: Context) {
     private var splitLayout: BrowserSplitLayout = BrowserSplitStore.layout(appContext)
     private var splitSideOnRight: Boolean = BrowserSplitStore.sideOnRight(appContext)
 
+    /** The ratio a dragged divider left behind, or null while the preset's own shape applies. */
+    private var splitFraction: Float? = BrowserSplitStore.sideFraction(appContext)
+
+    /** The panes as last measured, which is what a divider drag moves. Null without a split. */
+    private var splitPanes: SplitPanes? = null
+
+    /**
+     * Whether the divider is being dragged. Grabbed by tapping it and let go by tapping anywhere
+     * else, because the host reports a scroll as a bare distance with no position (see
+     * SurfaceCallback) — the tap is the only part of the gesture that says *what* is being dragged.
+     */
+    private var dividerGrabbed = false
+
+    /** Whether a divider drag has a re-layout queued; see [dragDivider]. */
+    private var dividerLayoutPending = false
+
     /**
      * Which pane navigation, the address bar, scrolling and zoom act on. Set by tapping a pane; the
      * toolbar shows the focused pane's page. Tabs, find and the error overlay stay with the main page.
@@ -465,7 +497,7 @@ class CarWebRenderer(context: Context) {
          */
         override fun skipToNext(): Boolean {
             val next = BrowserPlayQueue.takeNext(appContext) ?: return false
-            dev.autobridge.display.StructuredLog.i("MEDIA", "play queue -> ${next.url}")
+            dev.autobridge.logging.StructuredLog.i("MEDIA", "play queue -> ${next.url}")
             load(next.url)
             return true
         }
@@ -662,6 +694,9 @@ class CarWebRenderer(context: Context) {
     /** Drawer shortcut: steps 100 → 50/50 → 40/60 → portrait + landscape → 100. */
     fun cycleSplitLayout() = runOnMain {
         val next = splitLayout.next()
+        // The new preset decides the shape, so whatever was being dragged is no longer being
+        // dragged — and setLayout drops the dragged ratio with it.
+        dividerGrabbed = false
         BrowserSplitStore.setLayout(appContext, next)
         applyControlSettings()
         val label = next.label(appContext)
@@ -851,6 +886,12 @@ class CarWebRenderer(context: Context) {
                 }
             }
             mainHandler.removeCallbacks(frameRunnable)
+            // A divider let go of by driving away rather than by a second tap still keeps its
+            // ratio; the queued re-measure is dropped with the surface it would have measured.
+            mainHandler.removeCallbacks(applyDividerLayout)
+            dividerLayoutPending = false
+            dividerGrabbed = false
+            saveSplitFraction()
             AutoBridgeVideoLog.surface("destroyed", surface, surfaceWidth, surfaceHeight, surfaceDpi)
             // The host is taking its surface back. The display is pointed at nothing rather than
             // released, so the window and the WebView in it (page, playback, fullscreen) survive
@@ -1311,6 +1352,10 @@ class CarWebRenderer(context: Context) {
         // Recorded after the hit test, so a tap where a faded fullscreen FAB used to be reaches
         // the page and only wakes the button, instead of pressing it unseen.
         lastInputMs = now
+        // A tap chrome takes is also a tap that is not on the divider, so it lets go of one:
+        // reaching for the toolbar mid-drag must not leave the next scroll still moving the panes.
+        // Page taps go through pageTap, which grabs and releases on its own.
+        if (dividerGrabbed && zone != ChromeZone.NONE) releaseDivider()
         if (ViewportDebug.enabled) {
             Log.i(
                 TAG,
@@ -1360,6 +1405,7 @@ class CarWebRenderer(context: Context) {
      */
     private fun pageTap(x: Float, y: Float) {
         if (hardwareWindow?.fullscreen?.container == null) {
+            if (grabDivider(x, y)) return
             val side = sideViewport
             val tappedSide = isSplit && side != null && side.contains(x, y)
             val tappedMain = mainViewport.contains(x, y)
@@ -1376,6 +1422,114 @@ class CarWebRenderer(context: Context) {
             }
         }
         dispatchPageTap(x, y)
+    }
+
+    /**
+     * Takes hold of the divider when the tap lands on it, and lets go when it lands anywhere else.
+     * Returns true when the tap was the grab itself, so it never also reaches a page.
+     *
+     * Two steps rather than one drag because the host's scroll callback carries no position: the
+     * tap is the only part of the gesture that can say the divider — rather than a page — is what
+     * the drags that follow should move.
+     */
+    private fun grabDivider(x: Float, y: Float): Boolean {
+        val panes = splitPanes?.takeIf { isSplit && !isVideoFullscreen }
+        val hit = panes != null && dividerGrabBox(panes).contains(x, y)
+        val wasGrabbed = dividerGrabbed
+        dividerGrabbed = hit
+        if (hit) {
+            stopFling()
+            requestFullRate()
+            trace(ViewportDebug.Event.SPLIT_LAYOUT, "divider=grabbed")
+            return true
+        }
+        if (wasGrabbed) releaseDivider()
+        return false
+    }
+
+    /** Lands the dragged ratio: the pending re-layout runs now, and the ratio is remembered. */
+    private fun releaseDivider() {
+        dividerGrabbed = false
+        if (dividerLayoutPending) {
+            dividerLayoutPending = false
+            mainHandler.removeCallbacks(applyDividerLayout)
+            layoutWebView(surfaceWidth, surfaceHeight, ViewportDebug.Event.SPLIT_LAYOUT)
+        }
+        saveSplitFraction()
+        trace(ViewportDebug.Event.SPLIT_LAYOUT, "divider=released")
+    }
+
+    private fun saveSplitFraction() {
+        splitFraction?.let { BrowserSplitStore.setSideFraction(appContext, it) }
+    }
+
+    /** The middle of the gap between the panes, which is the divider the user sees. */
+    private fun dividerCentreX(panes: SplitPanes): Float =
+        if (splitSideOnRight) {
+            (panes.main.right + panes.side.left) / 2f
+        } else {
+            (panes.side.right + panes.main.left) / 2f
+        }
+
+    /** The handle as drawn. Hit testing grows it by [SPLIT_GRAB_DP]; nothing else moves it. */
+    private fun dividerHandleBox(panes: SplitPanes): Box {
+        val centreX = dividerCentreX(panes)
+        val centreY = panes.side.top + panes.side.height / 2f
+        val halfWidth = sizes.dp(if (dividerGrabbed) SPLIT_HANDLE_GRABBED_DP else SPLIT_HANDLE_DP) / 2f
+        val halfLength = panes.side.height * SPLIT_HANDLE_LENGTH_FRACTION / 2f
+        return Box(centreX - halfWidth, centreY - halfLength, centreX + halfWidth, centreY + halfLength)
+    }
+
+    /**
+     * What counts as a tap on the divider: the handle plus a finger's width around it. Only around
+     * the handle, not down the whole seam — a full-height grab strip would swallow every tap on
+     * the inner edge of either page.
+     */
+    private fun dividerGrabBox(panes: SplitPanes): Box {
+        val handle = dividerHandleBox(panes)
+        val margin = sizes.dp(SPLIT_GRAB_DP)
+        return Box(
+            handle.left - margin, handle.top - margin,
+            handle.right + margin, handle.bottom + margin
+        )
+    }
+
+    /**
+     * Moves a grabbed divider by one scroll's worth. Returns true whenever the drag was consumed,
+     * including the no-op cases, so a grabbed divider never also scrolls the page under it.
+     *
+     * The re-layout is coalesced: every step of the drag changes the ratio, but reflowing two live
+     * WebViews thirty times a second is what a drag on a head unit cannot afford. The pending pass
+     * is flushed on release, so where the finger stops is exactly where the panes land.
+     */
+    private fun dragDivider(distanceX: Float): Boolean {
+        val panes = splitPanes?.takeIf { isSplit }
+        if (panes == null) {
+            dividerGrabbed = false
+            return false
+        }
+        // The host reports the distance *scrolled*, which is the negative of the way the finger
+        // went; the divider follows the finger.
+        val delta = -distanceX.roundToInt()
+        if (delta == 0) return true
+        val next = BrowserSplitGeometry.dragSideFraction(
+            panes,
+            delta,
+            sideOnRight = splitSideOnRight,
+            minPanePx = sizes.dp(SPLIT_MIN_PANE_DP).roundToInt(),
+        )
+        if (next == splitFraction) return true
+        splitFraction = next
+        if (!dividerLayoutPending) {
+            dividerLayoutPending = true
+            mainHandler.postDelayed(applyDividerLayout, DIVIDER_LAYOUT_INTERVAL_MS)
+        }
+        return true
+    }
+
+    private val applyDividerLayout = Runnable {
+        dividerLayoutPending = false
+        layoutWebView(surfaceWidth, surfaceHeight, ViewportDebug.Event.SPLIT_LAYOUT)
     }
 
     private fun dispatchPageTap(x: Float, y: Float) {
@@ -1456,6 +1610,8 @@ class CarWebRenderer(context: Context) {
             return@runOnMain
         }
         if (overlay == Overlay.TABS) return@runOnMain
+        // A grabbed divider owns the drag; the page under it must not scroll with it.
+        if (dividerGrabbed && dragDivider(distanceX)) return@runOnMain
         val scale = viewport.scale.takeIf { it > 0f } ?: 1f
         scrollPageBy((distanceX / scale).toInt(), (distanceY / scale).toInt())
     }
@@ -1532,9 +1688,14 @@ class CarWebRenderer(context: Context) {
         // The split layout and side are geometry too: a change re-measures both panes.
         val nextSplit = BrowserSplitStore.layout(appContext)
         val nextSideOnRight = BrowserSplitStore.sideOnRight(appContext)
-        val splitChanged = nextSplit != splitLayout || nextSideOnRight != splitSideOnRight
+        // A dragged ratio is dropped when a preset is chosen (BrowserSplitStore.setLayout clears
+        // it), so this is also how the panes snap back to the preset's own shape.
+        val nextFraction = BrowserSplitStore.sideFraction(appContext)
+        val splitChanged = nextSplit != splitLayout || nextSideOnRight != splitSideOnRight ||
+            nextFraction != splitFraction
         splitLayout = nextSplit
         splitSideOnRight = nextSideOnRight
+        splitFraction = nextFraction
         if (splitChanged) {
             layoutWebView(surfaceWidth, surfaceHeight, ViewportDebug.Event.SPLIT_LAYOUT)
         } else if (insetChanged) {
@@ -2019,8 +2180,12 @@ class CarWebRenderer(context: Context) {
                 sideOnRight = splitSideOnRight,
                 gapPx = sizes.dp(SPLIT_GAP_DP).roundToInt(),
                 minPanePx = sizes.dp(SPLIT_MIN_PANE_DP).roundToInt(),
+                sideFraction = splitFraction,
             )
         } else null
+        splitPanes = panes
+        // Nothing left to hold on to once the split is gone (a narrower surface, or SINGLE).
+        if (panes == null) dividerGrabbed = false
         val nextMain = panes?.main?.let { paneViewport(width, height, it, desktop) } ?: next
         val nextSide = panes?.side?.let { paneViewport(width, height, it, desktop) }
         val geometryUnchanged = next == viewport && nextMain == mainViewport &&
@@ -2461,7 +2626,10 @@ class CarWebRenderer(context: Context) {
             drawErrorOverlay(canvas)
             canvas.restore()
         }
-        if (isSplit && !isVideoFullscreen) drawSplitFocus(canvas)
+        if (isSplit && !isVideoFullscreen) {
+            drawSplitFocus(canvas)
+            drawSplitDivider(canvas)
+        }
         drawChrome(canvas, SystemClock.uptimeMillis())
         canvas.restoreToCount(save)
     }
@@ -2541,6 +2709,23 @@ class CarWebRenderer(context: Context) {
         )
         toolbarPaint.alpha = 255
         toolbarPaint.style = Paint.Style.FILL
+    }
+
+    /**
+     * The handle on the divider. It is drawn whenever there is a split, faint, because a divider
+     * nobody can see is one nobody tries to drag; grabbing it lights it up and widens it, which is
+     * the only feedback the driver gets that the next drag moves the panes rather than the page.
+     */
+    private fun drawSplitDivider(canvas: Canvas) {
+        val handle = dividerHandleBox(splitPanes ?: return)
+        val radius = handle.width / 2f
+        toolbarPaint.style = Paint.Style.FILL
+        toolbarPaint.color = if (dividerGrabbed) BrowserTheme.dark.accent else Color.WHITE
+        toolbarPaint.alpha = if (dividerGrabbed) 255 else 90
+        canvas.drawRoundRect(
+            handle.left, handle.top, handle.right, handle.bottom, radius, radius, toolbarPaint
+        )
+        toolbarPaint.alpha = 255
     }
 
     /** Toolbar, overlays and FAB — shared by the legacy frame and the hardware chrome layer. */

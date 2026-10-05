@@ -459,7 +459,10 @@ object AutoBridgeSessionManager {
     // ------------------------------------------------------------------------------- queue
 
     fun queueAdd(context: Context, source: BridgeSource): Int? {
-        val size = BrowserPlayQueue.add(context, source.url, source.title)
+        // Queuing what is on screen is the one case where a length is already known; everything
+        // else queues an address, and the car rows label those with their source instead.
+        val durationMs = if (source.url == current.source?.url) current.durationMs else 0L
+        val size = BrowserPlayQueue.add(context, source.url, source.title, durationMs)
         update { it.copy(queueSize = BrowserPlayQueue.size(context)) }
         BridgeLog.i("queue.add", "url" to source.url, "size" to size)
         return size
@@ -495,7 +498,8 @@ object AutoBridgeSessionManager {
             source = source.copy(positionMs = current.positionMs),
             engine = current.engine,
             positionMs = current.positionMs,
-            savedAtMs = System.currentTimeMillis()
+            savedAtMs = System.currentTimeMillis(),
+            durationMs = current.durationMs
         )
         BridgeStore.setLastSession(context, snapshot)
         BridgeLog.i(
@@ -545,9 +549,24 @@ object AutoBridgeSessionManager {
                 kind = RecentActivityStore.Kind.BROWSER,
                 title = source.displayTitle,
                 subtitle = source.displayHost,
-                data = source.url
+                data = source.url,
+                origin = source.origin.recentOrigin()
             )
         )
+    }
+
+    /**
+     * How a send shows up in the recents list.
+     *
+     * Only the origins that say something about *who asked* are carried over. QUEUE and RESTORE
+     * describe the bridge continuing its own work, not a new request from anywhere, so they stay
+     * null and the home dashboard's "Recently Sent" does not claim they came from the phone.
+     */
+    private fun BridgeSource.Origin.recentOrigin(): RecentActivityStore.Origin? = when (this) {
+        BridgeSource.Origin.PHONE -> RecentActivityStore.Origin.PHONE
+        BridgeSource.Origin.SHARE -> RecentActivityStore.Origin.SHARE
+        BridgeSource.Origin.CAR -> RecentActivityStore.Origin.CAR
+        BridgeSource.Origin.QUEUE, BridgeSource.Origin.RESTORE -> null
     }
 
     fun recents(context: Context, limit: Int = 10): List<RecentActivityStore.Entry> =

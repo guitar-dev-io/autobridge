@@ -21,8 +21,9 @@ import androidx.car.app.navigation.model.NavigationTemplate
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import dev.autobridge.R
+import dev.autobridge.bridge.BridgeSource
 import dev.autobridge.core.state.VehicleStateSession
-import dev.autobridge.display.StructuredLog
+import dev.autobridge.logging.StructuredLog
 import dev.autobridge.library.HomeSection
 import dev.autobridge.mirror.MirrorSurfaceOwnership
 import dev.autobridge.mirror.ProjectionService
@@ -30,11 +31,16 @@ import dev.autobridge.mirror.ProjectionService
 /**
  * AutoBridge Home Dashboard.
  *
- * The home is drawn by the app on the car surface (NavigationTemplate) as a 3 × 2 grid of
- * [HomeMenuCard]s - TV, Radio, Web browser, YouTube, YouTube Music, Streaming - under a compact
- * AutoBridge header, so it reads as one dark design system instead of host-styled tiles. Layout is
- * computed from the surface size, density and the host's stable area ([HomeMenuLayout]); Android
- * Auto's own rail and bottom bar sit outside the surface and are never drawn over.
+ * The home is drawn by the app on the car surface (NavigationTemplate) as one column under a
+ * compact AutoBridge header - Continue Watching, the 3 × 2 grid of [HomeMenuCard]s (TV, Radio, Web
+ * browser, YouTube, YouTube Music, Streaming), then Recently Sent and Queue - so it reads as one
+ * dark design system instead of host-styled tiles. Layout is computed from the surface size,
+ * density and the host's stable area ([HomeDashboardLayout]); Android Auto's own rail, bottom bar,
+ * clock and status icons sit outside the surface and are never drawn over or imitated.
+ *
+ * Every section shows real state or is absent: [HomeDashboardContent] reads the bridge's own
+ * session snapshot, the recents the phone sent, and the play queue, and a section with nothing in
+ * it gives its space back to the cards.
  *
  * Everything else, and a rotary-friendly route to the six cards, is behind the single action-strip
  * button ([CarHomeMoreScreen]). Hosts older than Car API 5 cannot deliver surface taps, so they keep
@@ -56,7 +62,7 @@ class CarHomeDashboardScreen(
     // --- Surface-drawn menu state ---
     private val appManager = carContext.getCarService(AppManager::class.java)
     private val menuItems = HomeMenuItem.primary
-    private val menuRenderer by lazy { HomeMenuRenderer(carContext) }
+    private val dashboardRenderer by lazy { HomeDashboardRenderer(carContext) }
     private val handler = Handler(Looper.getMainLooper())
     private var surface: Surface? = null
     private var surfaceWidth = 0
@@ -64,10 +70,23 @@ class CarHomeDashboardScreen(
     private var surfaceDpi = 0
     private var stableArea: Rect? = null
     private var visibleArea: Rect? = null
-    private var menuLayout: HomeMenuLayout? = null
+    private var dashboardLayout: HomeDashboardLayout? = null
+    /** The sections to draw, re-read whenever this screen comes back to the front. */
+    private var content = HomeDashboardContent()
     private var scroll = 0f
-    private var pressed = -1
+    private var pressed: HomeHit? = null
     private var active = false
+
+    /**
+     * Thumbnails for the hero and the rows.
+     *
+     * A cached still is handed straight to the renderer; one that has to be fetched arrives later
+     * and repaints the dashboard once, which is why this is a callback and not a blocking read.
+     * Everything without a still keeps its fallback artwork for good.
+     */
+    private val thumbnails = HomeDashboardRenderer.Thumbnails { url ->
+        CarThumbnails.bitmap(carContext, url) { renderMenu() }
+    }
 
     /** onClick reaches a SurfaceCallback from Car API 5; older hosts keep the host-drawn grid. */
     private val drawsMenu: Boolean by lazy { page == 0 && carContext.carAppApiLevel >= 5 }
@@ -79,7 +98,8 @@ class CarHomeDashboardScreen(
             override fun onStart(owner: LifecycleOwner) {
                 if (!drawsMenu) return
                 active = true
-                pressed = -1
+                pressed = null
+                refreshContent()
                 MirrorSurfaceOwnership.claim(this@CarHomeDashboardScreen)
                 appManager.setSurfaceCallback(this@CarHomeDashboardScreen)
                 // The surface may have survived the screen above (both are surface templates).
@@ -133,7 +153,7 @@ class CarHomeDashboardScreen(
         surfaceWidth = surfaceContainer.width
         surfaceHeight = surfaceContainer.height
         surfaceDpi = surfaceContainer.dpi
-        menuLayout = null
+        dashboardLayout = null
         StructuredLog.i(TAG, "surface ${surfaceWidth}x$surfaceHeight dpi=$surfaceDpi")
         renderMenu()
     }
@@ -147,7 +167,7 @@ class CarHomeDashboardScreen(
         if (!active || !MirrorSurfaceOwnership.isOwner(this)) return
         StructuredLog.i(TAG, "stable area $stableArea")
         this.stableArea = Rect(stableArea)
-        menuLayout = null
+        dashboardLayout = null
         renderMenu()
     }
 
@@ -155,29 +175,130 @@ class CarHomeDashboardScreen(
         if (!active || !MirrorSurfaceOwnership.isOwner(this)) return
         StructuredLog.i(TAG, "visible area $visibleArea")
         this.visibleArea = Rect(visibleArea)
-        menuLayout = null
+        dashboardLayout = null
         renderMenu()
     }
 
     override fun onClick(x: Float, y: Float) {
-        if (!active || !MirrorSurfaceOwnership.isOwner(this) || pressed >= 0) return
-        val layout = menuLayout ?: return
-        if (layout.scrollUp?.contains(x, y) == true) return scrollMenuBy(-layout.scrollStep)
-        if (layout.scrollDown?.contains(x, y) == true) return scrollMenuBy(layout.scrollStep)
-        val index = layout.cardAt(x, y, scroll)
-        val item = menuItems.getOrNull(index) ?: return
-        // Short pressed flash on the card, then the same navigation the grid tile performed.
-        pressed = index
-        focusedSection = item.section
+        if (!active || !MirrorSurfaceOwnership.isOwner(this) || pressed != null) return
+        val layout = dashboardLayout ?: return
+        val hit = layout.hit(x, y, scroll) ?: return
+        when (hit.region) {
+            HomeRegion.SCROLL_UP -> return scrollMenuBy(-layout.scrollStep)
+            HomeRegion.SCROLL_DOWN -> return scrollMenuBy(layout.scrollStep)
+            else -> Unit
+        }
+        val action = actionFor(hit) ?: return
+
+        // Short pressed flash on whatever was touched, then the action it stands for.
+        pressed = hit
         renderMenu()
         handler.postDelayed({
-            pressed = -1
+            pressed = null
             if (!active) return@postDelayed
-            // Hand the surface over cleanly: the browser and video screens attach their own
-            // producers (VirtualDisplay / player) to it and cannot while we are still connected.
-            releaseSurface()
-            CarHomeNavigator.open(carContext, screenManager, item.section, ::requestSafety)
-        }, HomeMenuTheme.PRESS_FEEDBACK_MS)
+            action()
+            // An action that opened something has already handed the surface over and this draws
+            // nothing; one that could not (an address no engine accepts) leaves the home intact,
+            // and this is what takes the pressed flash back off it.
+            renderMenu()
+        }, HomeDashboardTheme.PRESS_FEEDBACK_MS)
+    }
+
+    /**
+     * What a tap does, or null when there is nothing behind it.
+     *
+     * Each action is responsible for releasing the surface *if* it hands it to another producer:
+     * the browser, video and player screens attach their own (VirtualDisplay / decoder) and cannot
+     * while this screen is still connected. Releasing unconditionally would blank the home on the
+     * one path that stays here, which is a send the router refuses.
+     */
+    private fun actionFor(hit: HomeHit): (() -> Unit)? = when (hit.region) {
+        HomeRegion.CONTINUE -> content.continueWatching?.let { item ->
+            {
+                if (handOverSurface(item.source)) {
+                    dev.autobridge.bridge.AutoBridgeSessionManager.resume(carContext, item.snapshot)
+                }
+            }
+        }
+
+        HomeRegion.QUICK_ACCESS -> menuItems.getOrNull(hit.index)?.let { item ->
+            {
+                focusedSection = item.section
+                releaseSurface()
+                CarHomeNavigator.open(carContext, screenManager, item.section, ::requestSafety)
+            }
+        }
+
+        HomeRegion.RECENT_HEADER -> {
+            {
+                releaseSurface()
+                CarNavigation.open(screenManager, "CarRecentScreen") { CarRecentScreen(carContext) }
+            }
+        }
+
+        HomeRegion.RECENT_ITEM -> content.recentlySent.getOrNull(hit.index)?.let { item ->
+            { play(BridgeSource(item.url, item.title, origin = BridgeSource.Origin.CAR)) }
+        }
+
+        HomeRegion.QUEUE_HEADER -> {
+            {
+                releaseSurface()
+                CarNavigation.open(screenManager, "CarQueueScreen") { CarQueueScreen(carContext) }
+            }
+        }
+
+        HomeRegion.QUEUE_ITEM -> content.queue.getOrNull(hit.index)?.let { item ->
+            {
+                val source = BridgeSource(item.url, item.title, origin = BridgeSource.Origin.QUEUE)
+                // The queue is consumed as it plays, so the row comes out - but only once the
+                // router has accepted it. Dropping an item the bridge then refused to open would
+                // lose it for good, with nothing on screen to say why.
+                if (handOverSurface(source)) {
+                    dev.autobridge.bridge.AutoBridgeSessionManager.queueRemove(carContext, item.url)
+                    dev.autobridge.bridge.AutoBridgeSessionManager.open(carContext, source)
+                }
+            }
+        }
+
+        HomeRegion.SCROLL_UP, HomeRegion.SCROLL_DOWN -> null
+    }
+
+    private fun play(source: BridgeSource) {
+        if (!handOverSurface(source)) return
+        dev.autobridge.bridge.AutoBridgeSessionManager.open(carContext, source)
+    }
+
+    /**
+     * Gives the surface up for [source], or says no and keeps the home on screen.
+     *
+     * The router is asked first because a refusal pushes no screen: without this check the home
+     * would release its producer, nothing would take it, and the head unit would go black with no
+     * way back but the action strip.
+     */
+    private fun handOverSurface(source: BridgeSource): Boolean {
+        val decision = dev.autobridge.bridge.ContentRouter.explain(
+            source,
+            dev.autobridge.remotestream.RemoteStreamConfig.isAvailable(carContext)
+        )
+        if (decision.engine == dev.autobridge.bridge.EngineKind.UNSUPPORTED) {
+            StructuredLog.w(TAG, "refused ${source.url}: ${decision.reason}")
+            CarToast.makeText(
+                carContext,
+                carContext.getString(
+                    decision.error?.messageRes ?: R.string.bridge_error_unsupported
+                ),
+                CarToast.LENGTH_LONG
+            ).show()
+            return false
+        }
+        releaseSurface()
+        return true
+    }
+
+    /** Re-reads the stores the dashboard draws from; the layout is sized by them, so it goes too. */
+    private fun refreshContent() {
+        content = HomeDashboardContent.read(carContext)
+        dashboardLayout = null
     }
 
     override fun onScroll(distanceX: Float, distanceY: Float) {
@@ -186,7 +307,7 @@ class CarHomeDashboardScreen(
     }
 
     private fun scrollMenuBy(delta: Float) {
-        val layout = menuLayout ?: return
+        val layout = dashboardLayout ?: return
         if (!layout.scrollable) return
         scroll = (scroll + delta).coerceIn(0f, layout.maxScroll)
         renderMenu()
@@ -207,21 +328,27 @@ class CarHomeDashboardScreen(
         if (surfaceWidth <= 0 || surfaceHeight <= 0) return
         // The head unit's dpi, never the phone's: it decides every dp on this screen.
         val density = (if (surfaceDpi > 0) surfaceDpi else BASELINE_DPI) / BASELINE_DPI.toFloat()
-        val layout = menuLayout ?: HomeMenuLayout.compute(
-            safeArea(), density, menuItems.map { it.title(carContext) }, menuRenderer::measureLabel
+        val layout = dashboardLayout ?: HomeDashboardLayout.compute(
+            safeArea(), density, menuItems.map { it.title(carContext) }, content,
+            dashboardRenderer::measureLabel
         ).also {
-            menuLayout = it
+            dashboardLayout = it
             scroll = scroll.coerceIn(0f, it.maxScroll)
-            StructuredLog.i(TAG, "layout card=${it.cards.first().width.toInt()}x${it.cards.first().height.toInt()} scroll=${it.scrollable}")
+            StructuredLog.i(
+                TAG,
+                "layout card=${it.cards.first().width.toInt()}x${it.cards.first().height.toInt()}" +
+                    " hero=${it.continueCard != null} recent=${it.recentRows.size}" +
+                    " queue=${it.queueRows.size} scroll=${it.scrollable}"
+            )
         }
-        val canvas = runCatching { target.lockHardwareCanvas() }.getOrNull()
-            ?: runCatching { target.lockCanvas(null) }.getOrNull()
-            ?: return
-        try {
+        // Not lockHardwareCanvas directly: on some devices it takes the process down a frame
+        // later, uncatchably. See [dev.autobridge.display.CarSurfaceCanvas].
+        dev.autobridge.display.CarSurfaceCanvas.draw(carContext, target) { canvas ->
             val focused = menuItems.indexOfFirst { it.section == focusedSection }
-            menuRenderer.draw(canvas, layout, menuItems, HomeMenuRenderer.State(focused, pressed, scroll))
-        } finally {
-            runCatching { target.unlockCanvasAndPost(canvas) }
+            dashboardRenderer.draw(
+                canvas, layout, menuItems, content,
+                HomeDashboardRenderer.State(focused, pressed, scroll), thumbnails
+            )
         }
     }
 

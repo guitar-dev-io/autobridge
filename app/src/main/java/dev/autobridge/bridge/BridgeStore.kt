@@ -23,12 +23,19 @@ object BridgeStore {
     private const val KEY_PENDING = "pending_send"
     private const val KEY_LAST_SESSION = "last_session"
 
-    /** A session worth offering to resume: what was playing, on which engine, and where. */
+    /**
+     * A session worth offering to resume: what was playing, on which engine, and where.
+     *
+     * [durationMs] is 0 whenever the engine never reported one - a browser page often does not -
+     * and the home dashboard then shows the elapsed time without a progress bar rather than
+     * drawing a bar against a length it had to invent.
+     */
     data class Snapshot(
         val source: BridgeSource,
         val engine: EngineKind,
         val positionMs: Long,
-        val savedAtMs: Long
+        val savedAtMs: Long,
+        val durationMs: Long = 0L
     )
 
     // ------------------------------------------------------------------------------ pure codec
@@ -62,6 +69,7 @@ object BridgeStore {
         .put("source", JSONObject(encodeSource(snapshot.source)))
         .put("engine", snapshot.engine.name)
         .put("positionMs", snapshot.positionMs)
+        .put("durationMs", snapshot.durationMs)
         .put("savedAt", snapshot.savedAtMs)
         .toString()
 
@@ -75,7 +83,8 @@ object BridgeStore {
                 engine = runCatching { EngineKind.valueOf(json.optString("engine")) }
                     .getOrDefault(EngineKind.BROWSER),
                 positionMs = json.optLong("positionMs"),
-                savedAtMs = json.optLong("savedAt")
+                savedAtMs = json.optLong("savedAt"),
+                durationMs = json.optLong("durationMs")
             )
         }.getOrNull()
     }

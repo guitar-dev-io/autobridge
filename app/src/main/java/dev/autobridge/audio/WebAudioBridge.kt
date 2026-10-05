@@ -1,7 +1,7 @@
 package dev.autobridge.audio
 
 import android.webkit.WebView
-import dev.autobridge.display.StructuredLog
+import dev.autobridge.logging.StructuredLog
 
 /** What the page is doing with sound, as far as the native layer can tell. */
 enum class WebAudioState { IDLE, PLAYING, PAUSED }

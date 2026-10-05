@@ -1,0 +1,41 @@
+{
+  "verdict": "CHANGES_REQUESTED",
+  "findings": [
+    {
+      "id": 1,
+      "severity": "MEDIUM",
+      "title": "progress visibility rule conflicts between onProgressChanged and the gating section for a mid-load gate flip",
+      "location": "design.md §3 onProgressChanged vs. Parked/policy gating and AC6",
+      "fix": "State that stale-progress hiding on a mid-load gate change is owned by enforcePolicy() (invoked from parkingListener); onProgressChanged's allowed() guard only prevents a new progress tick from re-showing the bar. Add that clarifying line to §3."
+    },
+    {
+      "id": 2,
+      "severity": "MEDIUM",
+      "title": "urlField is never populated before the first page load; initial display state unspecified (renders blank on launch)",
+      "location": "design.md §1 View / §1 Keeping the field in sync / onCreate ordering",
+      "fix": "Call syncAddress() once at the end of buildLayout() (or right after setContentView in onCreate) so the field shows currentUrl() (HOME on cold start) from first paint instead of empty text."
+    },
+    {
+      "id": 3,
+      "severity": "NIT",
+      "title": "AC2 and §3 onReceivedTitle disagree on title-vs-URL precedence wording",
+      "location": "design.md AC2 vs. §3 onReceivedTitle",
+      "fix": "Reword AC2 to: text equals the current URL when one exists; when the WebView has no URL yet, the title may be shown as a transient label."
+    },
+    {
+      "id": 4,
+      "severity": "NIT",
+      "title": "urlField focus semantics unspecified given host-owned input",
+      "location": "design.md §1 View (isFocusable = true)",
+      "fix": "Add that focus is for D-pad/rotary traversal only and the control responds solely to click; the host owns the IME (CarUiController takes com.google.android.gms.car.input.InputManager) so no phone IME attaches to the TextView."
+    },
+    {
+      "id": 5,
+      "severity": "NIT",
+      "title": "\"loads it verbatim\" overstates ContentAddress.https for full https URLs",
+      "location": "design.md AC4",
+      "fix": "Reword to: loads it as the normalized https URL (ContentAddress.https toASCIIString() output), which is byte-identical for already-canonical URLs."
+    }
+  ],
+  "reviewDoc": "/Users/anuwat.t/Documents/ChatGPT/AutoBridge/.agents/tasks/projection-browser-shell-phase1/design-review.md"
+}

@@ -3,6 +3,7 @@ package dev.autobridge.library
 /** How the Streaming list is grouped, in display order. */
 enum class StreamingGroup(val title: String) {
     VIDEO("Video"),
+    MOVIES("Movies"),
     MUSIC("Music"),
     LIVE("Live / Gaming"),
     ANIME("Anime")
@@ -19,12 +20,18 @@ data class StreamingLink(val title: String, val group: StreamingGroup, val url: 
  * DRM are listed: the WebView has no dependable Widevine path, so Netflix, Disney+, Prime Video,
  * HBO Max, Viu, iQIYI, WeTV, Youku, AIS PLAY and Spotify (whose web player also needs Widevine)
  * would open a page that cannot play. TrueVisions NOW has no web player at all.
+ *
+ * Movies is deliberately just the Internet Archive for now: it is public-domain and plays from a
+ * plain `<video>` tag, so it is the one "watch a movie" site that is both unambiguously legal and
+ * known to work in a WebView without Widevine. A free ad-supported service (Tubi, Pluto TV, …)
+ * would round this out, but whether its catalog plays without DRM in this WebView is unverified -
+ * add it once that is confirmed, rather than listing a site that may just show a black screen.
  */
 object StreamingLinks {
     val all: List<StreamingLink> = listOf(
         StreamingLink("YouTube", StreamingGroup.VIDEO, "https://m.youtube.com"),
-        StreamingLink("YouTube Kids", StreamingGroup.VIDEO, "https://www.youtubekids.com"),
         StreamingLink("TikTok", StreamingGroup.VIDEO, "https://www.tiktok.com"),
+        StreamingLink("Internet Archive: Feature Films", StreamingGroup.MOVIES, "https://archive.org/details/feature_films"),
         StreamingLink("YouTube Music", StreamingGroup.MUSIC, "https://music.youtube.com"),
         StreamingLink("Twitch", StreamingGroup.LIVE, "https://www.twitch.tv"),
         // The international site; bilibili.com is the mainland-China front end.

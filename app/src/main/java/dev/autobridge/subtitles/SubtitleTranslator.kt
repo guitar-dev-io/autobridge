@@ -34,3 +34,21 @@ interface SubtitleTranslator {
 interface SubtitleTranslatorFactory {
     fun create(config: SubtitleTranslationConfig): SubtitleTranslator
 }
+
+/**
+ * The engine that does nothing: it reports the pair it was asked for and hands every line back
+ * untranslated.
+ *
+ * Used when the chosen pair has no model behind it, and by the whole factory in a build without
+ * the engines compiled in. It keeps the pipeline's contract whole - there is always a translator to
+ * bind - so the "should this line be translated at all" decision stays in one place
+ * ([SubtitleTranslationConfig.isActive]) rather than being half here and half there.
+ */
+class PassthroughTranslator(
+    override val engine: TranslationEngine,
+    override val signature: String
+) : SubtitleTranslator {
+    override suspend fun prepare() = Unit
+    override suspend fun translate(text: String): String = text
+    override fun close() = Unit
+}

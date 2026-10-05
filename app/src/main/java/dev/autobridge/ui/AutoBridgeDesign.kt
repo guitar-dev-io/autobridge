@@ -18,6 +18,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import dev.autobridge.R
 
 /**
  * AutoBridge's own phone design language, used by every screen the app draws itself.
@@ -44,6 +45,14 @@ object AutoBridgeDesign {
     const val ACCENT = 0xFF4C7DF0.toInt()
     const val ACCENT_SOFT = 0xFF33C9D6.toInt()
     const val DANGER = 0xFFFF6B81.toInt()
+
+    /**
+     * Signal colours for a checked channel: green answers, amber answers slowly, and a dead one
+     * takes [DANGER]. Green reading as "go" is the one colour convention a driver does not have to
+     * learn, and the head unit shows the same three through `CarColor` (see `CarIptvCheck`).
+     */
+    const val SIGNAL_GOOD = 0xFF5BD98A.toInt()
+    const val SIGNAL_SLOW = 0xFFFFC65C.toInt()
 
     /** Per-section accents. Kept here so the phone and any future surface agree on them. */
     const val ACCENT_TV = 0xFF6EA8FF.toInt()
@@ -134,8 +143,9 @@ object AutoBridgeDesign {
                     action.glyph,
                     if (action.filled) 18f else 20f,
                     filled = action.filled,
+                    tint = action.tint,
                     onClick = action.onClick
-                ),
+                ).also { it.tag = action.tag },
                 LinearLayout.LayoutParams(context.dp(42), context.dp(42)).apply {
                     if (index != actions.lastIndex) marginEnd = context.dp(6)
                 }
@@ -144,11 +154,18 @@ object AutoBridgeDesign {
         return row
     }
 
-    /** One trailing header button. [filled] marks the screen's primary action. */
+    /**
+     * One trailing header button. [filled] marks the screen's primary action. [tint] overrides the
+     * glyph's colour, for a button whose own state is worth reading at a glance (a signal icon,
+     * say) rather than always looking like plain chrome. [tag] lets a caller find that button again
+     * after the header is built, to update [tint] live without re-rendering the whole page.
+     */
     data class HeaderAction(
         val glyph: String,
         val onClick: () -> Unit,
-        val filled: Boolean = false
+        val filled: Boolean = false,
+        val tint: Int? = null,
+        val tag: String? = null
     )
 
     /** A live-state pill: a small accent dot plus one short label. */
@@ -179,12 +196,13 @@ object AutoBridgeDesign {
         glyph: String,
         size: Float,
         filled: Boolean = false,
+        tint: Int? = null,
         onClick: () -> Unit
     ): TextView = TextView(context).apply {
         text = glyph
         textSize = size
         gravity = Gravity.CENTER
-        setTextColor(if (filled) INK else TEXT)
+        setTextColor(tint ?: if (filled) INK else TEXT)
         isClickable = true
         isFocusable = true
         contentDescription = glyph
@@ -348,6 +366,144 @@ object AutoBridgeDesign {
             LinearLayout.LayoutParams(context.dp(40), context.dp(40))
         )
     }
+
+    /**
+     * A grid cell for one entry: the playlist's own logo across the top, the title under it, and a
+     * coloured status line when there is something to say about the address.
+     *
+     * The row ([contentRow]) and the tile are the same content at two densities. A tile is for
+     * things that carry artwork worth seeing — channels, stations, films — because the logo is what
+     * a user recognises before they have read anything; a row is for everything whose identity is
+     * its text. The logo is fitted, never cropped: a channel wordmark cut in half reads as a
+     * broken image, and most of them arrive as wide transparent PNGs.
+     *
+     * [status] is text plus its colour, and the view holding it is tagged [R.id.autobridge_status_label]
+     * so a caller can write into a page that is already on screen — see [statusLabel].
+     */
+    fun contentTile(
+        context: Context,
+        title: String,
+        subtitle: String = "",
+        accent: Int,
+        artworkUrl: String? = null,
+        badgeText: String? = null,
+        status: Pair<String, Int>? = null,
+        corner: Pair<String, () -> Unit>? = null,
+        onLongClick: (() -> Unit)? = null,
+        onClick: () -> Unit
+    ): View = LinearLayout(context).apply {
+        orientation = LinearLayout.VERTICAL
+        background = tappable(context, SURFACE, 18, accent)
+        isClickable = true
+        isFocusable = true
+        contentDescription = title
+        setPadding(context.dp(10), context.dp(10), context.dp(10), context.dp(10))
+        setOnClickListener { onClick() }
+        if (onLongClick != null) setOnLongClickListener { onLongClick(); true }
+
+        val artwork = FrameLayout(context).apply {
+            background = surface(context, tint(accent, 0.14f), 12, tint(accent, 0.26f))
+            clipToOutline = true
+        }
+        val initial = TextView(context).apply {
+            text = (badgeText ?: title.trim().take(1)).uppercase()
+            textSize = 26f
+            gravity = Gravity.CENTER
+            setTextColor(accent)
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        }
+        artwork.addView(initial, FrameLayout.LayoutParams(-1, -1))
+        if (!artworkUrl.isNullOrBlank()) {
+            val image = ImageView(context).apply {
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                visibility = View.GONE
+                setPadding(context.dp(10), context.dp(10), context.dp(10), context.dp(10))
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }
+            artwork.addView(image, FrameLayout.LayoutParams(-1, -1))
+            // The letter stays until a bitmap actually arrives, so a failed logo is never a hole.
+            ImageLoader.load(context, artworkUrl, image) {
+                initial.visibility = View.GONE
+                image.visibility = View.VISIBLE
+            }
+        }
+        if (corner != null) artwork.addView(
+            glyphButton(context, corner.first, 15f, onClick = corner.second),
+            FrameLayout.LayoutParams(context.dp(32), context.dp(32), Gravity.TOP or Gravity.END)
+        )
+        addView(artwork, LinearLayout.LayoutParams(-1, context.dp(88)))
+
+        addView(TextView(context).apply {
+            this.text = title
+            textSize = 14f
+            setTextColor(TEXT)
+            maxLines = 2
+            ellipsize = TextUtils.TruncateAt.END
+            setPadding(0, context.dp(8), 0, 0)
+        }, LinearLayout.LayoutParams(-1, -2))
+
+        if (subtitle.isNotBlank()) addView(TextView(context).apply {
+            this.text = subtitle
+            textSize = 11f
+            setTextColor(TEXT_MUTED)
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+            setPadding(0, context.dp(2), 0, 0)
+        }, LinearLayout.LayoutParams(-1, -2))
+
+        // Built even when there is nothing to show yet: a result that lands later is written into
+        // this view, and a page that is already scrolled must not be rebuilt under the user.
+        addView(TextView(context).apply {
+            id = R.id.autobridge_status_label
+            textSize = 12f
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+            setPadding(0, context.dp(3), 0, 0)
+            status?.let { (text, color) ->
+                this.text = text
+                setTextColor(color)
+            }
+            visibility = if (status == null) View.GONE else View.VISIBLE
+        }, LinearLayout.LayoutParams(-1, -2))
+    }
+
+    /** The status line inside a [contentTile], for writing a result into a page already drawn. */
+    fun statusLabel(tile: View): TextView? = tile.findViewById(R.id.autobridge_status_label)
+
+    /** Writes [text] in [color] into a tile's status line, or hides it when [text] is blank. */
+    fun setStatus(tile: View, text: String, color: Int) {
+        val label = statusLabel(tile) ?: return
+        label.text = text
+        label.setTextColor(color)
+        label.visibility = if (text.isBlank()) View.GONE else View.VISIBLE
+    }
+
+    /**
+     * [tiles] laid out in rows of [columns], returned as views a page body stacks like any other
+     * row — so a grid page needs no new container and keeps the one scroll view.
+     *
+     * A short last row holds its cell width with empty space instead of stretching its tile across
+     * the page, which is what makes an odd channel count look like a grid rather than a mistake.
+     */
+    fun grid(context: Context, tiles: List<View>, columns: Int = 2, gap: Int = 8): List<View> =
+        tiles.chunked(columns.coerceAtLeast(1)).map { cells ->
+            LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                cells.forEachIndexed { index, tile ->
+                    // MATCH_PARENT in a wrap_content row is the equal-height trick: the row
+                    // measures to its tallest cell and the others stretch to it.
+                    addView(tile, LinearLayout.LayoutParams(0, -1, 1f).apply {
+                        marginStart = if (index == 0) 0 else context.dp(gap)
+                    })
+                }
+                repeat(columns - cells.size) {
+                    addView(View(context), LinearLayout.LayoutParams(0, -1, 1f).apply {
+                        marginStart = context.dp(gap)
+                    })
+                }
+            }
+        }
 
     /** Pill button used for page-level actions (Add source, Refresh, Clear…). */
     fun pill(

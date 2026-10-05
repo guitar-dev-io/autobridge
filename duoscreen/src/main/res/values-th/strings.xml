@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="duo_screen_edit_layout">จัดหน้าจอ</string>
+    <string name="duo_screen_done">เสร็จสิ้น</string>
+    <string name="duo_screen_reload">โหลดใหม่</string>
+    <string name="duo_screen_exit">ออก</string>
+    <string name="duo_screen_needs_shizuku">ให้สิทธิ์ Shizuku บนมือถือก่อน</string>
+    <string name="duo_screen_title">Duo screen</string>
+    <string name="duo_screen_subtitle">รัน 2–3 แอปพร้อมกันบนจอรถ</string>
+    <string name="duo_screen_shizuku_ready">เชื่อมต่อ Shizuku แล้ว</string>
+    <string name="duo_screen_shizuku_missing">ยังไม่ได้สิทธิ์ Shizuku</string>
+    <string name="duo_screen_shizuku_hint">ใช้สำหรับเปิดแอปลงแต่ละช่องและส่งการแตะเข้าไป</string>
+    <string name="duo_screen_panes_section">ช่อง</string>
+    <string name="duo_screen_pane_count">จำนวนช่อง</string>
+    <string name="duo_screen_pane_label">ช่องที่ %1$d</string>
+    <string name="duo_screen_pane_empty">ยังไม่ได้เลือกแอป</string>
+    <string name="duo_screen_layout_section">การจัดวาง</string>
+    <string name="duo_screen_preset">รูปแบบการแบ่งจอ</string>
+    <string name="duo_screen_preset_even_columns">แบ่งเท่ากัน</string>
+    <string name="duo_screen_preset_wide_left">ซ้ายกว้าง</string>
+    <string name="duo_screen_preset_wide_right">ขวากว้าง</string>
+    <string name="duo_screen_preset_even_rows">แบ่งบน-ล่าง</string>
+    <string name="duo_screen_preset_pip">จอซ้อนจอ</string>
+    <string name="duo_screen_reset_layout">รีเซ็ตการจัดวาง</string>
+    <string name="duo_screen_reset_layout_hint">กลับไปใช้รูปแบบที่เลือกไว้ แอปที่เลือกไว้ยังอยู่</string>
+    <string name="duo_screen_reset_done">รีเซ็ตการจัดวางแล้ว</string>
+    <string name="duo_screen_pick_app">เลือกแอป</string>
+    <string name="duo_screen_clear_app">ปล่อยว่าง</string>
+    <string name="duo_screen_self_pane">เบราว์เซอร์ AutoBridge</string>
+    <string name="duo_screen_applied_now">เปลี่ยนบนจอรถแล้ว</string>
+    <string name="duo_screen_applied_next">บันทึกแล้ว จะมีผลเมื่อเชื่อมต่อครั้งถัดไป</string>
+    <string name="duo_screen_session_section">เซสชัน</string>
+    <string name="duo_screen_end_session">ถอด duo screen ออกเดี๋ยวนี้</string>
+    <string name="duo_screen_end_session_hint">ปิดทุกช่องและแอปที่กำลังรันอยู่ในช่องนั้น</string>
+    <string name="duo_screen_end_done">ถอด duo screen แล้ว</string>
+    <string name="duo_screen_end_none">ยังไม่มีเซสชันที่รันอยู่</string>
+</resources>

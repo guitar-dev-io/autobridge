@@ -59,7 +59,7 @@
 //import dev.autobridge.display.OrientationMonitor
 //import dev.autobridge.display.ScreenOffController
 //import dev.autobridge.display.ScreenPowerController
-//import dev.autobridge.display.StructuredLog
+//import dev.autobridge.logging.StructuredLog
 //import dev.autobridge.display.SurfaceProfile
 //import dev.autobridge.entertainment.BrowserLauncher
 //import dev.autobridge.input.AccessibilityInputBackend
@@ -1899,7 +1899,7 @@ import dev.autobridge.display.MirrorOrientationController
 import dev.autobridge.display.OrientationMonitor
 import dev.autobridge.display.ScreenOffController
 import dev.autobridge.display.ScreenPowerController
-import dev.autobridge.display.StructuredLog
+import dev.autobridge.logging.StructuredLog
 import dev.autobridge.diagnostics.CrashReportStore
 import dev.autobridge.display.SurfaceProfile
 import dev.autobridge.entertainment.BrowserLauncher
@@ -1915,6 +1915,7 @@ import dev.autobridge.safety.ParkingStateStore
 import dev.autobridge.settings.MirrorSettings
 import dev.autobridge.settings.SettingsStore
 import dev.autobridge.ui.PhoneNav
+import dev.autobridge.update.UpdateChecker
 import rikka.shizuku.Shizuku
 
 /** Phone destinations are defined (and unit-tested) in [PhoneNav]. */
@@ -2626,6 +2627,27 @@ class MainActivity : androidx.activity.ComponentActivity() {
         )
     )
 
+    /**
+     * The Duo Screen row, present only in the sideload flavors that actually ship the feature.
+     *
+     * Resolved by component name rather than referenced directly: the activity and its strings live
+     * in a flavor-specific source set, so the safe (Play) build has neither, and a direct reference
+     * would not compile there. Its own manifest label and description supply the row's text, which
+     * keeps those strings out of the Play build too.
+     */
+    private fun duoScreenEntry(): List<dev.autobridge.ui.PhoneLauncherUi.Entry> {
+        val intent = Intent().setClassName(this, "dev.autobridge.projection.DuoScreenSettingsActivity")
+        val resolved = packageManager.resolveActivity(intent, 0) ?: return emptyList()
+        val title = resolved.loadLabel(packageManager).toString()
+        val caption = resolved.activityInfo?.descriptionRes
+            ?.takeIf { it != 0 }
+            ?.let(::getString)
+            .orEmpty()
+        return listOf(
+            settingsEntry(title, caption, R.drawable.ic_tile_settings) { startActivity(intent) }
+        )
+    }
+
     /** Settings > Advanced: the developer tools, kept out of the main Settings list. */
     private fun buildAdvancedScreen(): View = settingsListPage(
         title = getString(R.string.settings_advanced),
@@ -2654,6 +2676,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
                 ) {
                     startActivity(dev.autobridge.library.StorageSettingsActivity.intent(this))
                 },
+                *duoScreenEntry().toTypedArray(),
                 settingsEntry(
                     getString(R.string.bypass_setting_title),
                     getString(
@@ -2682,38 +2705,100 @@ class MainActivity : androidx.activity.ComponentActivity() {
         subtitle = "AutoBridge ${BuildConfig.VERSION_NAME}",
         back = { goBack() },
         groups = listOf(
-            SettingsGroup("", listOf(
-                settingsEntry(
+            SettingsGroup("", buildList {
+                add(settingsEntry(
                     getString(R.string.about_support),
                     getString(R.string.about_support_caption),
                     R.drawable.ic_tile_favorite
                 ) {
                     openExternalUrl(SUPPORT_URL)
-                },
-                settingsEntry(
+                })
+                // PromptPay donate QR. Off-store payment prompts breach Google Play policy, so the
+                // row only exists on the sideload flavors (personal/lab), never on `safe`.
+                if (BuildConfig.AUTOBRIDGE_MODE != "SAFE") {
+                    add(settingsEntry(
+                        getString(R.string.about_promptpay),
+                        getString(R.string.about_promptpay_caption),
+                        R.drawable.ic_tile_favorite
+                    ) {
+                        showPromptPayDialog()
+                    })
+                }
+                add(settingsEntry(
                     getString(R.string.about_licenses),
                     getString(R.string.about_licenses_caption),
                     R.drawable.ic_tile_folder
                 ) {
                     showOpenSourceLicenses()
-                },
-                settingsEntry(
+                })
+                add(settingsEntry(
                     getString(R.string.about_github),
                     "github.com/guitar-dev-io/autobridge",
                     R.drawable.ic_tile_web
                 ) {
                     openExternalUrl(GITHUB_URL)
-                },
-                settingsEntry(
+                })
+                add(settingsEntry(
+                    getString(R.string.about_check_update),
+                    updateCheckCaption(),
+                    R.drawable.ic_tile_remote
+                ) {
+                    checkForUpdates()
+                })
+                add(settingsEntry(
                     getString(R.string.about_version),
                     "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}) · ${BuildConfig.AUTOBRIDGE_MODE.lowercase()}",
                     R.drawable.ic_tile_settings
                 ) {
-                    Toast.makeText(this, "AutoBridge ${BuildConfig.VERSION_NAME}", Toast.LENGTH_SHORT).show()
-                }
-            ))
+                    Toast.makeText(this@MainActivity, "AutoBridge ${BuildConfig.VERSION_NAME}", Toast.LENGTH_SHORT).show()
+                })
+                add(settingsEntry(
+                    getString(R.string.about_credits),
+                    getString(R.string.about_credits_caption),
+                    R.drawable.ic_tile_folder
+                ) {
+                    showCreditsDialog()
+                })
+                add(settingsEntry(
+                    getString(R.string.about_developer),
+                    getString(R.string.about_developer_caption),
+                    R.drawable.ic_tile_favorite
+                ) {
+                    Toast.makeText(this@MainActivity, getString(R.string.about_developer_caption), Toast.LENGTH_SHORT).show()
+                })
+            })
         )
     )
+
+    /** Settings &gt; About: full attribution for the open-source and third-party sources. */
+    private fun showCreditsDialog() {
+        android.app.AlertDialog.Builder(this)
+            .setTitle(getString(R.string.about_credits_title))
+            .setMessage(getString(R.string.about_credits_body))
+            .setPositiveButton(getString(R.string.about_credits_close), null)
+            .show()
+    }
+
+    /**
+     * PromptPay donate QR. The image is a bundled drawable (never fetched over the network, so it
+     * cannot be swapped out from under the user). Only reachable on the sideload flavors — the
+     * About row that opens it is gated out of `safe` to stay within Google Play's payment policy.
+     */
+    private fun showPromptPayDialog() {
+        val image = ImageView(this).apply {
+            setImageResource(R.drawable.promptpay_qr)
+            adjustViewBounds = true
+            val pad = (24 * resources.displayMetrics.density).toInt()
+            setPadding(pad, pad, pad, pad)
+            contentDescription = getString(R.string.about_promptpay_title)
+        }
+        android.app.AlertDialog.Builder(this)
+            .setTitle(getString(R.string.about_promptpay_title))
+            .setMessage(getString(R.string.about_promptpay_message))
+            .setView(image)
+            .setPositiveButton(getString(R.string.about_promptpay_close), null)
+            .show()
+    }
 
     private fun openExternalUrl(url: String) {
         val opened = runCatching {
@@ -2723,6 +2808,78 @@ class MainActivity : androidx.activity.ComponentActivity() {
         if (!opened) {
             Toast.makeText(this, getString(R.string.about_no_browser), Toast.LENGTH_SHORT).show()
         }
+    }
+
+    /**
+     * What the "Check for updates" row says before it is tapped: the previous check's answer, or
+     * an invitation when there has not been one. [UpdateChecker] never runs on its own, so until
+     * the user asks there is nothing to report.
+     */
+    private fun updateCheckCaption(): String {
+        val last = UpdateChecker.lastCheck(this) ?: return getString(R.string.about_check_update_caption)
+        val checkedAt = android.text.format.DateUtils.getRelativeTimeSpanString(
+            last.checkedAtEpochMillis,
+            System.currentTimeMillis(),
+            android.text.format.DateUtils.MINUTE_IN_MILLIS
+        )
+        return getString(
+            if (last.updateAvailable) R.string.about_check_update_caption_available
+            else R.string.about_check_update_caption_latest,
+            last.latestVersion,
+            checkedAt
+        )
+    }
+
+    private fun checkForUpdates() {
+        Toast.makeText(this, getString(R.string.about_check_update_checking), Toast.LENGTH_SHORT).show()
+        UpdateChecker.checkAsync(this) { result ->
+            // The check outlives a back press or a rotation, so the activity may be gone by now.
+            if (isFinishing || isDestroyed) return@checkAsync
+            when (result) {
+                is UpdateChecker.Result.Available -> showUpdateDialog(result)
+                is UpdateChecker.Result.UpToDate -> Toast.makeText(
+                    this,
+                    getString(R.string.about_check_update_up_to_date, result.latestVersion),
+                    Toast.LENGTH_SHORT
+                ).show()
+                is UpdateChecker.Result.Failed -> Toast.makeText(
+                    this,
+                    getString(R.string.about_check_update_failed, result.reason),
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+            // Redraw so the row caption carries what was just learned.
+            if (currentScreen == PhoneScreen.ABOUT) showPhoneScreen(PhoneScreen.ABOUT, force = true)
+        }
+    }
+
+    /**
+     * Offers the newer release without installing anything: the APK link goes to the browser and
+     * the package installer, which is where a decision to replace this app belongs.
+     */
+    private fun showUpdateDialog(update: UpdateChecker.Result.Available) {
+        val release = update.release
+        val notes = release.notes.lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .take(12)
+            .joinToString("\n")
+            .take(600)
+        val message = buildString {
+            append(getString(R.string.about_update_message, release.versionName, update.currentVersion))
+            if (notes.isNotEmpty()) append("\n\n").append(notes)
+        }
+        android.app.AlertDialog.Builder(this)
+            .setTitle(getString(R.string.about_update_title))
+            .setMessage(message)
+            .setNeutralButton(getString(R.string.about_update_release_page)) { _, _ ->
+                openExternalUrl(release.pageUrl)
+            }
+            .setNegativeButton(getString(R.string.about_update_later), null)
+            .setPositiveButton(getString(R.string.about_update_download)) { _, _ ->
+                openExternalUrl(release.apkUrl ?: release.pageUrl)
+            }
+            .show()
     }
 
     /**

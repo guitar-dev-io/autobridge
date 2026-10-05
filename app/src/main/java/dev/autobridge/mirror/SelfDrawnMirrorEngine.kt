@@ -481,7 +481,7 @@ class SelfDrawnMirrorEngine(
 
     /** Keeps this renderer independent from the coordinator's lock/logging implementation. */
     private object StructuredLogBridge {
-        fun info(message: String) = dev.autobridge.display.StructuredLog.i(TAG, message)
-        fun warn(message: String) = dev.autobridge.display.StructuredLog.w(TAG, message)
+        fun info(message: String) = dev.autobridge.logging.StructuredLog.i(TAG, message)
+        fun warn(message: String) = dev.autobridge.logging.StructuredLog.w(TAG, message)
     }
 }

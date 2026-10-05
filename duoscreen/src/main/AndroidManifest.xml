@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+
+        <!-- Duo Screen: split the car display across 2-3 panes, each running a different phone
+             app, via privileged Shizuku ops (VirtualDisplay + shell "am start" targeted at a
+             display id, plus displayId-aware touch injection). A second, separate CarAppService
+             rather than a Screen inside AutoBridgeCarAppService's existing session, per the
+             feature spec: it keeps this experimental, policy-breaking surface fully isolated from
+             the template route that ships everywhere. Android Auto lists it as its own launcher
+             entry, so it carries its own label to stay distinguishable from the main AutoBridge
+             entry.
+
+             Declared here rather than in :app because these components, their label and their
+             icon all belong to this module; merging only happens for the flavors that depend on
+             it, which is the gating this feature needs. -->
+        <service android:name="dev.autobridge.duoscreen.car.DuoScreenCarAppService"
+            android:exported="true"
+            android:label="Bridge Duo"
+            android:icon="@mipmap/ic_duoscreen_launcher">
+            <intent-filter>
+                <action android:name="androidx.car.app.CarAppService" />
+                <category android:name="androidx.car.app.category.NAVIGATION" />
+            </intent-filter>
+        </service>
+
+        <!-- Development harness for the Duo Screen pane pipeline. exported, because shell is not
+             granted START_ANY_ACTIVITY on this ROM, so `adb shell am start` cannot reach it
+             otherwise; it reads nothing from the intent and only renders its own surface, so the
+             exposure is a blank screen. Removed once DuoScreenScreen has been exercised against a
+             real car Surface. -->
+        <activity android:name="dev.autobridge.duoscreen.phone.DuoScreenSpikeActivity"
+            android:exported="true"
+            android:label="Duo Screen spike"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|density|uiMode" />
+    </application>
+</manifest>

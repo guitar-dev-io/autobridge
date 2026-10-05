@@ -1,10 +1,10 @@
 # Home sections and IPTV
 
-Updated: 2026-09-29
+Updated: 2026-10-04
 
 The home grid on the phone and on Android Auto now follows the
 [Fermata-Xtream](https://github.com/malebuffy/Fermata-Xtream) launcher layout: TV, Radio, Web
-browser, Youtube, YouTube Music, YouTube Kids, Folders, Favorites, Playlists, Gallery, followed by
+browser, Youtube, YouTube Music, , Folders, Favorites, Playlists, Gallery, followed by
 the AutoBridge-specific Mirror, Apps, Remote and Settings tiles.
 
 This is an independent implementation. No Fermata or Fermata-Xtream source, asset or resource was
@@ -28,7 +28,7 @@ Head units cap grid items, so the car dashboard asks `ConstraintManager` for
 | Type | Fetched from | Notes |
 |---|---|---|
 | `XTREAM` | `player_api.php` | Live channels, movies, series; falls back to `get.php` m3u_plus when the API is missing. |
-| `M3U` | Playlist URL | `#EXTM3U` / `#EXTINF` with `group-title`, `tvg-logo`, `tvg-name`, plus `#EXTGRP`. |
+| `M3U` | Playlist URL | `#EXTM3U` / `#EXTINF` with `group-title`, a logo attribute, `tvg-name`, plus `#EXTGRP` and `#EXTIMG`. |
 
 - `XtreamCredentials` accepts a bare portal, a full `player_api.php` link, or a `get.php` playlist
   link, and builds the live/VOD/series/catch-up URLs. It is pure string work and unit-tested.
@@ -43,6 +43,10 @@ Head units cap grid items, so the car dashboard asks `ConstraintManager` for
   stream URL so a replay never reloads the catalog, plus how that URL has to be opened.
 - `IptvPlaylistConventions` reads the things community playlists do that the `#EXTM3U` format says
   nothing about; see [Public playlist conventions](#public-playlist-conventions).
+- `IptvLogos` decides where a channel logo comes from and what makes its address usable; see
+  [Channel logos](#channel-logos).
+- `StreamPing` answers whether a channel address responds, and how fast; see
+  [Checking a channel](#checking-a-channel).
 - `IptvDirectory` is the built-in list of public playlist addresses offered in the picker.
 
 Radio sources keep live entries only. An Xtream portal serves TV and radio from one playlist, so
@@ -59,7 +63,7 @@ the rest are one tap away in the "Public lists" picker instead of a URL typed on
 | Section | List | Default | Address |
 |---|---|---|---|
 | TV | Free-TV | yes | `https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8` |
-| TV | iptv-org · Thailand | yes | `https://iptv-org.github.io/iptv/countries/th.m3u` |
+| TV | Thai (dearbulut) | yes | `https://dearbulut.github.io/iptv/playlists/language/tha.m3u` |
 | TV | iptv-org · All countries | no | `https://iptv-org.github.io/iptv/index.m3u` |
 | Radio | radio-browser · Thailand | yes | `https://de1.api.radio-browser.info/m3u/stations/bycountry/thailand` |
 | Radio | radio-browser · Top voted | no | `https://de1.api.radio-browser.info/m3u/stations/topvote/100` |
@@ -106,6 +110,103 @@ string work, so both are unit-tested:
 A long list is also honest about what it is showing: the phone caps a category at 300 rows, so when
 there are more the subtitle says "showing first 300, search to narrow" rather than printing the full
 count above a truncated list.
+
+### Channel logos
+
+A logo is the fastest thing to recognise on a head unit, so the one the playlist already ships is
+what the rows show — on both surfaces, and with no image dependency added (`ImageLoader`, see
+[`PHONE_UI.md`](PHONE_UI.md#artwork)).
+
+`IptvLogos` is the small amount of knowledge that makes those addresses work. It is pure string
+work and unit-tested (`IptvLogoTest`):
+
+- **The attribute is spelled several ways.** `tvg-logo` is the convention, but panel generators
+  emit `logo`, `url-logo`, `tvg-logo-small` and `tvg-icon`, and some lists put the address on its
+  own `#EXTIMG:` line. The first one present wins, canonical name first.
+- **The address comes in three shapes.** Absolute is used as-is; protocol-relative (`//cdn/x.png`)
+  takes https; relative (`/logos/x.png`, `logos/x.png`) is resolved against the playlist or portal
+  URL, which is the only thing that can resolve it. A `data:`, `file:` or `ftp:` logo is dropped
+  rather than guessed at, because the loader behind the rows only speaks http(s), and a `null`,
+  `n/a` or `-` value is a generator saying "no logo".
+- Xtream's `stream_icon`/`cover` fields go through the same resolution against the portal URL.
+
+`IptvHistoryStore` stores the logo with the entry, so a recently-played row and a favourite look
+like the row they were played from. An item written by an older version has none and falls back to
+its accent initial, as every row without a logo does.
+
+On the head unit the constraint is different, and `CarChannelLogos` owns it. A list row accepts
+only `TYPE_BITMAP`/`TYPE_RESOURCE` (`TYPE_URI` is allowed solely in the templates that document
+it), so the host never fetches a logo itself: every pixel travels inside the template, and a
+binder transaction is capped at about 1 MB. So a logo is scaled to 72px on its long edge
+(`IMAGE_TYPE_SMALL` targets an 88 × 88 dp box and the host scales anyway), and at most 36 rows of
+one template carry an image — which puts the logos on the top of a page, the rows a driver is
+looking at. Logos that arrive from the network repaint the screen once per batch rather than once
+each, because a host rejects templates pushed in a tight loop.
+
+### Checking a channel
+
+A public playlist is a list of addresses, not a list of working channels: some share of any list is
+retired, geo-blocked, or behind a token that expired. Finding that out from a player that spins is
+bad on a phone and worse while driving, so a channel can be checked first. `StreamPing` does it,
+and the row then reads `142 ms`, `HTTP 403` or `No answer`.
+
+It is deliberately not ICMP — an app cannot open a raw socket without root, and an echo reply from
+a CDN edge says nothing about the stream behind it:
+
+| Address | Probe |
+|---|---|
+| `http(s)` | One `GET` with `Range: bytes=0-1`; the status is read and the body never touched. This is the first thing the player would do, so a 403 on an expired token or a 404 on a retired channel is seen for what it is. |
+| `rtmp`, `rtsp` | A TCP connect to the host and port, which is all a non-HTTP endpoint tells us cheaply. |
+| `udp`, `rtp`, anything else | Reported as not checkable. Multicast answers no connection, and calling that "dead" would be a lie about a channel that may well play. |
+
+**A channel list checks itself when it opens.** Asking the user to press a button to find out
+whether a list works is asking them to do the app's job, and on a head unit it is asking a driver
+to press a button. So the automatic pass runs on arrival and says nothing at all — no toast, no
+spinner — and its entire output is the colour on the tiles and rows.
+
+- The automatic pass stops at 24 addresses, about two screenfuls; an explicit check covers 60 on
+  the phone and the whole visible page on the car. Probing a 2,000-channel list on the way past
+  would be a port scan of a dozen CDNs for answers nobody asked for.
+- The explicit action is "Check again" (a pill on the phone, the signal-bars header action on the
+  car), and it *forgets* the remembered answers first. Inside the five-minute window it would
+  otherwise hand back exactly what is already on screen and look like a button that does nothing.
+- **A run always ends, and nothing gates the next one.** The first version held a process-wide
+  "a run is in flight" flag and released it only when every probe had reported. That made one
+  stalled socket fatal: the pool is four threads, a host that resolves slowly or accepts and then
+  says nothing holds one for far longer than its timeouts suggest, and the run that never finished
+  left the flag held, so every later check in the process was refused. On a device that showed as
+  a page with no results whose "Check again" did nothing, until the app was restarted. Now a run
+  closes on a 30-second deadline whatever its stragglers are doing, addresses that did not answer
+  in time are recorded as "Timed out" rather than left blank, a straggler that lands later
+  overwrites its own entry with the truth, and concurrent runs simply skip an address another run
+  is already probing. Redirects are no longer followed either — a 3xx already counts as alive, and
+  a chain of token hosts was the one way a single probe could outlast every timeout set here.
+- Results are cached process-wide for 5 minutes, so re-rendering a page — or crossing from the
+  phone to the head unit — re-probes nothing. Both surfaces read that cache per row.
+- Four probes run at a time with 5-second timeouts, and progress is coalesced to one callback per
+  800 ms: 90 channels would otherwise repaint 90 times, and a head unit rejects templates pushed
+  that fast.
+- The phone writes a landing result **into the tile that is already on screen** rather than
+  re-rendering the page. Rebuilding it would scroll back to the top every time a batch arrives,
+  which is an unusable page while a check runs. The tile's status line carries
+  `R.id.autobridge_status_label` for exactly that.
+- A channel's long-press menu on the phone still checks one address and explains the answer in a
+  sentence rather than a row.
+
+**Colour is the output.** `StreamPing.tone` maps a result onto three readings and each surface
+supplies its own colours — `SIGNAL_GOOD` / `SIGNAL_SLOW` / `DANGER` on the phone,
+`CarColor.GREEN` / `YELLOW` / `RED` through a `ForegroundCarColorSpan` on the car, which is the
+only way an app colours anything inside a template it does not draw itself.
+
+| Reading | When | Why not red |
+|---|---|---|
+| Good | answered in 1 s or less | — |
+| Slow | answered, but took longer than a second | It works; it will just take its time starting. |
+| Slow | the address cannot be probed at all (multicast) | Neither an answer nor a refusal, so calling it dead would be a lie. |
+| Bad | refused (`HTTP 403`, `HTTP 404`) or silent | — |
+
+- Pure parts (`endpoint`, `classify`, `describe`, `tone`) are unit-tested in `StreamPingTest`; the
+  probe itself needs a server and belongs to the hardware pass.
 
 ### Cleartext
 
@@ -159,7 +260,8 @@ YouTube quality selection listed by the reference mod are not implemented.
 
 - `testSafeDebugUnitTest` / `testPersonalDebugUnitTest` / `testLabDebugUnitTest`: 25
   `IptvParsingTest` cases pass, 10 of them over the public lists, the Free-TV conventions and the
-  default-seeding rule. The 5
+  default-seeding rule, plus 13 `IptvLogoTest` and 16 `StreamPingTest` cases over the logo shapes,
+  the ping classification and its three readings. The 5
   pre-existing `AppProfileRegressionTest`/`CoreRegressionTest` failures documented in
   [`IN_APP_MEDIA_PROTOTYPE.md`](IN_APP_MEDIA_PROTOTYPE.md) are unchanged.
 - `assembleSafeDebug` / `assemblePersonalDebug` / `assembleLabDebug` all succeed.
@@ -171,6 +273,12 @@ YouTube quality selection listed by the reference mod are not implemented.
 - The live Free-TV playlist was run through `M3uParser` + `IptvPlaylistConventions` on the JVM:
   2,080 channels, 97 groups, 140 watch pages routed to the browser, 457 rows given marker hints, no
   title emptied and no marker left behind. That is a parse-level check only.
-- Not yet verified on hardware: a real Xtream portal round trip (needs a paid account), catch-up,
+- Verified on hardware (Xiaomi 13T Pro, 2026-10-04): the phone channel grid over the iptv-org
+  Thailand list — logos drawn from the playlist, the automatic check running on arrival with no
+  tap, `88 ms` in green and `HTTP 404` in red on the tiles of a list that is largely retired, in
+  both portrait and landscape.
+- Not yet verified on hardware: channel logos and the ping check on a head unit (the car row
+  budget above is reasoned from the binder limit and the car-app constraints, not measured on a
+  car), and a real Xtream portal round trip (needs a paid account), catch-up,
   MediaStore behaviour across OEM devices, and how many of Free-TV's streams actually play from
   Thailand — a `Ⓖ` channel is geo-blocked by the broadcaster, which no client-side change fixes.

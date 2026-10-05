@@ -78,8 +78,10 @@ object OpusMtCatalog {
     const val APPROXIMATE_BYTES = 90L * 1024 * 1024
 
     /**
-     * Pairs with a widely mirrored ONNX export. English-centred, which is what the Opus-MT ONNX
-     * exports mostly are.
+     * Pairs with a published ONNX export under [OpusMtModel.ONNX_ORGANIZATION], checked against
+     * the Hugging Face listing. English-centred, which is what the Opus-MT ONNX exports mostly
+     * are. Note what is absent: there is no English-to-Thai, -Japanese, -Korean, -Polish or
+     * -Turkish Opus-MT model at all (Japanese exists only as the differently coded `en-jap`).
      */
     private val known: Set<String> = setOf(
         "en-de", "de-en",
@@ -91,22 +93,21 @@ object OpusMtCatalog {
         "en-zh", "zh-en",
         "en-ar", "ar-en",
         "en-hi", "hi-en",
-        "en-ja", "ja-en",
         "en-fi", "fi-en",
         "en-sv", "sv-en",
         "en-da", "da-en",
         "en-uk", "uk-en",
         "en-vi", "vi-en",
         "en-id", "id-en",
-        "en-he", "he-en",
-        "en-el", "el-en",
-        "en-ro", "ro-en",
         "en-cs", "cs-en",
         "en-hu", "hu-en",
-        "en-bg", "bg-en",
-        "en-et", "et-en",
-        "en-tr", "tr-en",
-        "pl-en", "pt-en", "ko-en", "th-en"
+        "en-af", "af-en",
+        "en-xh", "xh-en",
+        "en-ro",
+        "ja-en", "ko-en", "th-en", "pl-en", "tr-en", "et-en",
+        "de-es", "de-fr", "es-de", "es-fr", "es-it", "es-ru",
+        "fr-de", "fr-es", "fr-ro", "fr-ru", "it-es", "it-fr",
+        "ru-es", "ru-fr", "ru-uk", "uk-ru", "fi-de", "da-de", "nl-fr"
     )
 
     /**

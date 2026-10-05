@@ -400,6 +400,13 @@
 
     <!-- Entertainment screen ([EntertainmentActivity]): the parked-only content launcher. -->
     <string name="ent_playback_failed">Cannot play: %1$s — check the URL or pick another source</string>
+    <!-- PlayerActivity: send-to-car button results. -->
+    <string name="player_send_car_nothing">Nothing is playing to send</string>
+    <string name="player_send_car_opened">Sent to the car</string>
+    <string name="player_send_car_pending">Saved — it will open when the car connects</string>
+    <string name="player_send_car_refused">This source cannot be sent to the car</string>
+    <string name="player_exit_fullscreen">Exit fullscreen</string>
+    <string name="player_on_car">Playing on the car screen</string>
     <string name="ent_hint_web">Search the web on the car screen, or paste an HTTPS URL</string>
     <string name="ent_hint_youtube">Search YouTube, or paste an HTTPS URL</string>
     <string name="ent_btn_web">Web</string>
@@ -471,9 +478,33 @@
     <string name="advanced_debug_subtitle">INTERNAL STATE</string>
     <string name="about_support">Support AutoBridge</string>
     <string name="about_support_caption">Buy me a coffee</string>
+    <string name="about_promptpay">Buy me a coffee (PromptPay)</string>
+    <string name="about_promptpay_caption">Scan the QR to send a little something</string>
+    <string name="about_promptpay_title">Thanks for the coffee</string>
+    <string name="about_promptpay_message">Scan this PromptPay QR with your banking app.</string>
+    <string name="about_promptpay_close">Close</string>
+    <string name="about_developer">Developed by</string>
+    <string name="about_developer_caption">Guitar · Arnuwat Tiamrat · Thailand</string>
+    <string name="about_credits">Credits &amp; attributions</string>
+    <string name="about_credits_caption">Open-source libraries and content sources</string>
+    <string name="about_credits_title">Credits &amp; attributions</string>
+    <string name="about_credits_close">Close</string>
+    <string name="about_credits_body">AutoBridge\n Developed by Guitar (Arnuwat Tiamrat), Thailand.\n\nBuilt with these open-source and third-party components:\n\n• AndroidX &amp; Jetpack Compose — Google (Apache-2.0)\n• AndroidX Car App Library — Google (Apache-2.0)\n• Media3 / ExoPlayer — Google (Apache-2.0)\n• Kotlin &amp; kotlinx.coroutines — JetBrains (Apache-2.0)\n• Shizuku API — RikkaApps (Apache-2.0)\n• ML Kit Translate — Google\n• ONNX Runtime — Microsoft (MIT), with Opus-MT (Marian) models by the Language Technology Research Group, University of Helsinki (CC-BY-4.0)\n• AndroidX WebKit, Browser (Custom Tabs) — Google (Apache-2.0)\n• Play Services OSS Licenses — Google\n\nData &amp; content sources:\n• Weather by Open-Meteo (CC-BY-4.0), no API key\n• SponsorBlock community data for YouTube segment skipping\n• IPTV / streaming links are user-provided; AutoBridge hosts no content\n\nInspiration &amp; references (GPL-3.0):\n• Fermata Media Player — Andrey Pavlenko · github.com/AndreyPavlenko/Fermata\n• Fermata-Xtream — malebuffy · github.com/malebuffy/Fermata-Xtream\n• AABrowser — kododake · github.com/kododake/AABrowser\n\nTap \"Open-source licenses\" for the full third-party notices.\n\nAndroid Auto is a trademark of Google LLC. This is an independent project and is not affiliated with or endorsed by Google.</string>
     <string name="about_licenses">Open-source licenses</string>
     <string name="about_licenses_caption">View third-party notices</string>
     <string name="about_github">GitHub</string>
+    <string name="about_check_update">Check for updates</string>
+    <string name="about_check_update_caption">Compare this build with the latest GitHub release</string>
+    <string name="about_check_update_caption_latest">Latest release %1$s · checked %2$s</string>
+    <string name="about_check_update_caption_available">Update %1$s available · checked %2$s</string>
+    <string name="about_check_update_checking">Checking for updates…</string>
+    <string name="about_check_update_up_to_date">You are on the latest release (%1$s)</string>
+    <string name="about_check_update_failed">Could not check for updates: %1$s</string>
+    <string name="about_update_title">Update available</string>
+    <string name="about_update_message">%1$s has been released. This build is %2$s.</string>
+    <string name="about_update_download">Download APK</string>
+    <string name="about_update_release_page">Release page</string>
+    <string name="about_update_later">Later</string>
     <string name="about_version">Version</string>
     <string name="about_no_browser">No browser available</string>
     <string name="home_tagline">Your Car. Smarter.</string>
@@ -701,6 +732,12 @@
     <string name="car_iptv_no_episodes">No episodes available</string>
     <string name="car_iptv_no_stream">This entry has no stream address</string>
     <string name="car_iptv_connecting">Connecting to the player…</string>
+    <string name="car_iptv_ping_ms">%1$d ms</string>
+    <string name="car_iptv_ping_http">HTTP %1$d</string>
+    <string name="car_iptv_ping_dead">No answer</string>
+    <string name="car_iptv_ping_unsupported">Cannot be checked</string>
+    <string name="car_iptv_ping_started">Checking %1$d channels…</string>
+    <string name="car_iptv_ping_done">%1$d of %2$d answered</string>
     <plurals name="car_iptv_items">
         <item quantity="one">%1$d item</item>
         <item quantity="other">%1$d items</item>
@@ -975,6 +1012,18 @@
     <string name="car_home_more">More</string>
     <string name="car_home_speed_safety_enabled">Speed safety enabled</string>
     <string name="car_home_speed_permission_denied">Speed permission denied</string>
+    <!-- Home dashboard sections, drawn by the app on the Android Auto surface. -->
+    <string name="car_home_continue_watching">Continue Watching</string>
+    <string name="car_home_quick_access">Quick Access</string>
+    <string name="car_home_recently_sent">Recently Sent</string>
+    <string name="car_home_queue">Queue</string>
+    <string name="car_home_sent_from_phone">from phone</string>
+    <string name="car_queue_title">Queue</string>
+    <string name="car_queue_empty">Nothing is queued yet</string>
+    <string name="car_time_just_now">just now</string>
+    <string name="car_time_minutes_ago">%1$d min ago</string>
+    <string name="car_time_hours_ago">%1$d hr ago</string>
+    <string name="car_time_days_ago">%1$d d ago</string>
 
     <!-- Home sections, shared by the phone launcher and the car dashboard ([HomeSection]). -->
     <string name="section_tv">TV</string>
@@ -988,7 +1037,7 @@
     <string name="section_youtube_music">YouTube Music</string>
     <string name="section_youtube_music_caption">Streaming music</string>
     <string name="section_streaming">Streaming</string>
-    <string name="section_streaming_caption">Kids, TikTok, Twitch &amp; more</string>
+    <string name="section_streaming_caption">TikTok, Twitch &amp; more</string>
     <string name="section_folders">Folders</string>
     <string name="section_folders_caption">On-device media</string>
     <string name="section_favorites">Favorites</string>

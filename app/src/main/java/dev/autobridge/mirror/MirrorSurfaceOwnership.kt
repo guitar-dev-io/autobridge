@@ -18,7 +18,7 @@ object MirrorSurfaceOwnership {
         val previous = owner
         owner = candidate
         if (previous !== candidate) {
-            dev.autobridge.display.StructuredLog.i(
+            dev.autobridge.logging.StructuredLog.i(
                 "MirrorSurface",
                 "claim ${candidate.javaClass.simpleName} (was ${previous?.javaClass?.simpleName ?: "none"})"
             )

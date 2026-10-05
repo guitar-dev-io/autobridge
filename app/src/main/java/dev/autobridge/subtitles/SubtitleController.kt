@@ -1,7 +1,7 @@
 package dev.autobridge.subtitles
 
 import android.content.Context
-import dev.autobridge.display.StructuredLog
+import dev.autobridge.logging.StructuredLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -35,16 +35,30 @@ class SubtitleController(
     /** The engine currently bound, kept so an unchanged pair reuses it instead of rebuilding. */
     private var activeTranslator: SubtitleTranslator? = null
 
-    private val settingsListener: () -> Unit = { syncEngine() }
+    private val settingsListener: () -> Unit = { safeSyncEngine() }
 
     /** Starts listening to settings and binds the engine the current settings ask for. */
     fun start() {
         SubtitleSettings.addListener(settingsListener)
-        syncEngine()
+        safeSyncEngine()
+    }
+
+    /** [syncEngine] with failures logged; subtitles go untranslated rather than taking the app down. */
+    private fun safeSyncEngine() {
+        runCatching { syncEngine() }.onFailure { error ->
+            StructuredLog.w("SUBTITLE", "engine bind failed: ${error.message}")
+            runCatching { pipeline.bind(null, null) }
+            activeTranslator = null
+        }
     }
 
     /** One cue group off the text track; an empty group is the gap between two lines. */
-    fun onCues(cues: List<CharSequence?>) = pipeline.onCues(cues)
+    fun onCues(cues: List<CharSequence?>) {
+        // Runs on the player's main thread: a bug in translation must cost the subtitle line,
+        // never the playback service.
+        runCatching { pipeline.onCues(cues) }
+            .onFailure { StructuredLog.w("SUBTITLE", "cue handling failed: ${it.message}") }
+    }
 
     /** Clears the line without dropping the engine; used when playback stops or the item changes. */
     fun clear() = pipeline.clear()

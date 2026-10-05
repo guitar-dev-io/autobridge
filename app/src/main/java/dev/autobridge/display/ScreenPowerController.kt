@@ -5,9 +5,10 @@ import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
 import android.util.Log
-import dev.autobridge.input.ShizukuInputBackend
 import dev.autobridge.core.model.Feature
 import dev.autobridge.core.policy.FeaturePolicy
+import dev.autobridge.input.ShizukuInputBackend
+import dev.autobridge.logging.StructuredLog
 import dev.autobridge.mirror.MirrorCoordinator
 import dev.autobridge.settings.AutoDimDelay
 import dev.autobridge.settings.MirrorSettings

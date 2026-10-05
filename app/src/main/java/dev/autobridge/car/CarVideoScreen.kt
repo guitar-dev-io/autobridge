@@ -23,9 +23,10 @@ import androidx.media3.common.VideoSize
 import dev.autobridge.R
 import dev.autobridge.core.model.Feature
 import dev.autobridge.core.policy.FeaturePolicy
-import dev.autobridge.display.StructuredLog
+import dev.autobridge.logging.StructuredLog
 import dev.autobridge.media.MediaPlaybackClient
 import dev.autobridge.media.VideoOutputGeometry
+import dev.autobridge.media.VideoSurfaceArbiter
 import dev.autobridge.mirror.MirrorSurfaceOwnership
 import dev.autobridge.mirror.ProjectionService
 import dev.autobridge.safety.ParkingStateStore
@@ -137,9 +138,25 @@ class CarVideoScreen(
         // Published after the surface, never before: the player letterboxes into this size, and the
         // renderer discards an output resolution that arrives while it still has no surface.
         VideoOutputGeometry.set(surfaceWidth, surfaceHeight)
+        // The car now owns the shared player's video output; the phone player lets go of it.
+        VideoSurfaceArbiter.claimForCar(reassert)
         if (!started) {
             started = true
-            media.play(uri, title)
+            // Returning to TV (a fresh screen instance) while the shared session is still on the
+            // same channel: this instance has started=false, but the player already holds the
+            // item. Re-issuing play() would restart it; instead bind the surface to what is
+            // already playing and nudge a re-render, so the picture comes back rather than leaving
+            // audio-only. A new channel (nothing loaded, or a different URI) still starts fresh.
+            if (isSessionAlreadyOnThisChannel(player)) {
+                StructuredLog.i("CAR_VIDEO", "adopting the session already on this channel; re-rendering onto the surface")
+                nudgeReRender(player)
+                if (resumeWhenSurfaceReturns) {
+                    resumeWhenSurfaceReturns = false
+                    media.resume()
+                }
+            } else {
+                media.play(uri, title)
+            }
         } else if (resumeWhenSurfaceReturns) {
             resumeWhenSurfaceReturns = false
             // A live channel has moved on while the surface was gone. Resuming where it stopped
@@ -148,13 +165,64 @@ class CarVideoScreen(
                 player.isCommandAvailable(Player.COMMAND_SEEK_TO_DEFAULT_POSITION)
             ) {
                 player.seekToDefaultPosition()
+            } else {
+                nudgeReRender(player)
             }
             StructuredLog.i("CAR_VIDEO", "resuming playback after the surface came back")
             media.resume()
+        } else {
+            // Surface (re)bound to a player that is already playing and was not paused by us -
+            // force a frame onto the new surface so a mid-playback re-attach is not audio-only.
+            nudgeReRender(player)
         }
     }
 
+    /**
+     * True when the shared session already has this screen's channel loaded, so a new screen
+     * instance should adopt it rather than restart it. Compared on the current item's source URI.
+     */
+    private fun isSessionAlreadyOnThisChannel(player: Player): Boolean {
+        if (player.mediaItemCount == 0) return false
+        val current = player.currentMediaItem?.localConfiguration?.uri?.toString()
+            ?: player.currentMediaItem?.requestMetadata?.mediaUri?.toString()
+            ?: return false
+        return current == uri
+    }
+
+    /**
+     * Makes the renderer flush the current frame onto a surface that was just set under an
+     * already-playing player. Setting a video surface mid-playback does not by itself repaint, so
+     * live channels rejoin the live edge and everything else does a zero-delta seek.
+     */
+    private fun nudgeReRender(player: Player) {
+        if (player.isCurrentMediaItemLive &&
+            player.isCommandAvailable(Player.COMMAND_SEEK_TO_DEFAULT_POSITION)
+        ) {
+            player.seekToDefaultPosition()
+        } else if (player.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)) {
+            player.seekTo(player.currentPosition)
+        }
+    }
+
+    /**
+     * Re-binds the car surface and repaints. Run by [VideoSurfaceArbiter] after the phone has
+     * dropped its binding, so a phone clear that lands late cannot leave the car audio-only.
+     */
+    private val reassert: () -> Unit = reassert@{
+        val output = surface ?: return@reassert
+        val player = media.player ?: return@reassert
+        if (!active || !output.isValid || !MirrorSurfaceOwnership.isOwner(this)) return@reassert
+        if (!player.isCommandAvailable(Player.COMMAND_SET_VIDEO_SURFACE)) return@reassert
+        player.setVideoSurface(output)
+        VideoOutputGeometry.set(surfaceWidth, surfaceHeight)
+        if (player.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)) {
+            player.seekTo(player.currentPosition)
+        }
+        StructuredLog.i("CAR_VIDEO", "surface re-asserted after the phone let go")
+    }
+
     private fun detach() {
+        VideoSurfaceArbiter.releaseForCar(reassert)
         val output = surface ?: return
         VideoOutputGeometry.clear()
         media.player?.let { player ->
@@ -178,6 +246,12 @@ class CarVideoScreen(
 
     override fun onSurfaceDestroyed(surfaceContainer: SurfaceContainer) {
         if (!MirrorSurfaceOwnership.isOwner(this)) return
+        // A destroy event for a surface this screen never attached to is a stale delivery from the
+        // surface this screen's predecessor just gave up - the two SurfaceCallback swaps that happen
+        // when one channel screen is popped and another pushed are not synchronized with the host's
+        // own async surface teardown. Acting on it here would pause the shared player right as the
+        // new channel starts, which looks like the channel switch silently did nothing.
+        if (surfaceContainer.surface !== surface) return
         // The host takes the surface away on transient events - the phone display going to sleep is
         // one of them - and hands it back a moment later. Pausing without recording why left TV
         // playback stopped for good: the car screen kept the last frame and only the Play button
@@ -188,11 +262,30 @@ class CarVideoScreen(
     }
 
     override fun onGetTemplate(): Template {
+        // The "park to watch" message is not an error - it clears itself once the car stops - so
+        // it gets no retry action, unlike a real setup/playback failure.
+        val retryable = failure != null || playbackFailure != null
         val message = failure ?: playbackFailure
             ?: if (!allowed()) carContext.getString(R.string.car_video_park_to_watch) else null
         if (message != null) {
-            return PaneTemplate.Builder(Pane.Builder().addRow(Row.Builder().setTitle(title).addText(message).build()).build())
-                .setHeader(Header.Builder().setTitle(carContext.getString(R.string.car_video_title)).setStartHeaderAction(Action.BACK).build()).build()
+            val pane = Pane.Builder().addRow(Row.Builder().setTitle(title).addText(message).build())
+            val header = Header.Builder()
+                .setTitle(carContext.getString(R.string.car_video_title))
+                .setStartHeaderAction(Action.BACK)
+                .apply {
+                    // Icon-only, matching CarWeatherScreen's header refresh action rather than a
+                    // full-width Pane button.
+                    if (retryable) {
+                        addEndHeaderAction(
+                            Action.Builder()
+                                .setIcon(CarIcons.of(carContext, CarIcons.REFRESH))
+                                .setOnClickListener { retry() }
+                                .build()
+                        )
+                    }
+                }
+                .build()
+            return PaneTemplate.Builder(pane.build()).setHeader(header).build()
         }
         val player = media.player
         return NavigationTemplate.Builder()
@@ -213,6 +306,41 @@ class CarVideoScreen(
                 .addAction(control(android.R.drawable.ic_media_ff, carContext.getString(R.string.car_video_forward_10), player?.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM) == true, mapAction = true) { seek(10_000L) })
                 .build())
             .build()
+    }
+
+    /**
+     * Re-attempts playback after a setup or playback failure. A playback failure leaves the
+     * player's current item in place with its error still latched, so attach()'s usual
+     * "already on this channel" adoption would just re-render the broken state - the retry has to
+     * re-issue play() itself rather than go through that path.
+     */
+    private fun retry() {
+        if (playbackFailure != null) {
+            playbackFailure = null
+            if (media.isConnected) {
+                started = true
+                media.play(uri, title)
+            } else {
+                started = false
+            }
+            invalidate()
+            return
+        }
+        failure = null
+        started = false
+        if (media.isConnected) {
+            attach()
+        } else {
+            media.connect(onConnected = {
+                media.player?.addListener(listener)
+                attach()
+                invalidate()
+            }, onError = {
+                failure = carContext.getString(R.string.car_video_player_failed)
+                invalidate()
+            })
+        }
+        invalidate()
     }
 
     private fun seek(delta: Long) {

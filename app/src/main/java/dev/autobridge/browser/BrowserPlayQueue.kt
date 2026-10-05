@@ -36,8 +36,19 @@ object BrowserPlayQueue {
     private const val PREFS_NAME = "autobridge_browser"
     private const val KEY_ITEMS = "play_queue"
 
-    /** A queued page. [title] is for display only and may be blank. */
-    data class Item(val url: String, val title: String = "", val addedAtMs: Long = 0L)
+    /**
+     * A queued page. [title] is for display only and may be blank.
+     *
+     * [durationMs] is 0 unless whoever queued the item already knew a length - queuing an address
+     * tells you nothing about the media behind it, and the car rows show the source instead of a
+     * fabricated time when it is missing.
+     */
+    data class Item(
+        val url: String,
+        val title: String = "",
+        val addedAtMs: Long = 0L,
+        val durationMs: Long = 0L
+    )
 
     // ------------------------------------------------------------------------------- pure rules
 
@@ -61,6 +72,7 @@ object BrowserPlayQueue {
                     .put("url", item.url)
                     .put("title", item.title)
                     .put("addedAt", item.addedAtMs)
+                    .put("durationMs", item.durationMs)
             )
         }
         return array.toString()
@@ -79,7 +91,7 @@ object BrowserPlayQueue {
             (0 until array.length()).mapNotNull { index ->
                 val obj = array.optJSONObject(index) ?: return@mapNotNull null
                 val url = ContentAddress.https(obj.optString("url")) ?: return@mapNotNull null
-                Item(url, obj.optString("title"), obj.optLong("addedAt"))
+                Item(url, obj.optString("title"), obj.optLong("addedAt"), obj.optLong("durationMs"))
             }
         }.getOrDefault(emptyList())
     }
@@ -96,11 +108,11 @@ object BrowserPlayQueue {
      * @return the queue's new length, or null when the URL is unusable or already queued, so the
      *   caller can say which of the two happened by checking the URL itself.
      */
-    fun add(context: Context, url: String, title: String = ""): Int? {
+    fun add(context: Context, url: String, title: String = "", durationMs: Long = 0L): Int? {
         val safe = ContentAddress.https(url) ?: return null
         val next = appended(
             items(context),
-            Item(safe, title.trim(), System.currentTimeMillis())
+            Item(safe, title.trim(), System.currentTimeMillis(), durationMs)
         ) ?: return null
         save(context, next)
         return next.size

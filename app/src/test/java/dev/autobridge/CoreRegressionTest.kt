@@ -9,7 +9,7 @@ import dev.autobridge.display.MirrorDiagnostics
 import dev.autobridge.display.OrientationMonitor
 import dev.autobridge.display.PerAppDisplayController
 import dev.autobridge.display.ScreenOffController
-import dev.autobridge.display.StructuredLog
+import dev.autobridge.logging.StructuredLog
 import dev.autobridge.display.SurfaceProfile
 import dev.autobridge.input.CoordinateMapper
 import dev.autobridge.input.DisplayProfile

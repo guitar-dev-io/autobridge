@@ -1,5 +1,6 @@
 package dev.autobridge.library
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.PictureInPictureParams
 import android.content.Context
@@ -15,7 +16,6 @@ import android.util.Rational
 import android.view.GestureDetector
 import android.view.Gravity
 import android.view.MotionEvent
-import android.view.SurfaceView
 import android.view.View
 import android.view.WindowManager
 import android.widget.FrameLayout
@@ -27,6 +27,11 @@ import androidx.media3.common.C
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.ui.AspectRatioFrameLayout
+import androidx.media3.ui.PlayerView
+import dev.autobridge.settings.AspectRatio
+import dev.autobridge.R
 import dev.autobridge.core.model.Feature
 import dev.autobridge.core.policy.FeaturePolicy
 import dev.autobridge.entertainment.ContentKind
@@ -40,6 +45,7 @@ import dev.autobridge.settings.PlayerDpi
 import dev.autobridge.settings.SplitLayout
 import dev.autobridge.settings.VideoSettings
 import dev.autobridge.subtitles.SubtitleHub
+import dev.autobridge.subtitles.SubtitleSettings
 import dev.autobridge.subtitles.SubtitleLine
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.dp
@@ -63,6 +69,9 @@ import kotlin.math.abs
  * because the settings screen is opened from this one's header and a value that only took effect
  * on the next channel would look broken.
  */
+// PlayerView's buffering, resize-mode, button-visibility and fullscreen-listener setters are
+// marked @UnstableApi in Media3; the opt-in is deliberate and covers this screen only.
+@androidx.annotation.OptIn(UnstableApi::class)
 class PlayerActivity : Activity() {
     companion object {
         const val EXTRA_URL = "dev.autobridge.extra.PLAYER_URL"
@@ -120,12 +129,20 @@ class PlayerActivity : Activity() {
     private lateinit var playback: MediaPlaybackClient
     private lateinit var bodyView: LinearLayout
     private lateinit var stage: FrameLayout
-    private lateinit var video: SurfaceView
+    private lateinit var video: PlayerView
     private lateinit var artworkPanel: View
     private lateinit var artworkImage: ImageView
     private lateinit var artworkGlyph: TextView
     private lateinit var notice: TextView
+    private lateinit var loading: android.widget.ProgressBar
     private lateinit var subtitleView: TextView
+
+    /** Floating "exit fullscreen" button, shown over the picture only while fullscreen. */
+    private var exitFullscreenButton: TextView? = null
+
+    /** Our own seek bar and transport; see [ownControlsVisible]. */
+    private var progressRow: View? = null
+    private var transportRow: View? = null
     private lateinit var toggle: TextView
     private lateinit var scrubber: SeekBar
     private lateinit var elapsed: TextView
@@ -141,6 +158,14 @@ class PlayerActivity : Activity() {
     private var failure: String? = null
     private var scrubbing = false
     private var surfaceAttached = false
+
+    /** Fullscreen moves the stage into a window-wide overlay and goes landscape. */
+    private var fullscreen = false
+    private var fullscreenOverlay: FrameLayout? = null
+    private var stageHomeParent: android.view.ViewGroup? = null
+    private var stageHomeIndex = 0
+    private var stageHomeParams: android.view.ViewGroup.LayoutParams? = null
+    private var orientationBeforeFullscreen = Configuration.ORIENTATION_PORTRAIT
 
     /** The settings the current view tree was built for; a change rebuilds it. */
     private var builtFor: LayoutSignature? = null
@@ -179,7 +204,13 @@ class PlayerActivity : Activity() {
         if (::subtitleView.isInitialized) {
             val text = line.displayText
             subtitleView.text = text
-            subtitleView.visibility = if (line.isBlank || text.isBlank()) View.GONE else View.VISIBLE
+            val showing = !(line.isBlank || text.isBlank())
+            subtitleView.visibility = if (showing) View.VISIBLE else View.GONE
+            // While our translated line is up, PlayerView's own subtitle line would be the same
+            // cue a second time; it comes back whenever ours has nothing to show.
+            if (::video.isInitialized) {
+                video.subtitleView?.visibility = if (showing) View.GONE else View.VISIBLE
+            }
         }
     }
     private val playerListener = object : Player.Listener {
@@ -216,6 +247,7 @@ class PlayerActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        releaseBack = dev.autobridge.ui.SystemBack.register(this) { goBack() }
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         playback = MediaPlaybackClient(this)
         setContentView(buildUi())
@@ -237,6 +269,20 @@ class PlayerActivity : Activity() {
             onError = { showNotice("Could not reach the player service.") }
         )
         ParkingStateStore.addListener(parkingListener)
+        dev.autobridge.media.VideoSurfaceArbiter.registerPhone(phoneOutput)
+    }
+
+    /** Hands the video output to the car and takes it back when the car is done with it. */
+    private val phoneOutput = object : dev.autobridge.media.VideoSurfaceArbiter.PhoneOutput {
+        override fun onCarClaimed() {
+            // Clear now, before the car re-asserts, so this view's binding cannot blank the car.
+            detachSurface()
+            if (::notice.isInitialized) render()
+        }
+
+        override fun onCarReleased() {
+            if (::notice.isInitialized && !isFinishing && !isDestroyed) render()
+        }
     }
 
     // ----- UI -----
@@ -261,10 +307,19 @@ class PlayerActivity : Activity() {
             title = title,
             subtitle = subtitleText.ifBlank { if (kind == ContentKind.AUDIO) "Audio" else "Video" },
             onBack = { finish() },
-            actions = listOf(
-                AutoBridgeDesign.HeaderAction("💬", { startActivity(SubtitleSettingsActivity.intent(this)) }),
-                AutoBridgeDesign.HeaderAction("⚙", { startActivity(VideoSettingsActivity.intent(this)) })
-            )
+            actions = buildList {
+                // Send-to-car and fullscreen only make sense for the picture, so audio skips both.
+                if (kind == ContentKind.VIDEO) {
+                    add(AutoBridgeDesign.HeaderAction("📺", { sendToCar() }))
+                    add(AutoBridgeDesign.HeaderAction(if (fullscreen) "🡼" else "⛶", { toggleFullscreen() }))
+                }
+                // The subtitle screen is only translation settings, so a build without the
+                // engines has nothing to show behind this button.
+                if (SubtitleSettings.isSupported) {
+                    add(AutoBridgeDesign.HeaderAction("💬", { startActivity(SubtitleSettingsActivity.intent(this@PlayerActivity)) }))
+                }
+                add(AutoBridgeDesign.HeaderAction("⚙", { startActivity(VideoSettingsActivity.intent(this@PlayerActivity)) }))
+            }
         )
         chrome += header
 
@@ -277,8 +332,25 @@ class PlayerActivity : Activity() {
             // when the view is built and changes with rotation and with picture-in-picture.
             addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> applyVideoGeometry() }
         }
-        attachChannelGesture(stage)
-        video = SurfaceView(this).apply { visibility = View.GONE }
+        // Media3's own PlayerView: it owns the surface lifecycle (re-binding when the surface is
+        // recreated), and its controller brings the quality / audio track / subtitle track / speed
+        // menu, a seek bar with the buffered range, and a buffering spinner.
+        video = PlayerView(this).apply {
+            visibility = View.GONE
+            setBackgroundColor(0xFF000000.toInt())
+            useController = true
+            controllerAutoShow = true
+            setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+            setShowSubtitleButton(true)
+            setShowNextButton(true)
+            setShowPreviousButton(true)
+            setShowFastForwardButton(true)
+            setShowRewindButton(true)
+            setFullscreenButtonClickListener { toggleFullscreen() }
+        }
+        // On the PlayerView itself: it consumes touches, so a listener on the stage behind it would
+        // never see a swipe.
+        attachChannelGesture(video)
         artworkPanel = buildArtworkPanel()
         notice = TextView(this).apply {
             textSize = scaledText(14f)
@@ -298,9 +370,40 @@ class PlayerActivity : Activity() {
             visibility = View.GONE
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
         }
+        loading = android.widget.ProgressBar(this).apply {
+            isIndeterminate = true
+            indeterminateTintList = android.content.res.ColorStateList.valueOf(accent)
+            visibility = View.GONE
+        }
         stage.addView(artworkPanel, FrameLayout.LayoutParams(-1, -1))
         stage.addView(video, FrameLayout.LayoutParams(-1, -1, Gravity.CENTER))
         stage.addView(notice, FrameLayout.LayoutParams(-1, -1))
+        // Not added to the stage for video: PlayerView draws its own buffering spinner, and two
+        // spinners on top of each other look broken. Kept as a view so setLoading stays harmless.
+        // Exit-fullscreen affordance, pinned top-right over the picture. Hidden by default and
+        // only shown while fullscreen, so there is always a visible way out without relying on the
+        // system Back gesture. Tapping the picture toggles it (see attachChannelGesture's host).
+        exitFullscreenButton = TextView(this).apply {
+            text = "✕"
+            textSize = scaledText(20f)
+            setTextColor(0xFFFFFFFF.toInt())
+            gravity = Gravity.CENTER
+            background = AutoBridgeDesign.surface(
+                this@PlayerActivity, 0x99000000.toInt(), 24
+            )
+            val pad = dp(10)
+            setPadding(pad, pad, pad, pad)
+            visibility = View.GONE
+            contentDescription = getString(R.string.player_exit_fullscreen)
+            setOnClickListener { toggleFullscreen() }
+        }
+        stage.addView(
+            exitFullscreenButton,
+            FrameLayout.LayoutParams(scaled(44), scaled(44), Gravity.TOP or Gravity.END).apply {
+                topMargin = dp(10)
+                marginEnd = dp(10)
+            }
+        )
         // On top of the picture, pinned to the bottom with a small inset so it does not touch the
         // rounded corners of the stage.
         stage.addView(
@@ -316,6 +419,8 @@ class PlayerActivity : Activity() {
         val transport = buildTransport()
         chrome += progress
         chrome += transport
+        progressRow = progress
+        transportRow = transport
 
         val split = VideoSettings.splitLayout(this)
         val queuePanel = if (split == SplitLayout.MAIN_ONLY) null else buildQueuePanel()
@@ -552,10 +657,11 @@ class PlayerActivity : Activity() {
                 }
             }
         })
-        target.setOnTouchListener { view, event ->
+        // The detector sees every event, but only a recognised channel gesture is consumed. DOWN and
+        // plain taps fall through to the PlayerView, which uses them to show and hide its controls.
+        target.setOnTouchListener { _, event ->
             val handled = detector.onTouchEvent(event)
-            if (event.actionMasked == MotionEvent.ACTION_UP) view.performClick()
-            handled
+            if (event.actionMasked == MotionEvent.ACTION_DOWN) false else handled
         }
     }
 
@@ -682,6 +788,128 @@ class PlayerActivity : Activity() {
     }
 
     /**
+     * Fullscreen, the way video libraries do it: the stage is lifted out of the page and placed in
+     * a black overlay that covers the whole window, then put back exactly where it was on exit.
+     *
+     * Resizing the stage in place cannot work here: the page body lives in a ScrollView, where
+     * MATCH_PARENT and weights just wrap content, and the page root keeps its system-bar padding.
+     * Moving the stage recreates the SurfaceView's surface, which the holder callback re-attaches
+     * (with a re-render nudge), so the picture comes straight back.
+     */
+    private fun toggleFullscreen() {
+        if (kind != ContentKind.VIDEO) return
+        if (fullscreen) exitFullscreen() else enterFullscreen()
+    }
+
+    private fun enterFullscreen() {
+        val content = findViewById<android.view.ViewGroup>(android.R.id.content) ?: return
+        val parent = stage.parent as? android.view.ViewGroup ?: return
+        fullscreen = true
+
+        // Remember where the stage lived so exit can restore it exactly.
+        stageHomeParent = parent
+        stageHomeIndex = parent.indexOfChild(stage)
+        stageHomeParams = stage.layoutParams
+        orientationBeforeFullscreen = resources.configuration.orientation
+
+        parent.removeView(stage)
+        val overlay = FrameLayout(this).apply { setBackgroundColor(0xFF000000.toInt()) }
+        overlay.addView(stage, FrameLayout.LayoutParams(-1, -1))
+        content.addView(overlay, FrameLayout.LayoutParams(-1, -1))
+        fullscreenOverlay = overlay
+
+        stage.background = null
+        stage.clipToOutline = false
+        exitFullscreenButton?.visibility = View.VISIBLE
+
+        // Draw into the camera cutout too, so landscape has no black strip on the notch side.
+        window.attributes = window.attributes.apply {
+            layoutInDisplayCutoutMode =
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+        }
+        val controller = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
+        controller.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+        controller.systemBarsBehavior =
+            androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+
+        // Forced landscape, not SENSOR_LANDSCAPE, which stays put when the phone is upright.
+        requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        stage.post { applyVideoGeometry() }
+    }
+
+    private fun exitFullscreen() {
+        fullscreen = false
+        val overlay = fullscreenOverlay
+        overlay?.removeView(stage)
+        (overlay?.parent as? android.view.ViewGroup)?.removeView(overlay)
+        fullscreenOverlay = null
+
+        val home = stageHomeParent
+        if (home != null) {
+            val index = stageHomeIndex.coerceIn(0, home.childCount)
+            home.addView(stage, index, stageHomeParams ?: LinearLayout.LayoutParams(-1, scaled(220)))
+        }
+        stageHomeParent = null
+        stageHomeParams = null
+
+        stage.background = AutoBridgeDesign.surface(
+            this, AutoBridgeDesign.SURFACE, 20, AutoBridgeDesign.HAIRLINE
+        )
+        stage.clipToOutline = true
+        exitFullscreenButton?.visibility = View.GONE
+
+        window.attributes = window.attributes.apply {
+            layoutInDisplayCutoutMode =
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT
+        }
+        androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
+            .show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+
+        // Lock back to the orientation the screen had before fullscreen. Handing it back to the
+        // sensor (UNSPECIFIED) is what left the page upside down: with the phone flat on a table
+        // the sensor reading is ambiguous and the system picked 180 degrees.
+        requestedOrientation = if (orientationBeforeFullscreen == Configuration.ORIENTATION_LANDSCAPE) {
+            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        } else {
+            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        }
+        stage.post { applyVideoGeometry() }
+    }
+
+    /**
+     * Hands whatever is playing to the car through the shared bridge. When Android Auto is
+     * connected the car opens it as native video; when it is not, the bridge keeps it pending so
+     * it opens as soon as the car connects. Either way the user gets a clear status, never silence.
+     */
+    private fun sendToCar() {
+        val target = (playback.player?.currentMediaItem?.localConfiguration?.uri?.toString())
+            ?.takeIf { it.isNotBlank() }
+            ?: url.takeIf { it.isNotBlank() }
+            ?: run {
+                announce(getString(R.string.player_send_car_nothing))
+                return
+            }
+        val sendTitle = playback.currentTitle?.takeIf { it.isNotBlank() } ?: title
+        val result = dev.autobridge.bridge.AutoBridgeSessionManager.sendToCar(
+            this,
+            dev.autobridge.bridge.BridgeSource(
+                url = target,
+                title = sendTitle,
+                origin = dev.autobridge.bridge.BridgeSource.Origin.PHONE
+            )
+        )
+        val message = when (result) {
+            is dev.autobridge.bridge.AutoBridgeSessionManager.SendResult.Opened ->
+                getString(R.string.player_send_car_opened)
+            is dev.autobridge.bridge.AutoBridgeSessionManager.SendResult.Pending ->
+                getString(R.string.player_send_car_pending)
+            is dev.autobridge.bridge.AutoBridgeSessionManager.SendResult.Refused ->
+                getString(R.string.player_send_car_refused)
+        }
+        announce(message)
+    }
+
+    /**
      * Video is parked-only, so the surface is attached and detached from policy rather than from
      * the Activity lifecycle alone. Audio keeps playing in either case.
      */
@@ -693,25 +921,40 @@ class PlayerActivity : Activity() {
         if (failed != null) {
             detachSurface()
             showNotice(failed)
+            setLoading(false)
         } else if (kind == ContentKind.VIDEO && !videoAllowed) {
             detachSurface()
             video.visibility = View.GONE
             artworkPanel.visibility = View.GONE
             showNotice(FeaturePolicy.app.denialMessage(Feature.VIDEO))
+            setLoading(false)
+        } else if (kind == ContentKind.VIDEO && dev.autobridge.media.VideoSurfaceArbiter.carActive) {
+            // The car holds the one video output. Binding here would steal it and leave the head
+            // unit with sound only, so the phone says where the picture went instead.
+            detachSurface()
+            showNotice(getString(R.string.player_on_car))
+            setLoading(false)
         } else if (kind == ContentKind.VIDEO) {
             notice.visibility = View.GONE
             artworkPanel.visibility = View.GONE
             video.visibility = View.VISIBLE
-            if (!surfaceAttached && player != null) {
-                player.setVideoSurfaceView(video)
-                surfaceAttached = true
-            }
+            attachSurface()
             applyVideoGeometry()
             if (!started) startPlayback()
+            // Loading while the stream is being fetched/buffered and no frame is on screen yet.
+            // The spinner clears itself once the player reaches STATE_READY and starts rendering.
+            setLoading(isVideoBuffering())
         } else {
             video.visibility = View.GONE
             artworkPanel.visibility = View.VISIBLE
             if (notice.visibility == View.VISIBLE && started) notice.visibility = View.GONE
+            setLoading(false)
+        }
+
+        if (!isInPictureInPictureMode) {
+            val own = if (ownControlsVisible()) View.VISIBLE else View.GONE
+            progressRow?.visibility = own
+            transportRow?.visibility = own
         }
 
         toggle.text = if (playback.isPlaying) "❚❚" else "▶"
@@ -749,6 +992,36 @@ class PlayerActivity : Activity() {
         SafetyEnforcement.gateParked(ParkingStateStore.isParked)
 
     /**
+     * For video, PlayerView's controller is the transport, so ours would only duplicate it. Ours
+     * stays for audio, and for video while the car holds the picture: the PlayerView has no player
+     * then, so without these the phone would have no way to pause or change channel.
+     */
+    private fun ownControlsVisible(): Boolean =
+        kind != ContentKind.VIDEO || dev.autobridge.media.VideoSurfaceArbiter.carActive
+
+    /** Shows or hides the buffering spinner over the stage, if the view tree is built. */
+    private fun setLoading(show: Boolean) {
+        if (::loading.isInitialized) {
+            loading.visibility = if (show) View.VISIBLE else View.GONE
+        }
+    }
+
+    /**
+     * True while a tapped channel is still being fetched/buffered and no frame is up yet: the
+     * player is idle/buffering, or it is ready but has not drawn the first frame. Once a frame is
+     * on screen the player is playing and reports a video size, so the spinner clears on its own.
+     */
+    private fun isVideoBuffering(): Boolean {
+        val player = playback.player ?: return started
+        return when (player.playbackState) {
+            Player.STATE_IDLE, Player.STATE_BUFFERING -> true
+            Player.STATE_READY ->
+                player.playWhenReady && !player.isPlaying
+            else -> false
+        }
+    }
+
+    /**
      * "Show delay": how far behind the live edge the stream is sitting.
      *
      * Only a target-latency stream (a low-latency HLS or DASH channel) reports an offset at all;
@@ -762,31 +1035,71 @@ class PlayerActivity : Activity() {
         return "${offset / 1000}s behind live"
     }
 
-    /** Sizes the video view inside the stage for the chosen aspect ratio. */
+    /**
+     * Applies the aspect-ratio setting. Auto, Fill and Stretch map straight onto PlayerView's
+     * resize modes with the view filling the stage, so its controls always span the whole box.
+     * The forced 16:9 / 4:3 shapes have no resize mode, so for those the view itself is sized to
+     * that shape (always inside the box) and the picture is stretched into it.
+     */
     private fun applyVideoGeometry() {
         if (!::video.isInitialized || !::stage.isInitialized) return
-        val size = playback.player?.videoSize
-        val target = VideoAspect.layout(
-            mode = VideoSettings.aspectRatio(this),
-            videoWidth = size?.width ?: 0,
-            videoHeight = size?.height ?: 0,
-            boxWidth = stage.width,
-            boxHeight = stage.height
-        )
+        val mode = VideoSettings.aspectRatio(this)
         val params = video.layoutParams as? FrameLayout.LayoutParams ?: return
-        if (params.width == target.width && params.height == target.height) return
-        params.width = target.width
-        params.height = target.height
+        val (width, height) = when (mode) {
+            AspectRatio.AUTO, AspectRatio.FILL, AspectRatio.STRETCH -> -1 to -1
+            else -> {
+                val size = playback.player?.videoSize
+                val target = VideoAspect.layout(
+                    mode = mode,
+                    videoWidth = size?.width ?: 0,
+                    videoHeight = size?.height ?: 0,
+                    boxWidth = stage.width,
+                    boxHeight = stage.height
+                )
+                target.width to target.height
+            }
+        }
+        video.resizeMode = when (mode) {
+            AspectRatio.AUTO -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+            AspectRatio.FILL -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+            else -> AspectRatioFrameLayout.RESIZE_MODE_FILL
+        }
+        if (params.width == width && params.height == height) return
+        params.width = width
+        params.height = height
         params.gravity = Gravity.CENTER
         video.layoutParams = params
     }
 
-    private fun detachSurface() {
+    /**
+     * Hands the shared player to the PlayerView, which binds its own surface (and re-binds it
+     * whenever that surface is recreated). When the player is already mid-item - returning to the
+     * screen, or the car giving the picture back - a zero-delta seek once the surface is up makes
+     * the renderer repaint instead of leaving sound with a black frame.
+     */
+    private fun attachSurface() {
         val player = playback.player ?: return
-        if (!surfaceAttached) return
-        if (player.isCommandAvailable(Player.COMMAND_SET_VIDEO_SURFACE)) {
-            player.clearVideoSurfaceView(video)
+        if (surfaceAttached) return
+        // Never take the output while the car owns it; see VideoSurfaceArbiter.
+        if (dev.autobridge.media.VideoSurfaceArbiter.carActive) return
+        if (!player.isCommandAvailable(Player.COMMAND_SET_VIDEO_SURFACE)) return
+        video.player = player
+        surfaceAttached = true
+        video.post {
+            if (surfaceAttached && video.player === player &&
+                player.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM) &&
+                player.currentMediaItemIndex >= 0
+            ) {
+                player.seekTo(player.currentPosition)
+            }
         }
+        applyVideoGeometry()
+    }
+
+    /** Takes the player away from the PlayerView, which clears only the surface it had set. */
+    private fun detachSurface() {
+        if (!::video.isInitialized || !surfaceAttached) return
+        video.player = null
         surfaceAttached = false
     }
 
@@ -857,6 +1170,7 @@ class PlayerActivity : Activity() {
         // The window is a thumbnail: everything that is not the picture would be unreadable, and
         // the controls belong to the system's own PiP affordances there.
         chrome.forEach { it.visibility = if (isInPictureInPictureMode) View.GONE else View.VISIBLE }
+        if (::video.isInitialized) video.useController = !isInPictureInPictureMode
         // MATCH_PARENT inside the page's ScrollView would measure against the content rather than
         // the window, so the picture takes the window height the configuration itself reports.
         val params = stage.layoutParams
@@ -876,7 +1190,9 @@ class PlayerActivity : Activity() {
         // A layout setting changed on the settings screen this header opens; rebuild rather than
         // leave a stale shape behind. The surface is released first so the new SurfaceView can
         // take the player's output.
-        if (builtFor != signature()) {
+        // Not while fullscreen: the forced landscape changes the signature's orientation, and a
+        // rebuild would orphan the stage that is currently sitting in the fullscreen overlay.
+        if (!fullscreen && builtFor != signature()) {
             detachSurface()
             setContentView(buildUi())
         }
@@ -896,7 +1212,10 @@ class PlayerActivity : Activity() {
         // radio stream survives leaving the screen, matching the car behaviour. "Play in
         // background" extends that to video, and a picture-in-picture window is still on screen,
         // so neither case may pause here.
+        // The player is shared with the car: leaving the phone screen must not pause what the car
+        // is showing.
         val keepPlaying = kind != ContentKind.VIDEO ||
+            dev.autobridge.media.VideoSurfaceArbiter.carActive ||
             VideoSettings.playInBackground(this) ||
             (pictureInPictureSupported && isInPictureInPictureMode)
         if (!keepPlaying) {
@@ -905,10 +1224,35 @@ class PlayerActivity : Activity() {
         }
     }
 
+    /**
+     * Back leaves fullscreen first rather than the screen, which is what a user who went
+     * fullscreen expects the first Back to do.
+     */
+    private fun goBack() {
+        if (fullscreen) {
+            toggleFullscreen()
+            return
+        }
+        dev.autobridge.ui.SystemBack.finishFromBack(this)
+    }
+
+    // Pre-33 devices only; everything newer comes through [dev.autobridge.ui.SystemBack].
+    @Deprecated("Back is handled by SystemBack on API 33+", ReplaceWith("goBack()"))
+    @Suppress("DEPRECATION")
+    // The lint check wants this gone, but it is still the only Back a pre-33 device delivers;
+    // SystemBack carries the versions that no longer call it.
+    @SuppressLint("GestureBackNavigation")
+    override fun onBackPressed() = goBack()
+
+    /** Undoes the Back registration; see [dev.autobridge.ui.SystemBack]. */
+    private var releaseBack: () -> Unit = {}
+
     override fun onDestroy() {
         super.onDestroy()
+        releaseBack()
         ticker.removeCallbacksAndMessages(null)
         ParkingStateStore.removeListener(parkingListener)
+        dev.autobridge.media.VideoSurfaceArbiter.unregisterPhone(phoneOutput)
         detachSurface()
         playback.player?.removeListener(playerListener)
         playback.disconnect()

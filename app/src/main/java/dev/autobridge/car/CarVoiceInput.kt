@@ -22,7 +22,7 @@ import androidx.car.app.media.CarAudioRecord
 import androidx.car.app.versioning.CarAppApiLevels
 import androidx.core.content.ContextCompat
 import dev.autobridge.R
-import dev.autobridge.display.StructuredLog
+import dev.autobridge.logging.StructuredLog
 import java.io.IOException
 
 /**

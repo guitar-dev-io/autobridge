@@ -1,0 +1,95 @@
+{
+  // Tasks that drive the Desktop Head Unit via scripts/dhu-run.sh.
+  //
+  // IMPORTANT: these run inside VS Code's integrated terminal, which may NOT
+  // have macOS Screen Recording permission. The DHU window itself opens fine,
+  // but the screenshot helpers (scripts/dhu-shot.sh, dhu-test.sh) need a real
+  // Terminal.app / iTerm window. For plain "open the DHU and look at it", the
+  // integrated terminal is enough.
+  //
+  // Run from: Terminal > Run Task... (or Command Palette > "Run Task"),
+  // or via the matching entries in launch.json (Run and Debug panel).
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "DHU: safe (debug)",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/dhu-run.sh safe 720 touch",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "DHU: personal (debug)",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/dhu-run.sh personal 720 touch",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "DHU: lab (debug)",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/dhu-run.sh lab 720 touch",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "DHU: safe (no build, reconnect)",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/dhu-run.sh --no-build safe 720 touch",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    // Build + install the debug APK onto the connected device/emulator. Used as
+    // the preLaunchTask for the matching "App: <flavor> (build+run)" configs in
+    // launch.json, so one F5 rebuilds the latest code before relaunching.
+    {
+      "label": "gradle: installSafeDebug",
+      "type": "shell",
+      "command": "${workspaceFolder}/gradlew installSafeDebug",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "gradle: installPersonalDebug",
+      "type": "shell",
+      "command": "${workspaceFolder}/gradlew installPersonalDebug",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "gradle: installLabDebug",
+      "type": "shell",
+      "command": "${workspaceFolder}/gradlew installLabDebug",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    }
+  ]
+}

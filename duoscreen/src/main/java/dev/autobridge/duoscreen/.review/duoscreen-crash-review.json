@@ -1,0 +1,16 @@
+{
+  "verdict": "APPROVED",
+  "findings": [
+    {
+      "severity": "non-blocking",
+      "title": "Join timeout does not bound teardown",
+      "detail": "DuoScreenCompositor.stopBlocking calls runOnGlThread, whose latch.await() has no timeout, on the main thread before glThread.stop() does the timed 1 s join. A GL thread stuck mid-frame (e.g. eglSwapBuffers on a dying surface) would still hang onSurfaceDestroyed. Consider latch.await(timeout) on the release path."
+    },
+    {
+      "severity": "non-blocking",
+      "title": "Restart path untested end to end",
+      "detail": "DuoScreenThreadSlotTest uses plain JVM threads. Run the available->destroyed->available and available->available cycles once on DHU to confirm EGL re-init and pane relaunch on a real car surface."
+    }
+  ],
+  "reviewDoc": "/Users/anuwat.t/Documents/ChatGPT/AutoBridge/app/src/duoscreen/java/dev/autobridge/duoscreen/.review/duoscreen-crash-review.md"
+}

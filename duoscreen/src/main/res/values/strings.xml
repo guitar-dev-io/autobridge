@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="duo_screen_edit_layout">Arrange</string>
+    <string name="duo_screen_done">Done</string>
+    <string name="duo_screen_reload">Reload</string>
+    <string name="duo_screen_exit">Exit</string>
+    <string name="duo_screen_needs_shizuku">Grant Shizuku access on the phone first</string>
+    <string name="duo_screen_title">Duo screen</string>
+    <string name="duo_screen_subtitle">Run two or three apps side by side on the car display</string>
+    <string name="duo_screen_shizuku_ready">Shizuku connected</string>
+    <string name="duo_screen_shizuku_missing">Shizuku not available</string>
+    <string name="duo_screen_shizuku_hint">Needed to launch apps into the panes and pass touches to them</string>
+    <string name="duo_screen_panes_section">Panes</string>
+    <string name="duo_screen_pane_count">Number of panes</string>
+    <string name="duo_screen_pane_label">Pane %1$d</string>
+    <string name="duo_screen_pane_empty">No app chosen</string>
+    <string name="duo_screen_layout_section">Layout</string>
+    <string name="duo_screen_preset">Layout preset</string>
+    <string name="duo_screen_preset_even_columns">Even columns</string>
+    <string name="duo_screen_preset_wide_left">Wide left</string>
+    <string name="duo_screen_preset_wide_right">Wide right</string>
+    <string name="duo_screen_preset_even_rows">Stacked rows</string>
+    <string name="duo_screen_preset_pip">Picture in picture</string>
+    <string name="duo_screen_reset_layout">Reset arrangement</string>
+    <string name="duo_screen_reset_layout_hint">Back to the preset; the chosen apps are kept</string>
+    <string name="duo_screen_reset_done">Arrangement reset</string>
+    <string name="duo_screen_pick_app">Choose an app</string>
+    <string name="duo_screen_clear_app">Leave empty</string>
+    <string name="duo_screen_self_pane">AutoBridge browser</string>
+    <string name="duo_screen_applied_now">Changed on the car display</string>
+    <string name="duo_screen_applied_next">Saved; applies on the next connection</string>
+    <string name="duo_screen_session_section">Session</string>
+    <string name="duo_screen_end_session">End duo screen now</string>
+    <string name="duo_screen_end_session_hint">Closes every pane and the apps running in them</string>
+    <string name="duo_screen_end_done">Duo screen ended</string>
+    <string name="duo_screen_end_none">Nothing running</string>
+</resources>

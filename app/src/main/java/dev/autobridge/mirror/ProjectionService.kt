@@ -23,7 +23,7 @@ import dev.autobridge.display.MirrorDiagnostics
 import dev.autobridge.display.MirrorOrientationController
 import dev.autobridge.display.OrientationMonitor
 import dev.autobridge.display.ScreenPowerController
-import dev.autobridge.display.StructuredLog
+import dev.autobridge.logging.StructuredLog
 import dev.autobridge.input.ShizukuInputBackend
 import dev.autobridge.settings.MirrorSettings
 import dev.autobridge.settings.SettingsStore

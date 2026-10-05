@@ -15,7 +15,7 @@ internal object CarHomeNavigator {
         section: HomeSection,
         requestSafety: () -> Unit
     ) {
-        dev.autobridge.display.StructuredLog.i("CarHome", "tapped -> ${section.name}")
+        dev.autobridge.logging.StructuredLog.i("CarHome", "tapped -> ${section.name}")
         val url = section.webUrl
         when {
             section == HomeSection.TV ->

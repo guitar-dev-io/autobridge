@@ -1,0 +1,7 @@
+{
+  "task_id": "task-duoscreen-launch-touch-fix",
+  "task_description": "Fix the Duo Screen app-launch failure on device YXEMRCGYAI49S4SS (startActivityAsUser returns -91 / aInfo is null because the implicit MAIN/LAUNCHER intent does not resolve inside the Shizuku shell-UID cross-display launch, and because the app's own package dev.autobridge was stored as a pane target), then verify on-device whether touch injection works once an app is actually live in a pane. Fix-or-prove-unfixable: a PLATFORM-BLOCKED touch verdict with exact log-line evidence is a complete outcome.",
+  "status": "completed",
+  "feature_order": ["FEAT-001", "FEAT-002"],
+  "blocked_reason": null
+}

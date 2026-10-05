@@ -48,6 +48,14 @@ data class PaneRect(val left: Int, val top: Int, val right: Int, val bottom: Int
 data class SplitPanes(val main: PaneRect, val side: PaneRect)
 
 object BrowserSplitGeometry {
+    /**
+     * How far a dragged divider may go, as the side pane's share of the usable width. The real
+     * limit is usually [panes]' `minPanePx` — these only stop a very wide panel from being dragged
+     * to a ratio that is technically legible but useless.
+     */
+    const val MIN_SIDE_FRACTION = 0.2f
+    const val MAX_SIDE_FRACTION = 0.8f
+
     /** Side share of the width for the fixed-ratio layouts. */
     private const val HALF_FRACTION = 0.5f
     private const val FORTY_FRACTION = 0.4f
@@ -65,6 +73,10 @@ object BrowserSplitGeometry {
      *
      * [gapPx] is left empty between the panes for the divider. [sideOnRight] mirrors the layout so
      * the side pane can sit on either side of the driver.
+     *
+     * [sideFraction] is a divider the user has dragged: it overrides the preset's own ratio (and,
+     * for [BrowserSplitLayout.PORTRAIT_LANDSCAPE], its 16:9 main pane, which is a fixed shape and
+     * so has nothing left to drag). Cycling the preset clears it — see [BrowserSplitStore].
      */
     fun panes(
         layout: BrowserSplitLayout,
@@ -72,18 +84,22 @@ object BrowserSplitGeometry {
         sideOnRight: Boolean,
         gapPx: Int,
         minPanePx: Int,
+        sideFraction: Float? = null,
     ): SplitPanes? {
         val width = right - left
         val height = bottom - top
         if (width <= 0 || height <= 0) return null
+        if (layout == BrowserSplitLayout.SINGLE) return null
         val gap = gapPx.coerceAtLeast(0)
         val usable = width - gap
-        val (sideWidth, mainWidth, mainHeight) = when (layout) {
-            BrowserSplitLayout.SINGLE -> return null
-            BrowserSplitLayout.HALF -> fixed(usable, height, HALF_FRACTION)
-            BrowserSplitLayout.FORTY_SIXTY -> fixed(usable, height, FORTY_FRACTION)
-            BrowserSplitLayout.SIXTY_FIVE_THIRTY_FIVE -> fixed(usable, height, THIRTY_FIVE_FRACTION)
-            BrowserSplitLayout.PORTRAIT_LANDSCAPE -> {
+        val dragged = sideFraction?.takeIf { it.isFinite() }?.let { clampSideFraction(it, usable, minPanePx) }
+        val (sideWidth, mainWidth, mainHeight) = when {
+            dragged != null -> fixed(usable, height, dragged)
+            layout == BrowserSplitLayout.HALF -> fixed(usable, height, HALF_FRACTION)
+            layout == BrowserSplitLayout.FORTY_SIXTY -> fixed(usable, height, FORTY_FRACTION)
+            layout == BrowserSplitLayout.SIXTY_FIVE_THIRTY_FIVE ->
+                fixed(usable, height, THIRTY_FIVE_FRACTION)
+            else -> {
                 val main = minOf((height * 16f / 9f).roundToInt(), (usable * LANDSCAPE_MAX_FRACTION).roundToInt())
                 Triple(usable - main, main, (main * 9f / 16f).roundToInt().coerceAtMost(height))
             }
@@ -105,6 +121,40 @@ object BrowserSplitGeometry {
         val side = (usable * sideFraction).roundToInt()
         return Triple(side, usable - side, height)
     }
+
+    /**
+     * Holds a dragged ratio inside what the panel can actually show: both panes keep [minPanePx],
+     * and neither takes more than [MAX_SIDE_FRACTION] of the width. On a panel too narrow for two
+     * usable panes at once the midpoint is returned and [panes] drops back to a single page.
+     */
+    fun clampSideFraction(fraction: Float, usablePx: Int, minPanePx: Int): Float {
+        if (usablePx <= 0) return fraction.coerceIn(MIN_SIDE_FRACTION, MAX_SIDE_FRACTION)
+        val floor = maxOf(MIN_SIDE_FRACTION, minPanePx.toFloat() / usablePx)
+        val ceiling = minOf(MAX_SIDE_FRACTION, 1f - minPanePx.toFloat() / usablePx)
+        if (floor > ceiling) return HALF_FRACTION
+        return fraction.coerceIn(floor, ceiling)
+    }
+
+    /**
+     * The ratio a divider dragged by [deltaPx] lands on, starting from [panes]. The delta is in
+     * surface pixels and points right; [sideOnRight] flips it, because there the side pane grows
+     * as the divider moves left.
+     */
+    fun dragSideFraction(
+        panes: SplitPanes,
+        deltaPx: Int,
+        sideOnRight: Boolean,
+        minPanePx: Int,
+    ): Float {
+        val usable = panes.main.width + panes.side.width
+        if (usable <= 0) return HALF_FRACTION
+        val towardsSide = if (sideOnRight) -deltaPx else deltaPx
+        return clampSideFraction(
+            (panes.side.width + towardsSide).toFloat() / usable,
+            usable,
+            minPanePx
+        )
+    }
 }
 
 /** Persisted split preferences, in the browser's shared preference file. */
@@ -113,6 +163,7 @@ object BrowserSplitStore {
     private const val KEY_LAYOUT = "split_layout"
     private const val KEY_SIDE_ON_RIGHT = "split_side_on_right"
     private const val KEY_SIDE_URL = "split_side_url"
+    private const val KEY_SIDE_FRACTION = "split_side_fraction"
 
     /** What the side pane opens the first time: the map case this feature exists for. */
     const val DEFAULT_SIDE_URL = "https://www.google.com/maps"
@@ -125,8 +176,21 @@ object BrowserSplitStore {
             ?.let { runCatching { BrowserSplitLayout.valueOf(it) }.getOrNull() }
             ?: BrowserSplitLayout.SINGLE
 
+    /** Choosing a preset drops a dragged ratio: picking one again is how you get its shape back. */
     fun setLayout(context: Context, layout: BrowserSplitLayout) {
-        prefs(context).edit { putString(KEY_LAYOUT, layout.name) }
+        prefs(context).edit {
+            putString(KEY_LAYOUT, layout.name)
+            remove(KEY_SIDE_FRACTION)
+        }
+    }
+
+    /** The side pane's share of the width after a drag, or null while the preset's own applies. */
+    fun sideFraction(context: Context): Float? =
+        prefs(context).getFloat(KEY_SIDE_FRACTION, 0f).takeIf { it > 0f }
+
+    fun setSideFraction(context: Context, fraction: Float) {
+        if (!fraction.isFinite() || fraction <= 0f) return
+        prefs(context).edit { putFloat(KEY_SIDE_FRACTION, fraction) }
     }
 
     /** Off by default: the side pane (map) sits on the left, the main page on the right. */

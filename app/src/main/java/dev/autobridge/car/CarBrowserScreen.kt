@@ -349,7 +349,7 @@ class CarBrowserScreen(carContext: CarContext) :
         // readable on every phone (some OEM builds drop third-party tags), so the reason goes to
         // StructuredLog, which CarDiagnosticsScreen renders on the car itself.
         if (!active || !MirrorSurfaceOwnership.isOwner(this) || surfaceContainer.surface == null) {
-            dev.autobridge.display.StructuredLog.w(
+            dev.autobridge.logging.StructuredLog.w(
                 TAG,
                 "surface ignored active=$active owner=${MirrorSurfaceOwnership.isOwner(this)} " +
                     "surface=${surfaceContainer.surface != null}"
@@ -365,7 +365,7 @@ class CarBrowserScreen(carContext: CarContext) :
         CarDisplayInfo.record(surfaceWidth, surfaceHeight, surfaceDpi)
         Log.i(TAG, "Browser surface ${surfaceWidth}x$surfaceHeight dpi=$surfaceDpi")
         val permitted = allowed()
-        dev.autobridge.display.StructuredLog.i(
+        dev.autobridge.logging.StructuredLog.i(
             TAG, "surface ${surfaceWidth}x$surfaceHeight dpi=$surfaceDpi allowed=$permitted"
         )
         if (!permitted) return
@@ -417,7 +417,7 @@ class CarBrowserScreen(carContext: CarContext) :
                 Rect(stable).takeIf { it.intersect(visible) && usableVisibleArea(it) } ?: stable
             else -> stable ?: visible
         } ?: return
-        dev.autobridge.display.StructuredLog.i(TAG, "content area $area stable=$stable visible=$visible")
+        dev.autobridge.logging.StructuredLog.i(TAG, "content area $area stable=$stable visible=$visible")
         renderer.setStableArea(area)
     }
 

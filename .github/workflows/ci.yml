@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+# Cancel an in-flight run when a newer commit lands on the same ref.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build safe · lint · test · i18n
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Fails fast if the committed gradle-wrapper.jar was tampered with.
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # Gate: res/values-* / locales_config.xml / resourceConfigurations must agree, and no Thai
+      # UI text may be left in Kotlin. Needs python3, which ubuntu-latest already provides.
+      - name: i18n guard
+        run: ./scripts/check-i18n.sh
+
+      # MissingTranslation / ExtraTranslation are errors in app/build.gradle.kts, so a
+      # translation gap fails here as well as in the i18n guard above.
+      - name: Lint (safe debug)
+        run: ./gradlew --no-daemon lintSafeDebug
+
+      - name: Unit tests (safe debug)
+        run: ./gradlew --no-daemon testSafeDebugUnitTest
+
+      - name: Assemble (safe debug)
+        run: ./gradlew --no-daemon assembleSafeDebug
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: autobridge-safe-debug-apk
+          path: app/build/outputs/apk/safe/debug/*.apk
+          if-no-files-found: error
+
+      # Reports are the first thing you want when a run goes red, so upload them even on failure.
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports
+          path: |
+            app/build/reports/**
+            app/build/test-results/**
+          if-no-files-found: ignore
+
+  # Optional: the sideload-only flavors pull in libs/aauto.aar. They are not Play-shippable, so
+  # this is a compile check rather than a required gate — it must not block the main build.
+  sideload-compile:
+    name: Compile personal + lab (optional)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Assemble personal + lab debug
+        run: ./gradlew --no-daemon assemblePersonalDebug assembleLabDebug

@@ -2,4 +2,7 @@
     <!-- Tag slot used by ImageLoader to detect a recycled ImageView before applying a decode.
          View.setTag(int, Object) requires an application resource id, not an arbitrary int. -->
     <item name="autobridge_image_tag" type="id" />
+    <!-- The status line inside a content tile, so a ping result can be written into a page that
+         is already on screen instead of rebuilding it (see AutoBridgeDesign.statusLabel). -->
+    <item name="autobridge_status_label" type="id" />
 </resources>

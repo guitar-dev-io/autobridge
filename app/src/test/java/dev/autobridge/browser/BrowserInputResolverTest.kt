@@ -52,6 +52,31 @@ class BrowserInputResolverTest {
         }
     }
 
+    @Test fun emptyOrBlankInputBecomesAnEmptySearchNeverAUrl() {
+        // The projection address bar passes whatever onSearchSubmitted delivers straight through,
+        // so empty/blank must resolve to a (safe) search URL and never crash or navigate off-scheme.
+        for (engine in SearchEngine.entries) {
+            assertEquals(engine.searchUrl(""), resolve("", engine))
+            assertEquals(engine.searchUrl(""), resolve("   ", engine))
+        }
+        // And the result is a real https search URL, not a bare host or empty string.
+        assertTrue(resolve("", SearchEngine.GOOGLE).startsWith("https://www.google.com/search?q="))
+        assertTrue(resolve("   ", SearchEngine.YOUTUBE).startsWith("https://m.youtube.com/results?search_query="))
+    }
+
+    @Test fun projectionBarContractBareDomainFullUrlAndMultiWordSearch() {
+        // The projection browser's address bar contract, asserted explicitly: bare domain -> https,
+        // full https URL preserved, multi-word phrase -> engine search.
+        assertEquals("https://youtube.com", resolve("youtube.com", SearchEngine.YOUTUBE))
+        assertEquals(
+            "https://m.youtube.com/watch?v=abc",
+            resolve("https://m.youtube.com/watch?v=abc", SearchEngine.YOUTUBE),
+        )
+        val search = resolve("thai pop live concert", SearchEngine.GOOGLE)
+        assertTrue(search.startsWith("https://www.google.com/search?q="))
+        assertEquals("thai pop live concert", URLDecoder.decode(search.substringAfter("q="), "UTF-8"))
+    }
+
     @Test fun looksLikeUrlDistinguishesAddressesFromQueries() {
         assertTrue(BrowserInputResolver.looksLikeUrl("https://m.youtube.com/watch?v=1"))
         assertTrue(BrowserInputResolver.looksLikeUrl("youtube.com"))

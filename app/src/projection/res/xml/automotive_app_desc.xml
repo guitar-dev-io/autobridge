@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Projection-flavor override of the main car descriptor (personal/lab only; wired via
+     src/projection/res in app/build.gradle.kts). Adds the "projection" role so Android Auto's
+     OEMAppProvider surfaces dev.autobridge/.projection.ProjectionCarService (the
+     CATEGORY_PROJECTION entry "AutoBridge Browser"). The unofficial AA SDK in app/libs/aauto.aar
+     requires this role for its CarActivityService to be listed. template + media are kept so the
+     NAVIGATION services (AutoBridgeCarAppService, DuoScreenCarAppService) and the media card
+     (MediaPlaybackService) keep working exactly as before. The safe (Play) flavor keeps the
+     main descriptor with no projection role. -->
+<automotiveApp xmlns:tools="http://schemas.android.com/tools">
+    <uses name="template" />
+    <uses name="media" />
+    <uses name="projection" tools:ignore="InvalidUsesTagAttribute" />
+</automotiveApp>

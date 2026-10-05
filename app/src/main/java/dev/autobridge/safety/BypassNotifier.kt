@@ -7,7 +7,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import dev.autobridge.R
-import dev.autobridge.display.StructuredLog
+import dev.autobridge.logging.StructuredLog
 
 /**
  * Surfaces [BypassPolicyStore] changes as a status notification, and keeps a quiet standing

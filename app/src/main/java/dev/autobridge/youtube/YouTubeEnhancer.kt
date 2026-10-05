@@ -4,7 +4,7 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.webkit.WebView
-import dev.autobridge.display.StructuredLog
+import dev.autobridge.logging.StructuredLog
 import java.util.concurrent.Executors
 
 /**

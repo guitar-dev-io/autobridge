@@ -36,7 +36,7 @@ enum class HomeSection(
         R.string.section_youtube_music, R.string.section_youtube_music_caption, Accents.VIDEO,
         "https://music.youtube.com"
     ),
-    /** YouTube Kids, TikTok, Twitch and other web video sites; see [StreamingLinks]. */
+    /** , TikTok, Twitch and other web video sites; see [StreamingLinks]. */
     STREAMING(R.string.section_streaming, R.string.section_streaming_caption, Accents.VIDEO),
     FOLDERS(R.string.section_folders, R.string.section_folders_caption, Accents.FILES),
     FAVORITES(R.string.section_favorites, R.string.section_favorites_caption, Accents.FAVORITE),

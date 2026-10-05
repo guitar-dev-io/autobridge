@@ -32,6 +32,7 @@ class SubtitleTranslationPipeline(
     /** Identifies the line currently on screen, so a late result can tell it is late. */
     private var sequence = 0L
     private var pending: Job? = null
+    private var warmUp: Job? = null
     private var lastPublishedOriginal: String? = null
 
     /**
@@ -43,12 +44,23 @@ class SubtitleTranslationPipeline(
      */
     fun bind(translator: SubtitleTranslator?, config: SubtitleTranslationConfig?) {
         if (this.translator === translator && this.config == config) return
+        val engineChanged = this.translator !== translator
         pending?.cancel()
         pending = null
-        this.translator?.close()
+        if (engineChanged) {
+            warmUp?.cancel()
+            warmUp = null
+        }
+        this.translator?.takeIf { engineChanged }?.close()
         this.translator = translator
         this.config = config
         lastPublishedOriginal = null
+        if (engineChanged && translator != null && config?.isActive == true) {
+            // Load the model now, not on the first cue: otherwise the first line of every video
+            // waits out a download or a graph load before its translation can start. A failure
+            // here is not reported; the first line's own prepare() surfaces it on screen.
+            warmUp = scope.launch { runCatching { translator.prepare() } }
+        }
     }
 
     /** One cue group from the track; an empty list is the gap between two lines. */
@@ -96,6 +108,8 @@ class SubtitleTranslationPipeline(
                 engine.prepare()
                 engine.translate(text)
             }
+            // A cancelled line is not a failed one; there is nothing to show for it.
+            if (result.exceptionOrNull() is kotlinx.coroutines.CancellationException) return@launch
             // The line may have been replaced, or the engine swapped, while this ran.
             if (sequence != mine || translator !== engine) return@launch
             result.onSuccess { translated ->

@@ -25,7 +25,7 @@ CarPlay is not "Android Auto for iOS." The differences that matter here:
 | AutoBridge capability | CarPlay path | Status |
 |---|---|---|
 | MediaProjection screen mirroring (AUTO_MIRROR / SELF_DRAWN) | none | Not possible — no drawable surface is exposed to third-party apps |
-| In-app web browser (general browsing, YouTube/YT Music/YT Kids via WebView) | none | Not possible — WebView restricted to static content, no browsing |
+| In-app web browser (general browsing, YouTube/YT Music via WebView) | none | Not possible — WebView restricted to static content, no browsing |
 | Accessibility / Shizuku touch injection, Quick Apps launching | none | Not possible — no input-injection API, no arbitrary app launching |
 | IPTV/M3U/Xtream **radio** (audio-only streams) | CarPlay **Audio** category (`CPListTemplate` browsing + `CPNowPlayingTemplate`, `AVPlayer`/`MediaPlayer`) | Feasible, separate iOS app, own entitlement |
 | IPTV/M3U/Xtream **TV** (video streams) | CarPlay **Video** category, parked-only (new in iOS 26/WWDC26) | Conditionally feasible: needs Apple entitlement approval *and* a vehicle head unit certified for CarPlay video — no automaker has committed as of 2026-09-29 |

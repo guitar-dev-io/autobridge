@@ -39,7 +39,6 @@ struct StreamingLink: Identifiable, Hashable {
 enum StreamingLinks {
     static let all: [StreamingLink] = [
         StreamingLink(title: "YouTube", group: .video, url: URL(string: "https://m.youtube.com")!),
-        StreamingLink(title: "YouTube Kids", group: .video, url: URL(string: "https://www.youtubekids.com")!),
         StreamingLink(title: "TikTok", group: .video, url: URL(string: "https://www.tiktok.com")!),
         StreamingLink(title: "YouTube Music", group: .music, url: URL(string: "https://music.youtube.com")!),
         StreamingLink(title: "Twitch", group: .live, url: URL(string: "https://www.twitch.tv")!),

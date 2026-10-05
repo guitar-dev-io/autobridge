@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
-# Sync versionName / versionCode from app/build.gradle.kts into README.md.
+# Sync versionName / versionCode from version.properties into README.md.
 # Keeps the README header and the Google Play upload note in sync with the
-# authoritative Gradle build config.
+# authoritative version file that app/build.gradle.kts reads.
+#
+# Run it after editing version.properties by hand; scripts/set-version.sh calls it for you.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-GRADLE_FILE="$ROOT_DIR/app/build.gradle.kts"
+VERSION_FILE="$ROOT_DIR/version.properties"
 README_FILE="$ROOT_DIR/README.md"
 
-if [[ ! -f "$GRADLE_FILE" ]]; then
-  echo "sync-version: cannot find $GRADLE_FILE" >&2
+if [[ ! -f "$VERSION_FILE" ]]; then
+  echo "sync-version: cannot find $VERSION_FILE" >&2
   exit 1
 fi
 if [[ ! -f "$README_FILE" ]]; then
@@ -17,12 +19,16 @@ if [[ ! -f "$README_FILE" ]]; then
   exit 1
 fi
 
-# Extract the values from the defaultConfig block.
-VERSION_NAME="$(grep -Eo 'versionName[[:space:]]*=[[:space:]]*"[^"]+"' "$GRADLE_FILE" | head -n1 | sed -E 's/.*"([^"]+)".*/\1/')"
-VERSION_CODE="$(grep -Eo 'versionCode[[:space:]]*=[[:space:]]*[0-9]+' "$GRADLE_FILE" | head -n1 | sed -E 's/[^0-9]//g')"
+read_prop() {
+  grep -E "^$1[[:space:]]*=" "$VERSION_FILE" | tail -n1 \
+    | sed -E "s/^$1[[:space:]]*=[[:space:]]*//" | tr -d '\r' | sed -E 's/[[:space:]]+$//'
+}
+
+VERSION_NAME="$(read_prop versionName)"
+VERSION_CODE="$(read_prop versionCode)"
 
 if [[ -z "$VERSION_NAME" || -z "$VERSION_CODE" ]]; then
-  echo "sync-version: failed to parse versionName/versionCode from $GRADLE_FILE" >&2
+  echo "sync-version: failed to read versionName/versionCode from $VERSION_FILE" >&2
   exit 1
 fi
 

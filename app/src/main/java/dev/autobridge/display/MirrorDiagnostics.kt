@@ -1,6 +1,7 @@
 package dev.autobridge.display
 
 import android.os.SystemClock
+import dev.autobridge.logging.StructuredLog
 import java.util.concurrent.atomic.AtomicLong
 
 /**

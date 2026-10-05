@@ -31,7 +31,7 @@ class AutoBridgeSession : Session(), CarScreenController.Host {
                 // the phone UI read "Not connected" and the Mobile Remote showed the car offline
                 // while the head unit was plainly running our screens.
                 RuntimeContextStore.setConnected(true)
-                dev.autobridge.display.StructuredLog.i(TAG, "car session connected")
+                dev.autobridge.logging.StructuredLog.i(TAG, "car session connected")
                 // The bridge learns about the connection here rather than polling for it, and
                 // this is where a Send-to-Car that arrived while nothing was plugged in gets
                 // replayed onto the head unit.
@@ -44,7 +44,7 @@ class AutoBridgeSession : Session(), CarScreenController.Host {
                 // registered host - not this callback - decides whether anything is still attached.
                 val stillConnected = CarScreenController.isConnected
                 RuntimeContextStore.setConnected(stillConnected)
-                dev.autobridge.display.StructuredLog.i(TAG, "car session destroyed connected=$stillConnected")
+                dev.autobridge.logging.StructuredLog.i(TAG, "car session destroyed connected=$stillConnected")
                 dev.autobridge.bridge.AutoBridgeSessionManager.onCarDisconnected(carContext)
                 // The browser renderer outlives individual screens on purpose, so the session is
                 // the only correct place to tear its WebView down.
@@ -57,7 +57,7 @@ class AutoBridgeSession : Session(), CarScreenController.Host {
 
     override fun onCreateScreen(intent: Intent): Screen {
         Log.i(TAG, "onCreateScreen action=${intent.action} data=${intent.data}")
-        dev.autobridge.display.StructuredLog.i(TAG, "onCreateScreen action=${intent.action}")
+        dev.autobridge.logging.StructuredLog.i(TAG, "onCreateScreen action=${intent.action}")
         // The combined home is content-bearing on connect (clock, now-playing, vehicle state) and
         // links to the grid launcher, media library and web surfaces, so the head unit is never a
         // blank screen. Back from any child returns here.
@@ -65,7 +65,7 @@ class AutoBridgeSession : Session(), CarScreenController.Host {
             CarHomeDashboardScreen(carContext)
         } catch (error: Throwable) {
             Log.e(TAG, "Unable to create CarHomeDashboardScreen", error)
-            dev.autobridge.display.StructuredLog.e(TAG, "CarHomeDashboardScreen failed: ${error.message}")
+            dev.autobridge.logging.StructuredLog.e(TAG, "CarHomeDashboardScreen failed: ${error.message}")
             throw error
         }
     }

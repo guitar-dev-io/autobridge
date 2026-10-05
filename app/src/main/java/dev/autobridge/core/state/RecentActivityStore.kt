@@ -21,17 +21,30 @@ object RecentActivityStore {
     enum class Kind { BROWSER, MEDIA, MIRROR, AGENT }
 
     /**
+     * Where the action came from, when that is worth telling apart.
+     *
+     * The home dashboard's "Recently Sent" is exactly the entries that arrived from the phone
+     * ([PHONE], [SHARE]); without this they are indistinguishable from something started on the
+     * head unit itself. Null for every entry recorded before this field existed and for every
+     * caller that has nothing meaningful to say, which is why the dashboard filters on it rather
+     * than defaulting it.
+     */
+    enum class Origin { CAR, PHONE, SHARE, AGENT }
+
+    /**
      * @param kind    which feature produced this entry
      * @param title   primary label shown to the user (e.g. "google.com", "Good Day")
      * @param subtitle optional secondary label
      * @param data    resume payload interpreted by the kind (e.g. URL for BROWSER, media uri for MEDIA)
+     * @param origin  where the action was asked for, or null when the caller does not distinguish
      */
     data class Entry(
         val kind: Kind,
         val title: String,
         val subtitle: String? = null,
         val data: String? = null,
-        val timestampMs: Long = System.currentTimeMillis()
+        val timestampMs: Long = System.currentTimeMillis(),
+        val origin: Origin? = null
     )
 
     fun record(context: Context, entry: Entry) {
@@ -57,7 +70,8 @@ object RecentActivityStore {
                     title = obj.optString("title"),
                     subtitle = obj.optString("subtitle", "").takeIf { it.isNotBlank() },
                     data = obj.optString("data", "").takeIf { it.isNotBlank() },
-                    timestampMs = obj.optLong("ts", 0L)
+                    timestampMs = obj.optLong("ts", 0L),
+                    origin = runCatching { Origin.valueOf(obj.optString("origin")) }.getOrNull()
                 )
             }
         }.getOrDefault(emptyList()).take(limit)
@@ -67,16 +81,45 @@ object RecentActivityStore {
         prefs(context).edit { remove(KEY_ENTRIES) }
     }
 
+    /** How old an entry is, split into the unit a UI formats. Null for a missing timestamp. */
+    data class Age(val unit: Unit, val count: Long) {
+        enum class Unit { NOW, MINUTES, HOURS, DAYS }
+    }
+
+    /** Pure age bucketing, so the wording can be localised without duplicating the arithmetic. */
+    fun age(timestampMs: Long, now: Long = System.currentTimeMillis()): Age? {
+        if (timestampMs <= 0L) return null
+        val minutes = (now - timestampMs).coerceAtLeast(0L) / 60_000L
+        return when {
+            minutes < 1 -> Age(Age.Unit.NOW, 0L)
+            minutes < 60 -> Age(Age.Unit.MINUTES, minutes)
+            minutes < 60 * 24 -> Age(Age.Unit.HOURS, minutes / 60)
+            else -> Age(Age.Unit.DAYS, minutes / (60 * 24))
+        }
+    }
+
     /** Human-friendly relative age, e.g. "2 min ago", "1 hour ago". */
     fun relativeAge(timestampMs: Long, now: Long = System.currentTimeMillis()): String {
-        if (timestampMs <= 0L) return ""
-        val deltaMs = (now - timestampMs).coerceAtLeast(0L)
-        val minutes = deltaMs / 60_000L
-        return when {
-            minutes < 1 -> "just now"
-            minutes < 60 -> "$minutes min ago"
-            minutes < 60 * 24 -> "${minutes / 60} hour${if (minutes / 60 == 1L) "" else "s"} ago"
-            else -> "${minutes / (60 * 24)} day${if (minutes / (60 * 24) == 1L) "" else "s"} ago"
+        val age = age(timestampMs, now) ?: return ""
+        return when (age.unit) {
+            Age.Unit.NOW -> "just now"
+            Age.Unit.MINUTES -> "${age.count} min ago"
+            Age.Unit.HOURS -> "${age.count} hour${if (age.count == 1L) "" else "s"} ago"
+            Age.Unit.DAYS -> "${age.count} day${if (age.count == 1L) "" else "s"} ago"
+        }
+    }
+
+    /**
+     * The same age in the user's language. The car dashboard uses this one; the string-less
+     * [relativeAge] stays for callers with no Context and for the tests that pin the arithmetic.
+     */
+    fun relativeAge(context: Context, timestampMs: Long, now: Long = System.currentTimeMillis()): String {
+        val age = age(timestampMs, now) ?: return ""
+        return when (age.unit) {
+            Age.Unit.NOW -> context.getString(dev.autobridge.R.string.car_time_just_now)
+            Age.Unit.MINUTES -> context.getString(dev.autobridge.R.string.car_time_minutes_ago, age.count)
+            Age.Unit.HOURS -> context.getString(dev.autobridge.R.string.car_time_hours_ago, age.count)
+            Age.Unit.DAYS -> context.getString(dev.autobridge.R.string.car_time_days_ago, age.count)
         }
     }
 
@@ -90,6 +133,7 @@ object RecentActivityStore {
                     entry.subtitle?.let { put("subtitle", it) }
                     entry.data?.let { put("data", it) }
                     put("ts", entry.timestampMs)
+                    entry.origin?.let { put("origin", it.name) }
                 }
             )
         }

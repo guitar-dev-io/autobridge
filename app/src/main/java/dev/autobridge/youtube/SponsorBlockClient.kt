@@ -1,6 +1,6 @@
 package dev.autobridge.youtube
 
-import dev.autobridge.display.StructuredLog
+import dev.autobridge.logging.StructuredLog
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.ConcurrentHashMap

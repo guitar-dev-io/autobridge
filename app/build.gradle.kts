@@ -8,6 +8,68 @@ plugins {
 
 apply(plugin = "com.google.android.gms.oss-licenses-plugin")
 
+// The version lives in version.properties at the repo root so it can be bumped (and read by
+// scripts/sync-version.sh and the release workflow) without touching this build script. A single
+// build can override either value without editing any file; precedence is Gradle property, then
+// environment variable, then the file:
+//
+//   ./gradlew assembleSafeRelease -PversionName=0.5.0-rc1 -PversionCode=27
+//   AUTOBRIDGE_VERSION_NAME=0.5.0-rc1 ./gradlew assembleSafeRelease
+val versionPropertiesFile = rootProject.file("version.properties")
+val versionProperties = Properties()
+if (versionPropertiesFile.isFile) {
+    versionPropertiesFile.inputStream().use { versionProperties.load(it) }
+}
+
+val configuredVersion: (String, String) -> String? = { key, environmentVariable ->
+    (providers.gradleProperty(key).orNull
+        ?: System.getenv(environmentVariable)
+        ?: versionProperties.getProperty(key))
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+}
+
+val autoBridgeVersionName = requireNotNull(configuredVersion("versionName", "AUTOBRIDGE_VERSION_NAME")) {
+    "versionName is not set. Add it to version.properties or pass -PversionName=<x.y.z>."
+}
+val autoBridgeVersionCode = requireNotNull(
+    configuredVersion("versionCode", "AUTOBRIDGE_VERSION_CODE")?.toIntOrNull()
+) {
+    "versionCode is not set, or is not an integer. Add it to version.properties or pass " +
+        "-PversionCode=<n>."
+}
+
+// Subtitle translation is the only feature here with heavyweight dependencies behind it: ML Kit
+// Translate and ONNX Runtime (the Opus-MT/Marian engine). Both are mostly native code and both
+// ship a copy per ABI, which is around 17 MB of the packaged APK between them. A build that does
+// not want them - a smaller download, a device without Play Services, or an ABI ONNX Runtime has
+// no binary for - turns the whole feature off, which drops both libraries and the three source
+// files that use them:
+//
+//   ./gradlew assembleSafeRelease -Pautobridge.subtitleTranslation=false
+//   AUTOBRIDGE_SUBTITLE_TRANSLATION=false ./gradlew assembleSafeRelease
+//
+// Subtitles themselves are unaffected: the track still decodes and renders, untranslated. The
+// default lives in gradle.properties; precedence matches the version above - Gradle property,
+// then environment variable, then the file.
+val subtitleTranslationEnabled: Boolean = run {
+    val raw = (providers.gradleProperty("autobridge.subtitleTranslation").orNull
+        ?: System.getenv("AUTOBRIDGE_SUBTITLE_TRANSLATION")
+        ?: "true").trim()
+    raw.toBooleanStrictOrNull()
+        ?: throw GradleException(
+            "autobridge.subtitleTranslation must be true or false, not \"$raw\"."
+        )
+}
+
+// `./gradlew -q :app:printVersion` -> "0.4.12 26". The release workflow and scripts ask Gradle
+// rather than re-parsing the properties file, so there is one definition of what the build used.
+tasks.register("printVersion") {
+    group = "help"
+    description = "Prints the versionName and versionCode this build would use."
+    doLast { println("$autoBridgeVersionName $autoBridgeVersionCode") }
+}
+
 val releaseSigningPropertiesFile = rootProject.file("keystore/release.properties")
 val releaseSigningProperties = Properties()
 if (releaseSigningPropertiesFile.isFile) {
@@ -34,8 +96,8 @@ android {
         applicationId = "dev.autobridge"
         minSdk = 29
         targetSdk = 36
-        versionCode = 26
-        versionName = "0.4.12"
+        versionCode = autoBridgeVersionCode
+        versionName = autoBridgeVersionName
         // The faults that actually reach a head unit — viewport geometry, scroll bounds, WebView
         // state — only reproduce against a real WebView, so this module needs on-device tests as
         // well as JVM ones.
@@ -44,6 +106,9 @@ android {
         // keeps libraries from dragging in other partial translations and lets Android resolve the
         // car/phone UI by the device/app language automatically.
         resourceConfigurations += setOf("en", "th")
+        // Read by SubtitleSettings.enabled() so a pref left on by an earlier build cannot ask an
+        // engine that is not here, and by the screens that offer the feature.
+        buildConfigField("boolean", "SUBTITLE_TRANSLATION", subtitleTranslationEnabled.toString())
     }
 
     flavorDimensions += "mode"
@@ -72,7 +137,18 @@ android {
             if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")
             }
-            isMinifyEnabled = false
+            // R8 on. The point is the deobfuscation file: Play Console asks for one for every
+            // bundle, and a minified build writes app/build/outputs/mapping/<variant>/mapping.txt
+            // which AGP packs into the .aab, so uploaded crashes and ANRs retrace to real names
+            // instead of `a.b.c`. Shrinking the unreached dependency code is the bonus. The edges
+            // R8 cannot see - JNI, the Shizuku user service, the Android Auto host instantiating a
+            // CarActivity - are pinned in proguard-rules.pro, one rule per reason.
+            //
+            // Resource shrinking is deliberately not enabled alongside it:
+            // play-services-oss-licenses looks its generated res/raw notices up by name through
+            // Resources.getIdentifier(), so the Settings "Open-source licenses" screen would come
+            // up empty with no build-time warning.
+            isMinifyEnabled = true
             buildConfigField("boolean", "DEV_MODE", "true")
             // Unlocked-all-safety build: release mirrors the debug parked-mock behavior so both
             // variants behave identically for personal/DHU use.
@@ -107,6 +183,16 @@ android {
     }
 
     lint {
+        // Snapshot of the lint errors that already existed when CI started gating on lint, so the
+        // `lintSafeDebug` gate fails on anything *new* without first demanding the backlog be
+        // cleared. The entries are the intentional experimental-API opt-ins (media3 UnstableApi,
+        // car ExperimentalCarApi) and two one-offs; each is a tracked item, not a reason to let
+        // the next regression through. The onBackPressed() gesture-nav entries have left it: the
+        // four Activities that handled Back themselves now register with the platform dispatcher
+        // (see [dev.autobridge.ui.SystemBack]) and suppress the check where the pre-33 override
+        // has to stay. Regenerate with
+        // `./gradlew lintSafeDebug` after deleting the file to re-snapshot once they are fixed.
+        baseline = file("lint-baseline.xml")
         // A string that exists in res/values but not in every res/values-<tag> renders in English
         // for that locale, which reads as a bug rather than a missing translation. Promoted to an
         // error so it cannot ride along in a release; scripts/check-i18n.sh reports the same gap
@@ -129,21 +215,47 @@ kotlin {
 // Projection route (split screen beside the navigation app) for the sideloaded flavors only. It
 // depends on the unofficial Android Auto SDK, which Play does not accept, so the safe flavor never
 // sees this source set or the archive.
+//
+// Duo Screen is gated the same way, for the same reason, but it is a module (:duoscreen) rather
+// than a source set: the dependency below is declared on the personal and lab configurations
+// only, so the safe flavor never compiles it, never merges its manifest and never ships it. That
+// also gives it a manifest of its own — an AndroidSourceSet has exactly one `manifest` slot
+// (unlike java/aidl srcDirs, which merge), so as a source set its service and activity had to
+// squat in src/projection/AndroidManifest.xml next to the projection route's.
+//
+// DuoScreenSettingsActivity stays here, in src/projection: it is a phone settings screen built on
+// the app's own design system, and belongs with the app's other settings screens rather than in
+// a module that otherwise knows nothing about them.
+//
+// The subtitle translation engines are split the same way, but on the build flag rather than the
+// flavor: src/translate holds the two classes that import ML Kit and ONNX Runtime plus the factory
+// that names them, src/notranslate holds a factory that passes every line through. Exactly one of
+// the two is compiled, so the libraries can leave the build without a single `if` in the subtitle
+// stack above them.
 android.sourceSets {
+    getByName("main") {
+        java.srcDir(if (subtitleTranslationEnabled) "src/translate/java" else "src/notranslate/java")
+    }
     listOf("personal", "lab").forEach { flavor ->
         getByName(flavor) {
             java.srcDir("src/projection/java")
             manifest.srcFile("src/projection/AndroidManifest.xml")
+            res.srcDir("src/projection/res")
         }
     }
 }
 
 dependencies {
+    implementation(project(":common"))
     // Unofficial Android Auto SDK (CarActivity/CarActivityService), the same archive Fermata Auto
     // ships as fermata/lib/auto/aauto.aar. Not published by Google and carries no license file.
     // sha256 99337c3b591ac9670c12b508da38886aedba61dd494f39f5f166f02580ec584b
     "personalImplementation"(files("libs/aauto.aar"))
     "labImplementation"(files("libs/aauto.aar"))
+    // Duo Screen. Sideload flavors only, like every other thing Play would not accept; it brings
+    // its own Shizuku and hidden-API dependencies with it.
+    "personalImplementation"(project(":duoscreen"))
+    "labImplementation"(project(":duoscreen"))
     testImplementation("junit:junit:4.13.2")
     // The subtitle pipeline launches its translation on an injected CoroutineScope; the test
     // drives that scope with a test dispatcher so a line's result lands synchronously and the
@@ -184,6 +296,10 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer-dash:1.11.1")
     implementation("androidx.media3:media3-common:1.11.1")
     implementation("androidx.media3:media3-session:1.11.1")
+    // PlayerView for the phone player: quality / audio-track / subtitle-track / speed menus, the
+    // buffered seek bar, buffering spinner and resize modes, instead of re-implementing each one.
+    // The car keeps its own template controls (Android Auto only hands over a bare Surface).
+    implementation("androidx.media3:media3-ui:1.11.1")
     // Presentation (letterboxing) for the car surface. media3-exoplayer does not depend on the
     // effect module, so setVideoEffects() needs it declared here, at the same version.
     implementation("androidx.media3:media3-effect:1.11.1")
@@ -193,8 +309,11 @@ dependencies {
     // engine for full-sentence quality and pairs ML Kit has no model for, run as a Marian
     // encoder-decoder through ONNX Runtime. Both keep the subtitle track - the dialogue of
     // whatever is playing - on the device rather than on a translation API's server.
-    implementation("com.google.mlkit:translate:17.0.3")
-    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.20.0")
+    // Both are behind -Pautobridge.subtitleTranslation; see the flag at the top of this file.
+    if (subtitleTranslationEnabled) {
+        implementation("com.google.mlkit:translate:17.0.3")
+        implementation("com.microsoft.onnxruntime:onnxruntime-android:1.20.0")
+    }
     // Renders the generated third-party license list in OssLicensesMenuActivity, which the
     // Settings "Open-source licenses" row opens. The oss-licenses-plugin collects the notices from
     // the dependency POMs at build time; this library is the viewer for them.

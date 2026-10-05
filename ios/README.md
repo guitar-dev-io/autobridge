@@ -22,7 +22,7 @@ What it **does** port — the entertainment surface, which is pure logic plus st
   fetched live — nothing is bundled or redistributed.
 - Favorites and a recently-played list.
 - An AutoBridge-flavored Home: TV, Radio, Streaming, Web browser.
-- A **Streaming** list of DRM-free web services (YouTube, YouTube Kids, TikTok, YouTube Music,
+- A **Streaming** list of DRM-free web services (YouTube, , TikTok, YouTube Music,
   Twitch, Bilibili), grouped by category and opened in the in-app `WKWebView` — matching the
   Android Streaming tile.
 - A **CarPlay audio** scene skeleton (`CPTemplateApplicationSceneDelegate`) for the Radio/audio

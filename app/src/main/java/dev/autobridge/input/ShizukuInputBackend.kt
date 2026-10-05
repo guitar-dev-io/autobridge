@@ -8,6 +8,7 @@ import android.os.IBinder
 import android.util.Log
 import dev.autobridge.core.model.Feature
 import dev.autobridge.core.policy.FeaturePolicy
+import dev.autobridge.shizuku.ShizukuGrant
 import rikka.shizuku.Shizuku
 
 /**
@@ -78,8 +79,9 @@ object ShizukuInputBackend : InputBackend {
         }
     }
 
+    /** Shared with Duo Screen, which gates its privileged ops on the very same grant. */
     val isPermissionGranted: Boolean
-        get() = Shizuku.pingBinder() && Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
+        get() = ShizukuGrant.isGranted
 
     override val isAvailable: Boolean
         get() = FeaturePolicy.app.isAvailable(Feature.TOUCH) &&

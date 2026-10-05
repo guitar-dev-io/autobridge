@@ -4,9 +4,11 @@ package dev.autobridge.iptv
  * Minimal `#EXTM3U` reader for IPTV playlists, including the `m3u_plus` attribute form Xtream
  * portals serve from `get.php`.
  *
- * Only the attributes AutoBridge actually shows are read (`group-title`, `tvg-logo`, `tvg-name`);
+ * Only the attributes AutoBridge actually shows are read (`group-title`, the logo, `tvg-name`);
  * anything else on the line is ignored rather than rejected, because provider playlists routinely
- * carry vendor-specific extras. Pure string work, so it is unit-testable without a network.
+ * carry vendor-specific extras. Which attribute carries the logo, and what makes its address
+ * usable, is [IptvLogos]' business — the value arrives here however the provider wrote it.
+ * Pure string work, so it is unit-testable without a network.
  */
 object M3uParser {
     /** One playlist line pair: its `#EXTINF` metadata plus the URL that follows it. */
@@ -26,10 +28,16 @@ object M3uParser {
             when {
                 line.isEmpty() -> Unit
                 line.startsWith("#EXTINF", ignoreCase = true) -> pending = parseExtInf(line)
-                // Other directives (#EXTGRP, #EXTVLCOPT, #EXTM3U) refine or precede the entry.
+                // Other directives (#EXTGRP, #EXTIMG, #EXTVLCOPT, #EXTM3U) refine or precede it.
                 line.startsWith("#EXTGRP:", ignoreCase = true) -> {
                     val group = line.substringAfter(':').trim()
                     pending = pending?.copy(group = group)
+                }
+                // Some generators put the logo on its own line instead of in an attribute; an
+                // #EXTINF that carried one too keeps it, because the attribute is the convention.
+                line.startsWith("#EXTIMG:", ignoreCase = true) -> {
+                    val logo = line.substringAfter(':').trim()
+                    pending = pending?.let { if (it.logo.isBlank()) it.copy(logo = logo) else it }
                 }
                 line.startsWith("#") -> Unit
                 else -> {
@@ -55,7 +63,7 @@ object M3uParser {
             name = name.ifBlank { attributes["tvg-name"].orEmpty() },
             url = "",
             group = attributes["group-title"].orEmpty(),
-            logo = attributes["tvg-logo"].orEmpty()
+            logo = IptvLogos.pick(attributes)
         )
     }
 

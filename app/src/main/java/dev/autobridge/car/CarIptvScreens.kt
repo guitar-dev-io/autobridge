@@ -1,10 +1,14 @@
 package dev.autobridge.car
 
 import android.content.Intent
+import android.text.SpannableString
+import android.text.Spanned
 import androidx.car.app.CarContext
 import androidx.car.app.CarToast
 import androidx.car.app.Screen
 import androidx.car.app.model.Action
+import androidx.car.app.model.CarColor
+import androidx.car.app.model.ForegroundCarColorSpan
 import androidx.car.app.model.Header
 import androidx.car.app.model.ItemList
 import androidx.car.app.model.ListTemplate
@@ -12,6 +16,7 @@ import androidx.car.app.model.MessageTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
 import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import dev.autobridge.R
 import dev.autobridge.browser.CarBrowserRuntime
@@ -24,6 +29,7 @@ import dev.autobridge.iptv.IptvKind
 import dev.autobridge.iptv.IptvPlayback
 import dev.autobridge.iptv.IptvSource
 import dev.autobridge.iptv.IptvSourceStore
+import dev.autobridge.iptv.StreamPing
 import dev.autobridge.library.LibraryActivity
 import dev.autobridge.media.MediaPlaybackClient
 
@@ -37,6 +43,10 @@ import dev.autobridge.media.MediaPlaybackClient
  * Playback follows the existing split: video goes to [CarVideoScreen] (which attaches the car
  * surface to the shared MediaSession) and radio goes to the MediaSession directly, so audio keeps
  * working while the driver browses on.
+ *
+ * Channel rows carry the playlist's own logo through [CarChannelLogos], and a page can be checked
+ * with [StreamPing] before anything is opened, so a dead or geo-blocked channel is visible as a
+ * row that says so rather than as a player that spins.
  */
 class CarIptvSourcesScreen(
     carContext: CarContext,
@@ -206,37 +216,58 @@ class CarIptvEntriesScreen(
     private val page: Int = 0
 ) : Screen(carContext) {
     private val mediaPlayback = MediaPlaybackClient(carContext)
+    private val logos = CarChannelLogos(carContext) { repaint() }
+    private var autoChecked = false
 
     init {
         mediaPlayback.connect(onConnected = { invalidate() }, onError = { invalidate() })
         lifecycle.addObserver(object : DefaultLifecycleObserver {
-            override fun onDestroy(owner: LifecycleOwner) = mediaPlayback.disconnect()
+            // The driver should not have to ask whether a channel still works, so the page checks
+            // itself once when it opens. Paging to the next screenful is a new screen, and checks
+            // itself in turn; coming back to this one does not, because the answers are cached.
+            override fun onStart(owner: LifecycleOwner) {
+                if (autoChecked) return
+                autoChecked = true
+                CarIptvCheck.start(
+                    carContext,
+                    CarIptvCheck.urls(CarListPaging.page(carContext, entries, page).items),
+                    quiet = true
+                ) { repaint() }
+            }
+
+            override fun onDestroy(owner: LifecycleOwner) {
+                logos.stop()
+                mediaPlayback.disconnect()
+            }
         })
     }
 
     override fun onGetTemplate(): Template {
         val paged = CarListPaging.page(carContext, entries, page)
+        // The logo budget is per template, so it starts over for the rows about to be built.
+        logos.beginTemplate()
         val list = ItemList.Builder()
         paged.items.forEach { entry ->
             val favorite = entry.url.isNotBlank() && IptvHistoryStore.isFavorite(carContext, entry.url)
-            list.addItem(
-                Row.Builder()
-                    .setTitle(entry.title)
-                    .addText(
-                        listOfNotNull(
-                            entry.subtitle.takeIf { it.isNotBlank() },
-                            carContext.getString(R.string.car_iptv_opens_in_browser)
-                                .takeIf { entry.isWebPage },
-                            carContext.getString(R.string.car_iptv_favourite).takeIf { favorite },
-                            carContext.getString(R.string.car_iptv_catchup)
-                                .takeIf { entry.supportsCatchup }
-                        ).joinToString(" • ")
-                            .ifBlank { carContext.getString(R.string.car_iptv_tap_to_play) }
-                    )
-                    .setBrowsable(entry.isSeriesFolder)
-                    .setOnClickListener { open(entry) }
-                    .build()
-            )
+            val row = Row.Builder()
+                .setTitle(entry.title)
+                .addText(
+                    listOfNotNull(
+                        entry.subtitle.takeIf { it.isNotBlank() },
+                        carContext.getString(R.string.car_iptv_opens_in_browser)
+                            .takeIf { entry.isWebPage },
+                        carContext.getString(R.string.car_iptv_favourite).takeIf { favorite },
+                        carContext.getString(R.string.car_iptv_catchup)
+                            .takeIf { entry.supportsCatchup }
+                    ).joinToString(" • ")
+                        .ifBlank { carContext.getString(R.string.car_iptv_tap_to_play) }
+                )
+                .setBrowsable(entry.isSeriesFolder)
+                .setOnClickListener { open(entry) }
+            logos.icon(entry.logo)?.let { row.setImage(it, Row.IMAGE_TYPE_SMALL) }
+            // A full-list row may carry two lines of text; a check result earns the second one.
+            StreamPing.cached(entry.url)?.let { row.addText(CarIptvCheck.text(carContext, it)) }
+            list.addItem(row.build())
         }
         if (paged.hasMore) {
             list.addItem(
@@ -252,9 +283,25 @@ class CarIptvEntriesScreen(
             )
         }
         return ListTemplate.Builder()
-            .setHeader(Header.Builder().setTitle(title).setStartHeaderAction(Action.BACK).build())
+            .setHeader(
+                Header.Builder()
+                    .setTitle(title)
+                    .setStartHeaderAction(Action.BACK)
+                    .apply {
+                        // Only the page in front of the driver is checked - a category can hold
+                        // thousands of channels, and the answers would be stale before they land.
+                        CarIptvCheck.action(carContext, CarIptvCheck.urls(paged.items)) { repaint() }
+                            ?.let { addEndHeaderAction(it) }
+                    }
+                    .build()
+            )
             .setSingleList(list.build())
             .build()
+    }
+
+    /** A logo or a check result landed: push a template only while this screen is really up. */
+    private fun repaint() {
+        if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) invalidate()
     }
 
     private fun open(entry: IptvEntry) {
@@ -289,41 +336,173 @@ class CarIptvEntriesScreen(
 /** Replay list backed by [IptvHistoryStore], so a channel restarts without reloading the portal. */
 class CarIptvRecentScreen(carContext: CarContext, private val kind: IptvKind) : Screen(carContext) {
     private val mediaPlayback = MediaPlaybackClient(carContext)
+    private val logos = CarChannelLogos(carContext) { repaint() }
+    private var autoChecked = false
 
     init {
         mediaPlayback.connect(onConnected = { invalidate() }, onError = { invalidate() })
         lifecycle.addObserver(object : DefaultLifecycleObserver {
-            override fun onDestroy(owner: LifecycleOwner) = mediaPlayback.disconnect()
+            override fun onStart(owner: LifecycleOwner) {
+                if (autoChecked) return
+                autoChecked = true
+                val items = IptvHistoryStore.recent(carContext, kind)
+                    .filter { it.playback == IptvPlayback.STREAM }
+                CarIptvCheck.start(carContext, items.map { it.url }, quiet = true) { repaint() }
+            }
+
+            override fun onDestroy(owner: LifecycleOwner) {
+                logos.stop()
+                mediaPlayback.disconnect()
+            }
         })
     }
 
     override fun onGetTemplate(): Template {
         val items = IptvHistoryStore.recent(carContext, kind)
+        logos.beginTemplate()
         val list = ItemList.Builder()
         items.forEach { item ->
-            list.addItem(
-                Row.Builder()
-                    .setTitle(item.title)
-                    .addText(item.type.name.lowercase().replaceFirstChar { it.uppercase() })
-                    .setOnClickListener {
-                        CarIptvPlayback.play(
-                            this, carContext, mediaPlayback, item.title, item.url, item.kind,
-                            item.playback
-                        )
-                    }
-                    .build()
-            )
+            val row = Row.Builder()
+                .setTitle(item.title)
+                .addText(item.type.name.lowercase().replaceFirstChar { it.uppercase() })
+                .setOnClickListener {
+                    CarIptvPlayback.play(
+                        this, carContext, mediaPlayback, item.title, item.url, item.kind,
+                        item.playback
+                    )
+                }
+            logos.icon(item.logo)?.let { row.setImage(it, Row.IMAGE_TYPE_SMALL) }
+            StreamPing.cached(item.url)?.let { row.addText(CarIptvCheck.text(carContext, it)) }
+            list.addItem(row.build())
         }
         return ListTemplate.Builder()
             .setHeader(
                 Header.Builder()
                     .setTitle(carContext.getString(R.string.car_iptv_recent))
                     .setStartHeaderAction(Action.BACK)
+                    .apply {
+                        // The replay list is where "does this still work?" matters most: these are
+                        // the channels the driver already chose once.
+                        val urls = items.filter { it.playback == IptvPlayback.STREAM }.map { it.url }
+                        CarIptvCheck.action(carContext, urls) { repaint() }
+                            ?.let { addEndHeaderAction(it) }
+                    }
                     .build()
             )
             .setSingleList(list.build())
             .build()
     }
+
+    private fun repaint() {
+        if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) invalidate()
+    }
+}
+
+/**
+ * The "check this page" header action, and the reading of one result, shared by every car screen
+ * that lists channels.
+ *
+ * A head unit cannot show a progress bar inside a list, so the run reports itself the way the car
+ * reports everything else: a toast when it starts, a toast with the tally when it finishes, and
+ * the rows filling in with [StreamPing]'s cached answers in between.
+ */
+internal object CarIptvCheck {
+    /** The addresses on a page worth probing: a folder and a watch page are not streams. */
+    fun urls(entries: List<IptvEntry>): List<String> = entries
+        .filter { !it.isSeriesFolder && !it.isWebPage && it.url.isNotBlank() }
+        .map { it.url }
+
+    /**
+     * The icon-only end header action that re-checks [urls], or null when there is nothing to
+     * check. Icon-only is not a style choice: a header action may carry no custom title (see
+     * [CarIcons]).
+     *
+     * The page has already checked itself by the time this is tappable, so the action forgets the
+     * remembered answers first - otherwise, inside the freshness window, it would hand back
+     * exactly what is already on the rows and look like a button that does nothing.
+     */
+    fun action(carContext: CarContext, urls: List<String>, repaint: () -> Unit): Action? {
+        val checkable = urls.filter { it.isNotBlank() }.distinct()
+        if (checkable.isEmpty()) return null
+        return Action.Builder()
+            .setIcon(CarIcons.of(carContext, CarIcons.SIGNAL))
+            .setOnClickListener {
+                StreamPing.forget(checkable)
+                start(carContext, checkable, quiet = false, repaint = repaint)
+            }
+            .build()
+    }
+
+    /**
+     * The row-sized reading of [result], in the language the car is running in and in the colour
+     * the result deserves: green answered, amber slow or unknown, red refused or silent.
+     *
+     * A host honours `ForegroundCarColorSpan` on row text (and ignores every other span), which is
+     * the only way an app colours anything inside a template it does not draw itself.
+     */
+    fun text(carContext: CarContext, result: StreamPing.Result): CharSequence {
+        val label = when (result) {
+            is StreamPing.Result.Alive ->
+                carContext.getString(R.string.car_iptv_ping_ms, result.millis)
+            is StreamPing.Result.Refused ->
+                carContext.getString(R.string.car_iptv_ping_http, result.status)
+            is StreamPing.Result.Unreachable ->
+                carContext.getString(R.string.car_iptv_ping_dead)
+            StreamPing.Result.Unsupported ->
+                carContext.getString(R.string.car_iptv_ping_unsupported)
+        }
+        val color = when (StreamPing.tone(result)) {
+            StreamPing.Tone.GOOD -> CarColor.GREEN
+            StreamPing.Tone.SLOW -> CarColor.YELLOW
+            StreamPing.Tone.BAD -> CarColor.RED
+        }
+        return SpannableString(label).apply {
+            setSpan(
+                ForegroundCarColorSpan.create(color), 0, label.length,
+                Spanned.SPAN_INCLUSIVE_EXCLUSIVE
+            )
+        }
+    }
+
+    /**
+     * Runs the check. [quiet] is the automatic pass a list makes when it opens: it is work the
+     * driver did not ask for, so it says nothing and shows itself only as colour on the rows.
+     *
+     * The automatic pass stops at [AUTO_LIMIT] addresses. A host can allow a hundred rows in one
+     * list, and probing all of them on the way past a category is traffic nobody asked for; the
+     * header action still covers the whole page on request.
+     */
+    fun start(
+        carContext: CarContext,
+        urls: List<String>,
+        quiet: Boolean,
+        repaint: () -> Unit
+    ) {
+        val checkable = urls.filter { it.isNotBlank() }.distinct()
+            .let { if (quiet) it.take(AUTO_LIMIT) else it }
+        if (checkable.isEmpty()) return
+        StreamPing.checkAll(checkable) { progress ->
+            repaint()
+            if (progress.done && !quiet) {
+                CarToast.makeText(
+                    carContext,
+                    carContext.getString(
+                        R.string.car_iptv_ping_done, progress.alive, progress.total
+                    ),
+                    CarToast.LENGTH_LONG
+                ).show()
+            }
+        }
+        if (quiet) return
+        CarToast.makeText(
+            carContext,
+            carContext.getString(R.string.car_iptv_ping_started, checkable.size),
+            CarToast.LENGTH_SHORT
+        ).show()
+    }
+
+    /** What the automatic pass checks: about two screenfuls on a roomy head unit. */
+    private const val AUTO_LIMIT = 24
 }
 
 /**

@@ -2,7 +2,7 @@ package dev.autobridge.safety
 
 import android.content.Context
 import androidx.core.content.edit
-import dev.autobridge.display.StructuredLog
+import dev.autobridge.logging.StructuredLog
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**

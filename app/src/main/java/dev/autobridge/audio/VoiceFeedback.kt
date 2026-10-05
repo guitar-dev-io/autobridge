@@ -7,7 +7,7 @@ import android.media.AudioManager
 import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
-import dev.autobridge.display.StructuredLog
+import dev.autobridge.logging.StructuredLog
 import java.util.Locale
 
 /**

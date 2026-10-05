@@ -13,6 +13,7 @@ import dev.autobridge.bridge.ContentRouter
 import dev.autobridge.bridge.EngineKind
 import dev.autobridge.bridge.EngineState
 import dev.autobridge.media.VideoOutputGeometry
+import dev.autobridge.media.VideoSurfaceArbiter
 
 /**
  * Plays a direct media URL through the app's existing MediaSession.
@@ -151,6 +152,7 @@ class NativePlaybackEngine(context: Context) : PlaybackEngine {
         if (output == null || !output.isValid) {
             VideoOutputGeometry.clear()
             player.clearVideoSurface()
+            VideoSurfaceArbiter.releaseForCar(reassert)
             return
         }
         player.setVideoSurface(output)
@@ -158,12 +160,32 @@ class NativePlaybackEngine(context: Context) : PlaybackEngine {
         // and it is discarded if it arrives before the surface.
         VideoOutputGeometry.set(surfaceWidth, surfaceHeight)
         BridgeLog.i("native.surface", "size" to "${surfaceWidth}x$surfaceHeight")
+        // The car now owns the shared player's video output; the phone player lets go of it.
+        VideoSurfaceArbiter.claimForCar(reassert)
+    }
+
+    /**
+     * Re-binds the car surface and repaints. Run by [VideoSurfaceArbiter] after the phone has
+     * dropped its binding, so a phone clear that lands late cannot leave the car audio-only.
+     */
+    private val reassert: () -> Unit = reassert@{
+        if (released) return@reassert
+        val player = media.player ?: return@reassert
+        val output = surface ?: return@reassert
+        if (!output.isValid || !player.isCommandAvailable(Player.COMMAND_SET_VIDEO_SURFACE)) return@reassert
+        player.setVideoSurface(output)
+        VideoOutputGeometry.set(surfaceWidth, surfaceHeight)
+        if (player.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)) {
+            player.seekTo(player.currentPosition)
+        }
+        BridgeLog.i("native.surface_reasserted")
     }
 
     override fun release() {
         if (released) return
         released = true
         VideoOutputGeometry.clear()
+        VideoSurfaceArbiter.releaseForCar(reassert)
         // Teardown runs while the car session is going away, so every step here races something
         // the platform is also tearing down. A throw on the way out would take the process with
         // it for no gain - whatever is being released is going away regardless.

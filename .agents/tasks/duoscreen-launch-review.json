@@ -1,0 +1,51 @@
+{
+  "verdict": "APPROVED",
+  "task_id": "task-duoscreen-launch-touch-fix",
+  "reviewed_at": "2026-10-04",
+  "device": "YXEMRCGYAI49S4SS",
+  "summary": "All five requirements independently verified. The pane launch resolves an explicit ComponentName in-app under the already-held QUERY_ALL_PACKAGES, no longer launches dev.autobridge into a pane, keeps the implicit fallback, leaves shell-UID mechanics / safe flavor / main manifest untouched, passes the JVM gate (build + 54 duoscreen tests incl. the new resolver test), and both on-device verdicts are recorded with exact log lines. The launch fix was reproduced live during this review (fresh display ids 2972/2973 prove the evidence is genuine captured logcat, not fabricated).",
+  "requirements_checked": [
+    {
+      "id": "R1-explicit-component-no-self-launch",
+      "status": "met",
+      "evidence": "DuoScreenController.resolveLauncherComponent() builds Intent(ACTION_MAIN)+CATEGORY_LAUNCHER+setPackage and queries via SDK33+ ResolveInfoFlags.of(0L) / pre-33 @Suppress(DEPRECATION) fallback, maps to DuoScreenLauncherResolver.LauncherActivity, returns the first match as a ComponentName. Self-launch guard present in BOTH openPane and reload (packageName == context.packageName -> StructuredLog.w + skip). Fresh on-device run showed 'Pane 0: launch(com.miui.calculator on display 2972) = true (explicit ComponentInfo{...CalculatorActivity})' and 'Pane 1: launch(com.android.settings on display 2973) = true (explicit ...MainSettings)'."
+    },
+    {
+      "id": "R2-implicit-fallback-preserved",
+      "status": "met",
+      "evidence": "DuoScreenShizukuOps.launchOnDisplay: 'if (component != null) intent.component = component else intent.setPackage(packageName)'. Controller logs a warning and still calls launchOnDisplay with component=null when resolution yields nothing, so already-working apps cannot regress."
+    },
+    {
+      "id": "R3-shell-uid-safe-flavor-main-manifest-untouched",
+      "status": "met",
+      "evidence": "buildStartActivityArgs, SHELL_PACKAGE=com.android.shell, and the startActivityAsUser invocation are unchanged (only intent.component vs setPackage differs). app/build.gradle.kts wires src/duoscreen + src/projection only into personal/lab; the safe flavor never compiles them (no app/src/safe dir needed). git diff of app/src/main/AndroidManifest.xml contains NO duoscreen/QUERY_ALL_PACKAGES entries; the QUERY_ALL_PACKAGES + CarAppService/Settings/Spike entries live in app/src/projection/AndroidManifest.xml (personal/lab only), as the task's quirk notes require."
+    },
+    {
+      "id": "R4-jvm-gate-and-tests",
+      "status": "met",
+      "evidence": "Independently ran ./gradlew :app:assemblePersonalDebug -> BUILD SUCCESSFUL and ./gradlew :app:testPersonalDebugUnitTest --rerun-tasks -> BUILD SUCCESSFUL. XML test reports confirm 54 duoscreen tests, 0 failures/0 errors: DuoScreenInputRouterTest 11, DuoScreenLauncherResolverTest 4, DuoScreenLayoutCodecTest 8, DuoScreenLayoutTest 14, DuoScreenPaneSetTest 6, DuoScreenResizeDebouncerTest 7, DuoScreenThreadSlotTest 4. DuoScreenLauncherResolverTest genuinely covers the resolution logic: single match, multiple-match order preservation (first best match), other-package -> null, empty -> null. Existing tests unchanged and all green."
+    },
+    {
+      "id": "R5-ondevice-launch-and-touch-verdicts-with-real-evidence",
+      "status": "met",
+      "evidence": "LAUNCH FIXED and independently reproduced on YXEMRCGYAI49S4SS this review: explicit-component launches, 'callingPackage com.android.shell (BAL_ALLOW_PERMISSION) result code=0', 'Displayed com.miui.calculator/.cal.CalculatorActivity' and 'Displayed com.android.settings/.MainSettings', no -91 / no 'aInfo is null'. Fresh display ids (2972/2973) differ from the report's recorded ids (2946/2953/2954/2962/2963), confirming the logs are live captures rather than replayed/fabricated text. TOUCH verdict PLATFORM-BLOCKED is recorded with exact log lines ('InputDispatcher: Focused display #2962 does not have a focused window' + FocusedWindows naming the real activities) and rests on the absence of the three real AutoBridgeDuoOps warning strings that exist in DuoScreenShizukuOps.kt ('Could not reach the input manager over Shizuku', 'MotionEvent.setDisplayId is unavailable; cannot target a display', 'injectInputEvent failed on display'); the injector pid is the shell-UID shizuku_server. This matches the own-content untrusted VirtualDisplay boundary (DuoScreenDisplays FLAG_OWN_CONTENT_ONLY, no ADD_TRUSTED_DISPLAY) and ROADMAP.md's PARTIAL/BLOCKED classification. A fix-or-prove-unfixable PLATFORM-BLOCKED touch verdict with evidence is an approvable outcome."
+    }
+  ],
+  "findings": [
+    {
+      "severity": "info",
+      "label": "Launch fix verified live, not just from the report",
+      "detail": "Re-ran the harness launch during review; AutoBridgeDuoCtl emitted the explicit-component success lines with fresh display ids, proving the recorded evidence is genuine captured logcat."
+    },
+    {
+      "severity": "info",
+      "label": "Stored self-target already remediated on device",
+      "detail": "autobridge_duo_screen.xml now holds com.miui.calculator + com.android.settings (the self-target dev.autobridge was replaced during verification), consistent with the report's Run 2 cleared-layout state and the picker now excluding self."
+    },
+    {
+      "severity": "low",
+      "label": "Stale KDoc in DuoScreenDisplays contradicts the touch verdict (non-blocking)",
+      "detail": "DuoScreenDisplays' class KDoc still asserts 'shell-injected touch reaches it' on the untrusted own-content display, which contradicts the fresh PLATFORM-BLOCKED touch finding. This is documentation drift, outside the launch-fix code scope and not a correctness issue; worth updating in a follow-up so the comment matches the recorded on-device result."
+    }
+  ]
+}

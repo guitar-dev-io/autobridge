@@ -91,7 +91,7 @@ internal object XtreamClient {
                 categoryId = stream.optString("category_id").ifBlank { IptvCatalogData.ALL_CATEGORY_ID },
                 type = IptvEntryType.LIVE,
                 url = credentials.liveUrl(id),
-                logo = stream.optString("stream_icon"),
+                logo = IptvLogos.resolve(credentials.portal, stream.optString("stream_icon")),
                 catchupDays = stream.optInt("tv_archive_duration", 0)
                     .takeIf { stream.optInt("tv_archive", 0) == 1 } ?: 0
             )
@@ -111,7 +111,7 @@ internal object XtreamClient {
                     categoryId = movie.optString("category_id").ifBlank { IptvCatalogData.ALL_CATEGORY_ID },
                     type = IptvEntryType.MOVIE,
                     url = credentials.vodUrl(id, movie.optString("container_extension")),
-                    logo = movie.optString("stream_icon"),
+                    logo = IptvLogos.resolve(credentials.portal, movie.optString("stream_icon")),
                     subtitle = "Movie"
                 )
             }
@@ -129,7 +129,7 @@ internal object XtreamClient {
                     categoryId = show.optString("category_id").ifBlank { IptvCatalogData.ALL_CATEGORY_ID },
                     type = IptvEntryType.SERIES,
                     url = "",
-                    logo = show.optString("cover"),
+                    logo = IptvLogos.resolve(credentials.portal, show.optString("cover")),
                     subtitle = "Series",
                     seriesId = id
                 )
@@ -163,7 +163,9 @@ internal object XtreamClient {
                 categoryId = channel.group.ifBlank { IptvCatalogData.ALL_CATEGORY_ID },
                 type = IptvEntryType.LIVE,
                 url = channel.url,
-                logo = channel.logo,
+                // A logo is routinely written relative to the list it came from, so the playlist
+                // address is what resolves it; see [IptvLogos].
+                logo = IptvLogos.resolve(url, channel.logo),
                 subtitle = (listOf(channel.group) + label.hints)
                     .filter { it.isNotBlank() }
                     // Same separator the rows themselves use, so a row never mixes two.

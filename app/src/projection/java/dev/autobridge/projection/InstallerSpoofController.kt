@@ -1,7 +1,7 @@
 package dev.autobridge.projection
 
 import android.content.Context
-import dev.autobridge.display.StructuredLog
+import dev.autobridge.logging.StructuredLog
 import dev.autobridge.input.ShizukuCommandRunner
 import dev.autobridge.input.ShizukuInputBackend
 import dev.autobridge.install.InstallerSource

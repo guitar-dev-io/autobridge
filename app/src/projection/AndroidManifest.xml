@@ -17,11 +17,17 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Duo Screen's pane picker lists every launchable app, which package visibility otherwise
+         hides on Android 11+. Sideload flavors only; the Play build has neither the picker nor
+         this permission. -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+
     <application>
         <service
             android:name="dev.autobridge.projection.ProjectionCarService"
             android:exported="true"
-            android:label="AutoBridge Browser"
+            android:label="Bridge Web"
+            android:icon="@mipmap/ic_browser_launcher"
             tools:ignore="ExportedService">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -36,5 +42,14 @@
             android:name="dev.autobridge.projection.ProjectionSetupActivity"
             android:exported="false"
             android:label="AutoBridge on Android Auto" />
+
+
+        <!-- Phone-side Duo Screen setup: app per pane, pane count, Shizuku status. Not exported:
+             reached from the app's own settings list. -->
+        <activity android:name="dev.autobridge.projection.DuoScreenSettingsActivity"
+            android:exported="false"
+            android:label="@string/duo_screen_title"
+            android:description="@string/duo_screen_subtitle" />
+
     </application>
 </manifest>

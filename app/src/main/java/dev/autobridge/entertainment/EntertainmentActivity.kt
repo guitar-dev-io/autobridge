@@ -1,5 +1,6 @@
 package dev.autobridge.entertainment
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
@@ -89,6 +90,7 @@ class EntertainmentActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        releaseBack = dev.autobridge.ui.SystemBack.register(this) { goBack() }
         if (browserMode) {
             startActivity(Intent(this, dev.autobridge.browser.BrowserActivity::class.java).apply {
                 data = intent.data
@@ -563,11 +565,22 @@ YouTube · TV · Web
         super.onPause()
     }
 
-    @Deprecated("Deprecated in Java")
-    override fun onBackPressed() {
+    /** A fullscreen video gives its screen back before Back leaves this one. */
+    private fun goBack() {
         if (::fullscreenController.isInitialized && fullscreenController.onBackPressed()) return
-        super.onBackPressed()
+        dev.autobridge.ui.SystemBack.finishFromBack(this)
     }
+
+    // Pre-33 devices only; everything newer comes through [dev.autobridge.ui.SystemBack].
+    @Deprecated("Back is handled by SystemBack on API 33+", ReplaceWith("goBack()"))
+    @Suppress("DEPRECATION")
+    // The lint check wants this gone, but it is still the only Back a pre-33 device delivers;
+    // SystemBack carries the versions that no longer call it.
+    @SuppressLint("GestureBackNavigation")
+    override fun onBackPressed() = goBack()
+
+    /** Undoes the Back registration; see [dev.autobridge.ui.SystemBack]. */
+    private var releaseBack: () -> Unit = {}
 
     override fun onSaveInstanceState(out: Bundle) {
         out.putString("source", source)
@@ -586,6 +599,7 @@ YouTube · TV · Web
     }
 
     override fun onDestroy() {
+        releaseBack()
         geolocation.release()
         if (!::browser.isInitialized) { super.onDestroy(); return }
         abandonAudioFocus()

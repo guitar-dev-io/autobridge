@@ -25,15 +25,15 @@ internal data class HomeMenuItem(
     companion object {
         /** The six primary destinations, in reading order (3 columns × 2 rows). */
         val primary: List<HomeMenuItem> = listOf(
-            HomeMenuItem(HomeSection.TV, HomeMenuGlyph.TV, HomeMenuTheme.ACCENT_TV),
-            HomeMenuItem(HomeSection.RADIO, HomeMenuGlyph.RADIO, HomeMenuTheme.ACCENT_RADIO),
-            HomeMenuItem(HomeSection.WEB, HomeMenuGlyph.GLOBE, HomeMenuTheme.ACCENT_WEB),
-            HomeMenuItem(HomeSection.YOUTUBE, HomeMenuGlyph.YOUTUBE, HomeMenuTheme.ACCENT_YOUTUBE),
+            HomeMenuItem(HomeSection.TV, HomeMenuGlyph.TV, HomeDashboardTheme.ACCENT_TV),
+            HomeMenuItem(HomeSection.RADIO, HomeMenuGlyph.RADIO, HomeDashboardTheme.ACCENT_RADIO),
+            HomeMenuItem(HomeSection.WEB, HomeMenuGlyph.GLOBE, HomeDashboardTheme.ACCENT_WEB),
+            HomeMenuItem(HomeSection.YOUTUBE, HomeMenuGlyph.YOUTUBE, HomeDashboardTheme.ACCENT_YOUTUBE),
             HomeMenuItem(
                 HomeSection.YOUTUBE_MUSIC, HomeMenuGlyph.YOUTUBE_MUSIC,
-                HomeMenuTheme.ACCENT_YOUTUBE_MUSIC
+                HomeDashboardTheme.ACCENT_YOUTUBE_MUSIC
             ),
-            HomeMenuItem(HomeSection.STREAMING, HomeMenuGlyph.STREAMING, HomeMenuTheme.ACCENT_STREAMING)
+            HomeMenuItem(HomeSection.STREAMING, HomeMenuGlyph.STREAMING, HomeDashboardTheme.ACCENT_STREAMING)
         )
     }
 }
@@ -54,7 +54,7 @@ internal class HomeMenuCard {
         strokeJoin = Paint.Join.ROUND
     }
     val label = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = HomeMenuTheme.TEXT_PRIMARY
+        color = HomeDashboardTheme.TEXT_PRIMARY
         typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
         textAlign = Paint.Align.CENTER
     }
@@ -67,7 +67,7 @@ internal class HomeMenuCard {
         bounds: MenuBox,
         item: HomeMenuItem,
         title: String,
-        layout: HomeMenuLayout,
+        layout: HomeDashboardLayout,
         state: State
     ) {
         val d = layout.density
@@ -76,24 +76,24 @@ internal class HomeMenuCard {
 
         // Card body.
         fill.color = when (state) {
-            State.NORMAL -> HomeMenuTheme.CARD
-            State.FOCUSED -> HomeMenuTheme.CARD_FOCUSED
-            State.PRESSED -> HomeMenuTheme.CARD_PRESSED
+            State.NORMAL -> HomeDashboardTheme.CARD
+            State.FOCUSED -> HomeDashboardTheme.CARD_FOCUSED
+            State.PRESSED -> HomeDashboardTheme.CARD_PRESSED
         }
         canvas.drawRoundRect(rect, radius, radius, fill)
 
         // Border: hairline normally, AutoBridge blue with a soft halo when focused or pressed.
         if (state == State.NORMAL) {
-            stroke.color = HomeMenuTheme.BORDER
-            stroke.strokeWidth = HomeMenuTheme.Dp.CARD_BORDER * d
+            stroke.color = HomeDashboardTheme.BORDER
+            stroke.strokeWidth = HomeDashboardTheme.Dp.CARD_BORDER * d
             inset(rect, stroke.strokeWidth / 2f)
             canvas.drawRoundRect(rect, radius, radius, stroke)
         } else {
-            stroke.color = HomeMenuTheme.withAlpha(HomeMenuTheme.ACCENT, if (state == State.PRESSED) 0.30f else 0.20f)
-            stroke.strokeWidth = HomeMenuTheme.Dp.FOCUS_GLOW * d
+            stroke.color = HomeDashboardTheme.withAlpha(HomeDashboardTheme.ACCENT, if (state == State.PRESSED) 0.30f else 0.20f)
+            stroke.strokeWidth = HomeDashboardTheme.Dp.FOCUS_GLOW * d
             canvas.drawRoundRect(rect, radius, radius, stroke)
-            stroke.color = HomeMenuTheme.ACCENT
-            stroke.strokeWidth = HomeMenuTheme.Dp.FOCUS_BORDER * d
+            stroke.color = HomeDashboardTheme.ACCENT
+            stroke.strokeWidth = HomeDashboardTheme.Dp.FOCUS_BORDER * d
             inset(rect, stroke.strokeWidth / 2f)
             canvas.drawRoundRect(rect, radius, radius, stroke)
         }
@@ -114,11 +114,11 @@ internal class HomeMenuCard {
     }
 
     private fun drawIconTile(canvas: Canvas, left: Float, top: Float, size: Float, item: HomeMenuItem, d: Float) {
-        val radius = size * HomeMenuTheme.ICON_RADIUS_RATIO
+        val radius = size * HomeDashboardTheme.ICON_RADIUS_RATIO
         rect.set(left, top, left + size, top + size)
-        fill.color = HomeMenuTheme.mix(HomeMenuTheme.CARD, item.accent, HomeMenuTheme.ICON_TILE_TINT)
+        fill.color = HomeDashboardTheme.mix(HomeDashboardTheme.CARD, item.accent, HomeDashboardTheme.ICON_TILE_TINT)
         canvas.drawRoundRect(rect, radius, radius, fill)
-        stroke.color = HomeMenuTheme.mix(HomeMenuTheme.CARD, item.accent, HomeMenuTheme.ICON_TILE_BORDER_TINT)
+        stroke.color = HomeDashboardTheme.mix(HomeDashboardTheme.CARD, item.accent, HomeDashboardTheme.ICON_TILE_BORDER_TINT)
         stroke.strokeWidth = d
         inset(rect, d / 2f)
         canvas.drawRoundRect(rect, radius, radius, stroke)
@@ -131,6 +131,21 @@ internal class HomeMenuCard {
         canvas.restore()
     }
 
+    /**
+     * The same glyph, scaled into [box] instead of into a card's icon tile.
+     *
+     * Fallback artwork on the dashboard - the thumbnail stand-in for a row whose source publishes
+     * no still - is this glyph over a tinted panel, so a card tile and a missing thumbnail are
+     * drawn by one piece of code and cannot drift apart.
+     */
+    fun drawGlyph(canvas: Canvas, box: MenuBox, kind: HomeMenuGlyph, accent: Int) {
+        canvas.save()
+        canvas.translate(box.left, box.top)
+        canvas.scale(box.width / 100f, box.height / 100f)
+        drawGlyph(canvas, kind, accent)
+        canvas.restore()
+    }
+
     private fun drawGlyph(canvas: Canvas, kind: HomeMenuGlyph, accent: Int) {
         val strokeWeight = 5.5f
         glyph.color = accent
@@ -139,7 +154,7 @@ internal class HomeMenuCard {
             HomeMenuGlyph.TV -> {
                 rect.set(24f, 28f, 76f, 63f)
                 glyph.style = Paint.Style.FILL
-                glyph.color = HomeMenuTheme.withAlpha(accent, 0.22f)
+                glyph.color = HomeDashboardTheme.withAlpha(accent, 0.22f)
                 canvas.drawRoundRect(rect, 5f, 5f, glyph)
                 glyph.color = accent
                 glyph.style = Paint.Style.STROKE
@@ -173,13 +188,13 @@ internal class HomeMenuCard {
                 glyph.style = Paint.Style.FILL
                 rect.set(22f, 32f, 78f, 68f)
                 canvas.drawRoundRect(rect, 11f, 11f, glyph)
-                glyph.color = HomeMenuTheme.TEXT_PRIMARY
+                glyph.color = HomeDashboardTheme.TEXT_PRIMARY
                 triangle(canvas, 44f, 41f, 60f)
             }
             HomeMenuGlyph.YOUTUBE_MUSIC -> {
                 glyph.style = Paint.Style.FILL
                 canvas.drawCircle(50f, 50f, 26f, glyph)
-                glyph.color = HomeMenuTheme.TEXT_PRIMARY
+                glyph.color = HomeDashboardTheme.TEXT_PRIMARY
                 glyph.style = Paint.Style.STROKE
                 glyph.strokeWidth = 3.5f
                 canvas.drawCircle(50f, 50f, 15.5f, glyph)
@@ -194,7 +209,7 @@ internal class HomeMenuCard {
                 glyph.style = Paint.Style.FILL
                 rect.set(22f, 42f, 78f, 76f)
                 canvas.drawRoundRect(rect, 9f, 9f, glyph)
-                glyph.color = HomeMenuTheme.TEXT_PRIMARY
+                glyph.color = HomeDashboardTheme.TEXT_PRIMARY
                 path.reset()
                 path.moveTo(45f, 51f)
                 path.lineTo(45f, 67f)

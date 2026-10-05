@@ -41,7 +41,7 @@ import dev.autobridge.MainActivity
 import dev.autobridge.core.model.Feature
 import dev.autobridge.core.policy.FeaturePolicy
 import dev.autobridge.audio.WebMediaStatus
-import dev.autobridge.display.StructuredLog
+import dev.autobridge.logging.StructuredLog
 import dev.autobridge.safety.ParkingStateStore
 import dev.autobridge.settings.PreferredPlayer
 import dev.autobridge.subtitles.SubtitleController

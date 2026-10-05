@@ -1,5 +1,6 @@
 package dev.autobridge.display
 
+import dev.autobridge.logging.StructuredLog
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

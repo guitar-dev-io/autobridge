@@ -1,6 +1,6 @@
 package dev.autobridge.bridge
 
-import dev.autobridge.display.StructuredLog
+import dev.autobridge.logging.StructuredLog
 
 /**
  * The bridge's one logging entry point, so every line about a connect, a send, a routing decision

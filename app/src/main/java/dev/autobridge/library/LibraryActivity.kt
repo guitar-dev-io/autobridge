@@ -1,5 +1,6 @@
 package dev.autobridge.library
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
@@ -9,6 +10,7 @@ import android.os.Bundle
 import android.view.View
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
 import dev.autobridge.entertainment.ContentKind
 import dev.autobridge.entertainment.EntertainmentActivity
@@ -24,12 +26,14 @@ import dev.autobridge.iptv.IptvPlayback
 import dev.autobridge.iptv.IptvSource
 import dev.autobridge.iptv.IptvSourceStore
 import dev.autobridge.iptv.IptvSourceType
+import dev.autobridge.iptv.StreamPing
 import dev.autobridge.iptv.XtreamCredentials
 import dev.autobridge.media.MediaPlaybackClient
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.dp
 import dev.autobridge.ui.AutoBridgeDesign.stack
 import dev.autobridge.ui.MiniPlayer
+import dev.autobridge.ui.SystemBack
 
 /**
  * Phone host for the home grid's content sections: TV, Radio, Folders, Playlists, Gallery and
@@ -82,6 +86,22 @@ class LibraryActivity : Activity() {
     /** Rendered pages, most recent last. Back pops one; popping the root finishes the Activity. */
     private val stack = ArrayDeque<() -> Unit>()
 
+    /** Undoes [SystemBack.register]; see that object for why Back needs registering at all. */
+    private var releaseBack: () -> Unit = {}
+
+    /**
+     * The tiles of the entry page currently drawn, by stream URL, so a check result can be written
+     * into the page instead of rebuilding it. Rebuilt whenever that page draws; a stale view left
+     * in here after navigating away is only ever written to, never read from.
+     */
+    private val pingTiles = mutableMapOf<String, View>()
+
+    /**
+     * The entries page's header signal icon, so a check result landing can recolour it without
+     * re-rendering the page. Null on any page that has no signal icon, which `render` leaves it as.
+     */
+    private var signalIndicator: TextView? = null
+
     /** Applies the Settings &gt; Language choice; see [AppLocale.rebase]. */
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(AppLocale.rebase(newBase))
@@ -89,6 +109,7 @@ class LibraryActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        releaseBack = SystemBack.register(this) { goBack() }
         playback = MediaPlaybackClient(this)
         playback.connect()
         when (section) {
@@ -116,18 +137,32 @@ class LibraryActivity : Activity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        releaseBack()
         miniPlayer?.stop()
         playback.disconnect()
     }
 
-    override fun onBackPressed() {
-        // The current page is the top of the stack, so dropping it and replaying the one beneath
-        // restores the page the user came from without rebuilding the whole section. The previous
-        // page stays on the stack: it is now the current one.
+    /**
+     * Back goes up one page, not out of the section.
+     *
+     * The current page is the top of the stack, so dropping it and replaying the one beneath
+     * restores the page the user came from without rebuilding the whole section. The previous page
+     * stays on the stack: it is now the current one. The root page has nothing beneath it, so Back
+     * there leaves the way the system would have.
+     */
+    private fun goBack() {
         stack.removeLastOrNull()
         val previous = stack.lastOrNull()
-        if (previous == null) super.onBackPressed() else previous()
+        if (previous == null) SystemBack.finishFromBack(this) else previous()
     }
+
+    // Pre-33 devices only; everything newer comes through [SystemBack]. See its table.
+    @Deprecated("Back is handled by SystemBack on API 33+", ReplaceWith("goBack()"))
+    @Suppress("DEPRECATION")
+    // The lint check wants this gone, but it is still the only Back a pre-33 device delivers;
+    // SystemBack carries the versions that no longer call it.
+    @SuppressLint("GestureBackNavigation")
+    override fun onBackPressed() = goBack()
 
     /** Renders [page] and records it so Back can replay the page beneath it. */
     private fun push(page: () -> Unit) {
@@ -149,8 +184,9 @@ class LibraryActivity : Activity() {
         subtitle: String?,
         rows: List<View>,
         empty: View? = null,
-        onBack: () -> Unit = { onBackPressed() },
+        onBack: () -> Unit = { goBack() },
         actions: List<Pair<String, () -> Unit>> = emptyList(),
+        headerActions: List<AutoBridgeDesign.HeaderAction> = emptyList(),
         search: Pair<String, (String) -> Unit>? = null
     ) {
         val body = AutoBridgeDesign.body(this)
@@ -185,10 +221,12 @@ class LibraryActivity : Activity() {
             addView(bar.view, LinearLayout.LayoutParams(-1, -2))
         }
 
+        val header = AutoBridgeDesign.header(this, title, subtitle, onBack = onBack, actions = headerActions)
+        signalIndicator = header.findViewWithTag(SIGNAL_ACTION_TAG)
         setContentView(
             AutoBridgeDesign.page(
                 context = this,
-                header = AutoBridgeDesign.header(this, title, subtitle, onBack = onBack),
+                header = header,
                 pinned = pinned,
                 body = body,
                 bottomBar = bottom
@@ -204,7 +242,10 @@ class LibraryActivity : Activity() {
                 url = "",
                 title = playing,
                 subtitle = playback.currentArtist.orEmpty(),
-                video = false
+                // Open as video when the session is actually on a video channel. Hardcoding false
+                // forced the audio-only path, so tapping the now-playing bar on a TV channel kept
+                // the sound but never reattached the video surface - picture gone, audio only.
+                video = playback.hasVideo
             )
         )
     }
@@ -218,8 +259,22 @@ class LibraryActivity : Activity() {
     private fun showSources() = push {
         val sources = IptvSourceStore.list(this, iptvKind)
         val recent = IptvHistoryStore.recent(this, iptvKind)
+        val favorites = IptvHistoryStore.favorites(this, iptvKind)
         val rows = mutableListOf<View>()
 
+        // A starred channel is a deliberate choice, so it leads; "Recently played" is just
+        // whatever happened to play last and sits under it.
+        if (favorites.isNotEmpty()) {
+            rows += AutoBridgeDesign.contentRow(
+                context = this,
+                title = "Favorites",
+                subtitle = plural(favorites.size, "channel"),
+                accent = accent,
+                badgeText = "★",
+                trailing = "›",
+                onClick = { showFavorites() }
+            )
+        }
         if (recent.isNotEmpty()) {
             rows += AutoBridgeDesign.contentRow(
                 context = this,
@@ -335,6 +390,8 @@ class LibraryActivity : Activity() {
     ) {
         val all = data.entriesIn(categoryId)
         var query = ""
+        // Checked once per visit, not once per keystroke: draw() runs again on every letter typed.
+        var autoChecked = false
         // The page re-renders itself on every keystroke, so the filter lives outside the lambda.
         lateinit var draw: () -> Unit
         draw = {
@@ -344,6 +401,8 @@ class LibraryActivity : Activity() {
             val shown = filtered.take(MAX_VISIBLE_ENTRIES)
             val counted = if (query.isBlank()) plural(all.size, "entry", "entries")
             else "${filtered.size} of ${all.size} match \"$query\""
+            // The tiles about to be built are the ones a landing result writes into.
+            pingTiles.clear()
             render(
                 title = categoryName,
                 // A country-grouped public playlist puts thousands of channels in "All". Saying
@@ -353,9 +412,21 @@ class LibraryActivity : Activity() {
                 } else {
                     counted
                 },
-                rows = shown.map { entryRow(source, it, shown) },
+                // Channels and films carry a logo worth seeing, so this page is a grid of tiles
+                // rather than a list of rows; two columns is what fits a phone at a glance.
+                rows = AutoBridgeDesign.grid(this, shown.map { entryTile(source, it, shown) }),
                 empty = AutoBridgeDesign.emptyState(
                     this, "No matches", "Nothing in this category matches that search."
+                ),
+                // A signal icon in the corner instead of a labelled button: it reads this page's
+                // worst check result at a glance, and still taps to recheck like the button did.
+                headerActions = listOf(
+                    AutoBridgeDesign.HeaderAction(
+                        glyph = "📶",
+                        onClick = { recheckEntries(shown) },
+                        tint = signalTint(),
+                        tag = SIGNAL_ACTION_TAG
+                    )
                 ),
                 search = if (all.size >= SEARCH_THRESHOLD) {
                     query to { value: String ->
@@ -366,8 +437,102 @@ class LibraryActivity : Activity() {
                     null
                 }
             )
+            if (!autoChecked) {
+                autoChecked = true
+                pingEntries(shown.take(AUTO_PING_ENTRIES), quiet = true)
+            }
         }
         push(draw)
+    }
+
+    /**
+     * One entry as a grid tile: its logo, its title, and its last check result in colour.
+     *
+     * [siblings] is the list this tile is shown in. It becomes the player's queue, which is what
+     * Next/Previous, the channel gesture and "Auto next channel" walk; without it a channel opened
+     * from a category would be the only thing the player knows about.
+     */
+    private fun entryTile(
+        source: IptvSource,
+        entry: IptvEntry,
+        siblings: List<IptvEntry> = emptyList()
+    ): View {
+        val favorite = entry.url.isNotBlank() && IptvHistoryStore.isFavorite(this, entry.url)
+        val tile = AutoBridgeDesign.contentTile(
+            context = this,
+            title = entry.title,
+            subtitle = listOfNotNull(
+                entry.subtitle.takeIf { it.isNotBlank() },
+                "Opens in browser".takeIf { entry.isWebPage },
+                "Catch-up".takeIf { entry.supportsCatchup }
+            ).joinToString(" • "),
+            accent = accent,
+            artworkUrl = entry.logo,
+            status = StreamPing.cached(entry.url)?.let { pingStatus(it) },
+            corner = if (entry.isSeriesFolder) {
+                "›" to { openEntry(source, entry, siblings) }
+            } else {
+                (if (favorite) "★" else "☆") to {
+                    IptvHistoryStore.toggleFavorite(this, source, entry)
+                    refresh()
+                }
+            },
+            // TV video streams (not web pages, not folders) can be sent straight to the car's
+            // video screen without opening the phone player first.
+            onLongClick = if (!entry.isSeriesFolder && !entry.isWebPage && source.kind != IptvKind.RADIO) {
+                { sendChannelMenu(source, entry) }
+            } else {
+                null
+            },
+            onClick = { openEntry(source, entry, siblings) }
+        )
+        if (entry.url.isNotBlank()) pingTiles[entry.url] = tile
+        return tile
+    }
+
+    /** A check result as text and the colour it reads in. */
+    private fun pingStatus(result: StreamPing.Result): Pair<String, Int> =
+        StreamPing.describe(result) to when (StreamPing.tone(result)) {
+            StreamPing.Tone.GOOD -> AutoBridgeDesign.SIGNAL_GOOD
+            StreamPing.Tone.SLOW -> AutoBridgeDesign.SIGNAL_SLOW
+            StreamPing.Tone.BAD -> AutoBridgeDesign.DANGER
+        }
+
+    /**
+     * Writes the results that have landed into the tiles already on screen.
+     *
+     * Re-rendering the page instead would scroll it back to the top every time a batch of answers
+     * arrives, which is an unusable page while a check runs - so nothing is rebuilt here.
+     */
+    private fun updatePingTiles() {
+        pingTiles.forEach { (url, tile) ->
+            val result = StreamPing.cached(url) ?: return@forEach
+            val (text, color) = pingStatus(result)
+            AutoBridgeDesign.setStatus(tile, text, color)
+        }
+        signalTint()?.let { signalIndicator?.setTextColor(it) }
+    }
+
+    /**
+     * The header signal icon's colour: the worst tone among [pingTiles]' cached results, or null
+     * while nothing on this page has been checked yet, which leaves the icon in its default colour.
+     *
+     * [pingTiles] is read rather than taking an entries list, because that is exactly the set this
+     * page's icon is answering for - and it stays correct as results land without re-rendering.
+     */
+    private fun signalTint(): Int? {
+        val tones = pingTiles.keys.mapNotNull { StreamPing.cached(it) }.map { StreamPing.tone(it) }
+        val worst = when {
+            tones.isEmpty() -> return null
+            tones.contains(StreamPing.Tone.BAD) -> StreamPing.Tone.BAD
+            tones.contains(StreamPing.Tone.SLOW) -> StreamPing.Tone.SLOW
+            else -> StreamPing.Tone.GOOD
+        }
+        return when (worst) {
+            StreamPing.Tone.GOOD -> AutoBridgeDesign.SIGNAL_GOOD
+            StreamPing.Tone.SLOW -> AutoBridgeDesign.SIGNAL_SLOW
+            StreamPing.Tone.BAD -> AutoBridgeDesign.DANGER
+        }
     }
 
     /**
@@ -387,7 +552,10 @@ class LibraryActivity : Activity() {
             subtitle = listOfNotNull(
                 entry.subtitle.takeIf { it.isNotBlank() },
                 "Opens in browser".takeIf { entry.isWebPage },
-                "Catch-up".takeIf { entry.supportsCatchup }
+                "Catch-up".takeIf { entry.supportsCatchup },
+                // Whatever the last check said about this address, for as long as it stays true;
+                // the row says nothing extra until something has actually been checked.
+                StreamPing.cached(entry.url)?.let { StreamPing.describe(it) }
             ).joinToString(" • "),
             accent = accent,
             artworkUrl = entry.logo,
@@ -408,17 +576,93 @@ class LibraryActivity : Activity() {
         return row
     }
 
-    /** Long-press menu for a TV entry: play here, or send it straight to the car's video screen. */
+    /** Long-press menu for a TV entry: play here, send it to the car, or check that it answers. */
     private fun sendChannelMenu(source: IptvSource, entry: IptvEntry) {
         AlertDialog.Builder(this)
             .setTitle(entry.title)
-            .setItems(arrayOf("Play here", "Send to car")) { _, index ->
+            .setItems(arrayOf("Play here", "Send to car", "Ping")) { _, index ->
                 when (index) {
                     0 -> openEntry(source, entry)
                     1 -> sendToCar(source, entry)
+                    else -> pingEntry(entry)
                 }
             }
             .show()
+    }
+
+    /**
+     * Checks the channels on this page, so a dead or geo-blocked one reads as such in its row
+     * instead of being found out by a player that spins.
+     *
+     * Only what is on screen is checked, and only up to [MAX_PING_ENTRIES] of it: a public list
+     * holds thousands of addresses and probing them all would be a port scan of a dozen CDNs. The
+     * rows re-read [StreamPing]'s cache as results land, which is why this re-renders the page
+     * rather than tracking anything itself.
+     */
+    private fun pingEntries(entries: List<IptvEntry>, quiet: Boolean = false) {
+        val urls = checkableUrls(entries)
+        if (urls.isEmpty()) {
+            if (!quiet) Toast.makeText(this, "Nothing here can be checked.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        StreamPing.checkAll(urls) { progress ->
+            if (isFinishing || isDestroyed) return@checkAll
+            updatePingTiles()
+            if (progress.done && !quiet) {
+                Toast.makeText(
+                    this,
+                    "${progress.alive} of ${progress.total} channels answered.",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+        // The automatic pass says nothing at all: it is background work the user did not ask for,
+        // and its whole output is the colour on the tiles.
+        if (quiet) return
+        Toast.makeText(this, "Checking ${urls.size} channels…", Toast.LENGTH_SHORT).show()
+    }
+
+    /**
+     * The explicit recheck, triggered by tapping the header's signal icon: the same sweep, but the
+     * remembered answers are dropped first.
+     *
+     * Without that, a tap inside the five-minute freshness window would hand back exactly what is
+     * already on screen and look like a button that does nothing.
+     */
+    private fun recheckEntries(entries: List<IptvEntry>) {
+        StreamPing.forget(checkableUrls(entries))
+        pingEntries(entries)
+    }
+
+    /** The addresses on a page worth probing: a folder and a watch page are not streams. */
+    private fun checkableUrls(entries: List<IptvEntry>): List<String> = entries
+        .filter { !it.isSeriesFolder && !it.isWebPage && it.url.isNotBlank() }
+        .map { it.url }
+        .distinct()
+        .take(MAX_PING_ENTRIES)
+
+    /** One channel, checked from its long-press menu and reported in full rather than in a row. */
+    private fun pingEntry(entry: IptvEntry) {
+        val dialog = progressDialog("Checking ${entry.title}…")
+        StreamPing.check(entry.url) { result ->
+            dialog.dismiss()
+            if (isFinishing || isDestroyed) return@check
+            updatePingTiles()
+            alert(entry.title, pingSentence(result))
+        }
+    }
+
+    private fun pingSentence(result: StreamPing.Result): String = when (result) {
+        is StreamPing.Result.Alive -> "The server answered in ${result.millis} ms."
+        is StreamPing.Result.Refused ->
+            "The server answered HTTP ${result.status}: it is reachable, but it refused this " +
+                "address. An expired token or a geo-block looks like this."
+        is StreamPing.Result.Unreachable ->
+            "No answer: ${result.reason.lowercase()}. The channel is offline, or this network " +
+                "cannot reach it."
+        StreamPing.Result.Unsupported ->
+            "This address cannot be checked: it is a multicast or non-standard stream, which " +
+                "answers no connection of its own."
     }
 
     /**
@@ -526,6 +770,7 @@ class LibraryActivity : Activity() {
                     title = item.title,
                     subtitle = item.type.name.lowercase().replaceFirstChar { it.uppercase() },
                     accent = accent,
+                    artworkUrl = item.logo,
                     onClick = {
                         if (item.playback == IptvPlayback.WEB_PAGE) {
                             openWebChannel(item.url, item.title)
@@ -910,6 +1155,7 @@ class LibraryActivity : Activity() {
                 } else {
                     AutoBridgeDesign.ACCENT_TV
                 },
+                artworkUrl = item.logo,
                 trailing = "✕",
                 onTrailing = {
                     IptvHistoryStore.removeFavorite(this, item.url)
@@ -1101,3 +1347,19 @@ class LibraryActivity : Activity() {
 
 /** Cap on rows drawn at once: these pages are plain view stacks, not recycling lists. */
 private const val MAX_VISIBLE_ENTRIES = 300
+
+/**
+ * Cap on channels one explicit check probes. A page can show 300 tiles; probing them all would
+ * hammer a handful of providers for answers the user did not ask about.
+ */
+private const val MAX_PING_ENTRIES = 60
+
+/**
+ * Cap on the automatic check a page runs when it opens — roughly the first two screenfuls of a
+ * two-column grid. The automatic pass is traffic the user did not ask for, so it stays smaller
+ * than what tapping the signal icon will do on request.
+ */
+private const val AUTO_PING_ENTRIES = 24
+
+/** Tag on the entries page's header signal icon, so a landed check result can find it again. */
+private const val SIGNAL_ACTION_TAG = "iptv-signal"

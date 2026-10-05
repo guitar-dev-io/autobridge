@@ -2,7 +2,7 @@ package dev.autobridge.core.state
 
 import android.content.Context
 import dev.autobridge.diagnostics.CrashReportStore
-import dev.autobridge.display.StructuredLog
+import dev.autobridge.logging.StructuredLog
 import dev.autobridge.iptv.IptvCatalog
 import dev.autobridge.ui.ImageLoader
 import java.io.File

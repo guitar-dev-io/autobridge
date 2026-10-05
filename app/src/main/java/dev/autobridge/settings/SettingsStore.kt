@@ -3,7 +3,7 @@ package dev.autobridge.settings
 import android.content.Context
 import androidx.core.content.edit
 import dev.autobridge.display.ScreenOffController
-import dev.autobridge.display.StructuredLog
+import dev.autobridge.logging.StructuredLog
 import dev.autobridge.display.SurfaceProfile
 import dev.autobridge.mirror.MirrorCoordinator
 

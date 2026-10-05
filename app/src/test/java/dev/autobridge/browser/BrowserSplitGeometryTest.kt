@@ -12,7 +12,9 @@ class BrowserSplitGeometryTest {
 
     private fun split(
         layout: BrowserSplitLayout, w: Int, h: Int, sideOnRight: Boolean = false,
-    ): SplitPanes? = BrowserSplitGeometry.panes(layout, 0, 0, w, h, sideOnRight, gap, minPane)
+        sideFraction: Float? = null,
+    ): SplitPanes? =
+        BrowserSplitGeometry.panes(layout, 0, 0, w, h, sideOnRight, gap, minPane, sideFraction)
 
     @Test fun singleHasNoSidePane() {
         assertNull(split(BrowserSplitLayout.SINGLE, 1280, 720))
@@ -67,6 +69,77 @@ class BrowserSplitGeometryTest {
 
     @Test fun aSurfaceTooNarrowForTwoUsablePanesStaysSingle() {
         assertNull(split(BrowserSplitLayout.FORTY_SIXTY, 400, 480))
+    }
+
+    // --- a dragged divider ---
+
+    @Test fun aDraggedFractionOverridesThePresetsOwnRatio() {
+        val panes = split(BrowserSplitLayout.SIXTY_FIVE_THIRTY_FIVE, 1280, 720, sideFraction = 0.5f)!!
+        assertEquals(638, panes.side.width)
+        assertEquals(638, panes.main.width)
+    }
+
+    @Test fun aDraggedFractionAlsoOverridesTheSixteenByNinePreset() {
+        val panes = split(BrowserSplitLayout.PORTRAIT_LANDSCAPE, 1280, 720, sideFraction = 0.25f)!!
+        assertEquals(319, panes.side.width)
+        assertEquals(720, panes.main.height) // no longer letterboxed to 16:9
+    }
+
+    @Test fun singleIgnoresADraggedFraction() {
+        assertNull(split(BrowserSplitLayout.SINGLE, 1280, 720, sideFraction = 0.5f))
+    }
+
+    @Test fun aFractionPastTheEdgeIsHeldAtTheWidestAllowedSplit() {
+        val panes = split(BrowserSplitLayout.HALF, 1280, 720, sideFraction = 0.99f)!!
+        // On a 1280px panel the 80% cap binds before the 180px floor does: 20% of 1276 is 255px.
+        assertEquals(255, panes.main.width)
+        assertEquals(1276, panes.side.width + panes.main.width)
+    }
+
+    @Test fun clampingLeavesAWorkableFractionAlone() {
+        assertEquals(0.4f, BrowserSplitGeometry.clampSideFraction(0.4f, 1276, minPane))
+    }
+
+    @Test fun clampingFallsBackToTheMidpointOnAPanelTooNarrowToSplit() {
+        assertEquals(0.5f, BrowserSplitGeometry.clampSideFraction(0.2f, 300, minPane))
+    }
+
+    @Test fun draggingRightGrowsTheSidePaneWhenItIsOnTheLeft() {
+        val panes = split(BrowserSplitLayout.HALF, 1280, 720)!!
+        val fraction = BrowserSplitGeometry.dragSideFraction(panes, 100, sideOnRight = false, minPanePx = minPane)
+        assertEquals((638 + 100) / 1276f, fraction)
+    }
+
+    @Test fun draggingRightShrinksTheSidePaneWhenItIsOnTheRight() {
+        val panes = split(BrowserSplitLayout.HALF, 1280, 720, sideOnRight = true)!!
+        val fraction = BrowserSplitGeometry.dragSideFraction(panes, 100, sideOnRight = true, minPanePx = minPane)
+        assertEquals((638 - 100) / 1276f, fraction)
+    }
+
+    @Test fun aDragCannotPushAPaneUnderTheMinimum() {
+        val panes = split(BrowserSplitLayout.HALF, 1280, 720)!!
+        val fraction = BrowserSplitGeometry.dragSideFraction(panes, 10_000, sideOnRight = false, minPanePx = minPane)
+        val dragged = split(BrowserSplitLayout.HALF, 1280, 720, sideFraction = fraction)!!
+        assertTrue("main pane keeps the floor", dragged.main.width >= minPane)
+        assertEquals(BrowserSplitGeometry.MAX_SIDE_FRACTION, fraction)
+    }
+
+    @Test fun aNarrowPanelStopsTheDragAtTheMinimumPaneWidthInstead() {
+        // 800px panel: the 180px floor (22.6%) binds before the 20% cap does.
+        val panes = split(BrowserSplitLayout.HALF, 800, 480)!!
+        val fraction = BrowserSplitGeometry.dragSideFraction(panes, 10_000, sideOnRight = false, minPanePx = minPane)
+        val dragged = split(BrowserSplitLayout.HALF, 800, 480, sideFraction = fraction)!!
+        assertEquals(minPane, dragged.main.width)
+    }
+
+    @Test fun everyDraggedFractionStillLeavesTwoUsablePanes() {
+        listOf(0.01f, 0.2f, 0.5f, 0.8f, 0.99f).forEach { fraction ->
+            val panes = split(BrowserSplitLayout.HALF, 1280, 720, sideFraction = fraction)
+            assertNotNull("fraction $fraction", panes)
+            panes!!
+            assertTrue("fraction $fraction side", panes.side.width >= minPane)
+            assertTrue("fraction $fraction main", panes.main.width >= minPane)
+        }
     }
 
     /** Every layout on every head unit size: panes inside the card, never overlapping. */

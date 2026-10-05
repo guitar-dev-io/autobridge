@@ -44,6 +44,23 @@ class MediaPlaybackClient(private val context: Context) {
     val isPlaying: Boolean
         get() = controller?.isPlaying == true
 
+    /**
+     * Whether the item the session is currently on carries a video track. Used by the now-playing
+     * bar to open the player as video rather than audio: a TV channel opened from the mini player
+     * must reattach the video surface, not sit on the audio-only path. Reads the current size
+     * first (set as soon as the first frame is decoded) and falls back to the selected tracks so
+     * the answer is right even before a frame has arrived.
+     */
+    val hasVideo: Boolean
+        get() {
+            val c = controller ?: return false
+            val size = c.videoSize
+            if (size.width > 0 && size.height > 0) return true
+            return c.currentTracks.groups.any { group ->
+                group.type == androidx.media3.common.C.TRACK_TYPE_VIDEO && group.isSelected
+            }
+        }
+
     /** The index the shared session is currently on, or null when nothing is loaded. */
     val currentIndex: Int?
         get() = controller?.let { if (it.mediaItemCount > 0) it.currentMediaItemIndex else null }

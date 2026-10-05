@@ -3,7 +3,7 @@ package dev.autobridge.safety
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import dev.autobridge.display.StructuredLog
+import dev.autobridge.logging.StructuredLog
 
 /**
  * Single control surface for the runtime safety bypass, driven by broadcast intents.

@@ -35,7 +35,7 @@ object PhoneHomeLayout {
 
     /**
      * Everything else the phone offers, behind More: local media (Folders, Gallery), Streaming
-     * (YouTube Kids and other video sites), saved channels & pages, Weather, Mirror. Derived
+     * ( and other video sites), saved channels & pages, Weather, Mirror. Derived
      * rather than listed, so a section added to [HomeSection] later lands here instead of
      * disappearing from the phone.
      */

@@ -40,7 +40,14 @@ stack and read as one app.
 ## Components
 
 `AutoBridgeDesign` provides `header`, `statusChip`, `glyphButton`, `sectionLabel`, `sectionCard`,
-`contentRow`, `pill`, `searchField`, `emptyState`, `page` and `body`.
+`contentRow`, `contentTile`, `grid`, `pill`, `searchField`, `emptyState`, `page` and `body`.
+
+`contentRow` and `contentTile` are the same content at two densities. A tile is for things that
+carry artwork worth seeing — channels, stations, films — because the logo is what a user recognises
+before they have read anything; a row is for everything whose identity is its text. `grid` lays
+tiles out two to a line as ordinary stacked views, so a grid page needs no new container and keeps
+the one scroll view; a short last row holds its cell width instead of stretching across the page.
+A tile's logo is fitted, never cropped: a channel wordmark cut in half reads as a broken image.
 
 `page()` owns the window insets. targetSdk 36 means edge-to-edge on Android 15+, so the page pads
 itself for the system bars and folds in the IME inset; `applyInsets = false` is passed when the
@@ -66,6 +73,24 @@ are drawn at once: these pages are plain view stacks, not recycling lists.
 `inSampleSize` decoding to roughly 256px, and per-view tagging so a slow logo never lands on a
 recycled row. A row shows an accent-tinted initial until a bitmap actually arrives, so a dead logo
 URL is a letter rather than a hole. Failed URLs are remembered and not retried.
+
+Channel logos come from the playlist itself, including the lists that spell the attribute
+differently or write the address relative to themselves; recently-played rows and favourites keep
+the logo they were played with. See
+[`IPTV_SECTIONS.md`](IPTV_SECTIONS.md#channel-logos).
+
+### Checking a channel
+
+A public playlist is a list of addresses, not of working channels, so a category page checks itself
+when it opens — silently, with no button pressed — and each tile shows what it got: `88 ms` in
+green, a slow answer in amber, `HTTP 404` or `No answer` in red. "Check again" forgets the
+remembered answers and sweeps a wider set; a channel's long-press menu checks one address and
+explains it in a sentence instead.
+
+Results are written into the tiles that are already on screen rather than re-rendering the page:
+these pages rebuild from scratch, so a re-render while a check runs would scroll the user back to
+the top every time a batch of answers landed. See
+[`IPTV_SECTIONS.md`](IPTV_SECTIONS.md#checking-a-channel).
 
 ### Now playing
 
@@ -163,6 +188,30 @@ pass real icons.
 Header actions also became explicit about primacy. They used to render the *last* action filled,
 so a screen whose only action was the overflow menu showed it as a loud accent disc. An action now
 opts into `filled`, and the overflow menu never does.
+
+## The system Back button
+
+The screens here extend the framework `Activity` and used to handle Back by overriding
+`onBackPressed()`. That override is dead on this app's own target: predictive back is enabled by
+default for apps targeting API 35+, and on such a device **a back gesture or button never calls
+it** — the system finishes the Activity instead. The symptom was identical everywhere and easy to
+read as something else: on an Android 16 phone one Back jumped out of the library's page stack from
+three levels deep, the browser stopped walking its own history, and leaving fullscreen closed the
+player.
+
+`dev.autobridge.ui.SystemBack` registers one `OnBackInvokedCallback` with the platform dispatcher
+(androidx's `OnBackPressedDispatcher` needs `ComponentActivity`, which these are not), and each
+screen keeps its deprecated override for devices older than API 33. Exactly one of the two routes
+runs on any device — the object documents which, and why both stay. A registered callback replaces
+the default entirely, so each handler finishes its own Activity through `SystemBack.finishFromBack`
+once it has nothing left of its own to do.
+
+| Screen | What its Back does first |
+|---|---|
+| `LibraryActivity` | Pops one page off the in-memory page stack |
+| `BrowserActivity` | Leaves a fullscreen video, then browser fullscreen, then goes back in web history |
+| `PlayerActivity` | Leaves fullscreen |
+| `EntertainmentActivity` | Leaves a fullscreen video |
 
 ## Permissions
 

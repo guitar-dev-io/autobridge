@@ -13,7 +13,7 @@ import android.os.Looper
 import androidx.core.content.edit
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
-import dev.autobridge.display.StructuredLog
+import dev.autobridge.logging.StructuredLog
 
 /**
  * Brings the media session up when the phone connects to a car, so the head unit finds it already

@@ -11,7 +11,7 @@ import androidx.car.app.model.Row
 import androidx.car.app.model.Template
 import dev.autobridge.R
 import dev.autobridge.display.MirrorDiagnostics
-import dev.autobridge.display.StructuredLog
+import dev.autobridge.logging.StructuredLog
 
 /**
  * Car-native log viewer: the SAME [StructuredLog] ring the phone's Developer Tools screen shows,

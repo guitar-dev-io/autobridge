@@ -44,4 +44,5 @@ object CarIcons {
     @DrawableRes val LIBRARY = R.drawable.ic_action_library
     @DrawableRes val CONTROLS = R.drawable.ic_action_controls
     @DrawableRes val APPS = R.drawable.ic_action_apps
+    @DrawableRes val SIGNAL = R.drawable.ic_action_signal
 }

@@ -10,7 +10,7 @@ import dev.autobridge.core.model.Feature
 import dev.autobridge.core.policy.FeaturePolicy
 import dev.autobridge.core.state.RuntimeContextStore
 import dev.autobridge.display.MirrorDiagnostics
-import dev.autobridge.display.StructuredLog
+import dev.autobridge.logging.StructuredLog
 import dev.autobridge.mirror.MirrorCoordinator
 import dev.autobridge.settings.MirrorSettings
 

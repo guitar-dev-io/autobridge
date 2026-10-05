@@ -1,0 +1,146 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write  # needed to create a GitHub Release and attach the artifacts
+
+jobs:
+  release:
+    name: Build + publish safe release AAB + APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # A tag push is the release trigger; version.properties is what the build actually stamps
+      # into the APK. If they disagree the release is named one thing and installs as another, and
+      # the in-app update check compares the running build against the wrong number — so stop
+      # before anything is published.
+      - name: Check the tag matches version.properties
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#v}"
+          build_version="$(./gradlew --no-daemon -q :app:printVersion | tail -n1)"
+          name="${build_version%% *}"
+          echo "tag=$tag  version.properties=$build_version"
+          if [ "$tag" != "$name" ]; then
+            echo "::error::Tag v$tag does not match versionName $name in version.properties." \
+                 "Run ./scripts/set-version.sh $tag, commit, then re-tag."
+            exit 1
+          fi
+
+      # Signing is opt-in. If RELEASE_KEYSTORE_BASE64 is set, decode it to keystore/release.jks
+      # and write keystore/release.properties — the exact file app/build.gradle.kts reads to wire
+      # the `release` signing config. If the secret is absent, skip: the build still runs and
+      # produces an unsigned APK rather than failing on a missing keystore.
+      - name: Prepare signing material
+        id: signing
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${RELEASE_KEYSTORE_BASE64:-}" ]; then
+            echo "::warning::No signing secrets found — building UNSIGNED release AAB + APK."
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          mkdir -p keystore
+          echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode > keystore/release.jks
+          # storeFile is resolved by rootProject.file(...) in app/build.gradle.kts, so a repo-root
+          # relative path is correct here.
+          cat > keystore/release.properties <<EOF
+          storeFile=keystore/release.jks
+          storePassword=${RELEASE_STORE_PASSWORD}
+          keyAlias=${RELEASE_KEY_ALIAS}
+          keyPassword=${RELEASE_KEY_PASSWORD}
+          EOF
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+
+      # safe:    Play-shippable flavor -> AAB (Play upload) + APK (direct sideload)
+      # personal/lab: sideload-only flavors (pull in libs/aauto.aar, not Play-accepted) -> APK only.
+      #   Play never takes these, so there is no reason to bundle them into an .aab.
+      # One build pass; every variant shares the same signing config.
+      #   AAB -> app/build/outputs/bundle/<flavor>Release/*.aab
+      #   APK -> app/build/outputs/apk/<flavor>/release/*.apk
+      - name: Build release (all flavors)
+        run: >-
+          ./gradlew --no-daemon
+          bundleSafeRelease
+          assembleSafeRelease
+          assemblePersonalRelease
+          assembleLabRelease
+
+      # Scrub decoded signing material. The runner is ephemeral, but do not depend on that, and
+      # keep it out of any later step's artifact upload.
+      - name: Scrub signing material
+        if: always()
+        run: rm -f keystore/release.jks keystore/release.properties
+
+      # The R8 mapping file for each release variant. The safe .aab already carries its own copy
+      # (AGP writes it to BUNDLE-METADATA/com.android.tools.build.obfuscation/proguard.map), so
+      # Play deobfuscates those crashes by itself. The sideloaded personal/lab APKs have no such
+      # channel: a stack trace from one is unreadable without the matching mapping.txt, and R8
+      # output is not reproducible from a later build, so the only chance to keep it is now.
+      #
+      # Kept as a workflow artifact rather than attached to the GitHub Release: these are tens of
+      # MB each, and they are a debugging aid for whoever is holding the crash, not part of the
+      # download. Retrace with
+      #   $ANDROID_HOME/cmdline-tools/latest/bin/retrace mapping.txt trace.txt
+      - name: Upload R8 mapping files
+        uses: actions/upload-artifact@v4
+        with:
+          name: autobridge-release-mapping
+          path: |
+            app/build/outputs/mapping/safeRelease/mapping.txt
+            app/build/outputs/mapping/personalRelease/mapping.txt
+            app/build/outputs/mapping/labRelease/mapping.txt
+          if-no-files-found: error
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: autobridge-release
+          path: |
+            app/build/outputs/bundle/safeRelease/*.aab
+            app/build/outputs/apk/safe/release/*.apk
+            app/build/outputs/apk/personal/release/*.apk
+            app/build/outputs/apk/lab/release/*.apk
+          if-no-files-found: error
+
+      # Only publish a GitHub Release for an actual tag push, not for manual dispatch on a branch.
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            app/build/outputs/bundle/safeRelease/*.aab
+            app/build/outputs/apk/safe/release/*.apk
+            app/build/outputs/apk/personal/release/*.apk
+            app/build/outputs/apk/lab/release/*.apk
+          generate_release_notes: true
+          fail_on_unmatched_files: true

@@ -386,6 +386,13 @@
 
     <!-- Entertainment screen: the parked-only content launcher -->
     <string name="ent_playback_failed">เล่นไม่ได้: %1$s — ตรวจ URL หรือเลือกแหล่งอื่น</string>
+    <!-- PlayerActivity: ผลการส่งไปรถ -->
+    <string name="player_send_car_nothing">ไม่มีสิ่งที่กำลังเล่นให้ส่ง</string>
+    <string name="player_send_car_opened">ส่งไปที่รถแล้ว</string>
+    <string name="player_send_car_pending">บันทึกไว้ — จะเปิดเมื่อเชื่อมต่อรถ</string>
+    <string name="player_send_car_refused">แหล่งนี้ส่งไปรถไม่ได้</string>
+    <string name="player_exit_fullscreen">ออกจากเต็มจอ</string>
+    <string name="player_on_car">กำลังเล่นบนจอรถ</string>
     <string name="ent_hint_web">ค้นหาเว็บบนจอรถ หรือวาง HTTPS URL</string>
     <string name="ent_hint_youtube">ค้นหา YouTube หรือวาง HTTPS URL</string>
     <string name="ent_btn_web">เว็บ</string>
@@ -457,9 +464,33 @@
     <string name="advanced_debug_subtitle">สถานะภายใน</string>
     <string name="about_support">สนับสนุน AutoBridge</string>
     <string name="about_support_caption">เลี้ยงกาแฟผู้พัฒนา</string>
+    <string name="about_promptpay">เลี้ยงกาแฟ (พร้อมเพย์)</string>
+    <string name="about_promptpay_caption">สแกน QR เพื่อโอนค่าขนมเล็กๆ น้อยๆ</string>
+    <string name="about_promptpay_title">ขอบคุณสำหรับค่ากาแฟ</string>
+    <string name="about_promptpay_message">สแกน QR พร้อมเพย์นี้ด้วยแอปธนาคารของคุณ</string>
+    <string name="about_promptpay_close">ปิด</string>
+    <string name="about_developer">พัฒนาโดย</string>
+    <string name="about_developer_caption">Guitar · อานุวัฒน์ เตียมรัตน์ · ประเทศไทย</string>
+    <string name="about_credits">เครดิตและการอ้างอิง</string>
+    <string name="about_credits_caption">ไลบรารีโอเพนซอร์สและแหล่งข้อมูล</string>
+    <string name="about_credits_title">เครดิตและการอ้างอิง</string>
+    <string name="about_credits_close">ปิด</string>
+    <string name="about_credits_body">AutoBridge\nพัฒนาโดย Guitar Dev, \n\nสร้างด้วยส่วนประกอบโอเพนซอร์สและของผู้พัฒนาอื่นดังนี้:\n\n• AndroidX และ Jetpack Compose — Google (Apache-2.0)\n• AndroidX Car App Library — Google (Apache-2.0)\n• Media3 / ExoPlayer — Google (Apache-2.0)\n• Kotlin และ kotlinx.coroutines — JetBrains (Apache-2.0)\n• Shizuku API — RikkaApps (Apache-2.0)\n• ML Kit Translate — Google\n• ONNX Runtime — Microsoft (MIT) พร้อมโมเดล Opus-MT (Marian) โดย Language Technology Research Group มหาวิทยาลัยเฮลซิงกิ (CC-BY-4.0)\n• AndroidX WebKit, Browser (Custom Tabs) — Google (Apache-2.0)\n• Play Services OSS Licenses — Google\n\nแหล่งข้อมูลและเนื้อหา:\n• ข้อมูลสภาพอากาศจาก Open-Meteo (CC-BY-4.0) ไม่ต้องใช้คีย์\n• ข้อมูลชุมชน SponsorBlock สำหรับข้ามช่วงโฆษณาบน YouTube\n• ลิงก์ IPTV / สตรีมมิงเป็นข้อมูลที่ผู้ใช้ป้อนเอง AutoBridge ไม่ได้โฮสต์เนื้อหาใดๆ\n\nแรงบันดาลใจและการอ้างอิง (GPL-3.0):\n• Fermata Media Player — Andrey Pavlenko · github.com/AndreyPavlenko/Fermata\n• Fermata-Xtream — malebuffy · github.com/malebuffy/Fermata-Xtream\n• AABrowser — kododake · github.com/kododake/AABrowser\n\nแตะ \"สัญญาอนุญาตโอเพนซอร์ส\" เพื่อดูประกาศของผู้พัฒนาอื่นทั้งหมด\n\nAndroid Auto เป็นเครื่องหมายการค้าของ Google LLC โปรเจกต์นี้เป็นอิสระ ไม่ได้มีส่วนเกี่ยวข้องหรือได้รับการรับรองจาก Google</string>
     <string name="about_licenses">สัญญาอนุญาตโอเพนซอร์ส</string>
     <string name="about_licenses_caption">ดูสัญญาอนุญาตจากผู้พัฒนาอื่น</string>
     <string name="about_github">GitHub</string>
+    <string name="about_check_update">ตรวจหาการอัปเดต</string>
+    <string name="about_check_update_caption">เทียบรุ่นที่ติดตั้งกับรุ่นล่าสุดบน GitHub</string>
+    <string name="about_check_update_caption_latest">รุ่นล่าสุด %1$s · ตรวจเมื่อ %2$s</string>
+    <string name="about_check_update_caption_available">มีอัปเดต %1$s · ตรวจเมื่อ %2$s</string>
+    <string name="about_check_update_checking">กำลังตรวจหาการอัปเดต…</string>
+    <string name="about_check_update_up_to_date">คุณใช้รุ่นล่าสุดอยู่แล้ว (%1$s)</string>
+    <string name="about_check_update_failed">ตรวจหาการอัปเดตไม่สำเร็จ: %1$s</string>
+    <string name="about_update_title">มีอัปเดตใหม่</string>
+    <string name="about_update_message">ออกรุ่น %1$s แล้ว รุ่นที่ติดตั้งอยู่คือ %2$s</string>
+    <string name="about_update_download">ดาวน์โหลด APK</string>
+    <string name="about_update_release_page">หน้ารุ่นที่ออก</string>
+    <string name="about_update_later">ไว้ก่อน</string>
     <string name="about_version">เวอร์ชัน</string>
     <string name="about_no_browser">ไม่พบเบราว์เซอร์ในเครื่อง</string>
     <string name="home_tagline">รถคุณ ฉลาดขึ้น</string>
@@ -686,6 +717,12 @@
     <string name="car_iptv_no_episodes">ไม่มีตอนให้เล่น</string>
     <string name="car_iptv_no_stream">รายการนี้ไม่มีที่อยู่สตรีม</string>
     <string name="car_iptv_connecting">กำลังเชื่อมต่อเครื่องเล่น…</string>
+    <string name="car_iptv_ping_ms">%1$d ms</string>
+    <string name="car_iptv_ping_http">HTTP %1$d</string>
+    <string name="car_iptv_ping_dead">ไม่ตอบสนอง</string>
+    <string name="car_iptv_ping_unsupported">ตรวจสอบไม่ได้</string>
+    <string name="car_iptv_ping_started">กำลังตรวจสอบ %1$d ช่อง…</string>
+    <string name="car_iptv_ping_done">ตอบสนอง %1$d จาก %2$d ช่อง</string>
     <plurals name="car_iptv_items">
         <item quantity="other">%1$d รายการ</item>
     </plurals>
@@ -956,6 +993,18 @@
     <string name="car_home_more">เพิ่มเติม</string>
     <string name="car_home_speed_safety_enabled">เปิดระบบความปลอดภัยตามความเร็วแล้ว</string>
     <string name="car_home_speed_permission_denied">ไม่ได้รับสิทธิ์อ่านความเร็ว</string>
+    <!-- Home dashboard sections, drawn by the app on the Android Auto surface. -->
+    <string name="car_home_continue_watching">ดูต่อ</string>
+    <string name="car_home_quick_access">เข้าถึงด่วน</string>
+    <string name="car_home_recently_sent">ส่งมาล่าสุด</string>
+    <string name="car_home_queue">คิวเล่น</string>
+    <string name="car_home_sent_from_phone">จากมือถือ</string>
+    <string name="car_queue_title">คิวเล่น</string>
+    <string name="car_queue_empty">ยังไม่มีรายการในคิว</string>
+    <string name="car_time_just_now">เมื่อสักครู่</string>
+    <string name="car_time_minutes_ago">%1$d นาทีที่แล้ว</string>
+    <string name="car_time_hours_ago">%1$d ชั่วโมงที่แล้ว</string>
+    <string name="car_time_days_ago">%1$d วันที่แล้ว</string>
 
     <!-- Home sections, shared by the phone launcher and the car dashboard -->
     <string name="section_tv">ทีวี</string>
@@ -969,7 +1018,7 @@
     <string name="section_youtube_music">YouTube Music</string>
     <string name="section_youtube_music_caption">สตรีมเพลง</string>
     <string name="section_streaming">สตรีมมิง</string>
-    <string name="section_streaming_caption">Kids, TikTok, Twitch และอื่น ๆ</string>
+    <string name="section_streaming_caption">TikTok, Twitch และอื่น ๆ</string>
     <string name="section_folders">โฟลเดอร์</string>
     <string name="section_folders_caption">สื่อในเครื่อง</string>
     <string name="section_favorites">รายการโปรด</string>

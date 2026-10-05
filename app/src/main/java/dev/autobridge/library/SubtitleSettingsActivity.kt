@@ -11,7 +11,7 @@ import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
-import dev.autobridge.display.StructuredLog
+import dev.autobridge.logging.StructuredLog
 import dev.autobridge.i18n.AppLocale
 import dev.autobridge.subtitles.SubtitleLanguage
 import dev.autobridge.subtitles.SubtitleLanguages
@@ -70,6 +70,19 @@ class SubtitleSettingsActivity : Activity() {
         val body = AutoBridgeDesign.body(this)
 
         body.stack(AutoBridgeDesign.sectionLabel(this, "Translation"), gap = 2)
+
+        // PlayerActivity hides the button that opens this screen when the engines are not in the
+        // build; this is what any other way in gets, rather than a toggle that cannot do anything.
+        if (!SubtitleSettings.isSupported) {
+            body.stack(
+                hintRow(
+                    "This build was made without the translation engines, so subtitle tracks " +
+                        "play as they are."
+                )
+            )
+            setContentView(page(body))
+            return
+        }
 
         val enabled = SubtitleSettings.enabled(this)
         body.stack(
@@ -164,7 +177,7 @@ class SubtitleSettingsActivity : Activity() {
         if (model != null) {
             val installed = OpusMtModelStore.isInstalled(this, model)
             val availabilityNote = if (model.availability == OpusMtAvailability.UNVERIFIED) {
-                "This pair is not one of the verified ones - the download may not exist."
+                "Opus-MT probably has no model for this pair - ML Kit may cover it."
             } else {
                 "About ${OpusMtModelLayout.formatSize(OpusMtCatalog.APPROXIMATE_BYTES)} to download"
             }
@@ -232,7 +245,7 @@ class SubtitleSettingsActivity : Activity() {
             runOnUiThread {
                 result.onFailure { error ->
                     val message = if (error is FileNotFoundException) {
-                        "No published model for ${model.label}"
+                        "Opus-MT has no model for ${model.label}. Switch the engine to ML Kit."
                     } else {
                         "Download failed: ${error.message ?: error.javaClass.simpleName}"
                     }

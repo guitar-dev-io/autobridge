@@ -7,10 +7,19 @@
     <path
         android:fillColor="#17212E"
         android:pathData="M10,2 L38,2 Q46,2 46,10 L46,38 Q46,46 38,46 L10,46 Q2,46 2,38 L2,10 Q2,2 10,2 Z" />
+    <!-- Same glyph as assets/AutoBridge.svg (the real launcher icon), scaled 0.375x from its
+         128-unit artboard into this file's 48dp one so the car-home header logo stays in sync
+         with the icon the OS actually shows for this app. -->
     <path
-        android:fillColor="#559EFF"
-        android:pathData="M21.6,7.5 Q23.8,4.5 26,7.5 L42,34.5 Q44.2,38.2 40.6,40.6 Q37.3,42.5 34.9,38.7 L24,20.3 L13.1,38.7 Q10.7,42.5 7.4,40.6 Q3.8,38.2 6,34.5 Z" />
+        android:fillColor="#4DA6FF"
+        android:pathData="M24,9 L38.25,36.75 L31.5,36.75 L24,21.75 L16.5,36.75 L9.75,36.75 Z" />
     <path
-        android:fillColor="#A8D5FF"
-        android:pathData="M24,23 L32.9,38.2 Q33.8,39.7 32.4,40.5 L15.6,40.5 Q14.2,39.7 15.1,38.2 Z" />
+        android:fillColor="#A6ECFF"
+        android:pathData="M10.3125,29.25 L37.6875,29.25 A1.3125,1.3125 0 0 1 37.6875,31.875 L10.3125,31.875 A1.3125,1.3125 0 0 1 10.3125,29.25 Z" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#A6ECFF"
+        android:strokeWidth="2.25"
+        android:strokeLineCap="round"
+        android:pathData="M16.5,36.75 Q24,24.75 31.5,36.75" />
 </vector>

@@ -3,7 +3,7 @@ package dev.autobridge.diagnostics
 import android.content.Context
 import android.os.Build
 import dev.autobridge.BuildConfig
-import dev.autobridge.display.StructuredLog
+import dev.autobridge.logging.StructuredLog
 import java.io.File
 import java.io.PrintWriter
 import java.io.StringWriter

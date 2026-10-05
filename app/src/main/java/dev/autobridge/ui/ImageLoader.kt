@@ -42,6 +42,7 @@ object ImageLoader {
     }
     private val main = Handler(Looper.getMainLooper())
     private val failed = ConcurrentHashMap.newKeySet<String>()
+    private val inFlight = ConcurrentHashMap.newKeySet<String>()
 
     /**
      * Loads [url] into [target], calling [onLoaded] on the main thread once a bitmap is applied.
@@ -75,6 +76,35 @@ object ImageLoader {
                 }
             }
         }
+    }
+
+    /**
+     * The same load for a caller that paints on a Canvas instead of owning an [ImageView].
+     *
+     * A cached bitmap is returned straight away; otherwise the fetch is started and null comes
+     * back, and [onReady] is posted to the main thread once there is something new to draw. There
+     * is no target view to tag here, so an in-flight set does the de-duplication that the view tag
+     * does on [load] - without it a surface that re-renders on every scroll pixel would queue one
+     * download per frame for the same URL.
+     */
+    fun bitmap(context: Context, url: String, onReady: () -> Unit): Bitmap? {
+        val address = url.trim()
+        if (address.isEmpty() || address in failed) return null
+        memory.get(address)?.let { return it }
+        if (!inFlight.add(address)) return null
+
+        val applicationContext = context.applicationContext
+        worker.execute {
+            val bitmap = runCatching { fetch(applicationContext, address) }.getOrNull()
+            inFlight.remove(address)
+            if (bitmap == null) {
+                failed += address
+                return@execute
+            }
+            memory.put(address, bitmap)
+            main.post(onReady)
+        }
+        return null
     }
 
     private fun fetch(context: Context, url: String): Bitmap? {
@@ -142,6 +172,7 @@ object ImageLoader {
     fun clearCache(context: Context): Int {
         memory.evictAll()
         failed.clear()
+        inFlight.clear()
         val directory = File(context.applicationContext.cacheDir, CACHE_DIRECTORY)
         val files = directory.listFiles() ?: return 0
         return files.count { it.isFile && it.delete() }

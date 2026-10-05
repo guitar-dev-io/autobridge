@@ -4,7 +4,7 @@ import androidx.car.app.Screen
 import androidx.car.app.ScreenManager
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
-import dev.autobridge.display.StructuredLog
+import dev.autobridge.logging.StructuredLog
 
 /**
  * Bookkeeping for which single-instance screens are currently on the car back stack.

@@ -1,0 +1,1275 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<issues format="6" by="lint 8.13.2" type="baseline" client="gradle" dependencies="false" name="AGP (8.13.2)" variant="all" version="8.13.2">
+
+
+
+
+    <issue
+        id="InlinedApi"
+        message="Field requires API level 31 (current min is 29): `android.location.LocationManager#FUSED_PROVIDER`"
+        errorLine1="                locationManager?.isProviderEnabled(LocationManager.FUSED_PROVIDER) == true"
+        errorLine2="                                                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/speed/GpsSpeedSource.kt"
+            line="39"
+            column="52"/>
+    </issue>
+
+    <issue
+        id="MissingIntentFilterForMediaSearch"
+        message="Missing `intent-filter` for action `android.media.action.MEDIA_PLAY_FROM_SEARCH`."
+        errorLine1="    &lt;application android:name=&quot;.AutoBridgeApplication&quot; android:networkSecurityConfig=&quot;@xml/network_security_config&quot; android:allowBackup=&quot;true&quot; android:icon=&quot;@drawable/ic_autobridge_launcher&quot; android:label=&quot;@string/app_name&quot; android:localeConfig=&quot;@xml/locales_config&quot; android:roundIcon=&quot;@drawable/ic_autobridge_launcher&quot; android:supportsRtl=&quot;true&quot; android:theme=&quot;@style/AppTheme&quot;>"
+        errorLine2="    ^">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="71"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="OldTargetApi"
+        message="Not targeting the latest versions of Android; compatibility modes apply. Consider testing and updating this version. Consult the `android.os.Build.VERSION_CODES` javadoc for details."
+        errorLine1="        targetSdk = 36"
+        errorLine2="        ~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="75"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UnusedAttribute"
+        message="Attribute `localeConfig` is only used in API level 33 and higher (current min is 29)"
+        errorLine1="    &lt;application android:name=&quot;.AutoBridgeApplication&quot; android:networkSecurityConfig=&quot;@xml/network_security_config&quot; android:allowBackup=&quot;true&quot; android:icon=&quot;@drawable/ic_autobridge_launcher&quot; android:label=&quot;@string/app_name&quot; android:localeConfig=&quot;@xml/locales_config&quot; android:roundIcon=&quot;@drawable/ic_autobridge_launcher&quot; android:supportsRtl=&quot;true&quot; android:theme=&quot;@style/AppTheme&quot;>"
+        errorLine2="                                                                                                                                                                                                                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="71"
+            column="225"/>
+    </issue>
+
+    <issue
+        id="BatteryLife"
+        message="Use of `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` violates the Play Store Content Policy regarding acceptable use cases, as described in https://developer.android.com/training/monitoring-device-state/doze-standby.html"
+        errorLine1="                Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)"
+        errorLine2="                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/mirror/MirrorSetupActivity.kt"
+            line="236"
+            column="33"/>
+    </issue>
+
+    <issue
+        id="PictureInPictureIssue"
+        message="An activity in this app supports picture-in-picture and the targetSdkVersion is 31 or above; it is therefore strongly recommended to call both `setAutoEnterEnabled(true)` and `setSourceRectHint(...)`"
+        errorLine1="    &lt;application android:name=&quot;.AutoBridgeApplication&quot; android:networkSecurityConfig=&quot;@xml/network_security_config&quot; android:allowBackup=&quot;true&quot; android:icon=&quot;@drawable/ic_autobridge_launcher&quot; android:label=&quot;@string/app_name&quot; android:localeConfig=&quot;@xml/locales_config&quot; android:roundIcon=&quot;@drawable/ic_autobridge_launcher&quot; android:supportsRtl=&quot;true&quot; android:theme=&quot;@style/AppTheme&quot;>"
+        errorLine2="     ~~~~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="71"
+            column="6"/>
+    </issue>
+
+    <issue
+        id="SelectedPhotoAccess"
+        message="Your app is currently not handling Selected Photos Access introduced in Android 14+"
+        errorLine1="    &lt;uses-permission android:name=&quot;android.permission.READ_MEDIA_VIDEO&quot; />"
+        errorLine2="                                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="38"
+            column="36"/>
+    </issue>
+
+    <issue
+        id="SelectedPhotoAccess"
+        message="Your app is currently not handling Selected Photos Access introduced in Android 14+"
+        errorLine1="    &lt;uses-permission android:name=&quot;android.permission.READ_MEDIA_IMAGES&quot; />"
+        errorLine2="                                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="39"
+            column="36"/>
+    </issue>
+
+    <issue
+        id="AndroidGradlePluginVersion"
+        message="A newer version of Gradle than 8.13 is available: 8.14.5"
+        errorLine1="distributionUrl=https\://services.gradle.org/distributions/gradle-8.13-bin.zip"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="$HOME/Documents/ChatGPT/AutoBridge/gradle/wrapper/gradle-wrapper.properties"
+            line="3"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.test:core than 1.6.1 is available: 1.7.0"
+        errorLine1="    androidTestImplementation(&quot;androidx.test:core:1.6.1&quot;)"
+        errorLine2="                              ~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="199"
+            column="31"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.test:runner than 1.6.2 is available: 1.7.0"
+        errorLine1="    androidTestImplementation(&quot;androidx.test:runner:1.6.2&quot;)"
+        errorLine2="                              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="200"
+            column="31"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.test.ext:junit than 1.2.1 is available: 1.3.0"
+        errorLine1="    androidTestImplementation(&quot;androidx.test.ext:junit:1.2.1&quot;)"
+        errorLine2="                              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="201"
+            column="31"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.core:core-ktx than 1.18.0 is available: 1.19.1"
+        errorLine1="    implementation(&quot;androidx.core:core-ktx:1.18.0&quot;)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="217"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.webkit:webkit than 1.16.0 is available: 1.17.1"
+        errorLine1="    implementation(&quot;androidx.webkit:webkit:1.16.0&quot;)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="221"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.browser:browser than 1.8.0 is available: 1.10.0"
+        errorLine1="    implementation(&quot;androidx.browser:browser:1.8.0&quot;)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="224"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of com.google.android.gms:play-services-oss-licenses than 17.1.0 is available: 17.5.2"
+        errorLine1="    implementation(&quot;com.google.android.gms:play-services-oss-licenses:17.1.0&quot;)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="246"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="NewerVersionAvailable"
+        message="A newer version of org.jetbrains.kotlinx:kotlinx-coroutines-test than 1.10.2 is available: 1.11.0"
+        errorLine1="    testImplementation(&quot;org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2&quot;)"
+        errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="197"
+            column="24"/>
+    </issue>
+
+    <issue
+        id="NewerVersionAvailable"
+        message="A newer version of org.json:json than 20250107 is available: 20260814"
+        errorLine1="    testImplementation(&quot;org.json:json:20250107&quot;)"
+        errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="205"
+            column="24"/>
+    </issue>
+
+    <issue
+        id="NewerVersionAvailable"
+        message="A newer version of org.jetbrains.kotlinx:kotlinx-coroutines-android than 1.10.2 is available: 1.11.0"
+        errorLine1="    implementation(&quot;org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2&quot;)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="235"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="NewerVersionAvailable"
+        message="A newer version of com.microsoft.onnxruntime:onnxruntime-android than 1.20.0 is available: 1.30.0"
+        errorLine1="    implementation(&quot;com.microsoft.onnxruntime:onnxruntime-android:1.20.0&quot;)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="242"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="RestrictedApi"
+        message="WebViewFeature.REQUESTED_WITH_HEADER_ALLOW_LIST can only be accessed from within the same library group (referenced groupId=`androidx.webkit` from groupId=`AutoBridge`)"
+        errorLine1="        if (WebViewFeature.isFeatureSupported(WebViewFeature.REQUESTED_WITH_HEADER_ALLOW_LIST)) {"
+        errorLine2="                                                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/browser/BrowserDefaults.kt"
+            line="109"
+            column="62"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.car.app.annotations.ExperimentalCarApi` or `@OptIn(markerClass = androidx.car.app.annotations.ExperimentalCarApi.class)`"
+        errorLine1="            template.setItemSize(GridTemplate.ITEM_SIZE_SMALL)"
+        errorLine2="                     ~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/car/CarHomeDashboardScreen.kt"
+            line="431"
+            column="22"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.car.app.annotations.ExperimentalCarApi` or `@OptIn(markerClass = androidx.car.app.annotations.ExperimentalCarApi.class)`"
+        errorLine1="            template.setItemSize(GridTemplate.ITEM_SIZE_SMALL)"
+        errorLine2="                                              ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/car/CarHomeDashboardScreen.kt"
+            line="431"
+            column="47"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.car.app.annotations.ExperimentalCarApi` or `@OptIn(markerClass = androidx.car.app.annotations.ExperimentalCarApi.class)`"
+        errorLine1="                .setItemImageShape(GridTemplate.ITEM_IMAGE_SHAPE_UNSET)"
+        errorLine2="                 ~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/car/CarHomeDashboardScreen.kt"
+            line="432"
+            column="18"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.car.app.annotations.ExperimentalCarApi` or `@OptIn(markerClass = androidx.car.app.annotations.ExperimentalCarApi.class)`"
+        errorLine1="                .setItemImageShape(GridTemplate.ITEM_IMAGE_SHAPE_UNSET)"
+        errorLine2="                                                ~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/car/CarHomeDashboardScreen.kt"
+            line="432"
+            column="49"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        override fun onSetMediaItems("
+        errorLine2="                     ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/media/MediaPlaybackService.kt"
+            line="285"
+            column="22"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        ): ListenableFuture&lt;MediaSession.MediaItemsWithStartPosition> {"
+        errorLine2="                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/media/MediaPlaybackService.kt"
+            line="291"
+            column="29"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="                return Futures.immediateFuture(MediaSession.MediaItemsWithStartPosition(queue, tapped, C.TIME_UNSET))"
+        errorLine2="                                                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/media/MediaPlaybackService.kt"
+            line="296"
+            column="61"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="            return super.onSetMediaItems(mediaSession, controller, mediaItems, startIndex, startPositionMs)"
+        errorLine2="                         ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/media/MediaPlaybackService.kt"
+            line="298"
+            column="26"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="    private fun videoRenderer(target: ExoPlayer): Renderer? ="
+        errorLine2="                                                  ~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/media/MediaPlaybackService.kt"
+            line="425"
+            column="51"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        (0 until target.rendererCount).firstOrNull { target.getRendererType(it) == C.TRACK_TYPE_VIDEO }"
+        errorLine2="                        ~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/media/MediaPlaybackService.kt"
+            line="426"
+            column="25"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        (0 until target.rendererCount).firstOrNull { target.getRendererType(it) == C.TRACK_TYPE_VIDEO }"
+        errorLine2="                                                            ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/media/MediaPlaybackService.kt"
+            line="426"
+            column="61"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="            ?.let { target.getRenderer(it) }"
+        errorLine2="                           ~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/media/MediaPlaybackService.kt"
+            line="427"
+            column="28"/>
+    </issue>
+
+    <issue
+        id="UnsafeOptInUsageError"
+        message="This declaration is opt-in and its usage should be marked with `@androidx.media3.common.util.UnstableApi` or `@OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)`"
+        errorLine1="        carPlayer?.release()"
+        errorLine2="                   ~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/media/MediaPlaybackService.kt"
+            line="532"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="Aligned16KB"
+        message="The native library `arm64-v8a/libonnxruntime4j_jni.so` (from `com.microsoft.onnxruntime:onnxruntime-android:1.20.0`) is not 16 KB aligned"
+        errorLine1="    implementation(&quot;com.microsoft.onnxruntime:onnxruntime-android:1.20.0&quot;)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="build.gradle.kts"
+            line="242"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="Aligned16KB"
+        message="The native library `arm64-v8a/libonnxruntime4j_jni.so` (from `com.microsoft.onnxruntime:onnxruntime-android:1.20.0`) is not 16 KB aligned">
+        <location
+            file="$GRADLE_USER_HOME/caches/8.13/transforms/1dc4145945b471f2ac21605eebeb852f/transformed/onnxruntime-android-1.20.0/jni/arm64-v8a/libonnxruntime4j_jni.so"/>
+    </issue>
+
+    <issue
+        id="Aligned16KB"
+        message="The native library `arm64-v8a/libonnxruntime4j_jni.so` (from `com.microsoft.onnxruntime:onnxruntime-android:1.20.0`) is not 16 KB aligned">
+        <location
+            file="$GRADLE_USER_HOME/caches/8.13/transforms/1dc4145945b471f2ac21605eebeb852f/transformed/onnxruntime-android-1.20.0/jni/arm64-v8a/libonnxruntime4j_jni.so"/>
+    </issue>
+
+    <issue
+        id="DiscouragedApi"
+        message="Minimum and maximum aspect ratios will be ignored in most cases, starting from Android 16. Android is moving toward a model where apps are expected to adapt to various orientations, display sizes, and aspect ratios."
+        errorLine1="            android:maxAspectRatio=&quot;5.0&quot;"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="107"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UseCompatLoadingForDrawables"
+        message="Use `AppCompatResources.getDrawable()`"
+        errorLine1="        }.getOrNull() ?: getDrawable(android.R.drawable.sym_def_app_icon)"
+        errorLine2="                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/MainActivity.kt"
+            line="3788"
+            column="26"/>
+    </issue>
+
+    <issue
+        id="SetJavaScriptEnabled"
+        message="Using `setJavaScriptEnabled` can introduce XSS vulnerabilities into your application, review carefully"
+        errorLine1="        settings.javaScriptEnabled = true"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/browser/BrowserDefaults.kt"
+            line="83"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="ExportedService"
+        message="Exported service does not require permission"
+        errorLine1="        &lt;service android:name=&quot;.car.AutoBridgeCarAppService&quot; android:exported=&quot;true&quot;>"
+        errorLine2="         ~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="261"
+            column="10"/>
+    </issue>
+
+    <issue
+        id="InsecureBaseConfiguration"
+        message="Insecure Base Configuration"
+        errorLine1="    &lt;base-config cleartextTrafficPermitted=&quot;true&quot;>"
+        errorLine2="                                            ~~~~">
+        <location
+            file="src/main/res/xml/network_security_config.xml"
+            line="8"
+            column="45"/>
+    </issue>
+
+    <issue
+        id="ObsoleteSdkInt"
+        message="Unnecessary; `SDK_INT` is always >= 29"
+        errorLine1="    fun canSelectMediaOutputDevice(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P"
+        errorLine2="                                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/audio/AudioEnvironment.kt"
+            line="161"
+            column="49"/>
+    </issue>
+
+    <issue
+        id="StaticFieldLeak"
+        message="Do not place Android context classes in static fields (static reference to `MediaPlaybackClient` which has field `context` pointing to `Context`); this is a memory leak"
+        errorLine1="    @Volatile"
+        errorLine2="    ^">
+        <location
+            file="src/main/java/dev/autobridge/remote/RemoteRuntime.kt"
+            line="29"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="Overdraw"
+        message="Possible overdraw: Root element paints background `#101319` with a theme that also paints a background (inferred theme is `@style/AppTheme`)"
+        errorLine1="    android:background=&quot;#101319&quot; />"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/layout/car_permission_background.xml"
+            line="5"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.drawable.ic_car_back` appears to be unused"
+        errorLine1="&lt;vector xmlns:android=&quot;http://schemas.android.com/apk/res/android&quot;"
+        errorLine2="^">
+        <location
+            file="src/main/res/drawable/ic_car_back.xml"
+            line="2"
+            column="1"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.drawable.ic_car_recents` appears to be unused"
+        errorLine1="&lt;vector xmlns:android=&quot;http://schemas.android.com/apk/res/android&quot;"
+        errorLine2="^">
+        <location
+            file="src/main/res/drawable/ic_car_recents.xml"
+            line="2"
+            column="1"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.drawable.ic_car_stop` appears to be unused"
+        errorLine1="&lt;vector xmlns:android=&quot;http://schemas.android.com/apk/res/android&quot;"
+        errorLine2="^">
+        <location
+            file="src/main/res/drawable/ic_car_stop.xml"
+            line="2"
+            column="1"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.car_intro_title` appears to be unused"
+        errorLine1="    &lt;string name=&quot;car_intro_title&quot;>Mirror&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="842"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.car_intro_fit` appears to be unused"
+        errorLine1="    &lt;string name=&quot;car_intro_fit&quot;>Fit to screen&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="843"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.car_intro_fit_on` appears to be unused"
+        errorLine1="    &lt;string name=&quot;car_intro_fit_on&quot;>On • letterboxed&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="844"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.car_intro_fit_off` appears to be unused"
+        errorLine1="    &lt;string name=&quot;car_intro_fit_off&quot;>Off • fill&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="845"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.car_intro_quality` appears to be unused"
+        errorLine1="    &lt;string name=&quot;car_intro_quality&quot;>Quality&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="846"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.car_intro_quality_value` appears to be unused"
+        errorLine1="    &lt;string name=&quot;car_intro_quality_value&quot;>High (1080p)&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="847"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.car_intro_start` appears to be unused"
+        errorLine1="    &lt;string name=&quot;car_intro_start&quot;>Start Mirroring&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="848"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.car_intro_running` appears to be unused"
+        errorLine1="    &lt;string name=&quot;car_intro_running&quot;>Mirroring is running&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="849"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.car_intro_start_caption` appears to be unused"
+        errorLine1="    &lt;string name=&quot;car_intro_start_caption&quot;>Show the phone screen on the car&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="850"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.car_intro_needs_consent` appears to be unused"
+        errorLine1="    &lt;string name=&quot;car_intro_needs_consent&quot;>Grant screen sharing on your phone to start mirroring&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="852"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.car_intro_active` appears to be unused"
+        errorLine1="    &lt;string name=&quot;car_intro_active&quot;>Mirroring active&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="853"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.car_intro_ready` appears to be unused"
+        errorLine1="    &lt;string name=&quot;car_intro_ready&quot;>Ready to mirror&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="854"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.car_intro_connected_caption` appears to be unused"
+        errorLine1="    &lt;string name=&quot;car_intro_connected_caption&quot;>Phone connected • show your phone on Android Auto&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="855"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.car_intro_disconnected_caption` appears to be unused"
+        errorLine1="    &lt;string name=&quot;car_intro_disconnected_caption&quot;>Show your phone screen on Android Auto&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="856"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.car_now_playing_next` appears to be unused"
+        errorLine1="    &lt;string name=&quot;car_now_playing_next&quot;>Next&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="880"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.car_disclaimer_cancel` appears to be unused"
+        errorLine1="    &lt;string name=&quot;car_disclaimer_cancel&quot;>Cancel&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="1030"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="        runCatching { android.net.Uri.parse(url).host ?: url }.getOrDefault(url)"
+        errorLine2="                      ~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/agent/AgentCommandRouter.kt"
+            line="166"
+            column="23"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="                context.getSharedPreferences(name, Context.MODE_PRIVATE)"
+        errorLine2="                ^">
+        <location
+            file="src/main/java/dev/autobridge/core/state/AppDataManager.kt"
+            line="120"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="        runCatching { android.net.Uri.parse(url).host ?: url }.getOrDefault(url)"
+        errorLine2="                      ~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/remote/AutoBridgeCommandRouter.kt"
+            line="270"
+            column="23"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="        val host = runCatching { android.net.Uri.parse(url).host }.getOrNull()"
+        errorLine2="                                 ~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/browser/BrowserActivity.kt"
+            line="713"
+            column="34"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        getSharedPreferences(FAB_PREFS, Context.MODE_PRIVATE).edit()"
+        errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/browser/BrowserActivity.kt"
+            line="877"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="        runCatching { Uri.parse(url).host?.lowercase() }.getOrNull() in externalSignInHosts"
+        errorLine2="                      ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/browser/BrowserDefaults.kt"
+            line="36"
+            column="23"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="        val host = runCatching { Uri.parse(url).host?.lowercase() }.getOrNull() ?: return false"
+        errorLine2="                                 ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/browser/BrowserDefaults.kt"
+            line="51"
+            column="34"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="        context.getSharedPreferences(&quot;autobridge_browser&quot;, Context.MODE_PRIVATE)"
+        errorLine2="        ^">
+        <location
+            file="src/main/java/dev/autobridge/browser/BrowserDefaults.kt"
+            line="233"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="                Log.i(TAG, &quot;declined non-https download scheme=${runCatching { Uri.parse(url).scheme }.getOrNull()}&quot;)"
+        errorLine2="                                                                               ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/browser/BrowserDownloads.kt"
+            line="49"
+            column="80"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="                val request = DownloadManager.Request(Uri.parse(safe)).apply {"
+        errorLine2="                                                      ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/browser/BrowserDownloads.kt"
+            line="55"
+            column="55"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="                    setDescription(runCatching { Uri.parse(safe).host }.getOrNull().orEmpty())"
+        errorLine2="                                                 ~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/browser/BrowserDownloads.kt"
+            line="57"
+            column="50"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="        runCatching { Uri.parse(origin).scheme.equals(&quot;https&quot;, ignoreCase = true) }.getOrDefault(false)"
+        errorLine2="                      ~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/browser/BrowserGeolocation.kt"
+            line="45"
+            column="23"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="        runCatching { Uri.parse(origin).host }.getOrNull() ?: origin"
+        errorLine2="                      ~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/browser/BrowserGeolocation.kt"
+            line="48"
+            column="23"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="        val uri = Uri.parse(url)"
+        errorLine2="                  ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/entertainment/BrowserLauncher.kt"
+            line="41"
+            column="19"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {"
+        errorLine2="                                                ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/entertainment/BrowserLauncher.kt"
+            line="75"
+            column="49"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `Int.toDrawable` instead?"
+        errorLine1="                setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))"
+        errorLine2="                                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/browser/BrowserSheetShell.kt"
+            line="126"
+            column="39"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="        get() = runCatching { Uri.parse(url).host }.getOrNull()?.removePrefix(&quot;www.&quot;).orEmpty()"
+        errorLine2="                              ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/browser/BrowserTabs.kt"
+            line="13"
+            column="31"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `Bitmap.scale` instead?"
+        errorLine1="            return Bitmap.createScaledBitmap(drawable.bitmap, ICON_SIZE_PX, ICON_SIZE_PX, true)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/car/CarAppsScreen.kt"
+            line="104"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX function `createBitmap` instead?"
+        errorLine1="        val bitmap = Bitmap.createBitmap(ICON_SIZE_PX, ICON_SIZE_PX, Bitmap.Config.ARGB_8888)"
+        errorLine2="                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/car/CarAppsScreen.kt"
+            line="106"
+            column="22"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="        runCatching { Uri.parse(url).host ?: url }.getOrDefault(url)"
+        errorLine2="                      ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/car/CarBookmarksScreen.kt"
+            line="95"
+            column="23"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="            context.applicationContext"
+        errorLine2="            ^">
+        <location
+            file="src/main/java/dev/autobridge/browser/CarBrowserRenderMode.kt"
+            line="38"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="            carContext.startCarApp(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(safe)))"
+        errorLine2="                                                                                              ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/car/CarBrowserScreen.kt"
+            line="321"
+            column="95"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `Bitmap.scale` instead?"
+        errorLine1="            return Bitmap.createScaledBitmap(bitmap, width, height, true)"
+        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/car/CarLauncherScreen.kt"
+            line="121"
+            column="20"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX function `createBitmap` instead?"
+        errorLine1="            val bitmap = Bitmap.createBitmap(safeWidth, safeHeight, Bitmap.Config.ARGB_8888)"
+        errorLine2="                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/car/CarLauncherScreen.kt"
+            line="126"
+            column="26"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="                val label = android.net.Uri.parse(url).host ?: text"
+        errorLine2="                            ~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/car/CarQuickLaunchScreen.kt"
+            line="251"
+            column="29"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX function `createBitmap` instead?"
+        errorLine1="            val bitmap = Bitmap.createBitmap("
+        errorLine2="                         ^">
+        <location
+            file="src/main/java/dev/autobridge/browser/CarWebRenderer.kt"
+            line="1139"
+            column="26"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `Canvas.withTranslation` instead?"
+        errorLine1="            canvas.save()"
+        errorLine2="            ~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/browser/CarWebRenderer.kt"
+            line="2458"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `Canvas.withSave` instead?"
+        errorLine1="                canvas.save()"
+        errorLine2="                ~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/browser/CarWebRenderer.kt"
+            line="2511"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="            val address = runCatching { Uri.parse(url) }.getOrNull()"
+        errorLine2="                                        ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/browser/CarWebRenderer.kt"
+            line="2647"
+            column="41"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `Canvas.withClip` instead?"
+        errorLine1="        canvas.save()"
+        errorLine2="        ~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/browser/CarWebRenderer.kt"
+            line="2742"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `Canvas.withClip` instead?"
+        errorLine1="                canvas.save()"
+        errorLine2="                ~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/browser/CarWebRenderer.kt"
+            line="3074"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="        runCatching { Uri.parse(url).host ?: url }.getOrDefault(url)"
+        errorLine2="                      ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/car/CarWebScreen.kt"
+            line="80"
+            column="23"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="        return runCatching { android.net.Uri.parse(raw).host ?: raw }.getOrDefault(raw)"
+        errorLine2="                             ~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/remote/CommandHistoryStore.kt"
+            line="94"
+            column="30"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX function `createBitmap` instead?"
+        errorLine1="        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)"
+        errorLine2="                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/car/DashboardArtwork.kt"
+            line="28"
+            column="22"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `Canvas.withSave` instead?"
+        errorLine1="        canvas.save()"
+        errorLine2="        ~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/car/HomeDashboardRenderer.kt"
+            line="106"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `Canvas.withSave` instead?"
+        errorLine1="        canvas.save()"
+        errorLine2="        ~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/car/HomeDashboardRenderer.kt"
+            line="420"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `Canvas.withTranslation` instead?"
+        errorLine1="        canvas.save()"
+        errorLine2="        ~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/car/HomeMenuCard.kt"
+            line="127"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `Canvas.withTranslation` instead?"
+        errorLine1="        canvas.save()"
+        errorLine2="        ~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/car/HomeMenuCard.kt"
+            line="142"
+            column="9"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="                    .setDataAndType(Uri.parse(item.uri), &quot;image/*&quot;)"
+        errorLine2="                                    ~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/library/LibraryActivity.kt"
+            line="889"
+            column="37"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="                            .setData(Uri.parse(bookmark.url))"
+        errorLine2="                                     ~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/library/LibraryActivity.kt"
+            line="943"
+            column="38"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="                                .setData(Uri.parse(link.url))"
+        errorLine2="                                         ~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/library/LibraryActivity.kt"
+            line="979"
+            column="42"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="        runCatching { Uri.parse(url).host ?: url }.getOrDefault(url)"
+        errorLine2="                      ~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/library/LibraryActivity.kt"
+            line="1099"
+            column="23"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="            url != null -> startActivity(browserScreenIntent().setData(android.net.Uri.parse(url)))"
+        errorLine2="                                                                       ~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/MainActivity.kt"
+            line="2354"
+            column="72"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="            startActivity(browserScreenIntent().setData(android.net.Uri.parse(url)))"
+        errorLine2="                                                        ~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/MainActivity.kt"
+            line="2433"
+            column="57"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="            startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))"
+        errorLine2="                                                     ~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/MainActivity.kt"
+            line="2728"
+            column="54"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="                    android.net.Uri.parse(&quot;package:$packageName&quot;)"
+        errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/MainActivity.kt"
+            line="4073"
+            column="21"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `String.toUri` instead?"
+        errorLine1="                    .setData(Uri.parse(&quot;package:$packageName&quot;))"
+        errorLine2="                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/mirror/MirrorSetupActivity.kt"
+            line="237"
+            column="30"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `SharedPreferences.edit` instead?"
+        errorLine1="            getPreferences(Context.MODE_PRIVATE).edit().putBoolean(&quot;notifications_asked&quot;, value).apply()"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/mirror/MirrorSetupActivity.kt"
+            line="274"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension property `View.isVisible` instead?"
+        errorLine1="            if (notice.visibility == View.VISIBLE &amp;&amp; started) notice.visibility = View.GONE"
+        errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/library/PlayerActivity.kt"
+            line="714"
+            column="17"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX extension function `Canvas.withSave` instead?"
+        errorLine1="        val saveCount = canvas.save()"
+        errorLine2="                        ~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/mirror/RenderPlan.kt"
+            line="70"
+            column="25"/>
+    </issue>
+
+    <issue
+        id="UseKtx"
+        message="Use the KTX function `createBitmap` instead?"
+        errorLine1="                bitmap = runCatching { Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888) }"
+        errorLine2="                                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/java/dev/autobridge/mirror/SelfDrawnMirrorEngine.kt"
+            line="387"
+            column="40"/>
+    </issue>
+
+    <issue
+        id="ClickableViewAccessibility"
+        message="Custom view ``TextView`` has `setOnTouchListener` called on it but does not override `performClick`"
+        errorLine1="        menuButton.setOnTouchListener { view, event ->"
+        errorLine2="        ^">
+        <location
+            file="src/main/java/dev/autobridge/browser/BrowserActivity.kt"
+            line="757"
+            column="9"/>
+    </issue>
+
+</issues>
