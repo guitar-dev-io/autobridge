@@ -8,6 +8,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.Switch
 import android.widget.TextView
@@ -61,6 +62,15 @@ class BrowserMenuSheet(
         onAction(action)
     }
 
+    /** A [BrowserIcon] as a plain, untinted-background `ImageView` at a given size/tint. */
+    private fun icon(icon: BrowserIcon, sizeDp: Float, tint: Int): ImageView = ImageView(activity).apply {
+        setImageResource(icon.resId)
+        scaleType = ImageView.ScaleType.CENTER_INSIDE
+        setColorFilter(tint)
+        val side = sizes.dpInt(sizeDp)
+        layoutParams = LinearLayout.LayoutParams(side, side)
+    }
+
     private fun render() {
         val current = state()
         container.removeAllViews()
@@ -73,6 +83,7 @@ class BrowserMenuSheet(
         container.addView(secondaryRow())
         container.addView(divider())
         container.addView(desktopToggle(current))
+        container.addView(fullscreenToggle(current))
     }
 
     /** The faint full-width rule the mockup draws between its grouped sections. */
@@ -148,16 +159,12 @@ class BrowserMenuSheet(
                 event.action == android.view.KeyEvent.ACTION_UP
             if (action == EditorInfo.IME_ACTION_GO || enterUp) { go(); true } else false
         }
-        val lock = TextView(activity).apply {
-            text = if (current.secure) "🔒" else "!"
-            textSize = shell.sp(AutoUiSizes.ICON_SMALL_DP * 0.9f)
-            setTextColor(if (current.secure) BrowserTheme.secureBadge else BrowserTheme.insecureBadge)
-        }
-        val clear = TextView(activity).apply {
-            text = "✕"
-            gravity = Gravity.CENTER
-            textSize = shell.sp(AutoUiSizes.ICON_SMALL_DP * 0.9f)
-            setTextColor(BrowserTheme.textSecondary)
+        val lock = icon(
+            if (current.secure) BrowserIcon.LOCK else BrowserIcon.WARNING,
+            AutoUiSizes.ICON_SMALL_DP * 0.9f,
+            if (current.secure) BrowserTheme.secureBadge else BrowserTheme.insecureBadge,
+        )
+        val clear = icon(BrowserIcon.CLOSE, AutoUiSizes.ICON_SMALL_DP * 0.9f, BrowserTheme.textSecondary).apply {
             contentDescription = activity.getString(R.string.browser_clear_url)
             val side = sizes.dpInt(AutoUiSizes.SHEET_URL_FIELD_HEIGHT_DP * 0.78f)
             layoutParams = LinearLayout.LayoutParams(side, side)
@@ -186,10 +193,7 @@ class BrowserMenuSheet(
      * page, a different URL or a search before it goes to the car.
      */
     private fun sendToCarButton(): View {
-        val icon = TextView(activity).apply {
-            text = "🚗"
-            gravity = Gravity.CENTER
-            textSize = shell.sp(AutoUiSizes.SHEET_ICON_DP * 1.15f)
+        val carIcon = icon(BrowserIcon.CAR, AutoUiSizes.SHEET_ICON_DP * 1.15f, BrowserTheme.onPrimary).apply {
             setPadding(0, 0, shell.pad(), 0)
         }
         val label = LinearLayout(activity).apply {
@@ -207,19 +211,14 @@ class BrowserMenuSheet(
                 setTextColor(BrowserTheme.onPrimary)
             })
         }
-        val chevron = TextView(activity).apply {
-            text = "›"
-            gravity = Gravity.CENTER
-            textSize = shell.sp(AutoUiSizes.ICON_LARGE_DP)
-            setTextColor(BrowserTheme.onPrimary)
-        }
+        val chevron = icon(BrowserIcon.CHEVRON_RIGHT, AutoUiSizes.ICON_LARGE_DP, BrowserTheme.onPrimary)
         return LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             background = shell.rounded(BrowserTheme.accent, shell.cornerRadius())
             setPadding(shell.pad() + shell.gap(), shell.pad(), shell.pad(), shell.pad())
             contentDescription = "Send to car"
-            addView(icon)
+            addView(carIcon)
             addView(label, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
             addView(chevron)
             setOnClickListener { shell.dismiss(); onSendToCar() }
@@ -234,26 +233,26 @@ class BrowserMenuSheet(
     /** Back / Reload / Forward: the three controls used while reading a page. Medium emphasis. */
     private fun navRow(current: BrowserMenuState): View = LinearLayout(activity).apply {
         orientation = LinearLayout.HORIZONTAL
-        addView(actionButton("←", "Back", enabled = current.canGoBack) { perform(DrawerAction.NAV_BACK) }, equalParams(0))
-        addView(actionButton("↻", "Reload", enabled = true) { perform(DrawerAction.RELOAD) }, equalParams(1))
-        addView(actionButton("→", "Forward", enabled = current.canGoForward) { perform(DrawerAction.NAV_FORWARD) }, equalParams(2))
+        addView(actionButton(BrowserIcon.BACK, "Back", enabled = current.canGoBack) { perform(DrawerAction.NAV_BACK) }, equalParams(0))
+        addView(actionButton(BrowserIcon.RELOAD, "Reload", enabled = true) { perform(DrawerAction.RELOAD) }, equalParams(1))
+        addView(actionButton(BrowserIcon.FORWARD, "Forward", enabled = current.canGoForward) { perform(DrawerAction.NAV_FORWARD) }, equalParams(2))
         layoutParams = rowParams()
     }
 
     /** Bookmarks / Settings / More: lower emphasis than navigation, but still on the main sheet. */
     private fun secondaryRow(): View = LinearLayout(activity).apply {
         orientation = LinearLayout.HORIZONTAL
-        addView(actionButton("☆", "Bookmarks", enabled = true) { perform(DrawerAction.BOOKMARKS) }, equalParams(0))
-        addView(actionButton("⚙", "Settings", enabled = true) { perform(DrawerAction.SETTINGS) }, equalParams(1))
-        addView(actionButton("⋯", "More", enabled = true) { shell.dismiss(); onMore() }, equalParams(2))
+        addView(actionButton(BrowserIcon.BOOKMARK_LIST, "Bookmarks", enabled = true) { perform(DrawerAction.BOOKMARKS) }, equalParams(0))
+        addView(actionButton(BrowserIcon.SETTINGS, "Settings", enabled = true) { perform(DrawerAction.SETTINGS) }, equalParams(1))
+        addView(actionButton(BrowserIcon.MORE, "More", enabled = true) { shell.dismiss(); onMore() }, equalParams(2))
         layoutParams = rowParams()
     }
 
     /**
-     * One button in a navigation/secondary row: a glyph chip over a label, on a tonal background.
+     * One button in a navigation/secondary row: an icon chip over a label, on a tonal background.
      * Disabled entries keep their place (so the row never reflows) but take no tap and read dimmed.
      */
-    private fun actionButton(glyph: String, label: String, enabled: Boolean, onClick: () -> Unit): View =
+    private fun actionButton(icon: BrowserIcon, label: String, enabled: Boolean, onClick: () -> Unit): View =
         LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
@@ -267,12 +266,12 @@ class BrowserMenuSheet(
             isFocusable = enabled
             if (enabled) setOnClickListener { onClick() }
             val tint = if (enabled) BrowserTheme.iconEnabled else BrowserTheme.iconDisabled
-            addView(TextView(activity).apply {
-                text = glyph
-                gravity = Gravity.CENTER
-                textSize = shell.sp(AutoUiSizes.SHEET_ICON_DP)
-                setTextColor(tint)
-                setPadding(0, 0, 0, shell.gap())
+            addView(ImageView(activity).apply {
+                setImageResource(icon.resId)
+                scaleType = ImageView.ScaleType.CENTER_INSIDE
+                setColorFilter(tint)
+                val side = sizes.dpInt(AutoUiSizes.SHEET_ICON_DP)
+                layoutParams = LinearLayout.LayoutParams(side, side).apply { bottomMargin = shell.gap() }
             })
             addView(TextView(activity).apply {
                 text = label
@@ -283,33 +282,45 @@ class BrowserMenuSheet(
             })
         }
 
-    /** A compact full-width row with a switch — not an oversized card. 60dp, matching the mockup. */
-    private fun desktopToggle(current: BrowserMenuState): View = LinearLayout(activity).apply {
-        orientation = LinearLayout.HORIZONTAL
-        gravity = Gravity.CENTER_VERTICAL
-        background = shell.rounded(BrowserTheme.sheetCardBackground, shell.cornerRadius())
-        setPadding(shell.pad(), 0, shell.pad(), 0)
-        addView(TextView(activity).apply {
-            text = "🖥"
-            textSize = shell.sp(AutoUiSizes.SHEET_ICON_DP * 0.85f)
-            setTextColor(BrowserTheme.textSecondary)
-            setPadding(0, 0, shell.pad(), 0)
-        })
-        addView(
-            TextView(activity).apply {
-                text = "Request desktop site"
-                textSize = shell.sp(AutoUiSizes.ICON_SMALL_DP * 0.9f)
-                setTextColor(BrowserTheme.textPrimary)
-            },
-            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
-        )
-        addView(Switch(activity).apply {
-            isChecked = current.isDesktop
-            // The sheet stays open: the page reloads under it, which is what the setting changes.
-            setOnCheckedChangeListener { _, _ -> onAction(DrawerAction.TOGGLE_DESKTOP) }
-        })
-        layoutParams = rowParams().apply { height = sizes.dpInt(AutoUiSizes.SHEET_ROW_HEIGHT_DP) }
-    }
+    /**
+     * A compact full-width row with a switch — not an oversized card. 60dp, matching the mockup.
+     * Shared by [desktopToggle] and [fullscreenToggle] so the two stacked rows read as one family.
+     */
+    private fun switchRow(icon: BrowserIcon, label: String, checked: Boolean, onToggle: () -> Unit): View =
+        LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = shell.rounded(BrowserTheme.sheetCardBackground, shell.cornerRadius())
+            setPadding(shell.pad(), 0, shell.pad(), 0)
+            addView(ImageView(activity).apply {
+                setImageResource(icon.resId)
+                scaleType = ImageView.ScaleType.CENTER_INSIDE
+                setColorFilter(BrowserTheme.textSecondary)
+                val side = sizes.dpInt(AutoUiSizes.SHEET_ICON_DP * 0.85f)
+                layoutParams = LinearLayout.LayoutParams(side, side).apply { marginEnd = shell.pad() }
+            })
+            addView(
+                TextView(activity).apply {
+                    text = label
+                    textSize = shell.sp(AutoUiSizes.ICON_SMALL_DP * 0.9f)
+                    setTextColor(BrowserTheme.textPrimary)
+                },
+                LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            )
+            addView(Switch(activity).apply {
+                isChecked = checked
+                // The sheet stays open: whatever the setting changes happens underneath it.
+                setOnCheckedChangeListener { _, _ -> onToggle() }
+            })
+            layoutParams = rowParams().apply { height = sizes.dpInt(AutoUiSizes.SHEET_ROW_HEIGHT_DP) }
+        }
+
+    private fun desktopToggle(current: BrowserMenuState): View =
+        switchRow(BrowserIcon.DESKTOP_MODE, "Request desktop site", current.isDesktop) { onAction(DrawerAction.TOGGLE_DESKTOP) }
+
+    /** Sits directly below [desktopToggle]; promoted off the toolbar, see [BrowserActivity.buildChrome]. */
+    private fun fullscreenToggle(current: BrowserMenuState): View =
+        switchRow(BrowserIcon.FULLSCREEN_ENTER, "Fullscreen", current.fullscreen) { onAction(DrawerAction.TOGGLE_FULLSCREEN) }
 
     private fun rowParams() = LinearLayout.LayoutParams(
         ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT

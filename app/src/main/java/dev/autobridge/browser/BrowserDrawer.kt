@@ -15,7 +15,7 @@ enum class DrawerAction {
     COPY_URL, PASTE_AND_GO, FIND_IN_PAGE, AGENT,
     TOGGLE_DESKTOP, ZOOM_IN, ZOOM_OUT, RELOAD, HOME,
 
-    /** Car only: immersive fullscreen (no toolbar, floating button fades until touched). */
+    /** Immersive fullscreen (no toolbar, floating button/handle fades until touched). */
     TOGGLE_FULLSCREEN,
 
     /** Car only: steps through [BrowserSplitLayout] (100, 50/50, 40/60, portrait + landscape). */
@@ -110,7 +110,8 @@ data class DrawerItem(
      * moment. Resolve it with [label].
      */
     @StringRes val labelRes: Int,
-    val glyph: String,
+    /** The Material Icon drawn for this entry on every surface; see [BrowserIcon]. */
+    val icon: BrowserIcon,
     /** Corner state text, e.g. a tab count. Blank when the entry has no state. */
     val value: String = "",
     /**
@@ -150,6 +151,7 @@ data class BrowserMenuState(
     val url: String = "",
     val tabCount: Int = 1,
     val isDesktop: Boolean = false,
+    val fullscreen: Boolean = false,
     val canGoBack: Boolean = false,
     val canGoForward: Boolean = false,
     val version: String = "",
@@ -209,7 +211,8 @@ class BrowserDrawerModel private constructor(
     val tiles: List<DrawerRow>,
     /** Y positions of the hairlines between groups, in surface coordinates. */
     val dividers: List<Float>,
-    val toggle: DrawerRow?,
+    /** Desktop then Fullscreen, stacked; empty on the "more" list. */
+    val toggles: List<DrawerRow>,
     /** Everything below this scrolls; the header above it does not. */
     val headerBottom: Float,
     val contentHeight: Float,
@@ -224,11 +227,11 @@ class BrowserDrawerModel private constructor(
          */
         fun primaryAction(state: BrowserMenuState): DrawerItem = when (state.surface) {
             MenuSurface.CAR -> DrawerItem(
-                DrawerAction.TABS, R.string.drawer_tabs, "▣", value = state.tabCount.toString(),
+                DrawerAction.TABS, R.string.drawer_tabs, BrowserIcon.TABS, value = state.tabCount.toString(),
                 detailRes = R.string.browser_tabs_detail,
             )
             MenuSurface.PHONE -> DrawerItem(
-                DrawerAction.SEND_TO_CAR, R.string.drawer_send_to_car, "🚗",
+                DrawerAction.SEND_TO_CAR, R.string.drawer_send_to_car, BrowserIcon.CAR,
                 detailRes = R.string.browser_send_to_car_detail,
             )
         }
@@ -238,20 +241,29 @@ class BrowserDrawerModel private constructor(
             // Navigation first: it is what a menu opened mid-page is usually opened for, and the
             // toolbar it duplicates auto-hides.
             listOf(
-                DrawerItem(DrawerAction.NAV_BACK, R.string.drawer_back, "←", enabled = state.canGoBack),
-                DrawerItem(DrawerAction.RELOAD, R.string.drawer_reload, "↻"),
-                DrawerItem(DrawerAction.NAV_FORWARD, R.string.drawer_forward, "→", enabled = state.canGoForward),
+                DrawerItem(DrawerAction.NAV_BACK, R.string.drawer_back, BrowserIcon.BACK, enabled = state.canGoBack),
+                DrawerItem(DrawerAction.RELOAD, R.string.drawer_reload, BrowserIcon.RELOAD),
+                DrawerItem(DrawerAction.NAV_FORWARD, R.string.drawer_forward, BrowserIcon.FORWARD, enabled = state.canGoForward),
             ),
             listOf(
-                DrawerItem(DrawerAction.BOOKMARKS, R.string.drawer_bookmarks, "☆"),
-                DrawerItem(DrawerAction.SETTINGS, R.string.drawer_settings, "⚙"),
-                DrawerItem(DrawerAction.MORE, R.string.drawer_more, "⋯"),
+                DrawerItem(DrawerAction.BOOKMARKS, R.string.drawer_bookmarks, BrowserIcon.BOOKMARK_LIST),
+                DrawerItem(DrawerAction.SETTINGS, R.string.drawer_settings, BrowserIcon.SETTINGS),
+                DrawerItem(DrawerAction.MORE, R.string.drawer_more, BrowserIcon.MORE),
             ),
         )
 
-        /** The one switch on the primary sheet; a switch because the state is what it reports. */
+        /** The switches on the primary sheet; a switch because the state is what each reports. */
         fun desktopToggle(state: BrowserMenuState): DrawerItem = DrawerItem(
-            DrawerAction.TOGGLE_DESKTOP, R.string.drawer_request_desktop, "🖥", on = state.isDesktop
+            DrawerAction.TOGGLE_DESKTOP, R.string.drawer_request_desktop, BrowserIcon.DESKTOP_MODE, on = state.isDesktop
+        )
+
+        /**
+         * Sits directly below [desktopToggle] on the primary sheet. Promoted out of "More" (where it
+         * used to be the car's only entry point, see [carMoreItems]) so leaving fullscreen never
+         * needs a second trip through the menu on either surface.
+         */
+        fun fullscreenToggle(state: BrowserMenuState): DrawerItem = DrawerItem(
+            DrawerAction.TOGGLE_FULLSCREEN, R.string.drawer_fullscreen, BrowserIcon.FULLSCREEN_ENTER, on = state.fullscreen
         )
 
         /** Everything that did not earn a place on the primary sheet, reached through "More". */
@@ -261,48 +273,47 @@ class BrowserDrawerModel private constructor(
         }
 
         private fun carMoreItems(): List<DrawerItem> = listOf(
-            // First in the list: with the URL bar hidden by default, this is the only route to
-            // fullscreen that does not need the floating button rebound.
-            DrawerItem(DrawerAction.TOGGLE_FULLSCREEN, R.string.drawer_fullscreen, "⛶"),
-            DrawerItem(DrawerAction.SPLIT_LAYOUT, R.string.drawer_split, "◫"),
-            DrawerItem(DrawerAction.NEW_TAB, R.string.drawer_new_tab, "＋"),
-            DrawerItem(DrawerAction.HOME, R.string.drawer_start_page, "⌂"),
-            DrawerItem(DrawerAction.HISTORY, R.string.drawer_history, "↺"),
-            DrawerItem(DrawerAction.DOWNLOADS, R.string.drawer_downloads, "↓"),
-            DrawerItem(DrawerAction.BOOKMARK_PAGE, R.string.drawer_bookmark, "★"),
-            DrawerItem(DrawerAction.FIND_IN_PAGE, R.string.drawer_find, "⌕"),
-            DrawerItem(DrawerAction.COPY_URL, R.string.drawer_copy_url, "⧉"),
+            // Fullscreen no longer lives here: it is a primary-sheet toggle next to Desktop (see
+            // [fullscreenToggle]), so it is never buried behind "More" on either surface.
+            DrawerItem(DrawerAction.SPLIT_LAYOUT, R.string.drawer_split, BrowserIcon.SPLIT_LAYOUT),
+            DrawerItem(DrawerAction.NEW_TAB, R.string.drawer_new_tab, BrowserIcon.ADD),
+            DrawerItem(DrawerAction.HOME, R.string.drawer_start_page, BrowserIcon.HOME_PAGE),
+            DrawerItem(DrawerAction.HISTORY, R.string.drawer_history, BrowserIcon.HISTORY),
+            DrawerItem(DrawerAction.DOWNLOADS, R.string.drawer_downloads, BrowserIcon.DOWNLOAD),
+            DrawerItem(DrawerAction.BOOKMARK_PAGE, R.string.drawer_bookmark, BrowserIcon.BOOKMARK_ADD),
+            DrawerItem(DrawerAction.FIND_IN_PAGE, R.string.drawer_find, BrowserIcon.SEARCH),
+            DrawerItem(DrawerAction.COPY_URL, R.string.drawer_copy_url, BrowserIcon.COPY),
             // Always offered. Probing the clipboard to decide whether to show this entry does not
             // work on a car surface: Android denies clipboard reads to an app that is not focused
             // on the phone, so the probe always failed and the entry never appeared. Whether there
             // is anything to paste is decided when it is tapped.
-            DrawerItem(DrawerAction.PASTE_AND_GO, R.string.drawer_paste_and_go, "⎘"),
-            DrawerItem(DrawerAction.OPEN_EXTERNAL, R.string.drawer_external, "↗"),
-            DrawerItem(DrawerAction.ZOOM_IN, R.string.drawer_zoom_in, "+"),
-            DrawerItem(DrawerAction.ZOOM_OUT, R.string.drawer_zoom_out, "−"),
-            DrawerItem(DrawerAction.AGENT, R.string.drawer_agent, "❖"),
-            DrawerItem(DrawerAction.MEDIA_CENTER, R.string.drawer_media, "♪"),
-            DrawerItem(DrawerAction.NOW_PLAYING, R.string.drawer_now_playing, "▶"),
-            DrawerItem(DrawerAction.MEDIA_LIBRARY, R.string.drawer_library, "▤"),
-            DrawerItem(DrawerAction.CLEAR_DATA, R.string.drawer_clear_data, "⌧"),
-            DrawerItem(DrawerAction.DIAGNOSTICS, R.string.drawer_about, "ℹ"),
+            DrawerItem(DrawerAction.PASTE_AND_GO, R.string.drawer_paste_and_go, BrowserIcon.PASTE),
+            DrawerItem(DrawerAction.OPEN_EXTERNAL, R.string.drawer_external, BrowserIcon.OPEN_EXTERNAL),
+            DrawerItem(DrawerAction.ZOOM_IN, R.string.drawer_zoom_in, BrowserIcon.ADD),
+            DrawerItem(DrawerAction.ZOOM_OUT, R.string.drawer_zoom_out, BrowserIcon.REMOVE),
+            DrawerItem(DrawerAction.AGENT, R.string.drawer_agent, BrowserIcon.AGENT),
+            DrawerItem(DrawerAction.MEDIA_CENTER, R.string.drawer_media, BrowserIcon.MUSIC),
+            DrawerItem(DrawerAction.NOW_PLAYING, R.string.drawer_now_playing, BrowserIcon.PLAY),
+            DrawerItem(DrawerAction.MEDIA_LIBRARY, R.string.drawer_library, BrowserIcon.LIBRARY),
+            DrawerItem(DrawerAction.CLEAR_DATA, R.string.drawer_clear_data, BrowserIcon.DELETE),
+            DrawerItem(DrawerAction.DIAGNOSTICS, R.string.drawer_about, BrowserIcon.INFO),
         )
 
         /** The phone's secondary list, in the order [MoreActionsSheet] draws it. */
         private fun phoneMoreItems(): List<DrawerItem> = listOf(
-            DrawerItem(DrawerAction.RECEIVE_FROM_CAR, R.string.drawer_get_from_car, "◀"),
-            DrawerItem(DrawerAction.FIND_IN_PAGE, R.string.drawer_find, "⌕"),
-            DrawerItem(DrawerAction.COPY_URL, R.string.drawer_copy_url, "⧉"),
-            DrawerItem(DrawerAction.PASTE_AND_GO, R.string.drawer_paste_and_go, "⎘"),
-            DrawerItem(DrawerAction.OPEN_EXTERNAL, R.string.drawer_external, "↗"),
-            DrawerItem(DrawerAction.HOME, R.string.drawer_start_page, "⌂"),
-            DrawerItem(DrawerAction.HISTORY, R.string.drawer_history, "↺"),
-            DrawerItem(DrawerAction.DOWNLOADS, R.string.drawer_downloads, "↓"),
-            DrawerItem(DrawerAction.SUPPORT, R.string.drawer_support, "☕"),
-            DrawerItem(DrawerAction.LICENSES, R.string.drawer_licenses, "⚖"),
-            DrawerItem(DrawerAction.GITHUB, R.string.drawer_github, "⌥"),
-            DrawerItem(DrawerAction.ZOOM_IN, R.string.drawer_zoom_in, "+"),
-            DrawerItem(DrawerAction.ZOOM_OUT, R.string.drawer_zoom_out, "−"),
+            DrawerItem(DrawerAction.RECEIVE_FROM_CAR, R.string.drawer_get_from_car, BrowserIcon.RECEIVE),
+            DrawerItem(DrawerAction.FIND_IN_PAGE, R.string.drawer_find, BrowserIcon.SEARCH),
+            DrawerItem(DrawerAction.COPY_URL, R.string.drawer_copy_url, BrowserIcon.COPY),
+            DrawerItem(DrawerAction.PASTE_AND_GO, R.string.drawer_paste_and_go, BrowserIcon.PASTE),
+            DrawerItem(DrawerAction.OPEN_EXTERNAL, R.string.drawer_external, BrowserIcon.OPEN_EXTERNAL),
+            DrawerItem(DrawerAction.HOME, R.string.drawer_start_page, BrowserIcon.HOME_PAGE),
+            DrawerItem(DrawerAction.HISTORY, R.string.drawer_history, BrowserIcon.HISTORY),
+            DrawerItem(DrawerAction.DOWNLOADS, R.string.drawer_downloads, BrowserIcon.DOWNLOAD),
+            DrawerItem(DrawerAction.SUPPORT, R.string.drawer_support, BrowserIcon.SUPPORT),
+            DrawerItem(DrawerAction.LICENSES, R.string.drawer_licenses, BrowserIcon.LICENSES),
+            DrawerItem(DrawerAction.GITHUB, R.string.drawer_github, BrowserIcon.CODE),
+            DrawerItem(DrawerAction.ZOOM_IN, R.string.drawer_zoom_in, BrowserIcon.ADD),
+            DrawerItem(DrawerAction.ZOOM_OUT, R.string.drawer_zoom_out, BrowserIcon.REMOVE),
         )
 
         /** Fixed at three so the primary sheet keeps the phone sheet's proportions on every panel. */
@@ -359,12 +370,12 @@ class BrowserDrawerModel private constructor(
                 closeButton.left - gap - exitWidth, closeButton.top,
                 closeButton.left - gap, closeButton.bottom
             )
-            headerLinks += DrawerRow(DrawerItem(DrawerAction.APP_HOME, R.string.drawer_exit, "⏏"), exitBox, DrawerKind.PILL)
+            headerLinks += DrawerRow(DrawerItem(DrawerAction.APP_HOME, R.string.drawer_exit, BrowserIcon.APP_HOME), exitBox, DrawerKind.PILL)
             var titleLeft = header.left
             if (more) {
                 // The phone's "More actions" sheet opens with a circular back arrow; so does this.
                 val back = Box(header.left, closeButton.top, header.left + roundSide, closeButton.bottom)
-                headerLinks.add(0, DrawerRow(DrawerItem(DrawerAction.BACK_TO_MENU, R.string.drawer_back, "‹"), back, DrawerKind.ROUND))
+                headerLinks.add(0, DrawerRow(DrawerItem(DrawerAction.BACK_TO_MENU, R.string.drawer_back, BrowserIcon.BACK), back, DrawerKind.ROUND))
                 titleLeft = back.right + gap * 1.5f
             }
 
@@ -400,12 +411,15 @@ class BrowserDrawerModel private constructor(
                 bands += sizes.dp(64f) to sizes.touchTarget // primary button
             }
             repeat(itemRows.size) { bands += tileWant to tileFloor }
-            if (!more) bands += sizes.touchTarget to sizes.touchTarget * 0.8f // desktop switch
+            if (!more) repeat(2) { bands += sizes.touchTarget to sizes.touchTarget * 0.8f } // desktop + fullscreen switches
 
             // Fixed chrome: a gap after the address, one either side of each divider (drawn in the
             // middle of a doubled gap, as the phone's divider margins do), and the gaps between rows.
             val dividerCount = if (more) 0 else 2
-            val chrome = (if (more) 0f else gap) + dividerCount * gap * 2f + tileGap * (itemRows.size - 1)
+            // The gap between the two stacked toggle rows (Desktop, Fullscreen), present only when
+            // there are two of them — i.e. never on the "more" list.
+            val toggleGap = if (more) 0f else tileGap
+            val chrome = (if (more) 0f else gap) + dividerCount * gap * 2f + tileGap * (itemRows.size - 1) + toggleGap
             val heights = distribute(bands, (visibleHeight - chrome).coerceAtLeast(0f))
 
             val contentHeight = heights.sum() + chrome
@@ -461,12 +475,16 @@ class BrowserDrawerModel private constructor(
                 if (rowIndex < itemRows.lastIndex) cursor += tileGap
             }
 
-            val toggle = if (more) null else {
+            val toggles = if (more) emptyList() else {
                 divider()
-                val height = take()
-                val box = Box(innerLeft, cursor, innerRight, cursor + height)
-                cursor = box.bottom
-                DrawerRow(desktopToggle(state), box, DrawerKind.TOGGLE)
+                val items = listOf(desktopToggle(state), fullscreenToggle(state))
+                items.mapIndexed { index, item ->
+                    val height = take()
+                    val box = Box(innerLeft, cursor, innerRight, cursor + height)
+                    cursor = box.bottom
+                    if (index < items.lastIndex) cursor += tileGap
+                    DrawerRow(item, box, DrawerKind.TOGGLE)
+                }
             }
 
             return BrowserDrawerModel(
@@ -483,7 +501,7 @@ class BrowserDrawerModel private constructor(
                 primary = primary,
                 tiles = tiles,
                 dividers = dividers,
-                toggle = toggle,
+                toggles = toggles,
                 headerBottom = headerBottom,
                 contentHeight = contentHeight,
                 visibleHeight = visibleHeight,
@@ -512,20 +530,21 @@ class BrowserDrawerModel private constructor(
     val maxScroll: Float get() = (contentHeight - visibleHeight).coerceAtLeast(0f)
 
     /** The last thing on the sheet, for "scrolled to the end" checks. */
-    val contentBottom: Float get() = (toggle ?: tiles.lastOrNull() ?: primary)?.bounds?.bottom ?: headerBottom
+    val contentBottom: Float get() =
+        (toggles.lastOrNull() ?: tiles.lastOrNull() ?: primary)?.bounds?.bottom ?: headerBottom
 
     /** Everything that can be tapped, in the order hit testing resolves them. */
     val rows: List<DrawerRow>
         get() = buildList {
             addAll(headerLinks)
             address?.let { address ->
-                add(DrawerRow(DrawerItem(DrawerAction.ADDRESS_CLEAR, R.string.drawer_clear, "✕"), address.clear, DrawerKind.ROUND))
-                add(DrawerRow(DrawerItem(DrawerAction.ADDRESS_KEYBOARD, R.string.drawer_search, "⌕"), address.go, DrawerKind.ROUND))
-                add(DrawerRow(DrawerItem(DrawerAction.ADDRESS_KEYBOARD, R.string.drawer_address, "🔒"), address.bounds, DrawerKind.ADDRESS))
+                add(DrawerRow(DrawerItem(DrawerAction.ADDRESS_CLEAR, R.string.drawer_clear, BrowserIcon.CLOSE), address.clear, DrawerKind.ROUND))
+                add(DrawerRow(DrawerItem(DrawerAction.ADDRESS_KEYBOARD, R.string.drawer_search, BrowserIcon.SEARCH), address.go, DrawerKind.ROUND))
+                add(DrawerRow(DrawerItem(DrawerAction.ADDRESS_KEYBOARD, R.string.drawer_address, BrowserIcon.LOCK), address.bounds, DrawerKind.ADDRESS))
             }
             primary?.let { add(it) }
             addAll(tiles)
-            toggle?.let { add(it) }
+            addAll(toggles)
         }
 
     /** True when a tap landed on the header's close button. Checked before [actionAt]. */

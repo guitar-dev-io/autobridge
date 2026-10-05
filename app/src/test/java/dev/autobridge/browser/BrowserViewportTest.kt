@@ -273,9 +273,11 @@ class BrowserChromeLayoutTest {
         HEAD_UNITS.forEach { (width, height, dpi) ->
             val layout = layoutFor(width, height, dpi)
             val reload = layout.slot(ChromeZone.RELOAD)!!
-            val fullscreen = layout.slot(ChromeZone.FULLSCREEN)!!
+            // Fullscreen moved into the drawer (see BrowserDrawerModel.fullscreenToggle); Menu is
+            // now the only trailing toolbar slot bounding the address pill's right edge.
+            val menu = layout.slot(ChromeZone.MENU)!!
             assertTrue(layout.address.left >= reload.bounds.right)
-            assertTrue(layout.address.right <= fullscreen.bounds.left + 0.01f)
+            assertTrue(layout.address.right <= menu.bounds.left + 0.01f)
         }
     }
 
@@ -853,17 +855,27 @@ class BrowserDrawerModelTest {
         assertEquals(0f, negative.scrollOffset, 0.01f)
     }
 
-    /** The switch reports the store, not a label the user has to decode. */
-    @Test fun theDesktopSwitchShowsTheStateItToggles() {
+    /** The switches report the store, not a label the user has to decode. */
+    @Test fun theDesktopAndFullscreenSwitchesShowTheStateTheyToggle() {
         listOf(true, false).forEach { desktop ->
             val model = modelFor(1024, 600, 160, state = state.copy(isDesktop = desktop))
-            val toggle = requireNotNull(model.toggle)
-            assertEquals(DrawerKind.TOGGLE, toggle.kind)
-            assertEquals(desktop, toggle.item.on)
-            assertEquals(DrawerAction.TOGGLE_DESKTOP, model.actionAt(toggle.bounds.centerX, toggle.bounds.centerY))
+            val (desktopToggle, fullscreenToggle) = model.toggles
+            assertEquals(DrawerKind.TOGGLE, desktopToggle.kind)
+            assertEquals(desktop, desktopToggle.item.on)
+            assertEquals(
+                DrawerAction.TOGGLE_DESKTOP,
+                model.actionAt(desktopToggle.bounds.centerX, desktopToggle.bounds.centerY)
+            )
+            // Stacked directly below the desktop switch, same row shape.
+            assertEquals(DrawerKind.TOGGLE, fullscreenToggle.kind)
+            assertTrue(fullscreenToggle.bounds.top > desktopToggle.bounds.bottom)
+            assertEquals(
+                DrawerAction.TOGGLE_FULLSCREEN,
+                model.actionAt(fullscreenToggle.bounds.centerX, fullscreenToggle.bounds.centerY)
+            )
         }
-        // The "More" sheet is a plain grid; the switch belongs to the page-level sheet only.
-        assertNull(modelFor(1024, 600, 160, more = true).toggle)
+        // The "More" sheet is a plain grid; the switches belong to the page-level sheet only.
+        assertTrue(modelFor(1024, 600, 160, more = true).toggles.isEmpty())
     }
 
     /**
@@ -877,8 +889,8 @@ class BrowserDrawerModelTest {
 
     /**
      * The car sheet mirrors the phone's [BrowserMenuSheet]: one accent primary button, then
-     * Back / Reload / Forward and Bookmarks / Settings / More, then the desktop switch. Growing it is
-     * how the old menu ended up with a fold.
+     * Back / Reload / Forward and Bookmarks / Settings / More, then the desktop and fullscreen
+     * switches. Growing it is how the old menu ended up with a fold.
      */
     @Test fun thePrimarySheetMirrorsThePhoneSheet() {
         val model = modelFor(1024, 600, 160)
@@ -897,7 +909,9 @@ class BrowserDrawerModelTest {
         assertTrue(nav.all { it.bounds.top == nav.first().bounds.top })
         assertTrue(secondary.first().bounds.top > nav.first().bounds.bottom)
         assertTrue(nav.first().bounds.top > model.primary!!.bounds.bottom)
-        assertTrue(model.toggle!!.bounds.top > secondary.first().bounds.bottom)
+        assertEquals(2, model.toggles.size)
+        assertTrue(model.toggles[0].bounds.top > secondary.first().bounds.bottom)
+        assertTrue(model.toggles[1].bounds.top > model.toggles[0].bounds.bottom)
         assertEquals(2, model.dividers.size)
     }
 

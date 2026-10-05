@@ -13,13 +13,13 @@ import dev.autobridge.R
  * [MENU]; someone who switches between two sites all day wants [TABS] and never opens the menu at
  * all. Fixing it to one behaviour makes the other user press two things for every one.
  */
-enum class FloatingButtonAction(@StringRes val labelRes: Int, val glyph: String) {
-    MENU(R.string.fab_action_menu, "☰"),
-    TABS(R.string.fab_action_tabs, "▣"),
-    NEW_TAB(R.string.fab_action_new_tab, "+"),
-    HOME(R.string.fab_action_home, "⌂"),
-    ADDRESS(R.string.fab_action_address, "⌨"),
-    FULLSCREEN(R.string.fab_action_fullscreen, "⛶"),
+enum class FloatingButtonAction(@StringRes val labelRes: Int, val icon: BrowserIcon) {
+    MENU(R.string.fab_action_menu, BrowserIcon.MENU),
+    TABS(R.string.fab_action_tabs, BrowserIcon.TABS),
+    NEW_TAB(R.string.fab_action_new_tab, BrowserIcon.ADD),
+    HOME(R.string.fab_action_home, BrowserIcon.HOME_PAGE),
+    ADDRESS(R.string.fab_action_address, BrowserIcon.SEARCH),
+    FULLSCREEN(R.string.fab_action_fullscreen, BrowserIcon.FULLSCREEN_ENTER),
     ;
 
     /**
@@ -49,6 +49,7 @@ object BrowserControlsStore {
     private const val KEY_ALWAYS_SHOW_FLOATING_BUTTON = "controls_always_show_floating_button"
     private const val KEY_FLOATING_BUTTON_ACTION = "controls_floating_button_action"
     private const val KEY_FLOATING_BUTTON_ON_LEFT = "controls_floating_button_on_left"
+    private const val KEY_START_FULLSCREEN = "controls_start_fullscreen"
 
     private fun prefs(context: Context) =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -122,5 +123,22 @@ object BrowserControlsStore {
 
     fun setFloatingButtonOnLeft(context: Context, onLeft: Boolean) {
         prefs(context).edit { putBoolean(KEY_FLOATING_BUTTON_ON_LEFT, onLeft) }
+    }
+
+    /**
+     * Whether a fresh launch of the browser starts in immersive fullscreen (no toolbar, floating
+     * button/handle faded until touched).
+     *
+     * On by default: a car page wants every pixel, and the floating button still reaches everything
+     * the hidden chrome did. This is a *stored default*, not a per-launch force — the value is
+     * written whenever the user toggles fullscreen ([setStartFullscreen]), so toggling it off is
+     * remembered and the next launch honours that choice. Only a fresh install, with nothing stored
+     * yet, falls back to the `true` default.
+     */
+    fun startFullscreen(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_START_FULLSCREEN, true)
+
+    fun setStartFullscreen(context: Context, enabled: Boolean) {
+        prefs(context).edit { putBoolean(KEY_START_FULLSCREEN, enabled) }
     }
 }

@@ -11,6 +11,7 @@ import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Typeface
+import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -23,6 +24,7 @@ import android.util.Log
 import android.view.MotionEvent
 import android.view.Surface
 import androidx.annotation.VisibleForTesting
+import androidx.core.content.ContextCompat
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.CookieManager
@@ -360,7 +362,13 @@ class CarWebRenderer(context: Context) {
     /** Where the host leaves room for our controls; null until it reports a stable area. */
     private var chromeBounds: Box? = null
     private var chrome: BrowserChromeLayout = BrowserChromeLayout.create(sizes, viewport, showMenuButton = true)
-    private val visibility = ChromeVisibility()
+    // The browser opens fullscreen by default; a fresh session starts pinned, exactly as if the
+    // user had just tapped the fullscreen toggle. [ChromeVisibility] itself stays neutral
+    // (defaults off) since it is a general chrome-visibility state machine asserted on its own in
+    // ChromeVisibilityTest — this is CarWebRenderer's own session-start policy, applied once here
+    // rather than on every [start] (which runs again each time the screen is reattached and must
+    // not stomp on a choice the user already made during the session).
+    private val visibility = ChromeVisibility().apply { setFullscreen(0L, true) }
     private var overlay: Overlay = Overlay.NONE
     private var drawer: BrowserDrawerModel? = null
     private var drawerScroll = 0f
@@ -679,6 +687,10 @@ class CarWebRenderer(context: Context) {
      * reload it or move the content.
      */
     fun setFullscreen(enabled: Boolean) = runOnMain {
+        // Persist even when the state is unchanged is pointless, but persist the user's choice so a
+        // later session starts the way they left it; the stored default only applies until the
+        // first toggle. See [BrowserControlsStore.startFullscreen].
+        BrowserControlsStore.setStartFullscreen(appContext, enabled)
         if (visibility.fullscreen == enabled) return@runOnMain
         val now = SystemClock.uptimeMillis()
         // Show the floating button for one idle window on entry, so the way out is visible
@@ -768,8 +780,16 @@ class CarWebRenderer(context: Context) {
             running = true
             pumpIdle = false
             // Give the user the full idle window from the moment the browser appears.
-            visibility.onInteraction(SystemClock.uptimeMillis())
+            val startNow = SystemClock.uptimeMillis()
+            visibility.onInteraction(startNow)
             applyControlSettings()
+            // Seed fullscreen from the stored preference on the first start of the session only —
+            // never on a surface re-attach/resize, which would force fullscreen back on after the
+            // user had left it. Applied through [ChromeVisibility] directly so seeding does not
+            // re-write the preference it just read. See [BrowserControlsStore.startFullscreen].
+            if (firstStart) {
+                visibility.setFullscreen(startNow, BrowserControlsStore.startFullscreen(appContext))
+            }
             // Only load on the very first start (or when an explicit URL is requested). A surface
             // recreation/resize must re-fit the existing page, never reload and lose it. The
             // User-Agent is applied when the WebView is created and when the user changes it, not
@@ -1792,6 +1812,7 @@ class CarWebRenderer(context: Context) {
         url = url,
         tabCount = tabCount,
         isDesktop = BrowserUserAgentStore.mode(appContext) == BrowserUserAgentMode.DESKTOP,
+        fullscreen = visibility.fullscreen,
         canGoBack = canGoBack,
         canGoForward = canGoForward,
         version = "v${dev.autobridge.BuildConfig.VERSION_NAME}",
@@ -2770,13 +2791,12 @@ class CarWebRenderer(context: Context) {
         toolbarPaint.alpha = (245 * opacity).toInt()
         canvas.drawRoundRect(box.left, box.top, box.right, box.bottom, corner, corner, toolbarPaint)
         toolbarPaint.alpha = 255
-        glyphPaint.color = BrowserTheme.dark.onFabContainer
-        glyphPaint.alpha = (255 * opacity).toInt()
-        glyphPaint.textSize = radius * 0.95f
-        // The glyph says what the button will do, so a button rebound to "new tab" does not keep
+        // The icon says what the button will do, so a button rebound to "new tab" does not keep
         // claiming to be the menu.
-        canvas.drawText(fabAction.glyph, box.centerX, box.centerY + radius * 0.34f, glyphPaint)
-        glyphPaint.alpha = 255
+        drawIcon(
+            canvas, fabAction.icon, box.centerX, box.centerY,
+            radius * 0.95f, BrowserTheme.dark.onFabContainer, (255 * opacity).toInt()
+        )
     }
 
     /**
@@ -2802,21 +2822,21 @@ class CarWebRenderer(context: Context) {
                 ChromeZone.FORWARD -> canGoForward
                 else -> true
             }
-            glyphPaint.color = if (enabled) BrowserTheme.dark.iconEnabled else BrowserTheme.dark.iconDisabled
-            glyphPaint.alpha = opacity
-            glyphPaint.textSize = slot.iconSize
-            val glyph = when (slot.zone) {
-                ChromeZone.BACK -> "‹"
-                ChromeZone.FORWARD -> "›"
-                ChromeZone.RELOAD -> if (isLoading) "×" else "↻"
-                ChromeZone.FULLSCREEN -> if (isFullscreen) "⤡" else "⛶"
-                ChromeZone.MENU -> "☰"
-                else -> ""
+            val color = if (enabled) BrowserTheme.dark.iconEnabled else BrowserTheme.dark.iconDisabled
+            val icon = when (slot.zone) {
+                ChromeZone.BACK -> BrowserIcon.BACK
+                ChromeZone.FORWARD -> BrowserIcon.FORWARD
+                ChromeZone.RELOAD -> if (isLoading) BrowserIcon.CLOSE else BrowserIcon.RELOAD
+                ChromeZone.FULLSCREEN -> if (isFullscreen) BrowserIcon.FULLSCREEN_EXIT else BrowserIcon.FULLSCREEN_ENTER
+                ChromeZone.MENU -> BrowserIcon.MENU
+                else -> null
             }
-            canvas.drawText(
-                glyph, slot.bounds.centerX,
-                slot.bounds.centerY + slot.iconSize * 0.36f, glyphPaint
-            )
+            if (icon != null) {
+                drawIcon(
+                    canvas, icon, slot.bounds.centerX, slot.bounds.centerY,
+                    slot.iconSize, color, opacity
+                )
+            }
         }
 
         // Address pill: the page's identity, not a second row of controls.
@@ -2832,11 +2852,13 @@ class CarWebRenderer(context: Context) {
             val address = runCatching { Uri.parse(url) }.getOrNull()
             val host = address?.host.orEmpty()
             val isHttps = url.startsWith("https://", ignoreCase = true)
-            detailPaint.color = if (isHttps) BrowserTheme.dark.secureBadge else BrowserTheme.dark.insecureBadge
-            detailPaint.alpha = opacity
-            detailPaint.textSize = sizes.iconSmall * 0.8f
+            val badgeColor = if (isHttps) BrowserTheme.dark.secureBadge else BrowserTheme.dark.insecureBadge
             val badgeX = pill.left + sizes.horizontalPadding
-            canvas.drawText(if (isHttps) "🔒" else "!", badgeX, pill.centerY + sizes.iconSmall * 0.3f, detailPaint)
+            val badgeSize = sizes.iconSmall * 0.8f
+            drawIcon(
+                canvas, if (isHttps) BrowserIcon.LOCK else BrowserIcon.WARNING,
+                badgeX + badgeSize / 2f, pill.centerY, badgeSize, badgeColor, opacity
+            )
 
             titlePaint.color = BrowserTheme.dark.textPrimary
             titlePaint.alpha = opacity
@@ -2934,10 +2956,47 @@ class CarWebRenderer(context: Context) {
             canvas.drawRect(model.header.left, y, model.header.right, y + sizes.dp(1f), toolbarPaint)
         }
         model.tiles.forEach { drawSheetTile(canvas, it) }
-        model.toggle?.let { drawSheetToggle(canvas, it) }
+        model.toggles.forEach { drawSheetToggle(canvas, it) }
         canvas.restore()
 
         drawSheetHeader(canvas, model)
+    }
+
+    /**
+     * One inflated [Drawable] per [BrowserIcon] resource, so the vector is parsed once and only its
+     * tint/alpha/bounds are re-applied per frame — the car redraws many times a second and
+     * re-inflating a vector each time would be wasteful. Mirrors
+     * [BrowserActivity.buildIconDrawable], the phone's equivalent, so the same action resolves to
+     * the same artwork on both surfaces.
+     */
+    private val iconCache = HashMap<Int, Drawable>()
+
+    /**
+     * Draws a [BrowserIcon] as a tinted square centred on ([cx], [cy]), the Canvas-surface
+     * counterpart to the phone's `ImageView` icons. [sizePx] is the side of that square; the icon
+     * is centred on the point rather than offset to a text baseline, which is why callers pass a
+     * box centre where the old glyph draws passed a baseline.
+     */
+    private fun drawIcon(
+        canvas: Canvas,
+        icon: BrowserIcon,
+        cx: Float,
+        cy: Float,
+        sizePx: Float,
+        color: Int,
+        alpha: Int = 255,
+    ) {
+        val drawable = iconCache.getOrPut(icon.resId) {
+            ContextCompat.getDrawable(appContext, icon.resId)!!.mutate()
+        }
+        val half = sizePx / 2f
+        drawable.setBounds(
+            (cx - half).roundToInt(), (cy - half).roundToInt(),
+            (cx + half).roundToInt(), (cy + half).roundToInt()
+        )
+        drawable.setTint(color)
+        drawable.alpha = alpha.coerceIn(0, 255)
+        drawable.draw(canvas)
     }
 
     /** Draws [text] centred on [cx], restoring the alignment so no later draw inherits it. */
@@ -2989,15 +3048,24 @@ class CarWebRenderer(context: Context) {
             canvas.drawRoundRect(
                 box.left, box.top, box.right, box.bottom, box.height / 2f, box.height / 2f, toolbarPaint
             )
-            glyphPaint.color = BrowserTheme.dark.textPrimary
             if (link.kind == DrawerKind.ROUND) {
-                glyphPaint.textSize = sizes.iconLarge.coerceAtMost(box.height * 0.6f)
-                canvas.drawText(link.item.glyph, box.centerX, box.centerY + glyphPaint.textSize * 0.34f, glyphPaint)
+                val iconSize = sizes.iconLarge.coerceAtMost(box.height * 0.6f)
+                drawIcon(canvas, link.item.icon, box.centerX, box.centerY, iconSize, BrowserTheme.dark.textPrimary)
             } else {
+                // A pill: icon on the left, its label to the right, drawn as one centred block.
+                val iconSize = (sizes.iconSmall * 0.9f).coerceAtMost(box.height * 0.5f)
+                glyphPaint.color = BrowserTheme.dark.textPrimary
                 glyphPaint.textSize = (sizes.iconSmall * 0.8f).coerceAtMost(box.height * 0.42f)
+                val label = link.item.label(appContext)
+                val gap = sizes.contentGap * 0.5f
+                val labelWidth = glyphPaint.measureText(label)
+                val blockWidth = iconSize + gap + labelWidth
+                val iconCx = box.centerX - blockWidth / 2f + iconSize / 2f
+                drawIcon(canvas, link.item.icon, iconCx, box.centerY, iconSize, BrowserTheme.dark.textPrimary)
                 drawCentered(
-                    canvas, glyphPaint, "${link.item.glyph} ${link.item.label(appContext)}",
-                    box.centerX, box.centerY + glyphPaint.textSize * 0.36f
+                    canvas, glyphPaint, label,
+                    iconCx + iconSize / 2f + gap + labelWidth / 2f,
+                    box.centerY + glyphPaint.textSize * 0.36f
                 )
             }
         }
@@ -3006,9 +3074,8 @@ class CarWebRenderer(context: Context) {
         val close = model.closeButton
         toolbarPaint.color = BrowserTheme.dark.sheetCardBackground
         canvas.drawCircle(close.centerX, close.centerY, minOf(close.width, close.height) / 2f, toolbarPaint)
-        glyphPaint.color = BrowserTheme.dark.textSecondary
-        glyphPaint.textSize = sizes.iconSmall.coerceAtMost(close.height * 0.45f)
-        canvas.drawText("\u2715", close.centerX, close.centerY + glyphPaint.textSize * 0.36f, glyphPaint)
+        val closeSize = sizes.iconSmall.coerceAtMost(close.height * 0.45f)
+        drawIcon(canvas, BrowserIcon.CLOSE, close.centerX, close.centerY, closeSize, BrowserTheme.dark.textSecondary)
     }
 
     /**
@@ -3023,11 +3090,11 @@ class CarWebRenderer(context: Context) {
         canvas.drawRoundRect(box.left, box.top, box.right, box.bottom, radius, radius, addressPaint)
 
         val badgeX = box.left + sizes.horizontalPadding
-        detailPaint.color = if (address.secure) BrowserTheme.dark.secureBadge else BrowserTheme.dark.insecureBadge
-        detailPaint.textSize = sizes.iconSmall * 0.9f
-        canvas.drawText(
-            if (address.secure) "\uD83D\uDD12" else "!", badgeX,
-            box.centerY + detailPaint.textSize * 0.34f, detailPaint
+        val badgeColor = if (address.secure) BrowserTheme.dark.secureBadge else BrowserTheme.dark.insecureBadge
+        val badgeSize = sizes.iconSmall * 0.9f
+        drawIcon(
+            canvas, if (address.secure) BrowserIcon.LOCK else BrowserIcon.WARNING,
+            badgeX + badgeSize / 2f, box.centerY, badgeSize, badgeColor
         )
 
         titlePaint.color = BrowserTheme.dark.textPrimary
@@ -3038,11 +3105,10 @@ class CarWebRenderer(context: Context) {
             textLeft, box.centerY + titlePaint.textSize * 0.34f, titlePaint
         )
 
-        glyphPaint.color = BrowserTheme.dark.textSecondary
-        glyphPaint.textSize = sizes.iconSmall.coerceAtMost(address.clear.height * 0.5f)
-        canvas.drawText(
-            "\u2715", address.clear.centerX,
-            address.clear.centerY + glyphPaint.textSize * 0.36f, glyphPaint
+        val clearSize = sizes.iconSmall.coerceAtMost(address.clear.height * 0.5f)
+        drawIcon(
+            canvas, BrowserIcon.CLOSE, address.clear.centerX, address.clear.centerY,
+            clearSize, BrowserTheme.dark.textSecondary
         )
 
         // The one filled control on the row, because it is the one that commits: M3 filled button.
@@ -3051,11 +3117,10 @@ class CarWebRenderer(context: Context) {
             address.go.centerX, address.go.centerY,
             minOf(address.go.width, address.go.height) / 2f, toolbarPaint
         )
-        glyphPaint.color = BrowserTheme.dark.onPrimary
-        glyphPaint.textSize = sizes.iconMedium.coerceAtMost(address.go.height * 0.55f)
-        canvas.drawText(
-            "\u2315", address.go.centerX,
-            address.go.centerY + glyphPaint.textSize * 0.36f, glyphPaint
+        val goSize = sizes.iconMedium.coerceAtMost(address.go.height * 0.55f)
+        drawIcon(
+            canvas, BrowserIcon.SEARCH, address.go.centerX, address.go.centerY,
+            goSize, BrowserTheme.dark.onPrimary
         )
     }
 
@@ -3074,9 +3139,8 @@ class CarWebRenderer(context: Context) {
         val spacing = (sizes.contentGap * 0.75f).coerceAtMost(tile.height * 0.1f)
         val blockTop = tile.centerY - (glyphSize + spacing + labelSize) / 2f
 
-        glyphPaint.color = if (enabled) BrowserTheme.dark.iconEnabled else BrowserTheme.dark.iconDisabled
-        glyphPaint.textSize = glyphSize
-        canvas.drawText(row.item.glyph, tile.centerX, blockTop + glyphSize * 0.85f, glyphPaint)
+        val tileIconColor = if (enabled) BrowserTheme.dark.iconEnabled else BrowserTheme.dark.iconDisabled
+        drawIcon(canvas, row.item.icon, tile.centerX, blockTop + glyphSize / 2f, glyphSize, tileIconColor)
 
         detailPaint.color = if (enabled) BrowserTheme.dark.textPrimary else BrowserTheme.dark.iconDisabled
         detailPaint.textSize = labelSize
@@ -3108,16 +3172,15 @@ class CarWebRenderer(context: Context) {
         canvas.drawRoundRect(box.left, box.top, box.right, box.bottom, radius, radius, toolbarPaint)
 
         val pad = sizes.horizontalPadding * 1.5f
-        glyphPaint.color = BrowserTheme.dark.onPrimary
-        glyphPaint.textSize = (sizes.dp(AutoUiSizes.SHEET_ICON_DP) * 1.1f).coerceAtMost(box.height * 0.5f)
-        val iconCx = box.left + pad + glyphPaint.textSize / 2f
-        canvas.drawText(row.item.glyph, iconCx, box.centerY + glyphPaint.textSize * 0.36f, glyphPaint)
+        val primaryIconSize = (sizes.dp(AutoUiSizes.SHEET_ICON_DP) * 1.1f).coerceAtMost(box.height * 0.5f)
+        val iconCx = box.left + pad + primaryIconSize / 2f
+        drawIcon(canvas, row.item.icon, iconCx, box.centerY, primaryIconSize, BrowserTheme.dark.onPrimary)
 
         // Chevron, then the optional count badge, from the trailing edge in.
-        glyphPaint.textSize = sizes.iconLarge.coerceAtMost(box.height * 0.6f)
-        val chevronCx = box.right - pad * 0.8f - glyphPaint.textSize * 0.25f
-        canvas.drawText("\u203A", chevronCx, box.centerY + glyphPaint.textSize * 0.34f, glyphPaint)
-        var textRight = chevronCx - glyphPaint.textSize * 0.5f - sizes.contentGap
+        val chevronSize = sizes.iconLarge.coerceAtMost(box.height * 0.6f)
+        val chevronCx = box.right - pad * 0.8f - chevronSize * 0.25f
+        drawIcon(canvas, BrowserIcon.CHEVRON_RIGHT, chevronCx, box.centerY, chevronSize, BrowserTheme.dark.onPrimary)
+        var textRight = chevronCx - chevronSize * 0.5f - sizes.contentGap
         if (row.item.value.isNotBlank()) {
             val badge = (sizes.iconMedium * 1.3f).coerceAtMost(box.height * 0.55f)
             val badgeCx = textRight - badge / 2f
@@ -3165,10 +3228,9 @@ class CarWebRenderer(context: Context) {
             sizes.cornerRadius, sizes.cornerRadius, toolbarPaint
         )
 
-        glyphPaint.color = BrowserTheme.dark.textSecondary
-        glyphPaint.textSize = sizes.iconMedium.coerceAtMost(box.height * 0.5f)
-        val glyphX = box.left + sizes.horizontalPadding + glyphPaint.textSize / 2f
-        canvas.drawText(row.item.glyph, glyphX, box.centerY + glyphPaint.textSize * 0.36f, glyphPaint)
+        val toggleIconSize = sizes.iconMedium.coerceAtMost(box.height * 0.5f)
+        val glyphX = box.left + sizes.horizontalPadding + toggleIconSize / 2f
+        drawIcon(canvas, row.item.icon, glyphX, box.centerY, toggleIconSize, BrowserTheme.dark.textSecondary)
 
         val trackWidth = (sizes.touchTarget * 0.9f).coerceAtMost(box.width * 0.25f)
         val trackHeight = (trackWidth * 0.52f).coerceAtMost(box.height * 0.6f)
@@ -3177,7 +3239,7 @@ class CarWebRenderer(context: Context) {
 
         titlePaint.color = BrowserTheme.dark.textPrimary
         titlePaint.textSize = (sizes.iconSmall * 0.9f).coerceAtMost(box.height * 0.42f)
-        val labelLeft = glyphX + glyphPaint.textSize / 2f + sizes.horizontalPadding
+        val labelLeft = glyphX + toggleIconSize / 2f + sizes.horizontalPadding
         canvas.drawText(
             fit(row.item.label(appContext), titlePaint, trackLeft - labelLeft - sizes.contentGap),
             labelLeft, box.centerY + titlePaint.textSize * 0.34f, titlePaint
@@ -3217,9 +3279,8 @@ class CarWebRenderer(context: Context) {
             close.left, close.top, close.right, close.bottom,
             sizes.cornerRadius, sizes.cornerRadius, toolbarPaint
         )
-        glyphPaint.color = BrowserTheme.dark.iconEnabled
-        glyphPaint.textSize = minOf(close.width, close.height) * 0.5f
-        canvas.drawText("\u2715", close.centerX, close.centerY + glyphPaint.textSize * 0.36f, glyphPaint)
+        val tabCloseSize = minOf(close.width, close.height) * 0.5f
+        drawIcon(canvas, BrowserIcon.CLOSE, close.centerX, close.centerY, tabCloseSize, BrowserTheme.dark.iconEnabled)
 
         tabCardLayout().forEach { (tab, box, closeBox) ->
             val isActive = tab != null && tab.id == tabs.activeId
@@ -3246,9 +3307,7 @@ class CarWebRenderer(context: Context) {
                 toolbarPaint.style = Paint.Style.FILL
             }
             if (tab == null) {
-                glyphPaint.color = BrowserTheme.dark.textPrimary
-                glyphPaint.textSize = sizes.iconLarge
-                canvas.drawText("+", box.centerX, box.centerY + sizes.iconLarge * 0.35f, glyphPaint)
+                drawIcon(canvas, BrowserIcon.ADD, box.centerX, box.centerY, sizes.iconLarge, BrowserTheme.dark.textPrimary)
                 return@forEach
             }
             val inset = sizes.dp(3f)
@@ -3277,10 +3336,9 @@ class CarWebRenderer(context: Context) {
                 tab.host, box.left + sizes.horizontalPadding,
                 thumbBottom + sizes.iconSmall * 2f, detailPaint
             )
-            glyphPaint.color = BrowserTheme.dark.textSecondary
-            glyphPaint.textSize = sizes.iconSmall
-            canvas.drawText(
-                "×", closeBox.centerX, closeBox.centerY + sizes.iconSmall * 0.35f, glyphPaint
+            drawIcon(
+                canvas, BrowserIcon.CLOSE, closeBox.centerX, closeBox.centerY,
+                sizes.iconSmall, BrowserTheme.dark.textSecondary
             )
         }
     }

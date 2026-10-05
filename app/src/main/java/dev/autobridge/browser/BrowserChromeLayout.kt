@@ -97,12 +97,12 @@ class BrowserChromeLayout private constructor(
             val icon = sizes.iconMedium.coerceAtMost(barHeight * 0.5f)
             val pad = sizes.horizontalPadding
 
+            // Fullscreen no longer has its own toolbar slot: it lives in the drawer next to the
+            // Desktop-mode switch (see [BrowserDrawerModel.fullscreenToggle]), so the trailing slots
+            // are just whatever reaches the menu — Menu itself, or nothing when the floating button
+            // already is the fixed way to reach it.
             val leading = listOf(ChromeZone.BACK, ChromeZone.FORWARD, ChromeZone.RELOAD)
-            val trailing = if (showMenuButton) {
-                listOf(ChromeZone.FULLSCREEN, ChromeZone.MENU)
-            } else {
-                listOf(ChromeZone.FULLSCREEN)
-            }
+            val trailing = if (showMenuButton) listOf(ChromeZone.MENU) else emptyList()
 
             val slots = ArrayList<ChromeSlot>(leading.size + trailing.size)
             var cursor = left + pad

@@ -6,9 +6,12 @@ import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.SeekBar
 import android.widget.Switch
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import dev.autobridge.R
 
 /**
@@ -155,13 +158,13 @@ class BrowserSettingsSheet(
     // ------------------------------------------------------------------------------------ header
 
     private fun header(): View {
-        val back = TextView(activity).apply {
-            text = "‹"
-            gravity = Gravity.CENTER
-            textSize = shell.sp(AutoUiSizes.ICON_LARGE_DP)
-            setTextColor(BrowserTheme.textPrimary)
+        val back = ImageView(activity).apply {
+            setImageDrawable(iconDrawable(BrowserIcon.BACK, BrowserTheme.textPrimary))
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
             contentDescription = activity.getString(R.string.browser_back)
             val side = sizes.dpInt(AutoUiSizes.SHEET_CLOSE_BUTTON_DP)
+            val inset = (side - sizes.dpInt(AutoUiSizes.ICON_LARGE_DP)) / 2
+            setPadding(inset, inset, inset, inset)
             background = shell.rounded(BrowserTheme.sheetCardBackground, side / 2f)
             layoutParams = LinearLayout.LayoutParams(side, side).apply { marginEnd = shell.pad() }
             setOnClickListener { shell.dismiss(); onBack?.invoke() }
@@ -197,46 +200,62 @@ class BrowserSettingsSheet(
 
     // ----------------------------------------------------------------------------- Display scale
 
+    /**
+     * A slider rather than discrete chips: text zoom is a continuous quantity
+     * ([BrowserDisplayScaleStore.MIN_PERCENT]..[BrowserDisplayScaleStore.MAX_PERCENT] in
+     * [BrowserDisplayScaleStore.STEP_PERCENT] steps), and a slider shows where the current value
+     * sits in that range at a glance instead of making the user scan a row of numbers for the
+     * tick. The value label updates on every drag frame; the store is only written and the live
+     * page only re-zoomed on release ([SeekBar.OnSeekBarChangeListener.onStopTrackingTouch]), so
+     * dragging never hammers the WebView's `textZoom` on every pixel of finger movement. Unlike
+     * every other control in this sheet it does not call [render] on change — rebuilding the row
+     * mid-drag would tear down the very [SeekBar] the finger is on.
+     */
     private fun displayScaleRow(): View {
         val current = BrowserDisplayScaleStore.percent(activity)
-        val row = LinearLayout(activity).apply {
-            orientation = LinearLayout.HORIZONTAL
-            background = shell.rounded(BrowserTheme.sheetCardBackground, sizes.dp(AutoUiSizes.TOUCH_TARGET_DP) / 2f)
-            setPadding(sizes.dpInt(4f), sizes.dpInt(4f), sizes.dpInt(4f), sizes.dpInt(4f))
-            layoutParams = rowParams()
+        val steps = (BrowserDisplayScaleStore.MAX_PERCENT - BrowserDisplayScaleStore.MIN_PERCENT) /
+            BrowserDisplayScaleStore.STEP_PERCENT
+        fun percentAt(progress: Int) =
+            BrowserDisplayScaleStore.MIN_PERCENT + progress * BrowserDisplayScaleStore.STEP_PERCENT
+
+        val valueLabel = TextView(activity).apply {
+            text = "$current%"
+            textSize = shell.sp(AutoUiSizes.ICON_SMALL_DP * 0.85f)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(BrowserTheme.textPrimary)
+            gravity = Gravity.END
+            minWidth = sizes.dpInt(44f)
         }
-        BrowserDisplayScaleStore.STEPS.forEachIndexed { index, percent ->
-            val active = percent == current
-            // The chosen step is marked with a tick rather than the word "default" under 100%:
-            // "default" named a step instead of answering the question the row asks, which is
-            // which one is on. The fill and the bold say it too, but neither survives a glance in
-            // a car, and a tick does.
-            val chip = TextView(activity).apply {
-                text = if (active) "✓ $percent%" else "$percent%"
-                contentDescription = if (active) "$percent%, selected" else "$percent%"
-                gravity = Gravity.CENTER
-                maxLines = 1
-                textSize = shell.sp(AutoUiSizes.ICON_SMALL_DP * 0.78f)
-                setTextColor(if (active) BrowserTheme.onPrimary else BrowserTheme.textSecondary)
-                if (active) setTypeface(typeface, Typeface.BOLD)
-                background = shell.rounded(
-                    if (active) BrowserTheme.accent else android.graphics.Color.TRANSPARENT,
-                    sizes.dp(AutoUiSizes.TOUCH_TARGET_DP) / 2f
-                )
-                minHeight = sizes.dpInt(AutoUiSizes.TOUCH_TARGET_DP * 0.9f)
-                setOnClickListener {
-                    if (percent != current) {
-                        BrowserDisplayScaleStore.setPercent(activity, percent)
-                        onDisplayScaleChanged()
-                        render()
-                    }
+        val slider = SeekBar(activity).apply {
+            max = steps
+            progress = (current - BrowserDisplayScaleStore.MIN_PERCENT) / BrowserDisplayScaleStore.STEP_PERCENT
+            progressTintList = android.content.res.ColorStateList.valueOf(BrowserTheme.accent)
+            thumbTintList = android.content.res.ColorStateList.valueOf(BrowserTheme.accent)
+            contentDescription = "Display scale"
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) {
+                    valueLabel.text = "${percentAt(progress)}%"
                 }
-            }
-            row.addView(chip, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
-                if (index > 0) marginStart = sizes.dpInt(2f)
+
+                override fun onStartTrackingTouch(bar: SeekBar) = Unit
+
+                override fun onStopTrackingTouch(bar: SeekBar) {
+                    BrowserDisplayScaleStore.setPercent(activity, percentAt(bar.progress))
+                    onDisplayScaleChanged()
+                }
             })
         }
-        return row
+        return LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = shell.rounded(BrowserTheme.sheetCardBackground, shell.cornerRadius())
+            setPadding(shell.pad(), 0, shell.pad(), 0)
+            addView(slider, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            addView(valueLabel, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { marginStart = shell.gap() })
+            layoutParams = rowParams().apply { height = sizes.dpInt(AutoUiSizes.TOUCH_TARGET_DP) }
+        }
     }
 
     // ---------------------------------------------------------------------------------- Start up
@@ -265,7 +284,7 @@ class BrowserSettingsSheet(
 
     private fun floatingActionRow(): View {
         val action = BrowserControlsStore.floatingButtonAction(activity)
-        return navRow("Floating button action", "${action.glyph}  ${action.label(activity)}") {
+        return navRow("Floating button action", action.label(activity)) {
             cycleFloatingAction(action)
         }
     }
@@ -378,15 +397,20 @@ class BrowserSettingsSheet(
             setPadding(shell.pad(), shell.gap(), shell.pad(), shell.gap())
             contentDescription = title
             addView(texts, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-            addView(TextView(activity).apply {
-                text = "›"
-                textSize = shell.sp(AutoUiSizes.ICON_MEDIUM_DP)
-                setTextColor(BrowserTheme.textSecondary)
+            addView(ImageView(activity).apply {
+                setImageDrawable(iconDrawable(BrowserIcon.CHEVRON_RIGHT, BrowserTheme.textSecondary))
+                scaleType = ImageView.ScaleType.CENTER_INSIDE
+                val size = sizes.dpInt(AutoUiSizes.ICON_MEDIUM_DP)
+                layoutParams = LinearLayout.LayoutParams(size, size)
             })
             setOnClickListener { onClick() }
             layoutParams = rowParams()
         }
     }
+
+    /** The shared [BrowserIcon] vector tinted for use as an in-sheet affordance; see [BrowserIcon]. */
+    private fun iconDrawable(icon: BrowserIcon, color: Int) =
+        ContextCompat.getDrawable(activity, icon.resId)!!.mutate().apply { setTint(color) }
 
     private fun labelColumn(title: String, subtitle: String): View = LinearLayout(activity).apply {
         orientation = LinearLayout.VERTICAL

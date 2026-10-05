@@ -11,9 +11,10 @@ import android.view.ViewGroup
 import android.view.Window
 import android.view.WindowManager
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
-import android.widget.TextView
+import androidx.core.content.ContextCompat
 import dev.autobridge.R
 
 /**
@@ -64,16 +65,24 @@ internal class BrowserSheetShell(
     }
 
     /**
-     * The circular, icon-only "✕" close button in a sheet header — 48dp per the mockup, no "Close"
-     * text. A perfect circle (radius = half the side) on a tonal surface.
+     * The circular, icon-only close button in a sheet header — 48dp per the mockup, no "Close"
+     * text. A perfect circle (radius = half the side) on a tonal surface. The glyph is the shared
+     * [BrowserIcon.CLOSE] vector tinted to the chrome's secondary colour, so every sheet header's
+     * ✕ reads the same as the migrated menu/settings sheets and the car surface.
      */
-    fun closeButton(onClick: () -> Unit): View = TextView(activity).apply {
-        text = "✕"
-        gravity = Gravity.CENTER
-        textSize = sp(AutoUiSizes.ICON_SMALL_DP)
-        setTextColor(BrowserTheme.textSecondary)
+    fun closeButton(onClick: () -> Unit): View = ImageView(activity).apply {
+        setImageDrawable(
+            ContextCompat.getDrawable(activity, BrowserIcon.CLOSE.resId)!!.mutate().apply {
+                setTint(BrowserTheme.textSecondary)
+            }
+        )
+        scaleType = ImageView.ScaleType.CENTER_INSIDE
         contentDescription = activity.getString(R.string.browser_close)
         val side = sizes.dpInt(AutoUiSizes.SHEET_CLOSE_BUTTON_DP)
+        // Pad the icon in from the circular target so the glyph reads at ICON_SMALL_DP, as its
+        // text predecessor did, rather than filling the whole 48dp button.
+        val inset = (side - sizes.dpInt(AutoUiSizes.ICON_SMALL_DP)) / 2
+        setPadding(inset, inset, inset, inset)
         background = rounded(BrowserTheme.sheetCardBackground, side / 2f)
         layoutParams = LinearLayout.LayoutParams(side, side)
         setOnClickListener { onClick() }

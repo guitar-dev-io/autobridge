@@ -9,8 +9,10 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import dev.autobridge.R
 
 /**
@@ -220,10 +222,11 @@ class SendToCarSheet(
     // -------------------------------------------------------------------------------- input field
 
     private fun inputField(): View {
-        val search = TextView(activity).apply {
-            text = "⌕"
-            textSize = shell.sp(AutoUiSizes.ICON_MEDIUM_DP)
-            setTextColor(BrowserTheme.textSecondary)
+        val search = ImageView(activity).apply {
+            setImageDrawable(iconDrawable(BrowserIcon.SEARCH, BrowserTheme.textSecondary))
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
+            val size = sizes.dpInt(AutoUiSizes.ICON_MEDIUM_DP)
+            layoutParams = LinearLayout.LayoutParams(size, size)
         }
         input = EditText(activity).apply {
             setSingleLine()
@@ -239,13 +242,13 @@ class SendToCarSheet(
                 if (actionId == EditorInfo.IME_ACTION_GO) { sendTyped(); true } else false
             }
         }
-        val clear = TextView(activity).apply {
-            text = "✕"
-            gravity = Gravity.CENTER
-            textSize = shell.sp(AutoUiSizes.ICON_SMALL_DP)
-            setTextColor(BrowserTheme.textSecondary)
+        val clear = ImageView(activity).apply {
+            setImageDrawable(iconDrawable(BrowserIcon.CLOSE, BrowserTheme.textSecondary))
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
             contentDescription = activity.getString(R.string.send_clear_text)
             val side = sizes.dpInt(AutoUiSizes.TOUCH_TARGET_DP * 0.8f)
+            val inset = (side - sizes.dpInt(AutoUiSizes.ICON_SMALL_DP)) / 2
+            setPadding(inset, inset, inset, inset)
             layoutParams = LinearLayout.LayoutParams(side, side)
             setOnClickListener { input.setText(""); input.requestFocus() }
         }
@@ -414,13 +417,13 @@ class SendToCarSheet(
                 setTextColor(BrowserTheme.textPrimary)
                 layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
             })
-            addView(TextView(activity).apply {
-                text = "✕"
-                gravity = Gravity.CENTER
-                textSize = shell.sp(AutoUiSizes.ICON_SMALL_DP)
-                setTextColor(BrowserTheme.textSecondary)
+            addView(ImageView(activity).apply {
+                setImageDrawable(iconDrawable(BrowserIcon.CLOSE, BrowserTheme.textSecondary))
+                scaleType = ImageView.ScaleType.CENTER_INSIDE
                 contentDescription = activity.getString(R.string.send_queue_remove)
                 val side = sizes.dpInt(AutoUiSizes.TOUCH_TARGET_DP * 0.8f)
+                val inset = (side - sizes.dpInt(AutoUiSizes.ICON_SMALL_DP)) / 2
+                setPadding(inset, inset, inset, inset)
                 layoutParams = LinearLayout.LayoutParams(side, side)
                 setOnClickListener {
                     queue.remove(item.url)
@@ -489,6 +492,10 @@ class SendToCarSheet(
     private fun rowParams() = LinearLayout.LayoutParams(
         ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
     ).apply { bottomMargin = shell.gap() }
+
+    /** The shared [BrowserIcon] vector tinted for use in this sheet; see [BrowserIcon]. */
+    private fun iconDrawable(icon: BrowserIcon, color: Int) =
+        ContextCompat.getDrawable(activity, icon.resId)!!.mutate().apply { setTint(color) }
 
     private fun tabParams() = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
 }

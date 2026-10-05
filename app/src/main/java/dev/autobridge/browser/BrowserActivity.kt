@@ -33,6 +33,7 @@ import android.webkit.WebStorage
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.*
+import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -84,13 +85,12 @@ class BrowserActivity : Activity() {
     private lateinit var toolbar: LinearLayout
     private lateinit var chromeBar: FrameLayout
     private lateinit var handle: TextView
-    private lateinit var menuButton: TextView
-    private lateinit var toolbarMenuButton: Button
-    private lateinit var toolbarHomeButton: Button
-    private lateinit var backButton: Button
-    private lateinit var forwardButton: Button
-    private lateinit var stopReload: Button
-    private lateinit var fullscreenButton: Button
+    private lateinit var menuButton: ImageView
+    private lateinit var toolbarMenuButton: ImageButton
+    private lateinit var toolbarHomeButton: ImageButton
+    private lateinit var backButton: ImageButton
+    private lateinit var forwardButton: ImageButton
+    private lateinit var stopReload: ImageButton
     private lateinit var progress: ProgressBar
     private lateinit var blocked: TextView
     private lateinit var loadError: LinearLayout
@@ -221,11 +221,12 @@ class BrowserActivity : Activity() {
         startPage = BrowserStartPage.build(this, sizes) { navigate(it) }.apply { visibility = View.GONE }
         content.addView(startPage, FrameLayout.LayoutParams(-1, -1))
 
-        menuButton = TextView(this).apply {
-            text = "☰"
-            textSize = iconSp(AutoUiSizes.ICON_MEDIUM_DP)
-            gravity = Gravity.CENTER
-            setTextColor(BrowserTheme.iconEnabled)
+        menuButton = ImageView(this).apply {
+            setImageResource(BrowserControlsStore.floatingButtonAction(this@BrowserActivity).icon.resId)
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
+            val inset = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP)
+            setPadding(inset, inset, inset, inset)
+            setColorFilter(BrowserTheme.iconEnabled)
             contentDescription = getString(R.string.browser_fab_description)
             isFocusable = true
             background = GradientDrawable().apply {
@@ -305,7 +306,13 @@ class BrowserActivity : Activity() {
         val restored = savedInstanceState?.getBundle("web")?.let { web.restoreState(it) } != null
         pendingUrl = savedInstanceState?.getString("pending_url")
             ?: if (!restored) intent.dataString?.let(ContentAddress::https) ?: BrowserStartupStore.coldStartUrl(this) else null
-        setFullscreen(savedInstanceState?.getBoolean("fullscreen") == true)
+        // A saved instance (rotation, process restore) keeps whatever the user had on screen; a
+        // cold start uses the stored fullscreen preference, which defaults to on for a fresh
+        // install and remembers a later toggle-off. See [BrowserControlsStore.startFullscreen].
+        setFullscreen(
+            savedInstanceState?.getBoolean("fullscreen")
+                ?: BrowserControlsStore.startFullscreen(this)
+        )
         ParkingStateStore.addListener(parkingListener)
     }
 
@@ -321,13 +328,12 @@ class BrowserActivity : Activity() {
             setBackgroundColor(BrowserTheme.toolbarBackground)
             setPadding(sizes.dpInt(AutoUiSizes.HORIZONTAL_PADDING_DP), 0, sizes.dpInt(AutoUiSizes.HORIZONTAL_PADDING_DP), 0)
         }
-        fun control(label: String, description: String, action: () -> Unit): Button = Button(this).apply {
-            text = label
+        fun control(icon: BrowserIcon, description: String, action: () -> Unit): ImageButton = ImageButton(this).apply {
+            setImageResource(icon.resId)
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
             contentDescription = description
-            textSize = iconSp(AutoUiSizes.ICON_MEDIUM_DP)
-            setTextColor(BrowserTheme.iconEnabled)
+            setColorFilter(BrowserTheme.iconEnabled)
             background = null
-            minWidth = 0
             minimumWidth = 0
             setPadding(0, 0, 0, 0)
             setOnClickListener { if (allowed()) action() }
@@ -339,9 +345,9 @@ class BrowserActivity : Activity() {
                 )
             )
         }
-        backButton = control("‹", "Back") { if (web.canGoBack()) web.goBack() }
-        forwardButton = control("›", "Forward") { if (web.canGoForward()) web.goForward() }
-        stopReload = control("↻", "Reload") {
+        backButton = control(BrowserIcon.BACK, "Back") { if (web.canGoBack()) web.goBack() }
+        forwardButton = control(BrowserIcon.FORWARD, "Forward") { if (web.canGoForward()) web.goForward() }
+        stopReload = control(BrowserIcon.RELOAD, "Reload") {
             if (web.progress < 100) web.stopLoading() else web.reload()
             updateNavigation()
         }
@@ -355,18 +361,19 @@ class BrowserActivity : Activity() {
                 marginEnd = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP)
             }
         )
-        fullscreenButton = control("⛶", "Fullscreen") { setFullscreen(!fullscreen) }
+        // Fullscreen moved into the hamburger menu next to the Desktop-mode switch (see
+        // BrowserMenuSheet.fullscreenToggle) — it no longer has its own toolbar button.
         // Same ☰ as the floating button. Both live on screen only when the floating button has
         // been rebound away from MENU; while it is still the default, the toolbar button would be
         // a second, identical-looking way to do the one thing the floating one already does.
-        toolbarMenuButton = control("☰", "Browser menu") { showMenu() }
+        toolbarMenuButton = control(BrowserIcon.MENU, "Browser menu") { showMenu() }
         // Occupies the same slot as the ☰ button above, with the opposite visibility (see
         // applyFloatingButtonPreference). While the floating button still is the fixed way to open
         // the menu, that slot would otherwise sit empty, so it carries the one direct, no-menu way
         // back to the app's own Home instead of leaving that reachable only through the drawer's
         // footer "Exit" link — matching the always-visible Home action the car surface keeps on its
         // action strip for the same reason.
-        toolbarHomeButton = control("⏏", "Home") { runMenuAction(DrawerAction.APP_HOME) }
+        toolbarHomeButton = control(BrowserIcon.APP_HOME, "Home") { runMenuAction(DrawerAction.APP_HOME) }
 
         progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal)
         return FrameLayout(this).apply {
@@ -500,32 +507,20 @@ class BrowserActivity : Activity() {
         )
     }
 
-    /** Paints a short glyph as text, the same way the toolbar draws "☰"/"⛶" — no drawable resource. */
-    private fun buildGlyphDrawable(glyph: String, color: Int): android.graphics.drawable.Drawable {
+    /** A [BrowserIcon] sized and tinted for use as a compound drawable on the address field. */
+    private fun buildIconDrawable(icon: BrowserIcon, color: Int): android.graphics.drawable.Drawable {
         val size = sizes.dpInt(AutoUiSizes.ICON_SMALL_DP)
-        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            this.color = color
-            textAlign = android.graphics.Paint.Align.CENTER
-            textSize = size * 0.9f
+        return ContextCompat.getDrawable(this, icon.resId)!!.mutate().apply {
+            setTint(color)
+            setBounds(0, 0, size, size)
         }
-        return object : android.graphics.drawable.Drawable() {
-            override fun draw(canvas: android.graphics.Canvas) {
-                val b = bounds
-                val y = b.exactCenterY() - (paint.descent() + paint.ascent()) / 2f
-                canvas.drawText(glyph, b.exactCenterX(), y, paint)
-            }
-            override fun setAlpha(alpha: Int) { paint.alpha = alpha }
-            override fun setColorFilter(cf: android.graphics.ColorFilter?) { paint.colorFilter = cf }
-            @Deprecated("Deprecated in Java")
-            override fun getOpacity() = android.graphics.PixelFormat.TRANSLUCENT
-        }.apply { setBounds(0, 0, size, size) }
     }
 
-    /** The "✕" glyph used as the inline clear button, built once and tinted to the chrome icons. */
-    private val clearGlyphDrawable by lazy { buildGlyphDrawable("✕", BrowserTheme.iconEnabled) }
+    /** The clear-text icon used as the inline clear button, built once and tinted to the chrome icons. */
+    private val clearGlyphDrawable by lazy { buildIconDrawable(BrowserIcon.CLOSE, BrowserTheme.iconEnabled) }
 
-    /** The "🔒" glyph shown at the start of the pill for an https page; see [updateAddressDecorations]. */
-    private val lockGlyphDrawable by lazy { buildGlyphDrawable("🔒", BrowserTheme.secureBadge) }
+    /** The lock icon shown at the start of the pill for an https page; see [updateAddressDecorations]. */
+    private val lockGlyphDrawable by lazy { buildIconDrawable(BrowserIcon.LOCK, BrowserTheme.secureBadge) }
 
     /** Enter/Go path: drop focus and (optionally) the keyboard, collapsing back to compact display. */
     private fun collapseAddressEditing(hideKeyboard: Boolean) {
@@ -766,7 +761,7 @@ class BrowserActivity : Activity() {
     }
 
     private fun updateNavigation() {
-        stopReload.text = if (web.progress < 100) "×" else "↻"
+        stopReload.setImageResource(if (web.progress < 100) BrowserIcon.CLOSE.resId else BrowserIcon.RELOAD.resId)
         stopReload.contentDescription = if (web.progress < 100) "Stop loading" else "Reload"
         backButton.isEnabled = web.canGoBack()
         backButton.alpha = if (backButton.isEnabled) 1f else DISABLED_NAV_ALPHA
@@ -822,10 +817,12 @@ class BrowserActivity : Activity() {
 
     private fun setFullscreen(enabled: Boolean) {
         fullscreen = enabled
+        // Remember the choice so a later launch starts the way the user left it; the default only
+        // applies until the first toggle writes a value. See [BrowserControlsStore.startFullscreen].
+        BrowserControlsStore.setStartFullscreen(this, enabled)
         applyFloatingButtonPreference()
         chromeBar.visibility = if (enabled) View.GONE else View.VISIBLE
         handle.visibility = if (enabled) View.VISIBLE else View.GONE
-        fullscreenButton.contentDescription = if (enabled) "Exit fullscreen" else "Fullscreen"
         // The page's top inset depends on whether the toolbar is showing, so recompute it.
         ViewCompat.requestApplyInsets(root)
         ViewportDebug.logWindow(
@@ -923,7 +920,7 @@ class BrowserActivity : Activity() {
         // The glyph says what the button will do, so a button rebound to "new tab" does not keep
         // claiming to be the menu.
         val action = BrowserControlsStore.floatingButtonAction(this)
-        menuButton.text = action.glyph
+        menuButton.setImageResource(action.icon.resId)
         // The toolbar's own ☰ only appears once the floating button stops being the fixed way to
         // reach the menu; otherwise the two sat side by side doing the same thing. While the
         // floating button keeps that job, its slot carries Home instead rather than sitting empty.
@@ -1003,6 +1000,7 @@ class BrowserActivity : Activity() {
         },
         url = if (showingStartPage) "" else web.url.orEmpty(),
         isDesktop = BrowserUserAgentStore.mode(this) == BrowserUserAgentMode.DESKTOP,
+        fullscreen = fullscreen,
         canGoBack = web.canGoBack(),
         canGoForward = web.canGoForward(),
         version = "v${dev.autobridge.BuildConfig.VERSION_NAME}",
@@ -1237,13 +1235,14 @@ class BrowserActivity : Activity() {
                 if (!BrowserLauncher.openUrl(this, "https://github.com/guitar-dev-io/autobridge")) toast("เปิดเบราว์เซอร์ไม่ได้")
             // The sheet's own footer pair: leaving the browser is this activity finishing.
             DrawerAction.APP_HOME -> finish()
+            DrawerAction.TOGGLE_FULLSCREEN -> setFullscreen(!fullscreen)
             // Handled inside the sheet, which owns a real text field and does not need the activity
             // to open a keyboard screen the way the car surface does.
             DrawerAction.ADDRESS_KEYBOARD, DrawerAction.ADDRESS_CLEAR -> Unit
             // Car-surface entries; [MenuSurface.PHONE] never lists them.
             DrawerAction.NEW_TAB, DrawerAction.TABS, DrawerAction.MEDIA_CENTER,
             DrawerAction.NOW_PLAYING, DrawerAction.MEDIA_LIBRARY, DrawerAction.AGENT,
-            DrawerAction.DIAGNOSTICS, DrawerAction.TOGGLE_FULLSCREEN, DrawerAction.SPLIT_LAYOUT -> Unit
+            DrawerAction.DIAGNOSTICS, DrawerAction.SPLIT_LAYOUT -> Unit
             // Sheet navigation, resolved before an action is dispatched.
             DrawerAction.MORE, DrawerAction.BACK_TO_MENU, DrawerAction.CLOSE_SHEET -> Unit
         }
@@ -1405,24 +1404,33 @@ class BrowserActivity : Activity() {
         val presets = BrowserUserAgentCodec.presets(WebSettings.getDefaultUserAgent(this))
         val mode = BrowserUserAgentStore.mode(this)
         val custom = BrowserUserAgentStore.custom(this)
+        // A preset selected earlier is stored as its own UA string with mode CUSTOM — identical to
+        // a hand-typed one except that it happens to match a known preset — so "which row is
+        // selected" is this match, not the mode alone.
+        val matchedPresetIndex = presets.indexOfFirst { it.userAgent == custom }
+        val checkedIndex = when (mode) {
+            BrowserUserAgentMode.MOBILE -> 0
+            BrowserUserAgentMode.DESKTOP -> 1
+            BrowserUserAgentMode.CUSTOM -> if (matchedPresetIndex >= 0) matchedPresetIndex + 3 else 2
+        }
         val labels = buildList {
-            add(if (mode == BrowserUserAgentMode.MOBILE) "✓ Mobile" else "Mobile")
-            add(if (mode == BrowserUserAgentMode.DESKTOP) "✓ Desktop" else "Desktop")
+            add("Mobile")
+            add("Desktop")
             add(
-                if (mode == BrowserUserAgentMode.CUSTOM) {
+                if (checkedIndex == 2) {
                     getString(R.string.browser_ua_custom_selected, custom.take(40))
                 } else {
                     getString(R.string.browser_ua_custom)
                 }
             )
-            presets.forEach { preset ->
-                val selected = mode == BrowserUserAgentMode.CUSTOM && preset.userAgent == custom
-                add(if (selected) "✓ ${preset.label}" else preset.label)
-            }
+            presets.forEach { preset -> add(preset.label) }
         }.toTypedArray<CharSequence>()
+        // A real radio list instead of a "✓ "-prefixed plain list: the dialog draws the selection
+        // itself, so there is nothing to keep in sync by hand when the labels above change.
         AlertDialog.Builder(this)
             .setTitle("User-Agent")
-            .setItems(labels) { _, index ->
+            .setSingleChoiceItems(labels, checkedIndex) { dialog, index ->
+                dialog.dismiss()
                 when (index) {
                     0 -> { BrowserUserAgentStore.select(this, BrowserUserAgentMode.MOBILE); applyUserAgentChange() }
                     1 -> { BrowserUserAgentStore.select(this, BrowserUserAgentMode.DESKTOP); applyUserAgentChange() }
