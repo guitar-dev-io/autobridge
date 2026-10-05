@@ -9,9 +9,10 @@
 #      reaches the Play build the moment someone moves a declaration from src/projection into
 #      src/main. There is no lint check for "this belongs to another flavor".
 #   2. A permission that needs a Play Console declaration appears with nothing written down about
-#      it. Those declarations are prose a human writes in the console; docs/PLAY_DECLARATIONS.md is
-#      where that prose lives, so a permission in the manifest and not in the doc is a release with
-#      a form nobody filled in.
+#      it. Those declarations are prose a human writes in the console; README.md's permissions
+#      section is where that prose lives, so a permission in the manifest and not in the README is
+#      a release with a form nobody filled in. (It lived in PLAY_DECLARATIONS.md until the README
+#      grew a section saying what each permission is for, which left two copies to keep in step.)
 #
 # Reads the merged manifest, because that is what the user installs - a per-flavor manifest says
 # nothing about what the merge produced. Run ./gradlew :app:processSafeDebugMainManifest (or any
@@ -19,7 +20,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DOC="$ROOT_DIR/PLAY_DECLARATIONS.md"
+DOC="$ROOT_DIR/README.md"
 
 # Must not be in the Play build at all: "<thing in the manifest>|<why>".
 FORBIDDEN=(
