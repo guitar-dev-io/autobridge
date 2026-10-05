@@ -3,6 +3,7 @@ package dev.autobridge
 import android.app.Application
 import android.content.Context
 import dev.autobridge.diagnostics.CrashReportStore
+import dev.autobridge.display.CarSessionScreenPower
 import dev.autobridge.i18n.AppLocale
 import dev.autobridge.safety.BypassNotifier
 import dev.autobridge.safety.BypassPolicyStore
@@ -36,5 +37,9 @@ class AutoBridgeApplication : Application() {
         // notification that reflects it.
         BypassPolicyStore.init(this)
         BypassNotifier.install(this)
+        // A car session (Duo Screen) can start without any screen of ours having run, so the screen
+        // power policy has to be installed here rather than in an Activity. Registration only; it
+        // takes no lock and reads no settings until a session starts.
+        CarSessionScreenPower.install()
     }
 }

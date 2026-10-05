@@ -14,7 +14,7 @@ import dev.autobridge.settings.AutoDimDelay
 import dev.autobridge.settings.MirrorSettings
 
 /**
- * Best-effort screen power policy for a consented mirror session.
+ * Best-effort screen power policy for a consented car session: the mirror, or Duo Screen.
  *
  * The normal path uses public WakeLock APIs. When the user explicitly enables the ScreenOnAuto-
  * style option and the Shizuku user service proves the hidden display-power backend, auto-dim
@@ -37,6 +37,30 @@ object ScreenPowerController {
     private var preventScreenSleep = false
     private var autoDimDelay = AutoDimDelay.OFF
 
+    /**
+     * Which car session the current policy belongs to.
+     *
+     * The mirror is not the only session that needs the phone's display kept awake any more: a Duo
+     * Screen session's panes live on untrusted VirtualDisplays, which the system stops resuming
+     * once the phone sleeps or locks. Both routes go through this one controller because both want
+     * the same WakeLock and the same panel, and only one of them is ever on the car display.
+     *
+     * Ownership exists so the one that did not start it cannot end it: [stopCarSession] is a no-op
+     * while the mirror owns the screen. The reverse is deliberate — [stop] always tears down,
+     * whoever owns it, because it is also the MOVING/UNKNOWN safety path.
+     */
+    private enum class Owner { NONE, MIRROR, CAR_SESSION }
+
+    private var owner = Owner.NONE
+
+    /**
+     * True while a session that owns this policy is still on the car display. The idle policy asks
+     * before darkening anything: a mirror that died without a stop, or a Duo Screen session that
+     * ended, must not leave the panel off.
+     */
+    private val sessionActive: Boolean
+        get() = MirrorCoordinator.isMirroring || owner == Owner.CAR_SESSION
+
     private val dimRunnable = Runnable { applyIdlePolicy() }
 
     @Synchronized
@@ -54,8 +78,41 @@ object ScreenPowerController {
             )
             return
         }
+        owner = Owner.MIRROR
         acquire(dim = false)
         scheduleDim()
+    }
+
+    /**
+     * Starts the policy for a non-mirror car session (Duo Screen).
+     *
+     * `preventScreenSleep` is not read from settings here, unlike the mirror's call: for the mirror
+     * a sleeping phone means a black car screen, which is a bad session but still a session, so the
+     * user may choose to let it sleep. For Duo Screen a sleeping phone means the system stops
+     * resuming the apps *inside the panes* — the session stops working at all — so the WakeLock is
+     * part of running it, not a preference. What stays the user's choice is the darkening:
+     * [AutoDimDelay] decides when, and `MirrorSettings.screenOffOnAutoDim` decides whether that is
+     * the privileged panel-off or public dimming.
+     *
+     * The delay is [CarSessionDimPolicy]'s, which differs from the configured one in exactly one
+     * case; the mirror's own call is untouched.
+     */
+    @Synchronized
+    fun startForCarSession(context: Context) {
+        val configured = MirrorSettings.autoDimDelay
+        val delay = CarSessionDimPolicy.delay(configured, MirrorSettings.screenOffOnAutoDim)
+        if (delay != configured) {
+            StructuredLog.i(TAG, "Panel-off is on with no auto-dim delay; using ${delay.label}")
+        }
+        start(context, preventScreenSleep = true, autoDimDelay = delay)
+        if (powerManager != null) owner = Owner.CAR_SESSION
+    }
+
+    /** Ends a [startForCarSession] policy. Does nothing once the mirror has taken the screen over. */
+    @Synchronized
+    fun stopCarSession() {
+        if (owner != Owner.CAR_SESSION) return
+        stop()
     }
 
     /** Treat a car-side input event as activity and restart the auto-dim countdown. */
@@ -84,6 +141,7 @@ object ScreenPowerController {
         dimApplied = false
         preventScreenSleep = false
         autoDimDelay = AutoDimDelay.OFF
+        owner = Owner.NONE
     }
 
     @Synchronized
@@ -99,7 +157,7 @@ object ScreenPowerController {
     /** Manual idle action is available only for an active, permitted mirror. */
     @Synchronized
     fun dimNow(): Boolean {
-        if (powerManager == null || !MirrorCoordinator.isMirroring ||
+        if (powerManager == null || !sessionActive ||
             !FeaturePolicy.app.isAvailable(Feature.SCREEN_OFF)) return false
         handler.removeCallbacks(dimRunnable)
         applyIdlePolicy()
@@ -145,7 +203,7 @@ object ScreenPowerController {
     @Synchronized
     private fun applyIdlePolicy() {
         if (powerManager == null || panel.isOff) return
-        if (!MirrorCoordinator.isMirroring || !FeaturePolicy.app.isAvailable(Feature.SCREEN_OFF)) {
+        if (!sessionActive || !FeaturePolicy.app.isAvailable(Feature.SCREEN_OFF)) {
             scheduleDim()
             return
         }

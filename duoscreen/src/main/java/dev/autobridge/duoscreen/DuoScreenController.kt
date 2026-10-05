@@ -12,6 +12,7 @@ import android.os.Looper
 import android.os.SystemClock
 import android.view.Surface
 import dev.autobridge.logging.StructuredLog
+import dev.autobridge.power.CarScreenPower
 import dev.autobridge.duoscreen.input.DuoScreenInputPort
 import dev.autobridge.duoscreen.input.DuoScreenInputRouter
 import dev.autobridge.duoscreen.input.DuoScreenTouchController
@@ -107,7 +108,10 @@ class DuoScreenController(
         panelDpi: Int,
         fallbackPackages: List<String?>
     ): Boolean {
-        if (resume(output, width, height, panelDpi)) return true
+        if (resume(output, width, height, panelDpi)) {
+            CarScreenPower.sessionStarted(context)
+            return true
+        }
         stop()
         val bounds = Bounds(width, height)
         dpi = panelDpi
@@ -136,6 +140,13 @@ class DuoScreenController(
 
         router = DuoScreenInputRouter(paneSet, bounds, this)
         paneSet.panes.forEach(::openPane)
+        // The panes run on untrusted VirtualDisplays, which the system stops resuming once the
+        // phone sleeps or locks, so the display has to be held awake for as long as the session
+        // lives. Only the panel is allowed to go dark, and only if the user asked for that; see
+        // CarScreenPower. Deliberately not in detach(): a detached session's panes are still
+        // running, and the keep-alive window is exactly when the driver is looking at Maps with
+        // the phone untouched.
+        CarScreenPower.sessionStarted(context)
         StructuredLog.i(
             TAG,
             "Session started: ${paneSet.panes.size} panes on ${width}x$height" +
@@ -466,6 +477,7 @@ class DuoScreenController(
         router = null
         sessionBounds = null
         compositor.stopBlocking()
+        CarScreenPower.sessionEnded()
         StructuredLog.i(TAG, "Session stopped")
     }
 
@@ -508,6 +520,7 @@ class DuoScreenController(
     // --- DuoScreenInputPort ---
 
     override fun forwardTap(paneId: Int, localX: Int, localY: Int) {
+        CarScreenPower.carInput()
         val displayId = DuoScreenDisplays.displayId(paneId)
         if (displayId < 0) return
         val pane = router?.panes?.pane(paneId) ?: return
@@ -526,6 +539,7 @@ class DuoScreenController(
      * the pane — moving by the opposite of the scrolled distance, the direction content travels.
      */
     override fun forwardScroll(paneId: Int, dx: Int, dy: Int) {
+        CarScreenPower.carInput()
         val displayId = DuoScreenDisplays.displayId(paneId)
         val pane = router?.panes?.pane(paneId) ?: return
         if (displayId < 0) return
