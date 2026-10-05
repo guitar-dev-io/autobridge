@@ -48,13 +48,15 @@ if [[ -n "$(git status --porcelain -- . ':!version.properties' ':!README.md')" ]
   exit 1
 fi
 
-"$ROOT_DIR/scripts/set-version.sh" "$TARGET" "${CODE_ARGS[@]}"
+"$ROOT_DIR/scripts/set-version.sh" "$TARGET" ${CODE_ARGS[@]+"${CODE_ARGS[@]}"}
 
 NEW_NAME="$(grep -E '^versionName[[:space:]]*=' version.properties | sed -E 's/^versionName[[:space:]]*=[[:space:]]*//' | tr -d '\r')"
 NEW_CODE="$(grep -E '^versionCode[[:space:]]*=' version.properties | sed -E 's/^versionCode[[:space:]]*=[[:space:]]*//' | tr -d '\r')"
 TAG="v$NEW_NAME"
 
 if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+  # set-version.sh already wrote the bump above; undo it so a failed run leaves nothing dirty.
+  git checkout -- version.properties README.md
   echo "release: tag $TAG already exists locally — pick a different version, or delete it" \
        "first if it's a known-bad tag (git tag -d $TAG; git push origin :refs/tags/$TAG)." >&2
   exit 1
