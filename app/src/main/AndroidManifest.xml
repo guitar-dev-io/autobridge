@@ -9,6 +9,10 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Required by Shizuku's pre-v11 (ADB-server) permission-request flow; without it,
+         RequestPermissionActivity in the Shizuku/Shizuku-Next manager fails to launch with
+         SecurityException: Permission Denial. -->
+    <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
     <!-- Only so the ACL_CONNECTED broadcast is delivered: from Android 12 it is permission
          protected, and the media auto-start option would otherwise be a switch that does nothing.
          No device is read and nothing is scanned for. -->

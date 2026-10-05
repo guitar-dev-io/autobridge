@@ -725,3 +725,7 @@ adb shell am force-stop YOUR.PACKAGE.NAME
 # restart Android Auto
 adb shell am force-stop com.google.android.projection.gearhead
 adb shell monkey -p com.google.android.projection.gearhead 1
+
+
+
+https://screenonauto.lzn.idv.tw/docs/en/grant-mirror-permission-via-adb/

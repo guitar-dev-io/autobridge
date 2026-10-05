@@ -344,6 +344,7 @@
     <string name="browser_start_page_title">AutoBridge</string>
     <string name="browser_start_page_search_hint">Search or enter address</string>
     <string name="browser_start_page_label">Browser start page</string>
+    <string name="browser_start_page_shortcuts">Favourites</string>
     <string name="browser_error_no_internet">No internet connection</string>
     <string name="browser_error_host_not_found">Can\'t find this website\nCheck the address and try again</string>
     <string name="browser_error_blocked">This page can\'t be opened right now</string>

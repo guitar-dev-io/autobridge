@@ -86,6 +86,7 @@ class BrowserActivity : Activity() {
     private lateinit var handle: TextView
     private lateinit var menuButton: TextView
     private lateinit var toolbarMenuButton: Button
+    private lateinit var toolbarHomeButton: Button
     private lateinit var backButton: Button
     private lateinit var forwardButton: Button
     private lateinit var stopReload: Button
@@ -359,6 +360,13 @@ class BrowserActivity : Activity() {
         // been rebound away from MENU; while it is still the default, the toolbar button would be
         // a second, identical-looking way to do the one thing the floating one already does.
         toolbarMenuButton = control("☰", "Browser menu") { showMenu() }
+        // Occupies the same slot as the ☰ button above, with the opposite visibility (see
+        // applyFloatingButtonPreference). While the floating button still is the fixed way to open
+        // the menu, that slot would otherwise sit empty, so it carries the one direct, no-menu way
+        // back to the app's own Home instead of leaving that reachable only through the drawer's
+        // footer "Exit" link — matching the always-visible Home action the car surface keeps on its
+        // action strip for the same reason.
+        toolbarHomeButton = control("⏏", "Home") { runMenuAction(DrawerAction.APP_HOME) }
 
         progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal)
         return FrameLayout(this).apply {
@@ -917,8 +925,11 @@ class BrowserActivity : Activity() {
         val action = BrowserControlsStore.floatingButtonAction(this)
         menuButton.text = action.glyph
         // The toolbar's own ☰ only appears once the floating button stops being the fixed way to
-        // reach the menu; otherwise the two sat side by side doing the same thing.
-        toolbarMenuButton.visibility = if (action == FloatingButtonAction.MENU) View.GONE else View.VISIBLE
+        // reach the menu; otherwise the two sat side by side doing the same thing. While the
+        // floating button keeps that job, its slot carries Home instead rather than sitting empty.
+        val menuHandledByFab = action == FloatingButtonAction.MENU
+        toolbarMenuButton.visibility = if (menuHandledByFab) View.GONE else View.VISIBLE
+        toolbarHomeButton.visibility = if (menuHandledByFab) View.VISIBLE else View.GONE
     }
 
     /**
