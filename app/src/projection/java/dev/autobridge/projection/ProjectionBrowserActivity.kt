@@ -1344,17 +1344,28 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
     }
 
     private fun onKey(key: CarKey) {
+        // Keys that change the typed buffer mirror it into the page's focused field live (below),
+        // so the driver sees characters land in the box as they type. Layer toggles (Shift,
+        // Symbols, Language) never touch the buffer, so they do not push.
+        var mutated = false
         when (key) {
             is CarKey.Text -> {
                 typed.append(if (keyboardShift) key.upper else key.lower)
+                mutated = true
                 // One-shot, as every phone keyboard behaves: shift applies to the next key only.
                 if (keyboardShift) {
                     keyboardShift = false
                     rebuildKeys()
                 }
             }
-            is CarKey.Space -> typed.append(' ')
-            is CarKey.Backspace -> if (typed.isNotEmpty()) typed.setLength(typed.length - 1)
+            is CarKey.Space -> {
+                typed.append(' ')
+                mutated = true
+            }
+            is CarKey.Backspace -> {
+                if (typed.isNotEmpty()) typed.setLength(typed.length - 1)
+                mutated = true
+            }
             is CarKey.Shift -> {
                 keyboardShift = !keyboardShift
                 rebuildKeys()
@@ -1376,6 +1387,10 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
             is CarKey.Go -> return commitTyped()
         }
         syncKeyboardPreview()
+        // Re-send the full authoritative buffer on every mutating key (empty included, so
+        // backspace-to-empty clears the page field). autoSubmit = false: live mirror only, never
+        // submit — Go alone commits, via commitTyped() above.
+        if (mutated) sendTextToSearch(typed.toString(), autoSubmit = false)
     }
 
     private fun syncKeyboardPreview() {
@@ -1474,7 +1489,10 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
      */
     override fun sendTextToSearch(text: String, autoSubmit: Boolean) = onUi {
         val clean = text.trim()
-        if (clean.isEmpty()) return@onUi
+        // A submit (Go) on an empty buffer stays a no-op, matching commitTyped(). A live
+        // (non-submit) empty update must still reach the page so backspace-to-empty clears the
+        // focused field (el.value = "") rather than leaving stale text behind.
+        if (clean.isEmpty() && autoSubmit) return@onUi
         val view = webView ?: return@onUi
         // JSONObject.quote produces a complete, escaped JS string literal (quotes included), so no
         // hand-rolled escaper has to be kept correct here.
@@ -1496,7 +1514,9 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
             })();
         """.trimIndent()
         view.evaluateJavascript(script) { result ->
-            if (result?.contains("OK") != true) navigateFromInput(clean)
+            // An empty live clear that lands on no focused field has nothing to search for, so it
+            // must not fall back to a navigation — only non-empty input reaches navigateFromInput.
+            if (result?.contains("OK") != true && clean.isNotEmpty()) navigateFromInput(clean)
         }
     }
 
