@@ -5,9 +5,16 @@ import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.graphics.Typeface
+import android.graphics.drawable.Drawable
 import android.os.Bundle
+import android.text.TextUtils
 import android.util.TypedValue
+import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
+import android.widget.BaseAdapter
+import android.widget.GridView
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -33,6 +40,9 @@ import dev.autobridge.ui.AutoBridgeDesign.stack
 class DuoScreenSettingsActivity : Activity() {
     companion object {
         fun intent(context: Context): Intent = Intent(context, DuoScreenSettingsActivity::class.java)
+
+        /** Platform glyph for the "leave this pane empty" cell, so the grid has no gap in it. */
+        private const val CLEAR_ICON = android.R.drawable.ic_menu_close_clear_cancel
     }
 
     private val accent = AutoBridgeDesign.ACCENT_SYSTEM
@@ -199,11 +209,51 @@ class DuoScreenSettingsActivity : Activity() {
     }
 
     /**
+     * A grid of icon + name, not a single-column list: a phone has a hundred launchable apps, and
+     * finding one of them in a dialog list means scrolling past ninety others reading text. The
+     * icon is what the user recognises, and four to a row puts most of the grid on one screen.
+     *
      * Launchable apps only, by label. Needs QUERY_ALL_PACKAGES (declared in this flavor's manifest):
      * picking an arbitrary app to run in a pane is the whole feature, and this build never goes to
      * Play, where that permission would have to be justified.
      */
     private fun pickAppFor(paneId: Int) {
+        val items = pickerItems()
+        val builder = AlertDialog.Builder(this)
+        val grid = GridView(builder.context).apply {
+            // AUTO_FIT with a cell width rather than a fixed column count: the same dialog opens on
+            // a phone in portrait and on a 11" tablet, and the cell is the size that has to stay
+            // tappable.
+            numColumns = GridView.AUTO_FIT
+            columnWidth = dp(100)
+            stretchMode = GridView.STRETCH_COLUMN_WIDTH
+            // Padding, and clipped to it: the dialog cuts the grid off at its own height, and
+            // without the clip the last row scrolls flush into that edge with its second label
+            // line sliced in half.
+            setPadding(dp(12), 0, dp(12), dp(12))
+            adapter = PaneAppAdapter(builder.context, items)
+        }
+        val dialog = builder
+            // Title AND reason in one custom view, not setTitle + setMessage: AlertController
+            // attaches a message to the same content panel the grid goes in and drops the view, so
+            // a message would leave the picker with nothing to pick. Carrying the sentence in the
+            // title area is what lets the grid survive it.
+            .setCustomTitle(pickerHeader(builder.context))
+            .setView(grid)
+            .create()
+        grid.setOnItemClickListener { _, _, position, _ ->
+            DuoScreenStore.setPackage(this, paneId, items[position].packageName)
+            dialog.dismiss()
+            applied()
+            render()
+        }
+        dialog.show()
+    }
+
+    /** One cell of the picker. A null [packageName] is the "leave this pane empty" cell. */
+    private data class PaneApp(val label: String, val packageName: String?)
+
+    private fun pickerItems(): List<PaneApp> {
         val launchable = packageManager.queryIntentActivities(
             Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER),
             0
@@ -211,22 +261,67 @@ class DuoScreenSettingsActivity : Activity() {
             .mapNotNull { it.activityInfo?.packageName }
             .distinct()
             .sortedBy { paneLabel(it).lowercase() }
+        // "Leave empty" stays first, where the list had it: it is the one cell that is not an app,
+        // and a driver looking for it should not have to hunt through the icons.
+        return listOf(PaneApp(getString(R.string.duo_screen_clear_app), null)) +
+            launchable.map { PaneApp(paneLabel(it), it) }
+    }
 
-        val labels = listOf(getString(R.string.duo_screen_clear_app)) + launchable.map(::paneLabel)
-        val builder = AlertDialog.Builder(this)
-        builder
-            // Title AND reason in one custom view, not setTitle + setMessage: AlertController
-            // attaches the setItems ListView to the content panel only when no message is set, so a
-            // message leaves the picker with nothing to pick. Carrying the sentence in the title
-            // area is what lets the list survive it.
-            .setCustomTitle(pickerHeader(builder.context))
-            .setItems(labels.toTypedArray()) { _, which ->
-                val packageName = if (which == 0) null else launchable[which - 1]
-                DuoScreenStore.setPackage(this, paneId, packageName)
-                applied()
-                render()
-            }
-            .show()
+    /**
+     * Cells for the picker grid.
+     *
+     * Icons load as a cell scrolls into view and are kept after that: a hundred
+     * [android.content.pm.PackageManager.getApplicationIcon] calls before the dialog can appear is
+     * a pause the user sees, while the grid itself only ever shows a dozen at a time.
+     */
+    private inner class PaneAppAdapter(
+        private val themed: Context,
+        private val items: List<PaneApp>,
+    ) : BaseAdapter() {
+        private val icons = HashMap<String, Drawable>()
+
+        override fun getCount(): Int = items.size
+
+        override fun getItem(position: Int): Any = items[position]
+
+        override fun getItemId(position: Int): Long = position.toLong()
+
+        override fun getView(position: Int, convertView: View?, parent: ViewGroup?): View {
+            val cell = convertView as? LinearLayout ?: newCell()
+            val item = items[position]
+            (cell.getChildAt(0) as ImageView).setImageDrawable(
+                item.packageName?.let(::iconFor) ?: themed.getDrawable(CLEAR_ICON)
+            )
+            (cell.getChildAt(1) as TextView).text = item.label
+            return cell
+        }
+
+        private fun newCell(): LinearLayout = LinearLayout(themed).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(dp(4), dp(12), dp(4), dp(12))
+            addView(ImageView(themed), LinearLayout.LayoutParams(dp(48), dp(48)))
+            addView(
+                TextView(themed).apply {
+                    textSize = 12f
+                    gravity = Gravity.CENTER
+                    // Two lines, because a lot of app names do not fit in one at this width and a
+                    // name cut to "Google Pl..." is no better than no name.
+                    maxLines = 2
+                    ellipsize = TextUtils.TruncateAt.END
+                    setTextColor(themeColor(themed, android.R.attr.textColorPrimary))
+                    setPadding(0, dp(6), 0, 0)
+                },
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+            )
+        }
+
+        /** An app uninstalled between opening this dialog and scrolling to it has no icon. */
+        private fun iconFor(packageName: String): Drawable? = icons[packageName]
+            ?: runCatching { packageManager.getApplicationIcon(packageName) }.getOrNull()
+                ?.also { icons[packageName] = it }
     }
 
     /**
@@ -240,9 +335,8 @@ class DuoScreenSettingsActivity : Activity() {
      * rather than the activity's - those differ, and views built from the activity can come out
      * invisible against the dialog's background.
      */
-    private fun pickerHeader(themed: Context): View {
-        fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
-        return LinearLayout(themed).apply {
+    private fun pickerHeader(themed: Context): View =
+        LinearLayout(themed).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(24), dp(20), dp(24), dp(8))
             addView(
@@ -262,7 +356,8 @@ class DuoScreenSettingsActivity : Activity() {
                 }
             )
         }
-    }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     private fun themeColor(themed: Context, attr: Int): Int {
         val value = TypedValue()
