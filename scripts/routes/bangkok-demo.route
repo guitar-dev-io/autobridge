@@ -1,0 +1,13 @@
+# AutoBridge demo route: Lumphini Park area -> Siam, central Bangkok.
+# Format: one "<lat> <lng>" per line (comma also accepted). Comments start #.
+# Each line is a turn/waypoint; dhu-route.sh interpolates GPS fixes between them.
+#
+# Replace these with your own coordinates, or export a .gpx from a maps app and
+# pass that to dhu-route.sh instead.
+
+13.730300 100.541400   # Lumphini Park, SW corner
+13.733900 100.539600   # up Witthayu toward Phloen Chit
+13.739500 100.540200   # Phloen Chit / Chit Lom
+13.744600 100.539900   # Ratchadamri intersection
+13.746400 100.534700   # along Rama I toward Siam
+13.746300 100.531300   # Siam BTS / Siam Square (destination)
