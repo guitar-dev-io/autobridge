@@ -1,6 +1,6 @@
 # ติดตั้ง AutoBridge ให้โชว์บนจอ Android Auto 🚗📱
 
-อัปเดต: 2026-10-05 · ใช้กับ AutoBridge `0.4.18` (versionCode 32)
+อัปเดต: 2026-10-05 · เวอร์ชันที่ติดตั้งดูได้จาก ตั้งค่า → เกี่ยวกับ ในแอป
 
 คู่มือนี้เขียนจากโค้ดจริงในโปรเจกต์ (`InstallerSource`, `InstallerSpoofController`,
 `ProjectionSetupActivity`, `app/build.gradle.kts`) และปรับโครงมาจากคู่มือติดตั้งของ
