@@ -126,20 +126,29 @@ object SponsorBlock {
      * [dev.autobridge.audio.WebAudioBridge] exposes none: the browser loads arbitrary sites and
      * none of them should get a handle on the app.
      *
-     * The listener is attached once per `<video>` element and afterwards only the segment list is
-     * replaced, because YouTube reuses the same element across its in-page navigations.
+     * The listener sits on the document in the capture phase rather than on one `<video>`:
+     * `timeupdate` does not bubble but is still captured, so a player built after the script runs,
+     * or one YouTube swaps out between videos, is covered without a retry. Attaching to the element
+     * found at arm time missed every video whose player was not built yet and never tried again.
+     *
+     * The handler does nothing while the page is on a different video than [videoId] — the list
+     * from the previous video must not cut into the next one while its lookup is still in flight —
+     * or while an ad is showing, since the ad's clock has nothing to do with the segment times.
      */
     fun script(videoId: String, segments: List<SponsorSegment>): String {
         val list = segments.joinToString(",") { "[${it.start},${it.end}]" }
         return """
             (function(){
-              var v = document.querySelector('video');
-              if (!v) return 'no-video';
               window.__abSponsorSegments = [$list];
               window.__abSponsorVideo = '$videoId';
-              if (v.dataset.abSponsor === '1') return 'updated';
-              v.dataset.abSponsor = '1';
-              v.addEventListener('timeupdate', function(){
+              if (window.__abSponsorArmed) return 'updated';
+              window.__abSponsorArmed = true;
+              document.addEventListener('timeupdate', function(e){
+                var v = e.target;
+                if (!v || v.tagName !== 'VIDEO') return;
+                var id = window.__abSponsorVideo;
+                if (!id || location.href.indexOf(id) === -1) return;
+                if (document.querySelector('.ad-showing')) return;
                 var list = window.__abSponsorSegments || [];
                 var t = v.currentTime;
                 for (var i = 0; i < list.length; i++) {
@@ -148,7 +157,7 @@ object SponsorBlock {
                     return;
                   }
                 }
-              });
+              }, true);
               return 'armed';
             })();
         """.trimIndent()
@@ -156,7 +165,7 @@ object SponsorBlock {
 
     /** Clears any armed segment list, for when the feature is switched off mid-page. */
     fun clearScript(): String =
-        "(function(){ window.__abSponsorSegments = []; return 'cleared'; })();"
+        "(function(){ window.__abSponsorSegments = []; window.__abSponsorVideo = ''; return 'cleared'; })();"
 
     /**
      * Asks the page's own player for its best quality.

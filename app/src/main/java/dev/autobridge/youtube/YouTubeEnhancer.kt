@@ -118,10 +118,9 @@ class YouTubeEnhancer(private val context: Context) {
     }
 
     private fun arm(view: WebView, videoId: String, segments: List<SponsorSegment>) {
-        if (segments.isEmpty()) {
-            StructuredLog.i("YOUTUBE", "SponsorBlock: no segments")
-            return
-        }
+        // An empty list is still sent: it replaces the previous video's segments, which would
+        // otherwise stay live in the page and cut into this one at the same timestamps.
+        if (segments.isEmpty()) StructuredLog.i("YOUTUBE", "SponsorBlock: no segments")
         evaluate(view, SponsorBlock.script(videoId, segments)) { result ->
             StructuredLog.i("YOUTUBE", "SponsorBlock ${segments.size} segment(s) -> $result")
         }

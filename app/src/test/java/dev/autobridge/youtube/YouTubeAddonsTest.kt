@@ -142,6 +142,20 @@ class YouTubeAddonsTest {
     }
 
     @Test
+    fun `the sponsor skipper survives a late player and never acts on another video`() {
+        val script = SponsorBlock.script("dQw4w9WgXcQ", emptyList())
+        // Capture phase on the document: covers a <video> built or swapped after arming.
+        assertTrue(script.contains("document.addEventListener('timeupdate'"))
+        assertTrue(script.contains("}, true);"))
+        assertTrue(!script.contains("no-video"))
+        // Guards against the previous video's list and against ad playback.
+        assertTrue(script.contains("location.href.indexOf(id)"))
+        assertTrue(script.contains(".ad-showing"))
+        assertTrue(script.contains("window.__abSponsorSegments = [];"))
+        assertTrue(SponsorBlock.clearScript().contains("__abSponsorVideo = ''"))
+    }
+
+    @Test
     fun `arming and clearing the ad skipper address the same state object`() {
         // A typo in either key would leave clearScript() flipping a flag nothing reads, and the
         // timer running after the setting was switched off — with nothing on screen to show it.
