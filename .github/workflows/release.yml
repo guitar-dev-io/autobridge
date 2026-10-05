@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   release:
-    name: Build + publish safe release AAB + APK
+    name: Build + publish personal release AAB + APK
     runs-on: ubuntu-latest
 
     steps:
@@ -88,17 +88,15 @@ jobs:
           EOF
           echo "signed=true" >> "$GITHUB_OUTPUT"
 
-      # safe:    Play-shippable flavor -> AAB (Play upload) + APK (direct sideload)
-      # personal/lab: sideload-only flavors (pull in libs/aauto.aar, not Play-accepted) -> APK only.
-      #   Play never takes these, so there is no reason to bundle them into an .aab.
+      # personal: primary sideload flavor (pulls in libs/aauto.aar, not Play-accepted) -> AAB + APK.
+      # lab:      sideload-only flavor, same dependencies -> APK only; nothing consumes a lab .aab.
       # One build pass; every variant shares the same signing config.
       #   AAB -> app/build/outputs/bundle/<flavor>Release/*.aab
       #   APK -> app/build/outputs/apk/<flavor>/release/*.apk
       - name: Build release (all flavors)
         run: >-
           ./gradlew --no-daemon
-          bundleSafeRelease
-          assembleSafeRelease
+          bundlePersonalRelease
           assemblePersonalRelease
           assembleLabRelease
 
@@ -108,11 +106,10 @@ jobs:
         if: always()
         run: rm -f keystore/release.jks keystore/release.properties
 
-      # The R8 mapping file for each release variant. The safe .aab already carries its own copy
-      # (AGP writes it to BUNDLE-METADATA/com.android.tools.build.obfuscation/proguard.map), so
-      # Play deobfuscates those crashes by itself. The sideloaded personal/lab APKs have no such
-      # channel: a stack trace from one is unreadable without the matching mapping.txt, and R8
-      # output is not reproducible from a later build, so the only chance to keep it is now.
+      # The R8 mapping file for each release variant. Nothing here goes through Play, so there is
+      # no deobfuscation service reading the copy AGP embeds in the .aab: a stack trace from either
+      # flavor is unreadable without the matching mapping.txt, and R8 output is not reproducible
+      # from a later build, so the only chance to keep it is now.
       #
       # Kept as a workflow artifact rather than attached to the GitHub Release: these are tens of
       # MB each, and they are a debugging aid for whoever is holding the crash, not part of the
@@ -123,7 +120,6 @@ jobs:
         with:
           name: autobridge-release-mapping
           path: |
-            app/build/outputs/mapping/safeRelease/mapping.txt
             app/build/outputs/mapping/personalRelease/mapping.txt
             app/build/outputs/mapping/labRelease/mapping.txt
           if-no-files-found: error
@@ -133,8 +129,7 @@ jobs:
         with:
           name: autobridge-release
           path: |
-            app/build/outputs/bundle/safeRelease/*.aab
-            app/build/outputs/apk/safe/release/*.apk
+            app/build/outputs/bundle/personalRelease/*.aab
             app/build/outputs/apk/personal/release/*.apk
             app/build/outputs/apk/lab/release/*.apk
           if-no-files-found: error
@@ -145,8 +140,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            app/build/outputs/bundle/safeRelease/*.aab
-            app/build/outputs/apk/safe/release/*.apk
+            app/build/outputs/bundle/personalRelease/*.aab
             app/build/outputs/apk/personal/release/*.apk
             app/build/outputs/apk/lab/release/*.apk
           generate_release_notes: true
