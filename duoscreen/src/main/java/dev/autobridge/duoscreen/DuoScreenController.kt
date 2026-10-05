@@ -256,7 +256,7 @@ class DuoScreenController(
             return
         }
         val displayId = DuoScreenDisplays.create(
-            context, pane.id, surface, pane.rect.width, pane.rect.height, paneDpi
+            context, pane.id, surface, pane.rect.width, pane.rect.height, paneDpi, ops
         )
         if (displayId < 0) {
             StructuredLog.e(TAG, "Pane ${pane.id} got no display")

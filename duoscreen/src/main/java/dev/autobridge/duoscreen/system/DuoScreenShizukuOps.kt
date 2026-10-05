@@ -3,12 +3,16 @@ package dev.autobridge.duoscreen.system
 import android.app.ActivityOptions
 import android.content.ComponentName
 import android.content.Intent
+import android.os.Binder
 import android.os.Bundle
 import android.os.IBinder
 import android.util.Log
 import android.view.MotionEvent
+import android.view.Surface
 import dev.autobridge.shizuku.ShizukuGrant
 import java.lang.reflect.Method
+import java.lang.reflect.Proxy
+import java.util.concurrent.ConcurrentHashMap
 import org.lsposed.hiddenapibypass.HiddenApiBypass
 import rikka.shizuku.ShizukuBinderWrapper
 import rikka.shizuku.SystemServiceHelper
@@ -54,11 +58,37 @@ object DuoScreenShizukuOps : DuoScreenPrivilegedOps {
     private data class ActivityApi(val service: Any, val start: Method)
     private data class InputApi(val service: Any, val inject: Method)
 
+    /**
+     * The shell-wrapped IDisplayManager plus the methods a trusted display needs over its lifetime.
+     * Signatures are reflected once and reused; see IDisplayManager AIDL —
+     * `int createVirtualDisplay(VirtualDisplayConfig, IVirtualDisplayCallback, IMediaProjection, String)`,
+     * `void releaseVirtualDisplay(IVirtualDisplayCallback)`,
+     * `void resizeVirtualDisplay(IVirtualDisplayCallback, int, int, int)`,
+     * `void setVirtualDisplaySurface(IVirtualDisplayCallback, Surface)`.
+     */
+    private data class DisplayApi(
+        val service: Any,
+        val create: Method,
+        val release: Method?,
+        val resize: Method?,
+        val setSurface: Method?,
+    )
+
     @Volatile
     private var activityApi: ActivityApi? = null
 
     @Volatile
     private var inputApi: InputApi? = null
+
+    @Volatile
+    private var displayApi: DisplayApi? = null
+
+    /**
+     * The callback token each trusted display was created with, keyed by its display id. The token
+     * is the identity the system matches on for release/resize, so it must be the very object
+     * passed to `createVirtualDisplay`, kept until the display is released.
+     */
+    private val displayTokens = ConcurrentHashMap<Int, Any>()
 
     /**
      * Both Stub.asInterface methods are hidden-API blocked at this target SDK ("api=blocked" for
@@ -79,6 +109,10 @@ object DuoScreenShizukuOps : DuoScreenPrivilegedOps {
     fun reset() {
         activityApi = null
         inputApi = null
+        displayApi = null
+        // The tokens are only valid against the server that minted them; a reconnected Shizuku
+        // server does not know them, so drop them with the stale api handle.
+        displayTokens.clear()
     }
 
     override fun launchOnDisplay(
@@ -129,6 +163,152 @@ object DuoScreenShizukuOps : DuoScreenPrivilegedOps {
             inputApi = null
             Log.w(TAG, "injectInputEvent failed on display $displayId", error)
         }.getOrDefault(false)
+    }
+
+    override fun createTrustedVirtualDisplay(
+        name: String,
+        width: Int,
+        height: Int,
+        dpi: Int,
+        surface: Surface,
+        flags: Int,
+    ): Int {
+        if (!isAvailable) return -1
+        val api = resolveDisplayApi() ?: return -1
+        return runCatching {
+            val config = buildVirtualDisplayConfig(name, width, height, dpi, surface, flags)
+                ?: error("VirtualDisplayConfig.Builder is unavailable")
+            val token = newVirtualDisplayCallback()
+                ?: error("IVirtualDisplayCallback could not be built")
+            val args = buildCreateDisplayArgs(api.create, config, token)
+            val displayId = api.create.invoke(api.service, *args) as? Int ?: -1
+            if (displayId < 0) {
+                Log.w(TAG, "createVirtualDisplay(trusted $name) returned $displayId")
+            } else {
+                // Keep the token so release/resize can match it later.
+                displayTokens[displayId] = token
+                Log.i(TAG, "Trusted display created: $name -> $displayId (${width}x$height @ ${dpi}dpi)")
+            }
+            displayId
+        }.onFailure { error ->
+            displayApi = null
+            Log.w(TAG, "createTrustedVirtualDisplay failed for $name", error)
+        }.getOrDefault(-1)
+    }
+
+    override fun resizeTrustedVirtualDisplay(displayId: Int, width: Int, height: Int, dpi: Int): Boolean {
+        val token = displayTokens[displayId] ?: return false
+        val api = resolveDisplayApi() ?: return false
+        val resize = api.resize ?: run {
+            Log.w(TAG, "No resizeVirtualDisplay method; display $displayId not resized over shell")
+            return false
+        }
+        return runCatching {
+            resize.invoke(api.service, token, width, height, dpi)
+            true
+        }.onFailure { Log.w(TAG, "resizeVirtualDisplay($displayId) failed", it) }.getOrDefault(false)
+    }
+
+    override fun setTrustedVirtualDisplaySurface(displayId: Int, surface: Surface?): Boolean {
+        val token = displayTokens[displayId] ?: return false
+        val api = resolveDisplayApi() ?: return false
+        val setSurface = api.setSurface ?: run {
+            Log.w(TAG, "No setVirtualDisplaySurface method; display $displayId surface not set over shell")
+            return false
+        }
+        return runCatching {
+            setSurface.invoke(api.service, token, surface)
+            true
+        }.onFailure { Log.w(TAG, "setVirtualDisplaySurface($displayId) failed", it) }.getOrDefault(false)
+    }
+
+    override fun releaseTrustedVirtualDisplay(displayId: Int) {
+        val token = displayTokens.remove(displayId) ?: return
+        val api = resolveDisplayApi() ?: return
+        val release = api.release ?: run {
+            Log.w(TAG, "No releaseVirtualDisplay method; display $displayId not released over shell")
+            return
+        }
+        runCatching { release.invoke(api.service, token) }
+            .onFailure { Log.w(TAG, "releaseVirtualDisplay($displayId) failed", it) }
+    }
+
+    /**
+     * Builds a [android.hardware.display.VirtualDisplayConfig] carrying [flags] through its hidden
+     * Builder, reflectively because the Builder's trusted-flag setters are @hide. Name/width/
+     * height/dpi go through the public Builder constructor; the surface and flags through the
+     * hidden setters that `DisplayManager.createVirtualDisplay(...)` uses internally.
+     */
+    private fun buildVirtualDisplayConfig(
+        name: String,
+        width: Int,
+        height: Int,
+        dpi: Int,
+        surface: Surface,
+        flags: Int,
+    ): Any? = runCatching {
+        val builderClass = Class.forName("android.hardware.display.VirtualDisplayConfig\$Builder")
+        val builder = builderClass
+            .getConstructor(String::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)
+            .newInstance(name, width, height, dpi)
+        builderClass.getMethod("setFlags", Int::class.javaPrimitiveType).invoke(builder, flags)
+        builderClass.getMethod("setSurface", Surface::class.java).invoke(builder, surface)
+        builderClass.getMethod("build").invoke(builder)
+    }.onFailure { Log.w(TAG, "Could not build VirtualDisplayConfig", it) }.getOrNull()
+
+    /**
+     * A minimal [android.hardware.display.IVirtualDisplayCallback] whose only job is to be a stable
+     * binder identity: the system matches resize/release against the token's `asBinder()`, and
+     * nothing calls back into it for the uses here (the display paints from its Surface). A
+     * [Proxy] over the interface, returning a real local [Binder] from `asBinder()`, is that
+     * identity without needing the hidden abstract `Stub`.
+     */
+    private fun newVirtualDisplayCallback(): Any? = runCatching {
+        val callbackClass = Class.forName("android.hardware.display.IVirtualDisplayCallback")
+        val binder = Binder()
+        Proxy.newProxyInstance(callbackClass.classLoader, arrayOf(callbackClass)) { _, method, args ->
+            when (method.name) {
+                "asBinder" -> binder
+                "toString" -> "AutoBridgeDuoVirtualDisplayCallback"
+                "hashCode" -> binder.hashCode()
+                "equals" -> args?.getOrNull(0) === binder
+                else -> null
+            }
+        }
+    }.onFailure { Log.w(TAG, "Could not build IVirtualDisplayCallback", it) }.getOrNull()
+
+    /**
+     * Fills createVirtualDisplay's parameters positionally by type: the config, the callback token,
+     * null for the IMediaProjection (we hold none; the trusted flag is what grants the display,
+     * not a projection token), and the shell package for the String. Done by type, like
+     * [buildStartActivityArgs], so a parameter-list change across releases does not break it.
+     */
+    private fun buildCreateDisplayArgs(method: Method, config: Any, token: Any): Array<Any?> {
+        val configClass = config.javaClass
+        val callbackClass = token.javaClass
+        return method.parameterTypes.map { type ->
+            when {
+                type.isAssignableFrom(configClass) -> config
+                type.isAssignableFrom(callbackClass) -> token
+                type == String::class.java -> SHELL_PACKAGE
+                else -> null // IMediaProjection projectionToken, and any future added slot
+            }
+        }.toTypedArray()
+    }
+
+    private fun resolveDisplayApi(): DisplayApi? {
+        displayApi?.let { return it }
+        return runCatching {
+            val service = asShellInterface("display", "android.hardware.display.IDisplayManager")
+                ?: error("IDisplayManager could not be wrapped")
+            val methods = service.javaClass.methods
+            val create = methods.firstOrNull { it.name == "createVirtualDisplay" }
+                ?: error("createVirtualDisplay not found on ${service.javaClass.name}")
+            val release = methods.firstOrNull { it.name == "releaseVirtualDisplay" }
+            val resize = methods.firstOrNull { it.name == "resizeVirtualDisplay" }
+            val setSurface = methods.firstOrNull { it.name == "setVirtualDisplaySurface" }
+            DisplayApi(service, create, release, resize, setSurface).also { displayApi = it }
+        }.onFailure { Log.w(TAG, "Could not reach the display manager over Shizuku", it) }.getOrNull()
     }
 
     /**
