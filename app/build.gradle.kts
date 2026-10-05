@@ -109,6 +109,18 @@ android {
         // Read by SubtitleSettings.enabled() so a pref left on by an earlier build cannot ask an
         // engine that is not here, and by the screens that offer the feature.
         buildConfigField("boolean", "SUBTITLE_TRANSLATION", subtitleTranslationEnabled.toString())
+        // Arm only. Nothing this app runs on is x86: a phone driving a head unit is arm64, and
+        // armeabi-v7a is kept for the older 32-bit ones. The weight is in the translation engines
+        // (ML Kit Translate + ONNX Runtime, behind autobridge.subtitleTranslation above), which
+        // ship an uncompressed .so per ABI — about 130 MB across four ABIs, 72 MB of it x86 and
+        // x86_64 that no target device can load.
+        //
+        // The one thing this costs is the emulator: an x86_64 image no longer gets
+        // libandroidx.graphics.path.so, the only native library a standard build packs (~10 KB per
+        // ABI). On-device testing, which is what this project does anyway, is unaffected.
+        ndk {
+            abiFilters += setOf("arm64-v8a", "armeabi-v7a")
+        }
     }
 
     flavorDimensions += "mode"
