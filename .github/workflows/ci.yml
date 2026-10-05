@@ -34,6 +34,13 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # Explicit, because the action's own default is "tools platform-tools" and the obsolete
+          # "tools" package is gone from the SDK repository: sdkmanager answers "Failed to find
+          # package 'tools'" and exits 1, failing this step before a single Gradle task runs.
+          # Nothing else is listed because AGP downloads the platform and build-tools it wants, and
+          # the action has accepted the licenses by this point.
+          packages: platform-tools
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -94,6 +101,13 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # Explicit, because the action's own default is "tools platform-tools" and the obsolete
+          # "tools" package is gone from the SDK repository: sdkmanager answers "Failed to find
+          # package 'tools'" and exits 1, failing this step before a single Gradle task runs.
+          # Nothing else is listed because AGP downloads the platform and build-tools it wants, and
+          # the action has accepted the licenses by this point.
+          packages: platform-tools
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4

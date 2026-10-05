@@ -31,6 +31,9 @@ ALLOW_THAI_IN_CODE=(
   "dev/autobridge/agent/AgentCommandParser.kt"
   "dev/autobridge/remote/CommandParser.kt"
   "dev/autobridge/iptv/XtreamClient.kt"
+  # Keycaps, for the same reason: the Kedmanee layout *is* the Thai alphabet, and a Thai keyboard
+  # types Thai whatever language the UI is drawn in. These are characters the key emits, not copy.
+  "dev/autobridge/browser/CarKeyboardLayout.kt"
 )
 
 status=0
