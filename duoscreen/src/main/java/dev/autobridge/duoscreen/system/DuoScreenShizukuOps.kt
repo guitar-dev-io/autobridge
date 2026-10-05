@@ -30,7 +30,19 @@ import rikka.shizuku.SystemServiceHelper
  */
 object DuoScreenShizukuOps : DuoScreenPrivilegedOps {
     private const val TAG = "AutoBridgeDuoOps"
-    private const val INJECT_INPUT_EVENT_MODE_WAIT_FOR_FINISH = 2
+    /**
+     * Fire-and-forget, not WAIT_FOR_FINISH (2).
+     *
+     * WAIT_FOR_FINISH blocks the caller until the app that receives the event has finished
+     * handling it. The call that gets here starts at the car host's onClick/onScroll, which the
+     * car app library dispatches on the main thread, so waiting meant the phone's whole UI was
+     * frozen for as long as a pane's app took to answer — and a scroll is six of these in a row.
+     * Android calls that at five seconds: "Input dispatching timed out".
+     *
+     * Nothing here needs the finish signal. The boolean the caller uses is "was the event
+     * accepted", which ASYNC returns just the same.
+     */
+    private const val INJECT_INPUT_EVENT_MODE_ASYNC = 0
 
     /**
      * The launch is attributed to the shell package, not ours: the transaction arrives from uid
@@ -146,8 +158,9 @@ object DuoScreenShizukuOps : DuoScreenPrivilegedOps {
                 type.isInstance(event) -> event
                 type == Int::class.javaPrimitiveType ->
                     // The first int is the injection mode; a later one (injectInputEventToTarget's
-                    // targetUid) stays 0, meaning "no specific target".
-                    if (seenInt) 0 else INJECT_INPUT_EVENT_MODE_WAIT_FOR_FINISH.also { seenInt = true }
+                    // targetUid) stays 0, meaning "no specific target". Both are 0 now that the
+                    // mode is ASYNC, but the positions still differ in meaning.
+                    if (seenInt) 0 else INJECT_INPUT_EVENT_MODE_ASYNC.also { seenInt = true }
                 else -> null
             }
         }.toTypedArray()

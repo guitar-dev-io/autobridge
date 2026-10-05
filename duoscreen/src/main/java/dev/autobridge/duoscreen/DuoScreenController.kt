@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
 import android.os.Build
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.Looper
 import android.os.SystemClock
 import android.view.Surface
@@ -47,6 +48,8 @@ class DuoScreenController(
 
         /** A scroll is replayed into the pane as a short drag with this many interpolated moves. */
         const val SCROLL_STEPS = 4
+
+        const val INPUT_THREAD_NAME = "AutoBridgeDuoInput"
     }
 
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -56,6 +59,17 @@ class DuoScreenController(
     private val pendingSizes = HashMap<Int, Rect>()
 
     private var router: DuoScreenInputRouter? = null
+
+    /**
+     * Where touch injection runs. Not the main thread: the car host delivers onClick/onScroll
+     * there, and injection is a binder call into Shizuku which can stall on a busy pane app or a
+     * wedged service — on the main thread that is the phone's UI frozen, which is what ANR'd.
+     *
+     * One thread, not a pool, because the events of a gesture are only meaningful in order: a
+     * move that overtook its own down would be injected against a pointer that does not exist yet.
+     */
+    private var inputThread: HandlerThread? = null
+    private var inputHandler: Handler? = null
     private var dpi = 0
     private var running = false
     private var sessionBounds: Bounds? = null
@@ -202,7 +216,8 @@ class DuoScreenController(
         if (!running) return
         saveLayout()
         mainHandler.removeCallbacks(commitPoll)
-        touch.cancelAll()
+        // Kept alive, unlike in stop(): the session is only detached and resume() carries on with it.
+        onInputThread { touch.cancelAll() }
         compositor.detachBlocking()
         StructuredLog.i(TAG, "Surface detached; ${panes.size} pane(s) kept alive")
     }
@@ -414,7 +429,7 @@ class DuoScreenController(
         mainHandler.removeCallbacksAndMessages(null)
         debouncer.cancelAll()
         pendingSizes.clear()
-        touch.cancelAll()
+        releaseInputThread()
         router?.panes?.panes?.forEach { pane ->
             compositor.removePane(pane.id)
             DuoScreenDisplays.release(pane.id)
@@ -433,6 +448,34 @@ class DuoScreenController(
         DuoScreenStore.save(context, bounds, current.sortedBy { it.id })
     }
 
+    /** Runs [work] on [inputThread], starting it if this is the first event of a session. */
+    private fun onInputThread(work: () -> Unit) {
+        val live = inputHandler?.takeIf { inputThread?.isAlive == true }
+        val handler = live ?: run {
+            val thread = HandlerThread(INPUT_THREAD_NAME).also { it.start() }
+            inputThread = thread
+            Handler(thread.looper).also { inputHandler = it }
+        }
+        handler.post { work() }
+    }
+
+    /**
+     * Ends the input thread, letting what is already queued run first — the last thing queued is
+     * the pointer-release, and dropping it would leave a pane's app believing a finger is still
+     * down on it.
+     */
+    private fun releaseInputThread() {
+        val handler = inputHandler
+        if (handler == null) {
+            touch.cancelAll()
+        } else {
+            handler.post { touch.cancelAll() }
+            inputThread?.quitSafely()
+        }
+        inputHandler = null
+        inputThread = null
+    }
+
     // --- DuoScreenInputPort ---
 
     override fun forwardTap(paneId: Int, localX: Int, localY: Int) {
@@ -443,7 +486,9 @@ class DuoScreenController(
         // The router hands over pane-local surface pixels; the display may be running at another
         // size, in which case the image is stretched and the touch has to be stretched with it.
         val (x, y) = DuoScreenLayout.scaleToDisplay(localX, localY, pane.rect, size.width, size.height)
-        touch.tap(displayId, x, y)
+        // Geometry is read here, on the caller's thread, where the pane set and the displays are
+        // written; only the injection itself goes to the input thread.
+        onInputThread { touch.tap(displayId, x, y) }
     }
 
     /**
@@ -462,14 +507,23 @@ class DuoScreenController(
         val centreY = size.height / 2
         val (scrollX, scrollY) =
             DuoScreenLayout.scaleDeltaToDisplay(dx, dy, pane.rect, size.width, size.height)
-        if (!touch.touchDown(displayId, DuoScreenTouchController.POINTER_ID, centreX, centreY)) return
-        val ids = intArrayOf(DuoScreenTouchController.POINTER_ID)
-        for (step in 1..SCROLL_STEPS) {
-            val x = centreX - scrollX * step / SCROLL_STEPS
-            val y = centreY - scrollY * step / SCROLL_STEPS
-            touch.touchMove(displayId, ids, intArrayOf(x), intArrayOf(y))
+        // The whole drag is one unit of work on the input thread, so its down, moves and up stay
+        // in order and none of the six injections it costs lands on the caller's thread.
+        onInputThread {
+            if (!touch.touchDown(
+                    displayId, DuoScreenTouchController.POINTER_ID, centreX, centreY
+                )
+            ) return@onInputThread
+            val ids = intArrayOf(DuoScreenTouchController.POINTER_ID)
+            for (step in 1..SCROLL_STEPS) {
+                val x = centreX - scrollX * step / SCROLL_STEPS
+                val y = centreY - scrollY * step / SCROLL_STEPS
+                touch.touchMove(displayId, ids, intArrayOf(x), intArrayOf(y))
+            }
+            touch.touchUp(
+                displayId, DuoScreenTouchController.POINTER_ID, centreX - scrollX, centreY - scrollY
+            )
         }
-        touch.touchUp(displayId, DuoScreenTouchController.POINTER_ID, centreX - scrollX, centreY - scrollY)
     }
 
     override fun onDividerGrabbed(divider: DuoScreenLayout.Divider?) {
