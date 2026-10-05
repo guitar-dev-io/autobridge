@@ -509,6 +509,9 @@
     <string name="input_backend_caption">ใช้บริการช่วยการเข้าถึงเป็นหลัก Shizuku เป็นตัวเลือกเสริม</string>
     <string name="input_real_touch">ส่งการสัมผัสจริง</string>
     <string name="input_real_touch_caption">ต้องมีสิทธิ์ระดับสูง และ Android Auto ต้องส่งข้อมูลตำแหน่งนิ้วดิบมาให้</string>
+    <string name="input_real_touch_unavailable">ส่งการสัมผัสจริงต้องเชื่อม Shizuku ก่อน อนุญาตแล้วค่อยกลับเข้าหน้านี้อีกครั้ง</string>
+    <string name="projection_mirror_waiting">ยังไม่ได้เริ่มมิเรอร์ เริ่มได้จากแอป AutoBridge บนมือถือ</string>
+    <string name="projection_mirror_parked_only">มิเรอร์จะแสดงเมื่อรถจอดอยู่เท่านั้น</string>
     <string name="input_shizuku_enabled">เปิดการสัมผัสผ่าน Shizuku แล้ว</string>
     <string name="input_shizuku_denied">ไม่ได้รับสิทธิ์ Shizuku</string>
 

@@ -523,6 +523,9 @@
     <string name="input_backend_caption">Accessibility preferred, Shizuku optional</string>
     <string name="input_real_touch">Real touch injection</string>
     <string name="input_real_touch_caption">Privileged pointer sink; Android Auto must provide a raw pointer stream</string>
+    <string name="input_real_touch_unavailable">Real touch needs Shizuku connected: grant it, then open this screen again.</string>
+    <string name="projection_mirror_waiting">Mirroring has not started. Start it in AutoBridge on the phone.</string>
+    <string name="projection_mirror_parked_only">The mirror is shown while the car is parked.</string>
     <string name="input_shizuku_enabled">Shizuku touch enabled</string>
     <string name="input_shizuku_denied">Shizuku permission denied</string>
 

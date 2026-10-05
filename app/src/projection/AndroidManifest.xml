@@ -36,6 +36,25 @@
             </intent-filter>
         </service>
 
+        <!-- The mirror on the projection route. A separate CATEGORY_PROJECTION service because
+             Android Auto lists one icon per service, and because this is the only surface in the
+             app that gets real MotionEvents from the car display - the Car App Library route only
+             ever reports interpreted gestures. See ProjectionMirrorActivity.
+
+             exported: gearhead binds it, same as the browser service above. -->
+        <service
+            android:name="dev.autobridge.projection.ProjectionMirrorCarService"
+            android:exported="true"
+            android:label="Bridge Mirror"
+            android:icon="@mipmap/ic_launcher"
+            tools:ignore="ExportedService">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="com.google.android.gms.car.category.CATEGORY_PROJECTION" />
+                <category android:name="com.google.android.gms.car.category.CATEGORY_PROJECTION_OEM" />
+            </intent-filter>
+        </service>
+
         <!-- Walks the user through making this sideloaded build visible on Android Auto (installer
              rewrite via root or Shizuku). Not exported: launched only from within the app. -->
         <activity

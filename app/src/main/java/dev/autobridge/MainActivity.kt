@@ -1906,6 +1906,7 @@ import dev.autobridge.display.SurfaceProfile
 import dev.autobridge.entertainment.BrowserLauncher
 import dev.autobridge.input.AccessibilityInputBackend
 import dev.autobridge.input.ShizukuInputBackend
+import dev.autobridge.input.TouchRouter
 import dev.autobridge.media.MediaPlaybackClient
 import dev.autobridge.mirror.MirrorCoordinator
 import dev.autobridge.mirror.ProjectionService
@@ -4185,8 +4186,26 @@ class MainActivity : androidx.activity.ComponentActivity() {
     private fun toggleSurfaceProfile() {}
     private fun screenOffBehaviorValue() = "Auto"
     private fun onPanelOffToggled(enabled: Boolean) {}
-    private fun onRealTouchToggled(enabled: Boolean) {}
-    private fun inputBackendLabel() = "Accessibility"
+    /**
+     * Turns the privileged pointer sink on or off, and says why when it cannot be turned on.
+     *
+     * The switch is drawn enabled while the setting is already on, so a user who turned it on when
+     * Shizuku was connected can always turn it off again; that is the one case where this runs with
+     * the backend unavailable, and turning OFF must still be allowed to go through.
+     */
+    private fun onRealTouchToggled(enabled: Boolean) {
+        if (enabled && !ShizukuInputBackend.isRealTouchAvailable) {
+            Toast.makeText(this, getString(R.string.input_real_touch_unavailable), Toast.LENGTH_LONG).show()
+            // Redraw so the switch snaps back to off rather than sitting on a state nothing stored.
+            showPhoneScreen(PhoneScreen.INPUT_TOUCH, force = true)
+            return
+        }
+        SettingsStore.persistRealTouchEnabled(this, enabled)
+        showPhoneScreen(PhoneScreen.INPUT_TOUCH, force = true)
+    }
+
+    /** What is actually carrying touches right now - Shizuku, the accessibility service, neither. */
+    private fun inputBackendLabel() = TouchRouter.activeBackendLabel()
     /**
      * The accessibility service is how a tap on the car display becomes a tap on this phone, and
      * Play treats that use of the API as one the user must understand before granting. So the
