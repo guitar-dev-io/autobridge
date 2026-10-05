@@ -17,6 +17,8 @@ object SponsorBlockClient {
     private const val CONNECT_TIMEOUT_MS = 8_000
     private const val READ_TIMEOUT_MS = 8_000
     private const val MAX_BODY_BYTES = 512 * 1024
+    private const val ATTEMPTS = 2
+    private const val RETRY_DELAY_MS = 1_500L
 
     /** Keyed by video id and the categories asked for, so toggling a category re-queries. */
     private val cache = ConcurrentHashMap<String, List<SponsorSegment>>()
@@ -29,17 +31,29 @@ object SponsorBlockClient {
         if (categories.isEmpty()) return emptyList()
         cache[key(videoId, categories)]?.let { return it }
 
-        val query = categories.joinToString(",") { "\"${it.apiId}\"" }
+        // Quotes are percent-encoded too: a raw `"` is not legal in a query string, and whether
+        // it survives depends on every proxy between the head unit and the server.
+        val query = categories.joinToString("%2C") { "%22${it.apiId}%22" }
         val url = "$ENDPOINT/${SponsorBlock.hashPrefix(videoId)}" +
             "?categories=%5B$query%5D&actionTypes=%5B%22skip%22%5D"
 
-        val segments = runCatching { SponsorBlock.parse(fetch(url), videoId, categories) }
-            .onFailure { StructuredLog.w("YOUTUBE", "SponsorBlock lookup failed: ${it.message}") }
-            // A failed lookup is cached as "nothing to skip" only for this process run; the next
-            // video re-queries. Retrying per timeupdate would hammer a public service.
-            .getOrDefault(emptyList())
-        cache[key(videoId, categories)] = segments
-        return segments
+        // One retry: a car's connection drops for a second at a time, and a single miss would
+        // otherwise leave the whole video unskipped.
+        repeat(ATTEMPTS) { attempt ->
+            val result = runCatching { SponsorBlock.parse(fetch(url), videoId, categories) }
+            result.onSuccess { segments ->
+                cache[key(videoId, categories)] = segments
+                return segments
+            }
+            StructuredLog.w(
+                "YOUTUBE",
+                "SponsorBlock lookup failed (${attempt + 1}/$ATTEMPTS): ${result.exceptionOrNull()?.message}"
+            )
+            if (attempt + 1 < ATTEMPTS) Thread.sleep(RETRY_DELAY_MS)
+        }
+        // Failures are not cached, so opening the same video again asks again. Nothing retries on
+        // its own beyond that; polling would hammer a public service.
+        return emptyList()
     }
 
     private fun key(videoId: String, categories: Set<SponsorCategory>): String =

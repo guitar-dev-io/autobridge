@@ -142,6 +142,34 @@ class YouTubeAddonsTest {
     }
 
     @Test
+    fun `the sponsor skipper survives a late player and never acts on another video`() {
+        val script = SponsorBlock.script("dQw4w9WgXcQ", emptyList())
+        // Capture phase on the document: covers a <video> built or swapped after arming.
+        assertTrue(script.contains("document.addEventListener('timeupdate'"))
+        assertTrue(script.contains("}, true);"))
+        assertTrue(!script.contains("no-video"))
+        // Guards against the previous video's list and against ad playback.
+        assertTrue(script.contains("location.href.indexOf(id)"))
+        assertTrue(script.contains(".ad-showing"))
+        assertTrue(script.contains("window.__abSponsorSegments = [];"))
+        assertTrue(SponsorBlock.clearScript().contains("__abSponsorVideo = ''"))
+    }
+
+    @Test
+    fun `the skip uses the player API first and gives up on a segment it cannot leave`() {
+        val script = SponsorBlock.script("dQw4w9WgXcQ", listOf(SponsorSegment(SponsorCategory.SPONSOR, 5.0, 20.0)))
+        // seekTo keeps the player's own progress bar in step; currentTime stays as the fallback.
+        assertTrue(script.contains("p.seekTo(list[i][1], true)"))
+        assertTrue(script.contains("v.currentTime = list[i][1];"))
+        // A refused seek must not be re-issued on every timeupdate for the whole segment.
+        assertTrue(script.contains("__abSponsorTries"))
+        assertTrue(script.contains("if (n > 4) return;"))
+        // The counts are indexed into the segment list, so a new video has to drop them.
+        assertTrue(script.contains("if (window.__abSponsorVideo !== 'dQw4w9WgXcQ') window.__abSponsorTries = {};"))
+        assertTrue(SponsorBlock.clearScript().contains("__abSponsorTries = {}"))
+    }
+
+    @Test
     fun `arming and clearing the ad skipper address the same state object`() {
         // A typo in either key would leave clearScript() flipping a flag nothing reads, and the
         // timer running after the setting was switched off — with nothing on screen to show it.

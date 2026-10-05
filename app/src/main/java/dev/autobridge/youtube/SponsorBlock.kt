@@ -52,6 +52,13 @@ object SponsorBlock {
     private const val EDGE_TOLERANCE = 0.25
 
     /**
+     * How many times one segment may be seeked past before it is given up on. A seek that lands
+     * normally needs one; a seek the player refuses would otherwise be re-issued four times a
+     * second for the whole segment.
+     */
+    private const val MAX_SKIP_ATTEMPTS = 4
+
+    /**
      * The API is queried by the first four characters of the SHA-256 of the video id, so the
      * server is told a bucket of roughly 1 in 65,536 videos rather than which video is playing.
      * The exact match is then made locally in [parse].
@@ -126,29 +133,55 @@ object SponsorBlock {
      * [dev.autobridge.audio.WebAudioBridge] exposes none: the browser loads arbitrary sites and
      * none of them should get a handle on the app.
      *
-     * The listener is attached once per `<video>` element and afterwards only the segment list is
-     * replaced, because YouTube reuses the same element across its in-page navigations.
+     * The listener sits on the document in the capture phase rather than on one `<video>`:
+     * `timeupdate` does not bubble but is still captured, so a player built after the script runs,
+     * or one YouTube swaps out between videos, is covered without a retry. Attaching to the element
+     * found at arm time missed every video whose player was not built yet and never tried again.
+     *
+     * The handler does nothing while the page is on a different video than [videoId] — the list
+     * from the previous video must not cut into the next one while its lookup is still in flight —
+     * or while an ad is showing, since the ad's clock has nothing to do with the segment times.
+     *
+     * The jump itself prefers the player's own `seekTo`, which moves the progress bar with it, and
+     * falls back to writing `currentTime` on the element for the players that expose no API. Either
+     * one can be refused — an unbuffered range on a stream that is still loading — so a segment is
+     * attempted [MAX_SKIP_ATTEMPTS] times and then left alone, rather than re-seeking on every tick
+     * for as long as playback stays inside it.
      */
     fun script(videoId: String, segments: List<SponsorSegment>): String {
         val list = segments.joinToString(",") { "[${it.start},${it.end}]" }
         return """
             (function(){
-              var v = document.querySelector('video');
-              if (!v) return 'no-video';
+              // A new video invalidates the per-segment attempt counts, which are indexed into the
+              // list being replaced here.
+              if (window.__abSponsorVideo !== '$videoId') window.__abSponsorTries = {};
               window.__abSponsorSegments = [$list];
               window.__abSponsorVideo = '$videoId';
-              if (v.dataset.abSponsor === '1') return 'updated';
-              v.dataset.abSponsor = '1';
-              v.addEventListener('timeupdate', function(){
+              if (window.__abSponsorArmed) return 'updated';
+              window.__abSponsorArmed = true;
+              document.addEventListener('timeupdate', function(e){
+                var v = e.target;
+                if (!v || v.tagName !== 'VIDEO') return;
+                var id = window.__abSponsorVideo;
+                if (!id || location.href.indexOf(id) === -1) return;
+                if (document.querySelector('.ad-showing')) return;
                 var list = window.__abSponsorSegments || [];
+                var tries = window.__abSponsorTries || (window.__abSponsorTries = {});
                 var t = v.currentTime;
                 for (var i = 0; i < list.length; i++) {
-                  if (t >= list[i][0] && t < list[i][1] - $EDGE_TOLERANCE) {
-                    v.currentTime = list[i][1];
-                    return;
+                  if (t < list[i][0] || t >= list[i][1] - $EDGE_TOLERANCE) continue;
+                  var n = (tries[i] || 0) + 1;
+                  tries[i] = n;
+                  if (n > $MAX_SKIP_ATTEMPTS) return;
+                  var p = document.getElementById('movie_player') ||
+                          document.querySelector('.html5-video-player');
+                  if (p && p.seekTo) {
+                    try { p.seekTo(list[i][1], true); return; } catch (err) {}
                   }
+                  v.currentTime = list[i][1];
+                  return;
                 }
-              });
+              }, true);
               return 'armed';
             })();
         """.trimIndent()
@@ -156,7 +189,8 @@ object SponsorBlock {
 
     /** Clears any armed segment list, for when the feature is switched off mid-page. */
     fun clearScript(): String =
-        "(function(){ window.__abSponsorSegments = []; return 'cleared'; })();"
+        "(function(){ window.__abSponsorSegments = []; window.__abSponsorVideo = ''; " +
+            "window.__abSponsorTries = {}; return 'cleared'; })();"
 
     /**
      * Asks the page's own player for its best quality.
