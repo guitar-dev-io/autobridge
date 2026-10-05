@@ -1,8 +1,54 @@
 **Version:** `0.4.16` &nbsp;·&nbsp; **Build (versionCode):** `30`
 
-AutoBridge is a personal/development Android project for experimenting with a parked-only phone-to-Android-Auto surface bridge. It is an independent codebase, not a merge of the reference projects listed in [`docs/REFERENCE_PROJECTS.md`](docs/REFERENCE_PROJECTS.md).
+AutoBridge is a personal/development Android project for experimenting with a parked-only phone-to-Android-Auto surface bridge. It is an independent codebase, not a merge of the reference projects tracked in the project's internal `docs/` notes.
 
-**Safety boundary:** mirroring, video, browser, touch, and Quick App launching require an authoritative `PARKED` state. `MOVING` stops projection and leaves the car app. `UNKNOWN` is fail-closed. LAB controls never falsify a real vehicle's speed.
+**Safety boundary:** by default the parked/mode gate holds and nothing is bypassed — mirroring, video, browser, touch, and Quick App launching are gated on an authoritative `PARKED` state, `MOVING` stops projection and leaves the car app, `UNKNOWN` is fail-closed, and LAB controls never falsify a real vehicle's speed. An optional, off-by-default user override can open that gate, and a separate audio option can keep media playing through the reverse-gear chime; both are deliberate opt-ins the driver turns on at their own risk (see [Safety first](#️-safety-first--ความปลอดภัยต้องมาก่อน)).
+
+## ⚠️ Safety first / ความปลอดภัยต้องมาก่อน
+
+**English**
+- Use AutoBridge only while the vehicle is **parked**. Do not watch video, browse, or operate the phone/car screen while driving.
+- The driver is always fully responsible for operating the vehicle safely and for obeying all local traffic laws. Distracted driving is dangerous and in many places illegal.
+- The parked-only gate is a software safeguard, not a guarantee. It depends on a correct `CAR_SPEED` signal from the host/vehicle, which can be delayed, missing, or wrong on real hardware — never rely on it as a substitute for your own judgement.
+- Set everything up before you drive. Pull over and park before changing settings, picking content, or interacting with the car screen.
+
+_Optional overrides — advanced, at your own risk_
+
+- **Safety bypass (parked/mode override).** AutoBridge ships a runtime override of the parked/mode gate. It is **off by default**; a fresh install behaves exactly like the stock gate and nothing is bypassed. Turning it on is a deliberate opt-in that lifts the `PARKED` requirement, so parked-only features can open in any vehicle state (including while the car is moving). Its default scope also lifts the mode (SAFE/PERSONAL/LAB) restriction; a narrower "parked only" scope is available. You can toggle it from the phone **Settings** ("Safety bypass" row) or an `adb` broadcast.
+- **Persistent notification.** While the bypass is on, AutoBridge keeps an ongoing, non-dismissible notification ("Safety bypass ON") so you always see that the gate is open; it carries a one-tap "Turn off" action.
+- **Keep media playing through the reverse chime (audio option).** Also **off by default**. When on, playback no longer stops for the reverse-gear / rear-camera chime — but by the same mechanism it also no longer pauses or quiets for phone calls or navigation prompts. It is toggled from the car browser's audio settings.
+- Enabling either option lifts a protection you were relying on. You assume all risk and legal responsibility for doing so. Do not enable them to use features while driving; leave them off unless the vehicle is parked and you understand exactly what they change.
+
+**ไทย**
+- ใช้ AutoBridge เฉพาะตอน **จอดรถ** เท่านั้น อย่าดูวิดีโอ ท่องเว็บ หรือใช้งานหน้าจอมือถือ/จอรถขณะขับขี่
+- ผู้ขับขี่เป็นผู้รับผิดชอบการขับขี่อย่างปลอดภัยและการปฏิบัติตามกฎจราจรทั้งหมดเสมอ การขับรถโดยเสียสมาธิเป็นอันตรายและผิดกฎหมายในหลายพื้นที่
+- ระบบล็อกเฉพาะตอนจอด เป็นเพียงมาตรการป้องกันทางซอฟต์แวร์ ไม่ใช่การรับประกัน เพราะอาศัยสัญญาณ `CAR_SPEED` ที่ถูกต้องจาก host/รถ ซึ่งบนฮาร์ดแวร์จริงอาจมาช้า ขาดหาย หรือผิดพลาดได้ อย่าใช้แทนวิจารณญาณของตนเอง
+- ตั้งค่าทุกอย่างให้เสร็จก่อนออกรถ หากต้องเปลี่ยนการตั้งค่า เลือกเนื้อหา หรือแตะจอรถ ให้จอดรถในที่ปลอดภัยก่อน
+
+_ตัวเลือกการปลดล็อก — สำหรับผู้ใช้ขั้นสูง ยอมรับความเสี่ยงเอง_
+
+- **การปลดล็อกข้อจำกัดความปลอดภัย (ข้ามการเช็กจอดรถ/โหมด)** AutoBridge มีสวิตช์สำหรับข้ามการเช็กจอดรถ/โหมดในระดับรันไทม์ โดย **ปิดไว้เป็นค่าเริ่มต้น** การติดตั้งใหม่จะทำงานเหมือนระบบล็อกมาตรฐานทุกประการและไม่มีการข้ามอะไร การเปิดใช้งานเป็นการเลือกเองโดยตั้งใจ ซึ่งจะยกเลิกเงื่อนไข `PARKED` ทำให้ฟีเจอร์ที่ปกติใช้ได้เฉพาะตอนจอดสามารถเปิดได้ในทุกสถานะของรถ (รวมถึงขณะรถกำลังเคลื่อนที่) ค่า scope เริ่มต้นยังยกเลิกข้อจำกัดเรื่องโหมด (SAFE/PERSONAL/LAB) ด้วย และมี scope แบบแคบ ("เฉพาะจอด") ให้เลือก เปิด/ปิดได้จาก **ตั้งค่า** บนมือถือ (แถว "ปลดล็อกข้อจำกัดความปลอดภัย") หรือผ่าน `adb` broadcast
+- **การแจ้งเตือนแบบค้างไว้** ขณะที่เปิดการปลดล็อกอยู่ AutoBridge จะแสดงการแจ้งเตือนแบบค้าง (ปัดทิ้งไม่ได้ "เปิดการปลดล็อกข้อจำกัดแล้ว") เพื่อให้เห็นเสมอว่าระบบล็อกถูกเปิดออก พร้อมปุ่ม "ปิด" แบบแตะครั้งเดียว
+- **เล่นสื่อต่อผ่านเสียงเตือนถอยหลัง (ตัวเลือกเสียง)** **ปิดไว้เป็นค่าเริ่มต้น** เช่นกัน เมื่อเปิด เสียงจะไม่หยุดเพราะเสียงเตือนถอยรถ/กล้องหลัง แต่ด้วยกลไกเดียวกันนี้ มันจะไม่หยุดหรือหรี่เสียงให้สายโทรเข้าหรือเสียงนำทางด้วย เปิด/ปิดได้จากการตั้งค่าเสียงของเบราว์เซอร์บนจอรถ
+- การเปิดตัวเลือกใด ๆ ข้างต้นเป็นการยกเลิกการป้องกันที่คุณเคยพึ่งพาอยู่ คุณยอมรับความเสี่ยงและความรับผิดชอบทางกฎหมายทั้งหมดเอง อย่าเปิดเพื่อใช้ฟีเจอร์ขณะขับขี่ และควรปิดไว้เสมอจนกว่าจะจอดรถและเข้าใจชัดเจนว่าตัวเลือกเหล่านี้เปลี่ยนอะไรบ้าง
+
+## Disclaimer / ข้อจำกัดความรับผิดชอบ
+
+**English**
+
+AutoBridge is a personal, non-commercial project built for learning and experimentation. It is provided "as is", without any warranty, and is used entirely at your own risk; the author is not liable for any damage, loss, legal consequence, or accident arising from its use.
+
+It is **not affiliated with, endorsed by, or sponsored by** Google, Android, Android Auto, Ford, or any car manufacturer, platform, or brand. All product names, logos, and trademarks belong to their respective owners and are used for identification only. AutoBridge does not bypass DRM and is not intended for any use that violates a platform's terms of service or your local laws.
+
+AutoBridge also includes optional, off-by-default capabilities — a user override of the parked/mode safety gate and an audio option that keeps media playing through the reverse-gear chime (and, as a side effect, through phone calls and navigation prompts). These are disabled on a fresh install; enabling them is a deliberate choice, and doing so is entirely at your own risk and responsibility. This is separate from the DRM statement above, which remains true: lifting the parked/mode gate does not bypass DRM.
+
+**ไทย**
+
+AutoBridge เป็นโปรเจกต์ส่วนตัวที่ไม่ใช่เชิงพาณิชย์ จัดทำขึ้นเพื่อการศึกษาและทดลองเท่านั้น ให้บริการตามสภาพ ("as is") โดยไม่มีการรับประกันใด ๆ และผู้ใช้ยอมรับความเสี่ยงเองทั้งหมด ผู้พัฒนาไม่รับผิดชอบต่อความเสียหาย การสูญเสีย ผลทางกฎหมาย หรืออุบัติเหตุใด ๆ ที่เกิดจากการใช้งาน
+
+โปรเจกต์นี้ **ไม่มีส่วนเกี่ยวข้อง ไม่ได้รับการรับรอง และไม่ได้รับการสนับสนุน** จาก Google, Android, Android Auto, Ford หรือผู้ผลิตรถ แพลตฟอร์ม หรือแบรนด์ใด ๆ ชื่อผลิตภัณฑ์ โลโก้ และเครื่องหมายการค้าทั้งหมดเป็นของเจ้าของนั้น ๆ ใช้เพื่อการอ้างอิงเท่านั้น AutoBridge ไม่หลบเลี่ยง DRM และไม่ได้มีไว้เพื่อการใช้งานที่ละเมิดเงื่อนไขบริการของแพลตฟอร์มหรือกฎหมายในพื้นที่ของคุณ
+
+AutoBridge ยังมีความสามารถที่เป็นทางเลือกและปิดไว้เป็นค่าเริ่มต้นด้วย ได้แก่ การปลดล็อกข้อจำกัดจอดรถ/โหมดโดยผู้ใช้ และตัวเลือกเสียงที่ให้สื่อเล่นต่อผ่านเสียงเตือนถอยหลัง (และเป็นผลข้างเคียงให้เล่นต่อผ่านสายโทรเข้าและเสียงนำทางด้วย) ความสามารถเหล่านี้ปิดอยู่ในการติดตั้งใหม่ การเปิดใช้งานเป็นการตัดสินใจเองโดยตั้งใจ และถือเป็นความเสี่ยงและความรับผิดชอบของผู้ใช้เองทั้งหมด ทั้งนี้แยกต่างหากจากข้อความเรื่อง DRM ข้างต้นซึ่งยังคงเป็นจริง การปลดล็อกการเช็กจอดรถ/โหมดไม่ได้เป็นการหลบเลี่ยง DRM
 
 ## Current implementation
 
@@ -18,14 +64,14 @@ AutoBridge is a personal/development Android project for experimenting with a pa
 - Media3 progressive/HLS/DASH/local playback through a MediaSession, with controller authorization and independent audio/video policy.
 - Entertainment routing that distinguishes HTTPS web pages, audio, and video instead of treating all sources as browser content.
 - A Fermata-Xtream-style home on both surfaces: one shared `HomeSection` list renders as the phone launcher grid and as the Android Auto dashboard (TV, Radio, Web browser, Youtube, YouTube Music, , Folders, Favorites, Playlists, Gallery, then Mirror/Apps/Remote/Settings).
-- Xtream Codes and M3U IPTV sources for the TV and Radio sections, with unit-tested credential/playlist parsing, a shared catalog cache, host-aware list paging, favourites and a recently-played list. See [`docs/IPTV_SECTIONS.md`](docs/IPTV_SECTIONS.md).
+- Xtream Codes and M3U IPTV sources for the TV and Radio sections, with unit-tested credential/playlist parsing, a shared catalog cache, host-aware list paging, favourites and a recently-played list.
 - Built-in free public playlists ([Free-TV](https://github.com/Free-TV/IPTV), iptv-org, radio-browser): TV and Radio start with default lists so there are channels to browse out of the box, further lists are one tap away in the picker, and any of them can be removed for good. AutoBridge stores addresses only and fetches each list live from the project that publishes it; nothing is hosted, bundled or redistributed here. Community-playlist conventions are read rather than ignored: a channel whose entry is a YouTube/Twitch watch page opens in the browser instead of failing inside the player, and Free-TV's `Ⓢ`/`Ⓖ`/`Ⓨ` name markers become subtitle hints.
 - Channel logos from the playlist on both the phone and the head unit, including the lists that spell the attribute differently or write the address relative to themselves. The phone shows channels as a two-column grid of logo tiles; the car shows them as list rows with the logo beside them.
 - A ping check that runs by itself when a channel list opens, on both surfaces and with nothing to press: each channel reads `88 ms` in green, a slow answer in amber, or `HTTP 404` / `No answer` in red, so a retired or geo-blocked channel is visible before it is opened rather than as a player that spins.
 - MediaStore-backed Folders, Playlists and Gallery sections on the phone and in the car, reusing the existing MediaSession and car video surface.
-- An AutoBridge phone design language (`AutoBridgeDesign`): ink surfaces, hairline borders, a per-section accent that carries from the home card into that section's screens and player, a dependency-free cached image loader for channel logos, a shared now-playing bar, and a designed player with a scrubber and a LIVE state. See [`docs/PHONE_UI.md`](docs/PHONE_UI.md).
-- A step-by-step car setup screen: notifications, an input backend (Shizuku or accessibility) and screen capture in the order they happen, each with its live state and one action, plus an optional Bluetooth media-session start. See [`docs/MIRROR_ENGINE.md`](docs/MIRROR_ENGINE.md).
-- Optional YouTube add-ons for the in-app browser, off by default: SponsorBlock segment skipping with per-category switches and a privacy-preserving hash-prefix lookup, and an auto-highest-quality setting. Both run in the phone and car browsers from one implementation. See [`docs/YOUTUBE_ADDONS.md`](docs/YOUTUBE_ADDONS.md).
+- An AutoBridge phone design language (`AutoBridgeDesign`): ink surfaces, hairline borders, a per-section accent that carries from the home card into that section's screens and player, a dependency-free cached image loader for channel logos, a shared now-playing bar, and a designed player with a scrubber and a LIVE state.
+- A step-by-step car setup screen: notifications, an input backend (Shizuku or accessibility) and screen capture in the order they happen, each with its live state and one action, plus an optional Bluetooth media-session start.
+- Optional YouTube add-ons for the in-app browser, off by default: SponsorBlock segment skipping with per-category switches and a privacy-preserving hash-prefix lookup, and an auto-highest-quality setting. Both run in the phone and car browsers from one implementation.
 - Bounded Compose phone control-center content embedded in the existing Activity; Android Auto remains host-managed through Car App templates.
 - ScreenOnAuto-inspired mirror automation: optional prevent-sleep, timed auto-dim, opt-in panel-only screen-off, stop-on-disconnect, last-app auto-launch, consented auto-open, Shizuku onboarding, and explicit self-drawn renderer selection.
 
@@ -41,7 +87,7 @@ The code is implemented and flavored builds/tests are the primary local validati
 | `personal` | Personal parked use | Broad feature set, but parked-only features still require `PARKED`. |
 | `lab` | Emulator/DHU or controlled bench | Broad feature set plus LAB controls; real-car state is never replaced. |
 
-See [`docs/MODES.md`](docs/MODES.md), [`docs/FEATURE_POLICY.md`](docs/FEATURE_POLICY.md), and [`docs/LAB_MODE.md`](docs/LAB_MODE.md).
+Mode, feature-policy and LAB behaviour are described in the project's internal `docs/` notes.
 
 ## Requirements
 
@@ -160,13 +206,9 @@ If more than one device is connected, add `-s <device-serial>` to the `adb insta
 adb install -r app/build/outputs/apk/personal/release/app-personal-release.apk
 ```
 
-The keystore is `keystore/autobridge-release.jks` and its local signing properties are in `keystore/release.properties`. Both are ignored by Git; back them up securely because losing this keystore prevents future updates to the same app identity. The generated release certificate SHA-256 fingerprint is:
+Release builds are signed with the project's own release keystore, which is kept outside the repository (ignored by Git) and never published here. Back it up securely: the same keystore must be reused for every future update to keep the app identity, and losing it prevents those updates.
 
-```text
-96:a2:78:fa:a1:39:a0:07:34:a0:fc:42:76:39:fb:aa:d3:fb:2e:a7:0d:86:37:2b:6c:1a:f9:2d:fa:50:4e:7f
-```
-
-Do not rename or sideload the `-unsigned.apk` file. A release APK distributed through Google Play/Internal testing must continue using this same keystore for all future updates.
+Do not rename or sideload the `-unsigned.apk` file. A release APK distributed through Google Play/Internal testing must continue using the same release keystore for all future updates.
 
 ### Google Play upload
 
@@ -276,7 +318,7 @@ FeaturePolicy <--- RuntimeContextStore <--- VehicleStateSession <--- SpeedGate/L
        +--> Quick Apps / profiles / MediaSession / Entertainment
 ```
 
-For ownership and lifecycle details see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`docs/MIRROR_ENGINE.md`](docs/MIRROR_ENGINE.md).
+Ownership and lifecycle details live in the project's internal `docs/` notes (`ARCHITECTURE.md`, `MIRROR_ENGINE.md`).
 
 ## Platform limitations
 
@@ -287,33 +329,255 @@ For ownership and lifecycle details see [`docs/ARCHITECTURE.md`](docs/ARCHITECTU
 - When explicitly enabled, the real-touch sink uses hidden `InputManager.injectInputEvent(MotionEvent)` with bounded pointer IDs, pointer count, and coordinates. The current Android Auto host still exposes click/scroll/fling/scale callbacks rather than a raw pointer stream, so this sink is not fed by `onScale`; the existing pinch path remains synthetic Accessibility input.
 - Target-app-only capture/fullscreen cannot be forced reliably through public APIs.
 - Protected video surfaces (for example Netflix/Widevine content) may be blank in MediaProjection/AUTO_MIRROR output. AutoBridge does not bypass DRM; use an officially supported car/app integration for protected playback.
-- Ford profile values are placeholders until measured on real hardware; see [`docs/FORD_NEXT_GEN.md`](docs/FORD_NEXT_GEN.md).
+- Ford profile values are placeholders until measured on real hardware (see the internal `docs/FORD_NEXT_GEN.md` note).
 - A successful JVM test/build does not establish DHU, Ford, wireless Android Auto, panel-off behavior, raw touch landing, media-button, or Shizuku compatibility.
+
+## Futures / วิสัยทัศน์อนาคต
+
+> These are direction and intent, not promises. Anything parked-only stays gated behind an authoritative `PARKED` state, and anything host- or OEM-dependent stays a device check until it is measured on real hardware.
+> นี่คือทิศทางและความตั้งใจ ไม่ใช่คำสัญญา ฟีเจอร์ที่ใช้ได้เฉพาะตอนจอด (parked-only) จะยังถูกล็อกด้วยสถานะ `PARKED` ที่เชื่อถือได้เสมอ และส่วนที่ขึ้นกับ host/OEM จะยังเป็นสิ่งที่ต้องทดสอบบนฮาร์ดแวร์จริงก่อน
+
+### Mobile (phone surface)
+
+> These are the capabilities the phone app actually ships today — the full inventory of what the mobile surface can do right now, not just future direction. Items marked _parked-only_ are controlled from the phone but only open on the car once an authoritative `PARKED` state is present; items marked _flavor-gated_ depend on which build you installed (see the flavor note below).
+> นี่คือความสามารถที่แอปบนมือถือ ทำได้จริงในวันนี้ — รายการทั้งหมดของสิ่งที่ฝั่งมือถือทำได้ตอนนี้ ไม่ใช่แค่ทิศทางในอนาคต รายการที่ระบุว่า _parked-only_ สั่งงานจากมือถือได้ แต่จะเปิดบนจอรถเมื่ออยู่ในสถานะ `PARKED` ที่เชื่อถือได้เท่านั้น ส่วนที่ระบุว่า _flavor-gated_ ขึ้นกับ build ที่ติดตั้ง (ดูหมายเหตุเรื่อง flavor ด้านล่าง)
+
+**English**
+
+_Home & navigation_
+- Phone launcher Home with Quick Launch tiles over the full section list: TV, Radio, Web browser, YouTube, YouTube Music, Streaming (TikTok/Twitch and more), Folders, Favorites, Playlists, Gallery, Weather, Mirror, Apps, Remote, and Settings.
+- Bilingual UI (English / ไทย) with a device-language option, selectable in Settings ▸ Display & control.
+- A speed-safety header widget on Home (display-only; it never gates features).
+
+_Entertainment & IPTV_
+- IPTV via Xtream Codes accounts and M3U playlists, split into TV and Radio sources, with categories, catch-up entries, and a "recently played" list.
+- Channel logos plus a per-list ping check that reports latency, HTTP status, "no answer", or "cannot be checked".
+- Favorites and recently-played across TV, Radio, Web, and media, saved on the phone and shared with the car.
+- Weather by city (Open-Meteo, no API key) that the car Weather screen reads.
+
+_Media player & subtitles_
+- Built-in Media3/ExoPlayer with a scrubber, LIVE indicator, previous/next, and a 10-second skip; it keeps playing when the screen is left (background playback) and supports picture-in-picture.
+- Player options: preferred decoder (Auto/Hardware/Software), aspect ratio (Auto/Fill/Stretch/16:9/4:3), split layout, channel-change gesture, player-control density, show-delay, and picture enhancement (brightness/contrast/saturation).
+- Plays on-device files and MP4/HLS/DASH stream links; MediaStore Folders, Playlists, and a photo/clip Gallery.
+- On-device subtitle translation (_optional_): translate a subtitle track entirely on the phone with ML Kit or Opus-MT (ONNX Runtime), pick source/target language, show-original, and Wi-Fi-only model downloads. The whole translation stack can be compiled out at build time with `-Pautobridge.subtitleTranslation=false`, in which case subtitles still render untranslated.
+
+_Browser & YouTube add-ons_
+- Full phone web browser: tabs, address/search bar, history, bookmarks, downloads, find-in-page, desktop-site request, custom User-Agent, clear browsing data, and reset site permissions.
+- "Send to car" and a play queue: push the current page or a search to the car screen, or queue items to play next.
+- YouTube add-ons (all off by default): SponsorBlock segment skipping by category, auto-highest-quality, and YouTube ad-skip.
+
+_Mirroring & projection control_ (_parked-only_, _flavor-gated_)
+- Screen mirroring/projection to the car with a foreground-service notification and a Stop action; renderer pipeline choice (AUTO_MIRROR / SELF_DRAWN), mirror rotation, crop/fit, resolution and frame-rate targets, and a head-unit profile.
+- Projection automation: prevent sleep, auto-dim after inactivity, dim-now / restore-screen, panel-off on auto-dim (needs Shizuku/root, falls back to dim), and stop-on-disconnect.
+
+_Input backends_ (_parked-only_, _flavor-gated_)
+- Car-screen touch forwarding through an Accessibility service (preferred) or an optional Shizuku backend, with real (privileged) pointer injection when a raw pointer stream is available.
+
+_App profiles & Smart Mode_ (_flavor-gated_)
+- Per-app profiles for favorite apps: auto-mirror intent, auto-fullscreen, force-landscape, scale, resolution, frame rate, touch backend, audio output, keep-screen-on, and a Smart Mode preference, applied on launch.
+
+_Remote & agent_
+- A Remote/Control screen that sends commands and URLs to the car, a "send text to car" field, quick actions, and a command history (last 20) that can be re-run.
+- An Agent that interprets free text/voice into actions, with per-command confirmation, haptics, resume-last-feature, and auto-submit toggles.
+- An experimental self-hosted remote-stream fallback for pages that will not render on the car (never used for copy-protected services).
+
+_Settings, updates & support_
+- Settings for Display & Mirror, Input & Touch, Car & Connection, App Profiles, Video, YouTube, Agent & Commands, plus Advanced (Diagnostics log, Debug/WebView+MediaDrm report, Storage/cache reset).
+- In-app "Check for updates" that compares the build against the latest GitHub release and links to the APK/release page.
+- About with version/flavor, credits & attributions, open-source licenses, GitHub, and a Buy-me-a-coffee / PromptPay QR donate option (_flavor-gated_: the PromptPay row is hidden on the `safe` flavor).
+
+_Advanced / safety override_ (_at your own risk_)
+- Safety bypass: a Settings toggle (also reachable via an `adb` broadcast) that overrides the parked/mode gate so parked-only features can open in any vehicle state. Off by default; its default scope also lifts the SAFE/PERSONAL/LAB mode restriction, with a narrower "parked only" scope available. While on, an ongoing, non-dismissible notification shows the gate is open and offers a one-tap turn-off.
+- Keep media playing through the reverse chime: an audio option (in the car browser's audio settings) that stops playback from pausing for the reverse-gear / rear-camera chime — and, by the same mechanism, from pausing or ducking for phone calls and navigation prompts. Off by default.
+
+_Design / UI_
+- The AutoBridge design language across the phone surface, with icon-tiled sections and bilingual labels shared with the car dashboard.
+
+**ไทย**
+
+_หน้าหลักและการนำทาง_
+- หน้า Home บนมือถือแบบ launcher มีไทล์ Quick Launch อยู่เหนือรายการ section ทั้งหมด: TV, Radio, เว็บเบราว์เซอร์, YouTube, YouTube Music, Streaming (TikTok/Twitch และอื่น ๆ), โฟลเดอร์, Favorites, เพลย์ลิสต์, แกลเลอรี, สภาพอากาศ, Mirror, แอป, Remote และตั้งค่า
+- UI สองภาษา (English / ไทย) พร้อมตัวเลือกตามภาษาเครื่อง เลือกได้ที่ ตั้งค่า ▸ Display & control
+- วิดเจ็ตความเร็ว/ความปลอดภัยบนหน้า Home (แสดงผลอย่างเดียว ไม่ได้ใช้ล็อกฟีเจอร์)
+
+_ความบันเทิงและ IPTV_
+- IPTV ผ่านบัญชี Xtream Codes และเพลย์ลิสต์ M3U แยกเป็นแหล่ง TV และ Radio พร้อมหมวดหมู่ รายการ catch-up และรายการ "เล่นล่าสุด"
+- โลโก้ช่อง พร้อมการ ping ทั้งลิสต์ที่รายงานค่า latency, สถานะ HTTP, "ไม่ตอบสนอง" หรือ "ตรวจสอบไม่ได้"
+- Favorites และเล่นล่าสุด ของ TV, Radio, เว็บ และสื่อ บันทึกบนมือถือและแชร์กับจอรถ
+- สภาพอากาศตามเมือง (Open-Meteo ไม่ต้องใช้ API key) ซึ่งหน้า Weather บนจอรถดึงไปแสดง
+
+_เครื่องเล่นสื่อและซับไตเติล_
+- เครื่องเล่นในตัวด้วย Media3/ExoPlayer มีแถบเลื่อน (scrubber), ตัวบอก LIVE, ก่อนหน้า/ถัดไป และข้าม 10 วินาที เล่นต่อได้แม้ออกจากหน้าจอ (เล่นเบื้องหลัง) และรองรับ picture-in-picture
+- ตัวเลือกเครื่องเล่น: ตัวถอดรหัสที่เลือก (Auto/Hardware/Software), อัตราส่วนภาพ (Auto/Fill/Stretch/16:9/4:3), เลย์เอาต์แบบแบ่งจอ, ท่าทางเปลี่ยนช่อง, ความหนาแน่นของปุ่มควบคุม, การแสดง delay และการปรับภาพ (ความสว่าง/คอนทราสต์/ความอิ่มสี)
+- เล่นไฟล์บนเครื่อง และลิงก์สตรีม MP4/HLS/DASH รวมถึง โฟลเดอร์, เพลย์ลิสต์ และแกลเลอรีรูป/คลิป จาก MediaStore
+- การแปลซับไตเติลบนเครื่อง (_ทางเลือก_): แปลแทร็กซับไตเติลบนมือถือล้วน ๆ ด้วย ML Kit หรือ Opus-MT (ONNX Runtime) เลือกภาษาต้นทาง/ปลายทาง, แสดงต้นฉบับ และดาวน์โหลดโมเดลเฉพาะตอนต่อ Wi-Fi ทั้งชุดการแปลสามารถถอดออกตอน build ได้ด้วย `-Pautobridge.subtitleTranslation=false` ซึ่งซับไตเติลจะยังแสดงแบบไม่แปล
+
+_เบราว์เซอร์และส่วนเสริม YouTube_
+- เบราว์เซอร์บนมือถือเต็มรูปแบบ: แท็บ, แถบที่อยู่/ค้นหา, ประวัติ, บุ๊กมาร์ก, ดาวน์โหลด, ค้นหาในหน้า, ขอหน้าแบบเดสก์ท็อป, กำหนด User-Agent เอง, ล้างข้อมูลการท่องเว็บ และรีเซ็ตสิทธิ์เว็บไซต์
+- "ส่งไปจอรถ" และคิวเล่น: ส่งหน้าปัจจุบันหรือการค้นหาขึ้นจอรถ หรือเพิ่มเข้าคิวให้เล่นถัดไป
+- ส่วนเสริม YouTube (ปิดไว้โดยค่าเริ่มต้นทั้งหมด): ข้ามช่วงด้วย SponsorBlock ตามหมวดหมู่, เลือกคุณภาพสูงสุดอัตโนมัติ และข้ามโฆษณา YouTube
+
+_การ Mirror และควบคุมการฉายภาพ_ (_parked-only_, _flavor-gated_)
+- Mirror/ฉายหน้าจอขึ้นจอรถ พร้อม notification ของ foreground service และปุ่ม Stop เลือก renderer pipeline (AUTO_MIRROR / SELF_DRAWN), การหมุนภาพ, crop/fit, เป้าหมายความละเอียดและเฟรมเรต และโปรไฟล์ head-unit
+- ระบบอัตโนมัติของการฉายภาพ: กันเครื่องหลับ, หรี่จออัตโนมัติเมื่อไม่มีการใช้งาน, หรี่ทันที/คืนค่าหน้าจอ, ดับเฉพาะพาเนลเมื่อหรี่อัตโนมัติ (ต้องใช้ Shizuku/root ถ้าไม่ได้จะหรี่แทน) และหยุดเมื่อหลุดการเชื่อมต่อ
+
+_แบ็กเอนด์อินพุต_ (_parked-only_, _flavor-gated_)
+- ส่งต่อการสัมผัสจากจอรถผ่านบริการ Accessibility (แนะนำ) หรือแบ็กเอนด์ Shizuku (ทางเลือก) พร้อมการฉีด pointer จริง (แบบ privileged) เมื่อมีสตรีม raw pointer ให้ใช้
+
+_โปรไฟล์รายแอปและ Smart Mode_ (_flavor-gated_)
+- โปรไฟล์รายแอปสำหรับแอปโปรด: ตั้ง auto-mirror, auto-fullscreen, บังคับแนวนอน, สเกล, ความละเอียด, เฟรมเรต, แบ็กเอนด์การสัมผัส, เอาต์พุตเสียง, คงหน้าจอให้ติด และค่า Smart Mode ซึ่งจะถูกใช้ตอนเปิดแอป
+
+_Remote และ Agent_
+- หน้า Remote/Control ที่ส่งคำสั่งและ URL ขึ้นจอรถ, ช่อง "ส่งข้อความไปจอรถ", quick actions และประวัติคำสั่ง (20 รายการล่าสุด) ที่สั่งซ้ำได้
+- Agent ที่ตีความข้อความ/เสียงอิสระให้เป็นการกระทำ พร้อมสวิตช์ยืนยันแต่ละคำสั่ง, การสั่นตอบสนอง, เปิดฟีเจอร์ล่าสุดต่อ และ auto-submit
+- remote-stream แบบ self-hosted (ทดลอง) เป็นทางสำรองสำหรับหน้าที่เรนเดอร์บนจอรถไม่ได้ (ไม่เคยใช้กับบริการที่มีการป้องกันการคัดลอก)
+
+_ตั้งค่า อัปเดต และการสนับสนุน_
+- ตั้งค่า Display & Mirror, Input & Touch, Car & Connection, App Profiles, Video, YouTube, Agent & Commands และ Advanced (บันทึก Diagnostics, Debug/รายงาน WebView+MediaDrm, Storage/ล้างแคช)
+- "Check for updates" ในแอปที่เทียบ build กับ GitHub release ล่าสุด และลิงก์ไปหน้า APK/release
+- About ที่มีเวอร์ชัน/flavor, เครดิตและการอ้างอิง, ไลเซนส์โอเพนซอร์ส, GitHub และปุ่มสนับสนุนแบบ Buy-me-a-coffee / QR PromptPay (_flavor-gated_: แถว PromptPay จะถูกซ่อนในแฟลเวอร์ `safe`)
+
+_ขั้นสูง / การปลดล็อกความปลอดภัย_ (_ยอมรับความเสี่ยงเอง_)
+- ปลดล็อกข้อจำกัดความปลอดภัย: สวิตช์ในหน้าตั้งค่า (สั่งผ่าน `adb` broadcast ได้ด้วย) ที่ข้ามการเช็กจอดรถ/โหมด ทำให้ฟีเจอร์ที่ปกติใช้ได้เฉพาะตอนจอดเปิดได้ในทุกสถานะของรถ ปิดไว้เป็นค่าเริ่มต้น ค่า scope เริ่มต้นยังยกเลิกข้อจำกัดโหมด SAFE/PERSONAL/LAB ด้วย และมี scope แบบแคบ ("เฉพาะจอด") ให้เลือก ขณะเปิดอยู่จะมีการแจ้งเตือนแบบค้าง (ปัดทิ้งไม่ได้) บอกว่าระบบล็อกถูกเปิดออก พร้อมปุ่มปิดแบบแตะครั้งเดียว
+- เล่นสื่อต่อผ่านเสียงเตือนถอยหลัง: ตัวเลือกเสียง (อยู่ในการตั้งค่าเสียงของเบราว์เซอร์บนจอรถ) ที่ทำให้เสียงไม่หยุดเพราะเสียงเตือนถอยรถ/กล้องหลัง และด้วยกลไกเดียวกันนี้ ก็ไม่หยุดหรือหรี่เสียงให้สายโทรเข้าหรือเสียงนำทางด้วย ปิดไว้เป็นค่าเริ่มต้น
+
+_ดีไซน์ / UI_
+- ภาษาการออกแบบ AutoBridge ตลอดฝั่งมือถือ พร้อม section แบบไทล์ไอคอนและป้ายกำกับสองภาษาที่ใช้ร่วมกับแดชบอร์ดบนจอรถ
+
+### Car (Android Auto surface)
+
+**English**
+- More reliable mirroring across hosts: validated `AUTO_MIRROR` and opt-in `SELF_DRAWN` behaviour on a repeatable DHU + physical-host matrix, with measured frame/latency counters.
+- Measured Ford/SYNC surface profiles (dimensions, DPI, visible area) replacing today's placeholder values, once a real session is available.
+- Better input on the head unit where the host allows it: continued Accessibility and bounded Shizuku backends, and raw pointer input only if a supported host actually supplies the raw events.
+- Validated optional panel-only screen-off on explicitly supported phone/OEM/Android combinations, always with safe fallback and power restore on teardown.
+- Distribution/category compliance explored separately from the personal POC — only if and when Android Auto's rules allow it.
+
+**ไทย**
+- การ mirror ที่เสถียรขึ้นในหลาย host: ทดสอบพฤติกรรม `AUTO_MIRROR` และ `SELF_DRAWN` (แบบ opt-in) บน DHU และเครื่องจริงอย่างเป็นระบบ พร้อมวัดค่า frame/latency
+- โปรไฟล์หน้าจอ Ford/SYNC ที่วัดจริง (ขนาด, DPI, พื้นที่ที่มองเห็น) มาแทนค่า placeholder ปัจจุบัน เมื่อมีเครื่องจริงให้ทดสอบ
+- อินพุตบนจอรถที่ดีขึ้นเท่าที่ host อนุญาต: ยังคงใช้ Accessibility และ Shizuku แบบมีขอบเขต และจะรองรับ raw pointer เฉพาะเมื่อ host ที่รองรับส่ง event จริงมาให้เท่านั้น
+- ทดสอบฟีเจอร์ดับเฉพาะหน้าจอ (panel-only screen-off) แบบ opt-in บนชุดเครื่อง/OEM/Android ที่รองรับชัดเจน พร้อม fallback ที่ปลอดภัยและคืนค่าพลังงานจอเสมอเมื่อปิดการทำงาน
+- พิจารณาเรื่องการ distribute/หมวดหมู่แอปแยกจากตัว POC ส่วนตัว เฉพาะเมื่อกฎของ Android Auto เปิดให้ทำได้
+
+ดูลำดับงานถัดไปแบบละเอียดได้ที่ [`ROADMAP.md`](ROADMAP.md) · See [`ROADMAP.md`](ROADMAP.md) for the detailed next-order list.
+
+## APK sideload vs Store / ติดตั้งแบบ APK กับจาก Store ต่างกันอย่างไร
+
+AutoBridge is sideloaded today. How you install it changes what the **car** can do — the **phone** app works either way.
+
+ปัจจุบัน AutoBridge เป็นแอป sideload วิธีติดตั้งมีผลกับสิ่งที่ทำได้บน **จอรถ** ส่วนแอปบน **มือถือ** ทำงานได้เหมือนกันทั้งสองแบบ
+
+| | APK ปกติ (plain sideload) | APK + Shizuku/Play-origin | Google Play (เมื่อผ่านนโยบาย) |
+|---|---|---|---|
+| **Phone / มือถือ** | ✅ ใช้ได้เต็ม (home, IPTV, media, browser, settings) | ✅ ใช้ได้เต็ม | ✅ ใช้ได้เต็ม |
+| **Car launcher / แสดงบนจอรถ** | ❌ Android Auto มักไม่แสดงไอคอน | ✅ มักแสดง (ตั้ง installer origin เป็น Play + เปิด Unknown sources) | ✅ แสดงปกติ |
+| **Updates / อัปเดต** | ผู้ใช้โหลด APK เอง + In-app "Check for updates" | เหมือนกัน แต่ติดตั้งผ่าน Shizuku | อัปเดตผ่าน Play อัตโนมัติ |
+| **Setup effort / ความยุ่งยาก** | ต่ำ | ปานกลาง (ต้องตั้ง Shizuku ครั้งแรก) | ต่ำที่สุด |
+| **Status / สถานะ** | ใช้ได้วันนี้ | ใช้ได้วันนี้ (วิธีที่แนะนำสำหรับจอรถ) | ยังไม่การันตี — ขึ้นกับนโยบาย Android Auto |
+
+**Why the difference / ทำไมต่างกัน:**
+Google's Android Auto policy does not generally recognise an app installed by plain APK sideloading, so it may not appear in the car launcher even though Android's service resolver sees it. The project's current car surface is a `NavigationTemplate` custom-surface POC for personal/development use, so Play/Android Auto approval is not guaranteed.
+
+นโยบาย Android Auto ของ Google โดยทั่วไปจะไม่ยอมรับแอปที่ติดตั้งด้วย APK แบบปกติ จึงอาจไม่โผล่ในหน้า launcher ของรถแม้ระบบ Android จะมองเห็นแอปแล้ว ตัวจอรถของโปรเจกต์นี้เป็น POC แบบ `NavigationTemplate` สำหรับใช้งานส่วนตัว/พัฒนา ดังนั้นการผ่านนโยบาย Play/Android Auto จึงยังไม่การันตี
+
+> **Note:** AutoBridge never bypasses DRM, and parked-only features (mirror, video, browser, touch, Quick App launch) always require an authoritative `PARKED` state regardless of how it was installed.
+> **หมายเหตุ:** AutoBridge ไม่หลบ DRM และฟีเจอร์ที่ใช้ได้เฉพาะตอนจอด (mirror, วิดีโอ, เบราว์เซอร์, ทัช, เปิด Quick App) ต้องการสถานะ `PARKED` ที่เชื่อถือได้เสมอ ไม่ว่าจะติดตั้งแบบไหน
+
+## Installation / ขั้นตอนการติดตั้ง
+
+### A. Phone app only (plain APK) / ติดตั้งแอปบนมือถืออย่างเดียว
+
+**English**
+1. Download the APK (a release from the project, or build one yourself — see [Build and test](#build-and-test)).
+2. On the phone, allow installing from your browser/file manager (Settings → Apps → Install unknown apps).
+3. Open the APK and tap **Install**.
+4. Launch AutoBridge; the phone home, IPTV/media, and browser work immediately. The car launcher may not show it yet — continue with section B for the car.
+
+**ไทย**
+1. ดาวน์โหลดไฟล์ APK (จาก release ของโปรเจกต์ หรือ build เอง — ดูหัวข้อ [Build and test](#build-and-test))
+2. บนมือถือ อนุญาตติดตั้งจากเบราว์เซอร์/ตัวจัดการไฟล์ (ตั้งค่า → แอป → ติดตั้งแอปที่ไม่รู้จัก)
+3. เปิดไฟล์ APK แล้วกด **ติดตั้ง**
+4. เปิด AutoBridge หน้าโฮม, IPTV/สื่อ และเบราว์เซอร์บนมือถือใช้ได้ทันที แต่จอรถอาจยังไม่แสดงไอคอน ให้ทำตามหัวข้อ B ต่อสำหรับจอรถ
+
+### B. Show it on the car (Shizuku + Play-origin install) / ให้แสดงบนจอรถ
+
+This is the recommended path to make Android Auto show AutoBridge, without rooting the phone.
+วิธีที่แนะนำเพื่อให้ Android Auto แสดง AutoBridge โดยไม่ต้องรูทเครื่อง
+
+**English**
+1. **Enable Developer Options:** Settings → About phone → tap **Build number** 7 times.
+2. **Set up Shizuku via Wireless Debugging:** turn on **Wireless debugging** in Developer Options, then in the Shizuku app pair with the pairing code and tap **Start**. Shizuku should report "running". (Android 11+ needs no PC.)
+3. **Install with a Play-store origin:** use an installer that works through Shizuku (e.g. KingInstaller) to install the AutoBridge APK so the install origin is recorded as the Play Store. Grant it Shizuku access ("Allow all the time").
+4. **Enable Unknown sources in Android Auto:** open Android Auto settings → tap **Version** 10 times → **Developer settings** → check **Unknown sources**.
+5. **Connect to the car** (USB or wireless Android Auto) and open the Android Auto launcher — AutoBridge should now appear. If not, check **Customize launcher** in Android Auto.
+6. Shizuku is only needed for installing/updating; you do **not** need it running while using the app in the car.
+
+**ไทย**
+1. **เปิด Developer Options:** ตั้งค่า → เกี่ยวกับโทรศัพท์ → แตะ **หมายเลขบิลด์ (Build number)** 7 ครั้ง
+2. **ตั้งค่า Shizuku ผ่าน Wireless Debugging:** เปิด **Wireless debugging** ใน Developer Options จากนั้นในแอป Shizuku จับคู่ด้วยรหัส pairing แล้วกด **Start** จนขึ้นสถานะ "running" (Android 11+ ไม่ต้องใช้คอมพิวเตอร์)
+3. **ติดตั้งแบบ origin เป็น Play Store:** ใช้ตัวติดตั้งที่ทำงานผ่าน Shizuku (เช่น KingInstaller) ติดตั้งไฟล์ APK ของ AutoBridge เพื่อให้ origin การติดตั้งถูกบันทึกเป็น Play Store และอนุญาต Shizuku แบบ "Allow all the time"
+4. **เปิด Unknown sources ใน Android Auto:** เปิดการตั้งค่า Android Auto → แตะ **Version** 10 ครั้ง → **Developer settings** → ติ๊ก **Unknown sources**
+5. **เชื่อมต่อกับรถ** (ผ่าน USB หรือ Wireless Android Auto) แล้วเปิด launcher ของ Android Auto จะเห็นไอคอน AutoBridge หากไม่เห็นให้เช็ก **Customize launcher** ใน Android Auto
+6. Shizuku จำเป็นเฉพาะตอนติดตั้ง/อัปเดตเท่านั้น ตอนใช้งานในรถ **ไม่ต้อง** เปิด Shizuku ค้างไว้
+
+> Developer/signed APK details, keystore, and release signing are in [Installing on a physical phone](#installing-on-a-physical-phone) and [Google Play upload](#google-play-upload).
+> รายละเอียด APK แบบ debug/signed, keystore และการเซ็น release อยู่ที่หัวข้อ [Installing on a physical phone](#installing-on-a-physical-phone) และ [Google Play upload](#google-play-upload)
+
+### C. In-app updates / อัปเดตในแอป
+
+**Settings → About → Check for updates** asks GitHub for the latest release and offers the APK and release page when a newer `versionName` exists. It only runs when tapped, sends no identity beyond an `AutoBridge/<version>` User-Agent, and never replaces itself — installing stays with the browser and the package installer.
+
+**ตั้งค่า → เกี่ยวกับ → ตรวจหาอัปเดต** จะถาม GitHub หาเวอร์ชันล่าสุด และเสนอ APK กับหน้า release เมื่อมี `versionName` ใหม่กว่า ทำงานเฉพาะตอนกดเท่านั้น ไม่ส่งข้อมูลระบุตัวตนใดนอกจาก User-Agent `AutoBridge/<version>` และไม่ติดตั้งทับตัวเอง การติดตั้งยังทำผ่านเบราว์เซอร์และตัวติดตั้งแพ็กเกจตามปกติ
 
 ## Documentation
 
 - [`ROADMAP.md`](ROADMAP.md) — implemented scope and remaining work
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — ownership and runtime boundaries
-- [`docs/MODES.md`](docs/MODES.md) — SAFE/PERSONAL/LAB variants
-- [`docs/FEATURE_POLICY.md`](docs/FEATURE_POLICY.md) — centralized feature decisions
-- [`docs/MIRROR_ENGINE.md`](docs/MIRROR_ENGINE.md) — projection/surface/reconnect lifecycle
-- [`docs/INPUT_SYSTEM.md`](docs/INPUT_SYSTEM.md) — transforms and input backends
-- [`docs/APP_PROFILES.md`](docs/APP_PROFILES.md) — Quick Apps, profiles, Smart Mode
-- [`docs/LAB_MODE.md`](docs/LAB_MODE.md) — emulator/DHU development boundaries
-- [`docs/FORD_NEXT_GEN.md`](docs/FORD_NEXT_GEN.md) — measured Ford profile procedure
-- [`docs/REFERENCE_PROJECTS.md`](docs/REFERENCE_PROJECTS.md) — independent reference matrix
-- [`docs/SCREENON_AUTO_INTEGRATION.md`](docs/SCREENON_AUTO_INTEGRATION.md) — independent ScreenOnAuto feature mapping and limits
-- [`docs/YOUTUBE_ADDONS.md`](docs/YOUTUBE_ADDONS.md) — optional SponsorBlock and quality behaviour
-- [`docs/DHU_SCENARIOS.md`](docs/DHU_SCENARIOS.md) — manual host/device scenarios
-- [`docs/FORD_TEST.md`](docs/FORD_TEST.md) — DHU/Ford safety checklist
-- [`docs/CARVIEW_PARITY.md`](docs/CARVIEW_PARITY.md) — product-reference comparison
-- [`docs/PROGRESS.md`](docs/PROGRESS.md) — current verification record
+
+The following are kept as internal development notes under `docs/` in the working tree and are intentionally not published with the repository:
+
+- `docs/ARCHITECTURE.md` — ownership and runtime boundaries
+- `docs/MODES.md` — SAFE/PERSONAL/LAB variants
+- `docs/FEATURE_POLICY.md` — centralized feature decisions
+- `docs/MIRROR_ENGINE.md` — projection/surface/reconnect lifecycle
+- `docs/INPUT_SYSTEM.md` — transforms and input backends
+- `docs/APP_PROFILES.md` — Quick Apps, profiles, Smart Mode
+- `docs/LAB_MODE.md` — emulator/DHU development boundaries
+- `docs/FORD_NEXT_GEN.md` — measured Ford profile procedure
+- `docs/REFERENCE_PROJECTS.md` — independent reference matrix
+- `docs/SCREENON_AUTO_INTEGRATION.md` — independent ScreenOnAuto feature mapping and limits
+- `docs/YOUTUBE_ADDONS.md` — optional SponsorBlock and quality behaviour
+- `docs/DHU_SCENARIOS.md` — manual host/device scenarios
+- `docs/FORD_TEST.md` — DHU/Ford safety checklist
+- `docs/CARVIEW_PARITY.md` — product-reference comparison
+- `docs/PROGRESS.md` — current verification record
+
+## Support
+
+AutoBridge is a personal, non-commercial project. If it is useful to you and you would like to buy the developer a coffee, support is welcome but entirely optional.
+
+- **Buy Me a Coffee:** [buymeacoffee.com/guitar.story](https://buymeacoffee.com/guitar.story)
+- **PromptPay (Thailand):** scan the QR below with your banking app
+
+<img src="assets/donate_promptpay_qr.png" alt="PromptPay donate QR" width="260" />
+
+Developed by Guitar-Story Thailand.
+
+## Inspiration / แรงบันดาลใจ
+
+AutoBridge is an independent implementation under the `dev.autobridge` package. The projects below informed its behaviour and architecture only — no upstream source tree or asset was merged into this repository, and each project's own license/terms stay independent of AutoBridge's.
+
+AutoBridge เป็น implementation อิสระภายใต้แพ็กเกจ `dev.autobridge` โปรเจกต์ด้านล่างเป็นเพียง "แรงบันดาลใจ" ด้านพฤติกรรมและสถาปัตยกรรมเท่านั้น ไม่มีการนำ source หรือ asset ของโปรเจกต์ต้นทางมารวมไว้ในรีโปนี้ และไลเซนส์/เงื่อนไขของแต่ละโปรเจกต์ยังเป็นอิสระจาก AutoBridge
+
+- **[MirrorMobile](https://github.com/chenxiaolong/MirrorMobile)** (GPL-3.0) — Android Auto surface lifecycle, authoritative `CAR_SPEED`, and fail-closed parked behaviour. No GPL source was copied into this MIT tree. / วงจรชีวิตเซอร์เฟซบน Android Auto, `CAR_SPEED` ที่เชื่อถือได้ และพฤติกรรม fail-closed ตอนจอด (ไม่มีการคัดลอกซอร์ส GPL เข้ามาในทรี MIT นี้)
+- **[ScreenOnAuto](https://github.com/slzn/ScreenOnAuto-releases)** — touch UX, Quick Apps, force-landscape, optional privileged input, MediaSession, and screen-off ideas, credited as a behavioural/documentation reference. / แนวคิดเรื่อง touch UX, Quick Apps, บังคับแนวนอน, อินพุตแบบ privileged (ทางเลือก), MediaSession และ screen-off โดยอ้างเป็นแหล่งอ้างอิงเชิงพฤติกรรม/เอกสาร
+- **[Fermata-Xtream](https://github.com/malebuffy/Fermata-Xtream)** (GPL-3.0) — the home section set and ordering (TV, Radio, Web, YouTube family, Folders, Favorites, Playlists, Gallery) and the Xtream Codes account flow. No upstream source or assets were copied into this MIT tree. / ชุดและลำดับ section หน้าหลัก (TV, Radio, เว็บ, กลุ่ม YouTube, โฟลเดอร์, Favorites, เพลย์ลิสต์, แกลเลอรี) และ flow บัญชี Xtream Codes (ไม่มีการคัดลอกซอร์สหรือ asset เข้ามาในทรี MIT นี้)
 
 ## License
 
 AutoBridge is MIT licensed — see [`LICENSE`](LICENSE). The same file covers the separate [`ios/`](ios/README.md) tree.
 
-MIT is a deliberate choice, not a leftover. Two of the reference projects in [`docs/REFERENCE_PROJECTS.md`](docs/REFERENCE_PROJECTS.md) (MirrorMobile, Fermata) are GPL-3.0, and they informed behaviour and architecture only: no upstream source or asset was copied into this tree, so their terms stay independent of this repository. Anything that would change that — pasted copyleft source, a vendored upstream file, a decompiled asset — has to be raised before it lands, because it would force a relicense rather than just a review comment.
+MIT is a deliberate choice, not a leftover. Two of the reference projects tracked in the internal `docs/REFERENCE_PROJECTS.md` note (MirrorMobile, Fermata) are GPL-3.0, and they informed behaviour and architecture only: no upstream source or asset was copied into this tree, so their terms stay independent of this repository. Anything that would change that — pasted copyleft source, a vendored upstream file, a decompiled asset — has to be raised before it lands, because it would force a relicense rather than just a review comment.
 
 Third-party dependencies keep their own terms. The in-app list is generated at build time by the `oss-licenses` Gradle plugin from the dependency POMs and opens from the Settings "Open-source licenses" row.
 
