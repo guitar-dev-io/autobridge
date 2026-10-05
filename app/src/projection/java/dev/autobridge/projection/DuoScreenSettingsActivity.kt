@@ -4,7 +4,12 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
+import android.graphics.Typeface
 import android.os.Bundle
+import android.util.TypedValue
+import android.view.View
+import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
 import dev.autobridge.duoscreen.DuoScreenHost
 import dev.autobridge.duoscreen.R
@@ -208,12 +213,13 @@ class DuoScreenSettingsActivity : Activity() {
             .sortedBy { paneLabel(it).lowercase() }
 
         val labels = listOf(getString(R.string.duo_screen_clear_app)) + launchable.map(::paneLabel)
-        AlertDialog.Builder(this)
-            .setTitle(R.string.duo_screen_pick_app)
-            // Reading the installed-app list is the one thing here the user cannot see the reason
-            // for, so the picker says it. Play would require this justification in the console; the
-            // permission never reaches a Play build, but the user still deserves the sentence.
-            .setMessage(R.string.duo_screen_pick_app_why)
+        val builder = AlertDialog.Builder(this)
+        builder
+            // Title AND reason in one custom view, not setTitle + setMessage: AlertController
+            // attaches the setItems ListView to the content panel only when no message is set, so a
+            // message leaves the picker with nothing to pick. Carrying the sentence in the title
+            // area is what lets the list survive it.
+            .setCustomTitle(pickerHeader(builder.context))
             .setItems(labels.toTypedArray()) { _, which ->
                 val packageName = if (which == 0) null else launchable[which - 1]
                 DuoScreenStore.setPackage(this, paneId, packageName)
@@ -221,6 +227,47 @@ class DuoScreenSettingsActivity : Activity() {
                 render()
             }
             .show()
+    }
+
+    /**
+     * The picker's heading: what to do, then why the app list was read at all.
+     *
+     * Reading the installed-app list is the one thing on this screen the user cannot see the reason
+     * for, so the picker says it. Play would require that justification in the console; the
+     * permission never reaches a Play build, but the user still deserves the sentence.
+     *
+     * [themed] is the builder's own context, so the two labels take the dialog theme's colours
+     * rather than the activity's - those differ, and views built from the activity can come out
+     * invisible against the dialog's background.
+     */
+    private fun pickerHeader(themed: Context): View {
+        fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
+        return LinearLayout(themed).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(24), dp(20), dp(24), dp(8))
+            addView(
+                TextView(themed).apply {
+                    text = getString(R.string.duo_screen_pick_app)
+                    textSize = 20f
+                    setTypeface(typeface, Typeface.BOLD)
+                    setTextColor(themeColor(themed, android.R.attr.textColorPrimary))
+                }
+            )
+            addView(
+                TextView(themed).apply {
+                    text = getString(R.string.duo_screen_pick_app_why)
+                    textSize = 13f
+                    setTextColor(themeColor(themed, android.R.attr.textColorSecondary))
+                    setPadding(0, dp(8), 0, 0)
+                }
+            )
+        }
+    }
+
+    private fun themeColor(themed: Context, attr: Int): Int {
+        val value = TypedValue()
+        if (!themed.theme.resolveAttribute(attr, value, true)) return AutoBridgeDesign.TEXT
+        return if (value.resourceId != 0) themed.getColor(value.resourceId) else value.data
     }
 
     /**
