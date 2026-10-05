@@ -2700,13 +2700,21 @@ class MainActivity : androidx.activity.ComponentActivity() {
         )
     )
 
-    /** Settings > About: support, licenses, source and version (moved from the old Remote options). */
+    /**
+     * Settings > About, in three groups rather than one list of eight rows.
+     *
+     * The rows answer three different questions - how to say thanks, what this build is, and whose
+     * work it stands on - and reading them as one column meant a donation row sat between the
+     * licenses and the version number. Grouping also puts "Developed by" next to the two support
+     * rows, where a person who has just decided to buy the coffee looks for who they are buying it
+     * for.
+     */
     private fun buildAboutScreen(): View = settingsListPage(
         title = getString(R.string.settings_about),
         subtitle = "AutoBridge ${BuildConfig.VERSION_NAME}",
         back = { goBack() },
         groups = listOf(
-            SettingsGroup("", buildList {
+            SettingsGroup(getString(R.string.about_group_support), buildList {
                 add(settingsEntry(
                     getString(R.string.about_support),
                     getString(R.string.about_support_caption),
@@ -2726,48 +2734,52 @@ class MainActivity : androidx.activity.ComponentActivity() {
                     })
                 }
                 add(settingsEntry(
-                    getString(R.string.about_licenses),
-                    getString(R.string.about_licenses_caption),
-                    R.drawable.ic_tile_folder
-                ) {
-                    showOpenSourceLicenses()
-                })
-                add(settingsEntry(
-                    getString(R.string.about_github),
-                    "github.com/guitar-dev-io/autobridge",
-                    R.drawable.ic_tile_web
-                ) {
-                    openExternalUrl(GITHUB_URL)
-                })
-                add(settingsEntry(
-                    getString(R.string.about_check_update),
-                    updateCheckCaption(),
-                    R.drawable.ic_tile_remote
-                ) {
-                    checkForUpdates()
-                })
-                add(settingsEntry(
-                    getString(R.string.about_version),
-                    "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}) · ${BuildConfig.AUTOBRIDGE_MODE.lowercase()}",
-                    R.drawable.ic_tile_settings
-                ) {
-                    Toast.makeText(this@MainActivity, "AutoBridge ${BuildConfig.VERSION_NAME}", Toast.LENGTH_SHORT).show()
-                })
-                add(settingsEntry(
-                    getString(R.string.about_credits),
-                    getString(R.string.about_credits_caption),
-                    R.drawable.ic_tile_folder
-                ) {
-                    showCreditsDialog()
-                })
-                add(settingsEntry(
                     getString(R.string.about_developer),
                     getString(R.string.about_developer_caption),
                     R.drawable.ic_tile_favorite
                 ) {
                     Toast.makeText(this@MainActivity, getString(R.string.about_developer_caption), Toast.LENGTH_SHORT).show()
                 })
-            })
+            }),
+            SettingsGroup(getString(R.string.about_group_app), listOf(
+                settingsEntry(
+                    getString(R.string.about_check_update),
+                    updateCheckCaption(),
+                    R.drawable.ic_tile_remote
+                ) {
+                    checkForUpdates()
+                },
+                settingsEntry(
+                    getString(R.string.about_version),
+                    "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}) \u00b7 ${BuildConfig.AUTOBRIDGE_MODE.lowercase()}",
+                    R.drawable.ic_tile_settings
+                ) {
+                    Toast.makeText(this@MainActivity, "AutoBridge ${BuildConfig.VERSION_NAME}", Toast.LENGTH_SHORT).show()
+                },
+                settingsEntry(
+                    getString(R.string.about_github),
+                    "github.com/guitar-dev-io/autobridge",
+                    R.drawable.ic_tile_web
+                ) {
+                    openExternalUrl(GITHUB_URL)
+                }
+            )),
+            SettingsGroup(getString(R.string.about_group_credits), listOf(
+                settingsEntry(
+                    getString(R.string.about_credits),
+                    getString(R.string.about_credits_caption),
+                    R.drawable.ic_tile_folder
+                ) {
+                    showCreditsDialog()
+                },
+                settingsEntry(
+                    getString(R.string.about_licenses),
+                    getString(R.string.about_licenses_caption),
+                    R.drawable.ic_tile_folder
+                ) {
+                    showOpenSourceLicenses()
+                }
+            ))
         )
     )
 

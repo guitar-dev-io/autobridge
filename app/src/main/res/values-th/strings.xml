@@ -463,6 +463,9 @@
     <string name="advanced_storage_caption">ล้างแคชหรือรีเซ็ตข้อมูลแอป</string>
     <string name="advanced_debug_subtitle">สถานะภายใน</string>
     <string name="about_support">สนับสนุน AutoBridge</string>
+    <string name="about_group_support">สนับสนุน</string>
+    <string name="about_group_app">บิลด์นี้</string>
+    <string name="about_group_credits">เครดิตและสัญญาอนุญาต</string>
     <string name="about_support_caption">เลี้ยงกาแฟผู้พัฒนา</string>
     <string name="about_promptpay">เลี้ยงกาแฟ (พร้อมเพย์)</string>
     <string name="about_promptpay_caption">สแกน QR เพื่อโอนค่าขนมเล็กๆ น้อยๆ</string>
@@ -470,7 +473,7 @@
     <string name="about_promptpay_message">สแกน QR พร้อมเพย์นี้ด้วยแอปธนาคารของคุณ</string>
     <string name="about_promptpay_close">ปิด</string>
     <string name="about_developer">พัฒนาโดย</string>
-    <string name="about_developer_caption">Guitar · อานุวัฒน์ เตียมรัตน์ · ประเทศไทย</string>
+    <string name="about_developer_caption">Guitar · Guitar Dev</string>
     <string name="about_credits">เครดิตและการอ้างอิง</string>
     <string name="about_credits_caption">ไลบรารีโอเพนซอร์สและแหล่งข้อมูล</string>
     <string name="about_credits_title">เครดิตและการอ้างอิง</string>

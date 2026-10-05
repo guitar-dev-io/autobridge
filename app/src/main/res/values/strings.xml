@@ -477,6 +477,9 @@
     <string name="advanced_storage_caption">Clear cache or reset app data</string>
     <string name="advanced_debug_subtitle">INTERNAL STATE</string>
     <string name="about_support">Support AutoBridge</string>
+    <string name="about_group_support">Support</string>
+    <string name="about_group_app">This build</string>
+    <string name="about_group_credits">Credits &amp; licenses</string>
     <string name="about_support_caption">Buy me a coffee</string>
     <string name="about_promptpay">Buy me a coffee (PromptPay)</string>
     <string name="about_promptpay_caption">Scan the QR to send a little something</string>
