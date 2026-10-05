@@ -57,6 +57,7 @@ import dev.autobridge.remote.CommandResult
 import dev.autobridge.remote.CommandSource
 import dev.autobridge.remote.CommandStatus
 import dev.autobridge.remote.CommandType
+import dev.autobridge.remote.MirrorStatus
 import dev.autobridge.remote.QuickCommandStore
 import dev.autobridge.remote.RemoteScreen
 import dev.autobridge.remote.RemoteSettingsStore
@@ -107,6 +108,32 @@ fun ControlScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             AndroidAutoStatusCard(title = stringResource(R.string.control_android_auto), onClick = onOpenConnection)
+
+            // Only offer Disconnect while the car is actually mirroring; hidden otherwise.
+            if (state.mirrorStatus == MirrorStatus.ACTIVE) {
+                val disconnectDesc = stringResource(R.string.control_disconnect_desc)
+                Surface(
+                    onClick = {
+                        AutoBridgeCommandBus.send(
+                            AutoBridgeCommand(type = CommandType.STOP_MIRROR, source = CommandSource.MOBILE)
+                        )
+                    },
+                    color = ComposeTokens.Danger.copy(alpha = 0.16f),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth()
+                        .border(1.dp, ComposeTokens.Danger.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
+                        .semantics { contentDescription = disconnectDesc }
+                ) {
+                    Box(Modifier.fillMaxWidth().padding(14.dp), contentAlignment = Alignment.Center) {
+                        Text(
+                            stringResource(R.string.control_disconnect),
+                            color = ComposeTokens.Danger,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            }
 
             SectionLabel(stringResource(R.string.control_section_command_or_url))
             CommandField(placeholder = stringResource(R.string.control_command_placeholder))

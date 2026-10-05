@@ -81,6 +81,8 @@
     <string name="control_title">ควบคุม</string>
     <string name="control_history_action">ประวัติ</string>
     <string name="control_android_auto">Android Auto</string>
+    <string name="control_disconnect">หยุดมิเรอร์</string>
+    <string name="control_disconnect_desc">ตัดการเชื่อมต่อและหยุดมิเรอร์</string>
     <string name="control_section_command_or_url">คำสั่งหรือ URL</string>
     <string name="control_command_placeholder">เปิด google.com</string>
     <string name="control_section_quick_actions">คำสั่งด่วน</string>
@@ -1140,6 +1142,7 @@
 
     <!-- Car mirror surface -->
     <string name="car_mirror_controls">การควบคุม</string>
+    <string name="car_mirror_disconnect">หยุดมิเรอร์</string>
     <string name="car_speed_enabled">เปิดความปลอดภัยตามความเร็วแล้ว</string>
     <string name="car_speed_denied">ไม่ได้รับสิทธิ์อ่านความเร็ว</string>
     <string name="car_speed_kmh">%1$d กม./ชม.</string>

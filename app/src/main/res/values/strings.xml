@@ -89,6 +89,8 @@
     <string name="control_title">Control</string>
     <string name="control_history_action">History</string>
     <string name="control_android_auto">Android Auto</string>
+    <string name="control_disconnect">Disconnect</string>
+    <string name="control_disconnect_desc">Disconnect and stop mirroring</string>
     <string name="control_section_command_or_url">Command or URL</string>
     <string name="control_command_placeholder">open google.com</string>
     <string name="control_section_quick_actions">Quick Actions</string>
@@ -1159,6 +1161,7 @@
 
     <!-- Car mirror surface ([MirrorCarScreen]). -->
     <string name="car_mirror_controls">Controls</string>
+    <string name="car_mirror_disconnect">Disconnect</string>
     <string name="car_speed_enabled">Speed safety enabled</string>
     <string name="car_speed_denied">Speed permission denied</string>
     <string name="car_speed_kmh">%1$d km/h</string>

@@ -110,6 +110,15 @@ class MirrorCarScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
                     .setOnClickListener { openControls() }
                     .build()
             )
+            .addAction(
+                Action.Builder()
+                    .setTitle(carContext.getString(R.string.car_mirror_disconnect))
+                    .setOnClickListener {
+                        ProjectionService.stop(carContext)
+                        carContext.finishCarApp()
+                    }
+                    .build()
+            )
             .build()
 
         val safetyAction = Action.Builder()
