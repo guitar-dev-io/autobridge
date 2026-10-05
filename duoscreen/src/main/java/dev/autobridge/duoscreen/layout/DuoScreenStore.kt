@@ -109,10 +109,32 @@ object DuoScreenStore {
      * placeholder size) still lands exactly right on the head unit.
      */
     private const val KEY_ARRANGED = "arranged"
+    private const val KEY_CONTENT_SCALE = "content_scale"
     private const val DEFAULT_PANE_COUNT = 2
 
     const val MIN_PANES = 2
     const val MAX_PANES = 3
+
+    /**
+     * How much of a pane the app inside it gets to use, as a percentage.
+     *
+     * A pane's display runs at the pane's own pixel size, so the only thing that decides how much
+     * an app can fit in it is density: at the car panel's own dpi one pixel is one dp, and half an
+     * 800x400 panel leaves the app a 400x400dp screen — a third of the height a phone app is drawn
+     * for, which is why everything in it looks crammed. Dividing the density by this gives the app
+     * more dp for the same pixels: 150% turns that pane into 600x600dp. Nothing is scaled or
+     * stretched — the app simply lays itself out for a roomier screen and draws smaller.
+     *
+     * A short list rather than a free number: these are the steps worth having from a driver's
+     * seat, and each one is still legible on a car panel.
+     */
+    val CONTENT_SCALES = listOf(100, 125, 150, 200)
+
+    /**
+     * Roomier than the panel says by default. 100% is the honest reading of the car's own density,
+     * and on the 800x400 panels these head units have it is too tight to be useful.
+     */
+    private const val DEFAULT_CONTENT_SCALE = 150
 
     private fun prefs(context: Context) =
         context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -189,6 +211,15 @@ object DuoScreenStore {
             )
         }
         prefs(context).edit { putString(KEY_LAYOUT, DuoScreenLayoutCodec.encode(bounds, panes)) }
+    }
+
+    fun contentScale(context: Context): Int =
+        prefs(context).getInt(KEY_CONTENT_SCALE, DEFAULT_CONTENT_SCALE)
+            .takeIf { it in CONTENT_SCALES } ?: DEFAULT_CONTENT_SCALE
+
+    /** Density only: the panes keep their rects, so there is no arrangement to drop. */
+    fun setContentScale(context: Context, percent: Int) {
+        prefs(context).edit { putInt(KEY_CONTENT_SCALE, percent) }
     }
 
     /** Drops the arrangement but keeps the chosen apps, which is what "reset layout" means. */

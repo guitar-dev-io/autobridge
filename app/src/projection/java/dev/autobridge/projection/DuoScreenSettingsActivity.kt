@@ -114,6 +114,16 @@ class DuoScreenSettingsActivity : Activity() {
                 badgeText = preset.glyph
             ) { pickPreset() }
         )
+        val scale = DuoScreenStore.contentScale(this)
+        body.stack(
+            AutoBridgeDesign.contentRow(
+                context = this,
+                title = getString(R.string.duo_screen_content_scale),
+                subtitle = getString(R.string.duo_screen_content_scale_hint),
+                accent = accent,
+                badgeText = getString(R.string.duo_screen_content_scale_value, scale)
+            ) { pickContentScale() }
+        )
         body.stack(
             AutoBridgeDesign.contentRow(
                 context = this,
@@ -202,6 +212,24 @@ class DuoScreenSettingsActivity : Activity() {
             .setTitle(R.string.duo_screen_preset)
             .setItems(labels.toTypedArray()) { _, which ->
                 DuoScreenStore.setPreset(this, presets[which])
+                applied()
+                render()
+            }
+            .show()
+    }
+
+    /**
+     * Density, not zoom — see [DuoScreenStore.CONTENT_SCALES]. A pane's display keeps its pixels
+     * and its rect; only how many dp the app inside gets to lay itself out in changes, so a live
+     * session takes it as a resize and the driver sees each step on the car display as they pick.
+     */
+    private fun pickContentScale() {
+        val scales = DuoScreenStore.CONTENT_SCALES
+        val labels = scales.map { getString(R.string.duo_screen_content_scale_value, it) }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.duo_screen_content_scale)
+            .setItems(labels.toTypedArray()) { _, which ->
+                DuoScreenStore.setContentScale(this, scales[which])
                 applied()
                 render()
             }

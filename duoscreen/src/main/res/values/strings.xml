@@ -21,6 +21,9 @@
     <string name="duo_screen_preset_wide_right">Wide right</string>
     <string name="duo_screen_preset_even_rows">Stacked rows</string>
     <string name="duo_screen_preset_pip">Picture in picture</string>
+    <string name="duo_screen_content_scale">Content size in a pane</string>
+    <string name="duo_screen_content_scale_hint">Higher gives the app more room and draws it smaller</string>
+    <string name="duo_screen_content_scale_value">%1$d%%</string>
     <string name="duo_screen_reset_layout">Reset arrangement</string>
     <string name="duo_screen_reset_layout_hint">Back to the preset; the chosen apps are kept</string>
     <string name="duo_screen_reset_done">Arrangement reset</string>

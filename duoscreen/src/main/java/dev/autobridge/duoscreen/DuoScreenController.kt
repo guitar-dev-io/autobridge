@@ -71,6 +71,13 @@ class DuoScreenController(
     private var inputThread: HandlerThread? = null
     private var inputHandler: Handler? = null
     private var dpi = 0
+
+    /**
+     * The density the pane displays actually run at: [dpi] divided by the driver's content scale
+     * (see [DuoScreenStore.CONTENT_SCALES]). Kept beside [dpi] rather than replacing it, because
+     * the panel's own dpi is what a new scale has to be re-derived from.
+     */
+    private var paneDpi = 0
     private var running = false
     private var sessionBounds: Bounds? = null
     private var selectedPaneId: Int? = null
@@ -104,6 +111,7 @@ class DuoScreenController(
         stop()
         val bounds = Bounds(width, height)
         dpi = panelDpi
+        paneDpi = storedPaneDpi(panelDpi)
         val restored = DuoScreenStore.restore(context, bounds)
         val preset = DuoScreenStore.presetPanes(context, bounds)
         val paneSet = when {
@@ -192,6 +200,7 @@ class DuoScreenController(
             return false
         }
         dpi = panelDpi
+        paneDpi = storedPaneDpi(panelDpi)
         hostSurface = output
         val bounds = Bounds(width, height)
         sessionBounds = bounds
@@ -222,13 +231,21 @@ class DuoScreenController(
         StructuredLog.i(TAG, "Surface detached; ${panes.size} pane(s) kept alive")
     }
 
+    /**
+     * The panel's dpi divided by the stored content scale, which is what gives the app in a pane
+     * more dp to lay itself out in without anything being scaled after the fact. Floored at 1
+     * because a VirtualDisplay rejects a density of zero.
+     */
+    private fun storedPaneDpi(baseDpi: Int): Int =
+        (baseDpi * 100 / DuoScreenStore.contentScale(context)).coerceAtLeast(1)
+
     private fun openPane(pane: DuoScreenPane) {
         val surface = compositor.addPaneBlocking(pane.id, pane.rect) ?: run {
             StructuredLog.e(TAG, "Pane ${pane.id} got no compositor surface")
             return
         }
         val displayId = DuoScreenDisplays.create(
-            context, pane.id, surface, pane.rect.width, pane.rect.height, dpi
+            context, pane.id, surface, pane.rect.width, pane.rect.height, paneDpi
         )
         if (displayId < 0) {
             StructuredLog.e(TAG, "Pane ${pane.id} got no display")
@@ -273,6 +290,18 @@ class DuoScreenController(
         if (preset != appliedPreset) {
             applyPreset(preset)
             appliedPreset = preset
+        }
+
+        // A changed content scale is a density change and nothing else: the panes keep their rects,
+        // so there is no layout to redo — each live display is simply re-run at the new density.
+        val scaled = storedPaneDpi(dpi)
+        if (scaled != paneDpi) {
+            paneDpi = scaled
+            live.forEach { pane ->
+                val size = DuoScreenDisplays.size(pane.id) ?: return@forEach
+                DuoScreenDisplays.resize(pane.id, size.width, size.height, paneDpi)
+            }
+            StructuredLog.i(TAG, "Pane content scale applied: ${paneDpi}dpi from a ${dpi}dpi panel")
         }
 
         val changed = active.panes.panesWithOtherPackage(stored)
@@ -564,9 +593,9 @@ class DuoScreenController(
             // A pane that was dragged but not resized has nothing to commit, and committing it
             // anyway is a configuration change the hosted app answers with a blank relayout —
             // the blink after every move. Only a real size change goes through.
-            if (!DuoScreenDisplays.needsResize(paneId, rect.width, rect.height, dpi)) return@forEach
+            if (!DuoScreenDisplays.needsResize(paneId, rect.width, rect.height, paneDpi)) return@forEach
             compositor.commitSize(paneId, rect.width, rect.height)
-            DuoScreenDisplays.resize(paneId, rect.width, rect.height, dpi)
+            DuoScreenDisplays.resize(paneId, rect.width, rect.height, paneDpi)
             StructuredLog.i(TAG, "Pane $paneId committed ${rect.width}x${rect.height}")
         }
         saveLayout()
