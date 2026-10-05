@@ -43,11 +43,11 @@ val autoBridgeVersionCode = requireNotNull(
 // Translate and ONNX Runtime (the Opus-MT/Marian engine). Both are mostly native code and both
 // ship a copy per ABI, which is around 17 MB of the packaged APK between them. A build that does
 // not want them - a smaller download, a device without Play Services, or an ABI ONNX Runtime has
-// no binary for - turns the whole feature off, which drops both libraries and the three source
-// files that use them:
+// no binary for - leaves the whole feature off, which drops both libraries and the three source
+// files that use them. It is off by default, so compiling the feature in is the opt-in:
 //
-//   ./gradlew assembleSafeRelease -Pautobridge.subtitleTranslation=false
-//   AUTOBRIDGE_SUBTITLE_TRANSLATION=false ./gradlew assembleSafeRelease
+//   ./gradlew assembleSafeRelease -Pautobridge.subtitleTranslation=true
+//   AUTOBRIDGE_SUBTITLE_TRANSLATION=true ./gradlew assembleSafeRelease
 //
 // Subtitles themselves are unaffected: the track still decodes and renders, untranslated. The
 // default lives in gradle.properties; precedence matches the version above - Gradle property,
@@ -55,7 +55,7 @@ val autoBridgeVersionCode = requireNotNull(
 val subtitleTranslationEnabled: Boolean = run {
     val raw = (providers.gradleProperty("autobridge.subtitleTranslation").orNull
         ?: System.getenv("AUTOBRIDGE_SUBTITLE_TRANSLATION")
-        ?: "true").trim()
+        ?: "false").trim()
     raw.toBooleanStrictOrNull()
         ?: throw GradleException(
             "autobridge.subtitleTranslation must be true or false, not \"$raw\"."
