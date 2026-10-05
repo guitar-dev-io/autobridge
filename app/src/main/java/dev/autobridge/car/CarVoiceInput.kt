@@ -74,25 +74,44 @@ class CarVoiceInput(
 
     val isListening: Boolean get() = recognizer != null
 
+    /** True when listening would need a permission the app does not hold yet. */
+    val needsMicPermission: Boolean
+        get() = ContextCompat.checkSelfPermission(carContext, Manifest.permission.RECORD_AUDIO) !=
+            PackageManager.PERMISSION_GRANTED
+
+    /**
+     * Asks Android for the microphone and starts listening if it is granted.
+     *
+     * Only to be called straight after the user has read the disclosure
+     * ([dev.autobridge.car.CarDisclosureScreen] with `mic_disclosure_*`), which is the in-app
+     * explanation Play requires before a sensitive permission. The car host cannot show the system
+     * dialog itself: it tells the driver to check their phone, and the prompt appears there.
+     */
+    fun requestPermissionAndStart() {
+        if (!needsMicPermission) {
+            start()
+            return
+        }
+        carContext.requestPermissions(
+            listOf(Manifest.permission.RECORD_AUDIO),
+            carContext.mainExecutor
+        ) { granted, _ ->
+            if (Manifest.permission.RECORD_AUDIO in granted) start()
+            else listener.onError(carContext.getString(R.string.voice_error_needs_mic_permission))
+        }
+    }
+
     fun start() {
         if (isListening) return
         if (!SpeechRecognizer.isRecognitionAvailable(carContext)) {
             listener.onError(carContext.getString(R.string.voice_error_no_recognizer))
             return
         }
-        if (ContextCompat.checkSelfPermission(carContext, Manifest.permission.RECORD_AUDIO)
-            != PackageManager.PERMISSION_GRANTED
-        ) {
-            // The host shows "check your phone"; the phone shows the system permission dialog.
-            carContext.requestPermissions(
-                listOf(Manifest.permission.RECORD_AUDIO),
-                carContext.mainExecutor
-            ) { granted, _ ->
-                if (Manifest.permission.RECORD_AUDIO in granted) start()
-                else listener.onError(
-                    carContext.getString(R.string.voice_error_needs_mic_permission)
-                )
-            }
+        if (needsMicPermission) {
+            // Never asked from here. The microphone is a Play-declared permission, so the caller
+            // shows the disclosure first and then calls requestPermissionAndStart; reaching this
+            // point means something tried to start listening without that step.
+            listener.onError(carContext.getString(R.string.voice_error_needs_mic_permission))
             return
         }
         if (!requestFocus()) {

@@ -34,4 +34,6 @@
     <string name="duo_screen_end_session_hint">ปิดทุกช่องและแอปที่กำลังรันอยู่ในช่องนั้น</string>
     <string name="duo_screen_end_done">ถอด duo screen แล้ว</string>
     <string name="duo_screen_end_none">ยังไม่มีเซสชันที่รันอยู่</string>
+
+    <string name="duo_screen_pick_app_why">AutoBridge อ่านรายชื่อแอปที่ติดตั้งในเครื่องนี้ เพื่อให้เลือกแอปไปแสดงในแต่ละแพนได้ รายชื่อนี้ใช้สำหรับหน้าเลือกแอปนี้เท่านั้น และไม่ถูกส่งออกจากเครื่อง</string>
 </resources>

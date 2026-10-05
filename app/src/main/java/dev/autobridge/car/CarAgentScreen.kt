@@ -60,7 +60,11 @@ class CarAgentScreen(carContext: CarContext) : Screen(carContext) {
     init {
         lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) {
-                if (!autoListenDone && AppPreferences.preferVoice(carContext)) {
+                // Only when the permission is already held: "prefer voice" is a convenience
+                // setting, not consent to be asked for the microphone the moment a screen opens.
+                if (!autoListenDone && AppPreferences.preferVoice(carContext) &&
+                    !voice.needsMicPermission
+                ) {
                     autoListenDone = true
                     voice.start()
                 }
@@ -130,10 +134,29 @@ class CarAgentScreen(carContext: CarContext) : Screen(carContext) {
                     listening = false
                     invalidate()
                 } else {
-                    voice.start()
+                    startListening()
                 }
             }
             .build()
+
+    /**
+     * Starts listening, with the microphone disclosure in front of the system prompt the first time
+     * (or any time the permission has been revoked since). The disclosure is a screen rather than a
+     * dialog because the car surface has no Activity to host one - see [CarDisclosureScreen].
+     */
+    private fun startListening() {
+        if (voice.needsMicPermission) {
+            screenManager.push(
+                CarDisclosureScreen(
+                    carContext,
+                    R.string.mic_disclosure_title,
+                    R.string.mic_disclosure_body
+                ) { voice.requestPermissionAndStart() }
+            )
+        } else {
+            voice.start()
+        }
+    }
 
     private fun chip(title: String, onClick: () -> Unit): Action =
         Action.Builder().setTitle(title).setOnClickListener { onClick() }.build()

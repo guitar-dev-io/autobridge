@@ -94,6 +94,20 @@ class CarSettingsScreen(
                     )
                     .build()
             )
+            // The one row in this section that is not about presentation: it is where location
+            // becomes readable for the speed display, so it is also where the user is told what
+            // that means. Turning it on never grants anything by itself.
+            .addItem(
+                Row.Builder()
+                    .setTitle(carContext.getString(R.string.car_settings_gps_speed))
+                    .addText(carContext.getString(R.string.car_settings_gps_speed_caption))
+                    .setToggle(
+                        Toggle.Builder { checked ->
+                            if (checked) enableGpsSpeed() else AppPreferences.setGpsSpeed(carContext, false)
+                        }.setChecked(AppPreferences.gpsSpeed(carContext)).build()
+                    )
+                    .build()
+            )
             .build()
 
         val list = ItemList.Builder()
@@ -227,6 +241,52 @@ class CarSettingsScreen(
             .addSectionedList(SectionedItemList.create(drivingList, carContext.getString(R.string.car_settings_section_driving)))
             .addSectionedList(SectionedItemList.create(list, carContext.getString(R.string.car_settings_section_mirror)))
             .build()
+    }
+
+    /**
+     * Turns on GPS speed, disclosure first.
+     *
+     * The explanation is shown every time the user enables this, whether or not the app already
+     * holds location permission: the permission may have been granted for something else entirely
+     * (a web page asking for a fix), and this is the point at which location starts being read for
+     * a new purpose. Only after the user goes on is the preference written, and only then is
+     * Android asked for the permission if it is missing - a denial leaves the setting off.
+     */
+    private fun enableGpsSpeed() {
+        screenManager.push(
+            CarDisclosureScreen(
+                carContext,
+                R.string.gps_speed_disclosure_title,
+                R.string.gps_speed_disclosure_body
+            ) { requestLocationThenEnable() }
+        )
+        // The toggle flipped itself on screen; redraw it from the preference, which is still off
+        // until the disclosure is accepted.
+        invalidate()
+    }
+
+    private fun requestLocationThenEnable() {
+        val permission = android.Manifest.permission.ACCESS_FINE_LOCATION
+        if (carContext.checkSelfPermission(permission) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            AppPreferences.setGpsSpeed(carContext, true)
+            invalidate()
+            return
+        }
+        // The car host cannot show the system dialog; it tells the driver to look at their phone.
+        carContext.requestPermissions(listOf(permission), carContext.mainExecutor) { granted, _ ->
+            val allowed = permission in granted
+            AppPreferences.setGpsSpeed(carContext, allowed)
+            if (!allowed) {
+                CarToast.makeText(
+                    carContext,
+                    carContext.getString(R.string.gps_speed_denied),
+                    CarToast.LENGTH_LONG
+                ).show()
+            }
+            invalidate()
+        }
     }
 
     private fun vehicleLabel(): String = carContext.getString(

@@ -9,11 +9,24 @@ import android.location.LocationManager
 import android.os.Bundle
 import android.util.Log
 import androidx.core.content.ContextCompat
+import dev.autobridge.settings.AppPreferences
 
 /**
  * Phone-GPS speed fallback used when the Car Hardware API reports no usable speed. Uses
- * [Location.getSpeed] (m/s) and requires ACCESS_FINE_LOCATION granted at runtime. If the fix is
- * old or missing, an invalid sample is emitted so the manager can fall through to another source.
+ * [Location.getSpeed] (m/s). If the fix is old or missing, an invalid sample is emitted so the
+ * manager can fall through to another source.
+ *
+ * Two gates, both required, and in this order:
+ *
+ *  1. [AppPreferences.gpsSpeed] - the user turned GPS speed on in car settings, having read what
+ *     location would be used for. Off by default.
+ *  2. ACCESS_FINE_LOCATION granted at runtime.
+ *
+ * The preference is not a duplicate of the permission. The app can hold location permission for an
+ * entirely different reason - a map page in the browser asked for it - and reading the user's
+ * position for a second purpose on the strength of that grant is what Play's location policy (and
+ * plain fairness) forbids. Without the opt-in this source reports itself unavailable and never
+ * registers a listener.
  */
 class GpsSpeedSource(private val context: Context) : SpeedSource {
     override val origin: SpeedOrigin = SpeedOrigin.GPS
@@ -31,6 +44,7 @@ class GpsSpeedSource(private val context: Context) : SpeedSource {
     private var listener: LocationListener? = null
 
     override fun isAvailable(): Boolean {
+        if (!AppPreferences.gpsSpeed(context)) return false
         val granted = ContextCompat.checkSelfPermission(
             context, Manifest.permission.ACCESS_FINE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED

@@ -61,6 +61,13 @@ jobs:
       - name: Assemble (safe debug)
         run: ./gradlew --no-daemon assembleSafeDebug
 
+      # Gate: the merged safe manifest must not carry a sideload-only capability
+      # (QUERY_ALL_PACKAGES, the projection service, Duo Screen), and every permission that needs a
+      # Play Console declaration must have one written in PLAY_DECLARATIONS.md. Runs after the
+      # assemble because it reads the merged manifest the build produced.
+      - name: Play manifest guard
+        run: ./scripts/check-play-manifest.sh
+
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:

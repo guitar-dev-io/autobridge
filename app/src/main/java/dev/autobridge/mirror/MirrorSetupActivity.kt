@@ -13,6 +13,8 @@ import android.os.PowerManager
 import android.provider.Settings
 import android.view.View
 import android.widget.Toast
+import dev.autobridge.R
+import dev.autobridge.core.consent.PermissionDisclosure
 import dev.autobridge.i18n.AppLocale
 import dev.autobridge.input.AccessibilityInputBackend
 import dev.autobridge.input.ShizukuInputBackend
@@ -217,7 +219,15 @@ class MirrorSetupActivity : Activity() {
             }
             // Shizuku gives real multi-touch, so it stays the offer even once accessibility works.
             shizukuRunning -> ShizukuInputBackend.bind(this)
-            else -> startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            // Accessibility is a Play-declared permission: the user reads what the service will do
+            // with this phone before the settings screen that turns it on (see PLAY_DECLARATIONS).
+            else -> PermissionDisclosure.show(
+                this,
+                R.string.a11y_disclosure_title,
+                R.string.a11y_disclosure_body
+            ) {
+                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            }
         }
     }
 

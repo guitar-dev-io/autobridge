@@ -1262,4 +1262,24 @@
     <string name="car_quicklaunch_add_website">Website or search…</string>
     <string name="car_quicklaunch_add_website_caption">Type an address, or words to search for</string>
     <string name="car_quicklaunch_added">Added %1$s</string>
+
+    <!-- Permission disclosures. Each of these is shown BEFORE the system permission prompt or the
+         Settings screen that grants the permission, because Play requires the app to say what it
+         will do with a sensitive permission while the user can still decline (and because a prompt
+         with no context is one a reasonable person should refuse). Keep them specific: what is
+         accessed, what it is used for, and where it goes. See PLAY_DECLARATIONS.md. -->
+    <string name="disclosure_continue">Continue</string>
+    <string name="disclosure_not_now">Not now</string>
+
+    <string name="a11y_disclosure_title">About the accessibility service</string>
+    <string name="a11y_disclosure_body">AutoBridge uses Android\'s accessibility service as a remote control for this phone.\n\nWhen the phone screen is shown on the car display, this is what turns a tap on the car screen into a tap on the phone: the service performs the taps, swipes and Back/Home actions for you. Without it the car display can show the phone but cannot control it.\n\nIt is told about window changes only — it does not read the text on your screen, and it never passes anything on. Everything stays on this phone.\n\nThe next screen is Android\'s own accessibility settings. You can turn the service off there at any time.</string>
+
+    <string name="mic_disclosure_title">Use the microphone for voice commands?</string>
+    <string name="mic_disclosure_body">The Agent screen listens while you hold the mic, turns what you said into text, and runs it as a command — \"open YouTube\", \"resume\", \"play the radio\".\n\nIt records only during a listen session, the car microphone when the car has one and this phone\'s otherwise. The speech recognition is Android\'s own, the same one keyboard dictation uses. AutoBridge keeps no recording and sends nothing to its own servers.\n\nAndroid will now ask for microphone permission on your phone.</string>
+
+    <string name="car_settings_gps_speed">GPS speed</string>
+    <string name="car_settings_gps_speed_caption">Use the phone\'s GPS when the car reports no speed</string>
+    <string name="gps_speed_disclosure_title">Use GPS for the speed reading?</string>
+    <string name="gps_speed_disclosure_body">AutoBridge needs a speed to know whether the car is parked, and some head units never report one. With this on, the phone\'s GPS fills that gap: the app reads the speed from the location fix while a car session is running.\n\nThe location is used for that number alone. It is not stored, not logged and not sent anywhere, and nothing is read while the app is not connected to a car.\n\nLeave this off and AutoBridge uses the car\'s own speed signal only.</string>
+    <string name="gps_speed_denied">Location permission was not granted, so GPS speed stays off</string>
 </resources>

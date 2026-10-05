@@ -34,4 +34,9 @@
     <string name="duo_screen_end_session_hint">Closes every pane and the apps running in them</string>
     <string name="duo_screen_end_done">Duo screen ended</string>
     <string name="duo_screen_end_none">Nothing running</string>
+
+    <!-- Why the list below can name every installed app: QUERY_ALL_PACKAGES, which this
+         sideload-only build declares. Shown in the picker so the user is told rather than left
+         to notice. -->
+    <string name="duo_screen_pick_app_why">AutoBridge reads the list of installed apps on this phone so a pane can run one of them. The list is used for this picker only and never leaves the device.</string>
 </resources>

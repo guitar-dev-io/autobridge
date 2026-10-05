@@ -210,6 +210,10 @@ class DuoScreenSettingsActivity : Activity() {
         val labels = listOf(getString(R.string.duo_screen_clear_app)) + launchable.map(::paneLabel)
         AlertDialog.Builder(this)
             .setTitle(R.string.duo_screen_pick_app)
+            // Reading the installed-app list is the one thing here the user cannot see the reason
+            // for, so the picker says it. Play would require this justification in the console; the
+            // permission never reaches a Play build, but the user still deserves the sentence.
+            .setMessage(R.string.duo_screen_pick_app_why)
             .setItems(labels.toTypedArray()) { _, which ->
                 val packageName = if (which == 0) null else launchable[which - 1]
                 DuoScreenStore.setPackage(this, paneId, packageName)

@@ -1879,6 +1879,7 @@ import dev.autobridge.apps.PerAppProfileStore
 import dev.autobridge.apps.QuickAppLauncher
 import dev.autobridge.apps.QuickAppsStore
 import dev.autobridge.apps.SmartModeResolver
+import dev.autobridge.core.consent.PermissionDisclosure
 import dev.autobridge.core.datastore.SessionRestoreStore
 import dev.autobridge.core.model.AudioMode
 import dev.autobridge.core.model.AutoBridgeMode
@@ -4174,8 +4175,19 @@ class MainActivity : androidx.activity.ComponentActivity() {
     private fun onPanelOffToggled(enabled: Boolean) {}
     private fun onRealTouchToggled(enabled: Boolean) {}
     private fun inputBackendLabel() = "Accessibility"
+    /**
+     * The accessibility service is how a tap on the car display becomes a tap on this phone, and
+     * Play treats that use of the API as one the user must understand before granting. So the
+     * explanation comes first and Android's accessibility settings open only if the user goes on.
+     */
     private fun openTouchSettings() {
-        startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        PermissionDisclosure.show(
+            this,
+            R.string.a11y_disclosure_title,
+            R.string.a11y_disclosure_body
+        ) {
+            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        }
     }
     private fun shizukuTouchCard(): View? = null
     private fun cycleAutoDimDelay() {}
