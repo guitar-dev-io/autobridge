@@ -85,9 +85,9 @@ class DuoScreenSettingsActivity : Activity() {
                 title = getString(AppR.string.control_android_auto),
                 subtitle = "${runtimeStatus.summary} — ${getString(R.string.duo_screen_android_auto_hint)}",
                 // Same green-when-connected language as the AndroidAutoStatusCard on Home,
-                // Control and Car & Connection (AutoBridgeDesign.ACCENT_FILES == ComposeTokens.Ok),
+                // Control and Car & Connection (AutoBridgeDesign.ACCENT_ONLINE == ComposeTokens.Ok),
                 // not this screen's own accent — so "connected" reads the same color everywhere.
-                accent = if (runtimeStatus.connected) AutoBridgeDesign.ACCENT_FILES else AutoBridgeDesign.TEXT_MUTED,
+                accent = if (runtimeStatus.connected) AutoBridgeDesign.ACCENT_ONLINE else AutoBridgeDesign.TEXT_MUTED,
                 badgeText = if (runtimeStatus.connected) "✓" else "○"
             ) {}
         )

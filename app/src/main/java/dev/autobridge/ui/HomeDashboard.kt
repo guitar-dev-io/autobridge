@@ -56,7 +56,9 @@ fun HomeDashboard(
     tiles: List<HomeTileUi>,
     onOpenConnection: () -> Unit,
     onEditQuickLaunch: () -> Unit,
-    onOpenController: () -> Unit
+    onOpenController: () -> Unit,
+    onMirror: () -> Unit,
+    onBridgeDuo: (() -> Unit)?
 ) {
     val history by CommandHistoryStore.entries.collectAsState()
     val lastResult = rememberLastCommandResult()
@@ -67,7 +69,29 @@ fun HomeDashboard(
         Modifier.fillMaxWidth().background(ComposeTokens.Ink).padding(bottom = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        AndroidAutoStatusCard(title = stringResource(R.string.control_android_auto), onClick = onOpenConnection)
+        AndroidAutoStatusCard(
+            title = stringResource(R.string.control_android_auto),
+            onClick = onOpenConnection,
+            showPill = true,
+            actions = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    CardActionButton(
+                        stringResource(R.string.home_mirror_action),
+                        primary = true,
+                        onClick = onMirror,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (onBridgeDuo != null) {
+                        CardActionButton(
+                            stringResource(R.string.home_bridge_duo_action),
+                            primary = false,
+                            onClick = onBridgeDuo,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+        )
 
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             SectionLabel(stringResource(R.string.home_quick_launch), Modifier.weight(1f))
@@ -135,6 +159,28 @@ fun HomeDashboard(
                     }
                 }
             }
+        }
+    }
+}
+
+/** Mirror / Bridge Duo button on the Home Android Auto card. [primary] fills with the accent. */
+@Composable
+private fun CardActionButton(label: String, primary: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(12.dp),
+        color = if (primary) ComposeTokens.Accent else ComposeTokens.SurfaceRaised,
+        modifier = modifier.height(44.dp)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                label,
+                color = if (primary) ComposeTokens.Ink else ComposeTokens.Text,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }

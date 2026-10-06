@@ -18,7 +18,8 @@ import dev.autobridge.core.model.VehicleState
  */
 object ConnectionStatusText {
 
-    data class Status(val connected: Boolean, val summary: String)
+    /** [pill] is the short standalone word ("Parked", "Not connected"…) for a status pill/badge. */
+    data class Status(val connected: Boolean, val summary: String, val pill: String)
 
     /** Localized wording for every piece [of] can show. */
     data class Labels(
@@ -41,12 +42,12 @@ object ConnectionStatusText {
         of(runtime.connected, runtime.vehicleState, labels)
 
     fun of(connected: Boolean, vehicleState: VehicleState, labels: Labels = DEFAULT_LABELS): Status {
-        if (!connected) return Status(false, labels.notConnected)
+        if (!connected) return Status(false, labels.notConnected, labels.notConnected)
         val drive = when (vehicleState) {
             VehicleState.PARKED -> labels.parked
             VehicleState.MOVING -> labels.driving
             VehicleState.UNKNOWN -> labels.checking
         }
-        return Status(true, labels.connectedFormat(drive))
+        return Status(true, labels.connectedFormat(drive), drive)
     }
 }

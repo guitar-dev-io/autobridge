@@ -49,6 +49,6 @@ object ComposeTokens {
     val Accent = Color(AutoBridgeDesign.ACCENT)
     val AccentSoft = Color(AutoBridgeDesign.ACCENT_SOFT)
     val Danger = Color(AutoBridgeDesign.DANGER)
-    val Ok = Color(AutoBridgeDesign.ACCENT_FILES)
+    val Ok = Color(AutoBridgeDesign.ACCENT_ONLINE)
     val Warn = Color(AutoBridgeDesign.ACCENT_RADIO)
 }

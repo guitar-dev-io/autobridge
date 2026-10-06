@@ -9,34 +9,35 @@ import org.junit.Test
 
 class PhoneNavTest {
 
-    @Test fun bottomBarHasExactlyFourTabsInOrder() {
-        assertEquals(
-            listOf(Route.HOME, Route.CONTROL, Route.APPS, Route.SETTINGS),
-            PhoneNav.tabs.map { it.route }
-        )
-        assertEquals(listOf("Home", "Control", "Apps", "Settings"), PhoneNav.tabs.map { it.label })
-    }
-
-    @Test fun everyRouteHighlightsOneOfTheTabs() {
-        val tabRoutes = PhoneNav.tabs.map { it.route }.toSet()
-        Route.entries.forEach { route ->
-            assertTrue("$route lights no tab", PhoneNav.tabFor(route) in tabRoutes)
+    @Test fun homeIsTheOnlyRoot() {
+        assertTrue(PhoneNav.isRoot(Route.HOME))
+        Route.entries.filter { it != Route.HOME }.forEach { route ->
+            assertFalse("$route should not be a root", PhoneNav.isRoot(route))
         }
     }
 
-    @Test fun drillDownsKeepTheirParentTabLit() {
-        assertEquals(Route.SETTINGS, PhoneNav.tabFor(Route.CAR_CONNECTION))
-        assertEquals(Route.SETTINGS, PhoneNav.tabFor(Route.AGENT_COMMANDS))
-        assertEquals(Route.SETTINGS, PhoneNav.tabFor(Route.DEBUG))
-        assertEquals(Route.CONTROL, PhoneNav.tabFor(Route.CONTROL_HISTORY))
-        assertEquals(Route.APPS, PhoneNav.tabFor(Route.PROFILE))
-        assertEquals(Route.HOME, PhoneNav.tabFor(Route.HOME_MORE))
+    @Test fun everyRouteHasAParentThatEventuallyReachesHome() {
+        Route.entries.forEach { route ->
+            var current = route
+            var hops = 0
+            while (current != Route.HOME) {
+                current = PhoneNav.parentOf(current)
+                hops++
+                assertTrue("$route's parent chain did not reach Home", hops <= Route.entries.size)
+            }
+        }
     }
 
-    @Test fun savedNamesFromTheOldLayoutStillRestore() {
+    @Test fun appsMovedUnderSettings() {
+        assertEquals(Route.SETTINGS, PhoneNav.parentOf(Route.APPS))
+        assertEquals(Route.APPS, PhoneNav.parentOf(Route.PROFILE))
+    }
+
+    @Test fun savedNamesFromOlderLayoutsStillRestore() {
         assertEquals(Route.CONTROL, PhoneNav.parse("REMOTE"))
         assertEquals(Route.CAR_CONNECTION, PhoneNav.parse("DEVICES"))
         assertEquals(Route.CONTROL, PhoneNav.parse("CONTROL_CENTER"))
+        assertEquals(Route.APPS, PhoneNav.parse("PROFILES"))
         assertEquals(Route.HOME, PhoneNav.parse(null))
         assertEquals(Route.HOME, PhoneNav.parse("NOT_A_SCREEN"))
         Route.entries.forEach { assertEquals(it, PhoneNav.parse(it.name)) }
@@ -54,12 +55,20 @@ class PhoneNavTest {
         assertNull(stack.back(Route.HOME))
     }
 
-    @Test fun selectingATabClearsTheStack() {
+    @Test fun everyChildIsReachableFromHomeAndBackReturnsToHome() {
+        Route.entries.filter { it != Route.HOME }.forEach { route ->
+            val stack = PhoneNav.BackStack()
+            stack.onNavigate(Route.HOME, route)
+            assertEquals("$route should return to Home", Route.HOME, stack.back(route))
+        }
+    }
+
+    @Test fun navigatingHomeClearsTheStack() {
         val stack = PhoneNav.BackStack()
         stack.onNavigate(Route.SETTINGS, Route.ABOUT)
-        stack.onNavigate(Route.ABOUT, Route.APPS)
+        stack.onNavigate(Route.ABOUT, Route.HOME)
         assertTrue(stack.entries.isEmpty())
-        assertEquals(Route.HOME, stack.back(Route.APPS))
+        assertNull(stack.back(Route.HOME))
     }
 
     @Test fun backReturnsToWhereAChildWasOpenedFrom() {
@@ -71,9 +80,9 @@ class PhoneNavTest {
 
     @Test fun reopeningAPageOnTheStackUnwindsInsteadOfLooping() {
         val stack = PhoneNav.BackStack()
-        stack.onNavigate(Route.SETTINGS, Route.PROFILES)
-        stack.onNavigate(Route.PROFILES, Route.PROFILE)
-        stack.onNavigate(Route.PROFILE, Route.PROFILES)
+        stack.onNavigate(Route.SETTINGS, Route.APPS)
+        stack.onNavigate(Route.APPS, Route.PROFILE)
+        stack.onNavigate(Route.PROFILE, Route.APPS)
         assertEquals(listOf(Route.SETTINGS), stack.entries)
     }
 
@@ -82,11 +91,6 @@ class PhoneNavTest {
         assertEquals(Route.ADVANCED, stack.back(Route.DEBUG))
         assertEquals(Route.SETTINGS, stack.back(Route.CAR_CONNECTION))
         assertEquals(Route.CONTROL, stack.back(Route.CONTROL_HISTORY))
-    }
-
-    @Test fun onlyRootTabsAreRoots() {
-        assertTrue(PhoneNav.isRoot(Route.CONTROL))
-        assertFalse(PhoneNav.isRoot(Route.CAR_CONNECTION))
-        assertFalse(PhoneNav.isRoot(Route.HOME_MORE))
+        assertEquals(Route.SETTINGS, stack.back(Route.APPS))
     }
 }

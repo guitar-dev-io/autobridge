@@ -36,15 +36,19 @@ object AutoBridgeDesign {
 
     // ----- Tokens -----
 
-    const val INK = 0xFF0B0E14.toInt()
-    const val SURFACE = 0xFF141924.toInt()
-    const val SURFACE_RAISED = 0xFF1C2331.toInt()
-    const val HAIRLINE = 0xFF26304A.toInt()
-    const val TEXT = 0xFFEAF0FA.toInt()
-    const val TEXT_MUTED = 0xFF8494B0.toInt()
-    const val ACCENT = 0xFF4C7DF0.toInt()
+    // Matches the car dashboard palette (docs/UI_REDESIGN_TASKS.md "Design tokens").
+    const val INK = 0xFF12151A.toInt()
+    const val SURFACE = 0xFF1C2027.toInt()
+    const val SURFACE_RAISED = 0xFF232831.toInt()
+    const val HAIRLINE = 0xFF2E343E.toInt()
+    const val TEXT = 0xFFF3F5F7.toInt()
+    const val TEXT_MUTED = 0xFFA9B0BA.toInt()
+    const val ACCENT = 0xFF4DA3FF.toInt()
     const val ACCENT_SOFT = 0xFF33C9D6.toInt()
-    const val DANGER = 0xFFFF6B81.toInt()
+    const val DANGER = 0xFFFF9AA8.toInt()
+
+    /** "Parked" / "connected" status colour, shared by Home, Control, Car & Connection and Duo Screen. */
+    const val ACCENT_ONLINE = 0xFF5BE3B4.toInt()
 
     /**
      * Signal colours for a checked channel: green answers, amber answers slowly, and a dead one

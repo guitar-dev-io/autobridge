@@ -1,15 +1,18 @@
 package dev.autobridge.ui
 
 /**
- * Phone navigation model: which destinations exist, which four are bottom-bar tabs, which tab a
- * child page lights up, and how Back walks out of a drill-down.
+ * Phone navigation model: which destinations exist, and how Back walks out of a drill-down.
+ *
+ * Home is the only root — there is no bottom tab bar. Every other destination (Control, Apps &
+ * profiles, Settings, and everything under them) is a child reached from Home, directly or
+ * through Settings, and Back always walks back the way the user came, landing on Home last.
  *
  * Pure Kotlin so the rules are unit-tested without a device. [dev.autobridge.MainActivity] owns
  * the views; this object only answers "where am I and where does Back go".
  */
 object PhoneNav {
 
-    /** Every phone destination. Root tabs come first; everything else is a child page. */
+    /** Every phone destination. [HOME] is the only root; everything else is a child page. */
     enum class Route {
         HOME,
         CONTROL,
@@ -19,14 +22,13 @@ object PhoneNav {
         // Children of CONTROL
         CONTROL_HISTORY,
 
-        // Children of APPS
+        // Children of APPS (merged into Settings > Apps & profiles)
         PROFILE,
 
         // Children of SETTINGS
         MIRROR_SETTINGS,
         INPUT_TOUCH,
         CAR_CONNECTION,
-        PROFILES,
         AGENT_COMMANDS,
         ADVANCED,
         DEVELOPER,
@@ -39,61 +41,47 @@ object PhoneNav {
         HOME_MORE
     }
 
-    /** The bottom navigation, in order. */
-    data class Tab(val route: Route, val glyph: String, val label: String)
+    fun isRoot(route: Route): Boolean = route == Route.HOME
 
-    val tabs: List<Tab> = listOf(
-        Tab(Route.HOME, "⌂", "Home"),
-        Tab(Route.CONTROL, "➤", "Control"),
-        Tab(Route.APPS, "▦", "Apps"),
-        Tab(Route.SETTINGS, "⚙", "Settings")
-    )
-
-    fun isRoot(route: Route): Boolean = tabs.any { it.route == route }
-
-    /** The tab that stays highlighted while [route] is on screen. */
-    fun tabFor(route: Route): Route = when (route) {
-        Route.HOME, Route.HOME_MUSIC, Route.HOME_TV_RADIO, Route.HOME_MORE -> Route.HOME
-        Route.CONTROL, Route.CONTROL_HISTORY -> Route.CONTROL
-        Route.APPS, Route.PROFILE -> Route.APPS
-        Route.SETTINGS,
+    /**
+     * The immediate parent of [route] — where Back lands when there is no recorded back-stack
+     * entry (e.g. after process death restores a child with an empty stack).
+     */
+    fun parentOf(route: Route): Route = when (route) {
+        Route.HOME -> Route.HOME
+        Route.CONTROL -> Route.HOME
+        Route.CONTROL_HISTORY -> Route.CONTROL
+        Route.APPS -> Route.SETTINGS
+        Route.PROFILE -> Route.APPS
+        Route.SETTINGS -> Route.HOME
         Route.MIRROR_SETTINGS,
         Route.INPUT_TOUCH,
         Route.CAR_CONNECTION,
-        Route.PROFILES,
         Route.AGENT_COMMANDS,
         Route.ADVANCED,
-        Route.DEVELOPER,
-        Route.DEBUG,
         Route.ABOUT -> Route.SETTINGS
-    }
-
-    /** Parent used when a child is restored without a back stack (e.g. after process death). */
-    fun parentOf(route: Route): Route = when (route) {
         Route.DEVELOPER, Route.DEBUG -> Route.ADVANCED
-        else -> tabFor(route)
+        Route.HOME_MUSIC, Route.HOME_TV_RADIO, Route.HOME_MORE -> Route.HOME
     }
-
-    /** Detail pages that hide the bottom bar so Back is the only way out. */
-    fun hidesBottomBar(route: Route): Boolean =
-        route == Route.PROFILE || route == Route.DEVELOPER || route == Route.DEBUG
 
     /**
-     * Decodes a saved route name. Names from the previous five-tab layout map onto their new
-     * home ("REMOTE" became Control, "DEVICES" moved under Settings, "CONTROL_CENTER" was folded
-     * into Control/Settings), and anything unknown falls back to Home instead of crashing.
+     * Decodes a saved route name. Names from older layouts map onto their current home ("REMOTE"
+     * became Control, "DEVICES" moved under Settings, "CONTROL_CENTER" was folded into
+     * Control/Settings, "PROFILES" merged into Apps & profiles), and anything unknown falls back
+     * to Home instead of crashing.
      */
     fun parse(name: String?): Route = when (name) {
         null -> Route.HOME
         "REMOTE" -> Route.CONTROL
         "DEVICES" -> Route.CAR_CONNECTION
         "CONTROL_CENTER" -> Route.CONTROL
+        "PROFILES" -> Route.APPS
         else -> Route.entries.firstOrNull { it.name == name } ?: Route.HOME
     }
 
     /**
-     * Back stack for the phone shell. Selecting a tab clears it; opening a child pushes the page
-     * it was opened from, so Back returns to wherever the user actually came from.
+     * Back stack for the phone shell. Navigating to Home clears it; opening a child pushes the
+     * page it was opened from, so Back returns to wherever the user actually came from.
      */
     class BackStack(initial: List<Route> = emptyList()) {
         private val stack = ArrayDeque(initial)
@@ -118,13 +106,13 @@ object PhoneNav {
         }
 
         /**
-         * Where Back goes from [current]: the previous page, the parent of an orphaned child, Home
-         * for a non-Home tab, or null when Back should leave the app.
+         * Where Back goes from [current]: the previous page, the parent of an orphaned child, or
+         * null (leave the app) from Home.
          */
         fun back(current: Route): Route? {
             if (stack.isNotEmpty()) return stack.removeLast()
-            if (!isRoot(current)) return parentOf(current)
-            return if (current != Route.HOME) Route.HOME else null
+            if (current == Route.HOME) return null
+            return parentOf(current)
         }
     }
 }
