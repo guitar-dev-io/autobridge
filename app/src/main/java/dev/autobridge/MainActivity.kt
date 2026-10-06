@@ -2643,6 +2643,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
                         showPhoneScreen(PhoneScreen.CAR_CONNECTION)
                     })
                     addAll(duoScreenEntry())
+                    addAll(projectionSetupEntry())
                     add(settingsEntry(
                         getString(R.string.settings_app_profiles),
                         getString(R.string.settings_app_profiles_caption_full),
@@ -2743,6 +2744,24 @@ class MainActivity : androidx.activity.ComponentActivity() {
             settingsEntry(
                 getString(R.string.settings_duo_screen),
                 getString(R.string.settings_duo_screen_caption),
+                R.drawable.ic_tile_settings,
+                accent = dev.autobridge.ui.AutoBridgeDesign.ACCENT_SYSTEM
+            ) { startActivity(intent) }
+        )
+    }
+
+    /**
+     * Bridge Web / Bridge Mirror on Android Auto: re-running the install-source step after an
+     * update, and listing or unlisting Bridge Mirror. Resolved by name like [duoScreenIntent], and
+     * absent from the safe build, which has no projection route.
+     */
+    private fun projectionSetupEntry(): List<SettingsRow> {
+        val intent = Intent().setClassName(this, "dev.autobridge.projection.ProjectionSetupActivity")
+            .takeIf { packageManager.resolveActivity(it, 0) != null } ?: return emptyList()
+        return listOf(
+            settingsEntry(
+                getString(R.string.settings_projection_setup),
+                getString(R.string.settings_projection_setup_caption),
                 R.drawable.ic_tile_settings,
                 accent = dev.autobridge.ui.AutoBridgeDesign.ACCENT_SYSTEM
             ) { startActivity(intent) }

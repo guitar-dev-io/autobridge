@@ -1,7 +1,9 @@
 package dev.autobridge.projection
 
 import android.app.Activity
+import android.content.ComponentName
 import android.content.Context
+import android.content.pm.PackageManager
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
@@ -11,6 +13,7 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import dev.autobridge.input.ShizukuInputBackend
@@ -36,6 +39,7 @@ class ProjectionSetupActivity : Activity() {
     private val scope = CoroutineScope(Dispatchers.Main)
     private lateinit var status: TextView
     private lateinit var action: Button
+    private lateinit var mirrorSwitch: Switch
 
     private val permissionListener = Shizuku.OnRequestPermissionResultListener { _, _ -> render() }
 
@@ -79,6 +83,20 @@ class ProjectionSetupActivity : Activity() {
         }
         column.addView(action, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
 
+        mirrorSwitch = Switch(this).apply {
+            text = "Show Bridge Mirror on Android Auto"
+            textSize = 15f
+            setTextColor(Color.WHITE)
+            setPadding(0, pad(24), 0, 0)
+            setOnCheckedChangeListener { _, checked -> setMirrorShown(checked) }
+        }
+        column.addView(mirrorSwitch)
+        column.addView(TextView(this).apply {
+            text = MIRROR_NOTE
+            textSize = 13f
+            setTextColor(Color.GRAY)
+        })
+
         column.addView(TextView(this).apply {
             text = MANUAL_STEPS
             textSize = 13f
@@ -106,6 +124,8 @@ class ProjectionSetupActivity : Activity() {
             append("Shizuku: $shizuku")
         }
         action.visibility = if (visible) View.GONE else View.VISIBLE
+        val shown = isMirrorShown()
+        if (mirrorSwitch.isChecked != shown) mirrorSwitch.isChecked = shown
         action.text = when {
             InstallerSpoofController.canAttempt() -> "Enable on Android Auto"
             runCatching { Shizuku.pingBinder() }.getOrDefault(false) -> "Grant Shizuku permission"
@@ -139,8 +159,35 @@ class ProjectionSetupActivity : Activity() {
         }
     }
 
+    private val mirrorService get() = ComponentName(this, ProjectionMirrorCarService::class.java)
+
+    private fun isMirrorShown(): Boolean =
+        packageManager.getComponentEnabledSetting(mirrorService) !=
+            PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+
+    /**
+     * Lists or unlists Bridge Mirror on Android Auto by enabling or disabling its service. It is
+     * the second projection service this app declares, added after the last version on which the
+     * host offered its split screen beside Maps for Bridge Web, so this lets that be tested on the
+     * car without a separate build.
+     */
+    private fun setMirrorShown(shown: Boolean) {
+        if (shown == isMirrorShown()) return
+        packageManager.setComponentEnabledSetting(
+            mirrorService,
+            if (shown) PackageManager.COMPONENT_ENABLED_STATE_DEFAULT else PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+            PackageManager.DONT_KILL_APP
+        )
+        toast("Reconnect Android Auto for the change to show on the car")
+    }
+
     private fun toast(message: String) = Toast.makeText(this, message, Toast.LENGTH_LONG).show()
 }
+
+private val MIRROR_NOTE = """
+    Turn this off to list only Bridge Web on the car. If Android Auto then offers its split screen
+    (Bridge Web beside Maps) again, Bridge Mirror's extra projection service is what stopped it.
+""".trimIndent()
 
 private val MANUAL_STEPS = """
     Android Auto only shows apps it believes came from the Play Store, so a sideloaded build is
