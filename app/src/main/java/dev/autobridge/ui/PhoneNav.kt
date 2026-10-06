@@ -36,8 +36,6 @@ object PhoneNav {
         ABOUT,
 
         // Children of HOME
-        HOME_MUSIC,
-        HOME_TV_RADIO,
         HOME_MORE
     }
 
@@ -61,7 +59,7 @@ object PhoneNav {
         Route.ADVANCED,
         Route.ABOUT -> Route.SETTINGS
         Route.DEVELOPER, Route.DEBUG -> Route.ADVANCED
-        Route.HOME_MUSIC, Route.HOME_TV_RADIO, Route.HOME_MORE -> Route.HOME
+        Route.HOME_MORE -> Route.HOME
     }
 
     /**
