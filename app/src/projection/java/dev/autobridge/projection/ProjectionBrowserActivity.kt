@@ -113,8 +113,8 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         const val CHROME_TICK_MS = 500L
 
         /** On-screen keyboard metrics, in dp. */
-        const val KEY_HEIGHT = 48
-        const val KEY_GAP = 3
+        const val KEY_HEIGHT = 56
+        const val KEY_GAP = 4
         // Destinations the toolbar is worth spending width on. Google is deliberately absent: it
         // is [BrowserDefaults.HOME], so a Google chip was the Home button under a second name.
         val QUICK_SITES = listOf(
@@ -1234,6 +1234,14 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
             isSingleLine = true
             ellipsize = android.text.TextUtils.TruncateAt.START
             gravity = Gravity.CENTER_VERTICAL
+            // A rounded filled field like Gboard's text area. Non-clickable, so a plain rounded
+            // fill rather than a ripple.
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = 12f * resources.displayMetrics.density
+                setColor(scheme.surfaceContainerHigh)
+            }
+            // A drawable background resets padding, so set it after the background.
             setPadding(16.dp(), 0, 16.dp(), 0)
         }
         keyboardPreview = preview
@@ -1244,7 +1252,8 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         val panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(scheme.surfaceContainerLow)
-            setPadding(KEY_GAP.dp(), KEY_GAP.dp(), KEY_GAP.dp(), KEY_GAP.dp())
+            // A slightly inset tray so the caps read as a Gboard toolbar rather than edge-to-edge.
+            setPadding(8.dp(), 6.dp(), 8.dp(), 8.dp())
             // Taps that miss a key stay here rather than reaching the page underneath.
             isClickable = true
             // The page keeps DOM focus only while nothing else takes window focus, and the commit
@@ -1259,6 +1268,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
                     addView(
                         preview,
                         LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f)
+                            .apply { marginEnd = KEY_GAP.dp() }
                     )
                     addView(
                         TextView(this@ProjectionBrowserActivity).apply {
@@ -1267,7 +1277,8 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
                             setTextColor(scheme.textSecondary)
                             textSize = 20f
                             gravity = Gravity.CENTER
-                            background = circleRipple()
+                            // A rounded modifier-style cap so it reads as part of the tray.
+                            background = roundedRipple(scheme.surfaceContainerHigh, 12f)
                             isClickable = true
                             setOnClickListener { closeKeyboard() }
                         },
@@ -1275,6 +1286,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
                     )
                 },
                 LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, TOUCH_TARGET.dp())
+                    .apply { bottomMargin = 6.dp() }
             )
             addView(
                 rows,
@@ -1342,24 +1354,31 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         }
     }
 
+    /**
+     * Gboard's three-tier key coloring, in M3 roles over the tray's surfaceContainerLow:
+     * a light raised cap for letters/space, a darker/greyer cap for modifiers (Shift, Symbols,
+     * Language, Backspace), and the accent "enter" cap for Go.
+     */
+    private fun keyCapFill(key: CarKey): Int = when (key) {
+        is CarKey.Go -> scheme.fabContainer
+        is CarKey.Text, is CarKey.Space -> scheme.surfaceContainerHighest
+        else -> scheme.surfaceContainerHigh
+    }
+
+    private fun keyCapInk(key: CarKey): Int = when (key) {
+        is CarKey.Go -> scheme.onFabContainer
+        else -> scheme.textPrimary
+    }
+
     private fun keyButton(key: CarKey): TextView {
-        val fill = when (key) {
-            is CarKey.Go -> scheme.fabContainer
-            is CarKey.Text -> scheme.surfaceContainerHigh
-            else -> scheme.tileBackground
-        }
-        val ink = when (key) {
-            is CarKey.Go -> scheme.onFabContainer
-            is CarKey.Text -> scheme.textPrimary
-            else -> scheme.onSecondaryContainer
-        }
         return TextView(this).apply {
             text = keyLabel(key)
             contentDescription = keyDescription(key)
-            setTextColor(ink)
-            textSize = if (key is CarKey.Text) 19f else 15f
+            setTextColor(keyCapInk(key))
+            textSize = if (key is CarKey.Text) 22f else 17f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
             gravity = Gravity.CENTER
-            background = roundedRipple(fill, 10f)
+            background = roundedRipple(keyCapFill(key), 12f)
             isClickable = true
             isFocusable = false
             setOnClickListener { onKey(key) }
