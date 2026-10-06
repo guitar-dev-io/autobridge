@@ -6,7 +6,6 @@ import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
 import android.os.Build
-import androidx.core.location.LocationManagerCompat
 
 /**
  * One fresh fix for "I parked here", asked for when the driver taps the button and not otherwise.
@@ -37,7 +36,9 @@ object ParkingLocator {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             @Suppress("MissingPermission") // Checked above.
             runCatching {
-                LocationManagerCompat.getCurrentLocation(manager, provider, null, context.mainExecutor) { onFix(it) }
+                // The platform call (API 30), not LocationManagerCompat's: the compat library has two overloads
+                // that differ only in the CancellationSignal and Consumer types, and a null makes them ambiguous.
+                manager.getCurrentLocation(provider, null, context.mainExecutor) { location -> onFix(location) }
             }.onFailure { onFix(null) }
         } else {
             @Suppress("MissingPermission") // Checked above.
