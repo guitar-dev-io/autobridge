@@ -32,3 +32,21 @@ class StreamingLinksTest {
         assertFalse(StreamingLinks.mayNotPlay(StreamingLinks.all.first { it.title == "YouTube" }))
     }
 }
+
+class StreamingIconsTest {
+    @Test fun everyCatalogSiteHasItsOwnMark() {
+        // A catalog site never falls back to the generic initial-on-a-palette-colour.
+        StreamingLinks.all.forEach { link -> assertTrue("${link.title} has no icon of its own", StreamingIcons.hasOwnStyle(link)) }
+    }
+
+    @Test fun anUnknownSiteGetsItsInitialAndAStableColour() {
+        val a = StreamingIcons.styleFor("my channel", "https://example.org/live")
+        val b = StreamingIcons.styleFor("my channel", "https://example.org/live")
+        assertEquals("M", a.glyph)
+        assertEquals(a, b)
+    }
+
+    @Test fun aNameWithNoLetterStillGetsAMark() {
+        assertEquals("•", StreamingIcons.styleFor("---", "https://example.org").glyph)
+    }
+}

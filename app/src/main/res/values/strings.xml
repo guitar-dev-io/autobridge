@@ -561,7 +561,7 @@
     <string name="aa_hidden_title">Bridge Web is hidden on Android Auto</string>
     <string name="aa_hidden_message">Installing this update reset the install source, so Android Auto will not show Bridge Web until it is set again. It takes one tap with Shizuku.</string>
     <string name="aa_hidden_fix">Fix now</string>
-    <string name="whats_new_0_4_34">• YouTube SponsorBlock: a note under the switch now says plainly that it may not work or may be incomplete, and why.\n• Home has a coffee button for supporting the developer (not in the Play-store build).\n• Maintenance suggestions now include the compulsory insurance (Por.Ror.Bor.). If you already added the suggested items, tap Add suggested again to get it.\n• The fuel log, maintenance and backup now sit together under Utilities in Settings, and the fuel log and maintenance under Utilities in the car\'s More menu.\n• Fuel log: every fill-up has a date (today unless you change it) and any past one can be edited, so a missed fill-up can be entered on its own day.\n• Streaming: added Tencent Video, WeTV, iQIYI, Youku, Mango TV, CCTV, Douyin and Xiaohongshu (some may not play, or may be limited by region), and a Favorites list at the top: tap the star on any site, or add any website yourself. On the car, Manage favorites adds or removes them.</string>
+    <string name="whats_new_0_4_34">• YouTube SponsorBlock: a note under the switch now says plainly that it may not work or may be incomplete, and why.\n• Home has a coffee button for supporting the developer (not in the Play-store build).\n• Maintenance suggestions now include the compulsory insurance (Por.Ror.Bor.). If you already added the suggested items, tap Add suggested again to get it.\n• The fuel log, maintenance and backup now sit together under Utilities in Settings, and the fuel log and maintenance under Utilities in the car\'s More menu.\n• Fuel log: every fill-up has a date (today unless you change it) and any past one can be edited, so a missed fill-up can be entered on its own day.\n• Streaming: added Tencent Video, WeTV, iQIYI, Youku, Mango TV, CCTV, Douyin and Xiaohongshu (some may not play, or may be limited by region), and a Favorites list at the top: tap the star on any site, or add any website yourself. On the car, Manage favorites adds or removes them. The Streaming page is now an icon grid, on the phone and on the car.</string>
     <string name="whats_new_0_4_33">• Navigating from a map in the browser: the Start and Open app buttons on the Google Maps page now start navigation in the Google Maps app (they did nothing before), and if location is switched off on the phone the app says so instead of leaving the map unable to find you.\n• Maintenance now shows the date each item falls due (or about when, from your usual driving), lets you set a due date such as when the road tax runs out, and sends a notification when something is due or close.</string>
     <string name="whats_new_0_4_32">• Fuel log: choose the fuel grade for each fill-up (Gasohol 95, 91, E20, E85, Benzine 95, Diesel, Premium diesel, LPG, NGV) or type your own. The last grade is offered again, and it is in the CSV.</string>
     <string name="whats_new_0_4_31">• Backup: Settings &gt; Backup and restore saves the fuel or charging log and maintenance as one file, to move to another phone.</string>
@@ -1617,16 +1617,16 @@
     <!-- Streaming favourites -->
     <string name="streaming_favorites">Favorites</string>
     <string name="streaming_add_favorite">Add favorite</string>
-    <string name="streaming_add_favorite_caption">Any website, with a name of your own</string>
     <string name="streaming_field_name">Name (optional)</string>
     <string name="streaming_field_address">Website address</string>
     <string name="streaming_invalid_address">That is not a web address (https).</string>
     <string name="streaming_may_not_play">may not play everywhere</string>
     <string name="car_streaming_favorites">Favorites</string>
     <string name="car_streaming_manage">Manage favorites</string>
-    <string name="car_streaming_may_not_play">May not play, or may be limited by region</string>
     <string name="car_streaming_tap_to_remove">Tap to remove • %1$s</string>
     <string name="car_streaming_removed">Removed %1$s</string>
     <string name="car_streaming_add">Add %1$s</string>
     <string name="car_streaming_added">Added %1$s</string>
+    <string name="streaming_long_press_hint">Tap to open. Touch and hold an icon to add or remove a favorite.</string>
+    <string name="car_streaming_maybe">May not play</string>
 </resources>
