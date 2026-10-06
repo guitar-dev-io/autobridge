@@ -727,6 +727,51 @@ class CarWebRenderer(context: Context) {
         host?.showMessage(message)
     }
 
+    /**
+     * Drawer: shows the page the main pane is on in the side pane as well — the way to put a video
+     * or a site beside the map without typing its address again. Splits 50/50 first when the
+     * surface is not split.
+     */
+    fun showMainPageOnSide() = runOnMain {
+        val target = webView?.url?.let(ContentAddress::https)
+        if (target == null) {
+            host?.showMessage(appContext.getString(R.string.car_side_show_failed))
+            return@runOnMain
+        }
+        val hadSide = sideView != null
+        sideUrl = target
+        BrowserSplitStore.setSideUrl(appContext, target)
+        if (splitLayout == BrowserSplitLayout.SINGLE) {
+            dividerGrabbed = false
+            BrowserSplitStore.setLayout(appContext, BrowserSplitLayout.HALF)
+            applyControlSettings()
+        }
+        // A side pane created just now already opened [sideUrl].
+        if (hadSide) sideView?.loadUrl(target)
+        val label = splitLayout.label(appContext)
+        host?.showMessage(
+            when {
+                isSplit -> appContext.getString(R.string.car_side_shown)
+                !hardwareMode -> appContext.getString(R.string.car_split_unavailable_legacy, label)
+                else -> appContext.getString(R.string.car_split_too_narrow, label)
+            }
+        )
+    }
+
+    /**
+     * Drawer: starts real navigation to what the split's map is showing (a route's end, a place or
+     * a search), or failing that what the main page is showing.
+     */
+    fun navigateInMaps() = runOnMain {
+        val destination = MapsHandoff.destinationFromPage(sideView?.url)
+            ?: MapsHandoff.destinationFromPage(webView?.url)
+        if (destination == null) {
+            host?.showMessage(appContext.getString(R.string.car_maps_no_destination))
+        } else {
+            host?.startNavigation(destination)
+        }
+    }
+
     // ------------------------------------------------------------------ find
 
     fun findInPage(query: String) = runOnMain {
@@ -1498,13 +1543,28 @@ class CarWebRenderer(context: Context) {
             (panes.side.right + panes.main.left) / 2f
         }
 
+    /** [dividerCentreX] for stacked panes: the middle of the horizontal gap between them. */
+    private fun dividerCentreY(panes: SplitPanes): Float =
+        if (splitSideOnRight) {
+            (panes.main.bottom + panes.side.top) / 2f
+        } else {
+            (panes.side.bottom + panes.main.top) / 2f
+        }
+
     /** The handle as drawn. Hit testing grows it by [SPLIT_GRAB_DP]; nothing else moves it. */
     private fun dividerHandleBox(panes: SplitPanes): Box {
+        val thickness = sizes.dp(if (dividerGrabbed) SPLIT_HANDLE_GRABBED_DP else SPLIT_HANDLE_DP) / 2f
+        if (panes.stacked) {
+            // Lying across the seam between the top and bottom page.
+            val centreX = panes.side.left + panes.side.width / 2f
+            val centreY = dividerCentreY(panes)
+            val halfLength = panes.side.width * SPLIT_HANDLE_LENGTH_FRACTION / 2f
+            return Box(centreX - halfLength, centreY - thickness, centreX + halfLength, centreY + thickness)
+        }
         val centreX = dividerCentreX(panes)
         val centreY = panes.side.top + panes.side.height / 2f
-        val halfWidth = sizes.dp(if (dividerGrabbed) SPLIT_HANDLE_GRABBED_DP else SPLIT_HANDLE_DP) / 2f
         val halfLength = panes.side.height * SPLIT_HANDLE_LENGTH_FRACTION / 2f
-        return Box(centreX - halfWidth, centreY - halfLength, centreX + halfWidth, centreY + halfLength)
+        return Box(centreX - thickness, centreY - halfLength, centreX + thickness, centreY + halfLength)
     }
 
     /**
@@ -1529,15 +1589,16 @@ class CarWebRenderer(context: Context) {
      * WebViews thirty times a second is what a drag on a head unit cannot afford. The pending pass
      * is flushed on release, so where the finger stops is exactly where the panes land.
      */
-    private fun dragDivider(distanceX: Float): Boolean {
+    private fun dragDivider(distanceX: Float, distanceY: Float): Boolean {
         val panes = splitPanes?.takeIf { isSplit }
         if (panes == null) {
             dividerGrabbed = false
             return false
         }
         // The host reports the distance *scrolled*, which is the negative of the way the finger
-        // went; the divider follows the finger.
-        val delta = -distanceX.roundToInt()
+        // went; the divider follows the finger. Stacked panes are divided by a horizontal seam,
+        // which moves with the vertical part of the drag.
+        val delta = -(if (panes.stacked) distanceY else distanceX).roundToInt()
         if (delta == 0) return true
         val next = BrowserSplitGeometry.dragSideFraction(
             panes,
@@ -1638,7 +1699,7 @@ class CarWebRenderer(context: Context) {
         }
         if (overlay == Overlay.TABS) return@runOnMain
         // A grabbed divider owns the drag; the page under it must not scroll with it.
-        if (dividerGrabbed && dragDivider(distanceX)) return@runOnMain
+        if (dividerGrabbed && dragDivider(distanceX, distanceY)) return@runOnMain
         val scale = viewport.scale.takeIf { it > 0f } ?: 1f
         scrollPageBy((distanceX / scale).toInt(), (distanceY / scale).toInt())
     }
@@ -1875,6 +1936,8 @@ class CarWebRenderer(context: Context) {
             DrawerAction.TOGGLE_DESKTOP -> toggleDesktopMode(appContext)
             DrawerAction.TOGGLE_FULLSCREEN -> toggleFullscreen()
             DrawerAction.SPLIT_LAYOUT -> cycleSplitLayout()
+            DrawerAction.SIDE_SHOW_PAGE -> showMainPageOnSide()
+            DrawerAction.NAVIGATE_MAPS -> navigateInMaps()
             DrawerAction.ZOOM_IN -> zoomIn()
             DrawerAction.ZOOM_OUT -> zoomOut()
             DrawerAction.RELOAD -> reload()
@@ -2757,7 +2820,7 @@ class CarWebRenderer(context: Context) {
      */
     private fun drawSplitDivider(canvas: Canvas) {
         val handle = dividerHandleBox(splitPanes ?: return)
-        val radius = handle.width / 2f
+        val radius = minOf(handle.width, handle.height) / 2f
         toolbarPaint.style = Paint.Style.FILL
         toolbarPaint.color = if (dividerGrabbed) BrowserTheme.dark.accent else Color.WHITE
         toolbarPaint.alpha = if (dividerGrabbed) 255 else 90

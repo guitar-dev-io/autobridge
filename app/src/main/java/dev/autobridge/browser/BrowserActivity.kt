@@ -1262,7 +1262,8 @@ class BrowserActivity : Activity() {
             // multiple tabs and split layout have nothing to switch between here. [MenuSurface.PHONE]
             // never lists these; see [MoreActionsSheet] for the phone's actual AUTOBRIDGE section.
             DrawerAction.NEW_TAB, DrawerAction.TABS, DrawerAction.MEDIA_CENTER,
-            DrawerAction.DIAGNOSTICS, DrawerAction.SPLIT_LAYOUT -> Unit
+            DrawerAction.DIAGNOSTICS, DrawerAction.SPLIT_LAYOUT,
+            DrawerAction.SIDE_SHOW_PAGE, DrawerAction.NAVIGATE_MAPS -> Unit
             // Sheet navigation, resolved before an action is dispatched.
             DrawerAction.MORE, DrawerAction.BACK_TO_MENU, DrawerAction.CLOSE_SHEET -> Unit
         }

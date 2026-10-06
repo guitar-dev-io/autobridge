@@ -1127,6 +1127,10 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
                 dismissOverlay()
                 cycleSplitLayout()
             })
+            addView(menuRow("◨", getString(R.string.drawer_side_show_page)) {
+                dismissOverlay()
+                showPageOnSide()
+            })
             if (sideView != null) {
                 val destination = MapsHandoff.destinationFromPage(sideView?.url)
                 addView(menuRow(
@@ -1329,6 +1333,23 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         BrowserSplitStore.setLayout(this, next)
         layoutPanes()
         StructuredLog.i("PROJECTION", "split -> $next (side ${if (sideView != null) "shown" else "none"})")
+    }
+
+    /**
+     * Puts the page the main pane is on in the side pane too — a video or a site beside the map,
+     * without typing its address again. Splits 50/50 first when the screen is not split.
+     */
+    private fun showPageOnSide() {
+        val target = webView?.url?.let { ContentAddress.https(it) } ?: return
+        val hadSide = sideView != null
+        BrowserSplitStore.setSideUrl(this, target)
+        if (BrowserSplitStore.layout(this) == BrowserSplitLayout.SINGLE) {
+            BrowserSplitStore.setLayout(this, BrowserSplitLayout.HALF)
+        }
+        // A side pane created by this layout pass opens the stored address by itself.
+        layoutPanes()
+        if (hadSide) sideView?.loadUrl(target)
+        StructuredLog.i("PROJECTION", "main page shown on the side (side ${if (sideView != null) "shown" else "none"})")
     }
 
     /** The menu's second line for the split row: the layout, or why it is not showing. */

@@ -44,8 +44,13 @@ data class PaneRect(val left: Int, val top: Int, val right: Int, val bottom: Int
     fun contains(x: Float, y: Float): Boolean = x >= left && y >= top && x < right && y < bottom
 }
 
-/** The two panes of a split. [main] holds the full browser, [side] the second page. */
-data class SplitPanes(val main: PaneRect, val side: PaneRect)
+/**
+ * The two panes of a split. [main] holds the full browser, [side] the second page.
+ *
+ * [stacked] is a split on a portrait display: the panes sit one above the other rather than side
+ * by side, and "side on the right" means "side page at the bottom".
+ */
+data class SplitPanes(val main: PaneRect, val side: PaneRect, val stacked: Boolean = false)
 
 object BrowserSplitGeometry {
     /**
@@ -62,6 +67,12 @@ object BrowserSplitGeometry {
 
     /** Side (map) share for the 65/35 preset: the main pane keeps 65%, the map strip takes 35%. */
     private const val THIRTY_FIVE_FRACTION = 0.35f
+
+    /**
+     * How much taller than wide a panel must be before the panes stack. A nearly square surface
+     * is left to the side-by-side rules (and to staying single when too narrow for them).
+     */
+    private const val PORTRAIT_RATIO = 1.2f
 
     /** In [BrowserSplitLayout.PORTRAIT_LANDSCAPE], the 16:9 main pane never takes more than this. */
     private const val LANDSCAPE_MAX_FRACTION = 0.7f
@@ -90,6 +101,11 @@ object BrowserSplitGeometry {
         val height = bottom - top
         if (width <= 0 || height <= 0) return null
         if (layout == BrowserSplitLayout.SINGLE) return null
+        // A portrait panel (a tall centre screen) split side by side gives two slivers too narrow
+        // for any page, which is why the split never showed there. Stack the panes instead.
+        if (height > width * PORTRAIT_RATIO) {
+            return stacked(layout, left, top, right, bottom, sideOnRight, gapPx, minPanePx, sideFraction)
+        }
         val gap = gapPx.coerceAtLeast(0)
         val usable = width - gap
         val dragged = sideFraction?.takeIf { it.isFinite() }?.let { clampSideFraction(it, usable, minPanePx) }
@@ -114,6 +130,42 @@ object BrowserSplitGeometry {
         return SplitPanes(
             main = PaneRect(mainLeft, mainTop, mainLeft + mainWidth, mainTop + mainHeight),
             side = PaneRect(sideLeft, top, sideLeft + sideWidth, bottom),
+        )
+    }
+
+    /**
+     * [panes] for a portrait panel: the same presets and the same dragged ratio, taken from the
+     * height. The side page is on top, or at the bottom when [sideOnRight]. The 16:9 preset keeps
+     * its main pane 16:9 — full width, as tall as that makes it — and gives the side page the rest.
+     */
+    private fun stacked(
+        layout: BrowserSplitLayout,
+        left: Int, top: Int, right: Int, bottom: Int,
+        sideOnBottom: Boolean,
+        gapPx: Int,
+        minPanePx: Int,
+        sideFraction: Float?,
+    ): SplitPanes? {
+        val width = right - left
+        val height = bottom - top
+        val gap = gapPx.coerceAtLeast(0)
+        val usable = height - gap
+        val dragged = sideFraction?.takeIf { it.isFinite() }?.let { clampSideFraction(it, usable, minPanePx) }
+        val sideHeight = when {
+            dragged != null -> (usable * dragged).roundToInt()
+            layout == BrowserSplitLayout.HALF -> (usable * HALF_FRACTION).roundToInt()
+            layout == BrowserSplitLayout.FORTY_SIXTY -> (usable * FORTY_FRACTION).roundToInt()
+            layout == BrowserSplitLayout.SIXTY_FIVE_THIRTY_FIVE -> (usable * THIRTY_FIVE_FRACTION).roundToInt()
+            else -> usable - minOf((width * 9f / 16f).roundToInt(), (usable * LANDSCAPE_MAX_FRACTION).roundToInt())
+        }
+        val mainHeight = usable - sideHeight
+        if (sideHeight < minPanePx || mainHeight < minPanePx) return null
+        val sideTop = if (sideOnBottom) bottom - sideHeight else top
+        val mainTop = if (sideOnBottom) top else bottom - mainHeight
+        return SplitPanes(
+            main = PaneRect(left, mainTop, right, mainTop + mainHeight),
+            side = PaneRect(left, sideTop, right, sideTop + sideHeight),
+            stacked = true,
         )
     }
 
@@ -146,11 +198,13 @@ object BrowserSplitGeometry {
         sideOnRight: Boolean,
         minPanePx: Int,
     ): Float {
-        val usable = panes.main.width + panes.side.width
+        // Stacked, the delta is vertical (pointing down) and the side page's height is the share.
+        val usable = if (panes.stacked) panes.main.height + panes.side.height else panes.main.width + panes.side.width
         if (usable <= 0) return HALF_FRACTION
+        val sideSize = if (panes.stacked) panes.side.height else panes.side.width
         val towardsSide = if (sideOnRight) -deltaPx else deltaPx
         return clampSideFraction(
-            (panes.side.width + towardsSide).toFloat() / usable,
+            (sideSize + towardsSide).toFloat() / usable,
             usable,
             minPanePx
         )

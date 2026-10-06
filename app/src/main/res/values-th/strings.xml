@@ -321,6 +321,11 @@
     <string name="drawer_more">เพิ่มเติม</string>
     <string name="drawer_request_desktop">ขอเวอร์ชันเดสก์ท็อป</string>
     <string name="drawer_fullscreen">เต็มหน้าจอ</string>
+    <string name="drawer_side_show_page">เปิดในจอข้าง</string>
+    <string name="drawer_navigate_maps">นำทาง Maps</string>
+    <string name="car_side_shown">เปิดหน้านี้ในจอข้างแล้ว</string>
+    <string name="car_side_show_failed">เปิดหน้านี้ในจอข้างไม่ได้</string>
+    <string name="car_maps_no_destination">เปิดเส้นทางหรือสถานที่บนแผนที่ก่อน</string>
     <string name="drawer_split">แบ่งจอ</string>
     <string name="drawer_new_tab">แท็บใหม่</string>
     <string name="drawer_start_page">หน้าเริ่มต้น</string>
@@ -530,6 +535,8 @@
     <string name="settings_about_caption">เวอร์ชัน สัญญาอนุญาต และการสนับสนุน</string>
     <!-- หน้าตั้งค่าจัดกลุ่มใหม่เป็นสี่กลุ่ม (Phase 5, 07_PhoneSettings.png) -->
     <string name="settings_group_car_apps">รถและแอป</string>
+    <string name="settings_projection_setup">Bridge Web บน Android Auto</string>
+    <string name="settings_projection_setup_caption">ให้แสดงในรถ และเปิด/ปิด Bridge Mirror</string>
     <string name="settings_duo_screen">Duo screen</string>
     <string name="settings_duo_screen_caption">ช่อง การจัดวาง และขนาดเนื้อหา</string>
     <string name="settings_app_profiles_caption_full">Quick Apps สำหรับรถ การแสดงผลและเสียงแยกตามแอป</string>

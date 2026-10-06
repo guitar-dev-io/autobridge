@@ -334,6 +334,11 @@
     <string name="drawer_more">More</string>
     <string name="drawer_request_desktop">Request desktop site</string>
     <string name="drawer_fullscreen">Fullscreen</string>
+    <string name="drawer_side_show_page">Show on side</string>
+    <string name="drawer_navigate_maps">Navigate</string>
+    <string name="car_side_shown">Showing this page on the side</string>
+    <string name="car_side_show_failed">This page cannot be shown on the side</string>
+    <string name="car_maps_no_destination">Open a route or a place on the map first</string>
     <string name="drawer_split">Split</string>
     <string name="drawer_new_tab">New tab</string>
     <string name="drawer_start_page">Start page</string>
@@ -546,6 +551,8 @@
     <string name="settings_about_caption">Version, licenses and support</string>
     <!-- Settings root reorganised into four groups (Phase 5, 07_PhoneSettings.png). -->
     <string name="settings_group_car_apps">Car &amp; apps</string>
+    <string name="settings_projection_setup">Bridge Web on Android Auto</string>
+    <string name="settings_projection_setup_caption">Show on the car, Bridge Mirror on/off</string>
     <string name="settings_duo_screen">Duo screen</string>
     <string name="settings_duo_screen_caption">Panes, layout and content size</string>
     <string name="settings_app_profiles_caption_full">Quick Apps for the car, per-app display and audio</string>
