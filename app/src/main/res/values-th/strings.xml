@@ -1630,4 +1630,21 @@
     <plurals name="break_reminder_every">
         <item quantity="other">ทุก %1$d ชั่วโมง</item>
     </plurals>
+    <!-- Parking spot -->
+    <string name="parking_title">ที่จอดรถ</string>
+    <string name="parking_subtitle">หารถให้เจออีกครั้ง</string>
+    <string name="parking_settings_caption">ปักหมุดที่จอด และนำทางกลับ</string>
+    <string name="parking_privacy">แอปอ่านตำแหน่งของคุณเฉพาะตอนกด "ปักหมุดตรงนี้" และเก็บเฉพาะจุดที่คุณปักไว้ ในโทรศัพท์เครื่องนี้</string>
+    <string name="parking_mark_here">ปักหมุดตรงนี้</string>
+    <string name="parking_finding">กำลังหาตำแหน่ง…</string>
+    <string name="parking_saved">บันทึกที่จอดรถแล้ว</string>
+    <string name="parking_no_fix">หาตำแหน่งไม่ได้ ตรวจว่าเปิดตำแหน่งอยู่ แล้วลองอีกครั้ง</string>
+    <string name="parking_empty_title">ยังไม่ได้บันทึกที่จอดรถ</string>
+    <string name="parking_empty_message">กด "ปักหมุดตรงนี้" ตอนจอดรถ และเพิ่มโน้ต เช่น ชั้นและเสา จะหารถเจอง่ายในที่จอดที่มีรถเยอะ</string>
+    <string name="parking_car_empty">กด "ปักหมุดตรงนี้" ตอนจอดรถ</string>
+    <string name="parking_no_note">ไม่มีโน้ต</string>
+    <string name="parking_note_title">โน้ตของที่จอดนี้</string>
+    <string name="parking_note_hint">ชั้น เสา หรืออะไรก็ได้ที่ช่วยหารถ</string>
+    <string name="parking_navigate">นำทาง</string>
+    <string name="parking_clear">ล้าง</string>
 </resources>

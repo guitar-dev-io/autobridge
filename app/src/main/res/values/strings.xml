@@ -1661,4 +1661,21 @@
         <item quantity="one">Every %1$d hour</item>
         <item quantity="other">Every %1$d hours</item>
     </plurals>
+    <!-- Parking spot -->
+    <string name="parking_title">Parking spot</string>
+    <string name="parking_subtitle">Find the car again</string>
+    <string name="parking_settings_caption">Mark where you parked and navigate back</string>
+    <string name="parking_privacy">Your location is read only when you tap Mark here, and only the spot you mark is kept, on this phone.</string>
+    <string name="parking_mark_here">Mark here</string>
+    <string name="parking_finding">Finding your location…</string>
+    <string name="parking_saved">Parking spot saved</string>
+    <string name="parking_no_fix">Could not get your location. Check that location is on and try again.</string>
+    <string name="parking_empty_title">No parking spot saved</string>
+    <string name="parking_empty_message">Tap Mark here when you park. Add a note like the floor and pillar to find the car among others.</string>
+    <string name="parking_car_empty">Tap Mark here when you park.</string>
+    <string name="parking_no_note">No note</string>
+    <string name="parking_note_title">Note for this spot</string>
+    <string name="parking_note_hint">Floor, pillar, anything to find the car</string>
+    <string name="parking_navigate">Navigate</string>
+    <string name="parking_clear">Clear</string>
 </resources>

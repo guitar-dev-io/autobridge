@@ -130,6 +130,9 @@ class CarHomeMoreScreen(
             entry(R.string.maint_title) {
                 CarNavigation.open(screenManager, "CarMaintenanceScreen") { CarMaintenanceScreen(carContext) }
             },
+            entry(R.string.parking_title) {
+                CarNavigation.open(screenManager, "CarParkingScreen") { CarParkingScreen(carContext) }
+            },
             entry(R.string.emergency_title) {
                 CarNavigation.open(screenManager, "CarEmergencyScreen") { CarEmergencyScreen(carContext) }
             }
