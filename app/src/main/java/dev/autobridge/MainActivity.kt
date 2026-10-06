@@ -2749,6 +2749,12 @@ class MainActivity : androidx.activity.ComponentActivity() {
                         accent = design.ACCENT
                     ) { showBreakReminderChoice() })
                     add(settingsEntry(
+                        getString(R.string.costs_title),
+                        getString(R.string.costs_settings_caption),
+                        R.drawable.ic_tile_car,
+                        accent = design.ACCENT
+                    ) { startActivity(dev.autobridge.expense.CostsActivity.intent(this@MainActivity)) })
+                    add(settingsEntry(
                         getString(R.string.parking_title),
                         getString(R.string.parking_settings_caption),
                         R.drawable.ic_tile_car,

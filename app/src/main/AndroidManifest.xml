@@ -245,6 +245,7 @@
         <activity android:name=".backup.BackupActivity" android:exported="false" />
         <activity android:name=".emergency.EmergencyActivity" android:exported="false" />
         <activity android:name=".parking.ParkingActivity" android:exported="false" />
+        <activity android:name=".expense.CostsActivity" android:exported="false" />
 
         <!-- Settings > About > Open-source licenses. The Play-services viewer is an AppCompat
              activity; under the app's framework Material theme it crashes on launch

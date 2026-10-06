@@ -76,6 +76,7 @@ class BackupActivity : Activity() {
                 fuel = FuelLogStore.rawJson(this),
                 maintenance = MaintenanceStore.rawJson(this),
                 trips = TripStore.rawJson(this),
+                expenses = dev.autobridge.expense.ExpenseStore.rawJson(this),
             )
         )
         val dir = File(cacheDir, "exports").apply { mkdirs() }
@@ -114,7 +115,8 @@ class BackupActivity : Activity() {
             .setPositiveButton(getString(R.string.backup_replace)) { _, _ ->
                 val ok = FuelLogStore.restore(this, backup.fuel, backup.ev) &&
                     MaintenanceStore.restore(this, backup.maintenance) &&
-                    TripStore.restore(this, backup.trips)
+                    TripStore.restore(this, backup.trips) &&
+                    dev.autobridge.expense.ExpenseStore.restore(this, backup.expenses)
                 Toast.makeText(this, getString(if (ok) R.string.backup_done else R.string.backup_invalid), Toast.LENGTH_LONG).show()
             }
             .show()

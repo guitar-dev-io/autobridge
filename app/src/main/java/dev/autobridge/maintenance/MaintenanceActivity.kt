@@ -204,10 +204,16 @@ class MaintenanceActivity : Activity() {
             inputType = InputType.TYPE_CLASS_NUMBER
             setText(odometer?.let { it.roundToLong().toString() }.orEmpty())
         }
+        // What it cost, if the driver wants it in the monthly costs.
+        val cost = EditText(this).apply {
+            hint = getString(R.string.maint_field_cost)
+            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
+        }
         val form = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(8), dp(20), 0)
             addView(reading)
+            addView(cost)
         }
         AlertDialog.Builder(this)
             .setTitle(item.name)
@@ -219,6 +225,9 @@ class MaintenanceActivity : Activity() {
             }
             .setPositiveButton(getString(R.string.maint_mark_done)) { _, _ ->
                 MaintenanceStore.markDone(this, item.id, reading.text.toString().trim().toDoubleOrNull())
+                cost.text.toString().trim().replace(",", "").toDoubleOrNull()?.let {
+                    dev.autobridge.expense.ExpenseStore.add(this, item.name, it)
+                }
                 render()
             }
             .setNeutralButton(android.R.string.cancel, null)

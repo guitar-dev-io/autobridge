@@ -1647,4 +1647,24 @@
     <string name="parking_note_hint">ชั้น เสา หรืออะไรก็ได้ที่ช่วยหารถ</string>
     <string name="parking_navigate">นำทาง</string>
     <string name="parking_clear">ล้าง</string>
+    <!-- Costs -->
+    <string name="costs_title">ค่าใช้จ่ายรถ</string>
+    <string name="costs_subtitle">ค่าน้ำมันและอื่น ๆ รายเดือน</string>
+    <string name="costs_settings_caption">รถใช้เงินเดือนละเท่าไร</string>
+    <string name="costs_add">+ ค่าใช้จ่าย</string>
+    <string name="costs_by_month">รายเดือน</string>
+    <string name="costs_expenses">ค่าใช้จ่ายอื่น ๆ</string>
+    <string name="costs_unnamed">ค่าใช้จ่าย</string>
+    <string name="costs_baht">%1$s บาท</string>
+    <string name="costs_this_month">ถึงตอนนี้ของ %1$s</string>
+    <string name="costs_split">น้ำมันหรือค่าชาร์จ %1$s · อื่น ๆ %2$s บาท</string>
+    <string name="costs_average">เดือนปกติ: %1$s บาท</string>
+    <string name="costs_empty_title">ยังไม่มีค่าใช้จ่าย</string>
+    <string name="costs_empty_message">ค่าน้ำมันและค่าชาร์จมาจากบันทึกการเติมของคุณ เพิ่มค่าซ่อม ล้างรถ ทางด่วน ที่จอดรถ หรือภาษีได้ที่นี่ หรือใส่ราคาตอนกดว่าทำรายการบำรุงรักษาแล้ว</string>
+    <string name="costs_car_empty">เพิ่มการเติมน้ำมันและค่าใช้จ่ายบนโทรศัพท์</string>
+    <string name="costs_field_label">เรื่องอะไร (ซ่อม ทางด่วน ที่จอดรถ…)</string>
+    <string name="costs_field_baht">จำนวนเงิน (บาท)</string>
+    <string name="costs_invalid">กรอกจำนวนเงินที่มากกว่าศูนย์</string>
+    <string name="costs_delete_title">ลบค่าใช้จ่ายนี้?</string>
+    <string name="maint_field_cost">ราคา (บาท) ไม่บังคับ</string>
 </resources>

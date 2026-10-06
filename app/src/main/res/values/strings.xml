@@ -1678,4 +1678,24 @@
     <string name="parking_note_hint">Floor, pillar, anything to find the car</string>
     <string name="parking_navigate">Navigate</string>
     <string name="parking_clear">Clear</string>
+    <!-- Costs -->
+    <string name="costs_title">Car costs</string>
+    <string name="costs_subtitle">Fuel and everything else, by month</string>
+    <string name="costs_settings_caption">What the car costs each month</string>
+    <string name="costs_add">+ Expense</string>
+    <string name="costs_by_month">By month</string>
+    <string name="costs_expenses">Other expenses</string>
+    <string name="costs_unnamed">Expense</string>
+    <string name="costs_baht">%1$s baht</string>
+    <string name="costs_this_month">So far in %1$s</string>
+    <string name="costs_split">Fuel or charging %1$s · other %2$s baht</string>
+    <string name="costs_average">Usual month: %1$s baht</string>
+    <string name="costs_empty_title">No costs yet</string>
+    <string name="costs_empty_message">Fuel and charging come from your fuel log. Add a service, a wash, tolls, parking or a tax here, or give a cost when you mark a maintenance item done.</string>
+    <string name="costs_car_empty">Add fill-ups and expenses on the phone.</string>
+    <string name="costs_field_label">What for (service, tolls, parking…)</string>
+    <string name="costs_field_baht">Amount (baht)</string>
+    <string name="costs_invalid">Enter an amount above zero.</string>
+    <string name="costs_delete_title">Delete this expense?</string>
+    <string name="maint_field_cost">Cost (baht), optional</string>
 </resources>
