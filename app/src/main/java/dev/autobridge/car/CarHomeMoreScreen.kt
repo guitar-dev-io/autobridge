@@ -124,6 +124,9 @@ class CarHomeMoreScreen(
         R.string.car_more_group_other,
         listOf(
             section(HomeSection.WEATHER),
+            entry(R.string.car_more_fuel) {
+                CarNavigation.open(screenManager, "CarFuelScreen") { CarFuelScreen(carContext) }
+            },
             entry(R.string.car_more_driving) {
                 UiModeStore.setDriving(true)
                 screenManager.push(CarDrivingModeScreen(carContext))

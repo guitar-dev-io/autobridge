@@ -9,6 +9,10 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- The car's odometer and fuel level, for the fuel log. Asked for on the car (CarFuelScreen);
+         a car that does not report them, or a refusal, leaves the log to typed readings. -->
+    <uses-permission android:name="com.google.android.gms.permission.CAR_MILEAGE" />
+    <uses-permission android:name="com.google.android.gms.permission.CAR_FUEL" />
     <!-- Required by Shizuku's pre-v11 (ADB-server) permission-request flow; without it,
          RequestPermissionActivity in the Shizuku/Shizuku-Next manager fails to launch with
          SecurityException: Permission Denial. -->
@@ -234,6 +238,8 @@
 
         <!-- Weather home tile: pick a place and see its current conditions (Open-Meteo, no key). -->
         <activity android:name=".weather.WeatherActivity" android:exported="false" />
+        <!-- Fuel log on the phone: fill-ups, consumption, CSV export. -->
+        <activity android:name=".fuel.FuelLogActivity" android:exported="false" />
 
         <!-- Settings > About > Open-source licenses. The Play-services viewer is an AppCompat
              activity; under the app's framework Material theme it crashes on launch

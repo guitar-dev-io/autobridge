@@ -2654,6 +2654,12 @@ class MainActivity : androidx.activity.ComponentActivity() {
                     addAll(duoScreenEntry())
                     addAll(projectionSetupEntry())
                     add(settingsEntry(
+                        getString(R.string.fuel_title),
+                        getString(R.string.fuel_settings_caption),
+                        R.drawable.ic_tile_car,
+                        accent = design.ACCENT
+                    ) { startActivity(dev.autobridge.fuel.FuelLogActivity.intent(this@MainActivity)) })
+                    add(settingsEntry(
                         getString(R.string.settings_app_profiles),
                         getString(R.string.settings_app_profiles_caption_full),
                         R.drawable.ic_tile_apps,

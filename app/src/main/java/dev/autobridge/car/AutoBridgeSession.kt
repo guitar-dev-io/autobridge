@@ -31,6 +31,9 @@ class AutoBridgeSession : Session(), CarScreenController.Host {
                 // the phone UI read "Not connected" and the Mobile Remote showed the car offline
                 // while the head unit was plainly running our screens.
                 CarConnectionMonitor.publish()
+                // Odometer and fuel level for the fuel log, when the car reports them and the
+                // driver has allowed it (CarFuelScreen asks); nothing happens otherwise.
+                dev.autobridge.fuel.CarVehicleData.start(carContext)
                 dev.autobridge.logging.StructuredLog.i(TAG, "car session connected")
                 // The bridge learns about the connection here rather than polling for it, and
                 // this is where a Send-to-Car that arrived while nothing was plugged in gets
@@ -39,6 +42,7 @@ class AutoBridgeSession : Session(), CarScreenController.Host {
             }
 
             override fun onDestroy(owner: LifecycleOwner) {
+                dev.autobridge.fuel.CarVehicleData.stop()
                 CarScreenController.unregister(this@AutoBridgeSession)
                 // A replacement session can be created before the outgoing one is destroyed, so the
                 // registered host - not this callback - decides whether anything is still attached.
