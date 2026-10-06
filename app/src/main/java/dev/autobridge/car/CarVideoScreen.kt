@@ -14,6 +14,7 @@ import androidx.car.app.model.Pane
 import androidx.car.app.model.PaneTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
+import androidx.car.app.navigation.model.MessageInfo
 import androidx.car.app.navigation.model.NavigationTemplate
 import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.DefaultLifecycleObserver
@@ -61,11 +62,24 @@ class CarVideoScreen(
      * ever cleared the message again.
      */
     private var playbackFailure: String? = null
+
+    /**
+     * True from starting a different channel until its first frame is on screen. The host keeps
+     * showing whatever was last drawn on its surface, so without saying so the previous channel's
+     * picture sat there while the new one buffered — which read as "I picked B and it is still A".
+     */
+    private var loadingNewChannel = false
     private val listener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) {
             playbackFailure = player.playerError?.let {
                 carContext.getString(R.string.car_video_source_failed)
             }
+            invalidate()
+        }
+
+        override fun onRenderedFirstFrame() {
+            if (!loadingNewChannel) return
+            loadingNewChannel = false
             invalidate()
         }
 
@@ -134,6 +148,11 @@ class CarVideoScreen(
             invalidate()
             return
         }
+        // Starting a different channel: stop the previous one before the surface is bound, or the
+        // player paints the old channel's paused frame onto it and leaves it there until the new
+        // stream's first frame arrives — and keeps playing the old channel's sound meanwhile.
+        val switchingChannel = !started && !isSessionAlreadyOnThisChannel(player)
+        if (switchingChannel && player.isCommandAvailable(Player.COMMAND_STOP)) player.stop()
         player.setVideoSurface(output)
         // Published after the surface, never before: the player letterboxes into this size, and the
         // renderer discards an output resolution that arrives while it still has no surface.
@@ -155,6 +174,7 @@ class CarVideoScreen(
                     media.resume()
                 }
             } else {
+                loadingNewChannel = true
                 media.play(uri, title)
             }
         } else if (resumeWhenSurfaceReturns) {
@@ -289,6 +309,17 @@ class CarVideoScreen(
         }
         val player = media.player
         return NavigationTemplate.Builder()
+            .apply {
+                // A card over the surface naming the channel that is on its way, while the old
+                // picture may still be on the host's surface.
+                if (loadingNewChannel) {
+                    setNavigationInfo(
+                        MessageInfo.Builder(carContext.getString(R.string.car_video_loading))
+                            .setText(title)
+                            .build()
+                    )
+                }
+            }
             .setActionStrip(ActionStrip.Builder()
                 .addAction(Action.BACK)
                 .addAction(control(R.drawable.ic_car_home, carContext.getString(R.string.car_video_home)) { screenManager.popToRoot() })
@@ -319,6 +350,7 @@ class CarVideoScreen(
             playbackFailure = null
             if (media.isConnected) {
                 started = true
+                loadingNewChannel = true
                 media.play(uri, title)
             } else {
                 started = false

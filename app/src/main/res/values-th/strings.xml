@@ -1105,6 +1105,7 @@
 
     <!-- Car Video -->
     <string name="car_video_title">วิดีโอ</string>
+    <string name="car_video_loading">กำลังโหลดช่อง…</string>
     <string name="car_video_park_to_watch">จอดรถก่อนจึงจะดูวิดีโอได้</string>
 
     <!-- Car Mirror intro -->

@@ -1126,6 +1126,7 @@
 
     <!-- Car Video ([CarVideoScreen]). -->
     <string name="car_video_title">Video</string>
+    <string name="car_video_loading">Loading channel…</string>
     <string name="car_video_park_to_watch">Park the vehicle to watch video.</string>
 
     <!-- Car Mirror intro ([CarMirrorIntroScreen]). -->
