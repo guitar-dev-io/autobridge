@@ -78,8 +78,10 @@ object BrowserGeolocation {
         context: Context,
         origin: String,
         callback: GeolocationPermissions.Callback,
-        onMissingPermission: () -> Unit,
+        // Declared before the lambda that existing callers pass last, so `answerForCar(...) { }` still
+        // means "permission missing" (the projection flavor calls it that way).
         onLocationOff: () -> Unit = {},
+        onMissingPermission: () -> Unit,
     ) {
         val eligible = isEligibleOrigin(origin)
         val permitted = hasAppPermission(context)
