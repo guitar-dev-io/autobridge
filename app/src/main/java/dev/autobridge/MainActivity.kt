@@ -2292,6 +2292,9 @@ class MainActivity : androidx.activity.ComponentActivity() {
             header = design.header(
                 context = this,
                 title = getString(R.string.app_name),
+                // The installed version, so which build is on the phone can be read at a glance
+                // when a fix is being checked on the car.
+                subtitle = "v${BuildConfig.VERSION_NAME}",
                 logo = R.mipmap.ic_launcher_round,
                 // Outdoor temperature when a Weather place is saved; the connection itself is
                 // the status card right below, so the chip no longer repeats it.
