@@ -486,9 +486,9 @@
     <string name="about_licenses_caption">ดูสัญญาอนุญาตจากผู้พัฒนาอื่น</string>
     <string name="about_github">GitHub</string>
     <string name="about_check_update">ตรวจหาการอัปเดต</string>
-    <string name="about_check_update_caption">เทียบรุ่นที่ติดตั้งกับรุ่นล่าสุดบน GitHub</string>
+    <string name="about_check_update_caption">รุ่น %1$s · แตะเพื่อตรวจหาการอัปเดต</string>
     <string name="about_check_update_caption_latest">รุ่นล่าสุด %1$s · ตรวจเมื่อ %2$s</string>
-    <string name="about_check_update_caption_available">มีอัปเดต %1$s · ตรวจเมื่อ %2$s</string>
+    <string name="about_check_update_caption_available">มีอัปเดต %1$s · คุณมีรุ่น %2$s · ตรวจเมื่อ %3$s</string>
     <string name="about_check_update_checking">กำลังตรวจหาการอัปเดต…</string>
     <string name="about_check_update_up_to_date">คุณใช้รุ่นล่าสุดอยู่แล้ว (%1$s)</string>
     <string name="about_check_update_failed">ตรวจหาการอัปเดตไม่สำเร็จ: %1$s</string>
@@ -497,7 +497,6 @@
     <string name="about_update_download">ดาวน์โหลด APK</string>
     <string name="about_update_release_page">หน้ารุ่นที่ออก</string>
     <string name="about_update_later">ไว้ก่อน</string>
-    <string name="about_version">เวอร์ชัน</string>
     <string name="about_no_browser">ไม่พบเบราว์เซอร์ในเครื่อง</string>
     <string name="home_tagline">รถคุณ ฉลาดขึ้น</string>
     <string name="voice_no_recognizer">ไม่พบระบบแปลงเสียงเป็นข้อความบนโทรศัพท์นี้</string>

@@ -2751,13 +2751,6 @@ class MainActivity : androidx.activity.ComponentActivity() {
                     checkForUpdates()
                 },
                 settingsEntry(
-                    getString(R.string.about_version),
-                    "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}) \u00b7 ${BuildConfig.AUTOBRIDGE_MODE.lowercase()}",
-                    R.drawable.ic_tile_settings
-                ) {
-                    Toast.makeText(this@MainActivity, "AutoBridge ${BuildConfig.VERSION_NAME}", Toast.LENGTH_SHORT).show()
-                },
-                settingsEntry(
                     getString(R.string.about_github),
                     "github.com/guitar-dev-io/autobridge",
                     R.drawable.ic_tile_web
@@ -2825,23 +2818,26 @@ class MainActivity : androidx.activity.ComponentActivity() {
     }
 
     /**
-     * What the "Check for updates" row says before it is tapped: the previous check's answer, or
-     * an invitation when there has not been one. [UpdateChecker] never runs on its own, so until
-     * the user asks there is nothing to report.
+     * What the "Check for updates" row says before it is tapped: the installed version plus the
+     * previous check's answer, or an invitation when there has not been one. This row is the only
+     * place the installed version is shown in About, so it carries both jobs rather than repeating
+     * the number in a separate row. [UpdateChecker] never runs on its own, so until the user asks
+     * there is nothing to report beyond the version itself.
      */
     private fun updateCheckCaption(): String {
-        val last = UpdateChecker.lastCheck(this) ?: return getString(R.string.about_check_update_caption)
+        val current = BuildConfig.VERSION_NAME
+        val last = UpdateChecker.lastCheck(this)
+            ?: return getString(R.string.about_check_update_caption, current)
         val checkedAt = android.text.format.DateUtils.getRelativeTimeSpanString(
             last.checkedAtEpochMillis,
             System.currentTimeMillis(),
             android.text.format.DateUtils.MINUTE_IN_MILLIS
         )
-        return getString(
-            if (last.updateAvailable) R.string.about_check_update_caption_available
-            else R.string.about_check_update_caption_latest,
-            last.latestVersion,
-            checkedAt
-        )
+        return if (last.updateAvailable) {
+            getString(R.string.about_check_update_caption_available, last.latestVersion, current, checkedAt)
+        } else {
+            getString(R.string.about_check_update_caption_latest, last.latestVersion, checkedAt)
+        }
     }
 
     private fun checkForUpdates() {

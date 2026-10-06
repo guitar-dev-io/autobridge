@@ -500,9 +500,9 @@
     <string name="about_licenses_caption">View third-party notices</string>
     <string name="about_github">GitHub</string>
     <string name="about_check_update">Check for updates</string>
-    <string name="about_check_update_caption">Compare this build with the latest GitHub release</string>
+    <string name="about_check_update_caption">Build %1$s · tap to check for updates</string>
     <string name="about_check_update_caption_latest">Latest release %1$s · checked %2$s</string>
-    <string name="about_check_update_caption_available">Update %1$s available · checked %2$s</string>
+    <string name="about_check_update_caption_available">Update %1$s available · you have %2$s · checked %3$s</string>
     <string name="about_check_update_checking">Checking for updates…</string>
     <string name="about_check_update_up_to_date">You are on the latest release (%1$s)</string>
     <string name="about_check_update_failed">Could not check for updates: %1$s</string>
@@ -511,7 +511,6 @@
     <string name="about_update_download">Download APK</string>
     <string name="about_update_release_page">Release page</string>
     <string name="about_update_later">Later</string>
-    <string name="about_version">Version</string>
     <string name="about_no_browser">No browser available</string>
     <string name="home_tagline">Your Car. Smarter.</string>
     <string name="voice_no_recognizer">No speech recognizer on this phone</string>

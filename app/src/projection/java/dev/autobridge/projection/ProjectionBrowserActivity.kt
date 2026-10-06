@@ -1514,9 +1514,10 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
             })();
         """.trimIndent()
         view.evaluateJavascript(script) { result ->
-            // An empty live clear that lands on no focused field has nothing to search for, so it
-            // must not fall back to a navigation — only non-empty input reaches navigateFromInput.
-            if (result?.contains("OK") != true && clean.isNotEmpty()) navigateFromInput(clean)
+            // The navigation fallback is a Go-time decision only: a live (non-submit) keystroke
+            // landing on NO_FOCUS just means the page has nothing focused yet, not that the driver
+            // is done typing, so it must not fire loadUrl() on every character pressed.
+            if (result?.contains("OK") != true && clean.isNotEmpty() && autoSubmit) navigateFromInput(clean)
         }
     }
 
