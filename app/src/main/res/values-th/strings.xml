@@ -1580,4 +1580,8 @@
     <string name="maint_compulsory_insurance">พ.ร.บ.</string>
     <string name="settings_group_utilities">อรรถประโยชน์</string>
     <string name="car_more_group_utilities">อรรถประโยชน์</string>
+    <string name="fuel_date_button">วันที่: %1$s</string>
+    <string name="fuel_edit">แก้ไข</string>
+    <string name="fuel_edit_title">แก้ไขการเติมน้ำมัน</string>
+    <string name="fuel_edit_title_ev">แก้ไขการชาร์จ</string>
 </resources>

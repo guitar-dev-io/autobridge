@@ -70,6 +70,14 @@ class FuelStatsTest {
         assertTrue(lines[2].startsWith("2026-10-08 09:00"))
     }
 
+    @Test fun aFillUpEnteredLateSlotsIntoItsOwnDay() {
+        // The 8th was only logged after the 15th: the log is read by date, not by when it was typed.
+        val enteredInOrder = listOf(fill(1, 1, 40.0, 1400.0, 10_000.0), fill(2, 8, 35.0, 1225.0, 10_490.0), fill(3, 15, 30.0, 1080.0, 10_910.0))
+        val enteredLate = listOf(enteredInOrder[0], enteredInOrder[2], enteredInOrder[1])
+        assertEquals(FuelStats.intervals(enteredInOrder).map { it.kmPerLiter }, FuelStats.intervals(enteredLate).map { it.kmPerLiter })
+        assertEquals(14.0, FuelStats.summarize(enteredLate, at(20), zone).averageKmPerLiter!!, 0.001)
+    }
+
     @Test fun theGradeIsInTheCsv() {
         val log = listOf(
             FuelEntry(1, at(1), 40.0, 1400.0, 10_000.0, "PTT", "Gasohol 95"),

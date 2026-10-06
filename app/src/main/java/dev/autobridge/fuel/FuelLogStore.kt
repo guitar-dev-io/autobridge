@@ -40,9 +40,28 @@ object FuelLogStore {
         fuelType: String = "",
         timeMs: Long = System.currentTimeMillis(),
     ) {
-        val entry = FuelEntry(timeMs, timeMs, liters, totalBaht, odometerKm, station.trim(), fuelType.trim())
+        // The id is its own: the time can be a day in the past, and two entries may share one.
+        val id = maxOf(System.currentTimeMillis(), (all(context).maxOfOrNull { it.id } ?: 0L) + 1)
+        val entry = FuelEntry(id, timeMs, liters, totalBaht, odometerKm, station.trim(), fuelType.trim())
         write(context, all(context) + entry)
     }
+
+    /** Replaces the entry [id] with the edited figures; the date may be moved, which reorders the log. */
+    fun update(
+        context: Context,
+        id: Long,
+        liters: Double,
+        totalBaht: Double,
+        odometerKm: Double?,
+        station: String,
+        fuelType: String,
+        timeMs: Long,
+    ) = write(context, all(context).map {
+        if (it.id == id) it.copy(
+            timeMs = timeMs, liters = liters, totalBaht = totalBaht, odometerKm = odometerKm,
+            station = station.trim(), fuelType = fuelType.trim()
+        ) else it
+    })
 
     fun delete(context: Context, id: Long) = write(context, all(context).filterNot { it.id == id })
 

@@ -2,6 +2,7 @@ package dev.autobridge.fuel
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.app.DatePickerDialog
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -20,6 +21,7 @@ import dev.autobridge.ui.AutoBridgeDesign.stack
 import java.io.File
 import java.text.DateFormat
 import java.text.NumberFormat
+import java.util.Calendar
 import java.util.Date
 import kotlin.math.roundToLong
 
@@ -114,7 +116,7 @@ class FuelLogActivity : Activity() {
                         ).joinToString(" · "),
                         accent = accent,
                         badgeText = "⛽",
-                    ) { confirmDelete(entry) }
+                    ) { showEntryActions(entry) }
                 )
             }
         }
@@ -192,7 +194,8 @@ class FuelLogActivity : Activity() {
         }
     }
 
-    private fun showAddDialog() {
+    /** Adds a fill-up or charge, or edits [existing] (any date, so a missed one can be entered later). */
+    private fun showAddDialog(existing: FuelEntry? = null) {
         val carOdometer = CarVehicleData.lastOdometer(this)
             ?.takeIf { System.currentTimeMillis() - it.second < ODOMETER_FRESH_MS }?.first
         fun field(hint: Int, decimal: Boolean, initial: String = "") = EditText(this).apply {
@@ -204,14 +207,46 @@ class FuelLogActivity : Activity() {
             }
             setText(initial)
         }
-        val liters = field(if (ev) R.string.fuel_field_kwh else R.string.fuel_field_liters, decimal = true)
-        val baht = field(R.string.fuel_field_baht, decimal = true)
-        val odometer = field(
-            R.string.fuel_field_odometer, decimal = true, initial = carOdometer?.let { whole(it).replace(",", "") }.orEmpty()
+        val liters = field(
+            if (ev) R.string.fuel_field_kwh else R.string.fuel_field_liters, decimal = true,
+            initial = existing?.liters?.let { plain(it) }.orEmpty()
         )
-        val station = field(R.string.fuel_field_station, decimal = false)
+        val baht = field(R.string.fuel_field_baht, decimal = true, initial = existing?.totalBaht?.let { plain(it) }.orEmpty())
+        val odometer = field(
+            R.string.fuel_field_odometer, decimal = true,
+            initial = if (existing != null) {
+                existing.odometerKm?.let { whole(it).replace(",", "") }.orEmpty()
+            } else {
+                carOdometer?.let { whole(it).replace(",", "") }.orEmpty()
+            }
+        )
+        val station = field(R.string.fuel_field_station, decimal = false, initial = existing?.station.orEmpty())
+        // The day of the fill-up: today unless changed. Only the day is picked; the time of day stays
+        // as it was (now for a new one), which keeps same-day entries in the order they were made.
+        var timeMs = existing?.timeMs ?: System.currentTimeMillis()
+        val dateButton = Button(this).apply {
+            isAllCaps = false
+            fun refresh() {
+                text = getString(R.string.fuel_date_button, DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(timeMs)))
+            }
+            refresh()
+            setOnClickListener {
+                val shown = Calendar.getInstance().apply { timeInMillis = timeMs }
+                DatePickerDialog(
+                    this@FuelLogActivity,
+                    { _, year, month, day ->
+                        timeMs = Calendar.getInstance().apply {
+                            timeInMillis = timeMs
+                            set(year, month, day)
+                        }.timeInMillis
+                        refresh()
+                    },
+                    shown.get(Calendar.YEAR), shown.get(Calendar.MONTH), shown.get(Calendar.DAY_OF_MONTH)
+                ).apply { datePicker.maxDate = System.currentTimeMillis() }.show()
+            }
+        }
         // Petrol and diesel cars name the grade; the last one used is offered again.
-        var fuelType = if (ev) "" else FuelLogStore.lastFuelType(this)
+        var fuelType = existing?.fuelType ?: if (ev) "" else FuelLogStore.lastFuelType(this)
         val typeButton = Button(this).apply {
             isAllCaps = false
             visibility = if (ev) View.GONE else View.VISIBLE
@@ -247,16 +282,19 @@ class FuelLogActivity : Activity() {
             }
         }
         val note = TextView(this).apply {
-            text = getString(if (carOdometer != null) R.string.fuel_odometer_from_car else R.string.fuel_odometer_type_it)
+            text = getString(if (existing == null && carOdometer != null) R.string.fuel_odometer_from_car else R.string.fuel_odometer_type_it)
             textSize = 12f
         }
         val form = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(8), dp(20), 0)
-            listOf(typeButton, liters, baht, odometer, note, station).forEach { addView(it) }
+            listOf(dateButton, typeButton, liters, baht, odometer, note, station).forEach { addView(it) }
         }
         AlertDialog.Builder(this)
-            .setTitle(unit(R.string.fuel_add_title, R.string.fuel_add_title_ev))
+            .setTitle(
+                if (existing != null) unit(R.string.fuel_edit_title, R.string.fuel_edit_title_ev)
+                else unit(R.string.fuel_add_title, R.string.fuel_add_title_ev)
+            )
             .setView(form)
             .setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(getString(R.string.fuel_save)) { _, _ ->
@@ -270,8 +308,22 @@ class FuelLogActivity : Activity() {
                     Toast.makeText(this, getString(R.string.fuel_type_required), Toast.LENGTH_LONG).show()
                     return@setPositiveButton
                 }
-                FuelLogStore.add(this, l, b, number(odometer), station.text.toString(), fuelType)
+                if (existing != null) {
+                    FuelLogStore.update(this, existing.id, l, b, number(odometer), station.text.toString(), fuelType, timeMs)
+                } else {
+                    FuelLogStore.add(this, l, b, number(odometer), station.text.toString(), fuelType, timeMs)
+                }
                 render()
+            }
+            .show()
+    }
+
+    /** Tapping a row: edit it (including its date) or delete it. */
+    private fun showEntryActions(entry: FuelEntry) {
+        AlertDialog.Builder(this)
+            .setTitle(getString(rowTitleRes(), decimal(entry.liters), money(entry.totalBaht)))
+            .setItems(arrayOf(getString(R.string.fuel_edit), getString(R.string.fuel_delete))) { _, which ->
+                if (which == 0) showAddDialog(entry) else confirmDelete(entry)
             }
             .show()
     }
@@ -304,6 +356,10 @@ class FuelLogActivity : Activity() {
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         runCatching { startActivity(Intent.createChooser(send, getString(R.string.fuel_export))) }
     }
+
+    /** A figure as it is typed back into a field: no thousands separators, no needless ".0". */
+    private fun plain(value: Double): String =
+        if (value == value.toLong().toDouble()) value.toLong().toString() else value.toString()
 
     private fun number(field: EditText): Double? =
         field.text.toString().trim().replace(",", "").toDoubleOrNull()
