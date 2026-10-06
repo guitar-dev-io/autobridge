@@ -24,6 +24,8 @@ import androidx.media3.common.VideoSize
 import dev.autobridge.R
 import dev.autobridge.core.model.Feature
 import dev.autobridge.core.policy.FeaturePolicy
+import dev.autobridge.iptv.ChannelQueue
+import dev.autobridge.iptv.IptvChannelQueue
 import dev.autobridge.logging.StructuredLog
 import dev.autobridge.media.MediaPlaybackClient
 import dev.autobridge.media.VideoOutputGeometry
@@ -37,7 +39,12 @@ import dev.autobridge.safety.SafetyEnforcement
 class CarVideoScreen(
     carContext: CarContext,
     private val uri: String,
-    private val title: String
+    private val title: String,
+    /**
+     * The channels around this one, so Next / Previous on the wheel or the media card step
+     * through the category; null plays [uri] on its own. See [IptvChannelQueue].
+     */
+    private val queue: ChannelQueue? = null,
 ) : Screen(carContext), SurfaceCallback {
     private val appManager = carContext.getCarService(AppManager::class.java)
     private val media = MediaPlaybackClient(carContext)
@@ -175,7 +182,7 @@ class CarVideoScreen(
                 }
             } else {
                 loadingNewChannel = true
-                media.play(uri, title)
+                startPlayback()
             }
         } else if (resumeWhenSurfaceReturns) {
             resumeWhenSurfaceReturns = false
@@ -351,7 +358,7 @@ class CarVideoScreen(
             if (media.isConnected) {
                 started = true
                 loadingNewChannel = true
-                media.play(uri, title)
+                startPlayback()
             } else {
                 started = false
             }
@@ -373,6 +380,18 @@ class CarVideoScreen(
             })
         }
         invalidate()
+    }
+
+    /** Opens this screen's channel — with its queue, when it was opened from a list. */
+    private fun startPlayback() {
+        val channels = queue
+        if (channels == null) {
+            media.play(uri, title)
+        } else {
+            media.playPlaylist(
+                channels.channels.map { it.url }, channels.startIndex, channels.channels.map { it.title }
+            )
+        }
     }
 
     private fun seek(delta: Long) {

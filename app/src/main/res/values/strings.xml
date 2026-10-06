@@ -862,6 +862,7 @@
     <string name="car_iptv_phone_screen_failed">Could not open the phone screen</string>
     <string name="car_iptv_show_more">Show more</string>
     <string name="car_iptv_opens_in_browser">Opens in browser</string>
+    <string name="car_iptv_hidden_dead">%1$d unresponsive channel(s) hidden</string>
     <string name="car_iptv_favourite">Favourite</string>
     <string name="car_iptv_catchup">Catch-up</string>
     <string name="car_iptv_tap_to_play">Tap to play</string>

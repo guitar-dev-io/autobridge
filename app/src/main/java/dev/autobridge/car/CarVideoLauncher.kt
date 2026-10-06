@@ -2,6 +2,7 @@ package dev.autobridge.car
 
 import androidx.car.app.CarContext
 import androidx.car.app.ScreenManager
+import dev.autobridge.iptv.ChannelQueue
 import dev.autobridge.settings.VideoDisclaimerStore
 
 /**
@@ -11,11 +12,17 @@ import dev.autobridge.settings.VideoDisclaimerStore
  * CarVideoScreen directly.
  */
 object CarVideoLauncher {
-    fun open(screenManager: ScreenManager, carContext: CarContext, uri: String, title: String) {
+    fun open(
+        screenManager: ScreenManager,
+        carContext: CarContext,
+        uri: String,
+        title: String,
+        queue: ChannelQueue? = null,
+    ) {
         if (VideoDisclaimerStore.isAccepted(carContext)) {
-            screenManager.push(CarVideoScreen(carContext, uri, title))
+            screenManager.push(CarVideoScreen(carContext, uri, title, queue))
         } else {
-            screenManager.push(CarVideoDisclaimerScreen(carContext, uri, title))
+            screenManager.push(CarVideoDisclaimerScreen(carContext, uri, title, queue))
         }
     }
 }

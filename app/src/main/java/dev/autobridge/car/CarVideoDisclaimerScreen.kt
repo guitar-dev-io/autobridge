@@ -10,6 +10,7 @@ import androidx.car.app.model.PaneTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
 import dev.autobridge.R
+import dev.autobridge.iptv.ChannelQueue
 import dev.autobridge.settings.VideoDisclaimerStore
 
 /**
@@ -25,7 +26,8 @@ import dev.autobridge.settings.VideoDisclaimerStore
 class CarVideoDisclaimerScreen(
     carContext: CarContext,
     private val uri: String,
-    private val title: String
+    private val title: String,
+    private val queue: ChannelQueue? = null,
 ) : Screen(carContext) {
 
     override fun onGetTemplate(): Template {
@@ -72,6 +74,6 @@ class CarVideoDisclaimerScreen(
         // Replace this warning with the video itself, so Back from the video returns to the
         // library/stream screen that launched it rather than back through the warning.
         screenManager.pop()
-        screenManager.push(CarVideoScreen(carContext, uri, title))
+        screenManager.push(CarVideoScreen(carContext, uri, title, queue))
     }
 }
