@@ -2490,23 +2490,56 @@ class MainActivity : androidx.activity.ComponentActivity() {
     /** One titled group of rows on a settings-style list page. */
     private class SettingsGroup(
         val label: String,
-        val rows: List<dev.autobridge.ui.PhoneLauncherUi.Entry> = emptyList(),
-        /** Pre-built views that render after [rows]; used for switch rows or other non-standard items. */
+        val rows: List<SettingsRow> = emptyList(),
+        /** Pre-built views that render inside the group card after [rows]; e.g. the Safety switch. */
         val customRows: List<View> = emptyList()
     )
 
-    private fun settingsEntry(title: String, caption: String, icon: Int, action: () -> Unit) =
-        dev.autobridge.ui.PhoneLauncherUi.Entry(
-            title = title,
-            icon = icon,
-            caption = caption,
-            accent = dev.autobridge.ui.AutoBridgeDesign.ACCENT_SYSTEM,
-            open = action
-        )
+    /**
+     * One row on a settings list. [value], when set, draws the row as a value row (no icon badge,
+     * the value right-aligned) matching the GENERAL rows in design 07; otherwise it is a normal
+     * icon-badge row. [icon] is only used when [value] is null.
+     */
+    private class SettingsRow(
+        val title: String,
+        val caption: String,
+        val icon: Int,
+        val accent: Int,
+        val value: String? = null,
+        val open: () -> Unit
+    )
+
+    private fun settingsEntry(
+        title: String,
+        caption: String,
+        icon: Int,
+        accent: Int = dev.autobridge.ui.AutoBridgeDesign.ACCENT_SYSTEM,
+        action: () -> Unit
+    ) = SettingsRow(
+        title = title,
+        caption = caption,
+        icon = icon,
+        accent = accent,
+        open = action
+    )
+
+    /**
+     * A GENERAL-style row: no icon badge, the current [value] shown right-aligned before the
+     * chevron (design 07 "Agent & Commands → Quick actions, history", "Language → ไทย").
+     */
+    private fun settingsValueEntry(title: String, value: String, action: () -> Unit) = SettingsRow(
+        title = title,
+        caption = "",
+        icon = 0,
+        accent = dev.autobridge.ui.AutoBridgeDesign.ACCENT_SYSTEM,
+        value = value,
+        open = action
+    )
 
     /**
      * A grouped list page in the launcher's visual language: header, then each group as a quiet
-     * section label over accent-badged rows. [back] is null for the Settings root tab.
+     * section label over one rounded card whose rows are divided by hairlines (design 07). [back]
+     * is null for the Settings root tab.
      */
     private fun settingsListPage(
         title: String,
@@ -2515,26 +2548,33 @@ class MainActivity : androidx.activity.ComponentActivity() {
         back: (() -> Unit)?
     ): View {
         val design = dev.autobridge.ui.AutoBridgeDesign
+        val ui = dev.autobridge.ui.SettingsUi
         val body = design.body(this)
         groups.forEach { group ->
-            if (group.label.isNotBlank()) body.addView(design.sectionLabel(this, group.label))
-            group.rows.forEach { entry ->
-                body.addView(
-                    design.contentRow(
-                        context = this,
-                        title = entry.title,
-                        subtitle = entry.caption,
-                        accent = entry.accent,
-                        badgeIcon = entry.icon,
-                        trailing = "›",
-                        onClick = entry.open
-                    ),
-                    LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8) }
-                )
+            val cardRows = buildList {
+                group.rows.forEach { entry ->
+                    add(
+                        if (entry.value != null) ui.valueRow(
+                            context = this@MainActivity,
+                            title = entry.title,
+                            value = entry.value,
+                            onClick = entry.open
+                        ) else ui.row(
+                            context = this@MainActivity,
+                            title = entry.title,
+                            caption = entry.caption,
+                            icon = entry.icon,
+                            accent = entry.accent,
+                            onClick = entry.open
+                        )
+                    )
+                }
+                addAll(group.customRows)
             }
-            group.customRows.forEach { view ->
-                body.addView(view, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8) })
-            }
+            body.addView(
+                ui.group(this, group.label, cardRows),
+                LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(14) }
+            )
         }
         return design.page(
             context = this,
@@ -2551,48 +2591,42 @@ class MainActivity : androidx.activity.ComponentActivity() {
      */
     private fun buildSettingsMenu(): View {
         val design = dev.autobridge.ui.AutoBridgeDesign
+        val ui = dev.autobridge.ui.SettingsUi
         val bypassOn = dev.autobridge.safety.BypassPolicyStore.enabled
-        val bypassRow = design.contentRow(
+        // Safety bypass: an accent-tinted toggle on a card inside the SAFETY group (design 07).
+        // The row toggles; turning ON still goes through the confirm dialog, turning OFF is
+        // immediate — the exact behaviour (and persistent notification via toggleBypass) as before.
+        val bypassRow = ui.switchRow(
             context = this,
             title = getString(R.string.bypass_setting_title),
-            subtitle = getString(
+            caption = getString(
                 if (bypassOn) R.string.bypass_setting_summary_on
                 else R.string.bypass_setting_summary_off
             ),
-            accent = design.DANGER,
-            badgeIcon = R.drawable.ic_tile_settings,
-            trailing = null,
-            onClick = {}
-        ).also { row ->
-            // Append a Switch as the trailing control, matching the design.
-            val switch = android.widget.Switch(this).apply {
-                isChecked = bypassOn
-                setOnCheckedChangeListener { _, checked ->
-                    if (checked && !dev.autobridge.safety.BypassPolicyStore.enabled) {
-                        // Turning ON: show the same confirmation dialog as before.
-                        isChecked = false // revert until confirmed
-                        android.app.AlertDialog.Builder(this@MainActivity)
-                            .setTitle(R.string.bypass_confirm_title)
-                            .setMessage(R.string.bypass_confirm_message)
-                            .setNegativeButton(R.string.action_cancel, null)
-                            .setPositiveButton(R.string.bypass_notification_action_turn_on) { _, _ -> toggleBypass() }
-                            .show()
-                    } else if (!checked && dev.autobridge.safety.BypassPolicyStore.enabled) {
-                        // Turning OFF: disable immediately.
-                        toggleBypass()
-                    }
+            icon = R.drawable.ic_tile_settings,
+            accent = design.ACCENT_RADIO,
+            checked = bypassOn,
+            onToggle = {
+                if (!dev.autobridge.safety.BypassPolicyStore.enabled) {
+                    // Turning ON: show the same confirmation dialog as before.
+                    android.app.AlertDialog.Builder(this@MainActivity)
+                        .setTitle(R.string.bypass_confirm_title)
+                        .setMessage(R.string.bypass_confirm_message)
+                        .setNegativeButton(R.string.action_cancel) { _, _ ->
+                            // Nothing changed; rebuild so the toggle reflects the still-off state.
+                            showPhoneScreen(PhoneScreen.SETTINGS, force = true)
+                        }
+                        .setOnCancelListener {
+                            showPhoneScreen(PhoneScreen.SETTINGS, force = true)
+                        }
+                        .setPositiveButton(R.string.bypass_notification_action_turn_on) { _, _ -> toggleBypass() }
+                        .show()
+                } else {
+                    // Turning OFF: disable immediately.
+                    toggleBypass()
                 }
             }
-            (row as LinearLayout).addView(
-                switch,
-                LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                )
-            )
-            // Make the row's own click toggle the switch.
-            row.setOnClickListener { switch.toggle() }
-        }
+        )
 
         return settingsListPage(
             title = getString(R.string.settings_title),
@@ -2603,7 +2637,8 @@ class MainActivity : androidx.activity.ComponentActivity() {
                     add(settingsEntry(
                         getString(R.string.settings_car_connection),
                         getString(R.string.settings_car_connection_caption),
-                        R.drawable.ic_tile_car
+                        R.drawable.ic_tile_car,
+                        accent = design.ACCENT
                     ) {
                         showPhoneScreen(PhoneScreen.CAR_CONNECTION)
                     })
@@ -2611,7 +2646,8 @@ class MainActivity : androidx.activity.ComponentActivity() {
                     add(settingsEntry(
                         getString(R.string.settings_app_profiles),
                         getString(R.string.settings_app_profiles_caption_full),
-                        R.drawable.ic_tile_apps
+                        R.drawable.ic_tile_apps,
+                        accent = design.ACCENT_SYSTEM
                     ) {
                         appsFavoritesOnly = true
                         showPhoneScreen(PhoneScreen.APPS)
@@ -2619,14 +2655,16 @@ class MainActivity : androidx.activity.ComponentActivity() {
                     add(settingsEntry(
                         getString(R.string.settings_display_mirror),
                         getString(R.string.settings_display_mirror_caption),
-                        R.drawable.ic_tile_mirror
+                        R.drawable.ic_tile_mirror,
+                        accent = design.ACCENT
                     ) {
                         showPhoneScreen(PhoneScreen.MIRROR_SETTINGS)
                     })
                     add(settingsEntry(
                         getString(R.string.settings_input_touch),
                         getString(R.string.settings_input_touch_caption),
-                        R.drawable.ic_tile_touch
+                        R.drawable.ic_tile_touch,
+                        accent = design.ACCENT
                     ) {
                         showPhoneScreen(PhoneScreen.INPUT_TOUCH)
                     })
@@ -2635,21 +2673,24 @@ class MainActivity : androidx.activity.ComponentActivity() {
                     settingsEntry(
                         getString(R.string.settings_video),
                         getString(R.string.settings_video_caption_full),
-                        R.drawable.ic_tile_tv
+                        R.drawable.ic_tile_tv,
+                        accent = design.ACCENT_VIDEO
                     ) {
                         startActivity(dev.autobridge.library.VideoSettingsActivity.intent(this))
                     },
                     settingsEntry(
                         getString(R.string.settings_youtube),
                         getString(R.string.settings_youtube_caption_full),
-                        R.drawable.ic_tile_youtube
+                        R.drawable.ic_tile_youtube,
+                        accent = design.ACCENT_FAVORITE
                     ) {
                         startActivity(dev.autobridge.youtube.YouTubeSettingsActivity.intent(this))
                     },
                     settingsEntry(
                         getString(R.string.settings_browser),
                         getString(R.string.settings_browser_caption),
-                        R.drawable.ic_tile_web
+                        R.drawable.ic_tile_web,
+                        accent = design.ACCENT_WEB
                     ) {
                         openBrowserSettings()
                     }
@@ -2659,17 +2700,15 @@ class MainActivity : androidx.activity.ComponentActivity() {
                     customRows = listOf(bypassRow)
                 ),
                 SettingsGroup(getString(R.string.settings_group_general), listOf(
-                    settingsEntry(
+                    settingsValueEntry(
                         getString(R.string.agent_screen_title),
-                        getString(R.string.agent_screen_subtitle),
-                        R.drawable.ic_tile_remote
+                        getString(R.string.agent_screen_subtitle)
                     ) {
                         showPhoneScreen(PhoneScreen.AGENT_COMMANDS)
                     },
-                    settingsEntry(
+                    settingsValueEntry(
                         getString(R.string.settings_language),
-                        getString(AppLocale.selectedOption(this).labelRes),
-                        R.drawable.ic_tile_language
+                        getString(AppLocale.selectedOption(this).labelRes)
                     ) { chooseLanguage() },
                     settingsEntry(
                         getString(R.string.settings_advanced),
@@ -2698,13 +2737,14 @@ class MainActivity : androidx.activity.ComponentActivity() {
      * would not compile there. Uses explicit string resources from the shared strings.xml so the
      * text matches the design.
      */
-    private fun duoScreenEntry(): List<dev.autobridge.ui.PhoneLauncherUi.Entry> {
+    private fun duoScreenEntry(): List<SettingsRow> {
         val intent = duoScreenIntent() ?: return emptyList()
         return listOf(
             settingsEntry(
                 getString(R.string.settings_duo_screen),
                 getString(R.string.settings_duo_screen_caption),
-                R.drawable.ic_tile_settings
+                R.drawable.ic_tile_settings,
+                accent = dev.autobridge.ui.AutoBridgeDesign.ACCENT_SYSTEM
             ) { startActivity(intent) }
         )
     }
