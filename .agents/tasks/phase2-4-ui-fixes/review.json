@@ -1,0 +1,10 @@
+{
+  "verdict": "APPROVED",
+  "findings": [
+    {
+      "severity": "minor",
+      "file": "app/src/main/java/dev/autobridge/library/LibraryActivity.kt",
+      "detail": "The four new library string resources (library_sort_az, library_sort_za, library_edit_pinned, library_check_button) were added to both values/strings.xml and values-th/strings.xml but are never referenced. The code renders hardcoded English literals instead: \"A–Z ▼\"/\"Z–A ▲\" (allCategoriesHeader, ~line 573), \"Edit\" (pinnedHeader, ~line 598), \"↻ Check\" (checkSummaryRow, ~line 851), plus untranslated AlertDialog literals \"Pinned categories\" (~line 618) and \"Done\" (~line 625). The plan and FEAT-002 explicitly specified adding AND using these resources so Thai users get the translated labels. Replace the literals with getString(R.string.library_sort_az/library_sort_za/library_edit_pinned/library_check_button); consider adding/using string resources for the dialog title and button too. Non-blocking localization gap — the fixes are functionally correct and the build is green."
+    }
+  ]
+}
