@@ -2,6 +2,7 @@ package dev.autobridge.parking
 
 import android.content.Context
 import androidx.core.content.edit
+import java.io.File
 
 /**
  * Where the car was last parked, on this phone only: one spot, the latest. Only what the driver
@@ -28,6 +29,8 @@ object ParkingStore {
     /** Saves the spot; false when the position is not a real place (and nothing changes). */
     fun save(context: Context, lat: Double, lon: Double, note: String = "", nowMs: Long = System.currentTimeMillis()): Boolean {
         if (!ParkingSpot.isValid(lat, lon)) return false
+        // Parking somewhere new retires the old spot's photo; a photo taken before the first mark stays.
+        if (get(context) != null) deletePhoto(context)
         prefs(context).edit {
             putLong(KEY_LAT, lat.toRawBits())
             putLong(KEY_LON, lon.toRawBits())
@@ -41,7 +44,41 @@ object ParkingStore {
         if (get(context) != null) prefs(context).edit { putString(KEY_NOTE, note.trim()) }
     }
 
-    fun clear(context: Context) = prefs(context).edit { clear() }
+    fun clear(context: Context) {
+        deletePhoto(context)
+        prefs(context).edit { clear() }
+    }
+
+    // --- The photo of the spot: one file, on this phone only, never shared. ---
+
+    private fun dir(context: Context) = File(context.filesDir, "parking").apply { mkdirs() }
+
+    /** Where the camera writes the new picture; it replaces [photoFile] only once it is a real photo. */
+    fun pendingPhotoFile(context: Context): File = File(dir(context), "pending.jpg")
+
+    fun photoFile(context: Context): File = File(dir(context), "spot.jpg")
+
+    fun hasPhoto(context: Context): Boolean = photoFile(context).let { it.isFile && it.length() > 0 }
+
+    /** Keeps the pending picture as the spot's photo; false (and the old photo stays) when the camera left nothing. */
+    fun commitPendingPhoto(context: Context): Boolean {
+        val pending = pendingPhotoFile(context)
+        if (!pending.isFile || pending.length() == 0L) {
+            pending.delete()
+            return false
+        }
+        photoFile(context).delete()
+        return pending.renameTo(photoFile(context))
+    }
+
+    fun discardPendingPhoto(context: Context) {
+        pendingPhotoFile(context).delete()
+    }
+
+    fun deletePhoto(context: Context) {
+        photoFile(context).delete()
+        pendingPhotoFile(context).delete()
+    }
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 }

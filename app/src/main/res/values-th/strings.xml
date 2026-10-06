@@ -1635,7 +1635,7 @@
     <string name="parking_title">ที่จอดรถ</string>
     <string name="parking_subtitle">หารถให้เจออีกครั้ง</string>
     <string name="parking_settings_caption">ปักหมุดที่จอด และนำทางกลับ</string>
-    <string name="parking_privacy">แอปอ่านตำแหน่งของคุณเฉพาะตอนกด "ปักหมุดตรงนี้" และเก็บเฉพาะจุดที่คุณปักไว้ ในโทรศัพท์เครื่องนี้</string>
+    <string name="parking_privacy">แอปอ่านตำแหน่งของคุณเฉพาะตอนกด "ปักหมุดตรงนี้" และเก็บเฉพาะจุดที่ปักไว้ โน้ต และรูปของคุณ ในโทรศัพท์เครื่องนี้ ไม่มีการแชร์หรือส่งไปที่ไหน</string>
     <string name="parking_mark_here">ปักหมุดตรงนี้</string>
     <string name="parking_finding">กำลังหาตำแหน่ง…</string>
     <string name="parking_saved">บันทึกที่จอดรถแล้ว</string>
@@ -1673,4 +1673,14 @@
     <string name="voice_fuel_not_understood">ฟังไม่ได้ทั้งปริมาณและราคา</string>
     <string name="voice_fuel_vehicle_is_fuel">บันทึกของคุณตั้งเป็นรถน้ำมัน สลับเป็นรถ EV บนโทรศัพท์ก่อนถึงจะบันทึก kWh ได้</string>
     <string name="voice_fuel_vehicle_is_ev">บันทึกของคุณตั้งเป็นรถ EV สลับเป็นรถน้ำมันบนโทรศัพท์ก่อนถึงจะบันทึกลิตรได้</string>
+    <string name="parking_photo_take">ถ่ายรูป</string>
+    <string name="parking_photo_retake">ถ่ายรูปใหม่</string>
+    <string name="parking_photo_view">ดูรูป</string>
+    <string name="parking_photo_delete">ลบรูป</string>
+    <string name="parking_photo_hint">รูปป้ายชั้นหรือเลขเสา เป็นวิธีหารถเจอที่ง่ายที่สุด รูปเก็บไว้ในโทรศัพท์เครื่องนี้เท่านั้น</string>
+    <string name="parking_photo_saved_hint">รูปถูกเก็บในโทรศัพท์เครื่องนี้เท่านั้น ดู ถ่ายใหม่แทนที่ หรือลบได้</string>
+    <string name="parking_photo_saved">บันทึกรูปแล้ว</string>
+    <string name="parking_photo_deleted">ลบรูปแล้ว</string>
+    <string name="parking_photo_no_camera">ไม่มีแอปกล้อง</string>
+    <string name="parking_photo_on_phone">มีรูปในโทรศัพท์</string>
 </resources>

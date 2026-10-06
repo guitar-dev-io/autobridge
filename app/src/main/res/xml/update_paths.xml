@@ -5,4 +5,6 @@
     <cache-path name="updates" path="updates/" />
     <cache-path name="reports" path="reports/" />
     <cache-path name="exports" path="exports/" />
+    <!-- The camera writes the parking photo here (ParkingActivity), through a URI granted to it for that one file. -->
+    <files-path name="parking" path="parking/" />
 </paths>

@@ -1666,7 +1666,7 @@
     <string name="parking_title">Parking spot</string>
     <string name="parking_subtitle">Find the car again</string>
     <string name="parking_settings_caption">Mark where you parked and navigate back</string>
-    <string name="parking_privacy">Your location is read only when you tap Mark here, and only the spot you mark is kept, on this phone.</string>
+    <string name="parking_privacy">Your location is read only when you tap Mark here. Only the spot you mark, your note and your photo are kept, on this phone; nothing is shared or sent.</string>
     <string name="parking_mark_here">Mark here</string>
     <string name="parking_finding">Finding your location…</string>
     <string name="parking_saved">Parking spot saved</string>
@@ -1704,4 +1704,14 @@
     <string name="voice_fuel_not_understood">I did not catch both the amount and the price.</string>
     <string name="voice_fuel_vehicle_is_fuel">Your log is set to petrol or diesel. Switch it to EV on the phone to log kWh.</string>
     <string name="voice_fuel_vehicle_is_ev">Your log is set to EV. Switch it to petrol or diesel on the phone to log litres.</string>
+    <string name="parking_photo_take">Take a photo</string>
+    <string name="parking_photo_retake">Take a new photo</string>
+    <string name="parking_photo_view">View photo</string>
+    <string name="parking_photo_delete">Delete photo</string>
+    <string name="parking_photo_hint">A picture of the floor sign or the pillar number is the easiest way to find the car again. It stays on this phone.</string>
+    <string name="parking_photo_saved_hint">Photo saved on this phone only. View it, replace it with a new one, or delete it.</string>
+    <string name="parking_photo_saved">Photo saved</string>
+    <string name="parking_photo_deleted">Photo deleted</string>
+    <string name="parking_photo_no_camera">No camera app available.</string>
+    <string name="parking_photo_on_phone">Photo saved on the phone</string>
 </resources>

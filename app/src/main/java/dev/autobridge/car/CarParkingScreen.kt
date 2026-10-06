@@ -39,6 +39,8 @@ class CarParkingScreen(carContext: CarContext) : Screen(carContext) {
                 Row.Builder()
                     .setTitle(spot.note.ifBlank { carContext.getString(R.string.parking_no_note) })
                     .addText(DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(spot.savedMs)))
+                    // The picture itself is for the phone: not something to look at while driving.
+                    .apply { if (ParkingStore.hasPhoto(carContext)) addText(carContext.getString(R.string.parking_photo_on_phone)) }
                     .build()
             }
         )
