@@ -19,9 +19,9 @@ import java.net.URL
  * carries no identity, only the User-Agent below, and the result is cached so the row can show
  * what it last learned without going back out.
  *
- * Downloading and installing is deliberately left to the browser and the package installer.
- * Fetching an APK into app storage and firing an install intent would mean this app claiming the
- * right to replace itself; opening the release page keeps that decision where the user can see it.
+ * Installing is deliberately left to an installer the user picks. [UpdateDownloader] fetches the
+ * APK and offers it with "Install with…"; this app never replaces itself, so the decision stays
+ * where the user can see it.
  */
 object UpdateChecker {
     private const val PREFS_NAME = "autobridge_update"

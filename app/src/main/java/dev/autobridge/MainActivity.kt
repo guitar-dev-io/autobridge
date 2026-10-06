@@ -2987,8 +2987,8 @@ class MainActivity : androidx.activity.ComponentActivity() {
     }
 
     /**
-     * Offers the newer release without installing anything: the APK link goes to the browser and
-     * the package installer, which is where a decision to replace this app belongs.
+     * Offers the newer release without installing anything itself: the APK is downloaded and
+     * handed to the installer the user picks, which is where a decision to replace this app belongs.
      */
     private fun showUpdateDialog(update: UpdateChecker.Result.Available) {
         val release = update.release
@@ -3010,9 +3010,41 @@ class MainActivity : androidx.activity.ComponentActivity() {
             }
             .setNegativeButton(getString(R.string.about_update_later), null)
             .setPositiveButton(getString(R.string.about_update_download)) { _, _ ->
-                openExternalUrl(release.apkUrl ?: release.pageUrl)
+                val apkUrl = release.apkUrl
+                if (apkUrl == null) openExternalUrl(release.pageUrl) else downloadAndOfferInstall(apkUrl, release.pageUrl)
             }
             .show()
+    }
+
+    /**
+     * Downloads the release APK and opens "Install with…" so the user picks the installer —
+     * KingInstaller keeps a sideloaded build visible on Android Auto. Installing is that app's job
+     * and the user's tap there; see [dev.autobridge.update.UpdateDownloader]. Falls back to the
+     * browser download it replaced when the in-app download fails.
+     */
+    private fun downloadAndOfferInstall(apkUrl: String, pageUrl: String) {
+        Toast.makeText(this, getString(R.string.about_update_downloading), Toast.LENGTH_SHORT).show()
+        Thread {
+            val result = dev.autobridge.update.UpdateDownloader.download(applicationContext, apkUrl)
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                when (result) {
+                    is dev.autobridge.update.UpdateDownloader.Result.Ready -> {
+                        val chooser = dev.autobridge.update.UpdateDownloader.openWithIntent(
+                            this, result.apk, getString(R.string.about_update_install_with)
+                        )
+                        val opened = runCatching { startActivity(chooser); true }.getOrDefault(false)
+                        if (!opened) openExternalUrl(apkUrl)
+                    }
+                    is dev.autobridge.update.UpdateDownloader.Result.Failed -> {
+                        Toast.makeText(
+                            this, getString(R.string.about_update_download_failed, result.reason), Toast.LENGTH_LONG
+                        ).show()
+                        openExternalUrl(apkUrl.ifBlank { pageUrl })
+                    }
+                }
+            }
+        }.start()
     }
 
     /**
