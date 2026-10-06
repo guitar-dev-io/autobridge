@@ -314,6 +314,12 @@
     <string name="more_clear_browsing_data_caption">History, cookies and cached files</string>
     <string name="more_exit_browser">Exit browser</string>
     <string name="more_exit_browser_caption">Close and return to AutoBridge</string>
+    <!-- Short right-hand hints on the All actions list rows; the longer *_caption strings above
+         are the sheet's own descriptions and are too long for a trailing column. -->
+    <string name="more_history_hint">Pages visited</string>
+    <string name="more_downloads_hint">Downloaded files</string>
+    <string name="more_support_hint">Buy Me a Coffee</string>
+    <string name="more_github_hint">Source code</string>
 
     <!-- Browser menu sheet entries ([BrowserDrawerModel]). Drawn on the car surface by
          [CarWebRenderer] and listed on the phone, so one label serves both. -->
@@ -530,6 +536,18 @@
     <string name="settings_group_about">About</string>
     <string name="settings_about">About</string>
     <string name="settings_about_caption">Version, licenses and support</string>
+    <!-- Settings root reorganised into four groups (Phase 5, 07_PhoneSettings.png). -->
+    <string name="settings_group_car_apps">Car &amp; apps</string>
+    <string name="settings_duo_screen">Duo screen</string>
+    <string name="settings_duo_screen_caption">Panes, layout and content size</string>
+    <string name="settings_app_profiles_caption_full">Quick Apps for the car, per-app display and audio</string>
+    <string name="settings_group_playback_web">Playback &amp; web</string>
+    <string name="settings_video_caption_full">Player, aspect ratio, picture, subtitle translation</string>
+    <string name="settings_youtube_caption_full">SponsorBlock and playback quality</string>
+    <string name="settings_browser">Browser</string>
+    <string name="settings_browser_caption">Ad blocking, start page, user agent, site data</string>
+    <string name="settings_group_safety">Safety</string>
+    <string name="settings_group_general">General</string>
     <string name="advanced_subtitle">Developer tools</string>
     <string name="advanced_diagnostics">Diagnostics</string>
     <string name="advanced_diagnostics_caption">Logs, crash reports and mirror events</string>

@@ -2488,7 +2488,12 @@ class MainActivity : androidx.activity.ComponentActivity() {
     }
 
     /** One titled group of rows on a settings-style list page. */
-    private class SettingsGroup(val label: String, val rows: List<dev.autobridge.ui.PhoneLauncherUi.Entry>)
+    private class SettingsGroup(
+        val label: String,
+        val rows: List<dev.autobridge.ui.PhoneLauncherUi.Entry> = emptyList(),
+        /** Pre-built views that render after [rows]; used for switch rows or other non-standard items. */
+        val customRows: List<View> = emptyList()
+    )
 
     private fun settingsEntry(title: String, caption: String, icon: Int, action: () -> Unit) =
         dev.autobridge.ui.PhoneLauncherUi.Entry(
@@ -2527,6 +2532,9 @@ class MainActivity : androidx.activity.ComponentActivity() {
                     LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8) }
                 )
             }
+            group.customRows.forEach { view ->
+                body.addView(view, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8) })
+            }
         }
         return design.page(
             context = this,
@@ -2537,121 +2545,167 @@ class MainActivity : androidx.activity.ComponentActivity() {
     }
 
     /**
-     * Settings root. Grouped the way the user thinks about it rather than by implementation:
-     * what the car shows and how it is touched, the car and per-app setup, features, then the
-     * developer tools and the About page. Car setup, Debug and Control Center are no longer
-     * top-level rows: they live in Car & Connection, Advanced and the Control tab respectively.
+     * Settings root. Four groups matching design 07_PhoneSettings.png: CAR & APPS (connection,
+     * duo screen, apps, display, input), PLAYBACK & WEB (video, youtube, browser), SAFETY (bypass
+     * switch), GENERAL (agent, language, advanced, about).
      */
-    private fun buildSettingsMenu(): View = settingsListPage(
-        title = getString(R.string.settings_title),
-        subtitle = null,
-        // Settings is reached from Home's gear icon now, not a bottom tab, so it needs a way back.
-        back = { goBack() },
-        groups = listOf(
-            SettingsGroup(getString(R.string.settings_group_display), listOf(
-                settingsEntry(
-                    getString(R.string.settings_display_mirror),
-                    getString(R.string.settings_display_mirror_caption),
-                    R.drawable.ic_tile_mirror
-                ) {
-                    showPhoneScreen(PhoneScreen.MIRROR_SETTINGS)
-                },
-                settingsEntry(
-                    getString(R.string.settings_input_touch),
-                    getString(R.string.settings_input_touch_caption),
-                    R.drawable.ic_tile_touch
-                ) {
-                    showPhoneScreen(PhoneScreen.INPUT_TOUCH)
-                },
-                settingsEntry(
-                    getString(R.string.settings_language),
-                    // The caption names the language in force, so the row answers "what am I set
-                    // to" without having to be opened.
-                    getString(AppLocale.selectedOption(this).labelRes),
-                    R.drawable.ic_tile_language
-                ) { chooseLanguage() }
-            )),
-            SettingsGroup(getString(R.string.settings_group_car), listOf(
-                settingsEntry(
-                    getString(R.string.settings_car_connection),
-                    getString(R.string.settings_car_connection_caption),
-                    R.drawable.ic_tile_car
-                ) {
-                    showPhoneScreen(PhoneScreen.CAR_CONNECTION)
-                },
-                settingsEntry(
-                    getString(R.string.settings_app_profiles),
-                    getString(R.string.settings_app_profiles_caption),
-                    R.drawable.ic_tile_apps
-                ) {
-                    // Apps & profiles: the former Apps tab, merged with App Profiles. Opens
-                    // favorites-filtered, the same place the Profiles screen used to land on.
-                    appsFavoritesOnly = true
-                    showPhoneScreen(PhoneScreen.APPS)
+    private fun buildSettingsMenu(): View {
+        val design = dev.autobridge.ui.AutoBridgeDesign
+        val bypassOn = dev.autobridge.safety.BypassPolicyStore.enabled
+        val bypassRow = design.contentRow(
+            context = this,
+            title = getString(R.string.bypass_setting_title),
+            subtitle = getString(
+                if (bypassOn) R.string.bypass_setting_summary_on
+                else R.string.bypass_setting_summary_off
+            ),
+            accent = design.DANGER,
+            badgeIcon = R.drawable.ic_tile_settings,
+            trailing = null,
+            onClick = {}
+        ).also { row ->
+            // Append a Switch as the trailing control, matching the design.
+            val switch = android.widget.Switch(this).apply {
+                isChecked = bypassOn
+                setOnCheckedChangeListener { _, checked ->
+                    if (checked && !dev.autobridge.safety.BypassPolicyStore.enabled) {
+                        // Turning ON: show the same confirmation dialog as before.
+                        isChecked = false // revert until confirmed
+                        android.app.AlertDialog.Builder(this@MainActivity)
+                            .setTitle(R.string.bypass_confirm_title)
+                            .setMessage(R.string.bypass_confirm_message)
+                            .setNegativeButton(R.string.action_cancel, null)
+                            .setPositiveButton(R.string.bypass_notification_action_turn_on) { _, _ -> toggleBypass() }
+                            .show()
+                    } else if (!checked && dev.autobridge.safety.BypassPolicyStore.enabled) {
+                        // Turning OFF: disable immediately.
+                        toggleBypass()
+                    }
                 }
-            )),
-            SettingsGroup(getString(R.string.settings_group_features), listOf(
-                settingsEntry(
-                    getString(R.string.settings_video),
-                    getString(R.string.settings_video_caption),
-                    R.drawable.ic_tile_tv
-                ) {
-                    startActivity(dev.autobridge.library.VideoSettingsActivity.intent(this))
-                },
-                settingsEntry(
-                    getString(R.string.settings_youtube),
-                    getString(R.string.settings_youtube_caption),
-                    R.drawable.ic_tile_youtube
-                ) {
-                    startActivity(dev.autobridge.youtube.YouTubeSettingsActivity.intent(this))
-                },
-                settingsEntry(
-                    getString(R.string.agent_screen_title),
-                    getString(R.string.agent_screen_subtitle),
-                    R.drawable.ic_tile_remote
-                ) {
-                    showPhoneScreen(PhoneScreen.AGENT_COMMANDS)
-                }
-            )),
-            SettingsGroup(getString(R.string.settings_group_advanced), listOf(
-                settingsEntry(
-                    getString(R.string.settings_advanced),
-                    getString(R.string.settings_advanced_caption),
-                    R.drawable.ic_tile_debug
-                ) {
-                    showPhoneScreen(PhoneScreen.ADVANCED)
-                }
-            )),
-            SettingsGroup(getString(R.string.settings_group_about), listOf(
-                settingsEntry(
-                    getString(R.string.settings_about),
-                    getString(R.string.settings_about_caption),
-                    R.drawable.ic_tile_settings
-                ) {
-                    showPhoneScreen(PhoneScreen.ABOUT)
-                }
-            ))
+            }
+            (row as LinearLayout).addView(
+                switch,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            )
+            // Make the row's own click toggle the switch.
+            row.setOnClickListener { switch.toggle() }
+        }
+
+        return settingsListPage(
+            title = getString(R.string.settings_title),
+            subtitle = null,
+            back = { goBack() },
+            groups = listOf(
+                SettingsGroup(getString(R.string.settings_group_car_apps), buildList {
+                    add(settingsEntry(
+                        getString(R.string.settings_car_connection),
+                        getString(R.string.settings_car_connection_caption),
+                        R.drawable.ic_tile_car
+                    ) {
+                        showPhoneScreen(PhoneScreen.CAR_CONNECTION)
+                    })
+                    addAll(duoScreenEntry())
+                    add(settingsEntry(
+                        getString(R.string.settings_app_profiles),
+                        getString(R.string.settings_app_profiles_caption_full),
+                        R.drawable.ic_tile_apps
+                    ) {
+                        appsFavoritesOnly = true
+                        showPhoneScreen(PhoneScreen.APPS)
+                    })
+                    add(settingsEntry(
+                        getString(R.string.settings_display_mirror),
+                        getString(R.string.settings_display_mirror_caption),
+                        R.drawable.ic_tile_mirror
+                    ) {
+                        showPhoneScreen(PhoneScreen.MIRROR_SETTINGS)
+                    })
+                    add(settingsEntry(
+                        getString(R.string.settings_input_touch),
+                        getString(R.string.settings_input_touch_caption),
+                        R.drawable.ic_tile_touch
+                    ) {
+                        showPhoneScreen(PhoneScreen.INPUT_TOUCH)
+                    })
+                }),
+                SettingsGroup(getString(R.string.settings_group_playback_web), listOf(
+                    settingsEntry(
+                        getString(R.string.settings_video),
+                        getString(R.string.settings_video_caption_full),
+                        R.drawable.ic_tile_tv
+                    ) {
+                        startActivity(dev.autobridge.library.VideoSettingsActivity.intent(this))
+                    },
+                    settingsEntry(
+                        getString(R.string.settings_youtube),
+                        getString(R.string.settings_youtube_caption_full),
+                        R.drawable.ic_tile_youtube
+                    ) {
+                        startActivity(dev.autobridge.youtube.YouTubeSettingsActivity.intent(this))
+                    },
+                    settingsEntry(
+                        getString(R.string.settings_browser),
+                        getString(R.string.settings_browser_caption),
+                        R.drawable.ic_tile_web
+                    ) {
+                        openBrowserSettings()
+                    }
+                )),
+                SettingsGroup(
+                    label = getString(R.string.settings_group_safety),
+                    customRows = listOf(bypassRow)
+                ),
+                SettingsGroup(getString(R.string.settings_group_general), listOf(
+                    settingsEntry(
+                        getString(R.string.agent_screen_title),
+                        getString(R.string.agent_screen_subtitle),
+                        R.drawable.ic_tile_remote
+                    ) {
+                        showPhoneScreen(PhoneScreen.AGENT_COMMANDS)
+                    },
+                    settingsEntry(
+                        getString(R.string.settings_language),
+                        getString(AppLocale.selectedOption(this).labelRes),
+                        R.drawable.ic_tile_language
+                    ) { chooseLanguage() },
+                    settingsEntry(
+                        getString(R.string.settings_advanced),
+                        getString(R.string.settings_advanced_caption),
+                        R.drawable.ic_tile_debug
+                    ) {
+                        showPhoneScreen(PhoneScreen.ADVANCED)
+                    },
+                    settingsEntry(
+                        getString(R.string.settings_about),
+                        getString(R.string.settings_about_caption),
+                        R.drawable.ic_tile_settings
+                    ) {
+                        showPhoneScreen(PhoneScreen.ABOUT)
+                    }
+                ))
+            )
         )
-    )
+    }
 
     /**
      * The Duo Screen row, present only in the sideload flavors that actually ship the feature.
      *
      * Resolved by component name rather than referenced directly: the activity and its strings live
      * in a flavor-specific source set, so the safe (Play) build has neither, and a direct reference
-     * would not compile there. Its own manifest label and description supply the row's text, which
-     * keeps those strings out of the Play build too.
+     * would not compile there. Uses explicit string resources from the shared strings.xml so the
+     * text matches the design.
      */
     private fun duoScreenEntry(): List<dev.autobridge.ui.PhoneLauncherUi.Entry> {
         val intent = duoScreenIntent() ?: return emptyList()
-        val resolved = packageManager.resolveActivity(intent, 0) ?: return emptyList()
-        val title = resolved.loadLabel(packageManager).toString()
-        val caption = resolved.activityInfo?.descriptionRes
-            ?.takeIf { it != 0 }
-            ?.let(::getString)
-            .orEmpty()
         return listOf(
-            settingsEntry(title, caption, R.drawable.ic_tile_settings) { startActivity(intent) }
+            settingsEntry(
+                getString(R.string.settings_duo_screen),
+                getString(R.string.settings_duo_screen_caption),
+                R.drawable.ic_tile_settings
+            ) { startActivity(intent) }
         )
     }
 
@@ -2692,36 +2746,12 @@ class MainActivity : androidx.activity.ComponentActivity() {
                     R.drawable.ic_tile_settings
                 ) {
                     startActivity(dev.autobridge.library.StorageSettingsActivity.intent(this))
-                },
-                *duoScreenEntry().toTypedArray(),
-                settingsEntry(
-                    getString(R.string.bypass_setting_title),
-                    getString(
-                        if (dev.autobridge.safety.BypassPolicyStore.enabled)
-                            R.string.bypass_setting_summary_on
-                        else R.string.bypass_setting_summary_off
-                    ),
-                    R.drawable.ic_tile_settings
-                ) {
-                    // Turning it OFF restores the stock safety gate, so it needs no confirmation.
-                    // Turning it ON lifts that gate, so it is confirmed like the other actions on
-                    // this screen that change something safety- or data-relevant.
-                    if (dev.autobridge.safety.BypassPolicyStore.enabled) {
-                        toggleBypass()
-                    } else {
-                        android.app.AlertDialog.Builder(this)
-                            .setTitle(R.string.bypass_confirm_title)
-                            .setMessage(R.string.bypass_confirm_message)
-                            .setNegativeButton(R.string.action_cancel, null)
-                            .setPositiveButton(R.string.bypass_notification_action_turn_on) { _, _ -> toggleBypass() }
-                            .show()
-                    }
                 }
             ))
         )
     )
 
-    /** Flips the safety bypass and rebuilds Advanced so the row caption reflects the new state. */
+    /** Flips the safety bypass and rebuilds Settings so the switch row reflects the new state. */
     private fun toggleBypass() {
         val nowOn = dev.autobridge.safety.BypassPolicyStore.toggle()
         Toast.makeText(
@@ -2729,7 +2759,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
             getString(if (nowOn) R.string.bypass_toast_on else R.string.bypass_toast_off),
             Toast.LENGTH_SHORT
         ).show()
-        showPhoneScreen(PhoneScreen.ADVANCED, force = true)
+        showPhoneScreen(PhoneScreen.SETTINGS, force = true)
     }
 
     /**
@@ -3893,6 +3923,15 @@ class MainActivity : androidx.activity.ComponentActivity() {
 
     private fun openBrowserOnCar() {
         startActivity(browserScreenIntent())
+    }
+
+    /** Launches the phone browser and immediately opens its settings sheet. */
+    private fun openBrowserSettings() {
+        startActivity(
+            browserScreenIntent().putExtra(
+                dev.autobridge.browser.BrowserActivity.EXTRA_OPEN_SETTINGS, true
+            )
+        )
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
