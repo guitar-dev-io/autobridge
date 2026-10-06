@@ -2676,30 +2676,6 @@ class MainActivity : androidx.activity.ComponentActivity() {
                     addAll(duoScreenEntry())
                     addAll(projectionSetupEntry())
                     add(settingsEntry(
-                        getString(R.string.fuel_title),
-                        getString(R.string.fuel_settings_caption),
-                        R.drawable.ic_tile_car,
-                        accent = design.ACCENT
-                    ) { startActivity(dev.autobridge.fuel.FuelLogActivity.intent(this@MainActivity)) })
-                    add(settingsEntry(
-                        getString(R.string.maint_title),
-                        getString(R.string.maint_settings_caption),
-                        R.drawable.ic_tile_car,
-                        accent = design.ACCENT
-                    ) { startActivity(dev.autobridge.maintenance.MaintenanceActivity.intent(this@MainActivity)) })
-                    add(settingsEntry(
-                        getString(R.string.trip_title),
-                        getString(R.string.trip_settings_caption),
-                        R.drawable.ic_tile_car,
-                        accent = design.ACCENT
-                    ) { startActivity(dev.autobridge.trip.TripActivity.intent(this@MainActivity)) })
-                    add(settingsEntry(
-                        getString(R.string.backup_title),
-                        getString(R.string.backup_settings_caption),
-                        R.drawable.ic_tile_car,
-                        accent = design.ACCENT
-                    ) { startActivity(dev.autobridge.backup.BackupActivity.intent(this@MainActivity)) })
-                    add(settingsEntry(
                         getString(R.string.settings_app_profiles),
                         getString(R.string.settings_app_profiles_caption_full),
                         R.drawable.ic_tile_apps,
@@ -2724,6 +2700,27 @@ class MainActivity : androidx.activity.ComponentActivity() {
                     ) {
                         showPhoneScreen(PhoneScreen.INPUT_TOUCH)
                     })
+                }),
+                // The driver's own paperwork on the car: what it burns, what it is due for, and a copy of both.
+                SettingsGroup(getString(R.string.settings_group_utilities), buildList {
+                    add(settingsEntry(
+                        getString(R.string.fuel_title),
+                        getString(R.string.fuel_settings_caption),
+                        R.drawable.ic_tile_car,
+                        accent = design.ACCENT
+                    ) { startActivity(dev.autobridge.fuel.FuelLogActivity.intent(this@MainActivity)) })
+                    add(settingsEntry(
+                        getString(R.string.maint_title),
+                        getString(R.string.maint_settings_caption),
+                        R.drawable.ic_tile_car,
+                        accent = design.ACCENT
+                    ) { startActivity(dev.autobridge.maintenance.MaintenanceActivity.intent(this@MainActivity)) })
+                    add(settingsEntry(
+                        getString(R.string.backup_title),
+                        getString(R.string.backup_settings_caption),
+                        R.drawable.ic_tile_car,
+                        accent = design.ACCENT
+                    ) { startActivity(dev.autobridge.backup.BackupActivity.intent(this@MainActivity)) })
                 }),
                 SettingsGroup(getString(R.string.settings_group_playback_web), listOf(
                     settingsEntry(

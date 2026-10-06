@@ -561,10 +561,10 @@
     <string name="aa_hidden_title">Bridge Web is hidden on Android Auto</string>
     <string name="aa_hidden_message">Installing this update reset the install source, so Android Auto will not show Bridge Web until it is set again. It takes one tap with Shizuku.</string>
     <string name="aa_hidden_fix">Fix now</string>
-    <string name="whats_new_0_4_34">• YouTube SponsorBlock: a note under the switch now says plainly that it may not work or may be incomplete, and why.\n• Home has a coffee button for supporting the developer (not in the Play-store build).\n• Maintenance suggestions now include the compulsory insurance (Por.Ror.Bor.). If you already added the suggested items, tap Add suggested again to get it.</string>
+    <string name="whats_new_0_4_34">• YouTube SponsorBlock: a note under the switch now says plainly that it may not work or may be incomplete, and why.\n• Home has a coffee button for supporting the developer (not in the Play-store build).\n• Maintenance suggestions now include the compulsory insurance (Por.Ror.Bor.). If you already added the suggested items, tap Add suggested again to get it.\n• The fuel log, maintenance and backup now sit together under Utilities in Settings, and the fuel log and maintenance under Utilities in the car\'s More menu.</string>
     <string name="whats_new_0_4_33">• Navigating from a map in the browser: the Start and Open app buttons on the Google Maps page now start navigation in the Google Maps app (they did nothing before), and if location is switched off on the phone the app says so instead of leaving the map unable to find you.\n• Maintenance now shows the date each item falls due (or about when, from your usual driving), lets you set a due date such as when the road tax runs out, and sends a notification when something is due or close.</string>
     <string name="whats_new_0_4_32">• Fuel log: choose the fuel grade for each fill-up (Gasohol 95, 91, E20, E85, Benzine 95, Diesel, Premium diesel, LPG, NGV) or type your own. The last grade is offered again, and it is in the CSV.</string>
-    <string name="whats_new_0_4_31">• Trips: Settings &gt; Trips starts and ends a trip with the number of people, and shows distance and the cost per person (fuel or charging, plus tolls and parking). The car can start and end one under More &gt; Trips.\n• Backup: Settings &gt; Backup and restore saves the fuel or charging log, maintenance and trips as one file, to move to another phone.</string>
+    <string name="whats_new_0_4_31">• Backup: Settings &gt; Backup and restore saves the fuel or charging log and maintenance as one file, to move to another phone.</string>
     <string name="whats_new_0_4_30">• EV support: switch the fuel log to EV (⚡) in Settings &gt; Fuel log. It then counts kWh and km/kWh, and shows the battery level from the car where the car reports it.\n• Maintenance: Settings &gt; Maintenance tracks oil, tyres, road tax and, for an EV, the coolant and 12 V battery, by distance and by date. The car shows what is due under More &gt; Maintenance.</string>
     <string name="whats_new_0_4_29">• Fuel log: Settings > Fuel log records each fill-up and works out km/L, baht/km and this month\'s spend. On the car: More > Fuel log; allow the car\'s odometer there and it is filled in for you at the next fill-up.\n• Duo Screen: the apps in the panes start fresh each time instead of coming back as they were left.</string>
     <string name="whats_new_0_4_28">• The mirror is inside Bridge Web (menu > Mirror phone screen), and Bridge Mirror\'s own icon is off by default, so Android Auto can put Bridge Web beside Maps again.\n• A split in Bridge Web no longer splits the web screen in AutoBridge.\n• Settings > Send log shares a log file for reporting problems.\n• Update: the APK downloads in the app and opens in the installer you pick (e.g. KingInstaller).\n• The version is shown on Home.</string>
@@ -1569,12 +1569,12 @@
     <string name="trip_cost">%1$s baht in total · %3$s baht each (%2$d people)</string>
     <string name="backup_title">Backup and restore</string>
     <string name="backup_subtitle">Move your logs to another phone</string>
-    <string name="backup_settings_caption">Fuel or charging log, maintenance and trips in one file</string>
+    <string name="backup_settings_caption">Fuel or charging log and maintenance in one file</string>
     <string name="backup_export">Back up</string>
-    <string name="backup_export_caption">Save the fuel or charging log, maintenance and trips as a file</string>
+    <string name="backup_export_caption">Save the fuel or charging log and maintenance as a file</string>
     <string name="backup_import">Restore</string>
     <string name="backup_import_caption">Open a backup file; it replaces what is on this phone</string>
-    <string name="backup_confirm">The fuel or charging log, maintenance list and trips on this phone will be replaced by the file\'s.</string>
+    <string name="backup_confirm">The fuel or charging log and maintenance list on this phone will be replaced by the file\'s.</string>
     <string name="backup_replace">Replace</string>
     <string name="backup_done">Restored.</string>
     <string name="backup_invalid">That is not an AutoBridge backup.</string>
@@ -1608,4 +1608,6 @@
     <string name="youtube_sponsorblock_caveat">This may not work, or may be incomplete. The segments come from volunteers, so new or little-watched videos often have none and a marked segment can be a little off. Skipping needs the internet and works only in AutoBridge\'s own YouTube page; if YouTube changes its site, it can stop working until the app is updated.</string>
     <string name="home_donate">☕ Buy me a coffee</string>
     <string name="maint_compulsory_insurance">Compulsory insurance (Por.Ror.Bor.)</string>
+    <string name="settings_group_utilities">Utilities</string>
+    <string name="car_more_group_utilities">Utilities</string>
 </resources>
