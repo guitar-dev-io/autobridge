@@ -56,7 +56,7 @@ internal class HomeMenuCard {
     val label = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
         color = HomeDashboardTheme.TEXT_PRIMARY
         typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-        textAlign = Paint.Align.CENTER
+        textAlign = Paint.Align.LEFT
     }
     private val rect = RectF()
     private val path = Path()
@@ -98,19 +98,22 @@ internal class HomeMenuCard {
             canvas.drawRoundRect(rect, radius, radius, stroke)
         }
 
-        // Icon tile + label, centred as one block so short and long titles sit identically.
+        // Icon tile on the left, label to its right, both vertically centred (image 01). Short and
+        // long titles share one text size, so "TV" and "YouTube Music" read as the same component.
         label.textSize = layout.labelSize
         val metrics = label.fontMetrics
-        val lineHeight = metrics.descent - metrics.ascent
         val icon = layout.iconSize
-        val blockTop = bounds.centerY - (icon + layout.iconLabelGap + lineHeight) / 2f
-        val iconLeft = bounds.centerX - icon / 2f
-        drawIconTile(canvas, iconLeft, blockTop, icon, item, d)
+        val cardPadding = HomeDashboardTheme.Dp.CARD_PADDING * d
+        val gap = HomeDashboardTheme.Dp.CARD_ICON_LABEL_GAP * d
+        val iconLeft = bounds.left + cardPadding
+        val iconTop = bounds.centerY - icon / 2f
+        drawIconTile(canvas, iconLeft, iconTop, icon, item, d)
 
-        val text =
-            TextUtils.ellipsize(title, label, layout.labelMaxWidth, TextUtils.TruncateAt.END)
-        val baseline = blockTop + icon + layout.iconLabelGap - metrics.ascent
-        canvas.drawText(text, 0, text.length, bounds.centerX, baseline, label)
+        val textLeft = iconLeft + icon + gap
+        val textMaxWidth = bounds.right - cardPadding - textLeft
+        val text = TextUtils.ellipsize(title, label, textMaxWidth, TextUtils.TruncateAt.END)
+        val baseline = bounds.centerY - (metrics.ascent + metrics.descent) / 2f
+        canvas.drawText(text, 0, text.length, textLeft, baseline, label)
     }
 
     private fun drawIconTile(canvas: Canvas, left: Float, top: Float, size: Float, item: HomeMenuItem, d: Float) {

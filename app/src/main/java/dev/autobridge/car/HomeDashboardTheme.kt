@@ -111,6 +111,8 @@ internal object HomeDashboardTheme {
         const val ICON_MAX = 72f
         const val ICON_LABEL_GAP_MIN = 10f
         const val ICON_LABEL_GAP_MAX = 14f
+        /** Horizontal gap between a card's icon tile and its label (image 01 lays cards out in a row). */
+        const val CARD_ICON_LABEL_GAP = 16f
 
         const val LABEL_MAX = 22f
         const val LABEL_MIN = 16f

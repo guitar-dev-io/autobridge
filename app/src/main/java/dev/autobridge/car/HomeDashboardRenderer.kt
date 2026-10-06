@@ -111,9 +111,8 @@ internal class HomeDashboardRenderer(private val context: Context) {
         canvas.translate(0f, -state.scroll)
 
         content.continueWatching?.let { item ->
-            layout.continueTitle?.let {
-                drawSectionTitle(canvas, it, layout, context.getString(R.string.car_home_continue_watching))
-            }
+            // "Continue Watching" is drawn inside the hero card (image 01), not as a section title
+            // above it; the layout still reserves the title band so the budget maths is untouched.
             layout.continueCard?.let {
                 drawHero(canvas, it, layout, item, state.pressed?.region == HomeRegion.CONTINUE, thumbnails)
             }
@@ -221,12 +220,27 @@ internal class HomeDashboardRenderer(private val context: Context) {
         title.textSize = layout.heroTitleSize
         meta.textSize = layout.heroMetaSize
         trailing.textSize = layout.heroMetaSize
+        sectionTitle.textSize = layout.heroMetaSize
 
+        val captionLine = lineHeight(sectionTitle)
         val titleLine = lineHeight(title)
         val metaLine = lineHeight(meta)
-        val gap = HomeDashboardTheme.Dp.HERO_LINE_GAP * d
-        val block = titleLine + gap + metaLine + gap + metaLine
+        val lines = captionLine + titleLine + metaLine + metaLine
+        // Four stacked lines now (caption, title, source, progress); shrink the inter-line gap on a
+        // short hero so the block stays inside the card rather than clipping on a small head unit.
+        val maxGap = HomeDashboardTheme.Dp.HERO_LINE_GAP * d
+        val gap = min(maxGap, ((box.height - padding * 0.5f - lines) / 3f).coerceAtLeast(0f))
+        val block = lines + gap * 3f
         var y = box.centerY - block / 2f
+
+        // Caption: "Continue Watching" in secondary colour, above the video title (image 01).
+        sectionTitle.color = HomeDashboardTheme.TEXT_SECONDARY
+        drawEllipsized(
+            canvas, context.getString(R.string.car_home_continue_watching), sectionTitle,
+            textLeft, textRight, y, captionLine
+        )
+        sectionTitle.color = HomeDashboardTheme.TEXT_PRIMARY
+        y += captionLine + gap
 
         drawEllipsized(canvas, item.title, title, textLeft, textRight, y, titleLine)
         y += titleLine + gap
