@@ -161,9 +161,10 @@ class ProjectionSetupActivity : Activity() {
 
     private val mirrorService get() = ComponentName(this, ProjectionMirrorCarService::class.java)
 
+    /** Off unless switched on: the manifest declares the service disabled; see the comment there. */
     private fun isMirrorShown(): Boolean =
-        packageManager.getComponentEnabledSetting(mirrorService) !=
-            PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+        packageManager.getComponentEnabledSetting(mirrorService) ==
+            PackageManager.COMPONENT_ENABLED_STATE_ENABLED
 
     /**
      * Lists or unlists Bridge Mirror on Android Auto by enabling or disabling its service. It is
@@ -175,7 +176,7 @@ class ProjectionSetupActivity : Activity() {
         if (shown == isMirrorShown()) return
         packageManager.setComponentEnabledSetting(
             mirrorService,
-            if (shown) PackageManager.COMPONENT_ENABLED_STATE_DEFAULT else PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+            if (shown) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DEFAULT,
             PackageManager.DONT_KILL_APP
         )
         toast("Reconnect Android Auto for the change to show on the car")
@@ -185,8 +186,9 @@ class ProjectionSetupActivity : Activity() {
 }
 
 private val MIRROR_NOTE = """
-    Turn this off to list only Bridge Web on the car. If Android Auto then offers its split screen
-    (Bridge Web beside Maps) again, Bridge Mirror's extra projection service is what stopped it.
+    Off by default. While Bridge Mirror is listed, Android Auto may stop offering its split screen
+    (Bridge Web beside Maps, as with Fermata). Turn it on when you need the mirror, and off again
+    for the split. Reconnect Android Auto after changing it.
 """.trimIndent()
 
 private val MANUAL_STEPS = """

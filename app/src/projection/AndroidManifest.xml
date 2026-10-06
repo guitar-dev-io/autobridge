@@ -41,9 +41,16 @@
              app that gets real MotionEvents from the car display - the Car App Library route only
              ever reports interpreted gestures. See ProjectionMirrorActivity.
 
-             exported: gearhead binds it, same as the browser service above. -->
+             exported: gearhead binds it, same as the browser service above.
+
+             enabled="false": off until switched on in Settings > Bridge Web on Android Auto. With
+             a second CATEGORY_PROJECTION service listed (it arrived in 0.4.20), Android Auto stopped
+             offering its split screen - Bridge Web in the main area, Maps beside it - which it
+             gave through 0.4.17, when Bridge Web was this app's only projection service, as it is
+             Fermata's. Off by default puts the app back in that shape. -->
         <service
             android:name="dev.autobridge.projection.ProjectionMirrorCarService"
+            android:enabled="false"
             android:exported="true"
             android:label="Bridge Mirror"
             android:icon="@mipmap/ic_launcher"
