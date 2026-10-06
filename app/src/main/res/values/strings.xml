@@ -561,6 +561,7 @@
     <string name="aa_hidden_title">Bridge Web is hidden on Android Auto</string>
     <string name="aa_hidden_message">Installing this update reset the install source, so Android Auto will not show Bridge Web until it is set again. It takes one tap with Shizuku.</string>
     <string name="aa_hidden_fix">Fix now</string>
+    <string name="whats_new_0_4_32">• Checkpoints: mark your own checkpoints (Settings &gt; Checkpoints, or More &gt; Checkpoints on the car) and see how far the nearest are. After you allow location, a toast warns when you are within 500 m of one while the car\'s checkpoint screen is open. Your location is never stored or sent. Backups include them.</string>
     <string name="whats_new_0_4_31">• Trips: Settings &gt; Trips starts and ends a trip with the number of people, and shows distance and the cost per person (fuel or charging, plus tolls and parking). The car can start and end one under More &gt; Trips.\n• Backup: Settings &gt; Backup and restore saves the fuel or charging log, maintenance and trips as one file, to move to another phone.</string>
     <string name="whats_new_0_4_30">• EV support: switch the fuel log to EV (⚡) in Settings &gt; Fuel log. It then counts kWh and km/kWh, and shows the battery level from the car where the car reports it.\n• Maintenance: Settings &gt; Maintenance tracks oil, tyres, road tax and, for an EV, the coolant and 12 V battery, by distance and by date. The car shows what is due under More &gt; Maintenance.</string>
     <string name="whats_new_0_4_29">• Fuel log: Settings > Fuel log records each fill-up and works out km/L, baht/km and this month\'s spend. On the car: More > Fuel log; allow the car\'s odometer there and it is filled in for you at the next fill-up.\n• Duo Screen: the apps in the panes start fresh each time instead of coming back as they were left.</string>
@@ -1575,4 +1576,28 @@
     <string name="backup_replace">Replace</string>
     <string name="backup_done">Restored.</string>
     <string name="backup_invalid">That is not an AutoBridge backup.</string>
+
+    <!-- Checkpoints -->
+    <string name="checkpoint_title">Checkpoints</string>
+    <string name="checkpoint_subtitle">Your own marked checkpoints</string>
+    <string name="checkpoint_settings_caption">Mark checkpoints and see how far the nearest are</string>
+    <string name="checkpoint_privacy">Your own list, kept on this phone. Location is read only while the car\'s checkpoint screen is open, once you allow it, to measure the distance; it is never stored or sent.</string>
+    <string name="checkpoint_allow_title">Allow location for checkpoints?</string>
+    <string name="checkpoint_location_allow">Allow location on the car screen</string>
+    <string name="checkpoint_location_on">Location allowed: tap to turn off</string>
+    <string name="checkpoint_mark_here">Mark here</string>
+    <string name="checkpoint_add">+ Coordinates</string>
+    <string name="checkpoint_default_name">Checkpoint</string>
+    <string name="checkpoint_unnamed">Checkpoint</string>
+    <string name="checkpoint_field_coordinates">Coordinates or a map link</string>
+    <string name="checkpoint_invalid">No coordinates found. Paste them like 13.7563, 100.5018.</string>
+    <string name="checkpoint_no_fix">No location yet. Try again in a moment.</string>
+    <string name="checkpoint_waiting_fix">Waiting for a location\u2026</string>
+    <string name="checkpoint_empty_title">No checkpoints yet</string>
+    <string name="checkpoint_empty_message">Mark one from where you are, or paste coordinates or a map link.</string>
+    <string name="checkpoint_car_empty">Mark one here, or on the phone (Settings &gt; Checkpoints).</string>
+    <string name="checkpoint_delete_title">Delete this checkpoint?</string>
+    <string name="checkpoint_distance_m">%1$d m</string>
+    <string name="checkpoint_distance_km">%1$s km</string>
+    <string name="checkpoint_close">%1$s ahead, %2$d m</string>
 </resources>
