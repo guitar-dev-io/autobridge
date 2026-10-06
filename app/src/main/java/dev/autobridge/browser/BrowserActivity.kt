@@ -1041,6 +1041,7 @@ class BrowserActivity : Activity() {
         SendToCarSheet(
             activity = this,
             sizes = sizes,
+            isConnected = { dev.autobridge.bridge.AutoBridgeSessionManager.current.connected },
             currentUrl = { currentPageUrl() },
             currentTitle = { web.title?.takeIf { it.isNotBlank() } },
             engine = { SearchEngineStore.engine(this) },
