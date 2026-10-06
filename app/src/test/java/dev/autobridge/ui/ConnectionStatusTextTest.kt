@@ -35,4 +35,10 @@ class ConnectionStatusTextTest {
     @Test fun drivingIsReportedAsDriving() {
         assertEquals("Connected · Driving", ConnectionStatusText.of(true, VehicleState.MOVING).summary)
     }
+
+    @Test fun pillIsTheShortStandaloneWord() {
+        assertEquals("Parked", ConnectionStatusText.of(true, VehicleState.PARKED).pill)
+        assertEquals("Driving", ConnectionStatusText.of(true, VehicleState.MOVING).pill)
+        assertEquals("Not connected", ConnectionStatusText.of(false, VehicleState.PARKED).pill)
+    }
 }

@@ -346,9 +346,22 @@ fun AgentCommandsScreen(
  * Android Auto connection card. Reads [RuntimeContextStore] directly — the single source of truth
  * for connected / parked — and words it with [ConnectionStatusText], so Home, Control and
  * Car & Connection always agree and never show internal values like REAL_CAR.
+ *
+ * [showPill] swaps the trailing chevron for a status pill ("Parked" / "Driving" / "Not
+ * connected") — Home's reading of the card, where the pill is the at-a-glance signal rather than
+ * a "tap for more" hint. [actions], when given, renders below the status row inside the same card
+ * — Home's Mirror / Bridge Duo buttons. Clicks on them take priority over [onClick] (Compose
+ * always resolves the innermost clickable first), so the card can stay tappable to open
+ * Car & Connection everywhere outside the button row.
  */
 @Composable
-fun AndroidAutoStatusCard(title: String, caption: String? = null, onClick: (() -> Unit)?) {
+fun AndroidAutoStatusCard(
+    title: String,
+    caption: String? = null,
+    onClick: (() -> Unit)?,
+    showPill: Boolean = false,
+    actions: (@Composable () -> Unit)? = null
+) {
     val runtime by RuntimeContextStore.context.collectAsState()
     val connectedTemplate = stringResource(R.string.conn_connected_format)
     val labels = ConnectionStatusText.Labels(
@@ -360,31 +373,40 @@ fun AndroidAutoStatusCard(title: String, caption: String? = null, onClick: (() -
     )
     val status = ConnectionStatusText.of(runtime, labels)
     val body: @Composable () -> Unit = {
-        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier.size(46.dp)
-                    .background(ComposeTokens.Ok.copy(alpha = 0.16f), RoundedCornerShape(12.dp))
-                    .border(1.dp, ComposeTokens.Ok.copy(alpha = 0.3f), RoundedCornerShape(12.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    painterResource(R.drawable.ic_tile_car),
-                    contentDescription = null,
-                    tint = if (status.connected) AccentGreen else TextMuted,
-                    modifier = Modifier.size(24.dp)
-                )
+        Column {
+            Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.size(46.dp)
+                        .background(ComposeTokens.Ok.copy(alpha = 0.16f), RoundedCornerShape(12.dp))
+                        .border(1.dp, ComposeTokens.Ok.copy(alpha = 0.3f), RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        painterResource(R.drawable.ic_tile_car),
+                        contentDescription = null,
+                        tint = if (status.connected) AccentGreen else TextMuted,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                Column(Modifier.padding(start = 12.dp).weight(1f)) {
+                    Text(title, color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                    Text(
+                        (if (status.connected) "● " else "○ ") + status.summary,
+                        color = if (status.connected) AccentGreen else TextMuted,
+                        fontSize = 13.sp,
+                        modifier = Modifier.semantics { contentDescription = "$title: ${status.summary}" }
+                    )
+                    if (!caption.isNullOrBlank()) Text(caption, color = TextMuted, fontSize = 12.sp)
+                }
+                if (showPill) {
+                    StatusPill(status.pill, status.connected)
+                } else if (onClick != null) {
+                    Text("›", color = TextMuted, fontSize = 22.sp)
+                }
             }
-            Column(Modifier.padding(start = 12.dp).weight(1f)) {
-                Text(title, color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                Text(
-                    (if (status.connected) "● " else "○ ") + status.summary,
-                    color = if (status.connected) AccentGreen else TextMuted,
-                    fontSize = 13.sp,
-                    modifier = Modifier.semantics { contentDescription = "$title: ${status.summary}" }
-                )
-                if (!caption.isNullOrBlank()) Text(caption, color = TextMuted, fontSize = 12.sp)
+            if (actions != null) {
+                Box(Modifier.padding(start = 14.dp, end = 14.dp, bottom = 14.dp)) { actions() }
             }
-            if (onClick != null) Text("›", color = TextMuted, fontSize = 22.sp)
         }
     }
     val shape = RoundedCornerShape(16.dp)
@@ -392,6 +414,27 @@ fun AndroidAutoStatusCard(title: String, caption: String? = null, onClick: (() -
         Surface(onClick = onClick, color = CardColor, shape = shape, modifier = Modifier.fillMaxWidth()) { body() }
     } else {
         Surface(color = CardColor, shape = shape, modifier = Modifier.fillMaxWidth()) { body() }
+    }
+}
+
+/** A small accent dot plus one word — [AndroidAutoStatusCard]'s Home-only connection pill. */
+@Composable
+private fun StatusPill(label: String, connected: Boolean) {
+    val color = if (connected) AccentGreen else TextMuted
+    Surface(color = color.copy(alpha = 0.16f), shape = RoundedCornerShape(18.dp)) {
+        Row(
+            Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(Modifier.size(7.dp).background(color, CircleShape))
+            Text(
+                label,
+                color = color,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.padding(start = 6.dp)
+            )
+        }
     }
 }
 

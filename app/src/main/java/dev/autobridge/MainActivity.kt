@@ -1937,14 +1937,15 @@ class MainActivity : androidx.activity.ComponentActivity() {
         const val STATE_APPS_FAVORITES = "apps_favorites_only"
         const val STATE_APPS_QUERY = "apps_query"
 
-        const val COLOR_BACKGROUND = 0xff0b0e14.toInt()
-        const val COLOR_SURFACE = 0xff141924.toInt()
-        const val COLOR_SURFACE_ALT = 0xff1c2331.toInt()
-        const val COLOR_BORDER = 0xff26304a.toInt()
-        const val COLOR_ACCENT = 0xff4c7df0.toInt()
+        // Matches AutoBridgeDesign / ComposeTokens (docs/UI_REDESIGN_TASKS.md "Design tokens").
+        const val COLOR_BACKGROUND = 0xff12151a.toInt()
+        const val COLOR_SURFACE = 0xff1c2027.toInt()
+        const val COLOR_SURFACE_ALT = 0xff232831.toInt()
+        const val COLOR_BORDER = 0xff2e343e.toInt()
+        const val COLOR_ACCENT = 0xff4da3ff.toInt()
         const val COLOR_ACCENT_DARK = 0xff0b5d96.toInt()
-        const val COLOR_TEXT = 0xffeaf0fa.toInt()
-        const val COLOR_MUTED = 0xff8494b0.toInt()
+        const val COLOR_TEXT = 0xfff3f5f7.toInt()
+        const val COLOR_MUTED = 0xffa9b0ba.toInt()
         const val COLOR_SUCCESS = 0xff2ee879.toInt()
         const val COLOR_WARNING = 0xffffbf5f.toInt()
     }
@@ -1959,7 +1960,6 @@ class MainActivity : androidx.activity.ComponentActivity() {
     private lateinit var statusView: TextView
     private lateinit var mediaPlayback: MediaPlaybackClient
     private lateinit var screenContainer: FrameLayout
-    private lateinit var bottomNav: LinearLayout
     /** Live internal-state text on Advanced > Debug; null when that page is not showing. */
     private var debugStateView: TextView? = null
     private var developerLogView: TextView? = null
@@ -2103,6 +2103,8 @@ class MainActivity : androidx.activity.ComponentActivity() {
             view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
             insets
         }
+        // No bottom tab bar: Home is the hub and every other destination is a child reached from
+        // it, directly or through Settings (see PhoneNav).
         screenContainer = FrameLayout(this).apply {
             setBackgroundColor(COLOR_BACKGROUND)
         }
@@ -2110,22 +2112,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
             screenContainer,
             LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                0,
-                1f
-            )
-        )
-
-        bottomNav = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-            setPadding(dp(6), dp(5), dp(6), dp(7))
-            setBackgroundColor(COLOR_SURFACE_ALT)
-        }
-        root.addView(
-            bottomNav,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(64)
+                ViewGroup.LayoutParams.MATCH_PARENT
             )
         )
 
@@ -2160,7 +2147,6 @@ class MainActivity : androidx.activity.ComponentActivity() {
             PhoneScreen.CONTROL -> buildControlScreen()
             PhoneScreen.CONTROL_HISTORY -> buildCommandHistoryScreen()
             PhoneScreen.APPS -> buildAppsScreen()
-            PhoneScreen.PROFILES -> buildProfilesScreen()
             PhoneScreen.PROFILE -> buildProfileScreen()
             PhoneScreen.MIRROR_SETTINGS -> buildMirrorSettingsScreen()
             PhoneScreen.INPUT_TOUCH -> buildInputTouchScreen()
@@ -2182,45 +2168,8 @@ class MainActivity : androidx.activity.ComponentActivity() {
             )
         )
 
-        // The bar belongs to every top-level destination, including the ones it used to hide on.
-        // Hiding it on Home, Settings and Remote meant Home had no navigation at all (its tiles were
-        // the only way out) and that opening Settings from the Apps tab dropped the bar exactly when
-        // switching tabs was the likely next move. Only per-item detail screens hide it now, so Back
-        // is unambiguous there.
-        bottomNav.visibility = if (PhoneNav.hidesBottomBar(target)) View.GONE else View.VISIBLE
-        renderBottomNavigation()
         refreshStatus()
     }
-
-    private fun renderBottomNavigation() {
-        if (!::bottomNav.isInitialized || bottomNav.visibility != View.VISIBLE) return
-        bottomNav.removeAllViews()
-        // A drill-down keeps its parent tab lit, so the bar still says where you are.
-        val activeTab = PhoneNav.tabFor(currentScreen)
-        PhoneNav.tabs.forEach { tab ->
-            val active = tab.route == activeTab
-            val destination = tab.route
-            val item = TextView(this).apply {
-                text = "${tab.glyph}\n${tab.label}"
-                contentDescription = tab.label
-                isSelected = active
-                gravity = Gravity.CENTER
-                textSize = 11f
-                setLineSpacing(0f, 0.88f)
-                setTextColor(if (active) COLOR_ACCENT else COLOR_MUTED)
-                setTypeface(null, if (active) Typeface.BOLD else Typeface.NORMAL)
-                isClickable = true
-                isFocusable = true
-                setPadding(0, dp(3), 0, 0)
-                setOnClickListener { showPhoneScreen(destination) }
-            }
-            bottomNav.addView(
-                item,
-                LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f)
-            )
-        }
-    }
-
 
     /**
      * Home: a launcher/dashboard rather than a grid of every feature. Android Auto status, six
@@ -2265,7 +2214,9 @@ class MainActivity : androidx.activity.ComponentActivity() {
                             startActivity(
                                 Intent(this@MainActivity, dev.autobridge.bridge.BridgeControllerActivity::class.java)
                             )
-                        }
+                        },
+                        onMirror = { requestScreenCapture() },
+                        onBridgeDuo = duoScreenIntent()?.let { intent -> { startActivity(intent) } }
                     )
                 }
             }
@@ -2300,7 +2251,12 @@ class MainActivity : androidx.activity.ComponentActivity() {
                 // Outdoor temperature when a Weather place is saved; the connection itself is
                 // the status card right below, so the chip no longer repeats it.
                 chip = homeStatusChip(),
-                actions = listOf(dev.autobridge.ui.AutoBridgeDesign.HeaderAction("\uD83C\uDF99", ::homeVoiceSearch, filled = true))
+                actions = listOf(
+                    dev.autobridge.ui.AutoBridgeDesign.HeaderAction("\uD83C\uDF99", ::homeVoiceSearch, filled = true),
+                    // Home is the hub now that the bottom tab bar is gone, so this is the only way
+                    // into Settings from here.
+                    dev.autobridge.ui.AutoBridgeDesign.HeaderAction("\u2699", { showPhoneScreen(PhoneScreen.SETTINGS) })
+                )
             ),
             body = body,
             bottomBar = bottom,
@@ -2544,7 +2500,8 @@ class MainActivity : androidx.activity.ComponentActivity() {
     private fun buildSettingsMenu(): View = settingsListPage(
         title = getString(R.string.settings_title),
         subtitle = null,
-        back = null,
+        // Settings is reached from Home's gear icon now, not a bottom tab, so it needs a way back.
+        back = { goBack() },
         groups = listOf(
             SettingsGroup(getString(R.string.settings_group_display), listOf(
                 settingsEntry(
@@ -2582,7 +2539,10 @@ class MainActivity : androidx.activity.ComponentActivity() {
                     getString(R.string.settings_app_profiles_caption),
                     R.drawable.ic_tile_apps
                 ) {
-                    showPhoneScreen(PhoneScreen.PROFILES)
+                    // Apps & profiles: the former Apps tab, merged with App Profiles. Opens
+                    // favorites-filtered, the same place the Profiles screen used to land on.
+                    appsFavoritesOnly = true
+                    showPhoneScreen(PhoneScreen.APPS)
                 }
             )),
             SettingsGroup(getString(R.string.settings_group_features), listOf(
@@ -2638,7 +2598,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
      * keeps those strings out of the Play build too.
      */
     private fun duoScreenEntry(): List<dev.autobridge.ui.PhoneLauncherUi.Entry> {
-        val intent = Intent().setClassName(this, "dev.autobridge.projection.DuoScreenSettingsActivity")
+        val intent = duoScreenIntent() ?: return emptyList()
         val resolved = packageManager.resolveActivity(intent, 0) ?: return emptyList()
         val title = resolved.loadLabel(packageManager).toString()
         val caption = resolved.activityInfo?.descriptionRes
@@ -2648,6 +2608,16 @@ class MainActivity : androidx.activity.ComponentActivity() {
         return listOf(
             settingsEntry(title, caption, R.drawable.ic_tile_settings) { startActivity(intent) }
         )
+    }
+
+    /**
+     * Resolved by component name rather than referenced directly: the activity lives in a
+     * flavor-specific source set, so the safe (Play) build does not have it and a direct
+     * reference would not compile there. Null when this build/device has no Duo Screen.
+     */
+    private fun duoScreenIntent(): Intent? {
+        val intent = Intent().setClassName(this, "dev.autobridge.projection.DuoScreenSettingsActivity")
+        return intent.takeIf { packageManager.resolveActivity(it, 0) != null }
     }
 
     /** Settings > Advanced: the developer tools, kept out of the main Settings list. */
@@ -3043,7 +3013,8 @@ class MainActivity : androidx.activity.ComponentActivity() {
         // "App launcher" was misleading: tapping a row opens that app's profile, it does not launch
         // it. The star on each row is what adds it to Favorites (stored in QuickAppsStore, the one favorites list).
         content.addView(
-            screenHeader(getString(R.string.apps_title), getString(R.string.apps_subtitle))
+            // Apps & profiles: reached from Settings now, no longer a bottom tab.
+            screenHeader(getString(R.string.apps_title), getString(R.string.apps_subtitle), back = { goBack() })
         )
 
         val search = EditText(this).apply {
@@ -3100,52 +3071,6 @@ class MainActivity : androidx.activity.ComponentActivity() {
         })
         refreshAppFilter()
         renderAppGrid(grid)
-        return screenScroll(content)
-    }
-
-    private fun buildProfilesScreen(): View {
-        val content = screenContent()
-        content.addView(
-            screenHeader(
-                getString(R.string.settings_app_profiles),
-                getString(R.string.profiles_subtitle),
-                back = { goBack() }
-            )
-        )
-        content.addView(
-            mutedText(getString(R.string.profiles_applied_on_launch)),
-            LinearLayout.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT).apply { bottomMargin = dp(12) }
-        )
-        val installedApps = InstalledAppRepository.listLaunchableApps(this)
-        QuickAppsStore.syncFavorites(this, installedApps)
-        val apps = QuickAppsStore.enabledInstalledApps(this, installedApps)
-        if (apps.isEmpty()) {
-            addCard(content, mutedText(getString(R.string.profiles_empty)))
-            addCard(
-                content,
-                actionCard(getString(R.string.apps_browse_all)) {
-                    showPhoneScreen(PhoneScreen.APPS)
-                }
-            )
-        } else {
-            // Everything listed here is already a Quick App, and removing one from this screen is
-            // what the star does; the screen is rebuilt so the row disappears with it.
-            apps.forEach { app ->
-                addCard(
-                    content,
-                    appListRow(app, isQuickApp = true) {
-                        QuickAppsStore.setEnabled(this, app, false)
-                        Toast.makeText(
-                            this,
-                            getString(R.string.profiles_removed_from_favorites),
-                            Toast.LENGTH_SHORT
-                        ).show()
-                        showPhoneScreen(PhoneScreen.PROFILES)
-                    },
-                    top = 8
-                )
-            }
-        }
         return screenScroll(content)
     }
 
