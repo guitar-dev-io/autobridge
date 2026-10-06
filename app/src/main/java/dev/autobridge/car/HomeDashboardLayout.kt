@@ -309,18 +309,23 @@ internal class HomeDashboardLayout private constructor(
 
                 // --- quick-access card internals ---------------------------------------------
                 val cardPadding = Dp.CARD_PADDING * d
-                val labelMaxWidth = cardWidth - cardPadding * 2
                 val labelFloor = Dp.LABEL_MIN * d
+                val iconLabelGap = (cardHeight * 0.08f).coerceIn(Dp.ICON_LABEL_GAP_MIN * d, Dp.ICON_LABEL_GAP_MAX * d)
+                // The icon tile's room still assumes the largest candidate label; the fit loop only
+                // ever shrinks the label from here, so this stays a conservative (not undersized) tile.
+                val iconRoom = cardHeight - cardPadding * 2 - iconLabelGap - (Dp.LABEL_MAX * d) * 1.2f
+                val iconSize = min(min(cardHeight * 0.52f, cardWidth * 0.45f), iconRoom)
+                    .coerceIn(Dp.ICON_MIN * d, Dp.ICON_MAX * d)
+                // The horizontal card paints the label in the column to the right of the icon tile,
+                // not across the whole card, so fit it to that real column (card minus padding, the
+                // icon tile and the icon→label gap) or it ellipsizes early on narrow profiles.
+                val labelMaxWidth = cardWidth - cardPadding * 2 - iconSize - Dp.CARD_ICON_LABEL_GAP * d
                 var labelSize = min(Dp.LABEL_MAX * d, cardHeight * 0.18f).coerceAtLeast(labelFloor)
                 // One size for every card, so "TV" and "YouTube Music" read as the same component.
                 while (labelSize > labelFloor && labels.any { measure(it, labelSize) > labelMaxWidth }) {
                     labelSize -= 0.5f * d
                 }
                 labelSize = max(labelSize, labelFloor)
-                val iconLabelGap = (cardHeight * 0.08f).coerceIn(Dp.ICON_LABEL_GAP_MIN * d, Dp.ICON_LABEL_GAP_MAX * d)
-                val iconRoom = cardHeight - cardPadding * 2 - iconLabelGap - labelSize * 1.2f
-                val iconSize = min(min(cardHeight * 0.52f, cardWidth * 0.45f), iconRoom)
-                    .coerceIn(Dp.ICON_MIN * d, Dp.ICON_MAX * d)
 
                 val scrollUp = if (scrolling) MenuBox(
                     safe.left + margin, viewport.top, safe.left + margin + buttonSize, viewport.top + buttonSize
