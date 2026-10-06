@@ -93,6 +93,13 @@
     <string name="control_send_text_placeholder">พิมพ์ข้อความที่จะส่ง</string>
     <string name="control_send">ส่ง</string>
     <string name="control_auto_submit_hint">กด Enter อัตโนมัติหลังส่ง</string>
+    <string name="control_auto_submit_label">ส่งอัตโนมัติ</string>
+    <string name="control_on_the_car">กำลังแสดงบนรถ</string>
+    <string name="control_mode_open_search">เปิด / ค้นหา</string>
+    <string name="control_mode_type">พิมพ์ลงจอรถ</string>
+    <string name="control_quick_actions_edit">แก้ไข</string>
+    <string name="control_quick_actions_done">เสร็จ</string>
+    <string name="control_quick_action_remove">ลบ %1$s</string>
     <string name="control_result_sent">ส่งคำสั่งแล้ว</string>
     <string name="control_result_failed">ส่งคำสั่งไม่สำเร็จ</string>
     <string name="control_retry">ลองอีกครั้ง</string>

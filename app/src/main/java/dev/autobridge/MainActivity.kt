@@ -2210,11 +2210,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
                         tiles = tiles,
                         onOpenConnection = { showPhoneScreen(PhoneScreen.CAR_CONNECTION) },
                         onEditQuickLaunch = { appsFavoritesOnly = true; showPhoneScreen(PhoneScreen.APPS) },
-                        onOpenController = {
-                            startActivity(
-                                Intent(this@MainActivity, dev.autobridge.bridge.BridgeControllerActivity::class.java)
-                            )
-                        },
+                        onOpenController = { showPhoneScreen(PhoneScreen.CONTROL) },
                         onMirror = { requestScreenCapture() },
                         onBridgeDuo = duoScreenIntent()?.let { intent -> { startActivity(intent) } }
                     )
@@ -2939,10 +2935,14 @@ class MainActivity : androidx.activity.ComponentActivity() {
             setContent { AutoBridgePhoneTheme { content() } }
         }
 
-    /** Control tab: one page (status, command, quick actions, current screen, send text). */
+    /**
+     * Control: on-the-car transport, one Open/search-or-Type input, Quick Actions and Queue /
+     * Recent / Favorites — the former Control tab, Bridge controller and History button, merged.
+     */
     private fun buildControlScreen(): View = composeScreen {
         dev.autobridge.ui.ControlScreen(
             context = this@MainActivity,
+            onBack = { goBack() },
             onOpenHistory = { showPhoneScreen(PhoneScreen.CONTROL_HISTORY) },
             onOpenConnection = { showPhoneScreen(PhoneScreen.CAR_CONNECTION) }
         )

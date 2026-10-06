@@ -1,5 +1,6 @@
 package dev.autobridge.ui
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -14,15 +15,17 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -31,11 +34,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -46,10 +51,17 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.autobridge.R
+import dev.autobridge.bridge.AutoBridgeSessionManager
+import dev.autobridge.bridge.BridgePlaybackState
+import dev.autobridge.bridge.BridgeSource
+import dev.autobridge.bridge.EngineKind
+import dev.autobridge.browser.BrowserInputResolver
+import dev.autobridge.browser.BrowserResumePoint
+import dev.autobridge.browser.SearchEngineStore
 import dev.autobridge.core.state.RuntimeContextStore
+import dev.autobridge.entertainment.WebBookmarkStore
 import dev.autobridge.remote.AutoBridgeCommand
 import dev.autobridge.remote.AutoBridgeCommandBus
-import dev.autobridge.remote.AutoBridgeState
 import dev.autobridge.remote.AutoBridgeStateRepository
 import dev.autobridge.remote.CommandFailureReason
 import dev.autobridge.remote.CommandHistoryStore
@@ -60,9 +72,8 @@ import dev.autobridge.remote.CommandStatus
 import dev.autobridge.remote.CommandType
 import dev.autobridge.remote.MirrorStatus
 import dev.autobridge.remote.QuickCommandStore
-import dev.autobridge.remote.RemoteScreen
 import dev.autobridge.remote.RemoteSettingsStore
-import dev.autobridge.remote.TextInjectionController
+import dev.autobridge.remotestream.RemoteStreamConfig
 
 // Every colour here comes from ComposeTokens, which mirrors AutoBridgeDesign, so these screens sit
 // on the same surface stack as the launcher, the library and the player.
@@ -73,133 +84,290 @@ private val Accent = ComposeTokens.Accent
 private val TextPrimary = ComposeTokens.Text
 private val TextMuted = ComposeTokens.TextMuted
 
+/** Which of the two things the single input row does with what is typed. */
+private enum class ControlInputMode { OPEN_SEARCH, TYPE }
+
+/** The sections the Queue/Recent/Favorites group is split into; one is shown at a time. */
+private enum class ControlTab(val labelRes: Int) {
+    QUEUE(R.string.bridge_controller_tab_queue),
+    RECENT(R.string.bridge_controller_tab_recent),
+    FAVORITES(R.string.bridge_controller_tab_favorites)
+}
+
 /**
- * The Control tab (formerly "Remote"). One scrolling page instead of the old
- * Status / Control / History / Options sub-tabs:
+ * One Control screen: on-the-car transport, one input with an Open/search ↔ Type-into-car mode,
+ * Quick Actions, and Queue / Recent / Favorites — the former Control tab, the Bridge controller
+ * dialog and the duplicate "Open controller" Activity, merged into the single screen Home's
+ * Android Auto card and the Remote section now both open.
  *
- *  - Android Auto status (the old Status tab, reduced to the user-facing line),
- *  - command / URL input and Quick Actions (the old Control tab),
- *  - Current Screen and Send Text to Car,
- *  - History behind the header button ([CommandHistoryScreen]),
- *  - Options moved to Settings > Agent & Commands ([AgentCommandsScreen]).
- *
- * Everything still flows through the SAME [AutoBridgeCommandBus] / router as Android Auto and the
- * Agent; this screen only renders shared state and submits commands.
+ * The on-the-car card, input, tabs and transport all read and command
+ * [AutoBridgeSessionManager] — exactly what the retired Bridge controller used — so nothing about
+ * how a link reaches the car changes, only where the controls live. Quick Actions and Disconnect
+ * still go through [AutoBridgeCommandBus]: the command types they send (open mirror, reload, stop
+ * mirroring…) have no bridge equivalent.
  */
 @Composable
 fun ControlScreen(
     context: android.content.Context,
+    onBack: () -> Unit,
     onOpenHistory: () -> Unit,
     onOpenConnection: () -> Unit
 ) {
-    val state by AutoBridgeStateRepository.state.collectAsState()
+    // Mirrors BridgeControllerActivity's onCreate/onResume: idempotent, safe to repeat every time
+    // this screen is opened.
+    LaunchedEffect(Unit) {
+        AutoBridgeSessionManager.initialize(context)
+        AutoBridgeSessionManager.refresh()
+    }
+
+    val bridgeState by AutoBridgeSessionManager.state.collectAsState()
+    val legacyState by AutoBridgeStateRepository.state.collectAsState()
     val quickCommands by QuickCommandStore.items.collectAsState()
     val settings by RemoteSettingsStore.settings.collectAsState()
-    var sendText by remember { mutableStateOf("") }
-    var lastSubmittedText by remember { mutableStateOf("") }
-    val lastResult = rememberLastCommandResult()
+
+    var mode by remember { mutableStateOf(ControlInputMode.OPEN_SEARCH) }
+    var input by remember { mutableStateOf("") }
+    var editingQuickActions by remember { mutableStateOf(false) }
+    var tab by remember { mutableStateOf(ControlTab.QUEUE) }
+    // Bumped after any queue/favorite write so the lists below re-read: the queue and favorites
+    // are SharedPreferences-backed stores with no flow of their own, the same pattern the retired
+    // BridgeControllerActivity used.
+    var revision by remember { mutableIntStateOf(0) }
+
+    val queue = remember(revision) { AutoBridgeSessionManager.queueItems(context) }
+    val recents = remember(revision) { AutoBridgeSessionManager.recents(context) }
+    val favorites = remember(revision) { WebBookmarkStore.list(context) }
+
+    fun sendRaw(raw: String) {
+        val url = BrowserInputResolver.resolveBrowserInput(raw, SearchEngineStore.engine(context))
+        if (url == null) {
+            Toast.makeText(context, R.string.bridge_controller_nothing_to_send, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val result = AutoBridgeSessionManager.sendToCar(
+            context,
+            BridgeSource(url = url, origin = BridgeSource.Origin.PHONE)
+        )
+        val message = when (result) {
+            is AutoBridgeSessionManager.SendResult.Opened -> context.getString(R.string.bridge_controller_sent)
+            AutoBridgeSessionManager.SendResult.Pending -> context.getString(R.string.bridge_controller_queued_for_connect)
+            is AutoBridgeSessionManager.SendResult.Refused -> context.getString(result.error.messageRes)
+        }
+        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        revision++
+    }
+
+    fun sendTyped() {
+        val ok = AutoBridgeSessionManager.sendKeyboard(context, input, settings.autoSubmitText)
+        Toast.makeText(
+            context,
+            if (ok) context.getString(R.string.bridge_controller_text_sent)
+            else context.getString(R.string.bridge_controller_text_failed),
+            Toast.LENGTH_SHORT
+        ).show()
+        if (ok) input = ""
+    }
+
+    fun onSendClicked() {
+        if (mode == ControlInputMode.OPEN_SEARCH) {
+            sendRaw(input)
+            input = ""
+        } else {
+            sendTyped()
+        }
+    }
+
+    fun addToQueue(url: String, title: String = "") {
+        val size = AutoBridgeSessionManager.queueAdd(context, BridgeSource(url, title))
+        Toast.makeText(
+            context,
+            if (size == null) context.getString(R.string.browser_already_queued)
+            else context.getString(R.string.bridge_controller_queued),
+            Toast.LENGTH_SHORT
+        ).show()
+        revision++
+    }
 
     Column(Modifier.fillMaxSize().background(ComposeTokens.Ink)) {
         PhoneHeader(
             title = stringResource(R.string.control_title),
+            onBack = onBack,
             action = HeaderButton("↺", stringResource(R.string.control_history_action), onOpenHistory)
         )
-        Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-                .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
+
+        LazyColumn(
+            Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            AndroidAutoStatusCard(title = stringResource(R.string.control_android_auto), onClick = onOpenConnection)
+            item { OnTheCarCard(bridgeState, onOpenConnection) }
 
-            // Only offer Disconnect while the car is actually mirroring; hidden otherwise.
-            if (state.mirrorStatus == MirrorStatus.ACTIVE) {
-                val disconnectDesc = stringResource(R.string.control_disconnect_desc)
-                Surface(
-                    onClick = {
-                        AutoBridgeCommandBus.send(
-                            AutoBridgeCommand(type = CommandType.STOP_MIRROR, source = CommandSource.MOBILE)
-                        )
-                    },
-                    color = ComposeTokens.Danger.copy(alpha = 0.16f),
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.fillMaxWidth()
-                        .border(1.dp, ComposeTokens.Danger.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
-                        .semantics { contentDescription = disconnectDesc }
-                ) {
-                    Box(Modifier.fillMaxWidth().padding(14.dp), contentAlignment = Alignment.Center) {
-                        Text(
-                            stringResource(R.string.control_disconnect),
-                            color = ComposeTokens.Danger,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
+            item {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SegmentChip(
+                        stringResource(R.string.control_mode_open_search),
+                        selected = mode == ControlInputMode.OPEN_SEARCH,
+                        modifier = Modifier.weight(1f)
+                    ) { mode = ControlInputMode.OPEN_SEARCH }
+                    SegmentChip(
+                        stringResource(R.string.control_mode_type),
+                        selected = mode == ControlInputMode.TYPE,
+                        modifier = Modifier.weight(1f)
+                    ) { mode = ControlInputMode.TYPE }
                 }
             }
 
-            SectionLabel(stringResource(R.string.control_section_command_or_url))
-            CommandField(
-                placeholder = stringResource(R.string.control_command_placeholder),
-                onSubmitted = { lastSubmittedText = it }
-            )
-            lastResult.value?.let {
-                ResultBanner(
-                    it,
-                    onRetry = { submitCommand(lastSubmittedText) },
-                    onOpenConnection = onOpenConnection
+            item {
+                BridgeInputField(
+                    value = input,
+                    onValueChange = { input = it },
+                    placeholder = stringResource(
+                        if (mode == ControlInputMode.OPEN_SEARCH) R.string.bridge_controller_input_label
+                        else R.string.bridge_controller_keyboard_label
+                    ),
+                    onSend = ::onSendClicked
                 )
             }
 
-            SectionLabel(stringResource(R.string.control_section_quick_actions))
-            // Same persisted, user-customisable quick commands as before, all routed through the bus.
-            quickCommands.chunked(3).forEach { rowItems ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    rowItems.forEach { qc ->
-                        QuickCard(icon = qc.icon, label = qc.label, modifier = Modifier.weight(1f)) {
-                            AutoBridgeCommandBus.send(
-                                AutoBridgeCommand(type = qc.type, payload = qc.payload, source = CommandSource.MOBILE)
-                            )
-                        }
-                    }
-                    repeat(3 - rowItems.size) { Box(Modifier.weight(1f)) }
+            if (mode == ControlInputMode.TYPE) {
+                item {
+                    ToggleRow(
+                        stringResource(R.string.control_auto_submit_label),
+                        stringResource(R.string.control_auto_submit_hint),
+                        settings.autoSubmitText
+                    ) { checked -> RemoteSettingsStore.update(context) { s -> s.copy(autoSubmitText = checked) } }
                 }
             }
 
-            SectionLabel(stringResource(R.string.control_section_current_screen))
-            CurrentScreenCard(state)
-
-            SectionLabel(stringResource(R.string.control_section_send_text))
-            Card {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
-                        value = sendText,
-                        onValueChange = { sendText = it },
-                        placeholder = { Text(stringResource(R.string.control_send_text_placeholder), color = TextMuted) },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                    TextButton(onClick = {
-                        AutoBridgeCommandBus.send(
-                            AutoBridgeCommand(
-                                type = CommandType.SEND_TEXT_TO_SCREEN,
-                                payload = sendText,
-                                source = CommandSource.MOBILE,
-                                extras = mapOf(
-                                    "target" to TextInjectionController.Target.BROWSER_SEARCH.name,
-                                    "autoSubmit" to settings.autoSubmitText.toString()
-                                )
-                            )
+            item {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    SectionLabel(stringResource(R.string.control_section_quick_actions), Modifier.weight(1f))
+                    TextButton(onClick = { editingQuickActions = !editingQuickActions }) {
+                        Text(
+                            stringResource(
+                                if (editingQuickActions) R.string.control_quick_actions_done
+                                else R.string.control_quick_actions_edit
+                            ),
+                            color = Accent,
+                            fontSize = 13.sp
                         )
-                        sendText = ""
-                    }) { Text(stringResource(R.string.control_send), color = Accent) }
+                    }
                 }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(
-                        checked = settings.autoSubmitText,
-                        onCheckedChange = { RemoteSettingsStore.update(context) { s -> s.copy(autoSubmitText = it) } }
-                    )
-                    Text(stringResource(R.string.control_auto_submit_hint), color = TextMuted, fontSize = 13.sp)
+            }
+            // Same persisted, user-customisable quick commands as before, all routed through the bus.
+            quickCommands.chunked(3).forEach { rowItems ->
+                item {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        rowItems.forEach { qc ->
+                            QuickCard(
+                                icon = qc.icon,
+                                label = qc.label,
+                                removable = editingQuickActions,
+                                onRemove = { QuickCommandStore.remove(context, qc.id) },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                AutoBridgeCommandBus.send(
+                                    AutoBridgeCommand(type = qc.type, payload = qc.payload, source = CommandSource.MOBILE)
+                                )
+                            }
+                        }
+                        repeat(3 - rowItems.size) { Box(Modifier.weight(1f)) }
+                    }
                 }
+            }
+
+            item {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ControlTab.entries.forEach { entry ->
+                        val label = stringResource(entry.labelRes)
+                        SegmentChip(
+                            if (entry == ControlTab.QUEUE && queue.isNotEmpty()) "$label · ${queue.size}" else label,
+                            selected = tab == entry,
+                            modifier = Modifier.weight(1f)
+                        ) { tab = entry }
+                    }
+                }
+            }
+
+            when (tab) {
+                ControlTab.QUEUE -> {
+                    if (queue.isEmpty()) {
+                        item { EmptyRow(stringResource(R.string.bridge_controller_queue_empty)) }
+                    } else {
+                        item {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                TextButton(onClick = {
+                                    AutoBridgeSessionManager.next(context)
+                                    revision++
+                                }) {
+                                    Text(stringResource(R.string.bridge_controller_play_next), color = Accent)
+                                }
+                                TextButton(onClick = {
+                                    AutoBridgeSessionManager.queueClear(context)
+                                    revision++
+                                }) {
+                                    Text(stringResource(R.string.bridge_controller_clear_queue), color = ComposeTokens.Danger)
+                                }
+                            }
+                        }
+                        items(queue, key = { it.url }) { item ->
+                            LinkRow(
+                                title = item.title.ifBlank { item.url },
+                                subtitle = item.url,
+                                actionLabel = stringResource(R.string.bridge_controller_remove),
+                                onClick = { sendRaw(item.url) },
+                                onAction = {
+                                    AutoBridgeSessionManager.queueRemove(context, item.url)
+                                    revision++
+                                }
+                            )
+                        }
+                    }
+                }
+
+                ControlTab.RECENT -> {
+                    if (recents.isEmpty()) {
+                        item { EmptyRow(stringResource(R.string.bridge_controller_recent_empty)) }
+                    } else {
+                        items(recents, key = { "${it.kind}:${it.data ?: it.title}:${it.timestampMs}" }) { entry ->
+                            val url = entry.data
+                            LinkRow(
+                                title = entry.title,
+                                subtitle = entry.subtitle ?: url.orEmpty(),
+                                actionLabel = stringResource(R.string.bridge_controller_queue_action),
+                                onClick = { url?.let { sendRaw(it) } },
+                                onAction = { url?.let { addToQueue(it, entry.title) } }
+                            )
+                        }
+                    }
+                }
+
+                ControlTab.FAVORITES -> {
+                    if (favorites.isEmpty()) {
+                        item { EmptyRow(stringResource(R.string.bridge_controller_favorites_empty)) }
+                    } else {
+                        items(favorites, key = { it.url }) { bookmark ->
+                            LinkRow(
+                                title = bookmark.title,
+                                subtitle = bookmark.url,
+                                actionLabel = stringResource(R.string.bridge_controller_queue_action),
+                                onClick = { sendRaw(bookmark.url) },
+                                onAction = { addToQueue(bookmark.url, bookmark.title) }
+                            )
+                        }
+                    }
+                }
+            }
+
+            item { RemoteStreamCard() }
+
+            item { Box(Modifier.size(8.dp)) }
+        }
+
+        // Only offer Disconnect while the car is actually mirroring; hidden otherwise. Pinned
+        // below the scrolling content, same place image 04 puts it.
+        if (legacyState.mirrorStatus == MirrorStatus.ACTIVE) {
+            DisconnectButton {
+                AutoBridgeCommandBus.send(AutoBridgeCommand(type = CommandType.STOP_MIRROR, source = CommandSource.MOBILE))
             }
         }
     }
@@ -440,7 +608,7 @@ private fun StatusPill(label: String, connected: Boolean) {
 
 /**
  * Command / URL / search / text box. Submits through [submitCommand] — the one command path —
- * so Home's "Send to Car" and Control's command field behave identically.
+ * so Home's "Send to Car" field behaves the same way it always has.
  */
 @Composable
 fun CommandField(placeholder: String, onSubmitted: (String) -> Unit = {}) {
@@ -584,72 +752,401 @@ private fun RoundGlyph(glyph: String, description: String, size: Int, onClick: (
     }
 }
 
+/**
+ * "On the car": what is on screen now (engine + title + host), progress and transport — the
+ * former NowPlayingCard and TransportBar from the retired BridgeControllerActivity, combined into
+ * one card per image 04. All commands go through [AutoBridgeSessionManager], same as before.
+ */
 @Composable
-private fun CurrentScreenCard(state: AutoBridgeState) {
-    Card {
-        Text(currentStatusLabel(state), color = Accent, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-        val detail = when (state.currentScreen) {
-            RemoteScreen.BROWSER -> state.currentUrl ?: state.browserTitle ?: "—"
-            RemoteScreen.MIRROR -> stringResource(
-                when (state.mirrorStatus) {
-                    MirrorStatus.INACTIVE -> R.string.mirror_status_inactive
-                    MirrorStatus.READY -> R.string.mirror_status_ready
-                    MirrorStatus.ACTIVE -> R.string.mirror_status_active
+private fun OnTheCarCard(state: AutoBridgeSessionManager.SessionState, onOpenConnection: () -> Unit) {
+    val context = LocalContext.current
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = CardColor,
+        modifier = Modifier.fillMaxWidth().border(1.dp, ComposeTokens.Hairline, RoundedCornerShape(16.dp))
+    ) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            if (!state.connected) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        stringResource(R.string.bridge_controller_disconnected),
+                        color = ComposeTokens.Warn,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(onClick = onOpenConnection) {
+                        Text(stringResource(R.string.control_how_to_connect), color = Accent, fontSize = 12.sp)
+                    }
                 }
-            )
-            RemoteScreen.MEDIA -> buildString {
-                append(state.mediaTitle ?: "—")
-                append(" · ")
-                append(stringResource(if (state.mediaPlaying) R.string.media_status_playing else R.string.media_status_paused))
+            } else {
+                Text(
+                    stringResource(R.string.control_on_the_car) + " · " + engineLabel(context, state.engine),
+                    color = TextMuted,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    letterSpacing = 1.sp
+                )
             }
-            RemoteScreen.AGENT -> stringResource(if (state.agentReady) R.string.agent_status_ready else R.string.agent_status_busy)
-            // The title already says "Not connected"; the detail says what to do about it.
-            else -> if (state.androidAutoConnected) stringResource(R.string.screen_detail_idle)
-            else stringResource(R.string.screen_detail_open_on_car)
+            Text(
+                state.source?.displayTitle ?: stringResource(R.string.bridge_car_nothing_playing),
+                color = TextPrimary,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            val detail = buildString {
+                append(context.getString(playbackLabel(state.playback)))
+                if (state.source != null) append(" · ").append(state.source.displayHost)
+                if (state.durationMs > 0) {
+                    append(" · ")
+                        .append(BrowserResumePoint.clock(state.positionMs))
+                        .append(" / ")
+                        .append(BrowserResumePoint.clock(state.durationMs))
+                }
+            }
+            Text(detail, color = TextMuted, fontSize = 13.sp)
+            state.error?.let {
+                Text(context.getString(it.messageRes), color = ComposeTokens.Danger, fontSize = 13.sp)
+            }
+            state.pending?.let { pending ->
+                // A held request opens by itself on the next connect, so there has to be a way to
+                // say "not that one" — otherwise the only way to clear it is to send something
+                // else, and a link shared by mistake follows the driver into the car.
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        stringResource(R.string.bridge_controller_pending, pending.displayHost),
+                        color = ComposeTokens.Warn,
+                        fontSize = 13.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(onClick = { AutoBridgeSessionManager.clearPending(context) }) {
+                        Text(
+                            stringResource(R.string.bridge_controller_cancel_pending),
+                            color = ComposeTokens.Danger,
+                            fontSize = 13.sp
+                        )
+                    }
+                }
+            }
+
+            TransportRow(state)
         }
-        Text(detail, color = TextMuted, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
 
 /**
- * Short, localized status line for the Control tab's "Current Screen" card, e.g.
- * "Browser" or "Connected".
+ * Play/pause, skip and a seek bar. The slider is disabled when the engine reports no duration —
+ * the live-stream and still-loading case, where a scrubber that moves but seeks nowhere is worse
+ * than one that is plainly unavailable.
  */
 @Composable
-private fun currentStatusLabel(state: AutoBridgeState): String = when (state.currentScreen) {
-    RemoteScreen.BROWSER -> stringResource(R.string.screen_label_browser)
-    RemoteScreen.MIRROR -> stringResource(R.string.screen_label_mirror)
-    RemoteScreen.MEDIA -> stringResource(R.string.screen_label_media)
-    RemoteScreen.AGENT -> stringResource(R.string.screen_label_agent)
-    RemoteScreen.HOME -> stringResource(R.string.screen_label_home)
-    RemoteScreen.SETTINGS -> stringResource(R.string.screen_label_settings)
-    RemoteScreen.NONE -> if (state.androidAutoConnected) stringResource(R.string.conn_connected_plain)
-    else stringResource(R.string.conn_not_connected)
+private fun TransportRow(state: AutoBridgeSessionManager.SessionState) {
+    val context = LocalContext.current
+    var scrubbing by remember { mutableStateOf<Float?>(null) }
+    val seekable = state.durationMs > 0
+
+    Column {
+        Slider(
+            value = scrubbing ?: if (seekable) {
+                (state.positionMs.toFloat() / state.durationMs).coerceIn(0f, 1f)
+            } else 0f,
+            onValueChange = { scrubbing = it },
+            onValueChangeFinished = {
+                scrubbing?.let { fraction -> AutoBridgeSessionManager.seekTo((fraction * state.durationMs).toLong()) }
+                scrubbing = null
+            },
+            enabled = seekable,
+            modifier = Modifier.fillMaxWidth().semantics {
+                contentDescription = context.getString(R.string.bridge_controller_seek)
+            }
+        )
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TransportButton("⏮", R.string.bridge_controller_previous) { AutoBridgeSessionManager.previous() }
+            TransportButton("⏪", R.string.bridge_controller_back_10) { AutoBridgeSessionManager.seekBy(-10_000L) }
+            TransportButton(
+                if (state.isPlaying) "⏸" else "▶",
+                if (state.isPlaying) R.string.bridge_controller_pause else R.string.bridge_controller_play
+            ) { AutoBridgeSessionManager.togglePlayPause() }
+            TransportButton("⏩", R.string.bridge_controller_forward_10) { AutoBridgeSessionManager.seekBy(10_000L) }
+            TransportButton("⏭", R.string.bridge_controller_next) { AutoBridgeSessionManager.next(context) }
+        }
+    }
 }
 
 @Composable
-private fun QuickCard(icon: String, label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun TransportButton(glyph: String, descriptionRes: Int, onClick: () -> Unit) {
+    val description = stringResource(descriptionRes)
+    TextButton(
+        onClick = onClick,
+        modifier = Modifier.semantics { contentDescription = description }
+    ) {
+        Text(glyph, color = TextPrimary, fontSize = 22.sp)
+    }
+}
+
+/**
+ * The playback state as a word the user reads. Not `enum.name`: that produced "Idle"/"PLAYING" in
+ * the middle of an otherwise translated line, which reads as a bug in every locale but English.
+ */
+private fun playbackLabel(state: BridgePlaybackState): Int = when (state) {
+    BridgePlaybackState.IDLE -> R.string.bridge_state_idle
+    BridgePlaybackState.LOADING -> R.string.bridge_state_loading
+    BridgePlaybackState.PLAYING -> R.string.bridge_state_playing
+    BridgePlaybackState.PAUSED -> R.string.bridge_state_paused
+    BridgePlaybackState.ENDED -> R.string.bridge_state_ended
+    BridgePlaybackState.ERROR -> R.string.bridge_state_error
+}
+
+private fun engineLabel(context: android.content.Context, kind: EngineKind): String = context.getString(
+    when (kind) {
+        EngineKind.NATIVE -> R.string.bridge_engine_native
+        EngineKind.BROWSER -> R.string.bridge_engine_browser
+        EngineKind.REMOTE_STREAM -> R.string.bridge_engine_remote
+        EngineKind.UNSUPPORTED -> R.string.bridge_engine_none
+    }
+)
+
+/**
+ * One input, two jobs: paste a link / search text to open on the car, or type into whatever the
+ * car is already showing. [placeholder] carries the mode; [onSend] is the same action for the Go
+ * IME key and the arrow button.
+ */
+@Composable
+private fun BridgeInputField(value: String, onValueChange: (String) -> Unit, placeholder: String, onSend: () -> Unit) {
+    val sendDesc = stringResource(R.string.bridge_controller_send)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            placeholder = { Text(placeholder, color = TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+            keyboardActions = KeyboardActions(onSend = { onSend() }),
+            modifier = Modifier.weight(1f)
+        )
+        Spacer(Modifier.width(8.dp))
+        Surface(
+            onClick = onSend,
+            color = Accent,
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.size(52.dp).semantics { contentDescription = sendDesc }
+        ) {
+            Box(contentAlignment = Alignment.Center) { Text("➤", fontSize = 20.sp, color = ComposeTokens.Ink) }
+        }
+    }
+}
+
+/** A segmented pill: the Open/search ↔ Type mode toggle and the Queue/Recent/Favorites tabs. */
+@Composable
+private fun SegmentChip(label: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(16.dp),
-        color = CardAltColor,
-        modifier = modifier.height(84.dp)
+        shape = RoundedCornerShape(14.dp),
+        color = if (selected) ComposeTokens.AccentSoft else CardColor,
+        modifier = modifier.border(
+            1.dp,
+            if (selected) Accent else ComposeTokens.Hairline,
+            RoundedCornerShape(14.dp)
+        )
     ) {
-        Column(
-            Modifier.fillMaxSize().padding(8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+        Text(
+            label,
+            color = if (selected) Accent else TextMuted,
+            fontSize = 13.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(vertical = 10.dp, horizontal = 8.dp)
+        )
+    }
+}
+
+@Composable
+private fun LinkRow(
+    title: String,
+    subtitle: String,
+    actionLabel: String,
+    onClick: () -> Unit,
+    onAction: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = CardColor,
+        modifier = Modifier.fillMaxWidth().border(1.dp, ComposeTokens.Hairline, RoundedCornerShape(14.dp))
+    ) {
+        Row(
+            Modifier.padding(start = 14.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(icon, fontSize = 20.sp, color = Accent)
+            Column(Modifier.weight(1f)) {
+                Text(title, color = TextPrimary, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(subtitle, color = TextMuted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            TextButton(onClick = onClick) {
+                Text(stringResource(R.string.bridge_controller_send), color = Accent, fontSize = 13.sp)
+            }
+            TextButton(onClick = onAction) {
+                Text(actionLabel, color = TextMuted, fontSize = 13.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyRow(text: String) {
+    Text(text, color = TextMuted, fontSize = 13.sp, modifier = Modifier.padding(vertical = 12.dp))
+}
+
+/**
+ * The experimental remote-stream host setting. It lives at the bottom of Control rather than in
+ * the app's main settings because it is only meaningful next to the thing it affects: the user
+ * turning this on is about to send a link and watch which engine picks it up. Off by default, and
+ * the router skips the remote branch entirely while it is off, so an unconfigured install never
+ * waits on a host that was never set up (see [dev.autobridge.remotestream.RemoteStreamConfig]).
+ */
+@Composable
+private fun RemoteStreamCard() {
+    val context = LocalContext.current
+    var config by remember { mutableStateOf(RemoteStreamConfig.current(context)) }
+    var endpoint by remember { mutableStateOf(config.endpoint) }
+
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = CardColor,
+        modifier = Modifier.fillMaxWidth().border(1.dp, ComposeTokens.Hairline, RoundedCornerShape(16.dp))
+    ) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                label,
+                stringResource(R.string.bridge_remote_title),
                 color = TextPrimary,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 6.dp)
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold
             )
+            Text(stringResource(R.string.bridge_remote_caption), color = TextMuted, fontSize = 12.sp)
+            OutlinedTextField(
+                value = endpoint,
+                onValueChange = { endpoint = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text(stringResource(R.string.bridge_remote_endpoint_label)) },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = {
+                    RemoteStreamConfig.setEndpoint(context, endpoint)
+                    config = RemoteStreamConfig.current(context)
+                })
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = {
+                    RemoteStreamConfig.setEndpoint(context, endpoint)
+                    config = RemoteStreamConfig.current(context)
+                    Toast.makeText(
+                        context,
+                        if (RemoteStreamConfig.normalizeEndpoint(endpoint) == null)
+                            context.getString(R.string.bridge_remote_endpoint_invalid)
+                        else context.getString(R.string.bridge_remote_saved),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }) {
+                    Text(stringResource(R.string.bridge_remote_save), color = Accent)
+                }
+                TextButton(onClick = {
+                    RemoteStreamConfig.setEnabled(context, !config.enabled)
+                    config = RemoteStreamConfig.current(context)
+                }) {
+                    Text(
+                        if (config.enabled) stringResource(R.string.bridge_remote_disable)
+                        else stringResource(R.string.bridge_remote_enable),
+                        color = if (config.enabled) ComposeTokens.Danger else Accent
+                    )
+                }
+            }
+            Text(
+                if (config.isUsable) stringResource(R.string.bridge_remote_ready) else stringResource(R.string.bridge_remote_off),
+                color = if (config.isUsable) AccentGreen else TextMuted,
+                fontSize = 12.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun DisconnectButton(onClick: () -> Unit) {
+    val disconnectDesc = stringResource(R.string.control_disconnect_desc)
+    Surface(
+        onClick = onClick,
+        color = ComposeTokens.Danger.copy(alpha = 0.16f),
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth().padding(16.dp)
+            .border(1.dp, ComposeTokens.Danger.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
+            .semantics { contentDescription = disconnectDesc }
+    ) {
+        Box(Modifier.fillMaxWidth().padding(14.dp), contentAlignment = Alignment.Center) {
+            Text(
+                stringResource(R.string.control_disconnect),
+                color = ComposeTokens.Danger,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
+}
+
+/**
+ * One Quick Action chip. In [removable] (Edit) mode it stops sending on tap and shows a small ✕
+ * badge instead, wired to [onRemove] — [QuickCommandStore.remove] under the same key the chip row
+ * already reads.
+ */
+@Composable
+private fun QuickCard(
+    icon: String,
+    label: String,
+    removable: Boolean = false,
+    onRemove: () -> Unit = {},
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Box(modifier) {
+        Surface(
+            onClick = if (removable) ({}) else onClick,
+            shape = RoundedCornerShape(16.dp),
+            color = CardAltColor,
+            modifier = Modifier.fillMaxWidth().height(84.dp)
+        ) {
+            Column(
+                Modifier.fillMaxSize().padding(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(icon, fontSize = 20.sp, color = Accent)
+                Text(
+                    label,
+                    color = TextPrimary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 6.dp)
+                )
+            }
+        }
+        if (removable) {
+            val removeDesc = stringResource(R.string.control_quick_action_remove, label)
+            Surface(
+                onClick = onRemove,
+                shape = CircleShape,
+                color = ComposeTokens.Danger,
+                modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(22.dp)
+                    .semantics { contentDescription = removeDesc }
+            ) {
+                Box(contentAlignment = Alignment.Center) { Text("✕", fontSize = 12.sp, color = ComposeTokens.Ink) }
+            }
         }
     }
 }

@@ -101,6 +101,13 @@
     <string name="control_send_text_placeholder">Type text to send</string>
     <string name="control_send">Send</string>
     <string name="control_auto_submit_hint">Press Enter automatically after sending</string>
+    <string name="control_auto_submit_label">Auto-submit</string>
+    <string name="control_on_the_car">On the car</string>
+    <string name="control_mode_open_search">Open / search</string>
+    <string name="control_mode_type">Type into car</string>
+    <string name="control_quick_actions_edit">Edit</string>
+    <string name="control_quick_actions_done">Done</string>
+    <string name="control_quick_action_remove">Remove %1$s</string>
     <string name="control_result_sent">Command sent</string>
     <string name="control_result_failed">Command failed</string>
     <string name="control_retry">Retry</string>
