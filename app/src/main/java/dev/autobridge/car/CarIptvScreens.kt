@@ -26,6 +26,7 @@ import dev.autobridge.iptv.ChannelQueue
 import dev.autobridge.iptv.IptvCatalogData
 import dev.autobridge.iptv.IptvChannelQueue
 import dev.autobridge.iptv.IptvEntry
+import dev.autobridge.iptv.IptvEpg
 import dev.autobridge.iptv.IptvHistoryStore
 import dev.autobridge.iptv.IptvKind
 import dev.autobridge.iptv.IptvPlayback
@@ -63,6 +64,16 @@ class CarIptvSourcesScreen(
     init {
         mediaPlayback.connect(onConnected = { invalidate() }, onError = { invalidate() })
         lifecycle.addObserver(object : DefaultLifecycleObserver {
+            // The channels the driver actually picks from first — favourites and recent — are
+            // checked as soon as TV / Radio opens, quietly, so a dead one has already dropped off
+            // the quick rows by the time a finger reaches them.
+            override fun onStart(owner: LifecycleOwner) {
+                val urls = (IptvHistoryStore.favorites(carContext, kind) + IptvHistoryStore.recent(carContext, kind))
+                    .filter { it.playback == IptvPlayback.STREAM }
+                    .map { it.url }
+                CarIptvCheck.start(carContext, urls, quiet = true) { repaint() }
+            }
+
             override fun onDestroy(owner: LifecycleOwner) {
                 logos.stop()
                 mediaPlayback.disconnect()
@@ -298,12 +309,15 @@ class CarIptvEntriesScreen(
         // Pages are cut from the full category, and dead channels are dropped only from the page
         // in view, so a check landing mid-scroll never moves a channel onto another page.
         val shown = paged.items.filterNot { CarIptvCheck.isDead(it.url) }
+        // What is on now, for the live channels in view; each answer repaints as it lands.
+        IptvEpg.load(source, shown) { repaint() }
         shown.forEach { entry ->
             val favorite = entry.url.isNotBlank() && IptvHistoryStore.isFavorite(carContext, entry.url)
             val row = Row.Builder()
                 .setTitle(entry.title)
                 .addText(
                     listOfNotNull(
+                        IptvEpg.cached(source, entry)?.let { "▶ $it" },
                         entry.subtitle.takeIf { it.isNotBlank() },
                         carContext.getString(R.string.car_iptv_opens_in_browser)
                             .takeIf { entry.isWebPage },
