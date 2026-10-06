@@ -41,5 +41,8 @@ class AutoBridgeApplication : Application() {
         // power policy has to be installed here rather than in an Activity. Registration only; it
         // takes no lock and reads no settings until a session starts.
         CarSessionScreenPower.install()
+        // The phone's "connected to the car" state follows Android Auto itself, not only the one
+        // car screen session that used to set it; see CarConnectionMonitor.
+        dev.autobridge.car.CarConnectionMonitor.install(this)
     }
 }
