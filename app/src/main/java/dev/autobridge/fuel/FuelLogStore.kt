@@ -48,6 +48,19 @@ object FuelLogStore {
 
     fun setEv(context: Context, ev: Boolean) = prefs(context).edit { putBoolean(KEY_EV, ev) }
 
+    /** The stored entries as JSON, for a backup; "[]" when there are none. */
+    fun rawJson(context: Context): String = prefs(context).getString(KEY_ENTRIES, null) ?: "[]"
+
+    /** Replaces the log with a backup's. Returns false, changing nothing, if it is not a list. */
+    fun restore(context: Context, raw: String, ev: Boolean): Boolean {
+        if (runCatching { JSONArray(raw) }.isFailure) return false
+        prefs(context).edit {
+            putString(KEY_ENTRIES, raw)
+            putBoolean(KEY_EV, ev)
+        }
+        return true
+    }
+
     private fun write(context: Context, entries: List<FuelEntry>) {
         val array = JSONArray()
         entries.sortedBy { it.timeMs }.forEach { entry ->

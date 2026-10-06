@@ -46,6 +46,16 @@ object MaintenanceStore {
     fun currentOdometer(context: Context): Double? =
         listOfNotNull(CarVehicleData.lastOdometer(context)?.first, FuelLogStore.lastOdometer(context)).maxOrNull()
 
+    /** The stored items as JSON, for a backup; "[]" when there are none. */
+    fun rawJson(context: Context): String = prefs(context).getString(KEY_ITEMS, null) ?: "[]"
+
+    /** Replaces the list with a backup's. Returns false, changing nothing, if it is not a list. */
+    fun restore(context: Context, raw: String): Boolean {
+        if (runCatching { JSONArray(raw) }.isFailure) return false
+        prefs(context).edit { putString(KEY_ITEMS, raw) }
+        return true
+    }
+
     private fun write(context: Context, items: List<MaintenanceItem>) {
         val array = JSONArray()
         items.forEach {

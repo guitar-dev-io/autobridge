@@ -545,6 +545,7 @@
     <string name="aa_hidden_title">Bridge Web ถูกซ่อนใน Android Auto</string>
     <string name="aa_hidden_message">การติดตั้งอัปเดตนี้ทำให้ที่มาของการติดตั้งถูกรีเซ็ต Android Auto จะไม่แสดง Bridge Web จนกว่าจะตั้งค่าใหม่ กดครั้งเดียวผ่าน Shizuku</string>
     <string name="aa_hidden_fix">แก้ตอนนี้</string>
+    <string name="whats_new_0_4_31">• ทริป: ตั้งค่า &gt; ทริป เริ่มและจบทริปพร้อมจำนวนคน แสดงระยะทางและค่าใช้จ่ายต่อคน (ค่าน้ำมันหรือค่าชาร์จ บวกทางด่วนและที่จอดรถ) บนจอรถเริ่มและจบทริปได้ที่ เพิ่มเติม &gt; ทริป\n• สำรองข้อมูล: ตั้งค่า &gt; สำรองและกู้คืนข้อมูล บันทึกค่าน้ำมันหรือค่าชาร์จ การบำรุงรักษา และทริป เป็นไฟล์เดียว เพื่อย้ายไปเครื่องอื่น</string>
     <string name="whats_new_0_4_30">• รองรับรถ EV: สลับบันทึกค่าน้ำมันเป็นรถ EV (⚡) ได้ที่ ตั้งค่า &gt; บันทึกค่าน้ำมัน จะนับเป็น kWh และ กม./kWh และแสดงระดับแบตเตอรี่จากรถถ้ารถรายงาน\n• การบำรุงรักษา: ตั้งค่า &gt; การบำรุงรักษา ติดตามน้ำมันเครื่อง ยาง ภาษี และสำหรับรถ EV คือน้ำยาหล่อเย็นกับแบตเตอรี่ 12 โวลต์ ตามระยะทางและวันที่ บนจอรถดูสิ่งที่ถึงกำหนดได้ที่ เพิ่มเติม &gt; การบำรุงรักษา</string>
     <string name="whats_new_0_4_29">• บันทึกค่าน้ำมัน: ตั้งค่า > บันทึกค่าน้ำมัน จดการเติมแต่ละครั้ง คำนวณ กม./ลิตร บาท/กม. และยอดเดือนนี้ให้ บนจอรถ: More > บันทึกค่าน้ำมัน อนุญาตอ่านเลขไมล์จากรถแล้วจะกรอกให้เองตอนเติมครั้งถัดไป\n• Duo Screen: แอปในแต่ละช่องเริ่มใหม่ทุกครั้ง ไม่ค้างค่าเดิมจากรอบก่อน</string>
     <string name="whats_new_0_4_28">• Mirror อยู่ใน Bridge Web แล้ว (เมนู > Mirror phone screen) และไอคอน Bridge Mirror แยกปิดเป็นค่าเริ่มต้น เพื่อให้ Android Auto แบ่งจอ Bridge Web คู่ Maps ได้อีกครั้ง\n• แบ่งจอใน Bridge Web ไม่ลามไปที่เว็บใน AutoBridge แล้ว\n• ตั้งค่า > ส่ง log สำหรับแจ้งปัญหา\n• อัปเดต: โหลด APK ในแอปแล้วเปิดในตัวติดตั้งที่เลือก (เช่น KingInstaller)\n• เลขเวอร์ชันแสดงในหน้า Home</string>
@@ -1512,4 +1513,37 @@
     <string name="maint_battery_coolant">น้ำยาหล่อเย็นแบตเตอรี่</string>
     <string name="maint_battery_12v">แบตเตอรี่ 12 โวลต์</string>
     <string name="maint_road_tax">ต่อภาษี</string>
+
+    <!-- Trips and backup -->
+    <string name="trip_title">ทริป</string>
+    <string name="trip_subtitle">ระยะทางและค่าใช้จ่าย หารกันทุกคน</string>
+    <string name="trip_settings_caption">เริ่มทริป ดูค่าใช้จ่ายต่อคน</string>
+    <string name="trip_start">เริ่มทริป</string>
+    <string name="trip_end">จบทริป</string>
+    <string name="trip_history">ทริปที่ผ่านมา</string>
+    <string name="trip_empty_title">ยังไม่มีทริป</string>
+    <string name="trip_empty_message">เริ่มทริปพร้อมจำนวนคน เมื่อจบจะได้ระยะทางและค่าใช้จ่ายต่อคน คือค่าน้ำมันหรือค่าชาร์จจากบันทึกของคุณ บวกค่าทางด่วนและที่จอดรถ</string>
+    <string name="trip_car_empty">เริ่มได้ที่นี่ หรือบนโทรศัพท์ (ตั้งค่า &gt; ทริป)</string>
+    <string name="trip_field_people">จำนวนคน</string>
+    <string name="trip_field_other">ทางด่วน ที่จอดรถ และอื่น ๆ (บาท)</string>
+    <string name="trip_invalid_end">เลขไมล์ตอนจบต้องมากกว่าตอนเริ่ม</string>
+    <string name="trip_delete_title">ลบทริปนี้?</string>
+    <string name="trip_people">%1$d คน</string>
+    <string name="trip_in_progress">กำลังเดินทาง · %1$d คน</string>
+    <string name="trip_last">ทริปล่าสุด · %1$d คน</string>
+    <string name="trip_km">%1$s กม.</string>
+    <string name="trip_minutes">%1$d นาที</string>
+    <string name="trip_hours_minutes">%1$d ชม. %2$d นาที</string>
+    <string name="trip_cost">รวม %1$s บาท · คนละ %3$s บาท (%2$d คน)</string>
+    <string name="backup_title">สำรองและกู้คืนข้อมูล</string>
+    <string name="backup_subtitle">ย้ายบันทึกไปอีกเครื่อง</string>
+    <string name="backup_settings_caption">บันทึกค่าน้ำมันหรือค่าชาร์จ การบำรุงรักษา และทริป ในไฟล์เดียว</string>
+    <string name="backup_export">สำรองข้อมูล</string>
+    <string name="backup_export_caption">บันทึกค่าน้ำมันหรือค่าชาร์จ การบำรุงรักษา และทริป เป็นไฟล์</string>
+    <string name="backup_import">กู้คืนข้อมูล</string>
+    <string name="backup_import_caption">เปิดไฟล์สำรอง ข้อมูลในเครื่องนี้จะถูกแทนที่</string>
+    <string name="backup_confirm">บันทึกค่าน้ำมันหรือค่าชาร์จ รายการบำรุงรักษา และทริปในเครื่องนี้จะถูกแทนที่ด้วยข้อมูลในไฟล์</string>
+    <string name="backup_replace">แทนที่</string>
+    <string name="backup_done">กู้คืนแล้ว</string>
+    <string name="backup_invalid">ไม่ใช่ไฟล์สำรองของ AutoBridge</string>
 </resources>

@@ -130,6 +130,9 @@ class CarHomeMoreScreen(
             entry(R.string.maint_title) {
                 CarNavigation.open(screenManager, "CarMaintenanceScreen") { CarMaintenanceScreen(carContext) }
             },
+            entry(R.string.trip_title) {
+                CarNavigation.open(screenManager, "CarTripScreen") { CarTripScreen(carContext) }
+            },
             entry(R.string.car_more_driving) {
                 UiModeStore.setDriving(true)
                 screenManager.push(CarDrivingModeScreen(carContext))

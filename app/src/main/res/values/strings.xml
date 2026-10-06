@@ -561,6 +561,7 @@
     <string name="aa_hidden_title">Bridge Web is hidden on Android Auto</string>
     <string name="aa_hidden_message">Installing this update reset the install source, so Android Auto will not show Bridge Web until it is set again. It takes one tap with Shizuku.</string>
     <string name="aa_hidden_fix">Fix now</string>
+    <string name="whats_new_0_4_31">• Trips: Settings &gt; Trips starts and ends a trip with the number of people, and shows distance and the cost per person (fuel or charging, plus tolls and parking). The car can start and end one under More &gt; Trips.\n• Backup: Settings &gt; Backup and restore saves the fuel or charging log, maintenance and trips as one file, to move to another phone.</string>
     <string name="whats_new_0_4_30">• EV support: switch the fuel log to EV (⚡) in Settings &gt; Fuel log. It then counts kWh and km/kWh, and shows the battery level from the car where the car reports it.\n• Maintenance: Settings &gt; Maintenance tracks oil, tyres, road tax and, for an EV, the coolant and 12 V battery, by distance and by date. The car shows what is due under More &gt; Maintenance.</string>
     <string name="whats_new_0_4_29">• Fuel log: Settings > Fuel log records each fill-up and works out km/L, baht/km and this month\'s spend. On the car: More > Fuel log; allow the car\'s odometer there and it is filled in for you at the next fill-up.\n• Duo Screen: the apps in the panes start fresh each time instead of coming back as they were left.</string>
     <string name="whats_new_0_4_28">• The mirror is inside Bridge Web (menu > Mirror phone screen), and Bridge Mirror\'s own icon is off by default, so Android Auto can put Bridge Web beside Maps again.\n• A split in Bridge Web no longer splits the web screen in AutoBridge.\n• Settings > Send log shares a log file for reporting problems.\n• Update: the APK downloads in the app and opens in the installer you pick (e.g. KingInstaller).\n• The version is shown on Home.</string>
@@ -1541,4 +1542,37 @@
     <string name="maint_battery_coolant">Battery coolant</string>
     <string name="maint_battery_12v">12 V battery</string>
     <string name="maint_road_tax">Road tax</string>
+
+    <!-- Trips and backup -->
+    <string name="trip_title">Trips</string>
+    <string name="trip_subtitle">Distance and cost, shared between everyone</string>
+    <string name="trip_settings_caption">Start a trip, see the cost per person</string>
+    <string name="trip_start">Start trip</string>
+    <string name="trip_end">End trip</string>
+    <string name="trip_history">Past trips</string>
+    <string name="trip_empty_title">No trips yet</string>
+    <string name="trip_empty_message">Start a trip with the number of people. At the end you get the distance and the cost per person: fuel or charging from your log, plus tolls and parking.</string>
+    <string name="trip_car_empty">Start one here, or on the phone (Settings &gt; Trips).</string>
+    <string name="trip_field_people">Number of people</string>
+    <string name="trip_field_other">Tolls, parking and other (baht)</string>
+    <string name="trip_invalid_end">The end odometer must be past the start.</string>
+    <string name="trip_delete_title">Delete this trip?</string>
+    <string name="trip_people">%1$d people</string>
+    <string name="trip_in_progress">Trip in progress · %1$d people</string>
+    <string name="trip_last">Last trip · %1$d people</string>
+    <string name="trip_km">%1$s km</string>
+    <string name="trip_minutes">%1$d min</string>
+    <string name="trip_hours_minutes">%1$d h %2$d min</string>
+    <string name="trip_cost">%1$s baht in total · %3$s baht each (%2$d people)</string>
+    <string name="backup_title">Backup and restore</string>
+    <string name="backup_subtitle">Move your logs to another phone</string>
+    <string name="backup_settings_caption">Fuel or charging log, maintenance and trips in one file</string>
+    <string name="backup_export">Back up</string>
+    <string name="backup_export_caption">Save the fuel or charging log, maintenance and trips as a file</string>
+    <string name="backup_import">Restore</string>
+    <string name="backup_import_caption">Open a backup file; it replaces what is on this phone</string>
+    <string name="backup_confirm">The fuel or charging log, maintenance list and trips on this phone will be replaced by the file\'s.</string>
+    <string name="backup_replace">Replace</string>
+    <string name="backup_done">Restored.</string>
+    <string name="backup_invalid">That is not an AutoBridge backup.</string>
 </resources>
