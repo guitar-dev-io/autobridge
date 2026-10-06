@@ -2276,6 +2276,16 @@ class MainActivity : androidx.activity.ComponentActivity() {
         }
         val body = design.body(this).apply {
             addView(dashboard, LinearLayout.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT))
+            // Same rule as the About page: an off-store payment prompt is for the sideload flavors only.
+            if (BuildConfig.AUTOBRIDGE_MODE != "SAFE") {
+                addView(
+                    design.pill(this@MainActivity, getString(R.string.home_donate), accent = design.ACCENT_FAVORITE) { showDonateChoices() },
+                    LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                        topMargin = dp(12)
+                        gravity = android.view.Gravity.CENTER_HORIZONTAL
+                    }
+                )
+            }
         }
 
         val bar = homeMiniPlayer ?: dev.autobridge.ui.MiniPlayer(this, mediaPlayback) {
@@ -2318,6 +2328,16 @@ class MainActivity : androidx.activity.ComponentActivity() {
             bottomBar = bottom,
             applyInsets = false
         )
+    }
+
+    /** The coffee button on Home: the same two ways to say thanks as the About page. */
+    private fun showDonateChoices() {
+        android.app.AlertDialog.Builder(this)
+            .setTitle(getString(R.string.about_promptpay_title))
+            .setItems(arrayOf(getString(R.string.about_support_caption), getString(R.string.about_promptpay))) { _, which ->
+                if (which == 0) openExternalUrl(SUPPORT_URL) else showPromptPayDialog()
+            }
+            .show()
     }
 
     /** Home > Music / TV / Radio / More: a short list of the sections grouped behind one tile. */
