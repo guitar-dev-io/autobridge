@@ -31,6 +31,11 @@ import com.google.android.apps.auto.sdk.CarActivity
 import com.google.android.apps.auto.sdk.SearchCallback
 import com.google.android.apps.auto.sdk.SearchController
 import com.google.android.apps.auto.sdk.SearchItem
+import dev.autobridge.audio.AudioEnvironment
+import dev.autobridge.audio.AudioFocusAction
+import dev.autobridge.audio.AudioFocusController
+import dev.autobridge.audio.AudioFocusState
+import dev.autobridge.audio.AudioPlaybackStore
 import dev.autobridge.audio.WebAudioBridge
 import dev.autobridge.audio.WebMediaStatus
 import dev.autobridge.browser.BrowserAdBlock
@@ -74,12 +79,22 @@ import org.json.JSONObject
  * media card control it. Text entry on this SDK goes through the car host's own search surface
  * ([SearchController]) rather than an app-drawn EditText, because the host owns the IME.
  *
- * Audio focus is left to the WebView's Chromium, which requests and handles it itself. Holding a
- * second request from this app is what made the template route's page pause right after play.
+ * Audio focus is now held by this app via [AudioFocusController], the same way [CarWebRenderer]
+ * (the template route) holds it. It used to be left entirely to the WebView's Chromium, which
+ * requests and handles focus itself — a second request from this app made the template route's
+ * page pause right after play. That was the self-handover case Chromium's own request produces,
+ * fixed on the template route by treating a loss arriving within [SELF_FOCUS_WINDOW_MS] of a play
+ * as the hand-over rather than a real loss; see `applyFocusAction`. Going without any request of
+ * our own avoided that bug but left this surface with nothing listening for focus loss, so once
+ * Chromium's silent claim was lost to anything else, nothing ever resumed playback — the surface
+ * went mute on switching away and stayed that way.
  */
 class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarget {
     private companion object {
         const val TIMER_GATE_OWNER = "projection-browser"
+
+        /** See `applyFocusAction`: a loss within this long of a play is Chromium's own hand-over. */
+        const val SELF_FOCUS_WINDOW_MS = 1_500L
 
         /** Toolbar metrics, in dp. The touch target is the car minimum; nothing here goes under it. */
         const val BAR_HEIGHT = 60
@@ -230,6 +245,41 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
     }
 
     private val audio = WebAudioBridge { webView }
+
+    /**
+     * This surface used to play audio with no claim on system audio focus at all, relying only on
+     * never calling `webView.onPause()` to keep the page alive. That stopped protecting anything
+     * the moment Chromium's own internal media session requested focus for the page: once ANY
+     * later focus arbitration (another app, a system sound, the car host's own UI) took it away
+     * from Chromium, nothing was listening for the loss, so nothing ever resumed playback — sound
+     * would drop on switching away from this screen and never come back. [CarWebRenderer] already
+     * solved this the same way for the car-template browser; this mirrors that fix here.
+     */
+    private val audioEnvironment by lazy { AudioEnvironment(this) }
+    private val audioFocus by lazy {
+        AudioFocusController(
+            context = this,
+            environment = audioEnvironment,
+            onAction = { applyFocusAction(it) },
+            keepPlayingThroughFocusLoss = AudioPlaybackStore.keepPlayingThroughFocusLoss(this)
+        )
+    }
+
+    /**
+     * Mirrors [CarWebRenderer]'s same-named method: a page's own play request hands audio focus to
+     * Chromium, which reports back to [audioFocus] as an immediate permanent loss. Pausing on that
+     * would stop the page a few milliseconds after the user pressed play, so a loss landing within
+     * [SELF_FOCUS_WINDOW_MS] of this pane's last play is treated as that hand-over, not a real loss.
+     */
+    private fun applyFocusAction(action: AudioFocusAction) {
+        val selfHandOverPossible = action == AudioFocusAction.PAUSE &&
+            audioFocus.state == AudioFocusState.PERMANENT_LOSS
+        if (!selfHandOverPossible) {
+            audio.apply(action)
+            return
+        }
+        audio.msSinceLastPlay { ms -> if (ms > SELF_FOCUS_WINDOW_MS) audio.apply(action) }
+    }
 
     private val mediaSource = object : WebMediaSource {
         override fun readMediaStatus(onResult: (WebMediaStatus) -> Unit) = audio.readState(onResult)
@@ -1581,12 +1631,37 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         super.onResume()
         webView?.onResume()
         webView?.let { WebViewTimerGate.hold(TIMER_GATE_OWNER, it) }
+        audioFocus.isPlaying = true
+        // If the page kept playing while this screen was away (because nothing above paused the
+        // WebView), leave focus exactly where it is — re-requesting here would hand Chromium a
+        // loss and stop the page the same way a second request after play does. Only when it has
+        // actually gone silent is focus re-claimed and anything tagged by onPause() brought back.
+        audio.isAnyPlaying { stillPlaying ->
+            if (stillPlaying) {
+                audio.resumeMarked()
+                return@isAnyPlaying
+            }
+            audioFocus.request()
+            when (audioFocus.state) {
+                AudioFocusState.GAINED, AudioFocusState.DUCKED -> audio.resumeMarked()
+                else -> Unit
+            }
+        }
     }
 
-    // No onPause() override: the WebView is deliberately not paused when the host stops this
-    // activity (the driver switching apps), so music keeps playing then, as it does in Fermata.
+    override fun onPause() {
+        super.onPause()
+        // The WebView itself is deliberately not paused here (no webView.onPause()), so the page
+        // keeps running while the driver is elsewhere -- switching car apps or going to the car's
+        // home screen must not cut audio off outright, as it does in Fermata. What onResume() needs
+        // is to know whether it was playing: the page may pause its own media on visibilitychange
+        // once this screen is hidden, which untags it for [WebAudioBridge.resumeAll] unless it is
+        // tagged here first, before that can happen.
+        audio.markPlayingForResume { }
+    }
 
     override fun onDestroy() {
+        audioFocus.abandon()
         if (CarScreenController.activeBrowser === this) CarScreenController.activeBrowser = null
         BrowserTabStore.save(this, tabs)
         tabStates.clear()
