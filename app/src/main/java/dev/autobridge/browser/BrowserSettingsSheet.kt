@@ -21,8 +21,8 @@ import dev.autobridge.R
  *
  * It gathers everything that was scattered across `showControlSettings` / `showAdvancedSettings` /
  * `showPrivacySettings` / the User-Agent dialogs into one scrollable column of labelled groups:
- * Appearance, Display scale, Start up, In-app control, Start page, User agent, Playback (DRM) and
- * Privacy & site data. Each control reads and writes a store directly ([BrowserAppearanceStore],
+ * Start up, Appearance, In-app control, Content blocking & site, Playback and Privacy and site data.
+ * Each control reads and writes a store directly ([BrowserAppearanceStore],
  * [BrowserDisplayScaleStore], [BrowserStartupStore], [BrowserControlsStore], [BrowserUserAgentStore],
  * [BrowserDrmStore], [BrowserAdBlock]) and then calls back so the activity can apply the change to the live WebView;
  * the sheet owns no browser behaviour of its own, exactly like the other sheets.
@@ -72,31 +72,8 @@ class BrowserSettingsSheet(
         container.addView(shell.grip())
         container.addView(header())
 
-        container.addView(sectionLabel("Appearance"))
-        container.addView(appearanceRow())
-
-        container.addView(sectionLabel("Display scale"))
-        container.addView(displayScaleRow())
-
         container.addView(sectionLabel("Start up"))
         container.addView(homePageRow())
-        container.addView(launchBehaviorRow())
-
-        container.addView(sectionLabel("In-app control"))
-        container.addView(floatingActionRow())
-        container.addView(
-            toggleRow(
-                "Always show floating button",
-                "Keep the in-app button on-screen instead of auto-hiding after touching the page",
-                BrowserControlsStore.alwaysShowFloatingButton(activity),
-            ) {
-                BrowserControlsStore.setAlwaysShowFloatingButton(activity, it)
-                onFloatingButtonChanged()
-            }
-        )
-        container.addView(floatingPositionRow())
-
-        container.addView(sectionLabel("Start page"))
         container.addView(
             toggleRow(
                 "Default gradient background",
@@ -108,22 +85,25 @@ class BrowserSettingsSheet(
             }
         )
 
-        container.addView(sectionLabel("User agent"))
-        container.addView(userAgentRow())
+        container.addView(sectionLabel("Appearance"))
+        container.addView(displayScaleRow())
+        container.addView(appearanceRow())
 
-        container.addView(sectionLabel("Playback"))
+        container.addView(sectionLabel("In-app control"))
         container.addView(
             toggleRow(
-                "DRM Widevine L3 enforcer",
-                "Enforces Widevine L3 compatibility to resolve black screen or playback issues",
-                BrowserDrmStore.enforceL3(activity),
+                "Always show floating button",
+                "Keep the in-app button on-screen instead of auto-hiding after touching the page",
+                BrowserControlsStore.alwaysShowFloatingButton(activity),
             ) {
-                BrowserDrmStore.setEnforceL3(activity, it)
-                onDrmChanged()
+                BrowserControlsStore.setAlwaysShowFloatingButton(activity, it)
+                onFloatingButtonChanged()
             }
         )
+        container.addView(floatingActionRow())
+        container.addView(floatingPositionRow())
 
-        container.addView(sectionLabel("Content blocking"))
+        container.addView(sectionLabel("Content blocking & site"))
         container.addView(
             toggleRow(
                 "Block ads and trackers",
@@ -136,11 +116,32 @@ class BrowserSettingsSheet(
                 onAdBlockChanged()
             }
         )
+        container.addView(userAgentRow())
+
+        container.addView(sectionLabel("Playback"))
+        container.addView(
+            navRow(
+                activity.getString(R.string.browser_settings_youtube_addons),
+                activity.getString(R.string.browser_settings_youtube_addons_caption),
+            ) {
+                activity.startActivity(dev.autobridge.youtube.YouTubeSettingsActivity.intent(activity))
+            }
+        )
+        container.addView(
+            toggleRow(
+                "DRM Widevine L3 enforcer",
+                "Enforces Widevine L3 compatibility to resolve black screen or playback issues",
+                BrowserDrmStore.enforceL3(activity),
+            ) {
+                BrowserDrmStore.setEnforceL3(activity, it)
+                onDrmChanged()
+            }
+        )
 
         container.addView(sectionLabel("Privacy and site data"))
         container.addView(
-            navRow("Reset saved site permissions", "Clear camera, mic and other per-site grants") {
-                onResetPermissions()
+            navRow("Clear browsing data", "Cache, cookies, site data and history (bookmarks are kept)") {
+                onClearBrowsingData()
             }
         )
         container.addView(
@@ -149,8 +150,8 @@ class BrowserSettingsSheet(
             }
         )
         container.addView(
-            navRow("Clear browsing data", "Cache, cookies, site data and history (bookmarks are kept)") {
-                onClearBrowsingData()
+            navRow("Reset saved site permissions", "Clear camera, mic and other per-site grants") {
+                onResetPermissions()
             }
         )
     }

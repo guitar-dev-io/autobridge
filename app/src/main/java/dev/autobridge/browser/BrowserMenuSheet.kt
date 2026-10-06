@@ -190,12 +190,6 @@ class BrowserMenuSheet(
             onAction(DrawerAction.TOGGLE_AD_BLOCK)
         })
         addView(divider())
-        // Not in the mockup's two-switch card, but fullscreen lost its toolbar button in phase 1
-        // and this is its only one-tap home; All actions ▸ This page carries it as well.
-        addView(switchRow(activity.getString(R.string.drawer_fullscreen), current.fullscreen) {
-            onAction(DrawerAction.TOGGLE_FULLSCREEN)
-        })
-        addView(divider())
         addView(allActionsRow())
         layoutParams = rowParams()
     }

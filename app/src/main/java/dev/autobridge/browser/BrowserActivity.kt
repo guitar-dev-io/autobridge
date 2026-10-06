@@ -312,6 +312,16 @@ class BrowserActivity : Activity() {
                 ?: BrowserControlsStore.startFullscreen(this)
         )
         ParkingStateStore.addListener(parkingListener)
+        // Settings > Browser launches us with this extra so the settings sheet opens straight away.
+        if (savedInstanceState == null) maybeOpenSettingsSheet(intent)
+    }
+
+    /** Opens the browser settings sheet when launched with [EXTRA_OPEN_SETTINGS]. */
+    private fun maybeOpenSettingsSheet(intent: Intent) {
+        if (intent.getBooleanExtra(EXTRA_OPEN_SETTINGS, false)) {
+            intent.removeExtra(EXTRA_OPEN_SETTINGS)
+            root.post { showBrowserSettings() }
+        }
     }
 
     /**
@@ -1031,6 +1041,7 @@ class BrowserActivity : Activity() {
         SendToCarSheet(
             activity = this,
             sizes = sizes,
+            isConnected = { dev.autobridge.bridge.AutoBridgeSessionManager.current.connected },
             currentUrl = { currentPageUrl() },
             currentTitle = { web.title?.takeIf { it.isNotBlank() } },
             engine = { SearchEngineStore.engine(this) },
@@ -1490,7 +1501,13 @@ class BrowserActivity : Activity() {
         toast("User-Agent: ${BrowserUserAgentStore.label(this)}")
     }
 
-    private companion object {
+    companion object {
+        /**
+         * Intent extra: when set to `true`, the activity opens the browser settings sheet as soon
+         * as the page is ready, matching the Settings > Browser navigation in the phone launcher.
+         */
+        const val EXTRA_OPEN_SETTINGS = "open_settings"
+
         /** [WebViewTimerGate] owner tag for the phone browser. */
         const val TIMER_GATE_OWNER = "phone-browser"
 
@@ -1698,6 +1715,7 @@ class BrowserActivity : Activity() {
         }
         data?.let(ContentAddress::https)?.let { pendingUrl = it }
         enforcePolicy()
+        maybeOpenSettingsSheet(intent)
     }
 
     /**

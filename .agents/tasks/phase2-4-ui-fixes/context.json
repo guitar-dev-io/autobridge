@@ -1,0 +1,30 @@
+{
+  "project_type": "Android Kotlin app with Jetpack Compose + programmatic Views",
+  "language": "Kotlin",
+  "build_system": "Gradle with Android Gradle Plugin, single app module + duoscreen library module",
+  "test_framework": "JUnit (JVM unit tests under app/src/test/). No instrumentation tests for UI screens.",
+  "build_command": "cd /Users/anuwat.t/Documents/ChatGPT/AutoBridge && ./gradlew testPersonalDebugUnitTest assemblePersonalDebug",
+  "test_command": "cd /Users/anuwat.t/Documents/ChatGPT/AutoBridge && ./gradlew testPersonalDebugUnitTest",
+  "verification_instructions": "Run the full build command. All existing unit tests must pass and the APK must assemble. There are no UI-specific unit tests for the screens being changed — compilation is the gate.",
+  "snapshot_or_generated_files": null,
+  "environment_constraints": "The project uses flavor 'personal'. Build both unit tests and APK with: ./gradlew testPersonalDebugUnitTest assemblePersonalDebug. No dev server to worry about.",
+  "contribution_requirements": "Do NOT change playback, mirroring, bridge, IPTV parsing or safety-gate logic. UI and navigation ONLY. Keep every existing string resource; ADD new strings (EN + TH) instead of renaming. Use design tokens from AutoBridgeDesign / ComposeTokens only — no new color/radius values. Do NOT add: tabs count badge on browser toolbar; Tabs/New tab tiles in NAVIGATE section; Split tile in THIS PAGE section of All Actions.",
+  "key_patterns": "Two UI systems co-exist: (1) Compose (ControlScreen.kt) uses ComposeTokens from ComposeTheme.kt; (2) Programmatic Views (LibraryActivity.kt, browser sheets) use AutoBridgeDesign from AutoBridgeDesign.kt. Both share the same color constants (AutoBridgeDesign.ACCENT = 0xFF4DA3FF, ACCENT_ONLINE = 0xFF5BE3B4, DANGER = 0xFFFF9AA8, TEXT_MUTED = 0xFFA9B0BA, etc.). ComposeTokens wraps them as Color(). Browser sheets use BrowserTheme which provides accent/textPrimary/etc. BrowserIcon is an enum in BrowserIcons.kt mapping names to vector drawable resource IDs. AutoBridgeDesign.grid() takes a columns parameter (default 2). AutoBridgeDesign.sectionLabel() always sets TEXT_MUTED color. AutoBridgeDesign.header() renders HeaderAction list as glyph buttons. EN strings in app/src/main/res/values/strings.xml, TH strings in app/src/main/res/values-th/strings.xml.",
+  "relevant_files": [
+    "app/src/main/java/dev/autobridge/ui/ControlScreen.kt",
+    "app/src/main/java/dev/autobridge/library/LibraryActivity.kt",
+    "app/src/main/java/dev/autobridge/ui/AutoBridgeDesign.kt",
+    "app/src/main/java/dev/autobridge/ui/ComposeTheme.kt",
+    "app/src/main/java/dev/autobridge/browser/BrowserMenuSheet.kt",
+    "app/src/main/java/dev/autobridge/browser/MoreActionsSheet.kt",
+    "app/src/main/java/dev/autobridge/browser/SendToCarSheet.kt",
+    "app/src/main/java/dev/autobridge/browser/BrowserActivity.kt",
+    "app/src/main/java/dev/autobridge/browser/BrowserIcons.kt",
+    "app/src/main/res/drawable/ic_browser_menu.xml",
+    "app/src/main/res/drawable/ic_browser_more.xml",
+    "app/src/main/res/values/strings.xml",
+    "app/src/main/res/values-th/strings.xml",
+    "docs/UI_REDESIGN_TASKS.md"
+  ],
+  "directory_structure": "app/src/main/java/dev/autobridge/ui/ — Compose screens (ControlScreen.kt), design tokens (AutoBridgeDesign.kt, ComposeTheme.kt). app/src/main/java/dev/autobridge/library/ — LibraryActivity.kt (View-based). app/src/main/java/dev/autobridge/browser/ — Browser sheets (View-based) + BrowserActivity.kt + BrowserIcons.kt. app/src/main/res/drawable/ — vector icon XMLs. app/src/main/res/values/ — EN strings. app/src/main/res/values-th/ — TH strings."
+}

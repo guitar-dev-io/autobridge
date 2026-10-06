@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -23,7 +24,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -73,7 +77,6 @@ import dev.autobridge.remote.CommandType
 import dev.autobridge.remote.MirrorStatus
 import dev.autobridge.remote.QuickCommandStore
 import dev.autobridge.remote.RemoteSettingsStore
-import dev.autobridge.remotestream.RemoteStreamConfig
 
 // Every colour here comes from ComposeTokens, which mirrors AutoBridgeDesign, so these screens sit
 // on the same surface stack as the launcher, the library and the player.
@@ -192,7 +195,7 @@ fun ControlScreen(
         PhoneHeader(
             title = stringResource(R.string.control_title),
             onBack = onBack,
-            action = HeaderButton("↺", stringResource(R.string.control_history_action), onOpenHistory)
+            action = HeaderButton("🕘", stringResource(R.string.control_history_action), onOpenHistory)
         )
 
         LazyColumn(
@@ -254,35 +257,32 @@ fun ControlScreen(
                 }
             }
             // Same persisted, user-customisable quick commands as before, all routed through the bus.
-            quickCommands.chunked(3).forEach { rowItems ->
-                item {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        rowItems.forEach { qc ->
-                            QuickCard(
-                                icon = qc.icon,
-                                label = qc.label,
-                                removable = editingQuickActions,
-                                onRemove = { QuickCommandStore.remove(context, qc.id) },
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                AutoBridgeCommandBus.send(
-                                    AutoBridgeCommand(type = qc.type, payload = qc.payload, source = CommandSource.MOBILE)
-                                )
-                            }
+            item {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(quickCommands, key = { it.id }) { qc ->
+                        QuickChip(
+                            icon = qc.icon,
+                            label = qc.label,
+                            removable = editingQuickActions,
+                            onRemove = { QuickCommandStore.remove(context, qc.id) }
+                        ) {
+                            AutoBridgeCommandBus.send(
+                                AutoBridgeCommand(type = qc.type, payload = qc.payload, source = CommandSource.MOBILE)
+                            )
                         }
-                        repeat(3 - rowItems.size) { Box(Modifier.weight(1f)) }
                     }
                 }
             }
 
             item {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     ControlTab.entries.forEach { entry ->
                         val label = stringResource(entry.labelRes)
-                        SegmentChip(
-                            if (entry == ControlTab.QUEUE && queue.isNotEmpty()) "$label · ${queue.size}" else label,
-                            selected = tab == entry,
-                            modifier = Modifier.weight(1f)
+                        UnderlineTab(
+                            label = if (entry == ControlTab.QUEUE && queue.isNotEmpty()) "$label · ${queue.size}" else label,
+                            selected = tab == entry
                         ) { tab = entry }
                     }
                 }
@@ -357,8 +357,6 @@ fun ControlScreen(
                     }
                 }
             }
-
-            item { RemoteStreamCard() }
 
             item { Box(Modifier.size(8.dp)) }
         }
@@ -781,7 +779,7 @@ private fun OnTheCarCard(state: AutoBridgeSessionManager.SessionState, onOpenCon
                 }
             } else {
                 Text(
-                    stringResource(R.string.control_on_the_car) + " · " + engineLabel(context, state.engine),
+                    (stringResource(R.string.control_on_the_car) + " · " + engineLabel(context, state.engine)).uppercase(),
                     color = TextMuted,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
@@ -797,8 +795,10 @@ private fun OnTheCarCard(state: AutoBridgeSessionManager.SessionState, onOpenCon
                 overflow = TextOverflow.Ellipsis
             )
             val detail = buildString {
-                append(context.getString(playbackLabel(state.playback)))
-                if (state.source != null) append(" · ").append(state.source.displayHost)
+                if (state.source != null) append(state.source.displayHost)
+                val playback = context.getString(playbackLabel(state.playback))
+                if (isNotEmpty()) append(" · ")
+                append(playback)
                 if (state.durationMs > 0) {
                     append(" · ")
                         .append(BrowserResumePoint.clock(state.positionMs))
@@ -968,14 +968,42 @@ private fun SegmentChip(label: String, selected: Boolean, modifier: Modifier = M
     }
 }
 
+/**
+ * A plain-text tab with a 2dp accent underline when selected — the Queue/Recent/Favorites group.
+ * Unlike [SegmentChip] it has no fill or border, so the row reads as text tabs rather than pills.
+ */
+@Composable
+private fun UnderlineTab(label: String, selected: Boolean, onClick: () -> Unit) {
+    Column(
+        Modifier.clickable(onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            label,
+            color = if (selected) Accent else TextMuted,
+            fontSize = 14.sp,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(vertical = 8.dp)
+        )
+        if (selected) {
+            Box(Modifier.width(24.dp).height(2.dp).background(Accent, RoundedCornerShape(1.dp)))
+        }
+    }
+}
+
 @Composable
 private fun LinkRow(
     title: String,
     subtitle: String,
     actionLabel: String,
+    artworkUrl: String? = null,
     onClick: () -> Unit,
     onAction: () -> Unit
 ) {
+    var menuExpanded by remember { mutableStateOf(false) }
+    val overflowDesc = stringResource(R.string.control_queue_overflow)
     Surface(
         shape = RoundedCornerShape(14.dp),
         color = CardColor,
@@ -985,15 +1013,50 @@ private fun LinkRow(
             Modifier.padding(start = 14.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Leading thumbnail / placeholder
+            Box(
+                Modifier.size(40.dp)
+                    .background(ComposeTokens.AccentSoft, RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    title.firstOrNull()?.uppercase().orEmpty(),
+                    color = Accent,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Text(title, color = TextPrimary, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(subtitle, color = TextMuted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            TextButton(onClick = onClick) {
-                Text(stringResource(R.string.bridge_controller_send), color = Accent, fontSize = 13.sp)
-            }
-            TextButton(onClick = onAction) {
-                Text(actionLabel, color = TextMuted, fontSize = 13.sp)
+            Box {
+                IconButton(
+                    onClick = { menuExpanded = true },
+                    modifier = Modifier.semantics { contentDescription = overflowDesc }
+                ) {
+                    Text("⋯", color = TextMuted, fontSize = 20.sp)
+                }
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.bridge_controller_send)) },
+                        onClick = {
+                            menuExpanded = false
+                            onClick()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(actionLabel) },
+                        onClick = {
+                            menuExpanded = false
+                            onAction()
+                        }
+                    )
+                }
             }
         }
     }
@@ -1002,78 +1065,6 @@ private fun LinkRow(
 @Composable
 private fun EmptyRow(text: String) {
     Text(text, color = TextMuted, fontSize = 13.sp, modifier = Modifier.padding(vertical = 12.dp))
-}
-
-/**
- * The experimental remote-stream host setting. It lives at the bottom of Control rather than in
- * the app's main settings because it is only meaningful next to the thing it affects: the user
- * turning this on is about to send a link and watch which engine picks it up. Off by default, and
- * the router skips the remote branch entirely while it is off, so an unconfigured install never
- * waits on a host that was never set up (see [dev.autobridge.remotestream.RemoteStreamConfig]).
- */
-@Composable
-private fun RemoteStreamCard() {
-    val context = LocalContext.current
-    var config by remember { mutableStateOf(RemoteStreamConfig.current(context)) }
-    var endpoint by remember { mutableStateOf(config.endpoint) }
-
-    Surface(
-        shape = RoundedCornerShape(16.dp),
-        color = CardColor,
-        modifier = Modifier.fillMaxWidth().border(1.dp, ComposeTokens.Hairline, RoundedCornerShape(16.dp))
-    ) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                stringResource(R.string.bridge_remote_title),
-                color = TextPrimary,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(stringResource(R.string.bridge_remote_caption), color = TextMuted, fontSize = 12.sp)
-            OutlinedTextField(
-                value = endpoint,
-                onValueChange = { endpoint = it },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                label = { Text(stringResource(R.string.bridge_remote_endpoint_label)) },
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = {
-                    RemoteStreamConfig.setEndpoint(context, endpoint)
-                    config = RemoteStreamConfig.current(context)
-                })
-            )
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = {
-                    RemoteStreamConfig.setEndpoint(context, endpoint)
-                    config = RemoteStreamConfig.current(context)
-                    Toast.makeText(
-                        context,
-                        if (RemoteStreamConfig.normalizeEndpoint(endpoint) == null)
-                            context.getString(R.string.bridge_remote_endpoint_invalid)
-                        else context.getString(R.string.bridge_remote_saved),
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }) {
-                    Text(stringResource(R.string.bridge_remote_save), color = Accent)
-                }
-                TextButton(onClick = {
-                    RemoteStreamConfig.setEnabled(context, !config.enabled)
-                    config = RemoteStreamConfig.current(context)
-                }) {
-                    Text(
-                        if (config.enabled) stringResource(R.string.bridge_remote_disable)
-                        else stringResource(R.string.bridge_remote_enable),
-                        color = if (config.enabled) ComposeTokens.Danger else Accent
-                    )
-                }
-            }
-            Text(
-                if (config.isUsable) stringResource(R.string.bridge_remote_ready) else stringResource(R.string.bridge_remote_off),
-                color = if (config.isUsable) AccentGreen else TextMuted,
-                fontSize = 12.sp
-            )
-        }
-    }
 }
 
 @Composable
@@ -1094,6 +1085,57 @@ private fun DisconnectButton(onClick: () -> Unit) {
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold
             )
+        }
+    }
+}
+
+/**
+ * A Quick Action pill chip for the horizontal row: an icon and label laid out side by side, styled
+ * like [SegmentChip]. In [removable] (Edit) mode it stops sending on tap and shows a small ✕ badge
+ * instead, wired to [onRemove] — [QuickCommandStore.remove] under the same key the chip row already
+ * reads.
+ */
+@Composable
+private fun QuickChip(
+    icon: String,
+    label: String,
+    removable: Boolean = false,
+    onRemove: () -> Unit = {},
+    onClick: () -> Unit
+) {
+    Box {
+        Surface(
+            onClick = if (removable) ({}) else onClick,
+            shape = RoundedCornerShape(18.dp),
+            color = CardAltColor
+        ) {
+            Row(
+                Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(icon, fontSize = 16.sp, color = Accent)
+                Text(
+                    label,
+                    color = TextPrimary,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+            }
+        }
+        if (removable) {
+            val removeDesc = stringResource(R.string.control_quick_action_remove, label)
+            Surface(
+                onClick = onRemove,
+                shape = CircleShape,
+                color = ComposeTokens.Danger,
+                modifier = Modifier.align(Alignment.TopEnd).size(20.dp)
+                    .semantics { contentDescription = removeDesc }
+            ) {
+                Box(contentAlignment = Alignment.Center) { Text("✕", fontSize = 11.sp, color = ComposeTokens.Ink) }
+            }
         }
     }
 }

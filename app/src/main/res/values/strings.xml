@@ -112,6 +112,7 @@
     <string name="control_result_failed">Command failed</string>
     <string name="control_retry">Retry</string>
     <string name="control_how_to_connect">How to connect</string>
+    <string name="control_queue_overflow">More actions</string>
 
     <!-- Android Auto connection status — the single wording Home, Control, Car & Connection and
          Duo Screen all share, so "connected" never means something different on two pages. -->
@@ -314,6 +315,12 @@
     <string name="more_clear_browsing_data_caption">History, cookies and cached files</string>
     <string name="more_exit_browser">Exit browser</string>
     <string name="more_exit_browser_caption">Close and return to AutoBridge</string>
+    <!-- Short right-hand hints on the All actions list rows; the longer *_caption strings above
+         are the sheet's own descriptions and are too long for a trailing column. -->
+    <string name="more_history_hint">Pages visited</string>
+    <string name="more_downloads_hint">Downloaded files</string>
+    <string name="more_support_hint">Buy Me a Coffee</string>
+    <string name="more_github_hint">Source code</string>
 
     <!-- Browser menu sheet entries ([BrowserDrawerModel]). Drawn on the car surface by
          [CarWebRenderer] and listed on the phone, so one label serves both. -->
@@ -460,6 +467,13 @@
     <string name="browser_signin_message">For security, this provider does not allow signing in from a browser embedded in another app.</string>
     <string name="browser_resumed_from_queue">Playing the next item in the queue</string>
 
+    <!-- Phone browser: zoom readout in All Actions sheet. -->
+    <string name="browser_zoom_percent">%1$d%%</string>
+
+    <!-- Browser settings sheet ([BrowserSettingsSheet]): the Playback section's YouTube add-ons row. -->
+    <string name="browser_settings_youtube_addons">YouTube add-ons</string>
+    <string name="browser_settings_youtube_addons_caption">SponsorBlock and playback quality</string>
+
     <!-- Entertainment screen ([EntertainmentActivity]): the parked-only content launcher. -->
     <string name="ent_playback_failed">Cannot play: %1$s — check the URL or pick another source</string>
     <!-- PlayerActivity: send-to-car button results. -->
@@ -530,6 +544,18 @@
     <string name="settings_group_about">About</string>
     <string name="settings_about">About</string>
     <string name="settings_about_caption">Version, licenses and support</string>
+    <!-- Settings root reorganised into four groups (Phase 5, 07_PhoneSettings.png). -->
+    <string name="settings_group_car_apps">Car &amp; apps</string>
+    <string name="settings_duo_screen">Duo screen</string>
+    <string name="settings_duo_screen_caption">Panes, layout and content size</string>
+    <string name="settings_app_profiles_caption_full">Quick Apps for the car, per-app display and audio</string>
+    <string name="settings_group_playback_web">Playback &amp; web</string>
+    <string name="settings_video_caption_full">Player, aspect ratio, picture, subtitle translation</string>
+    <string name="settings_youtube_caption_full">SponsorBlock and playback quality</string>
+    <string name="settings_browser">Browser</string>
+    <string name="settings_browser_caption">Ad blocking, start page, user agent, site data</string>
+    <string name="settings_group_safety">Safety</string>
+    <string name="settings_group_general">General</string>
     <string name="advanced_subtitle">Developer tools</string>
     <string name="advanced_diagnostics">Diagnostics</string>
     <string name="advanced_diagnostics_caption">Logs, crash reports and mirror events</string>
@@ -1393,4 +1419,10 @@
     <string name="gps_speed_disclosure_title">Use GPS for the speed reading?</string>
     <string name="gps_speed_disclosure_body">AutoBridge needs a speed to know whether the car is parked, and some head units never report one. With this on, the phone\'s GPS fills that gap: the app reads the speed from the location fix while a car session is running.\n\nThe location is used for that number alone. It is not stored, not logged and not sent anywhere, and nothing is read while the app is not connected to a car.\n\nLeave this off and AutoBridge uses the car\'s own speed signal only.</string>
     <string name="gps_speed_denied">Location permission was not granted, so GPS speed stays off</string>
+
+    <!-- Library (TV / radio) screen: category sort control, pin management, and channel check. -->
+    <string name="library_sort_az">A–Z ▼</string>
+    <string name="library_sort_za">Z–A ▲</string>
+    <string name="library_edit_pinned">Edit</string>
+    <string name="library_check_button">↻ Check</string>
 </resources>

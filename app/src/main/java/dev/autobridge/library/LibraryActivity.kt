@@ -77,7 +77,7 @@ class LibraryActivity : Activity() {
 
     /** The chip row, in order. [FOLDERS]/[PLAYLISTS]/[GALLERY] fall under [Section.FILES]. */
     private val chips = listOf(
-        Section.TV, Section.RADIO, Section.MUSIC, Section.STREAMING, Section.FILES, Section.FAVORITES
+        Section.TV, Section.RADIO, Section.MUSIC, Section.STREAMING, Section.FILES
     )
 
     /** Which chip reads as selected for [section] — the three Files sub-pages included. */
@@ -374,6 +374,7 @@ class LibraryActivity : Activity() {
      */
     private fun showLibraryCategories(source: IptvSource, allSources: List<IptvSource>, data: IptvCatalogData) {
         var query = ""
+        var sortAscending = true
         lateinit var draw: () -> Unit
         draw = {
             val q = query.trim()
@@ -386,17 +387,26 @@ class LibraryActivity : Activity() {
                 val pinnedCategories = data.categories.filter { it.id in pinnedIds }
                 val hasRecent = IptvHistoryStore.recent(this, iptvKind).isNotEmpty()
                 if (pinnedCategories.isNotEmpty() || hasRecent) {
-                    rows += AutoBridgeDesign.sectionLabel(this, "Pinned")
+                    rows += pinnedHeader(source, data)
                     rows += pinnedRow(source, data, pinnedCategories, hasRecent)
                 }
 
                 val grouped = data.categories
                     .groupBy { categoryLetter(it.name) }
-                    .toSortedMap(compareBy { categoryLetterSortKey(it) })
-                if (grouped.isNotEmpty()) rows += AutoBridgeDesign.sectionLabel(this, "All categories • ${data.categories.size}")
+                    .toSortedMap(
+                        if (sortAscending) compareBy { categoryLetterSortKey(it) }
+                        else compareByDescending { categoryLetterSortKey(it) }
+                    )
+                if (grouped.isNotEmpty()) rows += allCategoriesHeader(data.categories.size, sortAscending) {
+                    sortAscending = !sortAscending
+                    draw()
+                }
                 val anchors = mutableMapOf<String, View>()
                 grouped.forEach { (letter, categories) ->
+                    // Letter headers reuse the muted sectionLabel but override to accent so the
+                    // A–Z spine reads as navigation, not just another quiet divider.
                     val header = AutoBridgeDesign.sectionLabel(this, letter)
+                        .also { it.setTextColor(AutoBridgeDesign.ACCENT) }
                     anchors[letter] = header
                     rows += header
                     categories.forEach { category -> rows += categoryRow(source, data, category) }
@@ -490,8 +500,8 @@ class LibraryActivity : Activity() {
             title = source.name,
             subtitle = subtitle,
             accent = accent,
-            badgeText = if (source.type == IptvSourceType.XTREAM) "X" else "M",
-            trailing = "⋯",
+            badgeText = "📁",
+            trailing = "▾",
             onTrailing = { sourceMenu(source) },
             onClick = { switchSource(source, allSources) }
         )
@@ -545,6 +555,75 @@ class LibraryActivity : Activity() {
             },
             onClick = { showEntries(source, data, category.id, category.name) }
         )
+    }
+
+    /**
+     * The "ALL CATEGORIES · N" divider with a tappable A–Z / Z–A sort affordance on the right.
+     * The label keeps its muted sectionLabel look; only the sort control reads as accent.
+     */
+    private fun allCategoriesHeader(count: Int, ascending: Boolean, onToggleSort: () -> Unit): View =
+        LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            addView(
+                AutoBridgeDesign.sectionLabel(this@LibraryActivity, "All categories • $count"),
+                LinearLayout.LayoutParams(0, -2, 1f)
+            )
+            addView(TextView(this@LibraryActivity).apply {
+                text = if (ascending) "A–Z ▼" else "Z–A ▲"
+                textSize = 12f
+                setTextColor(AutoBridgeDesign.ACCENT)
+                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                setPadding(dp(10), dp(6), dp(6), dp(6))
+                isClickable = true
+                isFocusable = true
+                setOnClickListener { onToggleSort() }
+            }, LinearLayout.LayoutParams(-2, -2))
+        }
+
+    /**
+     * The "PINNED" divider with an "Edit" link that opens a checkbox list for managing which
+     * categories are pinned for this source. Pins are read and toggled through
+     * [IptvPinnedCategoryStore]; the page refreshes when the dialog is dismissed.
+     */
+    private fun pinnedHeader(source: IptvSource, data: IptvCatalogData): View =
+        LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            addView(
+                AutoBridgeDesign.sectionLabel(this@LibraryActivity, "Pinned"),
+                LinearLayout.LayoutParams(0, -2, 1f)
+            )
+            addView(TextView(this@LibraryActivity).apply {
+                text = "Edit"
+                textSize = 12f
+                setTextColor(AutoBridgeDesign.ACCENT)
+                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                setPadding(dp(10), dp(6), dp(6), dp(6))
+                isClickable = true
+                isFocusable = true
+                setOnClickListener { editPinnedCategories(source, data) }
+            }, LinearLayout.LayoutParams(-2, -2))
+        }
+
+    /** Checkbox list of every category, toggling each one's pinned state for [source]. */
+    private fun editPinnedCategories(source: IptvSource, data: IptvCatalogData) {
+        val categories = data.categories
+        if (categories.isEmpty()) return
+        val names = categories.map { it.name }.toTypedArray()
+        val checked = BooleanArray(categories.size) {
+            IptvPinnedCategoryStore.isPinned(this, source.id, categories[it].id)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Pinned categories")
+            .setMultiChoiceItems(names, checked) { _, which, isChecked ->
+                if (isChecked != IptvPinnedCategoryStore.isPinned(this, source.id, categories[which].id)) {
+                    IptvPinnedCategoryStore.toggle(this, source.id, categories[which].id)
+                }
+            }
+            .setOnDismissListener { refresh() }
+            .setPositiveButton("Done", null)
+            .show()
     }
 
     /** Pinned categories, then a "Last watched" shortcut into the full recently-played list. */
@@ -661,19 +740,25 @@ class LibraryActivity : Activity() {
                 filtered
             }
             val shown = visible.take(MAX_VISIBLE_ENTRIES)
-            val counted = if (query.isBlank()) plural(all.size, "entry", "entries")
+            val counted = if (query.isBlank()) "${all.size} channels · ${source.name}"
             else "${filtered.size} of ${all.size} match \"$query\""
             // The tiles about to be built are the ones a landing result writes into.
             pingTiles.clear()
             val rows = mutableListOf<View>()
-            if (checkedResults.isNotEmpty()) rows += checkSummaryRow(onlineCount, offlineCount, hideOffline) {
-                hideOffline = !hideOffline
-                draw()
-            }
+            if (checkedResults.isNotEmpty()) rows += checkSummaryRow(
+                online = onlineCount,
+                offline = offlineCount,
+                hideOffline = hideOffline,
+                onCheck = { recheckEntries(shown) },
+                onToggleHide = {
+                    hideOffline = !hideOffline
+                    draw()
+                }
+            )
             rows += if (gridView) {
                 // Channels and films carry a logo worth seeing, so the grid is the default; two
                 // columns is what fits a phone at a glance. List trades the logo for density.
-                AutoBridgeDesign.grid(this, shown.map { entryTile(source, it, shown) })
+                AutoBridgeDesign.grid(this, shown.map { entryTile(source, it, shown) }, columns = 3)
             } else {
                 shown.map { entryRow(source, it, shown) }
             }
@@ -682,7 +767,7 @@ class LibraryActivity : Activity() {
                 // A country-grouped public playlist puts thousands of channels in "All". Saying
                 // "2080 entries" above 300 rows is a miscount the user has no way to notice.
                 subtitle = if (shown.size < filtered.size) {
-                    "$counted • showing first ${shown.size}, search to narrow"
+                    "${all.size} channels · ${source.name} • showing first ${shown.size}, search to narrow"
                 } else {
                     counted
                 },
@@ -690,18 +775,24 @@ class LibraryActivity : Activity() {
                 empty = AutoBridgeDesign.emptyState(
                     this, "No matches", "Nothing in this category matches that search."
                 ),
-                // A signal icon in the corner instead of a labelled button: it reads this page's
-                // worst check result at a glance, and still taps to recheck like the button did.
+                // A filled star to pin this category, then the grid/list toggle. The channel
+                // check moved to a button on the status summary row (see checkSummaryRow).
                 headerActions = listOf(
+                    run {
+                        val isPinned = IptvPinnedCategoryStore.isPinned(this@LibraryActivity, source.id, categoryId)
+                        AutoBridgeDesign.HeaderAction(
+                            glyph = if (isPinned) "★" else "☆",
+                            filled = isPinned,
+                            tint = if (isPinned) AutoBridgeDesign.ACCENT_FAVORITE else null,
+                            onClick = {
+                                IptvPinnedCategoryStore.toggle(this@LibraryActivity, source.id, categoryId)
+                                draw()
+                            }
+                        )
+                    },
                     AutoBridgeDesign.HeaderAction(
                         glyph = if (gridView) "▦" else "≡",
                         onClick = { gridView = !gridView; draw() }
-                    ),
-                    AutoBridgeDesign.HeaderAction(
-                        glyph = "📶",
-                        onClick = { recheckEntries(shown) },
-                        tint = signalTint(),
-                        tag = SIGNAL_ACTION_TAG
                     )
                 ),
                 search = if (all.size >= SEARCH_THRESHOLD) {
@@ -721,16 +812,49 @@ class LibraryActivity : Activity() {
         push(draw)
     }
 
-    /** Online/offline counts from the last check, plus the Hide offline toggle. */
-    private fun checkSummaryRow(online: Int, offline: Int, hideOffline: Boolean, onToggleHide: () -> Unit): View =
+    /** Online/offline counts from the last check, a recheck button, and the Hide offline toggle. */
+    private fun checkSummaryRow(
+        online: Int,
+        offline: Int,
+        hideOffline: Boolean,
+        onCheck: () -> Unit,
+        onToggleHide: () -> Unit
+    ): View =
         LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
+            // The leading dot of each count carries its own colour (green online, red offline)
+            // while the counts themselves stay muted, so the summary reads at a glance.
+            val summary = android.text.SpannableStringBuilder()
+            val onlineStart = summary.length
+            summary.append("●")
+            summary.setSpan(
+                android.text.style.ForegroundColorSpan(AutoBridgeDesign.ACCENT_ONLINE),
+                onlineStart, summary.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+            summary.append(" $online online   ")
+            val offlineStart = summary.length
+            summary.append("●")
+            summary.setSpan(
+                android.text.style.ForegroundColorSpan(AutoBridgeDesign.DANGER),
+                offlineStart, summary.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+            summary.append(" $offline offline")
             addView(TextView(this@LibraryActivity).apply {
-                text = "● $online online   ● $offline offline"
+                text = summary
                 textSize = 12f
                 setTextColor(AutoBridgeDesign.TEXT_MUTED)
             }, LinearLayout.LayoutParams(0, -2, 1f))
+            addView(
+                AutoBridgeDesign.pill(
+                    this@LibraryActivity,
+                    "↻ Check",
+                    primary = false,
+                    accent = accent,
+                    onClick = onCheck
+                ),
+                LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(8) }
+            )
             addView(
                 AutoBridgeDesign.pill(
                     this@LibraryActivity,

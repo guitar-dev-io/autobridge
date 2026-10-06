@@ -13,13 +13,12 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.BaseAdapter
+import android.widget.FrameLayout
 import android.widget.GridView
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
-import dev.autobridge.R as AppR
-import dev.autobridge.core.state.RuntimeContextStore
 import dev.autobridge.duoscreen.DuoScreenHost
 import dev.autobridge.duoscreen.R
 import dev.autobridge.duoscreen.layout.DuoScreenPreset
@@ -29,7 +28,6 @@ import dev.autobridge.i18n.AppLocale
 import dev.autobridge.input.ShizukuInputBackend
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.stack
-import dev.autobridge.ui.ConnectionStatusText
 
 /**
  * Phone-side setup for Duo Screen: which app each pane runs, how many panes there are, and whether
@@ -63,71 +61,40 @@ class DuoScreenSettingsActivity : Activity() {
         val body = AutoBridgeDesign.body(this)
         val shizukuReady = ShizukuInputBackend.isPermissionGranted
 
-        // Android Auto and Shizuku are two unrelated connections — the car display one and the
-        // privileged-touch one — so they get their own section and their own rows rather than
-        // being folded into one "connected" line. Android Auto's wording comes from the same
-        // ConnectionStatusText Home, Control and Car & Connection use, so "connected" never means
-        // something different here than it does there.
-        body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.duo_screen_connection_section)), gap = 2)
-        val runtimeStatus = ConnectionStatusText.of(
-            RuntimeContextStore.context.value,
-            ConnectionStatusText.Labels(
-                notConnected = getString(AppR.string.conn_not_connected),
-                parked = getString(AppR.string.conn_parked),
-                driving = getString(AppR.string.conn_driving),
-                checking = getString(AppR.string.conn_checking),
-                connectedFormat = { getString(AppR.string.conn_connected_format, it) }
-            )
-        )
-        body.stack(
-            AutoBridgeDesign.contentRow(
-                context = this,
-                title = getString(AppR.string.control_android_auto),
-                subtitle = "${runtimeStatus.summary} — ${getString(R.string.duo_screen_android_auto_hint)}",
-                // Same green-when-connected language as the AndroidAutoStatusCard on Home,
-                // Control and Car & Connection (AutoBridgeDesign.ACCENT_ONLINE == ComposeTokens.Ok),
-                // not this screen's own accent — so "connected" reads the same color everywhere.
-                accent = if (runtimeStatus.connected) AutoBridgeDesign.ACCENT_ONLINE else AutoBridgeDesign.TEXT_MUTED,
-                badgeText = if (runtimeStatus.connected) "✓" else "○"
-            ) {}
-        )
-        body.stack(
-            AutoBridgeDesign.contentRow(
-                context = this,
-                title = getString(
-                    if (shizukuReady) R.string.duo_screen_shizuku_ready
-                    else R.string.duo_screen_shizuku_missing
-                ),
-                subtitle = getString(R.string.duo_screen_shizuku_hint),
-                accent = if (shizukuReady) accent else AutoBridgeDesign.DANGER,
-                badgeText = if (shizukuReady) "✓" else "!",
-                trailing = "›"
-            ) {
-                if (!shizukuReady) ShizukuInputBackend.requestPermission()
-                render()
-            }
-        )
+        // ── Shizuku status banner ────────────────────────────────────────────
+        // The design replaces the old Connection section (AA + Shizuku rows)
+        // with a single banner card. AA status is shown on Home already; only
+        // the Shizuku state matters on this screen.
+        body.stack(shizukuBanner(shizukuReady))
 
+        // ── PANES ────────────────────────────────────────────────────────────
         val paneCount = DuoScreenStore.paneCount(this)
         body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.duo_screen_panes_section)), gap = 2)
-        body.stack(
-            AutoBridgeDesign.contentRow(
-                context = this,
-                title = getString(R.string.duo_screen_pane_count),
-                subtitle = paneCount.toString(),
-                accent = accent,
-                badgeText = paneCount.toString(),
-                trailing = "›"
-            ) { cyclePaneCount(paneCount) }
-        )
 
+        // Number of panes: 2/3 segmented control on a card
+        val paneCountRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = AutoBridgeDesign.surface(this@DuoScreenSettingsActivity, AutoBridgeDesign.SURFACE, 20)
+            setPadding(dp(14), dp(14), dp(14), dp(14))
+            addView(
+                TextView(this@DuoScreenSettingsActivity).apply {
+                    text = getString(R.string.duo_screen_pane_count)
+                    textSize = 15f
+                    setTextColor(AutoBridgeDesign.TEXT)
+                    typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                },
+                LinearLayout.LayoutParams(0, -2, 1f)
+            )
+            addView(paneCountSegments(paneCount), LinearLayout.LayoutParams(-2, -2))
+        }
+        body.stack(paneCountRow)
+
+        // Pane app picker rows
         val packages = DuoScreenStore.packages(this)
         repeat(paneCount) { index ->
             val chosen = packages.getOrNull(index)
             val paneNumber = index + 1
-            // Lint's StringFormatMatches misreads this exact call as passing a String (it does
-            // not: paneNumber is Int, matched by the %1$d in both locales) — a known false
-            // positive with this lambda shape, not a real type mismatch.
             @Suppress("StringFormatMatches")
             val paneTitle = getString(R.string.duo_screen_pane_label, paneNumber)
             body.stack(
@@ -142,61 +109,37 @@ class DuoScreenSettingsActivity : Activity() {
             )
         }
 
+        // ── LAYOUT ───────────────────────────────────────────────────────────
         body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.duo_screen_layout_section)), gap = 2)
+
+        // Layout preset visual chips + content scale chips inside one card
         val preset = DuoScreenStore.preset(this)
-        body.stack(
-            AutoBridgeDesign.contentRow(
-                context = this,
-                title = getString(R.string.duo_screen_preset),
-                subtitle = preset.label(this),
-                accent = accent,
-                badgeText = preset.glyph,
-                trailing = "›"
-            ) { pickPreset() }
-        )
         val scale = DuoScreenStore.contentScale(this)
-        body.stack(
-            AutoBridgeDesign.contentRow(
-                context = this,
-                title = getString(R.string.duo_screen_content_scale),
-                subtitle = getString(R.string.duo_screen_content_scale_hint),
-                accent = accent,
-                badgeText = getString(R.string.duo_screen_content_scale_value, scale),
-                trailing = "›"
-            ) { pickContentScale() }
-        )
+        body.stack(layoutCard(preset, scale))
+
+        // Reset arrangement row
         body.stack(
             AutoBridgeDesign.contentRow(
                 context = this,
                 title = getString(R.string.duo_screen_reset_layout),
                 subtitle = getString(R.string.duo_screen_reset_layout_hint),
                 accent = accent,
-                badgeText = "↺"
+                badgeText = "↺",
+                trailing = "›"
             ) {
                 DuoScreenStore.resetLayout(this)
-                // Not applied(): the preset has not changed, so only an explicit re-apply puts the
-                // live panes back onto it — that is what "reset the arrangement" means here.
                 DuoScreenHost.onLayoutReset()
                 Toast.makeText(this, R.string.duo_screen_reset_done, Toast.LENGTH_SHORT).show()
                 render()
             }
         )
 
-        // The phone-side way out, for the same reason the car screen has one: a session outlives the
-        // car Screen that showed it (DuoScreenHost.KEEP_ALIVE_MS), so the panes and the apps in them
-        // can still be holding their displays after the driver has moved on. The car button needs
-        // the driver to be looking at Duo Screen; this one does not. Confirmed first, same as any
-        // other action on this screen that shuts something down, naming exactly what closes.
+        // ── SESSION ──────────────────────────────────────────────────────────
         body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.duo_screen_session_section)), gap = 2)
-        body.stack(
-            AutoBridgeDesign.contentRow(
-                context = this,
-                title = getString(R.string.duo_screen_end_session),
-                subtitle = getString(R.string.duo_screen_end_session_hint),
-                accent = AutoBridgeDesign.DANGER,
-                badgeText = "✕"
-            ) { confirmEndSession() }
-        )
+        body.stack(dangerCard(
+            getString(R.string.duo_screen_end_session),
+            getString(R.string.duo_screen_end_session_hint)
+        ) { confirmEndSession() })
 
         setContentView(
             AutoBridgeDesign.page(
@@ -211,6 +154,376 @@ class DuoScreenSettingsActivity : Activity() {
             )
         )
     }
+
+    // ── Shizuku status banner ────────────────────────────────────────────────
+
+    /**
+     * A single card with an amber (or green) circle icon, the status title + hint text, and an
+     * accent-filled "Grant" pill when permission is not yet available.
+     */
+    private fun shizukuBanner(ready: Boolean): View {
+        val bannerAccent = if (ready) AutoBridgeDesign.ACCENT_ONLINE else AutoBridgeDesign.SIGNAL_SLOW
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = AutoBridgeDesign.surface(
+                this@DuoScreenSettingsActivity,
+                AutoBridgeDesign.tint(bannerAccent, 0.08f), 20,
+                AutoBridgeDesign.tint(bannerAccent, 0.25f)
+            )
+            setPadding(dp(12), dp(12), dp(14), dp(12))
+
+            // Circle icon: "!" or "✓"
+            addView(FrameLayout(this@DuoScreenSettingsActivity).apply {
+                background = AutoBridgeDesign.surface(
+                    this@DuoScreenSettingsActivity,
+                    AutoBridgeDesign.tint(bannerAccent, 0.22f), 20,
+                    bannerAccent
+                )
+                addView(TextView(this@DuoScreenSettingsActivity).apply {
+                    text = if (ready) "✓" else "!"
+                    textSize = 18f
+                    gravity = Gravity.CENTER
+                    setTextColor(bannerAccent)
+                    typeface = Typeface.create("sans-serif", Typeface.BOLD)
+                }, FrameLayout.LayoutParams(-1, -1))
+            }, LinearLayout.LayoutParams(dp(40), dp(40)))
+
+            // Title + subtitle
+            val text = LinearLayout(this@DuoScreenSettingsActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(12), 0, dp(8), 0)
+            }
+            text.addView(TextView(this@DuoScreenSettingsActivity).apply {
+                this.text = getString(
+                    if (ready) R.string.duo_screen_shizuku_ready
+                    else R.string.duo_screen_shizuku_missing
+                )
+                textSize = 14f
+                setTextColor(AutoBridgeDesign.TEXT)
+                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
+            })
+            text.addView(TextView(this@DuoScreenSettingsActivity).apply {
+                this.text = getString(R.string.duo_screen_shizuku_hint)
+                textSize = 12f
+                setTextColor(AutoBridgeDesign.TEXT_MUTED)
+                maxLines = 2
+                ellipsize = TextUtils.TruncateAt.END
+                setPadding(0, dp(2), 0, 0)
+            })
+            addView(text, LinearLayout.LayoutParams(0, -2, 1f))
+
+            // Grant button — only when Shizuku is not ready
+            if (!ready) {
+                addView(TextView(this@DuoScreenSettingsActivity).apply {
+                    this.text = getString(R.string.duo_screen_shizuku_grant)
+                    textSize = 13f
+                    gravity = Gravity.CENTER
+                    setTextColor(android.graphics.Color.WHITE)
+                    typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+                    isClickable = true
+                    isFocusable = true
+                    setPadding(dp(16), dp(8), dp(16), dp(8))
+                    background = AutoBridgeDesign.tappable(
+                        this@DuoScreenSettingsActivity,
+                        AutoBridgeDesign.ACCENT, 14,
+                        AutoBridgeDesign.ACCENT,
+                        stroke = AutoBridgeDesign.ACCENT
+                    )
+                    setOnClickListener {
+                        ShizukuInputBackend.requestPermission()
+                        render()
+                    }
+                }, LinearLayout.LayoutParams(-2, -2))
+            }
+        }
+    }
+
+    // ── Pane count segmented control ─────────────────────────────────────────
+
+    private fun paneCountSegments(current: Int): View = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        background = AutoBridgeDesign.surface(
+            this@DuoScreenSettingsActivity, AutoBridgeDesign.INK, 14
+        )
+        val inset = dp(3)
+        setPadding(inset, inset, inset, inset)
+        for (count in DuoScreenStore.MIN_PANES..DuoScreenStore.MAX_PANES) {
+            val active = count == current
+            addView(
+                TextView(this@DuoScreenSettingsActivity).apply {
+                    text = count.toString()
+                    textSize = 14f
+                    gravity = Gravity.CENTER
+                    contentDescription = if (active) "$count, selected" else "$count"
+                    setTextColor(if (active) android.graphics.Color.WHITE else AutoBridgeDesign.TEXT_MUTED)
+                    if (active) typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+                    background = if (active) AutoBridgeDesign.surface(
+                        this@DuoScreenSettingsActivity, AutoBridgeDesign.ACCENT, 11, AutoBridgeDesign.ACCENT
+                    ) else null
+                    minWidth = dp(52)
+                    setPadding(dp(12), dp(8), dp(12), dp(8))
+                    setOnClickListener {
+                        if (count != current) {
+                            DuoScreenStore.setPaneCount(this@DuoScreenSettingsActivity, count)
+                            applied()
+                            render()
+                        }
+                    }
+                },
+                LinearLayout.LayoutParams(-2, -2)
+            )
+        }
+    }
+
+    // ── Layout card (preset chips + content-size chips) ──────────────────────
+
+    /**
+     * A single card containing: "Layout preset" label + 5 mini-diagram chips, then a hairline,
+     * then "Content size in a pane" label + hint + 4 percentage chips.
+     */
+    private fun layoutCard(selectedPreset: DuoScreenPreset, selectedScale: Int): View {
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = AutoBridgeDesign.surface(this@DuoScreenSettingsActivity, AutoBridgeDesign.SURFACE, 20)
+            clipToOutline = true
+            setPadding(dp(14), dp(14), dp(14), dp(14))
+
+            // Preset label
+            addView(TextView(this@DuoScreenSettingsActivity).apply {
+                text = getString(R.string.duo_screen_preset)
+                textSize = 15f
+                setTextColor(AutoBridgeDesign.TEXT)
+                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            }, LinearLayout.LayoutParams(-1, -2))
+
+            // 5 preset mini-diagram chips in a row
+            addView(presetChipRow(selectedPreset), LinearLayout.LayoutParams(-1, -2).apply {
+                topMargin = dp(10)
+            })
+
+            // Hairline divider
+            addView(View(this@DuoScreenSettingsActivity).apply {
+                setBackgroundColor(AutoBridgeDesign.HAIRLINE)
+            }, LinearLayout.LayoutParams(-1, maxOf(1, dp(1) / 2)).apply {
+                topMargin = dp(14)
+                bottomMargin = dp(14)
+            })
+
+            // Content size label + hint
+            addView(TextView(this@DuoScreenSettingsActivity).apply {
+                text = getString(R.string.duo_screen_content_scale)
+                textSize = 15f
+                setTextColor(AutoBridgeDesign.TEXT)
+                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            }, LinearLayout.LayoutParams(-1, -2))
+
+            addView(TextView(this@DuoScreenSettingsActivity).apply {
+                text = getString(R.string.duo_screen_content_scale_hint)
+                textSize = 12f
+                setTextColor(AutoBridgeDesign.TEXT_MUTED)
+                maxLines = 2
+                setPadding(0, dp(2), 0, 0)
+            }, LinearLayout.LayoutParams(-1, -2))
+
+            // Content scale chip row
+            addView(contentScaleChipRow(selectedScale), LinearLayout.LayoutParams(-1, -2).apply {
+                topMargin = dp(10)
+            })
+        }
+    }
+
+    /** A row of 5 preset mini-diagram chips. */
+    private fun presetChipRow(selected: DuoScreenPreset): View = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        DuoScreenPreset.entries.forEachIndexed { index, preset ->
+            val active = preset == selected
+            addView(
+                presetChip(preset, active),
+                LinearLayout.LayoutParams(0, -2, 1f).apply {
+                    if (index > 0) marginStart = dp(6)
+                }
+            )
+        }
+    }
+
+    /** One preset chip: a mini-diagram + label. Active uses accent border, inactive uses hairline. */
+    private fun presetChip(preset: DuoScreenPreset, active: Boolean): View {
+        val chipAccent = if (active) AutoBridgeDesign.ACCENT else AutoBridgeDesign.HAIRLINE
+        val bgFill = if (active) AutoBridgeDesign.tint(AutoBridgeDesign.ACCENT, 0.12f) else AutoBridgeDesign.SURFACE_RAISED
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            background = AutoBridgeDesign.surface(this@DuoScreenSettingsActivity, bgFill, 14, chipAccent)
+            isClickable = true
+            isFocusable = true
+            contentDescription = preset.label(this@DuoScreenSettingsActivity)
+            setPadding(dp(6), dp(8), dp(6), dp(6))
+            setOnClickListener {
+                DuoScreenStore.setPreset(this@DuoScreenSettingsActivity, preset)
+                applied()
+                render()
+            }
+
+            // Mini diagram
+            addView(miniPresetDiagram(preset, active), LinearLayout.LayoutParams(dp(40), dp(28)))
+
+            // Label
+            addView(TextView(this@DuoScreenSettingsActivity).apply {
+                text = preset.label(this@DuoScreenSettingsActivity)
+                textSize = 10f
+                gravity = Gravity.CENTER
+                maxLines = 2
+                setTextColor(if (active) AutoBridgeDesign.ACCENT else AutoBridgeDesign.TEXT_MUTED)
+                setPadding(0, dp(4), 0, 0)
+            }, LinearLayout.LayoutParams(-1, -2))
+        }
+    }
+
+    /**
+     * A small programmatic diagram of the preset's pane arrangement, drawn with nested views.
+     * Active diagrams use ACCENT fill; inactive use SURFACE_RAISED with HAIRLINE stroke.
+     */
+    private fun miniPresetDiagram(preset: DuoScreenPreset, active: Boolean): View {
+        val rectFill = if (active) AutoBridgeDesign.ACCENT else AutoBridgeDesign.SURFACE_RAISED
+        val rectStroke = if (active) AutoBridgeDesign.ACCENT else AutoBridgeDesign.HAIRLINE
+        val gap = dp(2)
+        return when (preset) {
+            DuoScreenPreset.EVEN_COLUMNS -> {
+                // Two equal vertical rectangles side by side
+                LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    addView(View(this@DuoScreenSettingsActivity).apply {
+                        background = AutoBridgeDesign.surface(this@DuoScreenSettingsActivity, rectFill, 4, rectStroke)
+                    }, LinearLayout.LayoutParams(0, -1, 1f))
+                    addView(View(this@DuoScreenSettingsActivity).apply {
+                        background = AutoBridgeDesign.surface(this@DuoScreenSettingsActivity, rectFill, 4, rectStroke)
+                    }, LinearLayout.LayoutParams(0, -1, 1f).apply { marginStart = gap })
+                }
+            }
+            DuoScreenPreset.WIDE_LEFT -> {
+                // Left 60%, right 40%
+                LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    addView(View(this@DuoScreenSettingsActivity).apply {
+                        background = AutoBridgeDesign.surface(this@DuoScreenSettingsActivity, rectFill, 4, rectStroke)
+                    }, LinearLayout.LayoutParams(0, -1, 3f))
+                    addView(View(this@DuoScreenSettingsActivity).apply {
+                        background = AutoBridgeDesign.surface(this@DuoScreenSettingsActivity, rectFill, 4, rectStroke)
+                    }, LinearLayout.LayoutParams(0, -1, 2f).apply { marginStart = gap })
+                }
+            }
+            DuoScreenPreset.WIDE_RIGHT -> {
+                // Left 40%, right 60%
+                LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    addView(View(this@DuoScreenSettingsActivity).apply {
+                        background = AutoBridgeDesign.surface(this@DuoScreenSettingsActivity, rectFill, 4, rectStroke)
+                    }, LinearLayout.LayoutParams(0, -1, 2f))
+                    addView(View(this@DuoScreenSettingsActivity).apply {
+                        background = AutoBridgeDesign.surface(this@DuoScreenSettingsActivity, rectFill, 4, rectStroke)
+                    }, LinearLayout.LayoutParams(0, -1, 3f).apply { marginStart = gap })
+                }
+            }
+            DuoScreenPreset.EVEN_ROWS -> {
+                // Two equal horizontal rectangles stacked
+                LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    addView(View(this@DuoScreenSettingsActivity).apply {
+                        background = AutoBridgeDesign.surface(this@DuoScreenSettingsActivity, rectFill, 4, rectStroke)
+                    }, LinearLayout.LayoutParams(-1, 0, 1f))
+                    addView(View(this@DuoScreenSettingsActivity).apply {
+                        background = AutoBridgeDesign.surface(this@DuoScreenSettingsActivity, rectFill, 4, rectStroke)
+                    }, LinearLayout.LayoutParams(-1, 0, 1f).apply { topMargin = gap })
+                }
+            }
+            DuoScreenPreset.PICTURE_IN_PICTURE -> {
+                // Full rect with a small rect in the bottom-right corner
+                FrameLayout(this).apply {
+                    addView(View(this@DuoScreenSettingsActivity).apply {
+                        background = AutoBridgeDesign.surface(this@DuoScreenSettingsActivity, rectFill, 4, rectStroke)
+                    }, FrameLayout.LayoutParams(-1, -1))
+                    // Small PIP tile in the bottom-right
+                    val pipFill = if (active) AutoBridgeDesign.tint(AutoBridgeDesign.ACCENT, 0.6f) else AutoBridgeDesign.HAIRLINE
+                    addView(View(this@DuoScreenSettingsActivity).apply {
+                        background = AutoBridgeDesign.surface(this@DuoScreenSettingsActivity, pipFill, 3, rectStroke)
+                    }, FrameLayout.LayoutParams(dp(14), dp(10), Gravity.BOTTOM or Gravity.END).apply {
+                        marginEnd = dp(2)
+                        bottomMargin = dp(2)
+                    })
+                }
+            }
+        }
+    }
+
+    /** A row of 4 content-scale percentage chips. */
+    private fun contentScaleChipRow(selected: Int): View = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        DuoScreenStore.CONTENT_SCALES.forEachIndexed { index, scale ->
+            val active = scale == selected
+            addView(
+                TextView(this@DuoScreenSettingsActivity).apply {
+                    text = getString(R.string.duo_screen_content_scale_value, scale)
+                    textSize = 13f
+                    gravity = Gravity.CENTER
+                    maxLines = 1
+                    contentDescription = if (active) "${getString(R.string.duo_screen_content_scale_value, scale)}, selected" else getString(R.string.duo_screen_content_scale_value, scale)
+                    setTextColor(if (active) android.graphics.Color.WHITE else AutoBridgeDesign.TEXT_MUTED)
+                    if (active) typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+                    background = if (active) AutoBridgeDesign.surface(
+                        this@DuoScreenSettingsActivity, AutoBridgeDesign.ACCENT, 14, AutoBridgeDesign.ACCENT
+                    ) else AutoBridgeDesign.surface(
+                        this@DuoScreenSettingsActivity, AutoBridgeDesign.SURFACE_RAISED, 14
+                    )
+                    setPadding(dp(14), dp(8), dp(14), dp(8))
+                    isClickable = true
+                    isFocusable = true
+                    setOnClickListener {
+                        DuoScreenStore.setContentScale(this@DuoScreenSettingsActivity, scale)
+                        applied()
+                        render()
+                    }
+                },
+                LinearLayout.LayoutParams(0, -2, 1f).apply {
+                    if (index > 0) marginStart = dp(6)
+                }
+            )
+        }
+    }
+
+    // ── Danger card for ending the session ───────────────────────────────────
+
+    /** A danger-tinted card with red title and subtitle for the End session action. */
+    private fun dangerCard(title: String, caption: String, onClick: () -> Unit): View =
+        LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = AutoBridgeDesign.tappable(
+                this@DuoScreenSettingsActivity,
+                AutoBridgeDesign.tint(AutoBridgeDesign.DANGER, 0.08f), 20,
+                AutoBridgeDesign.DANGER,
+                stroke = AutoBridgeDesign.tint(AutoBridgeDesign.DANGER, 0.35f)
+            )
+            isClickable = true
+            isFocusable = true
+            contentDescription = title
+            setPadding(dp(14), dp(14), dp(14), dp(14))
+            setOnClickListener { onClick() }
+            addView(TextView(this@DuoScreenSettingsActivity).apply {
+                text = title
+                textSize = 16f
+                setTextColor(AutoBridgeDesign.DANGER)
+                typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+            })
+            addView(TextView(this@DuoScreenSettingsActivity).apply {
+                text = caption
+                textSize = 13f
+                setTextColor(AutoBridgeDesign.tint(AutoBridgeDesign.DANGER, 0.75f))
+                setPadding(0, dp(3), 0, 0)
+            })
+        }
 
     /**
      * Confirms before tearing the session down: the hint text already says what closes (every
@@ -233,15 +546,6 @@ class DuoScreenSettingsActivity : Activity() {
             .show()
     }
 
-    private fun cyclePaneCount(current: Int) {
-        val next = if (current >= DuoScreenStore.MAX_PANES) DuoScreenStore.MIN_PANES else current + 1
-        // setPaneCount also drops the arrangement, which was built for the old count and cannot
-        // describe the new one; the panes are laid out from the preset instead.
-        DuoScreenStore.setPaneCount(this, next)
-        applied()
-        render()
-    }
-
     /**
      * Hands the change to a running session and says which way it went. Called after every write,
      * because "I changed it and nothing happened" is the same screen either way otherwise.
@@ -253,42 +557,6 @@ class DuoScreenSettingsActivity : Activity() {
             if (live) R.string.duo_screen_applied_now else R.string.duo_screen_applied_next,
             Toast.LENGTH_SHORT
         ).show()
-    }
-
-    /**
-     * Picking a preset here only records the choice — there is no surface on the phone to lay it
-     * out on, so [dev.autobridge.duoscreen.DuoScreenController] builds the rects from it when the head unit connects. In a
-     * live session the car screen's own layout button applies one straight away.
-     */
-    private fun pickPreset() {
-        val presets = DuoScreenPreset.entries
-        val labels = presets.map { "${it.glyph}  ${it.label(this)}" }
-        AlertDialog.Builder(this)
-            .setTitle(R.string.duo_screen_preset)
-            .setItems(labels.toTypedArray()) { _, which ->
-                DuoScreenStore.setPreset(this, presets[which])
-                applied()
-                render()
-            }
-            .show()
-    }
-
-    /**
-     * Density, not zoom — see [DuoScreenStore.CONTENT_SCALES]. A pane's display keeps its pixels
-     * and its rect; only how many dp the app inside gets to lay itself out in changes, so a live
-     * session takes it as a resize and the driver sees each step on the car display as they pick.
-     */
-    private fun pickContentScale() {
-        val scales = DuoScreenStore.CONTENT_SCALES
-        val labels = scales.map { getString(R.string.duo_screen_content_scale_value, it) }
-        AlertDialog.Builder(this)
-            .setTitle(R.string.duo_screen_content_scale)
-            .setItems(labels.toTypedArray()) { _, which ->
-                DuoScreenStore.setContentScale(this, scales[which])
-                applied()
-                render()
-            }
-            .show()
     }
 
     /**

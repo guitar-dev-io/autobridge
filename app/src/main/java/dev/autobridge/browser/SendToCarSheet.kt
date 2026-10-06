@@ -42,6 +42,7 @@ import dev.autobridge.R
 class SendToCarSheet(
     private val activity: Activity,
     private val sizes: AutoUiSizes,
+    private val isConnected: () -> Boolean,
     private val currentUrl: () -> String?,
     private val currentTitle: () -> String?,
     private val engine: () -> SearchEngine,
@@ -72,10 +73,6 @@ class SendToCarSheet(
 
     private val shell = BrowserSheetShell(activity, sizes)
 
-    /** Which tab is active. "Send URL" shows the current page; "Search" focuses the query field. */
-    private enum class Mode { URL, SEARCH }
-
-    private var mode = Mode.URL
     private var selectedEngine = engine()
     private lateinit var container: LinearLayout
     private lateinit var input: EditText
@@ -90,10 +87,9 @@ class SendToCarSheet(
         container.removeAllViews()
         container.addView(shell.grip())
         container.addView(header())
-        container.addView(tabRow())
 
         val url = currentUrl()
-        if (mode == Mode.URL && url != null) {
+        if (url != null) {
             container.addView(sectionLabel(activity.getString(R.string.send_section_current_page)))
             container.addView(currentPageCard(url))
         }
@@ -124,47 +120,53 @@ class SendToCarSheet(
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(BrowserTheme.textPrimary)
         }
+        val connected = isConnected()
+        val pillColor = if (connected) BrowserTheme.secureBadge else BrowserTheme.textSecondary
+        val pillLabel = activity.getString(
+            if (connected) R.string.conn_connected_plain else R.string.conn_not_connected
+        )
+        val pill = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = GradientDrawable().apply {
+                setColor(android.graphics.Color.argb(
+                    40,
+                    android.graphics.Color.red(pillColor),
+                    android.graphics.Color.green(pillColor),
+                    android.graphics.Color.blue(pillColor)
+                ))
+                cornerRadius = sizes.dp(AutoUiSizes.TOUCH_TARGET_DP) / 2f
+            }
+            val hPad = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP)
+            val vPad = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP / 2f)
+            setPadding(hPad, vPad, hPad, vPad)
+            addView(View(activity).apply {
+                val dotSize = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP)
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(pillColor)
+                }
+                layoutParams = LinearLayout.LayoutParams(dotSize, dotSize).apply {
+                    marginEnd = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP / 2f)
+                }
+            })
+            addView(TextView(activity).apply {
+                text = pillLabel
+                textSize = shell.sp(AutoUiSizes.ICON_SMALL_DP * 0.75f)
+                setTextColor(pillColor)
+                maxLines = 1
+            })
+            contentDescription = pillLabel
+        }
         return LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             addView(title, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            addView(pill, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                marginEnd = shell.gap()
+            })
             addView(shell.closeButton { shell.dismiss() })
             layoutParams = rowParams()
-        }
-    }
-
-    /** Segmented control: "Send URL" vs "Search on car". */
-    private fun tabRow(): View {
-        val row = LinearLayout(activity).apply {
-            orientation = LinearLayout.HORIZONTAL
-            background = shell.rounded(BrowserTheme.sheetCardBackground, sizes.dp(AutoUiSizes.TOUCH_TARGET_DP) / 2f)
-            setPadding(sizes.dpInt(4f), sizes.dpInt(4f), sizes.dpInt(4f), sizes.dpInt(4f))
-            layoutParams = rowParams()
-        }
-        row.addView(tab("Send URL", Mode.URL), tabParams())
-        row.addView(tab("Search on car", Mode.SEARCH), tabParams())
-        return row
-    }
-
-    private fun tab(label: String, forMode: Mode): View = TextView(activity).apply {
-        text = label
-        gravity = Gravity.CENTER
-        maxLines = 1
-        textSize = shell.sp(AutoUiSizes.ICON_SMALL_DP * 0.85f)
-        val active = mode == forMode
-        setTextColor(if (active) BrowserTheme.onPrimary else BrowserTheme.textSecondary)
-        if (active) setTypeface(typeface, Typeface.BOLD)
-        background = shell.rounded(
-            if (active) BrowserTheme.accent else android.graphics.Color.TRANSPARENT,
-            sizes.dp(AutoUiSizes.TOUCH_TARGET_DP) / 2f
-        )
-        minHeight = sizes.dpInt(AutoUiSizes.TOUCH_TARGET_DP * 0.85f)
-        setOnClickListener {
-            if (mode != forMode) {
-                mode = forMode
-                render()
-                if (forMode == Mode.SEARCH) input.requestFocus()
-            }
         }
     }
 
@@ -208,12 +210,6 @@ class SendToCarSheet(
             contentDescription = activity.getString(R.string.send_current_page_action)
             addView(favicon)
             addView(texts, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-            // The mockup's filled "selected" radio on the right; the whole row is the tap target.
-            addView(TextView(activity).apply {
-                text = "◉"
-                textSize = shell.sp(AutoUiSizes.ICON_MEDIUM_DP)
-                setTextColor(BrowserTheme.accent)
-            })
             setOnClickListener { if (onSendUrl(url)) shell.dismiss() }
             layoutParams = rowParams()
         }
@@ -338,10 +334,11 @@ class SendToCarSheet(
         gravity = Gravity.CENTER
         background = shell.rounded(BrowserTheme.accent, shell.cornerRadius())
         contentDescription = "Send to car"
-        addView(TextView(activity).apply {
-            text = "🚗"
-            textSize = shell.sp(AutoUiSizes.SHEET_ICON_DP * 1.1f)
-            setPadding(0, 0, shell.pad(), 0)
+        addView(ImageView(activity).apply {
+            setImageDrawable(iconDrawable(BrowserIcon.CAR, BrowserTheme.onPrimary))
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
+            val side = sizes.dpInt(AutoUiSizes.SHEET_ICON_DP)
+            layoutParams = LinearLayout.LayoutParams(side, side).apply { marginEnd = shell.pad() }
         })
         addView(LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
@@ -374,11 +371,11 @@ class SendToCarSheet(
             setStroke(sizes.dpInt(1.5f), BrowserTheme.accent)
         }
         contentDescription = "Add to queue"
-        addView(TextView(activity).apply {
-            text = "≡"
-            textSize = shell.sp(AutoUiSizes.SHEET_ICON_DP * 0.9f)
-            setTextColor(BrowserTheme.accent)
-            setPadding(0, 0, shell.pad(), 0)
+        addView(ImageView(activity).apply {
+            setImageDrawable(iconDrawable(BrowserIcon.ADD, BrowserTheme.accent))
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
+            val side = sizes.dpInt(AutoUiSizes.SHEET_ICON_DP)
+            layoutParams = LinearLayout.LayoutParams(side, side).apply { marginEnd = shell.pad() }
         })
         addView(LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
@@ -496,6 +493,4 @@ class SendToCarSheet(
     /** The shared [BrowserIcon] vector tinted for use in this sheet; see [BrowserIcon]. */
     private fun iconDrawable(icon: BrowserIcon, color: Int) =
         ContextCompat.getDrawable(activity, icon.resId)!!.mutate().apply { setTint(color) }
-
-    private fun tabParams() = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
 }

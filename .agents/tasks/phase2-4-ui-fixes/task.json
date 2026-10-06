@@ -1,0 +1,7 @@
+{
+  "task_id": "task-phase2-4-ui-fixes",
+  "task_description": "Fix all Phase 2-4 UI design mismatches in the AutoBridge Android app. 28 UI-only fixes across ControlScreen.kt, LibraryActivity.kt, AutoBridgeDesign.kt, BrowserMenuSheet.kt, MoreActionsSheet.kt, SendToCarSheet.kt, BrowserActivity.kt, BrowserIcons.kt, and string resources.",
+  "status": "completed",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004"],
+  "blocked_reason": null
+}

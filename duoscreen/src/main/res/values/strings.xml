@@ -12,6 +12,7 @@
     <string name="duo_screen_shizuku_ready">Shizuku connected</string>
     <string name="duo_screen_shizuku_missing">Shizuku not available</string>
     <string name="duo_screen_shizuku_hint">Needed to launch apps into the panes and pass touches to them</string>
+    <string name="duo_screen_shizuku_grant">Grant</string>
     <string name="duo_screen_cancel">Cancel</string>
     <string name="duo_screen_panes_section">Panes</string>
     <string name="duo_screen_pane_count">Number of panes</string>

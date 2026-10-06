@@ -1,0 +1,34 @@
+{
+  "id": "FEAT-003",
+  "type": "fix",
+  "description": "Phase 4 (Browser Quick Menu + All Actions) design-match fixes in BrowserMenuSheet.kt, MoreActionsSheet.kt, BrowserActivity.kt, BrowserIcons.kt, and a drawable (fixes 20-24 from the audit). Uses BrowserTheme/BrowserIcon vectors. Does NOT re-add the intentionally-omitted Tabs/New tab/Split tiles.",
+  "status": "completed",
+  "steps": [
+    "Fix 20 — Remove Fullscreen switch from quick-menu card. In BrowserMenuSheet.kt settingsCard() (~line 165), delete the third switchRow block that adds R.string.drawer_fullscreen (TOGGLE_FULLSCREEN) and its preceding addView(divider()). Only the Desktop site switch and the Block ads switch remain in the card (plus the divider + All actions row). Note: fullscreen remains reachable via All actions ▸ This page (MoreActionsSheet thisPageTiles already has TOGGLE_FULLSCREEN), so no functionality is lost.",
+    "Fix 21 — Menu button glyph hamburger → vertical dots. The toolbar menu button uses BrowserIcon.MENU, which maps to R.drawable.ic_browser_menu (a hamburger: pathData 'M3,18h18...'). Create a NEW vector drawable app/src/main/res/drawable/ic_browser_more_vert.xml with vertical 3-dots pathData 'M12,8c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM12,10c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2zM12,16c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2z' (24dp, viewport 24, fillColor #FFFFFFFF, matching ic_browser_menu.xml structure). Then in BrowserIcons.kt change MENU(R.drawable.ic_browser_menu) to MENU(R.drawable.ic_browser_more_vert). This is the cleanest fix since BrowserIcon.MENU is used only for the toolbar menu affordance; verify no other consumer of BrowserIcon.MENU needs a hamburger (search for BrowserIcon.MENU usages — in BrowserActivity.buildChrome it is the toolbarMenuButton which per design 09 should be ⋮).",
+    "Fix 22 — Zoom '100%' readout. In MoreActionsSheet.kt zoomRow() (~line 395), add a TextView between the zoomButton(REMOVE) and zoomButton(ADD) showing the current zoom percent, defaulting to '100%'. Since BrowserActivity zooms by a relative factor and does not expose a level, maintain a local zoom-percent state in MoreActionsSheet: add a private var zoomPercent = 100 and a readout TextView field. On ZOOM_OUT decrement by 10 (min ~50), on ZOOM_IN increment by 10 (max ~200), update the readout text, THEN dispatch the action. The readout is a TextView (textSize ICON_SMALL_DP*0.9, BrowserTheme.textPrimary, gravity center, min width ~48dp) placed with marginStart/marginEnd = shell.gap(). This is a display-only approximation; if the coder determines BrowserActivity DOES expose a real zoom level via BrowserMenuState, prefer reading the real value — check BrowserMenuState fields first.",
+    "Fix 23 — Remove back arrow from All Actions header. In MoreActionsSheet.kt header() (~line 140), remove the circular 'back' ImageView and its addView(back). The header becomes just the 'All actions' title (weight=1) + the close X (shell.closeButton). The onBack constructor param becomes unused for the header; leave the param in the constructor signature (callers pass it) but do not render the back button. If leaving an unused param causes a lint/warning failure, keep it referenced by a comment or remove its usage safely — do not break callers in BrowserActivity.",
+    "Fix 24 — Ungroup Zoom + Request desktop site. In MoreActionsSheet.kt, the pageSettingsCard() wraps zoomRow() + divider() + desktopSwitchRow() in one rounded card. Replace the single container.addView(pageSettingsCard(current)) call in show() with two separate standalone rows: container.addView(standaloneRow(zoomRow())) and container.addView(standaloneRow(desktopSwitchRow(current))), each wrapped in its own rounded BrowserTheme.sheetCardBackground background (reuse the card styling but one row per card). Simplest: create two small helper wrappers or give zoomRow()/desktopSwitchRow() their own card background and remove pageSettingsCard(). Keep both controls' behavior and dispatched actions identical.",
+    "Add any new EN strings to app/src/main/res/values/strings.xml and TH strings to app/src/main/res/values-th/strings.xml (the zoom percent readout may use a plain '%d%%' format string — add browser_zoom_percent (\"%1$d%%\") EN + TH if a string resource is used instead of a literal).",
+    "Do NOT add Tabs/New tab tiles to navigateTiles, and do NOT add the Split tile to thisPageTiles — these are documented intentional omissions.",
+    "Build and confirm all unit tests pass."
+  ],
+  "acceptance_criteria": [
+    "BrowserMenuSheet.kt, MoreActionsSheet.kt, BrowserActivity.kt, BrowserIcons.kt compile; `./gradlew testPersonalDebugUnitTest assemblePersonalDebug` succeeds.",
+    "Quick-menu card shows only Desktop site + Block ads toggles (no Fullscreen row).",
+    "Toolbar menu button renders a vertical 3-dot ⋮ icon, not a hamburger.",
+    "All Actions Zoom row shows a '100%' readout between − and +, updating on tap.",
+    "All Actions header shows only 'All actions' + X (no back arrow).",
+    "Zoom and Request desktop site are separate standalone rows, not one grouped card.",
+    "navigateTiles still has 4 tiles (no Tabs/New tab); thisPageTiles still has 5 (no Split).",
+    "New strings (if any) exist in both strings.xml files; no existing string renamed.",
+    "New drawable ic_browser_more_vert.xml exists and is referenced by BrowserIcon.MENU."
+  ],
+  "verification": [
+    "cd /Users/anuwat.t/Documents/ChatGPT/AutoBridge && ./gradlew testPersonalDebugUnitTest assemblePersonalDebug",
+    "Confirm ic_browser_more_vert.xml created and BrowserIcon.MENU points to it",
+    "Confirm navigateTiles count unchanged (4) and thisPageTiles count unchanged (5)"
+  ],
+  "blocked_reason": null,
+  "findings": "All 5 fixes applied and verified: Fix 20 (fullscreen switch removed from quick-menu card), Fix 21 (MENU icon changed to ic_browser_more_vert.xml), Fix 22 (zoom readout between − and + with local zoomPercent state, min 50 / max 200 / step 10), Fix 23 (back arrow removed from All Actions header), Fix 24 (zoom and desktop-site ungrouped into separate standalone cards). Added browser_zoom_percent string to both EN and TH. navigateTiles=4, thisPageTiles=5 unchanged. Build + tests green."
+}

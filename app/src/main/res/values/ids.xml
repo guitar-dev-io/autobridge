@@ -5,6 +5,8 @@
     <!-- The status line inside a content tile, so a ping result can be written into a page that
          is already on screen instead of rebuilding it (see AutoBridgeDesign.statusLabel). -->
     <item name="autobridge_status_label" type="id" />
+    <!-- The small colored dot on a content tile's artwork corner, updated live by setStatus(). -->
+    <item name="autobridge_status_dot" type="id" />
     <!-- The ScrollView AutoBridgeDesign.page() builds around its body, so a caller that needs to
          scroll the page programmatically (a letter index, say) can find it after the page is
          built — see AutoBridgeDesign.pageScroll. -->
