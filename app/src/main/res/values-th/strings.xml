@@ -1603,4 +1603,23 @@
     <string name="car_streaming_maybe">อาจเล่นไม่ได้</string>
     <string name="about_facebook">เพจ Facebook</string>
     <string name="about_facebook_caption">ข่าวสารและอัปเดต</string>
+    <!-- Emergency card -->
+    <string name="emergency_title">บัตรฉุกเฉิน</string>
+    <string name="emergency_subtitle">เบอร์ที่ต้องโทรและข้อมูลที่ต้องแจ้ง</string>
+    <string name="emergency_settings_caption">ประกัน ช่วยเหลือบนถนน และสายด่วนฉุกเฉิน</string>
+    <string name="emergency_add">+ เพิ่ม</string>
+    <string name="emergency_add_suggested">เพิ่มสายด่วนฉุกเฉิน</string>
+    <string name="emergency_empty_title">ยังไม่มีอะไรบนบัตร</string>
+    <string name="emergency_empty_message">เพิ่มเบอร์ประกัน เลขกรมธรรม์ บริการช่วยเหลือบนถนน และคนที่ต้องโทรหา กดปุ่มสายด่วนฉุกเฉินเพื่อเพิ่มเบอร์สาธารณะ</string>
+    <string name="emergency_car_empty">กรอกบัตรบนโทรศัพท์ (ตั้งค่า &gt; บัตรฉุกเฉิน)</string>
+    <string name="emergency_field_label">ชื่อ (เช่น สายด่วนประกัน)</string>
+    <string name="emergency_field_value">เบอร์หรือข้อความ</string>
+    <string name="emergency_invalid">กรอกชื่อ และเบอร์หรือข้อความ</string>
+    <string name="emergency_call">โทร</string>
+    <string name="emergency_cannot_dial">เปิดแอปโทรไม่ได้</string>
+    <string name="emergency_police">ตำรวจ</string>
+    <string name="emergency_medical">เหตุฉุกเฉินทางการแพทย์</string>
+    <string name="emergency_highway_police">ตำรวจทางหลวง</string>
+    <string name="emergency_fire">ดับเพลิง</string>
+    <string name="emergency_tourist_police">ตำรวจท่องเที่ยว</string>
 </resources>

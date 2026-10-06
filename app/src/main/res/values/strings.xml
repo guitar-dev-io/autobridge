@@ -1633,4 +1633,23 @@
     <string name="car_streaming_maybe">May not play</string>
     <string name="about_facebook">Facebook page</string>
     <string name="about_facebook_caption">News and updates</string>
+    <!-- Emergency card -->
+    <string name="emergency_title">Emergency card</string>
+    <string name="emergency_subtitle">Numbers to ring and facts to quote</string>
+    <string name="emergency_settings_caption">Insurance, roadside help, emergency lines</string>
+    <string name="emergency_add">+ Add</string>
+    <string name="emergency_add_suggested">Add emergency lines</string>
+    <string name="emergency_empty_title">Nothing on the card yet</string>
+    <string name="emergency_empty_message">Add your insurance hotline and policy number, roadside assistance and someone to call. Tap the emergency-lines button for the public numbers.</string>
+    <string name="emergency_car_empty">Fill the card on the phone (Settings &gt; Emergency card).</string>
+    <string name="emergency_field_label">Label (e.g. Insurance hotline)</string>
+    <string name="emergency_field_value">Number or text</string>
+    <string name="emergency_invalid">Enter a label and a number or text.</string>
+    <string name="emergency_call">Call</string>
+    <string name="emergency_cannot_dial">Could not open the dialer.</string>
+    <string name="emergency_police">Police</string>
+    <string name="emergency_medical">Medical emergency</string>
+    <string name="emergency_highway_police">Highway police</string>
+    <string name="emergency_fire">Fire</string>
+    <string name="emergency_tourist_police">Tourist police</string>
 </resources>
