@@ -1923,6 +1923,23 @@ import rikka.shizuku.Shizuku
 /** Phone destinations are defined (and unit-tested) in [PhoneNav]. */
 private typealias PhoneScreen = PhoneNav.Route
 
+/**
+ * How another Activity (the browser's "Now playing" / "Agent" actions, say) opens a running or
+ * fresh [MainActivity] straight to one of its screens instead of landing on Home.
+ *
+ * [Intent.FLAG_ACTIVITY_REORDER_TO_FRONT] reuses the existing instance when MainActivity is still
+ * in the task's back stack (the common case: Home opened the caller in the first place), which is
+ * what makes [MainActivity.onNewIntent] run rather than a second instance being created.
+ */
+object MainActivityScreens {
+    const val EXTRA_OPEN_SCREEN = "dev.autobridge.extra.OPEN_SCREEN"
+
+    fun intent(context: android.content.Context, route: PhoneNav.Route): android.content.Intent =
+        android.content.Intent(context, MainActivity::class.java)
+            .addFlags(android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+            .putExtra(EXTRA_OPEN_SCREEN, route.name)
+}
+
 class MainActivity : androidx.activity.ComponentActivity() {
     private companion object {
         const val REQUEST_CAPTURE = 2001
@@ -2040,8 +2057,11 @@ class MainActivity : androidx.activity.ComponentActivity() {
         RemoteRuntime.attachMediaClient(mediaPlayback)
         // Rotation and process recreation return to the same page and drill-down path instead of
         // dropping the user on Home. Unknown or legacy names (REMOTE, DEVICES) are mapped by
-        // PhoneNav.parse, so an old saved state never crashes the restore.
-        val restoredScreen = PhoneNav.parse(savedInstanceState?.getString(STATE_SCREEN))
+        // PhoneNav.parse, so an old saved state never crashes the restore. An explicit deep-link
+        // target (see MainActivityScreens) wins over the saved one: it is a fresh, deliberate
+        // request from outside, not process-death restoration.
+        val openScreen = intent.getStringExtra(MainActivityScreens.EXTRA_OPEN_SCREEN)?.let(PhoneNav::parse)
+        val restoredScreen = openScreen ?: PhoneNav.parse(savedInstanceState?.getString(STATE_SCREEN))
         backStack = PhoneNav.BackStack(
             savedInstanceState?.getStringArrayList(STATE_BACK_STACK).orEmpty().map(PhoneNav::parse)
         )
@@ -2054,6 +2074,17 @@ class MainActivity : androidx.activity.ComponentActivity() {
             }
         })
         refreshStatus()
+    }
+
+    /**
+     * Reused-instance half of [MainActivityScreens]: when MainActivity is still in the back stack
+     * (brought forward instead of recreated), onCreate does not run again, so the deep-link target
+     * is applied here instead.
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        intent.getStringExtra(MainActivityScreens.EXTRA_OPEN_SCREEN)?.let { showPhoneScreen(PhoneNav.parse(it)) }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -2261,7 +2292,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
             header = design.header(
                 context = this,
                 title = getString(R.string.app_name),
-                subtitle = getString(R.string.home_tagline),
+                logo = R.mipmap.ic_launcher_round,
                 // Outdoor temperature when a Weather place is saved; the connection itself is
                 // the status card right below, so the chip no longer repeats it.
                 chip = homeStatusChip(),

@@ -63,6 +63,12 @@ enum class DrawerAction {
 
     /** Opens the AutoBridge GitHub repository in an external browser. */
     GITHUB,
+
+    /** Phone only: queues the current page — "plays when the current track ends". */
+    ADD_TO_QUEUE,
+
+    /** Phone only: flips [BrowserAdBlock], same switch as Settings ▸ Content blocking. */
+    TOGGLE_AD_BLOCK,
 }
 
 /**
@@ -152,6 +158,7 @@ data class BrowserMenuState(
     val tabCount: Int = 1,
     val isDesktop: Boolean = false,
     val fullscreen: Boolean = false,
+    val adBlockEnabled: Boolean = false,
     val canGoBack: Boolean = false,
     val canGoForward: Boolean = false,
     val version: String = "",
@@ -314,6 +321,10 @@ class BrowserDrawerModel private constructor(
             DrawerItem(DrawerAction.GITHUB, R.string.drawer_github, BrowserIcon.CODE),
             DrawerItem(DrawerAction.ZOOM_IN, R.string.drawer_zoom_in, BrowserIcon.ADD),
             DrawerItem(DrawerAction.ZOOM_OUT, R.string.drawer_zoom_out, BrowserIcon.REMOVE),
+            // Phone only: the quick menu's own two extra rows (see [BrowserMenuSheet]), with no car
+            // equivalent — the car's queue and ad-block controls live in Media Center and Settings.
+            DrawerItem(DrawerAction.ADD_TO_QUEUE, R.string.send_queue_title, BrowserIcon.ADD),
+            DrawerItem(DrawerAction.TOGGLE_AD_BLOCK, R.string.car_browser_block_ads, BrowserIcon.CLOSE),
         )
 
         /** Fixed at three so the primary sheet keeps the phone sheet's proportions on every panel. */

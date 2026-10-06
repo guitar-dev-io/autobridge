@@ -89,8 +89,6 @@ class BrowserActivity : Activity() {
     private lateinit var toolbarMenuButton: ImageButton
     private lateinit var toolbarHomeButton: ImageButton
     private lateinit var backButton: ImageButton
-    private lateinit var forwardButton: ImageButton
-    private lateinit var stopReload: ImageButton
     private lateinit var progress: ProgressBar
     private lateinit var blocked: TextView
     private lateinit var loadError: LinearLayout
@@ -346,11 +344,9 @@ class BrowserActivity : Activity() {
             )
         }
         backButton = control(BrowserIcon.BACK, "Back") { if (web.canGoBack()) web.goBack() }
-        forwardButton = control(BrowserIcon.FORWARD, "Forward") { if (web.canGoForward()) web.goForward() }
-        stopReload = control(BrowserIcon.RELOAD, "Reload") {
-            if (web.progress < 100) web.stopLoading() else web.reload()
-            updateNavigation()
-        }
+        // Forward and Reload left the toolbar with the phase-4 redesign: the mockup's bar is Back,
+        // address, menu and nothing else. Both still exist, one level in, under All actions ▸
+        // Navigate — see [MoreActionsSheet]'s `more_section_navigate` rows.
         address = buildAddressField()
         toolbar.addView(
             address,
@@ -761,12 +757,8 @@ class BrowserActivity : Activity() {
     }
 
     private fun updateNavigation() {
-        stopReload.setImageResource(if (web.progress < 100) BrowserIcon.CLOSE.resId else BrowserIcon.RELOAD.resId)
-        stopReload.contentDescription = if (web.progress < 100) "Stop loading" else "Reload"
         backButton.isEnabled = web.canGoBack()
         backButton.alpha = if (backButton.isEnabled) 1f else DISABLED_NAV_ALPHA
-        forwardButton.isEnabled = web.canGoForward()
-        forwardButton.alpha = if (forwardButton.isEnabled) 1f else DISABLED_NAV_ALPHA
         if (!address.hasFocus()) {
             if (showingStartPage) {
                 address.setText("")
@@ -1001,6 +993,7 @@ class BrowserActivity : Activity() {
         url = if (showingStartPage) "" else web.url.orEmpty(),
         isDesktop = BrowserUserAgentStore.mode(this) == BrowserUserAgentMode.DESKTOP,
         fullscreen = fullscreen,
+        adBlockEnabled = BrowserAdBlock.enabled(this),
         canGoBack = web.canGoBack(),
         canGoForward = web.canGoForward(),
         version = "v${dev.autobridge.BuildConfig.VERSION_NAME}",
@@ -1020,7 +1013,6 @@ class BrowserActivity : Activity() {
             activity = this,
             sizes = sizes,
             state = { menuState() },
-            onNavigate = { navigate(it) },
             onAction = { runMenuAction(it) },
             onSendToCar = { openSendToCar() },
             onMore = { openMoreActions() },
@@ -1167,14 +1159,14 @@ class BrowserActivity : Activity() {
     }
 
     /**
-     * Opens the secondary "More actions" sheet: a compact vertical list of the rarely-used entries
-     * moved off the main sheet. Each row dispatches straight back through [runMenuAction], so no
-     * behaviour is duplicated here.
+     * Opens "All actions": every action this surface offers, grouped into sections. Each row
+     * dispatches straight back through [runMenuAction], so no behaviour is duplicated here.
      */
     private fun openMoreActions() {
         MoreActionsSheet(
             activity = this,
             sizes = sizes,
+            state = { menuState() },
             onAction = { runMenuAction(it) },
             onBack = { showMenu() },
         ).show()
@@ -1228,6 +1220,22 @@ class BrowserActivity : Activity() {
             // the engine. One-tap "send current page" still lives there as the default.
             DrawerAction.SEND_TO_CAR -> openSendToCar()
             DrawerAction.RECEIVE_FROM_CAR -> receiveFromCar()
+            // Queues the page on screen — the input-less path through the same queue the "Send to
+            // car" sheet's own Add-to-queue button uses, so a quick tap and the full sheet agree.
+            DrawerAction.ADD_TO_QUEUE -> playQueueAccess().add(null, SearchEngineStore.engine(this))
+            DrawerAction.TOGGLE_AD_BLOCK -> {
+                BrowserAdBlock.setEnabled(this, !BrowserAdBlock.enabled(this))
+                web.reload()
+            }
+            // Phone equivalents of the car's own AutoBridge-section rows: this surface has no Media
+            // Center or in-browser Agent chat, but Library and "what's on the car" are both just a
+            // normal Activity away.
+            DrawerAction.MEDIA_LIBRARY ->
+                startActivity(dev.autobridge.library.LibraryActivity.intent(this, dev.autobridge.library.LibraryActivity.Section.TV))
+            DrawerAction.NOW_PLAYING ->
+                startActivity(dev.autobridge.MainActivityScreens.intent(this, dev.autobridge.ui.PhoneNav.Route.CONTROL))
+            DrawerAction.AGENT ->
+                startActivity(dev.autobridge.MainActivityScreens.intent(this, dev.autobridge.ui.PhoneNav.Route.AGENT_COMMANDS))
             DrawerAction.SUPPORT ->
                 if (!BrowserLauncher.openUrl(this, "https://buymeacoffee.com/guitar.story")) toast("เปิดเบราว์เซอร์ไม่ได้")
             DrawerAction.LICENSES -> showOpenSourceLicenses()
@@ -1239,9 +1247,10 @@ class BrowserActivity : Activity() {
             // Handled inside the sheet, which owns a real text field and does not need the activity
             // to open a keyboard screen the way the car surface does.
             DrawerAction.ADDRESS_KEYBOARD, DrawerAction.ADDRESS_CLEAR -> Unit
-            // Car-surface entries; [MenuSurface.PHONE] never lists them.
+            // Car-only concepts the phone genuinely does not have — one WebView, one pane, so
+            // multiple tabs and split layout have nothing to switch between here. [MenuSurface.PHONE]
+            // never lists these; see [MoreActionsSheet] for the phone's actual AUTOBRIDGE section.
             DrawerAction.NEW_TAB, DrawerAction.TABS, DrawerAction.MEDIA_CENTER,
-            DrawerAction.NOW_PLAYING, DrawerAction.MEDIA_LIBRARY, DrawerAction.AGENT,
             DrawerAction.DIAGNOSTICS, DrawerAction.SPLIT_LAYOUT -> Unit
             // Sheet navigation, resolved before an action is dispatched.
             DrawerAction.MORE, DrawerAction.BACK_TO_MENU, DrawerAction.CLOSE_SHEET -> Unit

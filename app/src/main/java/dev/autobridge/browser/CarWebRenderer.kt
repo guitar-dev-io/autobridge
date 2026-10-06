@@ -1889,6 +1889,9 @@ class CarWebRenderer(context: Context) {
             // Phone-sheet "About & support" links. Offered only on the phone More sheet; the car
             // surface never lists them, so reaching here means a caller bypassed the model.
             DrawerAction.SUPPORT, DrawerAction.LICENSES, DrawerAction.GITHUB -> Unit
+            // Phone-only quick-menu entries; the car reaches the same queue/ad-block controls
+            // through its own existing rows ([DrawerAction.MEDIA_CENTER], Settings).
+            DrawerAction.ADD_TO_QUEUE, DrawerAction.TOGGLE_AD_BLOCK -> Unit
         }
         host?.onBrowserStateChanged()
     }

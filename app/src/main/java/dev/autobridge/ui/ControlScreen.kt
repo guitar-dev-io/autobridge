@@ -559,7 +559,7 @@ fun AndroidAutoStatusCard(
                 Column(Modifier.padding(start = 12.dp).weight(1f)) {
                     Text(title, color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Medium)
                     Text(
-                        (if (status.connected) "● " else "○ ") + status.summary,
+                        status.summary,
                         color = if (status.connected) AccentGreen else TextMuted,
                         fontSize = 13.sp,
                         modifier = Modifier.semantics { contentDescription = "$title: ${status.summary}" }
