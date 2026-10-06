@@ -19,7 +19,8 @@ import dev.autobridge.settings.VideoDisclaimerStore
  * wherever the video was launched from without starting playback.
  *
  * This is a warning gate, not a content restriction: once accepted it is remembered
- * ([VideoDisclaimerStore]) and never shown again on this device, and it does not replace or bypass
+ * ([VideoDisclaimerStore]) for three months and until its wording changes, then asked again
+ * ([dev.autobridge.settings.VideoDisclaimerPolicy]), and it does not replace or bypass
  * the existing parked-only [dev.autobridge.safety.SafetyEnforcement] check that CarVideoScreen still
  * performs on every frame.
  */
