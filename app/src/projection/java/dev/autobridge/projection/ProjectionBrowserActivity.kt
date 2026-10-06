@@ -299,8 +299,24 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
             navigateFromInput(query)
             runCatching { searchController?.stopSearch() }
                 .onFailure { StructuredLog.w("PROJECTION", "stopSearch failed: ${it.message}") }
+            hideHostSearchBox()
             return true
         }
+
+        // Closed without submitting (Back on the host keyboard): the box goes with it.
+        override fun onSearchStop() = hideHostSearchBox()
+    }
+
+    /**
+     * Takes the car host's own search box ("ค้นหา") off the screen. Once a search callback is
+     * registered the host shows that box over the page on its own and nothing ever hid it again,
+     * so it sat over the top right of every site. The app's keyboard is the way to type on this
+     * route; the host box is only for the hosts where it works, opened from the menu
+     * ([openAddressEntry]) and hidden again as soon as that search ends.
+     */
+    private fun hideHostSearchBox() {
+        runCatching { searchController?.hideSearchBox() }
+            .onFailure { StructuredLog.w("PROJECTION", "hideSearchBox failed: ${it.message}") }
     }
 
     private val audio = WebAudioBridge { webView }
@@ -388,6 +404,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
             runCatching { controller.setSearchCallback(searchCallback) }
                 .onFailure { StructuredLog.w("PROJECTION", "setSearchCallback failed: ${it.message}") }
         }
+        hideHostSearchBox()
         ParkingStateStore.addListener(parkingListener)
         WebMediaHub.register(this, mediaSource)
         // Held for the activity's whole life, not just while it is on top. The template route
@@ -1964,6 +1981,8 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
 
     override fun onResume() {
         super.onResume()
+        // The host can bring its search box back when the activity returns to the screen.
+        hideHostSearchBox()
         webView?.onResume()
         webView?.let { WebViewTimerGate.hold(TIMER_GATE_OWNER, it) }
         audioFocus.isPlaying = true
