@@ -1133,7 +1133,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
                 applyChromePinning()
             })
             addView(menuRow("⌨", "Keyboard") { dismissOverlay(); openKeyboard() })
-            val split = BrowserSplitStore.layout(this@ProjectionBrowserActivity)
+            val split = BrowserSplitStore.projection.layout(this@ProjectionBrowserActivity)
             addView(menuRow(split.glyph, getString(R.string.car_browser_split), splitDetail(split)) {
                 dismissOverlay()
                 cycleSplitLayout()
@@ -1152,9 +1152,9 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
                     destination?.let { startMapsNavigation(it) }
                 })
                 addView(menuRow("⇆", "Swap split sides") {
-                    BrowserSplitStore.setSideOnRight(
+                    BrowserSplitStore.projection.setSideOnRight(
                         this@ProjectionBrowserActivity,
-                        !BrowserSplitStore.sideOnRight(this@ProjectionBrowserActivity)
+                        !BrowserSplitStore.projection.sideOnRight(this@ProjectionBrowserActivity)
                     )
                     dismissOverlay()
                     layoutPanes()
@@ -1340,8 +1340,8 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
 
     /** Steps to the next split layout and applies it, saying so when the display cannot fit it. */
     private fun cycleSplitLayout() {
-        val next = BrowserSplitStore.layout(this).next()
-        BrowserSplitStore.setLayout(this, next)
+        val next = BrowserSplitStore.projection.layout(this).next()
+        BrowserSplitStore.projection.setLayout(this, next)
         layoutPanes()
         StructuredLog.i("PROJECTION", "split -> $next (side ${if (sideView != null) "shown" else "none"})")
     }
@@ -1353,9 +1353,9 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
     private fun showPageOnSide() {
         val target = webView?.url?.let { ContentAddress.https(it) } ?: return
         val hadSide = sideView != null
-        BrowserSplitStore.setSideUrl(this, target)
-        if (BrowserSplitStore.layout(this) == BrowserSplitLayout.SINGLE) {
-            BrowserSplitStore.setLayout(this, BrowserSplitLayout.HALF)
+        BrowserSplitStore.projection.setSideUrl(this, target)
+        if (BrowserSplitStore.projection.layout(this) == BrowserSplitLayout.SINGLE) {
+            BrowserSplitStore.projection.setLayout(this, BrowserSplitLayout.HALF)
         }
         // A side pane created by this layout pass opens the stored address by itself.
         layoutPanes()
@@ -1385,12 +1385,12 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         val height = area.height
         if (width <= 0 || height <= 0) return
         val panes = BrowserSplitGeometry.panes(
-            BrowserSplitStore.layout(this),
+            BrowserSplitStore.projection.layout(this),
             0, 0, width, height,
-            sideOnRight = BrowserSplitStore.sideOnRight(this),
+            sideOnRight = BrowserSplitStore.projection.sideOnRight(this),
             gapPx = SPLIT_GAP.dp(),
             minPanePx = SPLIT_MIN_PANE.dp(),
-            sideFraction = BrowserSplitStore.sideFraction(this),
+            sideFraction = BrowserSplitStore.projection.sideFraction(this),
         )
         if (panes == null) {
             releaseSidePane()
@@ -1460,7 +1460,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
 
                 override fun onPageFinished(view: WebView, url: String) {
                     // Remembered, so the next split reopens the page the driver left there.
-                    BrowserSplitStore.setSideUrl(this@ProjectionBrowserActivity, url)
+                    BrowserSplitStore.projection.setSideUrl(this@ProjectionBrowserActivity, url)
                 }
             }
             webChromeClient = object : WebChromeClient() {
@@ -1485,7 +1485,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         // Index 1: above the main page, below nothing else in the page area.
         area.addView(side, 1, FrameLayout.LayoutParams(0, 0))
         sideView = side
-        side.loadUrl(BrowserSplitStore.sideUrl(this))
+        side.loadUrl(BrowserSplitStore.projection.sideUrl(this))
         StructuredLog.i("PROJECTION", "split side page created")
         return side
     }
@@ -1557,7 +1557,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         val side = sideView ?: return
         sideView = null
         if (keyboardTarget === side) closeKeyboard()
-        side.url?.let { BrowserSplitStore.setSideUrl(this, it) }
+        side.url?.let { BrowserSplitStore.projection.setSideUrl(this, it) }
         (side.parent as? ViewGroup)?.removeView(side)
         side.stopLoading()
         side.destroy()

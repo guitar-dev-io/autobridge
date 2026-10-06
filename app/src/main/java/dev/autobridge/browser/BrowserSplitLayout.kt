@@ -211,55 +211,72 @@ object BrowserSplitGeometry {
     }
 }
 
-/** Persisted split preferences, in the browser's shared preference file. */
-object BrowserSplitStore {
-    private const val PREFS_NAME = "autobridge_browser"
-    private const val KEY_LAYOUT = "split_layout"
-    private const val KEY_SIDE_ON_RIGHT = "split_side_on_right"
-    private const val KEY_SIDE_URL = "split_side_url"
-    private const val KEY_SIDE_FRACTION = "split_side_fraction"
-
-    /** What the side pane opens the first time: the map case this feature exists for. */
-    const val DEFAULT_SIDE_URL = "https://www.google.com/maps"
+/**
+ * Persisted split preferences for one browser surface, in the browser's shared preference file.
+ *
+ * Each surface keeps its own: Bridge Web (the projection route) and the Car App browser are
+ * different screens the driver opens separately, and a split chosen in one used to come up in the
+ * other as well — leaving AutoBridge's web screen stuck in two panes after Bridge Web was split.
+ * [BrowserSplitStore] is the Car App browser's (its keys predate the split, so existing choices
+ * are kept); [BrowserSplitStore.projection] is Bridge Web's.
+ */
+open class BrowserSplitPrefs internal constructor(private val keyPrefix: String) {
+    private val keyLayout = keyPrefix + "split_layout"
+    private val keySideOnRight = keyPrefix + "split_side_on_right"
+    private val keySideUrl = keyPrefix + "split_side_url"
+    private val keySideFraction = keyPrefix + "split_side_fraction"
 
     private fun prefs(context: Context) =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     fun layout(context: Context): BrowserSplitLayout =
-        prefs(context).getString(KEY_LAYOUT, null)
+        prefs(context).getString(keyLayout, null)
             ?.let { runCatching { BrowserSplitLayout.valueOf(it) }.getOrNull() }
             ?: BrowserSplitLayout.SINGLE
 
     /** Choosing a preset drops a dragged ratio: picking one again is how you get its shape back. */
     fun setLayout(context: Context, layout: BrowserSplitLayout) {
         prefs(context).edit {
-            putString(KEY_LAYOUT, layout.name)
-            remove(KEY_SIDE_FRACTION)
+            putString(keyLayout, layout.name)
+            remove(keySideFraction)
         }
     }
 
     /** The side pane's share of the width after a drag, or null while the preset's own applies. */
     fun sideFraction(context: Context): Float? =
-        prefs(context).getFloat(KEY_SIDE_FRACTION, 0f).takeIf { it > 0f }
+        prefs(context).getFloat(keySideFraction, 0f).takeIf { it > 0f }
 
     fun setSideFraction(context: Context, fraction: Float) {
         if (!fraction.isFinite() || fraction <= 0f) return
-        prefs(context).edit { putFloat(KEY_SIDE_FRACTION, fraction) }
+        prefs(context).edit { putFloat(keySideFraction, fraction) }
     }
 
     /** Off by default: the side pane (map) sits on the left, the main page on the right. */
-    fun sideOnRight(context: Context): Boolean = prefs(context).getBoolean(KEY_SIDE_ON_RIGHT, false)
+    fun sideOnRight(context: Context): Boolean = prefs(context).getBoolean(keySideOnRight, false)
 
     fun setSideOnRight(context: Context, onRight: Boolean) {
-        prefs(context).edit { putBoolean(KEY_SIDE_ON_RIGHT, onRight) }
+        prefs(context).edit { putBoolean(keySideOnRight, onRight) }
     }
 
     fun sideUrl(context: Context): String =
-        prefs(context).getString(KEY_SIDE_URL, null)?.let(dev.autobridge.entertainment.ContentAddress::https)
+        prefs(context).getString(keySideUrl, null)?.let(dev.autobridge.entertainment.ContentAddress::https)
             ?: DEFAULT_SIDE_URL
 
     fun setSideUrl(context: Context, url: String) {
         val valid = dev.autobridge.entertainment.ContentAddress.https(url) ?: return
-        prefs(context).edit { putString(KEY_SIDE_URL, valid) }
+        prefs(context).edit { putString(keySideUrl, valid) }
     }
+
+    companion object {
+        private const val PREFS_NAME = "autobridge_browser"
+
+        /** What the side pane opens the first time: the map case this feature exists for. */
+        const val DEFAULT_SIDE_URL = "https://www.google.com/maps"
+    }
+}
+
+/** The Car App browser's split preferences; see [BrowserSplitPrefs]. */
+object BrowserSplitStore : BrowserSplitPrefs("") {
+    /** Bridge Web's own split preferences, kept apart from the Car App browser's. */
+    val projection = BrowserSplitPrefs("projection_")
 }
