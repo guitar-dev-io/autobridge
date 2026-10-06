@@ -240,6 +240,7 @@
         <activity android:name=".weather.WeatherActivity" android:exported="false" />
         <!-- Fuel log on the phone: fill-ups, consumption, CSV export. -->
         <activity android:name=".fuel.FuelLogActivity" android:exported="false" />
+        <activity android:name=".maintenance.MaintenanceActivity" android:exported="false" />
 
         <!-- Settings > About > Open-source licenses. The Play-services viewer is an AppCompat
              activity; under the app's framework Material theme it crashes on launch

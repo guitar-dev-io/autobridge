@@ -561,6 +561,7 @@
     <string name="aa_hidden_title">Bridge Web is hidden on Android Auto</string>
     <string name="aa_hidden_message">Installing this update reset the install source, so Android Auto will not show Bridge Web until it is set again. It takes one tap with Shizuku.</string>
     <string name="aa_hidden_fix">Fix now</string>
+    <string name="whats_new_0_4_30">• EV support: switch the fuel log to EV (⚡) in Settings &gt; Fuel log. It then counts kWh and km/kWh, and shows the battery level from the car where the car reports it.\n• Maintenance: Settings &gt; Maintenance tracks oil, tyres, road tax and, for an EV, the coolant and 12 V battery, by distance and by date. The car shows what is due under More &gt; Maintenance.</string>
     <string name="whats_new_0_4_29">• Fuel log: Settings > Fuel log records each fill-up and works out km/L, baht/km and this month\'s spend. On the car: More > Fuel log; allow the car\'s odometer there and it is filled in for you at the next fill-up.\n• Duo Screen: the apps in the panes start fresh each time instead of coming back as they were left.</string>
     <string name="whats_new_0_4_28">• The mirror is inside Bridge Web (menu > Mirror phone screen), and Bridge Mirror\'s own icon is off by default, so Android Auto can put Bridge Web beside Maps again.\n• A split in Bridge Web no longer splits the web screen in AutoBridge.\n• Settings > Send log shares a log file for reporting problems.\n• Update: the APK downloads in the app and opens in the installer you pick (e.g. KingInstaller).\n• The version is shown on Home.</string>
     <string name="whats_new_0_4_27">• "Open Google Maps app? → Continue" on the split map now starts navigation in Google Maps.</string>
@@ -1484,4 +1485,60 @@
     <string name="library_sort_za">Z–A ▲</string>
     <string name="library_edit_pinned">Edit</string>
     <string name="library_check_button">↻ Check</string>
+
+    <!-- EV mode for the fuel log -->
+    <string name="fuel_title_ev">Charging log</string>
+    <string name="fuel_subtitle_ev">Charge to the same level each time</string>
+    <string name="fuel_vehicle_fuel">⛽ Petrol / diesel</string>
+    <string name="fuel_vehicle_ev">⚡ EV</string>
+    <string name="fuel_add_ev">+ Charge</string>
+    <string name="fuel_add_title_ev">Charge</string>
+    <string name="fuel_history_ev">Charges</string>
+    <string name="fuel_empty_title_ev">No charges yet</string>
+    <string name="fuel_empty_message_ev">Log each charge, always to the same level (say 80 percent). From the second one on, the average km/kWh appears here.</string>
+    <string name="fuel_average_pending_ev">Two charges needed</string>
+    <string name="fuel_km_per_kwh_value">%1$s km/kWh</string>
+    <string name="fuel_last_interval_ev">Last charge: %1$s km/kWh</string>
+    <string name="fuel_totals_ev">%1$d charges · %2$s kWh · %3$s baht in total</string>
+    <string name="fuel_row_title_ev">%1$s kWh · %2$s baht</string>
+    <string name="fuel_field_kwh">Energy (kWh)</string>
+    <string name="fuel_invalid_ev">Enter the kWh and the total.</string>
+    <string name="fuel_delete_title_ev">Delete this charge?</string>
+    <string name="fuel_car_battery">Battery: %1$d%%</string>
+    <string name="fuel_last_charge">Last charge: %1$s</string>
+
+    <!-- Maintenance reminders -->
+    <string name="maint_title">Maintenance</string>
+    <string name="maint_subtitle">Due by distance and by date</string>
+    <string name="maint_subtitle_ev">Due by distance and by date, for an EV</string>
+    <string name="maint_settings_caption">Oil, tyres, road tax and what is due next</string>
+    <string name="maint_add">+ Item</string>
+    <string name="maint_add_suggested">Add suggested</string>
+    <string name="maint_nothing_to_add">The suggested items are already on the list.</string>
+    <string name="maint_empty_title">Nothing tracked yet</string>
+    <string name="maint_empty_message">Add the suggested items for your vehicle, or your own. Each counts from the odometer and the date it was last done.</string>
+    <string name="maint_car_empty">Set up maintenance items on the phone (Settings &gt; Maintenance).</string>
+    <string name="maint_odometer_now">Odometer: %1$s km</string>
+    <string name="maint_odometer_unknown">Odometer unknown: log a fill-up with it, or allow the car\'s data</string>
+    <string name="maint_field_name">Name</string>
+    <string name="maint_field_km">Every (km), 0 for none</string>
+    <string name="maint_field_months">Every (months), 0 for none</string>
+    <string name="maint_field_last_km">Last done at (km)</string>
+    <string name="maint_invalid">Enter a name and a distance or a number of months.</string>
+    <string name="maint_done_message">Mark as done at this odometer, or delete the item.</string>
+    <string name="maint_mark_done">Done today</string>
+    <string name="maint_in_km">In %1$s km</string>
+    <string name="maint_over_km">Overdue by %1$s km</string>
+    <string name="maint_in_days">In %1$d days</string>
+    <string name="maint_over_days">Overdue by %1$d days</string>
+    <string name="maint_every_km">Every %1$s km</string>
+    <string name="maint_every_months">Every %1$d months</string>
+    <string name="maint_engine_oil">Engine oil</string>
+    <string name="maint_tires">Tyre rotation</string>
+    <string name="maint_air_filter">Air filter</string>
+    <string name="maint_cabin_filter">Cabin air filter</string>
+    <string name="maint_brake_fluid">Brake fluid</string>
+    <string name="maint_battery_coolant">Battery coolant</string>
+    <string name="maint_battery_12v">12 V battery</string>
+    <string name="maint_road_tax">Road tax</string>
 </resources>

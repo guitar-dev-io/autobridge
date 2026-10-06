@@ -39,6 +39,10 @@ object CarVehicleData {
     @Volatile var fuelPercent: Float? = null
         private set
 
+    /** An EV's battery charge, from the same energy report. */
+    @Volatile var batteryPercent: Float? = null
+        private set
+
     @Volatile var rangeKm: Float? = null
         private set
 
@@ -59,6 +63,7 @@ object CarVehicleData {
 
     private val energyListener = OnCarDataAvailableListener<EnergyLevel> { level ->
         fuelPercent = level.fuelPercent.takeIf { it.status == CarValue.STATUS_SUCCESS }?.value
+        batteryPercent = level.batteryPercent.takeIf { it.status == CarValue.STATUS_SUCCESS }?.value
         rangeKm = level.rangeRemainingMeters.takeIf { it.status == CarValue.STATUS_SUCCESS }?.value?.div(1000f)
     }
 

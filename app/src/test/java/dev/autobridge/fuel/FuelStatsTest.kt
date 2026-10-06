@@ -69,4 +69,11 @@ class FuelStatsTest {
         assertTrue(lines[2].contains("14.00"))
         assertTrue(lines[2].startsWith("2026-10-08 09:00"))
     }
+
+    @Test fun anEvLogHasEnergyColumnsButTheSameNumbers() {
+        val log = listOf(fill(1, 1, 40.0, 1400.0, 10_000.0), fill(2, 8, 35.0, 1225.0, 10_490.0))
+        val lines = FuelStats.csv(log, zone, ev = true).trim().lines()
+        assertTrue(lines[0].startsWith("date,kwh,") && lines[0].contains("km_per_kwh"))
+        assertEquals(FuelStats.csv(log, zone).trim().lines()[2], lines[2])
+    }
 }

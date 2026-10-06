@@ -545,6 +545,7 @@
     <string name="aa_hidden_title">Bridge Web ถูกซ่อนใน Android Auto</string>
     <string name="aa_hidden_message">การติดตั้งอัปเดตนี้ทำให้ที่มาของการติดตั้งถูกรีเซ็ต Android Auto จะไม่แสดง Bridge Web จนกว่าจะตั้งค่าใหม่ กดครั้งเดียวผ่าน Shizuku</string>
     <string name="aa_hidden_fix">แก้ตอนนี้</string>
+    <string name="whats_new_0_4_30">• รองรับรถ EV: สลับบันทึกค่าน้ำมันเป็นรถ EV (⚡) ได้ที่ ตั้งค่า &gt; บันทึกค่าน้ำมัน จะนับเป็น kWh และ กม./kWh และแสดงระดับแบตเตอรี่จากรถถ้ารถรายงาน\n• การบำรุงรักษา: ตั้งค่า &gt; การบำรุงรักษา ติดตามน้ำมันเครื่อง ยาง ภาษี และสำหรับรถ EV คือน้ำยาหล่อเย็นกับแบตเตอรี่ 12 โวลต์ ตามระยะทางและวันที่ บนจอรถดูสิ่งที่ถึงกำหนดได้ที่ เพิ่มเติม &gt; การบำรุงรักษา</string>
     <string name="whats_new_0_4_29">• บันทึกค่าน้ำมัน: ตั้งค่า > บันทึกค่าน้ำมัน จดการเติมแต่ละครั้ง คำนวณ กม./ลิตร บาท/กม. และยอดเดือนนี้ให้ บนจอรถ: More > บันทึกค่าน้ำมัน อนุญาตอ่านเลขไมล์จากรถแล้วจะกรอกให้เองตอนเติมครั้งถัดไป\n• Duo Screen: แอปในแต่ละช่องเริ่มใหม่ทุกครั้ง ไม่ค้างค่าเดิมจากรอบก่อน</string>
     <string name="whats_new_0_4_28">• Mirror อยู่ใน Bridge Web แล้ว (เมนู > Mirror phone screen) และไอคอน Bridge Mirror แยกปิดเป็นค่าเริ่มต้น เพื่อให้ Android Auto แบ่งจอ Bridge Web คู่ Maps ได้อีกครั้ง\n• แบ่งจอใน Bridge Web ไม่ลามไปที่เว็บใน AutoBridge แล้ว\n• ตั้งค่า > ส่ง log สำหรับแจ้งปัญหา\n• อัปเดต: โหลด APK ในแอปแล้วเปิดในตัวติดตั้งที่เลือก (เช่น KingInstaller)\n• เลขเวอร์ชันแสดงในหน้า Home</string>
     <string name="whats_new_0_4_27">• ปุ่ม "เปิดแอป Google Maps ไหม → ต่อไป" บนแผนที่ฝั่งข้าง เริ่มนำทางใน Google Maps ได้แล้ว</string>
@@ -1455,4 +1456,60 @@
     <string name="library_sort_za">ฮ–ก ▲</string>
     <string name="library_edit_pinned">แก้ไข</string>
     <string name="library_check_button">↻ ตรวจสอบ</string>
+
+    <!-- EV mode for the fuel log -->
+    <string name="fuel_title_ev">บันทึกการชาร์จ</string>
+    <string name="fuel_subtitle_ev">ชาร์จถึงระดับเดิมทุกครั้ง</string>
+    <string name="fuel_vehicle_fuel">⛽ เบนซิน / ดีเซล</string>
+    <string name="fuel_vehicle_ev">⚡ รถ EV</string>
+    <string name="fuel_add_ev">+ ชาร์จ</string>
+    <string name="fuel_add_title_ev">ชาร์จไฟ</string>
+    <string name="fuel_history_ev">การชาร์จ</string>
+    <string name="fuel_empty_title_ev">ยังไม่มีการชาร์จ</string>
+    <string name="fuel_empty_message_ev">บันทึกทุกครั้งที่ชาร์จ โดยชาร์จถึงระดับเดิมเสมอ (เช่น 80 เปอร์เซ็นต์) ตั้งแต่ครั้งที่สองจะเห็นค่าเฉลี่ย กม./kWh ที่นี่</string>
+    <string name="fuel_average_pending_ev">ต้องชาร์จอย่างน้อยสองครั้ง</string>
+    <string name="fuel_km_per_kwh_value">%1$s กม./kWh</string>
+    <string name="fuel_last_interval_ev">ชาร์จครั้งล่าสุด: %1$s กม./kWh</string>
+    <string name="fuel_totals_ev">ชาร์จ %1$d ครั้ง · %2$s kWh · รวม %3$s บาท</string>
+    <string name="fuel_row_title_ev">%1$s kWh · %2$s บาท</string>
+    <string name="fuel_field_kwh">พลังงาน (kWh)</string>
+    <string name="fuel_invalid_ev">กรอกจำนวน kWh และยอดรวม</string>
+    <string name="fuel_delete_title_ev">ลบการชาร์จนี้?</string>
+    <string name="fuel_car_battery">แบตเตอรี่: %1$d%%</string>
+    <string name="fuel_last_charge">ชาร์จล่าสุด: %1$s</string>
+
+    <!-- Maintenance reminders -->
+    <string name="maint_title">การบำรุงรักษา</string>
+    <string name="maint_subtitle">ครบกำหนดตามระยะทางและวันที่</string>
+    <string name="maint_subtitle_ev">ครบกำหนดตามระยะทางและวันที่ สำหรับรถ EV</string>
+    <string name="maint_settings_caption">น้ำมันเครื่อง ยาง ภาษี และสิ่งที่ถึงกำหนดต่อไป</string>
+    <string name="maint_add">+ รายการ</string>
+    <string name="maint_add_suggested">เพิ่มรายการแนะนำ</string>
+    <string name="maint_nothing_to_add">รายการแนะนำอยู่ในรายการแล้ว</string>
+    <string name="maint_empty_title">ยังไม่มีรายการที่ติดตาม</string>
+    <string name="maint_empty_message">เพิ่มรายการแนะนำสำหรับรถของคุณ หรือเพิ่มเอง แต่ละรายการนับจากเลขไมล์และวันที่ทำครั้งล่าสุด</string>
+    <string name="maint_car_empty">ตั้งรายการบำรุงรักษาบนโทรศัพท์ (ตั้งค่า &gt; การบำรุงรักษา)</string>
+    <string name="maint_odometer_now">เลขไมล์: %1$s กม.</string>
+    <string name="maint_odometer_unknown">ไม่ทราบเลขไมล์: บันทึกการเติมพร้อมเลขไมล์ หรืออนุญาตข้อมูลจากรถ</string>
+    <string name="maint_field_name">ชื่อ</string>
+    <string name="maint_field_km">ทุก (กม.) ใส่ 0 ถ้าไม่ใช้</string>
+    <string name="maint_field_months">ทุก (เดือน) ใส่ 0 ถ้าไม่ใช้</string>
+    <string name="maint_field_last_km">ทำครั้งล่าสุดที่ (กม.)</string>
+    <string name="maint_invalid">กรอกชื่อ และระยะทางหรือจำนวนเดือน</string>
+    <string name="maint_done_message">บันทึกว่าทำแล้วที่เลขไมล์นี้ หรือลบรายการ</string>
+    <string name="maint_mark_done">ทำวันนี้แล้ว</string>
+    <string name="maint_in_km">อีก %1$s กม.</string>
+    <string name="maint_over_km">เลยกำหนด %1$s กม.</string>
+    <string name="maint_in_days">อีก %1$d วัน</string>
+    <string name="maint_over_days">เลยกำหนด %1$d วัน</string>
+    <string name="maint_every_km">ทุก %1$s กม.</string>
+    <string name="maint_every_months">ทุก %1$d เดือน</string>
+    <string name="maint_engine_oil">น้ำมันเครื่อง</string>
+    <string name="maint_tires">สลับยาง</string>
+    <string name="maint_air_filter">ไส้กรองอากาศ</string>
+    <string name="maint_cabin_filter">ไส้กรองแอร์</string>
+    <string name="maint_brake_fluid">น้ำมันเบรก</string>
+    <string name="maint_battery_coolant">น้ำยาหล่อเย็นแบตเตอรี่</string>
+    <string name="maint_battery_12v">แบตเตอรี่ 12 โวลต์</string>
+    <string name="maint_road_tax">ต่อภาษี</string>
 </resources>

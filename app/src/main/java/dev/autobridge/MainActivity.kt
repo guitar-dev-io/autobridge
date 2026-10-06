@@ -2660,6 +2660,12 @@ class MainActivity : androidx.activity.ComponentActivity() {
                         accent = design.ACCENT
                     ) { startActivity(dev.autobridge.fuel.FuelLogActivity.intent(this@MainActivity)) })
                     add(settingsEntry(
+                        getString(R.string.maint_title),
+                        getString(R.string.maint_settings_caption),
+                        R.drawable.ic_tile_car,
+                        accent = design.ACCENT
+                    ) { startActivity(dev.autobridge.maintenance.MaintenanceActivity.intent(this@MainActivity)) })
+                    add(settingsEntry(
                         getString(R.string.settings_app_profiles),
                         getString(R.string.settings_app_profiles_caption_full),
                         R.drawable.ic_tile_apps,

@@ -12,6 +12,7 @@ import org.json.JSONObject
 object FuelLogStore {
     private const val PREFS = "autobridge_fuel"
     private const val KEY_ENTRIES = "entries"
+    private const val KEY_EV = "vehicle_is_ev"
 
     fun all(context: Context): List<FuelEntry> {
         val raw = prefs(context).getString(KEY_ENTRIES, null) ?: return emptyList()
@@ -38,6 +39,14 @@ object FuelLogStore {
 
     /** The highest odometer logged, to suggest when the car has not reported one. */
     fun lastOdometer(context: Context): Double? = all(context).mapNotNull { it.odometerKm }.maxOrNull()
+
+    /**
+     * Whether the vehicle is an EV. The log then counts kWh charged instead of litres filled — the
+     * same entries, a different unit — so one vehicle is either one or the other.
+     */
+    fun isEv(context: Context): Boolean = prefs(context).getBoolean(KEY_EV, false)
+
+    fun setEv(context: Context, ev: Boolean) = prefs(context).edit { putBoolean(KEY_EV, ev) }
 
     private fun write(context: Context, entries: List<FuelEntry>) {
         val array = JSONArray()

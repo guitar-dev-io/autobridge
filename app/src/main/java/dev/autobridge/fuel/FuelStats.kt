@@ -102,8 +102,11 @@ object FuelStats {
         intervals(entries).firstOrNull { it.entry.id == entry.id }?.kmPerLiter
 
     /** The log as CSV, oldest first, for a spreadsheet. */
-    fun csv(entries: List<FuelEntry>, zone: ZoneId = ZoneId.systemDefault()): String = buildString {
-        appendLine("date,liters,total_baht,price_per_liter,odometer_km,km_per_liter,station")
+    fun csv(entries: List<FuelEntry>, zone: ZoneId = ZoneId.systemDefault(), ev: Boolean = false): String = buildString {
+        appendLine(
+            if (ev) "date,kwh,total_baht,price_per_kwh,odometer_km,km_per_kwh,station"
+            else "date,liters,total_baht,price_per_liter,odometer_km,km_per_liter,station"
+        )
         entries.sortedBy { it.timeMs }.forEach { entry ->
             val date = Instant.ofEpochMilli(entry.timeMs).atZone(zone).toLocalDateTime().toString().replace('T', ' ')
             val kmPerL = kmPerLiterOf(entry, entries)

@@ -38,14 +38,16 @@ class CarFuelScreen(carContext: CarContext) : Screen(carContext) {
     }
 
     override fun onGetTemplate(): Template {
+        val ev = FuelLogStore.isEv(carContext)
         val entries = FuelLogStore.all(carContext)
         val summary = FuelStats.summarize(entries)
         val pane = Pane.Builder()
         pane.addRow(
             Row.Builder()
                 .setTitle(
-                    summary.averageKmPerLiter?.let { carContext.getString(R.string.fuel_km_per_liter_value, decimal(it)) }
-                        ?: carContext.getString(R.string.fuel_average_pending)
+                    summary.averageKmPerLiter?.let {
+                        carContext.getString(if (ev) R.string.fuel_km_per_kwh_value else R.string.fuel_km_per_liter_value, decimal(it))
+                    } ?: carContext.getString(if (ev) R.string.fuel_average_pending_ev else R.string.fuel_average_pending)
                 )
                 .addText(carContext.getString(R.string.fuel_average_label))
                 .build()
@@ -59,17 +61,17 @@ class CarFuelScreen(carContext: CarContext) : Screen(carContext) {
         summary.last?.let { last ->
             pane.addRow(
                 Row.Builder()
-                    .setTitle(carContext.getString(R.string.fuel_last_fill, DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(last.timeMs))))
-                    .addText(carContext.getString(R.string.fuel_row_title, decimal(last.liters), money(last.totalBaht)))
+                    .setTitle(carContext.getString(if (ev) R.string.fuel_last_charge else R.string.fuel_last_fill, DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(last.timeMs))))
+                    .addText(carContext.getString(if (ev) R.string.fuel_row_title_ev else R.string.fuel_row_title, decimal(last.liters), money(last.totalBaht)))
                     .build()
             )
         }
-        val level = CarVehicleData.fuelPercent
+        val level = if (ev) CarVehicleData.batteryPercent else CarVehicleData.fuelPercent
         val range = CarVehicleData.rangeKm
         if (level != null || range != null) {
             pane.addRow(
                 Row.Builder()
-                    .setTitle(level?.let { carContext.getString(R.string.fuel_car_level, it.roundToLong()) } ?: "—")
+                    .setTitle(level?.let { carContext.getString(if (ev) R.string.fuel_car_battery else R.string.fuel_car_level, it.roundToLong()) } ?: "—")
                     .apply { range?.let { addText(carContext.getString(R.string.fuel_car_range, it.roundToLong())) } }
                     .build()
             )
