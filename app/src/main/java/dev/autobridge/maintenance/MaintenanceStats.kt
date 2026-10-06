@@ -1,12 +1,14 @@
 package dev.autobridge.maintenance
 
+import dev.autobridge.fuel.FuelEntry
 import java.time.Instant
 import java.time.ZoneId
 
 /**
  * One thing to look after: due every [intervalKm] km, every [intervalMonths] months, or whichever
  * comes first. Either interval may be 0 — a road tax has no distance, a tyre rotation no date.
- * [lastKm] and [lastTimeMs] are when it was last done.
+ * [lastKm] and [lastTimeMs] are when it was last done. [dueDateMs], when set, is a date the driver
+ * gave outright (a road tax that runs out on the 12th) and stands in for "last done + months".
  */
 data class MaintenanceItem(
     val id: Long,
@@ -15,12 +17,23 @@ data class MaintenanceItem(
     val intervalMonths: Int,
     val lastKm: Double?,
     val lastTimeMs: Long,
+    val dueDateMs: Long = 0L,
 )
 
 enum class DueState { OK, SOON, OVERDUE }
 
-/** [kmLeft] and [daysLeft] are null when that interval is not set; negative once passed. */
-data class MaintenanceStatus(val item: MaintenanceItem, val state: DueState, val kmLeft: Double?, val daysLeft: Long?)
+/**
+ * [kmLeft] and [daysLeft] are null when that interval is not set; negative once passed. [dueMs] is
+ * when it falls due: the date, or the day the distance is reached at the driver's usual pace,
+ * whichever is first; null when neither can be told.
+ */
+data class MaintenanceStatus(
+    val item: MaintenanceItem,
+    val state: DueState,
+    val kmLeft: Double?,
+    val daysLeft: Long?,
+    val dueMs: Long? = null,
+)
 
 /** What a new vehicle is offered to start with. Names are string resources, resolved by the UI. */
 data class MaintenancePreset(val key: String, val intervalKm: Int, val intervalMonths: Int)
@@ -51,30 +64,72 @@ object MaintenanceStats {
 
     fun presets(ev: Boolean): List<MaintenancePreset> = if (ev) EV_PRESETS else FUEL_PRESETS
 
+    private const val DAY_MS = 24 * 60 * 60 * 1000L
+
+    /** The date [item] falls due by the calendar, or null when it has no date side. */
+    fun dateDueMs(item: MaintenanceItem, zone: ZoneId = ZoneId.systemDefault()): Long? = when {
+        item.dueDateMs > 0 -> item.dueDateMs
+        item.intervalMonths > 0 && item.lastTimeMs > 0 ->
+            Instant.ofEpochMilli(item.lastTimeMs).atZone(zone).plusMonths(item.intervalMonths.toLong()).toInstant().toEpochMilli()
+        else -> null
+    }
+
+    /**
+     * How far the car goes in a day, from the first and last fill-ups that carry an odometer. Null
+     * until there are two at least two weeks apart that moved forward: a shorter stretch says
+     * little about a driver's pace.
+     */
+    fun kmPerDay(entries: List<FuelEntry>): Double? {
+        val dated = entries.filter { it.odometerKm != null }.sortedBy { it.timeMs }
+        if (dated.size < 2) return null
+        val days = (dated.last().timeMs - dated.first().timeMs).toDouble() / DAY_MS
+        val km = dated.last().odometerKm!! - dated.first().odometerKm!!
+        return if (days >= 14 && km > 0) km / days else null
+    }
+
     /**
      * Where [item] stands at [odometerKm] (null when no odometer is known, which leaves only the
-     * date to go by) and [nowMs].
+     * date to go by) and [nowMs]. [kmPerDay], when known, turns the distance left into a date.
      */
-    fun status(item: MaintenanceItem, odometerKm: Double?, nowMs: Long, zone: ZoneId = ZoneId.systemDefault()): MaintenanceStatus {
+    fun status(
+        item: MaintenanceItem,
+        odometerKm: Double?,
+        nowMs: Long,
+        zone: ZoneId = ZoneId.systemDefault(),
+        kmPerDay: Double? = null,
+    ): MaintenanceStatus {
         val kmLeft = if (item.intervalKm > 0 && item.lastKm != null && odometerKm != null) {
             item.lastKm + item.intervalKm - odometerKm
         } else null
-        val daysLeft = if (item.intervalMonths > 0 && item.lastTimeMs > 0) {
-            val due = Instant.ofEpochMilli(item.lastTimeMs).atZone(zone).plusMonths(item.intervalMonths.toLong()).toInstant()
-            java.time.Duration.between(Instant.ofEpochMilli(nowMs), due).toDays().let {
-                // Duration truncates toward zero; a due date a few hours behind is already overdue.
-                if (due.isBefore(Instant.ofEpochMilli(nowMs)) && it == 0L) -1L else it
-            }
+        val dateDue = dateDueMs(item, zone)
+        val daysLeft = dateDue?.let { due ->
+            // Math.floorDiv rounds toward the past: a due date hours behind is already -1 days.
+            Math.floorDiv(due - nowMs, DAY_MS)
+        }
+        val kmDue = if (kmLeft != null && kmLeft >= 0 && kmPerDay != null && kmPerDay > 0) {
+            nowMs + (kmLeft / kmPerDay * DAY_MS).toLong()
         } else null
         val overdue = (kmLeft != null && kmLeft < 0) || (daysLeft != null && daysLeft < 0)
         val soon = (kmLeft != null && kmLeft <= maxOf(SOON_MIN_KM, item.intervalKm / 10.0)) ||
             (daysLeft != null && daysLeft <= SOON_DAYS)
-        return MaintenanceStatus(item, if (overdue) DueState.OVERDUE else if (soon) DueState.SOON else DueState.OK, kmLeft, daysLeft)
+        return MaintenanceStatus(
+            item,
+            if (overdue) DueState.OVERDUE else if (soon) DueState.SOON else DueState.OK,
+            kmLeft,
+            daysLeft,
+            listOfNotNull(dateDue, kmDue).minOrNull(),
+        )
     }
 
     /** Every item with its status, the most urgent first: overdue, then soon, then the rest. */
-    fun ordered(items: List<MaintenanceItem>, odometerKm: Double?, nowMs: Long, zone: ZoneId = ZoneId.systemDefault()): List<MaintenanceStatus> =
-        items.map { status(it, odometerKm, nowMs, zone) }.sortedWith(
+    fun ordered(
+        items: List<MaintenanceItem>,
+        odometerKm: Double?,
+        nowMs: Long,
+        zone: ZoneId = ZoneId.systemDefault(),
+        kmPerDay: Double? = null,
+    ): List<MaintenanceStatus> =
+        items.map { status(it, odometerKm, nowMs, zone, kmPerDay) }.sortedWith(
             compareByDescending<MaintenanceStatus> { it.state.ordinal }
                 .thenBy { it.daysLeft ?: Long.MAX_VALUE }
                 .thenBy { it.kmLeft ?: Double.MAX_VALUE }

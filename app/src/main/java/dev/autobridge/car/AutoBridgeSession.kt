@@ -34,6 +34,8 @@ class AutoBridgeSession : Session(), CarScreenController.Host {
                 // Odometer and fuel level for the fuel log, when the car reports them and the
                 // driver has allowed it (CarFuelScreen asks); nothing happens otherwise.
                 dev.autobridge.fuel.CarVehicleData.start(carContext)
+                // What maintenance is due, as a phone notification: the drive is about to start.
+                runCatching { dev.autobridge.maintenance.MaintenanceReminder.check(carContext) }
                 dev.autobridge.logging.StructuredLog.i(TAG, "car session connected")
                 // The bridge learns about the connection here rather than polling for it, and
                 // this is where a Send-to-Car that arrived while nothing was plugged in gets

@@ -35,6 +35,14 @@ object MaintenanceText {
         return parts.ifEmpty { listOf(context.getString(R.string.maint_odometer_unknown)) }.joinToString(" · ")
     }
 
+    /** "Due 12 Dec 2026" — when it falls due, by the date or by the pace the car is driven at; null if unknown. */
+    fun due(context: Context, status: MaintenanceStatus): String? = status.dueMs?.let {
+        val date = java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(java.util.Date(it))
+        // An estimate when it is the distance, at the driver's pace, that sets the day; a date otherwise.
+        val estimated = MaintenanceStats.dateDueMs(status.item) != it
+        context.getString(if (estimated) R.string.maint_due_estimate else R.string.maint_due, date)
+    }
+
     /** "Every 10,000 km · every 12 months". */
     fun interval(context: Context, item: MaintenanceItem): String = listOfNotNull(
         item.intervalKm.takeIf { it > 0 }?.let { context.getString(R.string.maint_every_km, NumberFormat.getIntegerInstance().format(it)) },

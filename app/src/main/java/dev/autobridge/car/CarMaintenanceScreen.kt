@@ -26,7 +26,8 @@ class CarMaintenanceScreen(carContext: CarContext) : Screen(carContext) {
 
     override fun onGetTemplate(): Template {
         val statuses = MaintenanceStats.ordered(
-            MaintenanceStore.all(carContext), MaintenanceStore.currentOdometer(carContext), System.currentTimeMillis()
+            MaintenanceStore.all(carContext), MaintenanceStore.currentOdometer(carContext), System.currentTimeMillis(),
+            kmPerDay = MaintenanceStore.kmPerDay(carContext),
         )
         val list = ItemList.Builder()
         if (statuses.isEmpty()) {
@@ -39,6 +40,7 @@ class CarMaintenanceScreen(carContext: CarContext) : Screen(carContext) {
                             (if (status.state == DueState.OK) "" else MaintenanceText.badge(status.state) + " ") + status.item.name
                         )
                         .addText(MaintenanceText.standing(carContext, status))
+                        .apply { MaintenanceText.due(carContext, status)?.let { addText(it) } }
                         .build()
                 )
             }

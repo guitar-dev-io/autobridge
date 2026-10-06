@@ -2033,6 +2033,8 @@ class MainActivity : androidx.activity.ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         SettingsStore.restore(this)
+        // What maintenance is due, as a notification (once a day at most; nothing without items).
+        runCatching { dev.autobridge.maintenance.MaintenanceReminder.check(this) }
         SessionRestoreStore.restore(this)?.let { snapshot ->
             RuntimeContextStore.setCurrentFeature(snapshot.feature, snapshot.packageName)
             RuntimeContextStore.setDisplayPreferences(

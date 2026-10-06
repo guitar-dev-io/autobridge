@@ -24,18 +24,32 @@ object MaintenanceStore {
                 intervalMonths = item.optInt("months"),
                 lastKm = if (item.has("last_km") && !item.isNull("last_km")) item.optDouble("last_km") else null,
                 lastTimeMs = item.optLong("last_time"),
+                dueDateMs = item.optLong("due_date"),
             ).takeIf { it.name.isNotBlank() && (it.intervalKm > 0 || it.intervalMonths > 0) }
         }
     }
 
-    fun add(context: Context, name: String, intervalKm: Int, intervalMonths: Int, lastKm: Double?, nowMs: Long = System.currentTimeMillis()) {
+    fun add(
+        context: Context,
+        name: String,
+        intervalKm: Int,
+        intervalMonths: Int,
+        lastKm: Double?,
+        dueDateMs: Long = 0L,
+        nowMs: Long = System.currentTimeMillis(),
+    ) {
         val id = maxOf(nowMs, (all(context).maxOfOrNull { it.id } ?: 0L) + 1)
-        write(context, all(context) + MaintenanceItem(id, name.trim(), intervalKm, intervalMonths, lastKm, nowMs))
+        write(context, all(context) + MaintenanceItem(id, name.trim(), intervalKm, intervalMonths, lastKm, nowMs, dueDateMs))
     }
 
-    /** Records [id] as done now, at [km] (or the date alone when no odometer is known). */
+    /**
+     * Records [id] as done now, at [km] (or the date alone when no odometer is known). A date the
+     * driver gave outright is spent by doing it, so the next one counts from today.
+     */
     fun markDone(context: Context, id: Long, km: Double?, nowMs: Long = System.currentTimeMillis()) =
-        write(context, all(context).map { if (it.id == id) it.copy(lastKm = km ?: it.lastKm, lastTimeMs = nowMs) else it })
+        write(context, all(context).map {
+            if (it.id == id) it.copy(lastKm = km ?: it.lastKm, lastTimeMs = nowMs, dueDateMs = 0L) else it
+        })
 
     fun delete(context: Context, id: Long) = write(context, all(context).filterNot { it.id == id })
 
@@ -43,6 +57,9 @@ object MaintenanceStore {
      * The best odometer known: the car's last report or the highest one logged with a fill-up,
      * whichever is higher (an odometer only goes up). Null when neither exists.
      */
+    /** The driver's usual pace in km a day, from the fuel log; null until it says enough. */
+    fun kmPerDay(context: Context): Double? = MaintenanceStats.kmPerDay(FuelLogStore.all(context))
+
     fun currentOdometer(context: Context): Double? =
         listOfNotNull(CarVehicleData.lastOdometer(context)?.first, FuelLogStore.lastOdometer(context)).maxOrNull()
 
@@ -67,6 +84,7 @@ object MaintenanceStore {
                     .put("months", it.intervalMonths)
                     .put("last_km", it.lastKm ?: JSONObject.NULL)
                     .put("last_time", it.lastTimeMs)
+                    .put("due_date", it.dueDateMs)
             )
         }
         prefs(context).edit { putString(KEY_ITEMS, array.toString()) }
