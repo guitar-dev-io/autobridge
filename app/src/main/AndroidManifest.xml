@@ -172,10 +172,6 @@
             </intent-filter>
         </activity>
 
-        <!-- Media bridge: the phone controller (search, queue, recents, favorites, transport). -->
-        <activity android:name=".bridge.BridgeControllerActivity" android:exported="false"
-            android:windowSoftInputMode="adjustResize" />
-
         <!-- TV, Radio, Folders, Playlists, Gallery and Favorites for the phone home grid. -->
         <activity android:name=".library.LibraryActivity" android:exported="false"
             android:windowSoftInputMode="adjustResize" />
