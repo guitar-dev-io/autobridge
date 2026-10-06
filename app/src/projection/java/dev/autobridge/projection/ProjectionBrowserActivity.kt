@@ -59,6 +59,7 @@ import dev.autobridge.browser.CarKeyboardLanguage
 import dev.autobridge.browser.CarKeyboardLayouts
 import dev.autobridge.browser.CarKeyboardStore
 import dev.autobridge.browser.ChromeVisibility
+import dev.autobridge.browser.MapsHandoff
 import dev.autobridge.browser.PaneRect
 import dev.autobridge.browser.SearchEngineStore
 import dev.autobridge.browser.SidePaneAudio
@@ -1110,6 +1111,14 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
                 cycleSplitLayout()
             })
             if (sideView != null) {
+                val destination = MapsHandoff.destinationFromPage(sideView?.url)
+                addView(menuRow(
+                    "➤", "Navigate in Google Maps",
+                    destination ?: "Open a route or a place on the map first"
+                ) {
+                    dismissOverlay()
+                    destination?.let { startMapsNavigation(it) }
+                })
                 addView(menuRow("⇆", "Swap split sides") {
                     BrowserSplitStore.setSideOnRight(
                         this@ProjectionBrowserActivity,
@@ -1388,7 +1397,11 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
 
                 override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                     val scheme = request.url.scheme?.lowercase()
-                    return scheme != "https" && scheme != "http"
+                    if (scheme == "https" || scheme == "http") return false
+                    // The map's "Start" / "Open app" link: the mobile web cannot navigate, the
+                    // Maps app can, so it is handed over instead of dropped.
+                    MapsHandoff.destinationFromLink(request.url.toString())?.let { startMapsNavigation(it) }
+                    return true
                 }
 
                 override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
@@ -1419,6 +1432,23 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         side.loadUrl(BrowserSplitStore.sideUrl(this))
         StructuredLog.i("PROJECTION", "split side page created")
         return side
+    }
+
+    /**
+     * Starts turn-by-turn navigation to [destination] in the Google Maps app, which Android Auto
+     * then shows as the car's navigation. The map in the split is Google Maps for the mobile web,
+     * which can show a route but has no navigation of its own; see [MapsHandoff].
+     */
+    private fun startMapsNavigation(destination: String) {
+        val intent = android.content.Intent(
+            android.content.Intent.ACTION_VIEW,
+            android.net.Uri.parse(MapsHandoff.navigationUri(destination))
+        )
+            .setPackage(MapsHandoff.MAPS_PACKAGE)
+            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { applicationContext.startActivity(intent) }
+            .onSuccess { StructuredLog.i("PROJECTION", "maps hand-off started") }
+            .onFailure { StructuredLog.w("PROJECTION", "maps hand-off failed: ${it.message}") }
     }
 
     /** Drops the side page; its URL is kept, so the next split reopens it. */

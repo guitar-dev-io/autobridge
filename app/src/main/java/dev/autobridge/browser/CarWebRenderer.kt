@@ -198,6 +198,13 @@ class CarWebRenderer(context: Context) {
         fun openSettings()
         fun openDiagnostics()
         fun openExternal(url: String)
+
+        /**
+         * Starts turn-by-turn navigation to [destination] in the car's navigation app. Called when
+         * the split's Google Maps page asks for the Maps app, which the mobile web needs for any
+         * actual navigation; see [MapsHandoff].
+         */
+        fun startNavigation(destination: String)
         fun showMessage(text: String)
         /** Leaves the browser entirely and returns to AutoBridge's main dashboard. */
         fun openAppHome()
@@ -2472,6 +2479,12 @@ class CarWebRenderer(context: Context) {
                 val target = request.url.toString()
                 if (BrowserDefaults.isExternalSignInHost(target)) {
                     onExternalSignInRequired?.invoke(target)
+                    return true
+                }
+                // The map's "Start" / "Open app" link: the mobile web cannot navigate, the Maps
+                // app can. Handed over rather than dropped like every other non-web link.
+                MapsHandoff.destinationFromLink(target)?.let { destination ->
+                    mainHandler.post { host?.startNavigation(destination) }
                     return true
                 }
                 if (ContentAddress.https(target) == null) return true
