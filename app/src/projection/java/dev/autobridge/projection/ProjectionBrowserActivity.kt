@@ -10,6 +10,7 @@ import android.graphics.drawable.RippleDrawable
 import android.graphics.drawable.ShapeDrawable
 import android.graphics.drawable.shapes.OvalShape
 import android.os.Bundle
+import android.os.Message
 import android.os.SystemClock
 import android.view.Gravity
 import android.view.MotionEvent
@@ -437,9 +438,12 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
 
                 override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                     // Only web pages load here; app links and other schemes are dropped rather than
-                    // handed to an intent the car display cannot show.
+                    // handed to an intent the car display cannot show — except a map's request
+                    // for the Maps app, which starts real navigation instead.
                     val scheme = request.url.scheme?.lowercase()
-                    return scheme != "https" && scheme != "http"
+                    if (scheme == "https" || scheme == "http") return false
+                    handOffToMaps(request.url.toString(), view.url)
+                    return true
                 }
 
                 override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
@@ -477,6 +481,13 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
             webChromeClient = object : WebChromeClient() {
                 override fun onPermissionRequest(request: PermissionRequest) =
                     BrowserDefaults.grantProtectedMediaPermission(request)
+
+                override fun onCreateWindow(
+                    view: WebView,
+                    isDialog: Boolean,
+                    isUserGesture: Boolean,
+                    resultMsg: Message,
+                ): Boolean = isUserGesture && openPopupIn(view, resultMsg)
 
                 override fun onShowCustomView(view: View, callback: CustomViewCallback) = enterFullscreen(view, callback)
 
@@ -1438,7 +1449,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
                     if (scheme == "https" || scheme == "http") return false
                     // The map's "Start" / "Open app" link: the mobile web cannot navigate, the
                     // Maps app can, so it is handed over instead of dropped.
-                    MapsHandoff.destinationFromLink(request.url.toString())?.let { startMapsNavigation(it) }
+                    handOffToMaps(request.url.toString(), view.url)
                     return true
                 }
 
@@ -1453,6 +1464,13 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
                 }
             }
             webChromeClient = object : WebChromeClient() {
+                override fun onCreateWindow(
+                    view: WebView,
+                    isDialog: Boolean,
+                    isUserGesture: Boolean,
+                    resultMsg: Message,
+                ): Boolean = isUserGesture && openPopupIn(view, resultMsg)
+
                 override fun onGeolocationPermissionsShowPrompt(
                     origin: String,
                     callback: android.webkit.GeolocationPermissions.Callback,
@@ -1487,6 +1505,51 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         runCatching { applicationContext.startActivity(intent) }
             .onSuccess { StructuredLog.i("PROJECTION", "maps hand-off started") }
             .onFailure { StructuredLog.w("PROJECTION", "maps hand-off failed: ${it.message}") }
+    }
+
+    /**
+     * When [link] asks for the Google Maps app, navigates to its destination — or to what
+     * [pageUrl], the map page that asked, is showing. Other links are left alone (dropped by the
+     * caller). The mobile site's "Open Google Maps app? → Continue" is such a link with no place
+     * in it, which is why the page's own address is the fallback.
+     */
+    private fun handOffToMaps(link: String, pageUrl: String?) {
+        if (!MapsHandoff.isMapsAppLink(link) && MapsHandoff.destinationFromLink(link) == null) return
+        val destination = MapsHandoff.handoffDestination(link, pageUrl)
+        if (destination != null) {
+            startMapsNavigation(destination)
+        } else {
+            StructuredLog.w("PROJECTION", "maps hand-off: no destination in the link or the page")
+        }
+    }
+
+    /**
+     * A link that opens a new window (`target="_blank"`, `window.open`) — which the car display
+     * has no room for, and which until now did nothing at all. The window's first address is
+     * read from a throwaway probe and opened in [page] itself, or, when it asks for the Maps app
+     * (the map's "Open app → Continue" can arrive this way), handed to [handOffToMaps].
+     */
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun openPopupIn(page: WebView, resultMsg: Message): Boolean {
+        val transport = resultMsg.obj as? WebView.WebViewTransport ?: return false
+        val probe = WebView(this).apply {
+            BrowserDefaults.configure(this@ProjectionBrowserActivity, this)
+            webViewClient = object : WebViewClient() {
+                override fun shouldOverrideUrlLoading(probeView: WebView, request: WebResourceRequest): Boolean {
+                    val target = request.url.toString()
+                    val scheme = request.url.scheme?.lowercase()
+                    page.post {
+                        if (scheme == "https" || scheme == "http") page.loadUrl(target)
+                        else handOffToMaps(target, page.url)
+                        probeView.destroy()
+                    }
+                    return true
+                }
+            }
+        }
+        transport.webView = probe
+        resultMsg.sendToTarget()
+        return true
     }
 
     /** Drops the side page; its URL is kept, so the next split reopens it. */

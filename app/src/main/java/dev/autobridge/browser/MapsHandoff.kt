@@ -24,6 +24,23 @@ object MapsHandoff {
         "google.navigation:q=" + URLEncoder.encode(destination, "UTF-8")
 
     /**
+     * What to navigate to when the page in [pageUrl] asks to leave for [link]: the destination in
+     * the link itself, or — when the link only says "open the Maps app", as the mobile site's
+     * "Open Google Maps app? → Continue" prompt does — the place or route the page is showing.
+     * Null when the link is not aimed at the Maps app, or neither says where to go.
+     */
+    fun handoffDestination(link: String, pageUrl: String?): String? =
+        destinationFromLink(link) ?: if (isMapsAppLink(link)) destinationFromPage(pageUrl) else null
+
+    /** True when [link] asks for the Google Maps app rather than for a web page. */
+    fun isMapsAppLink(link: String): Boolean {
+        val lower = link.lowercase()
+        return lower.startsWith("google.navigation:") || lower.startsWith("geo:") ||
+            lower.startsWith("comgooglemaps:") || lower.startsWith("google.maps:") ||
+            (lower.startsWith("intent:") && lower.contains("package=$MAPS_PACKAGE"))
+    }
+
+    /**
      * The destination a non-web link from the Maps page was asking the app to navigate to, or
      * null when the link is not a Maps navigation hand-off.
      */
@@ -48,7 +65,8 @@ object MapsHandoff {
         if (url.isNullOrBlank()) return null
         val uri = runCatching { URI(url) }.getOrNull() ?: return null
         val host = uri.host?.lowercase() ?: return null
-        if (!host.endsWith("google.com") && !host.startsWith("maps.google.")) return null
+        // google.com, google.co.th, maps.google.com…: every country domain serves the same map.
+        if (!GOOGLE_HOST.matches(host)) return null
         val query = uri.rawQuery.orEmpty()
         queryParam(query, "destination")?.let { return it }
         queryParam(query, "daddr")?.let { return it }
@@ -78,7 +96,9 @@ object MapsHandoff {
         val target = extras["package"]
         if (target != null && target != MAPS_PACKAGE) return null
         val body = link.substringAfter("intent:").removePrefix("//").substringBefore("#Intent;")
-        return when (extras["scheme"]?.lowercase()) {
+        // The web page the link falls back to when the app is missing names the same place.
+        val fallback = extras["S.browser_fallback_url"]?.let(::decode)?.let(::destinationFromPage)
+        return fallback ?: when (extras["scheme"]?.lowercase()) {
             "google.navigation" -> queryParam(body, "q")
             "geo" -> destinationFromLink("geo:$body")
             else -> {
@@ -89,6 +109,8 @@ object MapsHandoff {
             }
         }
     }
+
+    private val GOOGLE_HOST = Regex("(^|.*\\.)google\\.[a-z]{2,3}(\\.[a-z]{2})?$")
 
     private fun queryParam(query: String, name: String): String? =
         query.substringAfter('?').split('&').firstNotNullOfOrNull { pair ->

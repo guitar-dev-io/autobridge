@@ -71,4 +71,34 @@ class MapsHandoffTest {
     fun navigationUriEncodesTheDestination() {
         assertEquals("google.navigation:q=Central+World", MapsHandoff.navigationUri("Central World"))
     }
+
+    /** The mobile site's "Open Google Maps app? → Continue" asks for the app without a place. */
+    @Test
+    fun aBareOpenTheAppLinkNavigatesToWhatThePageShows() {
+        val page = "https://www.google.co.th/maps/place/%E0%B9%80%E0%B8%94%E0%B8%AD%E0%B8%B0%E0%B8%A1%E0%B8%AD%E0%B8%A5%E0%B8%A5%E0%B9%8C/@13.76,100.64,17z"
+        assertEquals(
+            "เดอะมอลล์",
+            MapsHandoff.handoffDestination("intent://#Intent;package=com.google.android.apps.maps;end", page)
+        )
+        // A link to some other app never borrows the page's place.
+        assertNull(MapsHandoff.handoffDestination("intent://x#Intent;package=com.example;end", page))
+    }
+
+    @Test
+    fun theIntentsFallbackPageNamesThePlace() {
+        assertEquals(
+            "Central World",
+            MapsHandoff.destinationFromLink(
+                "intent://maps.app.goo.gl/abc#Intent;package=com.google.android.apps.maps;" +
+                    "S.browser_fallback_url=https%3A%2F%2Fwww.google.com%2Fmaps%2Fplace%2FCentral%2BWorld;end"
+            )
+        )
+    }
+
+    @Test
+    fun countryDomainsAreGoogleMapsToo() {
+        assertEquals("X", MapsHandoff.destinationFromPage("https://www.google.co.th/maps/search/X"))
+        assertEquals("X", MapsHandoff.destinationFromPage("https://maps.google.com/maps/place/X"))
+        assertNull(MapsHandoff.destinationFromPage("https://notgoogle.com/maps/place/X"))
+    }
 }

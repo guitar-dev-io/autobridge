@@ -772,6 +772,25 @@ class CarWebRenderer(context: Context) {
         }
     }
 
+    /**
+     * When [target] is a link asking for the Google Maps app, starts navigation to its destination
+     * (or to what [pageUrl], the map page that asked, is showing) and returns true; the mobile web
+     * map has no navigation of its own. Says why when there is nowhere to navigate to, rather than
+     * leaving the tap to do nothing. False for every other link. Callable from any thread.
+     */
+    private fun handOffToMaps(target: String, pageUrl: String?): Boolean {
+        if (!MapsHandoff.isMapsAppLink(target) && MapsHandoff.destinationFromLink(target) == null) return false
+        val destination = MapsHandoff.handoffDestination(target, pageUrl)
+        mainHandler.post {
+            if (destination != null) {
+                host?.startNavigation(destination)
+            } else {
+                host?.showMessage(appContext.getString(R.string.car_maps_no_destination))
+            }
+        }
+        return true
+    }
+
     // ------------------------------------------------------------------ find
 
     fun findInPage(query: String) = runOnMain {
@@ -2131,6 +2150,11 @@ class CarWebRenderer(context: Context) {
                             request: WebResourceRequest,
                         ): Boolean {
                             val target = request.url.toString()
+                            // "Open in the Maps app" can arrive as a popup rather than a link.
+                            if (handOffToMaps(target, webView?.url)) {
+                                mainHandler.post { probeView.destroy() }
+                                return true
+                            }
                             mainHandler.post {
                                 ContentAddress.https(target)?.let { url ->
                                     // The car surface can only show one WebView, so a popup cannot
@@ -2169,6 +2193,8 @@ class CarWebRenderer(context: Context) {
                     onExternalSignInRequired?.invoke(target)
                     return true
                 }
+                // A map opened in the main page asks for the Maps app the same way the side one does.
+                if (handOffToMaps(target, view.url)) return true
                 // Only allow HTTPS navigation; block custom schemes/intents on the car surface.
                 if (ContentAddress.https(target) == null) return true
                 // Set the identity before the request leaves; onPageStarted is too late for the
@@ -2514,6 +2540,10 @@ class CarWebRenderer(context: Context) {
                     webViewClient = object : WebViewClient() {
                         override fun shouldOverrideUrlLoading(probeView: WebView, request: WebResourceRequest): Boolean {
                             val target = request.url.toString()
+                            if (handOffToMaps(target, sideView?.url)) {
+                                mainHandler.post { probeView.destroy() }
+                                return true
+                            }
                             mainHandler.post {
                                 ContentAddress.https(target)?.let { url -> sideView?.loadUrl(url) }
                                 probeView.destroy()
@@ -2546,10 +2576,7 @@ class CarWebRenderer(context: Context) {
                 }
                 // The map's "Start" / "Open app" link: the mobile web cannot navigate, the Maps
                 // app can. Handed over rather than dropped like every other non-web link.
-                MapsHandoff.destinationFromLink(target)?.let { destination ->
-                    mainHandler.post { host?.startNavigation(destination) }
-                    return true
-                }
+                if (handOffToMaps(target, view.url)) return true
                 if (ContentAddress.https(target) == null) return true
                 if (request.isForMainFrame) BrowserDefaults.applyIdentity(appContext, view, target)
                 return false
