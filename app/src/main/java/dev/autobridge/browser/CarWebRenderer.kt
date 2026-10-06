@@ -454,6 +454,7 @@ class CarWebRenderer(context: Context) {
      * itself if another app takes over. Any other loss is applied as before.
      */
     private fun applyFocusAction(action: dev.autobridge.audio.AudioFocusAction) {
+        dev.autobridge.logging.StructuredLog.i("CARWEB", "audio focus action=$action state=${audioFocus.state}")
         val selfHandOverPossible = action == dev.autobridge.audio.AudioFocusAction.PAUSE &&
             audioFocus.state == dev.autobridge.audio.AudioFocusState.PERMANENT_LOSS
         if (!selfHandOverPossible) {
@@ -850,6 +851,7 @@ class CarWebRenderer(context: Context) {
             reattachRasterHost()
             running = true
             pumpIdle = false
+            dev.autobridge.logging.StructuredLog.i("CARWEB", "surface back ${width}x$height")
             // Give the user the full idle window from the moment the browser appears.
             val startNow = SystemClock.uptimeMillis()
             visibility.onInteraction(startNow)
@@ -967,6 +969,12 @@ class CarWebRenderer(context: Context) {
                 sideAudio.markPlayingForResume { sidePlaying ->
                     // A newer start()/stop() has taken over; its own decision stands.
                     if (generation != surfaceGeneration || running) return@markPlayingForResume
+                    // In the Send log (the video log below goes to Logcat only): what the page was doing
+                    // when the car took the screen, which decides whether its sound carries on.
+                    dev.autobridge.logging.StructuredLog.i(
+                        "CARWEB",
+                        "surface lost: mainPlaying=$mainPlaying sidePlaying=$sidePlaying focus=${audioFocus.state}"
+                    )
                     if (!mainPlaying && !sidePlaying) {
                         audioFocus.isPlaying = false
                         audioFocus.abandon()
