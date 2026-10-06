@@ -11,11 +11,11 @@ data class EmergencyEntry(val id: Long, val label: String, val value: String) {
 
 /** What counts as a phone number, kept pure so it is tested on the JVM. */
 object EmergencyNumber {
-    private val PHONE = Regex("""^\+?[0-9][0-9 \-().]{1,18}$""")
+    private val PHONE = Regex("""^\+?\(?[0-9][0-9 \-().]{1,18}$""")
 
     /**
      * [value] as a dialable string (digits and a leading +) when it looks like a phone number:
-     * 191, 1669, 02-123-4567, +66 81 234 5678. Text with letters, like a policy number "AB-1234567",
+     * 191, 1669, 02-123-4567, (081) 234-5678, +66 81 234 5678. Text with letters, like a policy number "AB-1234567",
      * is not one.
      */
     fun dialable(value: String): String? {
