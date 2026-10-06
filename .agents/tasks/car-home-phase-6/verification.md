@@ -1,55 +1,103 @@
-# Verification — Phase 6: Car Home dashboard look
+# Verification — Phase 6: Car Home Dashboard Restyle
 
-Branch: `ui/phase-6`. Iteration: FIRST (no `review.json` present).
+Branch: `ui/phase-6`  
+Commit: `5a003ce` — *UI redesign Phase 6: car Home dashboard look to match design 01*
 
-## Commands run (from repo root `/Users/anuwat.t/Documents/ChatGPT/AutoBridge`)
+---
 
-1. Baseline, before any edit:
-   ```
-   ./gradlew :app:testPersonalDebugUnitTest
-   ```
-   Result: **BUILD SUCCESSFUL**. Green starting point.
+## Build & Test Command
 
-2. After the Phase 6 edits (the required phase build command):
-   ```
-   ./gradlew testPersonalDebugUnitTest assemblePersonalDebug
-   ```
-   Result: **BUILD SUCCESSFUL in 4s** (88 actionable tasks). The `personalDebug` APK assembled
-   and all unit tests passed.
+```
+./gradlew testPersonalDebugUnitTest assemblePersonalDebug
+```
 
-## Unit test detail (from `app/build/test-results/testPersonalDebugUnitTest/`)
+Run from repo root `/Users/anuwat.t/Documents/ChatGPT/AutoBridge`.
 
-- `dev.autobridge.car.HomeDashboardLayoutTest` — tests=19, failures=0, errors=0, skipped=0.
-- `dev.autobridge.car.HomeDashboardClockTest` — tests=6, failures=0, errors=0, skipped=0.
+**Result: PASS — BUILD SUCCESSFUL** (88 actionable tasks, all up-to-date).  
+The `personalDebug` APK assembled and all unit tests passed (60 test suites, 0 failures across the entire `testPersonalDebugUnitTest` task).
 
-`HomeDashboardLayoutTest` asserts `continueTitle` is non-null when a hero exists; the layout band
-is left untouched (only the renderer stopped painting a title there), so that assertion still holds.
+### Car-specific test suites
 
-## What changed (look only)
+| Suite | Tests | Failures | Errors |
+|---|---|---|---|
+| `dev.autobridge.car.HomeDashboardLayoutTest` | 19 | 0 | 0 |
+| `dev.autobridge.car.HomeDashboardClockTest` | 6 | 0 | 0 |
+| `dev.autobridge.car.CarThumbnailsTest` | 4 | 0 | 0 |
+| `dev.autobridge.car.HeaderActionConstraintTest` | 1 | 0 | 0 |
 
-- **Quick Access cards → horizontal (image 01).** `HomeMenuCard.draw` now draws the tinted icon
-  tile at `bounds.left + CARD_PADDING`, vertically centred, with the label left-aligned to its
-  right starting at `iconRight + CARD_ICON_LABEL_GAP`, baseline on the card centre line, ellipsized
-  to the remaining card width. Label `Paint.Align` switched `CENTER → LEFT`. One label size for all
-  six cards is still chosen by `HomeDashboardLayout` (unchanged). New token
-  `HomeDashboardTheme.Dp.CARD_ICON_LABEL_GAP = 16f` for the icon→label gap. Card bounds, grid, tile
-  tint (16% / 32% border), icon-size clamps and focus/pressed border logic are unchanged.
-- **"Continue Watching" caption → inside the hero card (image 01).** The renderer no longer paints
-  `layout.continueTitle` as a section title above the card. `drawHero` now stacks caption (secondary
-  colour) → title → source line → progress line inside the card's right-hand text column. The hero
-  inter-line gap shrinks to fit a short hero so the four lines never clip on a small head unit. The
-  layout still reserves the `continueTitle` band (budget maths untouched); that band is simply left
-  unpainted.
-- **Wordmark / headers / count pill + chevron / Duo screen action strip:** confirmed already match
-  the design; no change required. Duo strip (image 02) is preset glyph → Reload → Arrange/Done →
-  Exit, four actions, EN + TH strings present.
-- **Strings:** all `car_home_*` captions used already exist in EN (`values`) and TH (`values-th`);
-  no new string keys were introduced, nothing renamed.
+---
 
-## Not verifiable in this environment
+## What WAS Verifiable (Code Level)
 
-The DHU/visual section-by-section comparison against `01_Main.png` at the three profiles
-(800×480, 1280×720, 1920×720) requires a running Desktop Head Unit / real head unit and was NOT
-run here (headless build environment). The changes are drawing-only and the geometry/format unit
-tests are green; a reviewer with a DHU should confirm the horizontal cards, the in-card caption,
-and that nothing clips on the 800×480 profile.
+All items below were confirmed by inspecting the diff (`git diff main...ui/phase-6`), reading the source, and running the build/tests above.
+
+### 1. Build success
+`assemblePersonalDebug` produces a valid APK. No compile errors, no lint failures blocking the build.
+
+### 2. Unit tests green
+All 60 test suites pass. `HomeDashboardLayoutTest` (19 tests) confirms layout budgets, `continueTitle` non-null assertion, scrolling geometry, and side-by-side decisions are intact.
+
+### 3. Layout logic untouched
+`HomeDashboardLayout.kt` is **not in the diff at all**. Budget calculations, `place()` passes, `maxScroll`, the side-by-side decision, and hit-testing are byte-for-byte unchanged.
+
+### 4. Car API < 5 fallback intact
+`CarHomeDashboardScreen.kt` is **not in the diff**. The fallback logic is unchanged:
+```kotlin
+private val drawsMenu: Boolean by lazy { page == 0 && carContext.carAppApiLevel >= 5 }
+override fun onGetTemplate(): Template = if (drawsMenu) menuTemplate() else gridTemplate()
+```
+Hosts with `carAppApiLevel < 5` continue to receive `gridTemplate()`.
+
+### 5. Action strip = single "More" action
+`menuTemplate()` builds its `ActionStrip` with exactly one action: `CarIcons.APPS` → `openMore()`. No other action is added. This code is unchanged (not in the diff).
+
+### 6. Design tokens reused (not ad-hoc literals)
+The one new constant is `HomeDashboardTheme.Dp.CARD_ICON_LABEL_GAP = 16f`, added in `HomeDashboardTheme.kt`. All other tokens (`CARD_PADDING`, icon-size clamps, tile tints `ICON_TILE_TINT`/`ICON_TILE_BORDER_TINT`, `heroMetaSize`, etc.) are existing and reused. No ad-hoc pixel literals were introduced.
+
+### 7. EN + TH strings present
+All 9 `car_home_*` string keys exist in both `app/src/main/res/values/strings.xml` (EN) and `values-th/strings.xml` (TH). No new string keys were added or renamed by this phase. Parity confirmed.
+
+### 8. No behavior logic changed
+The diff touches only 3 files — `HomeMenuCard.kt`, `HomeDashboardRenderer.kt`, `HomeDashboardTheme.kt` — all drawing/rendering code. No changes to: playback, mirroring, bridge, IPTV parsing, safety gates, screen navigation, scrolling, input handling, or any `CarHomeDashboardScreen` template logic.
+
+---
+
+## What Was NOT Verifiable (Requires DHU / Manual Testing)
+
+The following items **cannot be verified in a headless build environment** and require a running Android Auto Desktop Head Unit (DHU) or a real car head unit. These are a manual verification step for the user.
+
+### Visual verification at three display profiles
+
+| Profile | Resolution | What to check |
+|---|---|---|
+| Small | 800×480 | Nothing clipped. Horizontal Quick Access cards render icon + label within card bounds. Hero card's four-line stack (caption, title, source, progress) does not overflow. The `continueTitle` reserved band (now unpainted) does not leave an awkward visible gap above the hero. |
+| Medium | 1280×720 | Standard layout renders correctly. Cards are appropriately sized. |
+| Wide | 1920×720 | Wide profile uses space correctly. Side-by-side layout (if triggered) renders correctly. |
+
+### Specific visual checks
+
+- **Horizontal Quick Access cards**: Icon tile on the left, label left-aligned to its right, both vertically centred (matches design `01_Main.png`).
+- **Label truncation on narrow profiles**: The layout's label-fit loop sizes against full card width, but the horizontal card draws labels in a narrower column (card width minus icon and gap). Long labels ("YouTube Music", "Web browser") may ellipsize on 800×480 side-by-side cards. If truncation is unacceptable, derive the label-fit width from icon+gap in the renderer/card.
+- **Scroll buttons**: Appear only when content overflows the visible area; not shown otherwise.
+- **Tap targets**: Tapping a card after scrolling lands on the correct card (hit-test alignment with scroll offset).
+- **Text readability**: All text (labels, captions, titles) is readable at arm's length on each profile.
+- **"Continue Watching" in-card caption**: Rendered in secondary colour inside the hero card's text column, above the title line (matches design `01_Main.png`).
+- **Wordmark, count pill + chevron headers, progress readout**: Already matched the design before Phase 6; confirm they remain intact.
+
+### Review finding (non-blocking)
+
+**Label-fit width mismatch**: The layout fits `labelSize` to full card width while the horizontal card draws in a narrower column. This may cause visual truncation on 800×480. See `review.json` for details. Confirm on DHU; fix if needed by computing the label width from icon+gap in the renderer/card rather than changing layout budgets.
+
+---
+
+## Files Changed
+
+| File | Change |
+|---|---|
+| `app/src/main/java/dev/autobridge/car/HomeMenuCard.kt` | Quick Access card painting: icon left + label left-aligned right, both vertically centred. `Paint.Align.CENTER` → `LEFT`. Ellipsize to real column width. |
+| `app/src/main/java/dev/autobridge/car/HomeDashboardRenderer.kt` | Stopped painting standalone "Continue Watching" section title. `drawHero` now stacks caption/title/source/progress with collapsible inter-line gap. |
+| `app/src/main/java/dev/autobridge/car/HomeDashboardTheme.kt` | New token `CARD_ICON_LABEL_GAP = 16f`. |
+
+---
+
+*Last updated after final verification run. Review: `review.json` (APPROVED with 1 non-blocking finding).*
