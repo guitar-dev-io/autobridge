@@ -1667,4 +1667,9 @@
     <string name="costs_invalid">กรอกจำนวนเงินที่มากกว่าศูนย์</string>
     <string name="costs_delete_title">ลบค่าใช้จ่ายนี้?</string>
     <string name="maint_field_cost">ราคา (บาท) ไม่บังคับ</string>
+    <!-- Voice fuel entry -->
+    <string name="voice_fuel_saved">บันทึกแล้ว: %1$s</string>
+    <string name="voice_fuel_not_understood">ฟังไม่ได้ทั้งปริมาณและราคา</string>
+    <string name="voice_fuel_vehicle_is_fuel">บันทึกของคุณตั้งเป็นรถน้ำมัน สลับเป็นรถ EV บนโทรศัพท์ก่อนถึงจะบันทึก kWh ได้</string>
+    <string name="voice_fuel_vehicle_is_ev">บันทึกของคุณตั้งเป็นรถ EV สลับเป็นรถน้ำมันบนโทรศัพท์ก่อนถึงจะบันทึกลิตรได้</string>
 </resources>

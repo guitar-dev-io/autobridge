@@ -2513,6 +2513,8 @@ class MainActivity : androidx.activity.ComponentActivity() {
                 mediaPlayback.resume()
                 toast(getString(R.string.agent_toast_resuming_playback))
             }
+            dev.autobridge.agent.AgentCommandRouter.AgentAction.LOG_FUEL ->
+                toast(dev.autobridge.fuel.FuelVoiceLogger.log(this, command.argument.orEmpty()).message)
             dev.autobridge.agent.AgentCommandRouter.AgentAction.OPEN_RECENT ->
                 toast(getString(R.string.car_agent_recent_on_car))
             dev.autobridge.agent.AgentCommandRouter.AgentAction.ENABLE_DESKTOP -> {

@@ -30,7 +30,10 @@ object AgentCommandRouter {
         ENABLE_DESKTOP,
         DISABLE_DESKTOP,
         ENTER_FULLSCREEN,
-        EXIT_FULLSCREEN
+        EXIT_FULLSCREEN,
+
+        /** A spoken fill-up or charge; the command's argument is what was said. */
+        LOG_FUEL
     }
 
     data class Command(val action: AgentAction, val argument: String? = null)
@@ -103,6 +106,10 @@ object AgentCommandRouter {
                     carContext.getString(R.string.agent_toast_resuming_playback),
                     carContext.getString(R.string.agent_spoken_resuming_playback)
                 )
+            }
+            AgentAction.LOG_FUEL -> {
+                val outcome = dev.autobridge.fuel.FuelVoiceLogger.log(carContext, command.argument.orEmpty())
+                Result(outcome.saved, outcome.message)
             }
             AgentAction.OPEN_RECENT -> {
                 screenManager.push(CarRecentScreen(carContext))
