@@ -5,11 +5,17 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
+import android.graphics.Typeface
 import android.net.Uri
 import android.os.Bundle
+import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
 import android.widget.EditText
+import android.widget.FrameLayout
+import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import dev.autobridge.entertainment.ContentKind
@@ -18,10 +24,12 @@ import dev.autobridge.entertainment.WebBookmarkStore
 import dev.autobridge.i18n.AppLocale
 import dev.autobridge.iptv.IptvCatalog
 import dev.autobridge.iptv.IptvCatalogData
+import dev.autobridge.iptv.IptvCategory
 import dev.autobridge.iptv.IptvDirectory
 import dev.autobridge.iptv.IptvEntry
 import dev.autobridge.iptv.IptvHistoryStore
 import dev.autobridge.iptv.IptvKind
+import dev.autobridge.iptv.IptvPinnedCategoryStore
 import dev.autobridge.iptv.IptvPlayback
 import dev.autobridge.iptv.IptvSource
 import dev.autobridge.iptv.IptvSourceStore
@@ -47,15 +55,35 @@ import dev.autobridge.ui.SystemBack
  * attachment and the parked-state gate.
  */
 class LibraryActivity : Activity() {
-    /** Which home tile opened this Activity. */
+    /**
+     * Which library content is showing. One Activity now covers all of them — see [chips] — so
+     * this is "which chip is selected" as much as "which home tile opened this Activity".
+     *
+     * [FOLDERS], [PLAYLISTS] and [GALLERY] have no chip of their own; they are reached through
+     * [FILES], but stay as their own [Section] so an external launch (the voice agent opens
+     * [PLAYLISTS] directly) still lands on the right page with [FILES] highlighted.
+     */
     enum class Section(val title: String, val accent: Int) {
         TV("TV", AutoBridgeDesign.ACCENT_TV),
         RADIO("Radio", AutoBridgeDesign.ACCENT_RADIO),
+        MUSIC("Music", AutoBridgeDesign.ACCENT_VIDEO),
+        STREAMING("Streaming", AutoBridgeDesign.ACCENT_VIDEO),
+        FILES("Files", AutoBridgeDesign.ACCENT_FILES),
+        FAVORITES("Favorites", AutoBridgeDesign.ACCENT_FAVORITE),
         FOLDERS("Folders", AutoBridgeDesign.ACCENT_FILES),
         PLAYLISTS("Playlists", AutoBridgeDesign.ACCENT_FILES),
-        GALLERY("Gallery", AutoBridgeDesign.ACCENT_WEB),
-        FAVORITES("Favorites", AutoBridgeDesign.ACCENT_FAVORITE),
-        STREAMING("Streaming", AutoBridgeDesign.ACCENT_VIDEO)
+        GALLERY("Gallery", AutoBridgeDesign.ACCENT_WEB)
+    }
+
+    /** The chip row, in order. [FOLDERS]/[PLAYLISTS]/[GALLERY] fall under [Section.FILES]. */
+    private val chips = listOf(
+        Section.TV, Section.RADIO, Section.MUSIC, Section.STREAMING, Section.FILES, Section.FAVORITES
+    )
+
+    /** Which chip reads as selected for [section] — the three Files sub-pages included. */
+    private fun chipFor(target: Section): Section = when (target) {
+        Section.FOLDERS, Section.PLAYLISTS, Section.GALLERY -> Section.FILES
+        else -> target
     }
 
     companion object {
@@ -65,16 +93,25 @@ class LibraryActivity : Activity() {
         /** Below this a search field is clutter; above it, a long list is unusable without one. */
         private const val SEARCH_THRESHOLD = 12
 
+        /** Entries a global category-page search matches, across the whole source. */
+        private const val MAX_SEARCH_MATCHES = 120
+
         fun intent(context: android.content.Context, section: Section): Intent =
             Intent(context, LibraryActivity::class.java).putExtra(EXTRA_SECTION, section.name)
     }
 
-    private val section by lazy {
+    private val initialSection by lazy {
         runCatching { Section.valueOf(intent.getStringExtra(EXTRA_SECTION).orEmpty()) }
             .getOrDefault(Section.TV)
     }
+
+    /** The chip/page on screen right now. Switched in place by [showSection] — no re-launch. */
+    private var section: Section = Section.TV
     private val accent get() = section.accent
     private val iptvKind get() = if (section == Section.RADIO) IptvKind.RADIO else IptvKind.TV
+
+    /** A url just sent to the car's video screen, so its tile can read "ON CAR" until another is sent. */
+    private var lastSentToCarUrl: String? = null
 
     private lateinit var playback: MediaPlaybackClient
     private var miniPlayer: MiniPlayer? = null
@@ -112,13 +149,26 @@ class LibraryActivity : Activity() {
         releaseBack = SystemBack.register(this) { goBack() }
         playback = MediaPlaybackClient(this)
         playback.connect()
-        when (section) {
-            Section.TV, Section.RADIO -> showSources()
+        showSection(initialSection)
+    }
+
+    /**
+     * Switches the chip row to [target] and draws its root page, clearing whatever page stack the
+     * previous chip had built up — the same as if a fresh Activity had been launched for it, which
+     * is what this replaces: tapping a chip no longer re-launches the Activity.
+     */
+    private fun showSection(target: Section) {
+        section = target
+        stack.clear()
+        when (target) {
+            Section.TV, Section.RADIO -> showLibraryHome()
+            Section.MUSIC -> showMusic()
+            Section.FILES -> showFiles()
+            Section.FAVORITES -> showFavorites()
+            Section.STREAMING -> showStreaming()
             Section.FOLDERS -> showFolders()
             Section.PLAYLISTS -> showPlaylists()
             Section.GALLERY -> showGalleryAlbums()
-            Section.FAVORITES -> showFavorites()
-            Section.STREAMING -> showStreaming()
         }
     }
 
@@ -177,7 +227,9 @@ class LibraryActivity : Activity() {
 
     /**
      * Assembles a page in the house style: header, optional pinned search/action row, a scrolling
-     * body and the shared now-playing bar.
+     * body and the shared now-playing bar. Returns the built page so a caller that passed
+     * [overlay] can look up the scroll view afterwards (see [AutoBridgeDesign.pageScroll]) and wire
+     * up what the overlay does.
      */
     private fun render(
         title: String,
@@ -187,13 +239,16 @@ class LibraryActivity : Activity() {
         onBack: () -> Unit = { goBack() },
         actions: List<Pair<String, () -> Unit>> = emptyList(),
         headerActions: List<AutoBridgeDesign.HeaderAction> = emptyList(),
-        search: Pair<String, (String) -> Unit>? = null
-    ) {
+        search: Pair<String, (String) -> Unit>? = null,
+        extraPinned: List<View> = emptyList(),
+        overlay: View? = null
+    ): View {
         val body = AutoBridgeDesign.body(this)
         if (rows.isEmpty() && empty != null) body.addView(empty)
         else rows.forEach { body.stack(it) }
 
         val pinned = mutableListOf<View>()
+        pinned += extraPinned
         if (search != null) {
             pinned += AutoBridgeDesign.searchField(this, "Search", search.first, search.second)
         }
@@ -223,15 +278,16 @@ class LibraryActivity : Activity() {
 
         val header = AutoBridgeDesign.header(this, title, subtitle, onBack = onBack, actions = headerActions)
         signalIndicator = header.findViewWithTag(SIGNAL_ACTION_TAG)
-        setContentView(
-            AutoBridgeDesign.page(
-                context = this,
-                header = header,
-                pinned = pinned,
-                body = body,
-                bottomBar = bottom
-            )
+        val page = AutoBridgeDesign.page(
+            context = this,
+            header = header,
+            pinned = pinned,
+            body = body,
+            bottomBar = bottom,
+            overlay = overlay
         )
+        setContentView(page)
+        return page
     }
 
     private fun openNowPlaying() {
@@ -256,129 +312,323 @@ class LibraryActivity : Activity() {
 
     // ----- IPTV: sources -> categories -> entries -----
 
-    private fun showSources() = push {
+    /**
+     * Root of the TV/Radio chips: the current source's categories, loaded straight away so there
+     * is no extra "pick a source" step when one already exists — switching is the source card's
+     * job now (see [sourceCard]). Re-runs in full on [refresh], so adding the first source from
+     * the empty state hands off to the loaded page without a second tap.
+     */
+    private fun showLibraryHome() = push {
         val sources = IptvSourceStore.list(this, iptvKind)
-        val recent = IptvHistoryStore.recent(this, iptvKind)
-        val favorites = IptvHistoryStore.favorites(this, iptvKind)
-        val rows = mutableListOf<View>()
-
-        // A starred channel is a deliberate choice, so it leads; "Recently played" is just
-        // whatever happened to play last and sits under it.
-        if (favorites.isNotEmpty()) {
-            rows += AutoBridgeDesign.contentRow(
-                context = this,
-                title = "Favorites",
-                subtitle = plural(favorites.size, "channel"),
-                accent = accent,
-                badgeText = "★",
-                trailing = "›",
-                onClick = { showFavorites() }
+        if (sources.isEmpty()) {
+            render(
+                title = "Library",
+                subtitle = "No ${section.title} source yet",
+                rows = emptyList(),
+                empty = AutoBridgeDesign.emptyState(
+                    context = this,
+                    title = "No ${section.title} source yet",
+                    message = "Pick a free public list, or add your own Xtream account or M3U playlist.",
+                    action = "Browse public lists" to { addFromDirectory() },
+                    accent = accent
+                ),
+                headerActions = listOf(AutoBridgeDesign.HeaderAction("+", onClick = { addSourceChooser() })),
+                actions = listOf(
+                    "Public lists" to { addFromDirectory() },
+                    "+ Xtream" to { addSource(IptvSourceType.XTREAM) },
+                    "+ M3U" to { addSource(IptvSourceType.M3U) }
+                ),
+                extraPinned = listOf(chipsRow())
             )
-        }
-        if (recent.isNotEmpty()) {
-            rows += AutoBridgeDesign.contentRow(
-                context = this,
-                title = "Recently played",
-                subtitle = "${recent.size} items",
-                accent = accent,
-                badgeText = "↺",
-                trailing = "›",
-                onClick = { showRecent() }
-            )
-        }
-        sources.forEach { source ->
-            rows += AutoBridgeDesign.contentRow(
-                context = this,
-                title = source.name,
-                subtitle = sourceSubtitle(source),
-                accent = accent,
-                badgeText = if (source.type == IptvSourceType.XTREAM) "X" else "M",
-                trailing = "⋯",
-                onTrailing = { sourceMenu(source) },
-                onClick = { openSource(source) }
-            )
-        }
-
-        render(
-            title = section.title,
-            subtitle = if (sources.isEmpty()) "No source configured" else plural(sources.size, "source"),
-            rows = rows,
-            empty = AutoBridgeDesign.emptyState(
-                context = this,
-                title = "No ${section.title} source yet",
-                message = "Pick a free public list, or add your own Xtream account or M3U playlist.",
-                action = "Browse public lists" to { addFromDirectory() },
-                accent = accent
-            ),
-            actions = listOf(
-                "Public lists" to { addFromDirectory() },
-                "+ Xtream" to { addSource(IptvSourceType.XTREAM) },
-                "+ M3U" to { addSource(IptvSourceType.M3U) }
-            )
-        )
-    }
-
-    private fun sourceSubtitle(source: IptvSource): String {
-        val type = if (source.type == IptvSourceType.XTREAM) "Xtream" else "M3U playlist"
-        val cached = IptvCatalog.cached(source.id)
-        return when {
-            IptvCatalog.isLoading(source.id) -> "$type • loading…"
-            cached != null -> "$type • " + plural(cached.entries.size, "entry", "entries")
-            else -> "$type • ${hostOf(source.url)}"
+        } else {
+            // A source now exists (e.g. just added from the empty state above) — hand off to the
+            // loaded categories page and drop this page from the stack, so Back does not return
+            // to a stale empty check sitting behind the one that actually loaded.
+            stack.removeLastOrNull()
+            openLibrarySource(sources.first(), sources)
         }
     }
 
-    private fun openSource(source: IptvSource) {
+    private fun openLibrarySource(source: IptvSource, allSources: List<IptvSource>) {
         val cached = IptvCatalog.cached(source.id)
         if (cached != null) {
-            showCategories(source, cached)
+            showLibraryCategories(source, allSources, cached)
             return
         }
         val dialog = progressDialog("Loading ${source.name}…")
         IptvCatalog.load(this, source) { result ->
             dialog.dismiss()
             when (result) {
-                is IptvCatalog.Result.Ready -> showCategories(source, result.data)
+                is IptvCatalog.Result.Ready -> showLibraryCategories(source, allSources, result.data)
                 is IptvCatalog.Result.Failed -> alert("Could not load ${source.name}", result.message)
             }
         }
     }
 
-    private fun showCategories(source: IptvSource, data: IptvCatalogData) = push {
-        val rows = data.categories.map { category ->
-            AutoBridgeDesign.contentRow(
-                context = this,
-                title = category.name,
-                subtitle = plural(category.count, "entry", "entries"),
-                accent = accent,
-                trailing = "›",
-                onClick = { showEntries(source, data, category.id, category.name) }
+    /**
+     * Source card, search across the whole source, pinned categories + Last watched, and the full
+     * category list grouped A–Z with a right-edge letter index. A non-blank search replaces the
+     * A–Z list with flat channel and category matches instead of narrowing it in place — the two
+     * read as different modes (browse vs. find), which is what the categories page and the old
+     * entries-page search already did separately.
+     */
+    private fun showLibraryCategories(source: IptvSource, allSources: List<IptvSource>, data: IptvCatalogData) {
+        var query = ""
+        lateinit var draw: () -> Unit
+        draw = {
+            val q = query.trim()
+            val rows = mutableListOf<View>()
+            var overlay: View? = null
+            var scrollRef: ScrollView? = null
+
+            if (q.isBlank()) {
+                val pinnedIds = IptvPinnedCategoryStore.pinned(this, source.id)
+                val pinnedCategories = data.categories.filter { it.id in pinnedIds }
+                val hasRecent = IptvHistoryStore.recent(this, iptvKind).isNotEmpty()
+                if (pinnedCategories.isNotEmpty() || hasRecent) {
+                    rows += AutoBridgeDesign.sectionLabel(this, "Pinned")
+                    rows += pinnedRow(source, data, pinnedCategories, hasRecent)
+                }
+
+                val grouped = data.categories
+                    .groupBy { categoryLetter(it.name) }
+                    .toSortedMap(compareBy { categoryLetterSortKey(it) })
+                if (grouped.isNotEmpty()) rows += AutoBridgeDesign.sectionLabel(this, "All categories • ${data.categories.size}")
+                val anchors = mutableMapOf<String, View>()
+                grouped.forEach { (letter, categories) ->
+                    val header = AutoBridgeDesign.sectionLabel(this, letter)
+                    anchors[letter] = header
+                    rows += header
+                    categories.forEach { category -> rows += categoryRow(source, data, category) }
+                }
+                // A short list fits on screen without help; the index would just be clutter.
+                if (grouped.size > 3) {
+                    overlay = letterIndex(grouped.keys.toList()) { letter ->
+                        val target = anchors[letter] ?: return@letterIndex
+                        scrollRef?.post { scrollRef?.smoothScrollTo(0, target.top) }
+                    }
+                }
+            } else {
+                val matchingEntries = data.entries
+                    .filter { it.title.contains(q, ignoreCase = true) }
+                    .take(MAX_SEARCH_MATCHES)
+                val matchingCategories = data.categories.filter { it.name.contains(q, ignoreCase = true) }
+                if (matchingEntries.isNotEmpty()) {
+                    rows += AutoBridgeDesign.sectionLabel(this, "Channels")
+                    rows += matchingEntries.map { entryRow(source, it, matchingEntries) }
+                }
+                if (matchingCategories.isNotEmpty()) {
+                    rows += AutoBridgeDesign.sectionLabel(this, "Categories")
+                    rows += matchingCategories.map { categoryRow(source, data, it) }
+                }
+            }
+
+            val page = render(
+                title = "Library",
+                subtitle = null,
+                rows = rows,
+                empty = if (q.isNotBlank()) {
+                    AutoBridgeDesign.emptyState(this, "No matches", "Nothing matches \"$q\".")
+                } else {
+                    AutoBridgeDesign.emptyState(this, "Nothing here", "This source returned no categories.")
+                },
+                headerActions = listOf(AutoBridgeDesign.HeaderAction("+", onClick = { addSourceChooser() })),
+                search = query to { value -> query = value; draw() },
+                extraPinned = listOf(chipsRow(), sourceCard(source, allSources)),
+                overlay = overlay
+            )
+            scrollRef = AutoBridgeDesign.pageScroll(page)
+        }
+        push(draw)
+    }
+
+    /** Every chip, the currently selected one highlighted; tapping a different one switches to it. */
+    private fun chipsRow(): View {
+        val selected = chipFor(section)
+        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        chips.forEach { chip ->
+            val isSelected = chip == selected
+            row.addView(
+                TextView(this).apply {
+                    text = chip.title
+                    textSize = 14f
+                    gravity = Gravity.CENTER
+                    setTextColor(if (isSelected) AutoBridgeDesign.INK else AutoBridgeDesign.TEXT)
+                    typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                    setPadding(dp(18), dp(10), dp(18), dp(10))
+                    background = AutoBridgeDesign.surface(
+                        this@LibraryActivity,
+                        if (isSelected) chip.accent else AutoBridgeDesign.SURFACE,
+                        20,
+                        if (isSelected) chip.accent else AutoBridgeDesign.HAIRLINE
+                    )
+                    isClickable = true
+                    isFocusable = true
+                    setOnClickListener { if (!isSelected) showSection(chip) }
+                },
+                LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(8) }
             )
         }
-        render(
+        return HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(row, ViewGroup.LayoutParams(-2, -2))
+        }
+    }
+
+    /** Current source, its size, and a tap to switch; the "⋯" keeps Refresh/Edit/Delete reachable. */
+    private fun sourceCard(source: IptvSource, allSources: List<IptvSource>): View {
+        val type = if (source.type == IptvSourceType.XTREAM) "Xtream" else "M3U"
+        val cached = IptvCatalog.cached(source.id)
+        val subtitle = if (cached != null) {
+            "$type • " + plural(cached.categories.size, "category", "categories") + " • " +
+                plural(cached.entries.size, "channel")
+        } else {
+            "$type • ${hostOf(source.url)}"
+        }
+        return AutoBridgeDesign.contentRow(
+            context = this,
             title = source.name,
-            subtitle = plural(data.entries.size, "entry", "entries") + " • " +
-                plural(data.categories.size, "category", "categories"),
-            rows = rows,
-            empty = AutoBridgeDesign.emptyState(
-                this, "Nothing here", "This source returned no categories."
-            ),
-            actions = listOf("Refresh" to { refreshSource(source) })
+            subtitle = subtitle,
+            accent = accent,
+            badgeText = if (source.type == IptvSourceType.XTREAM) "X" else "M",
+            trailing = "⋯",
+            onTrailing = { sourceMenu(source) },
+            onClick = { switchSource(source, allSources) }
         )
     }
 
-    private fun refreshSource(source: IptvSource) {
-        val dialog = progressDialog("Refreshing ${source.name}…")
-        IptvCatalog.load(this, source, forceRefresh = true) { result ->
-            dialog.dismiss()
-            when (result) {
-                is IptvCatalog.Result.Ready -> {
-                    // Replace the stale categories page rather than stacking a second copy.
+    private fun switchSource(current: IptvSource, allSources: List<IptvSource>) {
+        if (allSources.size <= 1) {
+            addSourceChooser()
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Switch source")
+            .setItems(allSources.map { it.name }.toTypedArray()) { _, index ->
+                val chosen = allSources[index]
+                if (chosen.id != current.id) {
+                    // Replace the current categories page rather than stacking a second copy.
                     stack.removeLastOrNull()
-                    showCategories(source, result.data)
+                    openLibrarySource(chosen, allSources)
                 }
-                is IptvCatalog.Result.Failed -> alert("Refresh failed", result.message)
             }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun addSourceChooser() {
+        AlertDialog.Builder(this)
+            .setTitle("Add a source")
+            .setItems(arrayOf("Browse public lists", "Add Xtream account", "Add M3U playlist")) { _, index ->
+                when (index) {
+                    0 -> addFromDirectory()
+                    1 -> addSource(IptvSourceType.XTREAM)
+                    else -> addSource(IptvSourceType.M3U)
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    /** One category row: name, entry count, and a pin star — the main way to pin and unpin. */
+    private fun categoryRow(source: IptvSource, data: IptvCatalogData, category: IptvCategory): View {
+        val pinned = IptvPinnedCategoryStore.isPinned(this, source.id, category.id)
+        return AutoBridgeDesign.contentRow(
+            context = this,
+            title = category.name,
+            subtitle = plural(category.count, "entry", "entries"),
+            accent = accent,
+            trailing = if (pinned) "★" else "☆",
+            onTrailing = {
+                IptvPinnedCategoryStore.toggle(this, source.id, category.id)
+                refresh()
+            },
+            onClick = { showEntries(source, data, category.id, category.name) }
+        )
+    }
+
+    /** Pinned categories, then a "Last watched" shortcut into the full recently-played list. */
+    private fun pinnedRow(
+        source: IptvSource,
+        data: IptvCatalogData,
+        pinnedCategories: List<IptvCategory>,
+        hasRecent: Boolean
+    ): View {
+        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        pinnedCategories.forEach { category ->
+            row.addView(
+                chip("★ ${category.name} · ${category.count}", AutoBridgeDesign.ACCENT_FAVORITE) {
+                    showEntries(source, data, category.id, category.name)
+                },
+                LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(8) }
+            )
+        }
+        if (hasRecent) {
+            row.addView(
+                chip("↺ Last watched", AutoBridgeDesign.ACCENT_FILES) { showRecent() },
+                LinearLayout.LayoutParams(-2, -2)
+            )
+        }
+        return HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(row, ViewGroup.LayoutParams(-2, -2))
+        }
+    }
+
+    private fun chip(label: String, color: Int, onClick: () -> Unit): View = TextView(this).apply {
+        text = label
+        textSize = 13f
+        setTextColor(color)
+        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        setPadding(dp(14), dp(10), dp(14), dp(10))
+        background = AutoBridgeDesign.surface(
+            this@LibraryActivity, AutoBridgeDesign.tint(color, 0.16f), 18, AutoBridgeDesign.tint(color, 0.32f)
+        )
+        isClickable = true
+        isFocusable = true
+        setOnClickListener { onClick() }
+    }
+
+    /** The right-edge jump index: one small glyph per [letters] entry, tapping scrolls to its header. */
+    private fun letterIndex(letters: List<String>, onJump: (String) -> Unit): View =
+        LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(dp(2), dp(4), dp(6), dp(4))
+            letters.forEach { letter ->
+                addView(TextView(this@LibraryActivity).apply {
+                    text = letter
+                    textSize = 11f
+                    gravity = Gravity.CENTER
+                    setTextColor(AutoBridgeDesign.ACCENT)
+                    typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                    isClickable = true
+                    isFocusable = true
+                    setPadding(dp(6), dp(1), dp(6), dp(1))
+                    setOnClickListener { onJump(letter) }
+                })
+            }
+        }
+
+    /** A–Z section letter for a category name: Latin and Thai keep their own letter, everything
+     *  else (digits, symbols) groups under "#". */
+    private fun categoryLetter(name: String): String {
+        val c = name.trim().firstOrNull()?.uppercaseChar() ?: return "#"
+        return when {
+            c in 'A'..'Z' -> c.toString()
+            c.code in 0x0E01..0x0E5B -> c.toString()
+            else -> "#"
+        }
+    }
+
+    /** Sort key for [categoryLetter]: A–Z, then Thai in code-point order, then "#" last. */
+    private fun categoryLetterSortKey(letter: String): Int {
+        val c = letter.firstOrNull() ?: return Int.MAX_VALUE
+        return when {
+            letter == "#" -> Int.MAX_VALUE
+            c in 'A'..'Z' -> c.code
+            c.code in 0x0E01..0x0E5B -> 1000 + c.code
+            else -> Int.MAX_VALUE
         }
     }
 
@@ -390,6 +640,8 @@ class LibraryActivity : Activity() {
     ) {
         val all = data.entriesIn(categoryId)
         var query = ""
+        var hideOffline = false
+        var gridView = true
         // Checked once per visit, not once per keystroke: draw() runs again on every letter typed.
         var autoChecked = false
         // The page re-renders itself on every keystroke, so the filter lives outside the lambda.
@@ -398,11 +650,33 @@ class LibraryActivity : Activity() {
             val filtered = if (query.isBlank()) all else {
                 all.filter { it.title.contains(query, ignoreCase = true) }
             }
-            val shown = filtered.take(MAX_VISIBLE_ENTRIES)
+            val checkedResults = filtered.mapNotNull { e -> e.url.takeIf { it.isNotBlank() }?.let(StreamPing::cached) }
+            val offlineCount = checkedResults.count { StreamPing.tone(it) == StreamPing.Tone.BAD }
+            val onlineCount = checkedResults.size - offlineCount
+            val visible = if (hideOffline) {
+                filtered.filter { e ->
+                    e.url.isBlank() || StreamPing.cached(e.url)?.let { StreamPing.tone(it) != StreamPing.Tone.BAD } ?: true
+                }
+            } else {
+                filtered
+            }
+            val shown = visible.take(MAX_VISIBLE_ENTRIES)
             val counted = if (query.isBlank()) plural(all.size, "entry", "entries")
             else "${filtered.size} of ${all.size} match \"$query\""
             // The tiles about to be built are the ones a landing result writes into.
             pingTiles.clear()
+            val rows = mutableListOf<View>()
+            if (checkedResults.isNotEmpty()) rows += checkSummaryRow(onlineCount, offlineCount, hideOffline) {
+                hideOffline = !hideOffline
+                draw()
+            }
+            rows += if (gridView) {
+                // Channels and films carry a logo worth seeing, so the grid is the default; two
+                // columns is what fits a phone at a glance. List trades the logo for density.
+                AutoBridgeDesign.grid(this, shown.map { entryTile(source, it, shown) })
+            } else {
+                shown.map { entryRow(source, it, shown) }
+            }
             render(
                 title = categoryName,
                 // A country-grouped public playlist puts thousands of channels in "All". Saying
@@ -412,15 +686,17 @@ class LibraryActivity : Activity() {
                 } else {
                     counted
                 },
-                // Channels and films carry a logo worth seeing, so this page is a grid of tiles
-                // rather than a list of rows; two columns is what fits a phone at a glance.
-                rows = AutoBridgeDesign.grid(this, shown.map { entryTile(source, it, shown) }),
+                rows = rows,
                 empty = AutoBridgeDesign.emptyState(
                     this, "No matches", "Nothing in this category matches that search."
                 ),
                 // A signal icon in the corner instead of a labelled button: it reads this page's
                 // worst check result at a glance, and still taps to recheck like the button did.
                 headerActions = listOf(
+                    AutoBridgeDesign.HeaderAction(
+                        glyph = if (gridView) "▦" else "≡",
+                        onClick = { gridView = !gridView; draw() }
+                    ),
                     AutoBridgeDesign.HeaderAction(
                         glyph = "📶",
                         onClick = { recheckEntries(shown) },
@@ -445,6 +721,27 @@ class LibraryActivity : Activity() {
         push(draw)
     }
 
+    /** Online/offline counts from the last check, plus the Hide offline toggle. */
+    private fun checkSummaryRow(online: Int, offline: Int, hideOffline: Boolean, onToggleHide: () -> Unit): View =
+        LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            addView(TextView(this@LibraryActivity).apply {
+                text = "● $online online   ● $offline offline"
+                textSize = 12f
+                setTextColor(AutoBridgeDesign.TEXT_MUTED)
+            }, LinearLayout.LayoutParams(0, -2, 1f))
+            addView(
+                AutoBridgeDesign.pill(
+                    this@LibraryActivity,
+                    if (hideOffline) "Show all" else "Hide offline",
+                    primary = hideOffline,
+                    accent = accent,
+                    onClick = onToggleHide
+                )
+            )
+        }
+
     /**
      * One entry as a grid tile: its logo, its title, and its last check result in colour.
      *
@@ -458,6 +755,7 @@ class LibraryActivity : Activity() {
         siblings: List<IptvEntry> = emptyList()
     ): View {
         val favorite = entry.url.isNotBlank() && IptvHistoryStore.isFavorite(this, entry.url)
+        val onCar = entry.url.isNotBlank() && entry.url == lastSentToCarUrl
         val tile = AutoBridgeDesign.contentTile(
             context = this,
             title = entry.title,
@@ -487,7 +785,30 @@ class LibraryActivity : Activity() {
             onClick = { openEntry(source, entry, siblings) }
         )
         if (entry.url.isNotBlank()) pingTiles[entry.url] = tile
-        return tile
+        return if (onCar) onCarBadge(tile) else tile
+    }
+
+    /** Wraps an entry tile with the accent border and "ON CAR" pill the currently-sent channel gets. */
+    private fun onCarBadge(tile: View): View = FrameLayout(this).apply {
+        background = AutoBridgeDesign.surface(this@LibraryActivity, android.graphics.Color.TRANSPARENT, 18, accent)
+        addView(tile, FrameLayout.LayoutParams(-1, -1).apply {
+            val inset = dp(2)
+            setMargins(inset, inset, inset, inset)
+        })
+        addView(
+            TextView(this@LibraryActivity).apply {
+                text = "ON CAR"
+                textSize = 10f
+                setTextColor(AutoBridgeDesign.INK)
+                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                setPadding(dp(8), dp(3), dp(8), dp(3))
+                background = AutoBridgeDesign.surface(this@LibraryActivity, accent, 10)
+            },
+            FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.START).apply {
+                leftMargin = dp(10)
+                topMargin = dp(10)
+            }
+        )
     }
 
     /** A check result as text and the colour it reads in. */
@@ -546,10 +867,12 @@ class LibraryActivity : Activity() {
         siblings: List<IptvEntry> = emptyList()
     ): View {
         val favorite = entry.url.isNotBlank() && IptvHistoryStore.isFavorite(this, entry.url)
+        val onCar = entry.url.isNotBlank() && entry.url == lastSentToCarUrl
         val row = AutoBridgeDesign.contentRow(
             context = this,
             title = entry.title,
             subtitle = listOfNotNull(
+                "ON CAR".takeIf { onCar },
                 entry.subtitle.takeIf { it.isNotBlank() },
                 "Opens in browser".takeIf { entry.isWebPage },
                 "Catch-up".takeIf { entry.supportsCatchup },
@@ -672,6 +995,8 @@ class LibraryActivity : Activity() {
      */
     private fun sendToCar(source: IptvSource, entry: IptvEntry) {
         IptvHistoryStore.recordPlayback(this, source, entry)
+        lastSentToCarUrl = entry.url
+        refresh()
         dev.autobridge.remote.RemoteRuntime.ensureStarted(this)
         dev.autobridge.remote.AutoBridgeCommandBus.send(
             dev.autobridge.remote.AutoBridgeCommand(
@@ -796,8 +1121,10 @@ class LibraryActivity : Activity() {
             .setItems(arrayOf("Refresh", "Edit", "Delete")) { _, index ->
                 when (index) {
                     0 -> {
+                        // Replace the stale categories page rather than stacking a second copy.
+                        stack.removeLastOrNull()
                         IptvCatalog.invalidate(source.id)
-                        openSource(source)
+                        openLibrarySource(source, IptvSourceStore.list(this, iptvKind))
                     }
                     1 -> addSource(source.type, source)
                     else -> confirmDelete(source)
@@ -1200,8 +1527,78 @@ class LibraryActivity : Activity() {
                 this,
                 "Nothing saved yet",
                 "Star a channel in TV or Radio, or save a page in the browser, and it appears here."
+            ),
+            extraPinned = listOf(chipsRow())
+        )
+    }
+
+    // ----- Music -----
+
+    /** YouTube Music (a web shortcut, same as Home's Music tile) and this device's audio playlists. */
+    private fun showMusic() = push {
+        val rows = listOf(
+            AutoBridgeDesign.contentRow(
+                context = this,
+                title = "YouTube Music",
+                subtitle = "music.youtube.com",
+                accent = accent,
+                badgeText = "▶",
+                trailing = "›",
+                onClick = {
+                    startActivity(
+                        Intent(this, dev.autobridge.browser.BrowserActivity::class.java)
+                            .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+                            .setData(Uri.parse("https://music.youtube.com"))
+                    )
+                }
+            ),
+            AutoBridgeDesign.contentRow(
+                context = this,
+                title = "Playlists",
+                subtitle = "Audio on this device",
+                accent = accent,
+                badgeText = "♪",
+                trailing = "›",
+                onClick = { showPlaylists() }
             )
         )
+        render(title = "Music", subtitle = null, rows = rows, extraPinned = listOf(chipsRow()))
+    }
+
+    // ----- Files -----
+
+    /** Folders, Playlists and Gallery, merged behind one chip. */
+    private fun showFiles() = push {
+        val rows = listOf(
+            AutoBridgeDesign.contentRow(
+                context = this,
+                title = "Folders",
+                subtitle = "Audio and video on this device",
+                accent = accent,
+                badgeText = "▣",
+                trailing = "›",
+                onClick = { showFolders() }
+            ),
+            AutoBridgeDesign.contentRow(
+                context = this,
+                title = "Playlists",
+                subtitle = "Audio on this device",
+                accent = accent,
+                badgeText = "♪",
+                trailing = "›",
+                onClick = { showPlaylists() }
+            ),
+            AutoBridgeDesign.contentRow(
+                context = this,
+                title = "Gallery",
+                subtitle = "Photos and videos on this device",
+                accent = accent,
+                badgeText = "◱",
+                trailing = "›",
+                onClick = { showGalleryAlbums() }
+            )
+        )
+        render(title = "Files", subtitle = null, rows = rows, extraPinned = listOf(chipsRow()))
     }
 
     // ----- Streaming -----
@@ -1228,7 +1625,12 @@ class LibraryActivity : Activity() {
                 )
             }
         }
-        render(title = "Streaming", subtitle = "${StreamingLinks.all.size} sites", rows = rows)
+        render(
+            title = "Streaming",
+            subtitle = "${StreamingLinks.all.size} sites",
+            rows = rows,
+            extraPinned = listOf(chipsRow())
+        )
     }
 
     // ----- Shared helpers -----

@@ -592,6 +592,11 @@ object AutoBridgeDesign {
     /**
      * The standard page: ink background, a header, optional pinned content (search, action pills),
      * a scrolling body, and an optional bottom bar the caller owns (the mini player).
+     *
+     * [overlay], when given, floats at the end edge of the scroll area instead of scrolling with
+     * it — a right-edge letter index, say. The scroll view itself carries [R.id.autobridge_page_scroll]
+     * so a caller that built [overlay] can find it afterwards and scroll to a position; see
+     * [pageScroll].
      */
     fun page(
         context: Context,
@@ -599,7 +604,8 @@ object AutoBridgeDesign {
         pinned: List<View> = emptyList(),
         body: View,
         bottomBar: View? = null,
-        applyInsets: Boolean = true
+        applyInsets: Boolean = true,
+        overlay: View? = null
     ): View {
         val root = FrameLayout(context).apply { setBackgroundColor(INK) }
         val column = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
@@ -622,15 +628,26 @@ object AutoBridgeDesign {
             })
         }
         val scroll = ScrollView(context).apply {
+            id = R.id.autobridge_page_scroll
             isVerticalScrollBarEnabled = false
             clipToPadding = false
             addView(body, ViewGroup.LayoutParams(-1, -2))
         }
-        column.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        if (overlay == null) {
+            column.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        } else {
+            val scrollArea = FrameLayout(context)
+            scrollArea.addView(scroll, FrameLayout.LayoutParams(-1, -1))
+            scrollArea.addView(overlay, FrameLayout.LayoutParams(-2, -1, Gravity.END))
+            column.addView(scrollArea, LinearLayout.LayoutParams(-1, 0, 1f))
+        }
         if (bottomBar != null) column.addView(bottomBar, LinearLayout.LayoutParams(-1, -2))
         root.addView(column, FrameLayout.LayoutParams(-1, -1))
         return root
     }
+
+    /** The scroll view [page] built around its body, so a caller can scroll to a position in it. */
+    fun pageScroll(page: View): ScrollView? = page.findViewById(R.id.autobridge_page_scroll)
 
     /** Vertical container for page body content, with the standard side gutter. */
     fun body(context: Context): LinearLayout = LinearLayout(context).apply {
