@@ -104,6 +104,7 @@
     <string name="control_result_failed">ส่งคำสั่งไม่สำเร็จ</string>
     <string name="control_retry">ลองอีกครั้ง</string>
     <string name="control_how_to_connect">วิธีเชื่อมต่อ</string>
+    <string name="control_queue_overflow">การทำงานเพิ่มเติม</string>
 
     <!-- สถานะการเชื่อมต่อ Android Auto — ใช้คำเดียวกันทุกหน้า (Home, Control, Car & Connection,
          Duo screen) เพื่อไม่ให้ "เชื่อมต่อแล้ว" มีความหมายต่างกันในแต่ละหน้า -->
