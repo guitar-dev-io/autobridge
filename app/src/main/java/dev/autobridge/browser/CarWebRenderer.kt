@@ -2397,6 +2397,8 @@ class CarWebRenderer(context: Context) {
     private fun newSideWebView(context: Context): ScrollableWebView = ScrollableWebView(context).apply {
         BrowserDefaults.configureDebugTools()
         BrowserDefaults.configure(appContext, this)
+        // The side page must never take audio focus off the main page; see [SidePaneAudio].
+        SidePaneAudio.install(this)
         // Split only exists in HARDWARE mode, where the view is on a real display (see newWebView).
         settings.setOffscreenPreRaster(false)
         setDownloadListener(

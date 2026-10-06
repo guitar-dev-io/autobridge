@@ -23,7 +23,13 @@ enum class WebAudioState { IDLE, PLAYING, PAUSED }
 class WebAudioBridge(private val webViewProvider: () -> WebView?) {
 
     private companion object {
-        /** Records when any media element starts playing. Fixed string, takes nothing from the page. */
+        /**
+         * Records when any media element starts playing — or seeks, which is the same moment as far
+         * as audio focus goes: Chromium re-claims focus when a seeked element resumes, and that
+         * claim reaches the app's own focus listener as a loss. Without the seek events here, a
+         * seek back arrived as a "real" loss before `playing` fired and paused the page, which is
+         * what "rewind the song and it goes silent" was. Fixed string, takes nothing from the page.
+         */
         const val PLAY_TRACKING_SCRIPT = """
             (function(){
               if (window.__abPlayHook) return 0;
@@ -31,6 +37,8 @@ class WebAudioBridge(private val webViewProvider: () -> WebView?) {
               var mark = function(){ window.__abLastPlayAt = Date.now(); };
               document.addEventListener('play', mark, true);
               document.addEventListener('playing', mark, true);
+              document.addEventListener('seeking', mark, true);
+              document.addEventListener('seeked', mark, true);
               return 1;
             })();
         """
@@ -227,6 +235,11 @@ class WebAudioBridge(private val webViewProvider: () -> WebView?) {
     /**
      * Seeks the element that is playing (or, failing that, the first one with a duration). The
      * only value placed in the script is a number this app computed, so it stays a fixed shape.
+     *
+     * YouTube and YouTube Music are asked through their own player (`#movie_player.seekTo`) when
+     * it is there. Writing `currentTime` underneath their streaming player — above all backwards,
+     * into a range it has already dropped from its buffer — could leave it stalled with no sound.
+     * Whatever was playing before the seek is playing after it.
      */
     fun seekTo(positionMs: Long) {
         val seconds = positionMs.coerceAtLeast(0L) / 1000.0
@@ -237,11 +250,25 @@ class WebAudioBridge(private val webViewProvider: () -> WebView?) {
               var m = all.filter(function(x){ return !x.paused && !x.ended; })[0] ||
                       all.filter(function(x){ return isFinite(x.duration) && x.duration > 0; })[0];
               if (!m) return 0;
+              var wasPlaying = !m.paused && !m.ended;
+              // Stamped before the seek, so the focus re-claim it triggers is never taken for a
+              // real loss even if it lands before the page's own seeking event.
+              window.__abLastPlayAt = Date.now();
+              var yt = document.getElementById('movie_player');
+              if (yt && typeof yt.seekTo === 'function') {
+                yt.seekTo($seconds, true);
+                if (wasPlaying && typeof yt.playVideo === 'function') yt.playVideo();
+                return 2;
+              }
               m.currentTime = $seconds;
+              if (wasPlaying && m.paused) {
+                var p = m.play();
+                if (p && p.catch) p.catch(function(){});
+              }
               return 1;
             })();
             """.trimIndent()
-        ) { StructuredLog.i("AUDIO", "web seek ${positionMs}ms -> $it element(s)") }
+        ) { StructuredLog.i("AUDIO", "web seek ${positionMs}ms -> $it") }
     }
 
     private fun duck() {
