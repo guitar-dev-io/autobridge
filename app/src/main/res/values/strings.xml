@@ -561,7 +561,7 @@
     <string name="aa_hidden_title">Bridge Web is hidden on Android Auto</string>
     <string name="aa_hidden_message">Installing this update reset the install source, so Android Auto will not show Bridge Web until it is set again. It takes one tap with Shizuku.</string>
     <string name="aa_hidden_fix">Fix now</string>
-    <string name="whats_new_0_4_33">• Maps in the browser: if the page is allowed your location but the phone\'s location is switched off, the app now says so instead of leaving the map silently unable to find you.</string>
+    <string name="whats_new_0_4_33">• Navigating from a map in the browser: the Start and Open app buttons on the Google Maps page now start navigation in the Google Maps app (they did nothing before), and if location is switched off on the phone the app says so instead of leaving the map unable to find you.</string>
     <string name="whats_new_0_4_32">• Fuel log: choose the fuel grade for each fill-up (Gasohol 95, 91, E20, E85, Benzine 95, Diesel, Premium diesel, LPG, NGV) or type your own. The last grade is offered again, and it is in the CSV.</string>
     <string name="whats_new_0_4_31">• Trips: Settings &gt; Trips starts and ends a trip with the number of people, and shows distance and the cost per person (fuel or charging, plus tolls and parking). The car can start and end one under More &gt; Trips.\n• Backup: Settings &gt; Backup and restore saves the fuel or charging log, maintenance and trips as one file, to move to another phone.</string>
     <string name="whats_new_0_4_30">• EV support: switch the fuel log to EV (⚡) in Settings &gt; Fuel log. It then counts kWh and km/kWh, and shows the battery level from the car where the car reports it.\n• Maintenance: Settings &gt; Maintenance tracks oil, tyres, road tax and, for an EV, the coolant and 12 V battery, by distance and by date. The car shows what is due under More &gt; Maintenance.</string>
@@ -1595,4 +1595,5 @@
     <string name="fuel_type_lpg">LPG</string>
     <string name="fuel_type_ngv">NGV</string>
     <string name="geo_location_off">Location is turned off on the phone, so the map cannot find you. Turn it on in the phone\'s settings and reload the page.</string>
+    <string name="maps_app_missing">Google Maps is not installed or could not start navigation.</string>
 </resources>
