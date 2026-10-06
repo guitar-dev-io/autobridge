@@ -36,6 +36,8 @@ class AutoBridgeSession : Session(), CarScreenController.Host {
                 dev.autobridge.fuel.CarVehicleData.start(carContext)
                 // What maintenance is due, as a phone notification: the drive is about to start.
                 runCatching { dev.autobridge.maintenance.MaintenanceReminder.check(carContext) }
+                // "Time for a break" every N hours of this connection, when the driver turned it on.
+                runCatching { dev.autobridge.breakreminder.BreakReminder.start(carContext) }
                 dev.autobridge.logging.StructuredLog.i(TAG, "car session connected")
                 // The bridge learns about the connection here rather than polling for it, and
                 // this is where a Send-to-Car that arrived while nothing was plugged in gets
@@ -44,6 +46,7 @@ class AutoBridgeSession : Session(), CarScreenController.Host {
             }
 
             override fun onDestroy(owner: LifecycleOwner) {
+                dev.autobridge.breakreminder.BreakReminder.stop()
                 dev.autobridge.fuel.CarVehicleData.stop()
                 CarScreenController.unregister(this@AutoBridgeSession)
                 // A replacement session can be created before the outgoing one is destroyed, so the

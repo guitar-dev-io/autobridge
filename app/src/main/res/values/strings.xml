@@ -1652,4 +1652,13 @@
     <string name="emergency_highway_police">Highway police</string>
     <string name="emergency_fire">Fire</string>
     <string name="emergency_tourist_police">Tourist police</string>
+    <!-- Break reminder -->
+    <string name="break_reminder_title">Break reminder</string>
+    <string name="break_reminder_off">Off</string>
+    <string name="break_reminder_explain">Tells you to take a break after this many hours with the car connected. It uses no location, only the time. Takes effect the next time the car connects.</string>
+    <string name="break_reminder_message">You have been driving a while. Time for a break.</string>
+    <plurals name="break_reminder_every">
+        <item quantity="one">Every %1$d hour</item>
+        <item quantity="other">Every %1$d hours</item>
+    </plurals>
 </resources>

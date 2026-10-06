@@ -2333,6 +2333,30 @@ class MainActivity : androidx.activity.ComponentActivity() {
         )
     }
 
+    /** What the break-reminder row says: off, or how often. */
+    private fun breakReminderCaption(): String {
+        val hours = dev.autobridge.breakreminder.BreakReminder.hours(this)
+        return if (hours == 0) getString(R.string.break_reminder_off) else resources.getQuantityString(R.plurals.break_reminder_every, hours, hours)
+    }
+
+    /** Off, or every 1 to 4 hours of driving with the car connected. */
+    private fun showBreakReminderChoice() {
+        val options = dev.autobridge.breakreminder.BreakReminderOptions.HOURS
+        val labels = (listOf(getString(R.string.break_reminder_off)) +
+            options.map { resources.getQuantityString(R.plurals.break_reminder_every, it, it) }).toTypedArray()
+        val current = dev.autobridge.breakreminder.BreakReminder.hours(this)
+        android.app.AlertDialog.Builder(this)
+            .setTitle(getString(R.string.break_reminder_title))
+            .setMessage(getString(R.string.break_reminder_explain))
+            .setSingleChoiceItems(labels, if (current == 0) 0 else options.indexOf(current) + 1) { dialog, which ->
+                dev.autobridge.breakreminder.BreakReminder.setHours(this, if (which == 0) 0 else options[which - 1])
+                dialog.dismiss()
+                showPhoneScreen(PhoneScreen.SETTINGS, force = true)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
     /** The coffee button on Home: the same two ways to say thanks as the About page. */
     private fun showDonateChoices() {
         android.app.AlertDialog.Builder(this)
@@ -2718,6 +2742,12 @@ class MainActivity : androidx.activity.ComponentActivity() {
                         R.drawable.ic_tile_car,
                         accent = design.ACCENT
                     ) { startActivity(dev.autobridge.maintenance.MaintenanceActivity.intent(this@MainActivity)) })
+                    add(settingsEntry(
+                        getString(R.string.break_reminder_title),
+                        breakReminderCaption(),
+                        R.drawable.ic_tile_car,
+                        accent = design.ACCENT
+                    ) { showBreakReminderChoice() })
                     add(settingsEntry(
                         getString(R.string.emergency_title),
                         getString(R.string.emergency_settings_caption),

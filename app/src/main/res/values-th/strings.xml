@@ -1622,4 +1622,12 @@
     <string name="emergency_highway_police">ตำรวจทางหลวง</string>
     <string name="emergency_fire">ดับเพลิง</string>
     <string name="emergency_tourist_police">ตำรวจท่องเที่ยว</string>
+    <!-- Break reminder -->
+    <string name="break_reminder_title">เตือนพักระหว่างขับ</string>
+    <string name="break_reminder_off">ปิด</string>
+    <string name="break_reminder_explain">เตือนให้พักเมื่อต่อรถไว้นานตามจำนวนชั่วโมงที่เลือก ไม่ใช้ตำแหน่ง ใช้แค่เวลา มีผลตั้งแต่การต่อรถครั้งถัดไป</string>
+    <string name="break_reminder_message">ขับมานานแล้ว พักสักหน่อยดีกว่า</string>
+    <plurals name="break_reminder_every">
+        <item quantity="other">ทุก %1$d ชั่วโมง</item>
+    </plurals>
 </resources>
