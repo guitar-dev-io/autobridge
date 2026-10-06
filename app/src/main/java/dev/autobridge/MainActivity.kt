@@ -1942,10 +1942,6 @@ object MainActivityScreens {
 
 class MainActivity : androidx.activity.ComponentActivity() {
     private companion object {
-        private const val POST_UPDATE_PREFS = "autobridge_post_update"
-        private const val KEY_LAST_SEEN_VERSION = "last_seen_version"
-        private const val KEY_AA_WARNED_VERSION = "aa_warned_version_code"
-
         const val REQUEST_CAPTURE = 2001
         const val REQUEST_NOTIFICATIONS = 2002
         const val REQUEST_VOICE_SEARCH = 2003
@@ -2109,66 +2105,16 @@ class MainActivity : androidx.activity.ComponentActivity() {
         return true
     }
 
+    /** Update, What's-new and Send-log flows; see [PhoneMaintenance]. */
+    private val maintenance by lazy {
+        PhoneMaintenance(this, openUrl = ::openExternalUrl, fallbackShare = ::shareDiagnostics)
+    }
+
     override fun onResume() {
         super.onResume()
         statusHandler.removeCallbacks(refreshStatusRunnable)
         refreshStatusRunnable.run()
-        runPostUpdateChecks()
-    }
-
-    /** Once per process: the checks below are about this install, not about each return here. */
-    private var postUpdateChecked = false
-
-    /**
-     * After an update: what changed, then whether Android Auto can still see Bridge Web.
-     *
-     * Installing a new APK by most means resets the recorded installer, and Android Auto then hides
-     * the projection route until it is set back — which used to surface only as "Bridge Web is
-     * gone from the car". The warning is shown once per version, with the fix one tap away.
-     */
-    private fun runPostUpdateChecks() {
-        if (postUpdateChecked) return
-        postUpdateChecked = true
-        val prefs = getSharedPreferences(POST_UPDATE_PREFS, MODE_PRIVATE)
-        val current = BuildConfig.VERSION_NAME
-        val notes = dev.autobridge.update.WhatsNew.since(prefs.getString(KEY_LAST_SEEN_VERSION, null), current)
-        prefs.edit().putString(KEY_LAST_SEEN_VERSION, current).apply()
-        val afterNotes = { checkAndroidAutoVisibility(prefs) }
-        if (notes.isEmpty()) {
-            afterNotes()
-            return
-        }
-        val message = notes.joinToString("\n\n") { release ->
-            "v${release.versionName}\n" + getString(release.notes)
-        }
-        android.app.AlertDialog.Builder(this)
-            .setTitle(getString(R.string.whats_new_title, current))
-            .setMessage(message)
-            .setPositiveButton(android.R.string.ok, null)
-            .setOnDismissListener { afterNotes() }
-            .show()
-    }
-
-    private fun checkAndroidAutoVisibility(prefs: android.content.SharedPreferences) {
-        val setup = Intent().setClassName(this, "dev.autobridge.projection.ProjectionSetupActivity")
-        if (packageManager.resolveActivity(setup, 0) == null) return
-        val installer = runCatching {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                packageManager.getInstallSourceInfo(packageName).installingPackageName
-            } else {
-                @Suppress("DEPRECATION")
-                packageManager.getInstallerPackageName(packageName)
-            }
-        }.getOrNull()
-        if (dev.autobridge.install.InstallerSource.isTrusted(installer)) return
-        if (prefs.getInt(KEY_AA_WARNED_VERSION, -1) == BuildConfig.VERSION_CODE) return
-        prefs.edit().putInt(KEY_AA_WARNED_VERSION, BuildConfig.VERSION_CODE).apply()
-        android.app.AlertDialog.Builder(this)
-            .setTitle(getString(R.string.aa_hidden_title))
-            .setMessage(getString(R.string.aa_hidden_message))
-            .setPositiveButton(getString(R.string.aa_hidden_fix)) { _, _ -> startActivity(setup) }
-            .setNegativeButton(getString(R.string.about_update_later), null)
-            .show()
+        maintenance.runPostUpdateChecks()
     }
 
     override fun onPause() {
@@ -2785,7 +2731,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
                         getString(R.string.settings_send_log),
                         getString(R.string.settings_send_log_caption),
                         R.drawable.ic_tile_debug
-                    ) { sendLogReport() },
+                    ) { maintenance.sendLogReport() },
                     settingsEntry(
                         getString(R.string.settings_about),
                         getString(R.string.settings_about_caption),
@@ -3076,40 +3022,9 @@ class MainActivity : androidx.activity.ComponentActivity() {
             .setNegativeButton(getString(R.string.about_update_later), null)
             .setPositiveButton(getString(R.string.about_update_download)) { _, _ ->
                 val apkUrl = release.apkUrl
-                if (apkUrl == null) openExternalUrl(release.pageUrl) else downloadAndOfferInstall(apkUrl, release.pageUrl)
+                if (apkUrl == null) openExternalUrl(release.pageUrl) else maintenance.downloadAndOfferInstall(apkUrl)
             }
             .show()
-    }
-
-    /**
-     * Downloads the release APK and opens "Install with…" so the user picks the installer —
-     * KingInstaller keeps a sideloaded build visible on Android Auto. Installing is that app's job
-     * and the user's tap there; see [dev.autobridge.update.UpdateDownloader]. Falls back to the
-     * browser download it replaced when the in-app download fails.
-     */
-    private fun downloadAndOfferInstall(apkUrl: String, pageUrl: String) {
-        Toast.makeText(this, getString(R.string.about_update_downloading), Toast.LENGTH_SHORT).show()
-        Thread {
-            val result = dev.autobridge.update.UpdateDownloader.download(applicationContext, apkUrl)
-            runOnUiThread {
-                if (isFinishing || isDestroyed) return@runOnUiThread
-                when (result) {
-                    is dev.autobridge.update.UpdateDownloader.Result.Ready -> {
-                        val chooser = dev.autobridge.update.UpdateDownloader.openWithIntent(
-                            this, result.apk, getString(R.string.about_update_install_with)
-                        )
-                        val opened = runCatching { startActivity(chooser); true }.getOrDefault(false)
-                        if (!opened) openExternalUrl(apkUrl)
-                    }
-                    is dev.autobridge.update.UpdateDownloader.Result.Failed -> {
-                        Toast.makeText(
-                            this, getString(R.string.about_update_download_failed, result.reason), Toast.LENGTH_LONG
-                        ).show()
-                        openExternalUrl(apkUrl.ifBlank { pageUrl })
-                    }
-                }
-            }
-        }.start()
     }
 
     /**
@@ -3754,7 +3669,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
 
         val crashActions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         crashActions.addView(
-            actionCard("SHARE") { sendLogReport() },
+            actionCard("SHARE") { maintenance.sendLogReport() },
             LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(6) }
         )
         crashActions.addView(
@@ -4136,29 +4051,6 @@ class MainActivity : androidx.activity.ComponentActivity() {
         val latest = CrashReportStore.latestReport(this)
             ?: return "No crash recorded on this device."
         return "$count report(s) stored. Newest:\n\n$latest"
-    }
-
-    /**
-     * Settings > Send log: builds [dev.autobridge.diagnostics.LogReport] (it reads logcat, so off
-     * the main thread) and opens the share sheet with it attached. Falls back to the plain-text
-     * share below if the file cannot be built.
-     */
-    private fun sendLogReport() {
-        Toast.makeText(this, getString(R.string.send_log_preparing), Toast.LENGTH_SHORT).show()
-        Thread {
-            val file = runCatching { dev.autobridge.diagnostics.LogReport.build(applicationContext) }.getOrNull()
-            runOnUiThread {
-                if (isFinishing || isDestroyed) return@runOnUiThread
-                if (file == null) {
-                    shareDiagnostics()
-                    return@runOnUiThread
-                }
-                val chooser = dev.autobridge.diagnostics.LogReport.shareIntent(
-                    this, file, getString(R.string.send_log_via)
-                )
-                runCatching { startActivity(chooser) }.onFailure { shareDiagnostics() }
-            }
-        }.start()
     }
 
     /**
