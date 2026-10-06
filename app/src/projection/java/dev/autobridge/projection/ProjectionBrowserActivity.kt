@@ -179,6 +179,14 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
      * route, so a layout chosen on either surface is the layout on both.
      */
     private var sideView: WebView? = null
+
+    /**
+     * The phone's screen over the page, opened from the menu; null while the browser is showing.
+     * Bridge Mirror inside Bridge Web, so the mirror needs no second projection service — the one
+     * that cost Bridge Web Android Auto's split screen beside Maps. See [ProjectionMirrorPane].
+     */
+    private var mirrorPane: ProjectionMirrorPane? = null
+    private var mirrorLayer: View? = null
     private var blocked: TextView? = null
     private var fullscreenView: View? = null
     private var fullscreenCallback: WebChromeClient.CustomViewCallback? = null
@@ -1133,6 +1141,10 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
                 applyChromePinning()
             })
             addView(menuRow("⌨", "Keyboard") { dismissOverlay(); openKeyboard() })
+            addView(menuRow("▢", "Mirror phone screen", "Back to the web with ✕") {
+                dismissOverlay()
+                openMirror()
+            })
             val split = BrowserSplitStore.projection.layout(this@ProjectionBrowserActivity)
             addView(menuRow(split.glyph, getString(R.string.car_browser_split), splitDetail(split)) {
                 dismissOverlay()
@@ -1550,6 +1562,56 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         transport.webView = probe
         resultMsg.sendToTarget()
         return true
+    }
+
+    // ------------------------------------------------------------------ mirror
+
+    /**
+     * Shows the phone's screen over the whole browser, with a ✕ that comes back to the page. The
+     * page keeps running underneath (audio included), so going back to it loses nothing.
+     */
+    private fun openMirror() {
+        if (mirrorLayer != null) return
+        val parent = root ?: return
+        closeKeyboard()
+        val pane = ProjectionMirrorPane(this)
+        val close = TextView(this).apply {
+            text = "\u2715  Web"
+            contentDescription = "Back to the browser"
+            setTextColor(scheme.onFabContainer)
+            textSize = 16f
+            gravity = Gravity.CENTER
+            background = roundedRipple(scheme.fabContainer, TOUCH_TARGET / 2f)
+            setPadding(16.dp(), 0, 16.dp(), 0)
+            isClickable = true
+            setOnClickListener { closeMirror() }
+        }
+        val layer = FrameLayout(this).apply {
+            addView(pane, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+            addView(
+                close,
+                FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, TOUCH_TARGET.dp(), Gravity.TOP or Gravity.END)
+                    .apply { setMargins(FAB_MARGIN.dp(), FAB_MARGIN.dp(), FAB_MARGIN.dp(), FAB_MARGIN.dp()) }
+            )
+        }
+        parent.addView(layer, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        mirrorPane = pane
+        mirrorLayer = layer
+        fab?.visibility = View.INVISIBLE
+        pane.start()
+        StructuredLog.i("PROJECTION", "mirror opened inside Bridge Web")
+    }
+
+    private fun closeMirror() {
+        val layer = mirrorLayer ?: return
+        mirrorPane?.stop()
+        mirrorPane = null
+        mirrorLayer = null
+        root?.removeView(layer)
+        // Back to whatever the chrome state already says, as closing the keyboard does.
+        applyChromeVisible(chromeVisibility.isShown)
+        scheduleChromeTick()
+        StructuredLog.i("PROJECTION", "mirror closed; back to the browser")
     }
 
     /** Drops the side page; its URL is kept, so the next split reopens it. */
@@ -2057,6 +2119,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
 
     override fun onBackPressed() {
         // An open sheet or keyboard is the top of the stack: back dismisses it before the page.
+        if (mirrorLayer != null) return closeMirror()
         if (overlay != null) return dismissOverlay()
         if (keyboardPanel != null) return closeKeyboard()
         if (fullscreenView != null || webView?.canGoBack() == true) navigateBack()
@@ -2105,6 +2168,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         tabStates.clear()
         dismissOverlay()
         closeKeyboard()
+        closeMirror()
         // After closeKeyboard(), which re-arms the ticker on its way out.
         chromeBar?.removeCallbacks(chromeTicker)
         ParkingStateStore.removeListener(parkingListener)

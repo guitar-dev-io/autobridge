@@ -186,9 +186,9 @@ class ProjectionSetupActivity : Activity() {
 }
 
 private val MIRROR_NOTE = """
-    Off by default. While Bridge Mirror is listed, Android Auto may stop offering its split screen
-    (Bridge Web beside Maps, as with Fermata). Turn it on when you need the mirror, and off again
-    for the split. Reconnect Android Auto after changing it.
+    Off by default. The mirror is also inside Bridge Web (menu > Mirror phone screen), which keeps
+    Android Auto's split screen (Bridge Web beside Maps, as with Fermata). Listing Bridge Mirror as
+    its own icon may cost that split. Reconnect Android Auto after changing it.
 """.trimIndent()
 
 private val MANUAL_STEPS = """
