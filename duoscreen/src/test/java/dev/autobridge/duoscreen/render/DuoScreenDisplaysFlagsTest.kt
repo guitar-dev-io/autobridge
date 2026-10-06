@@ -13,6 +13,7 @@ import org.junit.Test
 class DuoScreenDisplaysFlagsTest {
     private val FLAG_OWN_CONTENT_ONLY = 1 shl 3
     private val FLAG_SUPPORTS_TOUCH = 1 shl 6
+    private val FLAG_DESTROY_CONTENT_ON_REMOVAL = 1 shl 8
     private val FLAG_TRUSTED = 1 shl 10
     private val FLAG_OWN_DISPLAY_GROUP = 1 shl 11
 
@@ -26,8 +27,13 @@ class DuoScreenDisplaysFlagsTest {
         assertTrue("own-display-group bit", DuoScreenDisplays.TRUSTED_FLAGS and FLAG_OWN_DISPLAY_GROUP != 0)
     }
 
-    @Test fun trustedFlagsAreExactlyThoseFourBitsAndNoOther() {
-        val expected = FLAG_OWN_CONTENT_ONLY or FLAG_SUPPORTS_TOUCH or FLAG_TRUSTED or FLAG_OWN_DISPLAY_GROUP
+    @Test fun paneAppsEndWithTheirDisplay() {
+        assertTrue("destroy-content bit", DuoScreenDisplays.TRUSTED_FLAGS and FLAG_DESTROY_CONTENT_ON_REMOVAL != 0)
+    }
+
+    @Test fun trustedFlagsAreExactlyThoseFiveBitsAndNoOther() {
+        val expected = FLAG_OWN_CONTENT_ONLY or FLAG_SUPPORTS_TOUCH or FLAG_DESTROY_CONTENT_ON_REMOVAL or
+            FLAG_TRUSTED or FLAG_OWN_DISPLAY_GROUP
         assertEquals(expected, DuoScreenDisplays.TRUSTED_FLAGS)
     }
 }
