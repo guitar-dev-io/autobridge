@@ -7,10 +7,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -77,6 +80,7 @@ fun HomeDashboard(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     CardActionButton(
                         stringResource(R.string.home_mirror_action),
+                        icon = R.drawable.ic_tile_mirror,
                         primary = true,
                         onClick = onMirror,
                         modifier = Modifier.weight(1f)
@@ -84,6 +88,7 @@ fun HomeDashboard(
                     if (onBridgeDuo != null) {
                         CardActionButton(
                             stringResource(R.string.home_bridge_duo_action),
+                            icon = R.drawable.ic_browser_split,
                             primary = false,
                             onClick = onBridgeDuo,
                             modifier = Modifier.weight(1f)
@@ -147,9 +152,7 @@ fun HomeDashboard(
                             .semantics { contentDescription = sendAgainDescription }
                     ) {
                         Text(
-                            // Leading glyph marks the chip as "tap to send again", not just a log
-                            // of what happened — same resend glyph used elsewhere in the app.
-                            "↻ ${recent.label}",
+                            recent.label,
                             color = ComposeTokens.Text,
                             fontSize = 13.sp,
                             maxLines = 1,
@@ -165,22 +168,27 @@ fun HomeDashboard(
 
 /** Mirror / Bridge Duo button on the Home Android Auto card. [primary] fills with the accent. */
 @Composable
-private fun CardActionButton(label: String, primary: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun CardActionButton(label: String, icon: Int, primary: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val tint = if (primary) ComposeTokens.Ink else ComposeTokens.Text
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(12.dp),
         color = if (primary) ComposeTokens.Accent else ComposeTokens.SurfaceRaised,
         modifier = modifier.height(44.dp)
     ) {
-        Box(contentAlignment = Alignment.Center) {
-            Text(
-                label,
-                color = if (primary) ComposeTokens.Ink else ComposeTokens.Text,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(painterResource(icon), contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    label,
+                    color = tint,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
     }
 }

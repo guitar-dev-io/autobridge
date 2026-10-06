@@ -267,7 +267,7 @@
     <string name="car_tap_to_retry">Tap to try again</string>
 
     <!-- Phone browser: the "More actions" sheet ([MoreActionsSheet]). -->
-    <string name="more_title">More actions</string>
+    <string name="more_title">All actions</string>
     <string name="more_get_from_car">Get from car</string>
     <string name="more_get_from_car_caption">Bring the car screen\'s URL back to the phone</string>
     <string name="more_find_in_page">Find in page</string>
@@ -292,6 +292,28 @@
     <string name="more_github_caption">The source code on GitHub</string>
     <string name="more_zoom">Zoom</string>
     <string name="more_zoom_caption">Make the page bigger or smaller</string>
+    <string name="more_section_car">Car</string>
+    <string name="more_section_navigate">Navigate</string>
+    <string name="more_section_this_page">This page</string>
+    <string name="more_section_saved">Saved &amp; open elsewhere</string>
+    <string name="more_section_autobridge">AutoBridge</string>
+    <string name="more_section_settings">Settings &amp; about</string>
+    <string name="more_back_caption">Go to the previous page</string>
+    <string name="more_forward_caption">Go forward again</string>
+    <string name="more_reload_caption">Reload this page</string>
+    <string name="more_bookmark_caption">Save this page</string>
+    <string name="more_fullscreen_caption">Hide the toolbar</string>
+    <string name="more_desktop_caption">Show the desktop version of this page</string>
+    <string name="more_bookmarks_list_caption">Pages you saved</string>
+    <string name="more_now_playing_caption">What the car is playing, and its transport controls</string>
+    <string name="more_library_caption">TV, radio, music and your files</string>
+    <string name="more_agent_caption">Commands and voice settings</string>
+    <string name="more_browser_settings">Browser settings</string>
+    <string name="more_browser_settings_caption">Start up, appearance, content blocking and privacy</string>
+    <string name="more_clear_browsing_data">Clear browsing data</string>
+    <string name="more_clear_browsing_data_caption">History, cookies and cached files</string>
+    <string name="more_exit_browser">Exit browser</string>
+    <string name="more_exit_browser_caption">Close and return to AutoBridge</string>
 
     <!-- Browser menu sheet entries ([BrowserDrawerModel]). Drawn on the car surface by
          [CarWebRenderer] and listed on the phone, so one label serves both. -->

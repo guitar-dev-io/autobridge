@@ -257,7 +257,7 @@
     <string name="car_tap_to_retry">แตะเพื่อลองใหม่</string>
 
     <!-- Phone browser: the "More actions" sheet -->
-    <string name="more_title">คำสั่งเพิ่มเติม</string>
+    <string name="more_title">การทำงานทั้งหมด</string>
     <string name="more_get_from_car">ดึงจากจอรถ</string>
     <string name="more_get_from_car_caption">ดึง URL จากจอรถมาที่โทรศัพท์</string>
     <string name="more_find_in_page">ค้นหาในหน้า</string>
@@ -282,6 +282,28 @@
     <string name="more_github_caption">ซอร์สโค้ดบน GitHub</string>
     <string name="more_zoom">การย่อขยาย</string>
     <string name="more_zoom_caption">ขยาย / ย่อหน้าเว็บ</string>
+    <string name="more_section_car">รถ</string>
+    <string name="more_section_navigate">การนำทาง</string>
+    <string name="more_section_this_page">หน้านี้</string>
+    <string name="more_section_saved">บันทึกไว้ และเปิดที่อื่น</string>
+    <string name="more_section_autobridge">AutoBridge</string>
+    <string name="more_section_settings">การตั้งค่าและเกี่ยวกับ</string>
+    <string name="more_back_caption">ย้อนกลับไปหน้าก่อนหน้า</string>
+    <string name="more_forward_caption">ไปข้างหน้าอีกครั้ง</string>
+    <string name="more_reload_caption">โหลดหน้านี้ใหม่</string>
+    <string name="more_bookmark_caption">บันทึกหน้านี้</string>
+    <string name="more_fullscreen_caption">ซ่อนแถบเครื่องมือ</string>
+    <string name="more_desktop_caption">แสดงหน้าเว็บเวอร์ชันเดสก์ท็อป</string>
+    <string name="more_bookmarks_list_caption">หน้าที่คุณบันทึกไว้</string>
+    <string name="more_now_playing_caption">สิ่งที่กำลังเล่นบนรถ และปุ่มควบคุม</string>
+    <string name="more_library_caption">ทีวี วิทยุ เพลง และไฟล์ของคุณ</string>
+    <string name="more_agent_caption">คำสั่งและการตั้งค่าเสียง</string>
+    <string name="more_browser_settings">ตั้งค่าเบราว์เซอร์</string>
+    <string name="more_browser_settings_caption">การเริ่มต้น รูปลักษณ์ การบล็อกเนื้อหา และความเป็นส่วนตัว</string>
+    <string name="more_clear_browsing_data">ล้างข้อมูลการท่องเว็บ</string>
+    <string name="more_clear_browsing_data_caption">ประวัติ คุกกี้ และไฟล์แคช</string>
+    <string name="more_exit_browser">ออกจากเบราว์เซอร์</string>
+    <string name="more_exit_browser_caption">ปิดและกลับไปที่ AutoBridge</string>
 
     <!-- Browser menu sheet entries -->
     <string name="drawer_tabs">แท็บ</string>

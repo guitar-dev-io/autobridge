@@ -102,7 +102,8 @@ object AutoBridgeDesign {
         subtitle: String? = null,
         onBack: (() -> Unit)? = null,
         chip: String? = null,
-        actions: List<HeaderAction> = emptyList()
+        actions: List<HeaderAction> = emptyList(),
+        logo: Int? = null
     ): View {
         val row = LinearLayout(context).apply {
             gravity = Gravity.CENTER_VERTICAL
@@ -114,6 +115,14 @@ object AutoBridgeDesign {
         if (onBack != null) {
             row.addView(glyphButton(context, "‹", 30f) { onBack() },
                 LinearLayout.LayoutParams(context.dp(44), context.dp(44)))
+        }
+        if (logo != null) {
+            row.addView(ImageView(context).apply {
+                setImageResource(logo)
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }, LinearLayout.LayoutParams(context.dp(40), context.dp(40)).apply {
+                marginEnd = context.dp(12)
+            })
         }
         val text = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
         text.addView(TextView(context).apply {
