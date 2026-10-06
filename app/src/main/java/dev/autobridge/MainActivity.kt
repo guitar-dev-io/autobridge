@@ -2722,6 +2722,11 @@ class MainActivity : androidx.activity.ComponentActivity() {
                         showPhoneScreen(PhoneScreen.ADVANCED)
                     },
                     settingsEntry(
+                        getString(R.string.settings_send_log),
+                        getString(R.string.settings_send_log_caption),
+                        R.drawable.ic_tile_debug
+                    ) { sendLogReport() },
+                    settingsEntry(
                         getString(R.string.settings_about),
                         getString(R.string.settings_about_caption),
                         R.drawable.ic_tile_settings
@@ -3689,7 +3694,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
 
         val crashActions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         crashActions.addView(
-            actionCard("SHARE") { shareDiagnostics() },
+            actionCard("SHARE") { sendLogReport() },
             LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(6) }
         )
         crashActions.addView(
@@ -4071,6 +4076,29 @@ class MainActivity : androidx.activity.ComponentActivity() {
         val latest = CrashReportStore.latestReport(this)
             ?: return "No crash recorded on this device."
         return "$count report(s) stored. Newest:\n\n$latest"
+    }
+
+    /**
+     * Settings > Send log: builds [dev.autobridge.diagnostics.LogReport] (it reads logcat, so off
+     * the main thread) and opens the share sheet with it attached. Falls back to the plain-text
+     * share below if the file cannot be built.
+     */
+    private fun sendLogReport() {
+        Toast.makeText(this, getString(R.string.send_log_preparing), Toast.LENGTH_SHORT).show()
+        Thread {
+            val file = runCatching { dev.autobridge.diagnostics.LogReport.build(applicationContext) }.getOrNull()
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                if (file == null) {
+                    shareDiagnostics()
+                    return@runOnUiThread
+                }
+                val chooser = dev.autobridge.diagnostics.LogReport.shareIntent(
+                    this, file, getString(R.string.send_log_via)
+                )
+                runCatching { startActivity(chooser) }.onFailure { shareDiagnostics() }
+            }
+        }.start()
     }
 
     /**

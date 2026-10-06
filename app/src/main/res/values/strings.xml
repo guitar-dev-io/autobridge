@@ -553,6 +553,10 @@
     <string name="settings_group_car_apps">Car &amp; apps</string>
     <string name="settings_projection_setup">Bridge Web on Android Auto</string>
     <string name="settings_projection_setup_caption">Show on the car, Bridge Mirror on/off</string>
+    <string name="settings_send_log">Send log</string>
+    <string name="settings_send_log_caption">Share a log file to report a problem</string>
+    <string name="send_log_preparing">Preparing the log…</string>
+    <string name="send_log_via">Send log via</string>
     <string name="settings_duo_screen">Duo screen</string>
     <string name="settings_duo_screen_caption">Panes, layout and content size</string>
     <string name="settings_app_profiles_caption_full">Quick Apps for the car, per-app display and audio</string>

@@ -537,6 +537,10 @@
     <string name="settings_group_car_apps">รถและแอป</string>
     <string name="settings_projection_setup">Bridge Web บน Android Auto</string>
     <string name="settings_projection_setup_caption">ให้แสดงในรถ และเปิด/ปิด Bridge Mirror</string>
+    <string name="settings_send_log">ส่ง log</string>
+    <string name="settings_send_log_caption">ส่งไฟล์ log เพื่อแจ้งปัญหา</string>
+    <string name="send_log_preparing">กำลังเตรียม log…</string>
+    <string name="send_log_via">ส่ง log ทาง</string>
     <string name="settings_duo_screen">Duo screen</string>
     <string name="settings_duo_screen_caption">ช่อง การจัดวาง และขนาดเนื้อหา</string>
     <string name="settings_app_profiles_caption_full">Quick Apps สำหรับรถ การแสดงผลและเสียงแยกตามแอป</string>
