@@ -12,6 +12,7 @@
     <string name="duo_screen_shizuku_ready">เชื่อมต่อ Shizuku แล้ว</string>
     <string name="duo_screen_shizuku_missing">ยังไม่ได้สิทธิ์ Shizuku</string>
     <string name="duo_screen_shizuku_hint">ใช้สำหรับเปิดแอปลงแต่ละช่องและส่งการแตะเข้าไป</string>
+    <string name="duo_screen_shizuku_grant">อนุญาต</string>
     <string name="duo_screen_cancel">ยกเลิก</string>
     <string name="duo_screen_panes_section">ช่อง</string>
     <string name="duo_screen_pane_count">จำนวนช่อง</string>
