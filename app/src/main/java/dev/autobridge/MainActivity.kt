@@ -2235,20 +2235,20 @@ class MainActivity : androidx.activity.ComponentActivity() {
             when (tile) {
                 dev.autobridge.ui.PhoneHomeLayout.Tile.BROWSER, dev.autobridge.ui.PhoneHomeLayout.Tile.YOUTUBE -> {
                     val section = layout.directSection.getValue(tile)
-                    dev.autobridge.ui.HomeTileUi(tile.title, tileIcon(section), section.accent) { openHomeSection(section) }
+                    dev.autobridge.ui.HomeTileUi(getString(tile.titleRes), tileIcon(section), section.accent) { openHomeSection(section) }
                 }
                 dev.autobridge.ui.PhoneHomeLayout.Tile.MUSIC -> dev.autobridge.ui.HomeTileUi(
-                    tile.title, R.drawable.ic_tile_youtube_music, design.ACCENT_FILES
+                    getString(tile.titleRes), R.drawable.ic_tile_youtube_music, design.ACCENT_FILES
                 ) { showPhoneScreen(PhoneScreen.HOME_MUSIC) }
                 dev.autobridge.ui.PhoneHomeLayout.Tile.TV_RADIO -> dev.autobridge.ui.HomeTileUi(
-                    tile.title, R.drawable.ic_tile_tv, design.ACCENT_TV
+                    getString(tile.titleRes), R.drawable.ic_tile_tv, design.ACCENT_TV
                 ) { showPhoneScreen(PhoneScreen.HOME_TV_RADIO) }
                 // Favorite apps: the same QuickAppsStore list the Apps tab stars.
                 dev.autobridge.ui.PhoneHomeLayout.Tile.FAVORITES -> dev.autobridge.ui.HomeTileUi(
-                    tile.title, R.drawable.ic_tile_favorite, design.ACCENT_FAVORITE
+                    getString(tile.titleRes), R.drawable.ic_tile_favorite, design.ACCENT_FAVORITE
                 ) { appsFavoritesOnly = true; showPhoneScreen(PhoneScreen.APPS) }
                 dev.autobridge.ui.PhoneHomeLayout.Tile.MORE -> dev.autobridge.ui.HomeTileUi(
-                    tile.title, R.drawable.ic_tile_apps, design.ACCENT_SYSTEM
+                    getString(tile.titleRes), R.drawable.ic_tile_apps, design.ACCENT_SYSTEM
                 ) { showPhoneScreen(PhoneScreen.HOME_MORE) }
             }
         }
@@ -2688,18 +2688,34 @@ class MainActivity : androidx.activity.ComponentActivity() {
                     ),
                     R.drawable.ic_tile_settings
                 ) {
-                    val nowOn = dev.autobridge.safety.BypassPolicyStore.toggle()
-                    Toast.makeText(
-                        this,
-                        getString(if (nowOn) R.string.bypass_toast_on else R.string.bypass_toast_off),
-                        Toast.LENGTH_SHORT
-                    ).show()
-                    // Rebuild so the row caption reflects the new state immediately.
-                    showPhoneScreen(PhoneScreen.ADVANCED, force = true)
+                    // Turning it OFF restores the stock safety gate, so it needs no confirmation.
+                    // Turning it ON lifts that gate, so it is confirmed like the other actions on
+                    // this screen that change something safety- or data-relevant.
+                    if (dev.autobridge.safety.BypassPolicyStore.enabled) {
+                        toggleBypass()
+                    } else {
+                        android.app.AlertDialog.Builder(this)
+                            .setTitle(R.string.bypass_confirm_title)
+                            .setMessage(R.string.bypass_confirm_message)
+                            .setNegativeButton(R.string.action_cancel, null)
+                            .setPositiveButton(R.string.bypass_notification_action_turn_on) { _, _ -> toggleBypass() }
+                            .show()
+                    }
                 }
             ))
         )
     )
+
+    /** Flips the safety bypass and rebuilds Advanced so the row caption reflects the new state. */
+    private fun toggleBypass() {
+        val nowOn = dev.autobridge.safety.BypassPolicyStore.toggle()
+        Toast.makeText(
+            this,
+            getString(if (nowOn) R.string.bypass_toast_on else R.string.bypass_toast_off),
+            Toast.LENGTH_SHORT
+        ).show()
+        showPhoneScreen(PhoneScreen.ADVANCED, force = true)
+    }
 
     /**
      * Settings > About, in three groups rather than one list of eight rows.
@@ -4201,7 +4217,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
     }
 
     /** What is actually carrying touches right now - Shizuku, the accessibility service, neither. */
-    private fun inputBackendLabel() = TouchRouter.activeBackendLabel()
+    private fun inputBackendLabel() = TouchRouter.activeBackendLabel(this)
     /**
      * The accessibility service is how a tap on the car display becomes a tap on this phone, and
      * Play treats that use of the API as one the user must understand before granting. So the

@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
+import dev.autobridge.R
 import dev.autobridge.core.state.AppDataManager
 import dev.autobridge.i18n.AppLocale
 import dev.autobridge.ui.AutoBridgeDesign
@@ -15,11 +16,12 @@ import java.io.File
 /**
  * Storage section of settings: clear regenerable caches, or reset the app to a first-launch state.
  *
- * The two actions are deliberately separated and treated differently. "Clear cache" only drops
- * logos and the in-memory catalog, so it runs on tap and reports what it freed. "Clear all data"
- * removes every setting, favourite, bookmark and IPTV source and cannot be undone, so it always
- * goes through a confirmation dialog first. All work is delegated to [AppDataManager]; this screen
- * only presents it and shows the result.
+ * Both actions confirm first, worded to match what they actually do: "Clear cache" only drops
+ * logos and the in-memory catalog, so its dialog says that and nothing you set up is affected.
+ * "Clear all data" removes every setting, favourite, bookmark and IPTV source and cannot be
+ * undone, so its dialog says that plainly and the confirming button carries that word rather than
+ * a bare "OK". All work is delegated to [AppDataManager]; this screen only presents it and shows
+ * the result.
  */
 class StorageSettingsActivity : Activity() {
 
@@ -45,23 +47,23 @@ class StorageSettingsActivity : Activity() {
     private fun render() {
         val body = AutoBridgeDesign.body(this)
 
-        body.stack(AutoBridgeDesign.sectionLabel(this, "Cache"), gap = 2)
+        body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.storage_section_cache)), gap = 2)
         body.stack(
             AutoBridgeDesign.contentRow(
                 context = this,
-                title = "Clear cache",
-                subtitle = "Logos and catalog data • ${formatSize(cacheBytes())}",
+                title = getString(R.string.storage_clear_cache),
+                subtitle = getString(R.string.storage_clear_cache_caption, formatSize(cacheBytes())),
                 accent = accent,
                 badgeText = "↻"
             ) { confirmClearCache() }
         )
 
-        body.stack(AutoBridgeDesign.sectionLabel(this, "Reset"), gap = 2)
+        body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.storage_section_reset)), gap = 2)
         body.stack(
             AutoBridgeDesign.contentRow(
                 context = this,
-                title = "Clear all data",
-                subtitle = "Remove every setting, favourite and source",
+                title = getString(R.string.storage_clear_all),
+                subtitle = getString(R.string.storage_clear_all_caption),
                 accent = AutoBridgeDesign.DANGER,
                 badgeText = "⚠"
             ) { confirmClearAll() }
@@ -72,8 +74,8 @@ class StorageSettingsActivity : Activity() {
                 context = this,
                 header = AutoBridgeDesign.header(
                     context = this,
-                    title = "Storage",
-                    subtitle = "Cache and app data",
+                    title = getString(R.string.storage_title),
+                    subtitle = getString(R.string.storage_subtitle),
                     onBack = { finish() }
                 ),
                 body = body
@@ -83,17 +85,24 @@ class StorageSettingsActivity : Activity() {
 
     /**
      * Cache clearing loses nothing the user chose, so the confirmation is light: it names what will
-     * happen and runs. Kept as a dialog anyway so the freed size can be reported back in the toast.
+     * happen, then runs. The dialog also lets the freed size be reported back in the toast.
      */
     private fun confirmClearCache() {
-        val result = AppDataManager.clearCache(this)
-        val message = if (result.isEmpty) {
-            "Cache was already empty"
-        } else {
-            "Cleared ${result.imageFilesDeleted + result.otherFilesDeleted} cached file(s)"
-        }
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
-        render()
+        AlertDialog.Builder(this)
+            .setTitle(R.string.storage_clear_cache_confirm_title)
+            .setMessage(R.string.storage_clear_cache_confirm_message)
+            .setNegativeButton(R.string.action_cancel, null)
+            .setPositiveButton(R.string.storage_clear_cache_action) { _, _ ->
+                val result = AppDataManager.clearCache(this)
+                val message = if (result.isEmpty) {
+                    getString(R.string.storage_cache_empty)
+                } else {
+                    getString(R.string.storage_cache_cleared, result.imageFilesDeleted + result.otherFilesDeleted)
+                }
+                Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+                render()
+            }
+            .show()
     }
 
     /**
@@ -102,17 +111,14 @@ class StorageSettingsActivity : Activity() {
      */
     private fun confirmClearAll() {
         AlertDialog.Builder(this)
-            .setTitle("Clear all data?")
-            .setMessage(
-                "This removes every setting, favourite, bookmark, IPTV source and per-app " +
-                    "profile, returning AutoBridge to a fresh install. This cannot be undone."
-            )
-            .setNegativeButton("Cancel", null)
-            .setPositiveButton("Clear everything") { _, _ ->
+            .setTitle(R.string.storage_clear_all_confirm_title)
+            .setMessage(R.string.storage_clear_all_confirm_message)
+            .setNegativeButton(R.string.action_cancel, null)
+            .setPositiveButton(R.string.storage_clear_all_action) { _, _ ->
                 val result = AppDataManager.clearAllData(this)
                 Toast.makeText(
                     this,
-                    "Cleared ${result.prefsFilesCleared} setting file(s) and all caches",
+                    getString(R.string.storage_clear_all_done, result.prefsFilesCleared),
                     Toast.LENGTH_LONG
                 ).show()
                 render()

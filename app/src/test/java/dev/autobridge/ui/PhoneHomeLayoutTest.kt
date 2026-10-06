@@ -1,5 +1,6 @@
 package dev.autobridge.ui
 
+import dev.autobridge.R
 import dev.autobridge.library.HomeSection
 import dev.autobridge.remote.CommandHistoryStore
 import dev.autobridge.remote.CommandType
@@ -11,8 +12,15 @@ class PhoneHomeLayoutTest {
 
     @Test fun quickLaunchIsTheSixTilesFromTheMock() {
         assertEquals(
-            listOf("Browser", "YouTube", "Music", "TV / Radio", "Favorites", "More"),
-            PhoneHomeLayout.Tile.entries.map { it.title }
+            listOf(
+                R.string.home_tile_browser,
+                R.string.home_tile_youtube,
+                R.string.home_tile_music,
+                R.string.home_tile_tv_radio,
+                R.string.home_tile_favorites,
+                R.string.home_tile_more
+            ),
+            PhoneHomeLayout.Tile.entries.map { it.titleRes }
         )
     }
 

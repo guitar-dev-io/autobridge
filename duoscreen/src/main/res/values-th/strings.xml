@@ -7,9 +7,12 @@
     <string name="duo_screen_needs_shizuku">ให้สิทธิ์ Shizuku บนมือถือก่อน</string>
     <string name="duo_screen_title">Duo screen</string>
     <string name="duo_screen_subtitle">รัน 2–3 แอปพร้อมกันบนจอรถ</string>
+    <string name="duo_screen_connection_section">การเชื่อมต่อ</string>
+    <string name="duo_screen_android_auto_hint">ต้องเชื่อมต่อ Android Auto เพื่อแสดง Duo screen บนจอรถ</string>
     <string name="duo_screen_shizuku_ready">เชื่อมต่อ Shizuku แล้ว</string>
     <string name="duo_screen_shizuku_missing">ยังไม่ได้สิทธิ์ Shizuku</string>
     <string name="duo_screen_shizuku_hint">ใช้สำหรับเปิดแอปลงแต่ละช่องและส่งการแตะเข้าไป</string>
+    <string name="duo_screen_cancel">ยกเลิก</string>
     <string name="duo_screen_panes_section">ช่อง</string>
     <string name="duo_screen_pane_count">จำนวนช่อง</string>
     <string name="duo_screen_pane_label">ช่องที่ %1$d</string>
@@ -35,6 +38,8 @@
     <string name="duo_screen_session_section">เซสชัน</string>
     <string name="duo_screen_end_session">ถอด duo screen ออกเดี๋ยวนี้</string>
     <string name="duo_screen_end_session_hint">ปิดทุกช่องและแอปที่กำลังรันอยู่ในช่องนั้น</string>
+    <string name="duo_screen_end_session_confirm_title">ถอด duo screen ตอนนี้เลยไหม?</string>
+    <string name="duo_screen_end_session_confirm_action">ถอดตอนนี้</string>
     <string name="duo_screen_end_done">ถอด duo screen แล้ว</string>
     <string name="duo_screen_end_none">ยังไม่มีเซสชันที่รันอยู่</string>
 

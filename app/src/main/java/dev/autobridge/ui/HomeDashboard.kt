@@ -22,14 +22,19 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.autobridge.R
 import dev.autobridge.remote.AutoBridgeCommand
 import dev.autobridge.remote.AutoBridgeCommandBus
 import dev.autobridge.remote.CommandHistoryStore
@@ -55,17 +60,20 @@ fun HomeDashboard(
 ) {
     val history by CommandHistoryStore.entries.collectAsState()
     val lastResult = rememberLastCommandResult()
+    var lastSubmittedText by remember { mutableStateOf("") }
     val recents = PhoneHomeLayout.recentSends(history)
 
     Column(
         Modifier.fillMaxWidth().background(ComposeTokens.Ink).padding(bottom = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        AndroidAutoStatusCard(title = "Android Auto", onClick = onOpenConnection)
+        AndroidAutoStatusCard(title = stringResource(R.string.control_android_auto), onClick = onOpenConnection)
 
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            SectionLabel("Quick Launch", Modifier.weight(1f))
-            TextButton(onClick = onEditQuickLaunch) { Text("Edit", color = ComposeTokens.Accent, fontSize = 13.sp) }
+            SectionLabel(stringResource(R.string.home_quick_launch), Modifier.weight(1f))
+            TextButton(onClick = onEditQuickLaunch) {
+                Text(stringResource(R.string.home_quick_launch_edit), color = ComposeTokens.Accent, fontSize = 13.sp)
+            }
         }
         tiles.chunked(3).forEach { row ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -75,24 +83,34 @@ fun HomeDashboard(
         }
 
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            SectionLabel("Send to Car", Modifier.weight(1f))
+            SectionLabel(stringResource(R.string.home_send_to_car), Modifier.weight(1f))
             // The full controller: queue, recents, favorites and the transport bar. The field
             // below stays because one-shot sending is the common case and should not need a
             // navigation step; this is the way in when the driver wants to manage what is queued.
             TextButton(onClick = onOpenController) {
-                Text("Open controller", color = ComposeTokens.Accent, fontSize = 13.sp)
+                Text(stringResource(R.string.home_open_controller), color = ComposeTokens.Accent, fontSize = 13.sp)
             }
         }
-        CommandField(placeholder = "Search or paste URL, or type text…")
-        lastResult.value?.let { ResultBanner(it) }
+        CommandField(
+            placeholder = stringResource(R.string.home_send_placeholder),
+            onSubmitted = { lastSubmittedText = it }
+        )
+        lastResult.value?.let {
+            ResultBanner(
+                it,
+                onRetry = { submitCommand(lastSubmittedText) },
+                onOpenConnection = onOpenConnection
+            )
+        }
 
         if (recents.isNotEmpty()) {
-            SectionLabel("Recent")
+            SectionLabel(stringResource(R.string.home_recent))
             Row(
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 recents.forEach { recent ->
+                    val sendAgainDescription = stringResource(R.string.home_recent_send_again, recent.label)
                     Surface(
                         onClick = {
                             AutoBridgeCommandBus.send(
@@ -102,10 +120,12 @@ fun HomeDashboard(
                         shape = RoundedCornerShape(18.dp),
                         color = ComposeTokens.Surface,
                         modifier = Modifier.border(1.dp, ComposeTokens.Hairline, RoundedCornerShape(18.dp))
-                            .semantics { contentDescription = "Send ${recent.label} again" }
+                            .semantics { contentDescription = sendAgainDescription }
                     ) {
                         Text(
-                            recent.label,
+                            // Leading glyph marks the chip as "tap to send again", not just a log
+                            // of what happened — same resend glyph used elsewhere in the app.
+                            "↻ ${recent.label}",
                             color = ComposeTokens.Text,
                             fontSize = 13.sp,
                             maxLines = 1,

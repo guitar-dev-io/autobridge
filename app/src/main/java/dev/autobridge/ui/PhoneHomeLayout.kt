@@ -1,5 +1,7 @@
 package dev.autobridge.ui
 
+import androidx.annotation.StringRes
+import dev.autobridge.R
 import dev.autobridge.library.HomeSection
 import dev.autobridge.remote.CommandHistoryStore
 import dev.autobridge.remote.CommandType
@@ -13,14 +15,15 @@ import dev.autobridge.remote.CommandType
  */
 object PhoneHomeLayout {
 
-    /** The six Quick Launch tiles, in order. */
-    enum class Tile(val title: String) {
-        BROWSER("Browser"),
-        YOUTUBE("YouTube"),
-        MUSIC("Music"),
-        TV_RADIO("TV / Radio"),
-        FAVORITES("Favorites"),
-        MORE("More")
+    /** The six Quick Launch tiles, in order. Titles are string resources so Home follows the
+     *  selected app language, same as every other tile/label on the page. */
+    enum class Tile(@StringRes val titleRes: Int) {
+        BROWSER(R.string.home_tile_browser),
+        YOUTUBE(R.string.home_tile_youtube),
+        MUSIC(R.string.home_tile_music),
+        TV_RADIO(R.string.home_tile_tv_radio),
+        FAVORITES(R.string.home_tile_favorites),
+        MORE(R.string.home_tile_more)
     }
 
     /** Tiles that open a single section directly. */

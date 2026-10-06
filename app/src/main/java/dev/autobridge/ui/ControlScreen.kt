@@ -51,6 +51,7 @@ import dev.autobridge.remote.AutoBridgeCommand
 import dev.autobridge.remote.AutoBridgeCommandBus
 import dev.autobridge.remote.AutoBridgeState
 import dev.autobridge.remote.AutoBridgeStateRepository
+import dev.autobridge.remote.CommandFailureReason
 import dev.autobridge.remote.CommandHistoryStore
 import dev.autobridge.remote.CommandParser
 import dev.autobridge.remote.CommandResult
@@ -95,6 +96,7 @@ fun ControlScreen(
     val quickCommands by QuickCommandStore.items.collectAsState()
     val settings by RemoteSettingsStore.settings.collectAsState()
     var sendText by remember { mutableStateOf("") }
+    var lastSubmittedText by remember { mutableStateOf("") }
     val lastResult = rememberLastCommandResult()
 
     Column(Modifier.fillMaxSize().background(ComposeTokens.Ink)) {
@@ -136,8 +138,17 @@ fun ControlScreen(
             }
 
             SectionLabel(stringResource(R.string.control_section_command_or_url))
-            CommandField(placeholder = stringResource(R.string.control_command_placeholder))
-            lastResult.value?.let { ResultBanner(it) }
+            CommandField(
+                placeholder = stringResource(R.string.control_command_placeholder),
+                onSubmitted = { lastSubmittedText = it }
+            )
+            lastResult.value?.let {
+                ResultBanner(
+                    it,
+                    onRetry = { submitCommand(lastSubmittedText) },
+                    onOpenConnection = onOpenConnection
+                )
+            }
 
             SectionLabel(stringResource(R.string.control_section_quick_actions))
             // Same persisted, user-customisable quick commands as before, all routed through the bus.
@@ -339,7 +350,15 @@ fun AgentCommandsScreen(
 @Composable
 fun AndroidAutoStatusCard(title: String, caption: String? = null, onClick: (() -> Unit)?) {
     val runtime by RuntimeContextStore.context.collectAsState()
-    val status = ConnectionStatusText.of(runtime)
+    val connectedTemplate = stringResource(R.string.conn_connected_format)
+    val labels = ConnectionStatusText.Labels(
+        notConnected = stringResource(R.string.conn_not_connected),
+        parked = stringResource(R.string.conn_parked),
+        driving = stringResource(R.string.conn_driving),
+        checking = stringResource(R.string.conn_checking),
+        connectedFormat = { String.format(connectedTemplate, it) }
+    )
+    val status = ConnectionStatusText.of(runtime, labels)
     val body: @Composable () -> Unit = {
         Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
@@ -438,8 +457,19 @@ fun rememberLastCommandResult(): androidx.compose.runtime.MutableState<CommandRe
     return last
 }
 
+/**
+ * Success/failure feedback for a sent command. [result] already carries a cause-specific message
+ * from [dev.autobridge.remote.AutoBridgeCommandRouter] (e.g. "Android Auto is not connected" vs.
+ * "That URL is not valid"), so this never relabels a non-connection failure as a connection
+ * problem. [onRetry] resends the same input when available; [onOpenConnection] is only offered
+ * when the failure reason is actually [CommandFailureReason.NOT_CONNECTED].
+ */
 @Composable
-fun ResultBanner(result: CommandResult) {
+fun ResultBanner(
+    result: CommandResult,
+    onRetry: (() -> Unit)? = null,
+    onOpenConnection: (() -> Unit)? = null
+) {
     val ok = result.status == CommandStatus.SUCCESS
     Surface(color = CardAltColor, shape = RoundedCornerShape(12.dp)) {
         Column(Modifier.fillMaxWidth().padding(12.dp)) {
@@ -449,6 +479,20 @@ fun ResultBanner(result: CommandResult) {
                 fontWeight = FontWeight.SemiBold
             )
             Text(result.message, color = TextMuted, fontSize = 13.sp)
+            if (!ok && (onRetry != null || (onOpenConnection != null && result.reason == CommandFailureReason.NOT_CONNECTED))) {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (onRetry != null) {
+                        TextButton(onClick = onRetry) {
+                            Text(stringResource(R.string.control_retry), color = Accent, fontSize = 13.sp)
+                        }
+                    }
+                    if (onOpenConnection != null && result.reason == CommandFailureReason.NOT_CONNECTED) {
+                        TextButton(onClick = onOpenConnection) {
+                            Text(stringResource(R.string.control_how_to_connect), color = Accent, fontSize = 13.sp)
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -500,20 +544,44 @@ private fun RoundGlyph(glyph: String, description: String, size: Int, onClick: (
 @Composable
 private fun CurrentScreenCard(state: AutoBridgeState) {
     Card {
-        Text(state.currentStatusLabel(), color = Accent, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+        Text(currentStatusLabel(state), color = Accent, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
         val detail = when (state.currentScreen) {
             RemoteScreen.BROWSER -> state.currentUrl ?: state.browserTitle ?: "—"
-            RemoteScreen.MIRROR -> state.mirrorStatus.name.lowercase().replaceFirstChar { it.uppercase() }
+            RemoteScreen.MIRROR -> stringResource(
+                when (state.mirrorStatus) {
+                    MirrorStatus.INACTIVE -> R.string.mirror_status_inactive
+                    MirrorStatus.READY -> R.string.mirror_status_ready
+                    MirrorStatus.ACTIVE -> R.string.mirror_status_active
+                }
+            )
             RemoteScreen.MEDIA -> buildString {
                 append(state.mediaTitle ?: "—")
-                append(if (state.mediaPlaying) " · Playing" else " · Paused")
+                append(" · ")
+                append(stringResource(if (state.mediaPlaying) R.string.media_status_playing else R.string.media_status_paused))
             }
-            RemoteScreen.AGENT -> if (state.agentReady) "Ready" else "Busy"
+            RemoteScreen.AGENT -> stringResource(if (state.agentReady) R.string.agent_status_ready else R.string.agent_status_busy)
             // The title already says "Not connected"; the detail says what to do about it.
-            else -> if (state.androidAutoConnected) "Idle" else "Open AutoBridge on the car screen"
+            else -> if (state.androidAutoConnected) stringResource(R.string.screen_detail_idle)
+            else stringResource(R.string.screen_detail_open_on_car)
         }
         Text(detail, color = TextMuted, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
+}
+
+/**
+ * Short, localized status line for the Control tab's "Current Screen" card, e.g.
+ * "Browser" or "Connected".
+ */
+@Composable
+private fun currentStatusLabel(state: AutoBridgeState): String = when (state.currentScreen) {
+    RemoteScreen.BROWSER -> stringResource(R.string.screen_label_browser)
+    RemoteScreen.MIRROR -> stringResource(R.string.screen_label_mirror)
+    RemoteScreen.MEDIA -> stringResource(R.string.screen_label_media)
+    RemoteScreen.AGENT -> stringResource(R.string.screen_label_agent)
+    RemoteScreen.HOME -> stringResource(R.string.screen_label_home)
+    RemoteScreen.SETTINGS -> stringResource(R.string.screen_label_settings)
+    RemoteScreen.NONE -> if (state.androidAutoConnected) stringResource(R.string.conn_connected_plain)
+    else stringResource(R.string.conn_not_connected)
 }
 
 @Composable

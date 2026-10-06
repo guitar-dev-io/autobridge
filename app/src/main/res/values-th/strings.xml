@@ -24,6 +24,8 @@
     <string name="bypass_setting_summary_off">ปิด — ใช้การเช็กจอดรถ/โหมดตามปกติ</string>
     <string name="bypass_toast_on">เปิดการปลดล็อกข้อจำกัดแล้ว</string>
     <string name="bypass_toast_off">ปิดการปลดล็อกข้อจำกัดแล้ว</string>
+    <string name="bypass_confirm_title">เปิดปลดล็อกข้อจำกัดความปลอดภัยเลยไหม?</string>
+    <string name="bypass_confirm_message">การเปิดนี้จะข้ามการล็อก "ต้องจอดรถ/โหมดที่อนุญาต" ทำให้ฟีเจอร์ใช้งานได้แม้รถไม่ได้จอดอยู่ เปิดเฉพาะเมื่อเข้าใจความเสี่ยงแล้วเท่านั้น</string>
 
     <!-- Agent spoken + toast confirmations -->
     <string name="agent_toast_opening_browser">กำลังเปิดเบราว์เซอร์</string>
@@ -93,6 +95,34 @@
     <string name="control_auto_submit_hint">กด Enter อัตโนมัติหลังส่ง</string>
     <string name="control_result_sent">ส่งคำสั่งแล้ว</string>
     <string name="control_result_failed">ส่งคำสั่งไม่สำเร็จ</string>
+    <string name="control_retry">ลองอีกครั้ง</string>
+    <string name="control_how_to_connect">วิธีเชื่อมต่อ</string>
+
+    <!-- สถานะการเชื่อมต่อ Android Auto — ใช้คำเดียวกันทุกหน้า (Home, Control, Car & Connection,
+         Duo screen) เพื่อไม่ให้ "เชื่อมต่อแล้ว" มีความหมายต่างกันในแต่ละหน้า -->
+    <string name="conn_not_connected">ยังไม่ได้เชื่อมต่อ</string>
+    <string name="conn_parked">จอดอยู่</string>
+    <string name="conn_driving">กำลังขับ</string>
+    <string name="conn_checking">กำลังตรวจสอบสถานะรถ</string>
+    <string name="conn_connected_format">เชื่อมต่อแล้ว · %1$s</string>
+    <string name="conn_connected_plain">เชื่อมต่อแล้ว</string>
+
+    <!-- การ์ด "หน้าจอปัจจุบัน" ในแท็บ Control -->
+    <string name="screen_label_browser">เบราว์เซอร์</string>
+    <string name="screen_label_mirror">มิเรอร์</string>
+    <string name="screen_label_media">มีเดีย</string>
+    <string name="screen_label_agent">Agent</string>
+    <string name="screen_label_home">หน้าแรก</string>
+    <string name="screen_label_settings">การตั้งค่า</string>
+    <string name="screen_detail_idle">ว่าง</string>
+    <string name="screen_detail_open_on_car">เปิด AutoBridge บนหน้าจอรถ</string>
+    <string name="mirror_status_inactive">ปิดอยู่</string>
+    <string name="mirror_status_ready">พร้อมใช้งาน</string>
+    <string name="mirror_status_active">กำลังทำงาน</string>
+    <string name="media_status_playing">กำลังเล่น</string>
+    <string name="media_status_paused">หยุดชั่วคราว</string>
+    <string name="agent_status_ready">พร้อม</string>
+    <string name="agent_status_busy">กำลังทำงาน</string>
 
     <!-- Command history screen -->
     <string name="history_title">ประวัติ</string>
@@ -464,6 +494,25 @@
     <string name="advanced_debug_caption">สถานะภายในของระบบ</string>
     <string name="advanced_storage">ที่เก็บข้อมูล</string>
     <string name="advanced_storage_caption">ล้างแคชหรือรีเซ็ตข้อมูลแอป</string>
+
+    <!-- หน้าตั้งค่าพื้นที่จัดเก็บ -->
+    <string name="storage_title">พื้นที่จัดเก็บ</string>
+    <string name="storage_subtitle">แคชและข้อมูลแอป</string>
+    <string name="storage_section_cache">แคช</string>
+    <string name="storage_clear_cache">ล้างแคช</string>
+    <string name="storage_clear_cache_caption">โลโก้และข้อมูลแคตตาล็อก • %1$s</string>
+    <string name="storage_clear_cache_confirm_title">ล้างแคชเลยไหม?</string>
+    <string name="storage_clear_cache_confirm_message">ลบโลโก้และข้อมูลแคตตาล็อกที่เก็บไว้ AutoBridge จะโหลดใหม่เมื่อต้องใช้ ไม่กระทบการตั้งค่า รายการที่ชอบ หรือแหล่งข้อมูลของคุณ</string>
+    <string name="storage_clear_cache_action">ล้างแคช</string>
+    <string name="storage_cache_empty">แคชว่างอยู่แล้ว</string>
+    <string name="storage_cache_cleared">ล้างไฟล์แคชแล้ว %1$d ไฟล์</string>
+    <string name="storage_section_reset">รีเซ็ต</string>
+    <string name="storage_clear_all">ล้างข้อมูลแอปทั้งหมด</string>
+    <string name="storage_clear_all_caption">ลบการตั้งค่า รายการที่ชอบ และแหล่งข้อมูลทั้งหมด</string>
+    <string name="storage_clear_all_confirm_title">ล้างข้อมูลแอปทั้งหมดเลยไหม?</string>
+    <string name="storage_clear_all_confirm_message">การทำนี้จะลบการตั้งค่า รายการที่ชอบ บุ๊กมาร์ก แหล่ง IPTV และโปรไฟล์ของแต่ละแอปทั้งหมด ทำให้ AutoBridge กลับไปเป็นเหมือนติดตั้งใหม่ และไม่สามารถย้อนกลับได้</string>
+    <string name="storage_clear_all_action">ล้างทั้งหมด</string>
+    <string name="storage_clear_all_done">ล้างไฟล์ตั้งค่าแล้ว %1$d ไฟล์ และล้างแคชทั้งหมด</string>
     <string name="advanced_debug_subtitle">สถานะภายใน</string>
     <string name="about_support">สนับสนุน AutoBridge</string>
     <string name="about_group_support">สนับสนุน</string>
@@ -499,6 +548,26 @@
     <string name="about_update_later">ไว้ก่อน</string>
     <string name="about_no_browser">ไม่พบเบราว์เซอร์ในเครื่อง</string>
     <string name="home_tagline">รถคุณ ฉลาดขึ้น</string>
+    <string name="home_quick_launch">เปิดด่วน</string>
+    <string name="home_quick_launch_edit">แก้ไข</string>
+    <string name="home_send_to_car">ส่งไปที่รถ</string>
+    <string name="home_open_controller">เปิดตัวควบคุม</string>
+    <string name="home_send_placeholder">ค้นหาหรือวาง URL หรือพิมพ์ข้อความ…</string>
+    <string name="home_recent">ล่าสุด</string>
+    <string name="home_recent_send_again">ส่ง %1$s อีกครั้ง</string>
+    <string name="home_tile_browser">เบราว์เซอร์</string>
+    <string name="home_tile_youtube">YouTube</string>
+    <string name="home_tile_music">เพลง</string>
+    <string name="home_tile_tv_radio">ทีวี / วิทยุ</string>
+    <string name="home_tile_favorites">รายการที่ชอบ</string>
+    <string name="home_tile_more">เพิ่มเติม</string>
+
+    <!-- หน้า Car & Connection -->
+    <string name="car_connection_title">รถและการเชื่อมต่อ</string>
+    <string name="car_connection_subtitle">Android Auto, Bluetooth และการเริ่มต้นใช้งาน</string>
+    <string name="car_connection_current_vehicle">รถคันปัจจุบัน</string>
+    <string name="car_connection_my_car">รถของฉัน</string>
+    <string name="car_connection_settings_section">การตั้งค่า</string>
     <string name="voice_no_recognizer">ไม่พบระบบแปลงเสียงเป็นข้อความบนโทรศัพท์นี้</string>
 
     <!-- Settings > Input & Touch -->
@@ -509,6 +578,8 @@
     <string name="input_open">เปิด</string>
     <string name="input_backend">ระบบรับการสัมผัส</string>
     <string name="input_backend_caption">ใช้บริการช่วยการเข้าถึงเป็นหลัก Shizuku เป็นตัวเลือกเสริม</string>
+    <string name="input_backend_accessibility">บริการช่วยการเข้าถึง</string>
+    <string name="input_backend_unavailable">ใช้งานไม่ได้</string>
     <string name="input_real_touch">ส่งการสัมผัสจริง</string>
     <string name="input_real_touch_caption">ต้องมีสิทธิ์ระดับสูง และ Android Auto ต้องส่งข้อมูลตำแหน่งนิ้วดิบมาให้</string>
     <string name="input_real_touch_unavailable">ส่งการสัมผัสจริงต้องเชื่อม Shizuku ก่อน อนุญาตแล้วค่อยกลับเข้าหน้านี้อีกครั้ง</string>

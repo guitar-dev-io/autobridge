@@ -5,6 +5,7 @@ import android.graphics.Point
 import android.hardware.display.DisplayManager
 import android.view.Display
 import android.view.WindowManager
+import dev.autobridge.R
 import dev.autobridge.core.model.Feature
 import dev.autobridge.core.policy.FeaturePolicy
 import dev.autobridge.mirror.MirrorCoordinator
@@ -39,10 +40,11 @@ object TouchRouter {
         return backends.flatMapTo(linkedSetOf()) { it.capabilities }
     }
 
-    fun activeBackendLabel(): String = when {
+    /** "Shizuku" is a product name and stays as-is in every language; the other two are localized. */
+    fun activeBackendLabel(context: Context): String = when {
         ShizukuInputBackend.isAvailable -> "Shizuku"
-        AccessibilityInputBackend.isAvailable -> "Accessibility"
-        else -> "Unavailable"
+        AccessibilityInputBackend.isAvailable -> context.getString(R.string.input_backend_accessibility)
+        else -> context.getString(R.string.input_backend_unavailable)
     }
 
     /** Describes both the privileged sink and the Android Auto source limitation. */

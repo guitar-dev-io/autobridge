@@ -18,6 +18,8 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import dev.autobridge.R as AppR
+import dev.autobridge.core.state.RuntimeContextStore
 import dev.autobridge.duoscreen.DuoScreenHost
 import dev.autobridge.duoscreen.R
 import dev.autobridge.duoscreen.layout.DuoScreenPreset
@@ -27,6 +29,7 @@ import dev.autobridge.i18n.AppLocale
 import dev.autobridge.input.ShizukuInputBackend
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.stack
+import dev.autobridge.ui.ConnectionStatusText
 
 /**
  * Phone-side setup for Duo Screen: which app each pane runs, how many panes there are, and whether
@@ -60,7 +63,34 @@ class DuoScreenSettingsActivity : Activity() {
         val body = AutoBridgeDesign.body(this)
         val shizukuReady = ShizukuInputBackend.isPermissionGranted
 
-        body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.duo_screen_title)), gap = 2)
+        // Android Auto and Shizuku are two unrelated connections — the car display one and the
+        // privileged-touch one — so they get their own section and their own rows rather than
+        // being folded into one "connected" line. Android Auto's wording comes from the same
+        // ConnectionStatusText Home, Control and Car & Connection use, so "connected" never means
+        // something different here than it does there.
+        body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.duo_screen_connection_section)), gap = 2)
+        val runtimeStatus = ConnectionStatusText.of(
+            RuntimeContextStore.context.value,
+            ConnectionStatusText.Labels(
+                notConnected = getString(AppR.string.conn_not_connected),
+                parked = getString(AppR.string.conn_parked),
+                driving = getString(AppR.string.conn_driving),
+                checking = getString(AppR.string.conn_checking),
+                connectedFormat = { getString(AppR.string.conn_connected_format, it) }
+            )
+        )
+        body.stack(
+            AutoBridgeDesign.contentRow(
+                context = this,
+                title = getString(AppR.string.control_android_auto),
+                subtitle = "${runtimeStatus.summary} — ${getString(R.string.duo_screen_android_auto_hint)}",
+                // Same green-when-connected language as the AndroidAutoStatusCard on Home,
+                // Control and Car & Connection (AutoBridgeDesign.ACCENT_FILES == ComposeTokens.Ok),
+                // not this screen's own accent — so "connected" reads the same color everywhere.
+                accent = if (runtimeStatus.connected) AutoBridgeDesign.ACCENT_FILES else AutoBridgeDesign.TEXT_MUTED,
+                badgeText = if (runtimeStatus.connected) "✓" else "○"
+            ) {}
+        )
         body.stack(
             AutoBridgeDesign.contentRow(
                 context = this,
@@ -70,7 +100,8 @@ class DuoScreenSettingsActivity : Activity() {
                 ),
                 subtitle = getString(R.string.duo_screen_shizuku_hint),
                 accent = if (shizukuReady) accent else AutoBridgeDesign.DANGER,
-                badgeText = if (shizukuReady) "✓" else "!"
+                badgeText = if (shizukuReady) "✓" else "!",
+                trailing = "›"
             ) {
                 if (!shizukuReady) ShizukuInputBackend.requestPermission()
                 render()
@@ -85,20 +116,28 @@ class DuoScreenSettingsActivity : Activity() {
                 title = getString(R.string.duo_screen_pane_count),
                 subtitle = paneCount.toString(),
                 accent = accent,
-                badgeText = paneCount.toString()
+                badgeText = paneCount.toString(),
+                trailing = "›"
             ) { cyclePaneCount(paneCount) }
         )
 
         val packages = DuoScreenStore.packages(this)
         repeat(paneCount) { index ->
             val chosen = packages.getOrNull(index)
+            val paneNumber = index + 1
+            // Lint's StringFormatMatches misreads this exact call as passing a String (it does
+            // not: paneNumber is Int, matched by the %1$d in both locales) — a known false
+            // positive with this lambda shape, not a real type mismatch.
+            @Suppress("StringFormatMatches")
+            val paneTitle = getString(R.string.duo_screen_pane_label, paneNumber)
             body.stack(
                 AutoBridgeDesign.contentRow(
                     context = this,
-                    title = getString(R.string.duo_screen_pane_label, index + 1),
+                    title = paneTitle,
                     subtitle = chosen?.let(::paneLabel) ?: getString(R.string.duo_screen_pane_empty),
                     accent = accent,
-                    badgeText = "${index + 1}"
+                    badgeText = "$paneNumber",
+                    trailing = "›"
                 ) { pickAppFor(index) }
             )
         }
@@ -111,7 +150,8 @@ class DuoScreenSettingsActivity : Activity() {
                 title = getString(R.string.duo_screen_preset),
                 subtitle = preset.label(this),
                 accent = accent,
-                badgeText = preset.glyph
+                badgeText = preset.glyph,
+                trailing = "›"
             ) { pickPreset() }
         )
         val scale = DuoScreenStore.contentScale(this)
@@ -121,7 +161,8 @@ class DuoScreenSettingsActivity : Activity() {
                 title = getString(R.string.duo_screen_content_scale),
                 subtitle = getString(R.string.duo_screen_content_scale_hint),
                 accent = accent,
-                badgeText = getString(R.string.duo_screen_content_scale_value, scale)
+                badgeText = getString(R.string.duo_screen_content_scale_value, scale),
+                trailing = "›"
             ) { pickContentScale() }
         )
         body.stack(
@@ -144,7 +185,8 @@ class DuoScreenSettingsActivity : Activity() {
         // The phone-side way out, for the same reason the car screen has one: a session outlives the
         // car Screen that showed it (DuoScreenHost.KEEP_ALIVE_MS), so the panes and the apps in them
         // can still be holding their displays after the driver has moved on. The car button needs
-        // the driver to be looking at Duo Screen; this one does not.
+        // the driver to be looking at Duo Screen; this one does not. Confirmed first, same as any
+        // other action on this screen that shuts something down, naming exactly what closes.
         body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.duo_screen_session_section)), gap = 2)
         body.stack(
             AutoBridgeDesign.contentRow(
@@ -153,15 +195,7 @@ class DuoScreenSettingsActivity : Activity() {
                 subtitle = getString(R.string.duo_screen_end_session_hint),
                 accent = AutoBridgeDesign.DANGER,
                 badgeText = "✕"
-            ) {
-                val ended = DuoScreenHost.release()
-                Toast.makeText(
-                    this,
-                    if (ended) R.string.duo_screen_end_done else R.string.duo_screen_end_none,
-                    Toast.LENGTH_SHORT
-                ).show()
-                render()
-            }
+            ) { confirmEndSession() }
         )
 
         setContentView(
@@ -176,6 +210,27 @@ class DuoScreenSettingsActivity : Activity() {
                 body = body
             )
         )
+    }
+
+    /**
+     * Confirms before tearing the session down: the hint text already says what closes (every
+     * pane and the apps running in them), so the dialog reuses it rather than writing it twice.
+     */
+    private fun confirmEndSession() {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.duo_screen_end_session_confirm_title)
+            .setMessage(R.string.duo_screen_end_session_hint)
+            .setNegativeButton(R.string.duo_screen_cancel, null)
+            .setPositiveButton(R.string.duo_screen_end_session_confirm_action) { _, _ ->
+                val ended = DuoScreenHost.release()
+                Toast.makeText(
+                    this,
+                    if (ended) R.string.duo_screen_end_done else R.string.duo_screen_end_none,
+                    Toast.LENGTH_SHORT
+                ).show()
+                render()
+            }
+            .show()
     }
 
     private fun cyclePaneCount(current: Int) {

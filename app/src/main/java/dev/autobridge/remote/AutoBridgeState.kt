@@ -33,15 +33,4 @@ data class AutoBridgeState(
 
     // Connection
     val androidAutoConnected: Boolean = false
-) {
-    /** Short human-readable status line, e.g. "Browser · google.com" or "Media · Playing". */
-    fun currentStatusLabel(): String = when (currentScreen) {
-        RemoteScreen.BROWSER -> "Browser"
-        RemoteScreen.MIRROR -> "Mirror"
-        RemoteScreen.MEDIA -> "Media"
-        RemoteScreen.AGENT -> "Agent"
-        RemoteScreen.HOME -> "Home"
-        RemoteScreen.SETTINGS -> "Settings"
-        RemoteScreen.NONE -> if (androidAutoConnected) "Connected" else "Not connected"
-    }
-}
+)

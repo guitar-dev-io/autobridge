@@ -20,9 +20,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.autobridge.R
 import dev.autobridge.core.state.RuntimeContextStore
 
 /** One tappable settings row: accent icon badge, title, caption and a chevron. */
@@ -45,19 +47,23 @@ data class SettingsLink(
 fun CarConnectionScreen(onBack: () -> Unit, links: List<SettingsLink>) {
     val runtime by RuntimeContextStore.context.collectAsState()
     Column(Modifier.fillMaxSize().background(ComposeTokens.Ink)) {
-        PhoneHeader(title = "Car & Connection", subtitle = "Android Auto, Bluetooth and startup", onBack = onBack)
+        PhoneHeader(
+            title = stringResource(R.string.car_connection_title),
+            subtitle = stringResource(R.string.car_connection_subtitle),
+            onBack = onBack
+        )
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState())
                 .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            SectionLabel("Current vehicle")
+            SectionLabel(stringResource(R.string.car_connection_current_vehicle))
             AndroidAutoStatusCard(
-                title = runtime.vehicleProfile?.name ?: "My Car",
-                caption = "Android Auto",
+                title = runtime.vehicleProfile?.name ?: stringResource(R.string.car_connection_my_car),
+                caption = stringResource(R.string.control_android_auto),
                 onClick = null
             )
-            SectionLabel("Settings")
+            SectionLabel(stringResource(R.string.car_connection_settings_section))
             links.forEach { SettingsLinkRow(it) }
         }
     }

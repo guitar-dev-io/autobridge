@@ -7,9 +7,12 @@
     <string name="duo_screen_needs_shizuku">Grant Shizuku access on the phone first</string>
     <string name="duo_screen_title">Duo screen</string>
     <string name="duo_screen_subtitle">Run two or three apps side by side on the car display</string>
+    <string name="duo_screen_connection_section">Connection</string>
+    <string name="duo_screen_android_auto_hint">Needed to show Duo screen on the car display</string>
     <string name="duo_screen_shizuku_ready">Shizuku connected</string>
     <string name="duo_screen_shizuku_missing">Shizuku not available</string>
     <string name="duo_screen_shizuku_hint">Needed to launch apps into the panes and pass touches to them</string>
+    <string name="duo_screen_cancel">Cancel</string>
     <string name="duo_screen_panes_section">Panes</string>
     <string name="duo_screen_pane_count">Number of panes</string>
     <string name="duo_screen_pane_label">Pane %1$d</string>
@@ -35,6 +38,8 @@
     <string name="duo_screen_session_section">Session</string>
     <string name="duo_screen_end_session">End duo screen now</string>
     <string name="duo_screen_end_session_hint">Closes every pane and the apps running in them</string>
+    <string name="duo_screen_end_session_confirm_title">End duo screen now?</string>
+    <string name="duo_screen_end_session_confirm_action">End now</string>
     <string name="duo_screen_end_done">Duo screen ended</string>
     <string name="duo_screen_end_none">Nothing running</string>
 
