@@ -2101,13 +2101,19 @@ class CarWebRenderer(context: Context) {
             override fun onGeolocationPermissionsShowPrompt(
                 origin: String,
                 callback: GeolocationPermissions.Callback,
-            ) = BrowserGeolocation.answerForCar(appContext, origin, callback) {
-                mainHandler.post {
-                    host?.showMessage(
-                        appContext.getString(R.string.car_needs_location_permission)
-                    )
-                }
-            }
+            ) = BrowserGeolocation.answerForCar(
+                appContext, origin, callback,
+                onMissingPermission = {
+                    mainHandler.post {
+                        host?.showMessage(
+                            appContext.getString(R.string.car_needs_location_permission)
+                        )
+                    }
+                },
+                onLocationOff = {
+                    mainHandler.post { host?.showMessage(appContext.getString(R.string.geo_location_off)) }
+                },
+            )
 
             /**
              * HTML5 fullscreen (YouTube's fullscreen button, `requestFullscreen()` on a video).
@@ -2511,13 +2517,19 @@ class CarWebRenderer(context: Context) {
             override fun onGeolocationPermissionsShowPrompt(
                 origin: String,
                 callback: GeolocationPermissions.Callback,
-            ) = BrowserGeolocation.answerForCar(appContext, origin, callback) {
-                mainHandler.post {
-                    host?.showMessage(
-                        appContext.getString(R.string.car_needs_location_permission)
-                    )
-                }
-            }
+            ) = BrowserGeolocation.answerForCar(
+                appContext, origin, callback,
+                onMissingPermission = {
+                    mainHandler.post {
+                        host?.showMessage(
+                            appContext.getString(R.string.car_needs_location_permission)
+                        )
+                    }
+                },
+                onLocationOff = {
+                    mainHandler.post { host?.showMessage(appContext.getString(R.string.geo_location_off)) }
+                },
+            )
 
             override fun onShowCustomView(view: View, callback: CustomViewCallback) =
                 hostFullscreen(view, callback)

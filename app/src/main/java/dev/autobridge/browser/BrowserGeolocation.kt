@@ -2,11 +2,13 @@ package dev.autobridge.browser
 
 import android.Manifest
 import android.app.Activity
+import android.app.ActivityManager
 import android.app.AlertDialog
 import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.util.Log
+import androidx.core.location.LocationManagerCompat
 import android.webkit.GeolocationPermissions
 import dev.autobridge.R
 
@@ -41,6 +43,24 @@ object BrowserGeolocation {
         context.checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED
     }
 
+    /**
+     * Whether the phone's location services are on. With them off a page is "allowed" but never gets
+     * a fix, which looks exactly like a broken map; saying so is the useful part.
+     */
+    fun locationServicesOn(context: Context): Boolean {
+        val manager = context.getSystemService(Context.LOCATION_SERVICE) as? android.location.LocationManager ?: return true
+        return runCatching { LocationManagerCompat.isLocationEnabled(manager) }.getOrDefault(true)
+    }
+
+    /**
+     * How important Android considers this app right now (lower is more). Past the foreground-service
+     * level Android withholds location from an app in the background, which also looks like a broken
+     * map; it goes in the log so a report shows it.
+     */
+    private fun importance(): Int = runCatching {
+        ActivityManager.RunningAppProcessInfo().also { ActivityManager.getMyMemoryState(it) }.importance
+    }.getOrDefault(-1)
+
     fun isEligibleOrigin(origin: String): Boolean =
         runCatching { Uri.parse(origin).scheme.equals("https", ignoreCase = true) }.getOrDefault(false)
 
@@ -59,13 +79,16 @@ object BrowserGeolocation {
         origin: String,
         callback: GeolocationPermissions.Callback,
         onMissingPermission: () -> Unit,
+        onLocationOff: () -> Unit = {},
     ) {
         val eligible = isEligibleOrigin(origin)
         val permitted = hasAppPermission(context)
         val grant = eligible && permitted
         callback.invoke(origin, grant, false)
-        Log.i(TAG, "car prompt origin=$origin eligible=$eligible appPermission=$permitted granted=$grant")
+        val servicesOn = locationServicesOn(context)
+        Log.i(TAG, "car prompt origin=$origin eligible=$eligible appPermission=$permitted servicesOn=$servicesOn importance=${importance()} granted=$grant")
         if (eligible && !permitted) onMissingPermission()
+        else if (grant && !servicesOn) onLocationOff()
     }
 
     /**
@@ -135,7 +158,11 @@ object BrowserGeolocation {
             // Retained only when allowed, so the car renderer and later visits reuse the grant
             // without asking; a refusal is not remembered, so the site can ask again next visit.
             callback.invoke(origin, granted, granted)
-            Log.i(TAG, "phone prompt origin=$origin granted=$granted")
+            val servicesOn = locationServicesOn(activity)
+            Log.i(TAG, "phone prompt origin=$origin granted=$granted servicesOn=$servicesOn importance=${importance()}")
+            if (granted && !servicesOn) {
+                android.widget.Toast.makeText(activity, activity.getString(R.string.geo_location_off), android.widget.Toast.LENGTH_LONG).show()
+            }
         }
 
         private fun cancelPending() {
