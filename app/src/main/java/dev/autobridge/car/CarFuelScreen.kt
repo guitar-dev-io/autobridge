@@ -62,7 +62,12 @@ class CarFuelScreen(carContext: CarContext) : Screen(carContext) {
             pane.addRow(
                 Row.Builder()
                     .setTitle(carContext.getString(if (ev) R.string.fuel_last_charge else R.string.fuel_last_fill, DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(last.timeMs))))
-                    .addText(carContext.getString(if (ev) R.string.fuel_row_title_ev else R.string.fuel_row_title, decimal(last.liters), money(last.totalBaht)))
+                    .addText(
+                        listOfNotNull(
+                            carContext.getString(if (ev) R.string.fuel_row_title_ev else R.string.fuel_row_title, decimal(last.liters), money(last.totalBaht)),
+                            last.fuelType.takeIf { it.isNotBlank() },
+                        ).joinToString(" · ")
+                    )
                     .build()
             )
         }

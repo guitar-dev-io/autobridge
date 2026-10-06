@@ -26,16 +26,28 @@ object FuelLogStore {
                 totalBaht = item.optDouble("baht", 0.0),
                 odometerKm = if (item.has("odo") && !item.isNull("odo")) item.optDouble("odo") else null,
                 station = item.optString("station"),
+                fuelType = item.optString("type"),
             ).takeIf { it.liters > 0 }
         }.sortedByDescending { it.timeMs }
     }
 
-    fun add(context: Context, liters: Double, totalBaht: Double, odometerKm: Double?, station: String, timeMs: Long = System.currentTimeMillis()) {
-        val entry = FuelEntry(timeMs, timeMs, liters, totalBaht, odometerKm, station.trim())
+    fun add(
+        context: Context,
+        liters: Double,
+        totalBaht: Double,
+        odometerKm: Double?,
+        station: String,
+        fuelType: String = "",
+        timeMs: Long = System.currentTimeMillis(),
+    ) {
+        val entry = FuelEntry(timeMs, timeMs, liters, totalBaht, odometerKm, station.trim(), fuelType.trim())
         write(context, all(context) + entry)
     }
 
     fun delete(context: Context, id: Long) = write(context, all(context).filterNot { it.id == id })
+
+    /** The grade of the latest fill-up that named one, offered again for the next. */
+    fun lastFuelType(context: Context): String = all(context).firstOrNull { it.fuelType.isNotBlank() }?.fuelType.orEmpty()
 
     /** The highest odometer logged, to suggest when the car has not reported one. */
     fun lastOdometer(context: Context): Double? = all(context).mapNotNull { it.odometerKm }.maxOrNull()
@@ -72,6 +84,7 @@ object FuelLogStore {
                     .put("baht", entry.totalBaht)
                     .put("odo", entry.odometerKm ?: JSONObject.NULL)
                     .put("station", entry.station)
+                    .put("type", entry.fuelType)
             )
         }
         prefs(context).edit { putString(KEY_ENTRIES, array.toString()) }

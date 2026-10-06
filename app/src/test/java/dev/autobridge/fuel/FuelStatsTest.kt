@@ -70,6 +70,17 @@ class FuelStatsTest {
         assertTrue(lines[2].startsWith("2026-10-08 09:00"))
     }
 
+    @Test fun theGradeIsInTheCsv() {
+        val log = listOf(
+            FuelEntry(1, at(1), 40.0, 1400.0, 10_000.0, "PTT", "Gasohol 95"),
+            FuelEntry(2, at(8), 35.0, 1225.0, 10_490.0, "", "Diesel \"B7\""),
+        )
+        val lines = FuelStats.csv(log, zone).trim().lines()
+        assertTrue(lines[0].endsWith(",station,fuel_type"))
+        assertTrue(lines[1].endsWith(",\"PTT\",\"Gasohol 95\""))
+        assertTrue(lines[2].endsWith(",\"\",\"Diesel \"\"B7\"\"\""))
+    }
+
     @Test fun anEvLogHasEnergyColumnsButTheSameNumbers() {
         val log = listOf(fill(1, 1, 40.0, 1400.0, 10_000.0), fill(2, 8, 35.0, 1225.0, 10_490.0))
         val lines = FuelStats.csv(log, zone, ev = true).trim().lines()

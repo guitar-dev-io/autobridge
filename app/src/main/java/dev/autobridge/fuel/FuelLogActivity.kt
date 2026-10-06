@@ -7,6 +7,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.text.InputType
 import android.view.View
+import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -33,6 +34,19 @@ class FuelLogActivity : Activity() {
 
         /** A car odometer reading older than this is not offered as "now" when logging a fill-up. */
         private const val ODOMETER_FRESH_MS = 6 * 60 * 60 * 1000L
+
+        /** The grades sold in Thailand, offered when logging a fill-up; anything else is typed. */
+        private val FUEL_TYPES = listOf(
+            R.string.fuel_type_gasohol95,
+            R.string.fuel_type_gasohol91,
+            R.string.fuel_type_e20,
+            R.string.fuel_type_e85,
+            R.string.fuel_type_benzine95,
+            R.string.fuel_type_diesel,
+            R.string.fuel_type_diesel_premium,
+            R.string.fuel_type_lpg,
+            R.string.fuel_type_ngv,
+        )
     }
 
     private val accent = AutoBridgeDesign.ACCENT
@@ -95,6 +109,7 @@ class FuelLogActivity : Activity() {
                             DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(entry.timeMs)),
                             entry.odometerKm?.let { getString(R.string.fuel_row_odometer, whole(it)) },
                             kmPerL?.let { getString(kmPerUnitRes(), decimal(it)) },
+                            entry.fuelType.takeIf { it.isNotBlank() },
                             entry.station.takeIf { it.isNotBlank() },
                         ).joinToString(" · "),
                         accent = accent,
@@ -195,6 +210,42 @@ class FuelLogActivity : Activity() {
             R.string.fuel_field_odometer, decimal = true, initial = carOdometer?.let { whole(it).replace(",", "") }.orEmpty()
         )
         val station = field(R.string.fuel_field_station, decimal = false)
+        // Petrol and diesel cars name the grade; the last one used is offered again.
+        var fuelType = if (ev) "" else FuelLogStore.lastFuelType(this)
+        val typeButton = Button(this).apply {
+            isAllCaps = false
+            visibility = if (ev) View.GONE else View.VISIBLE
+            fun refresh() {
+                text = getString(R.string.fuel_type_button, fuelType.ifBlank { getString(R.string.fuel_type_choose) })
+            }
+            refresh()
+            setOnClickListener {
+                val names = FUEL_TYPES.map { getString(it) } + getString(R.string.fuel_type_other)
+                AlertDialog.Builder(this@FuelLogActivity)
+                    .setTitle(getString(R.string.fuel_type_title))
+                    .setItems(names.toTypedArray()) { _, which ->
+                        if (which < FUEL_TYPES.size) {
+                            fuelType = names[which]
+                            refresh()
+                        } else {
+                            val typed = EditText(this@FuelLogActivity).apply {
+                                hint = getString(R.string.fuel_type_other_hint)
+                                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
+                            }
+                            AlertDialog.Builder(this@FuelLogActivity)
+                                .setTitle(getString(R.string.fuel_type_other))
+                                .setView(typed)
+                                .setNegativeButton(android.R.string.cancel, null)
+                                .setPositiveButton(android.R.string.ok) { _, _ ->
+                                    fuelType = typed.text.toString().trim()
+                                    refresh()
+                                }
+                                .show()
+                        }
+                    }
+                    .show()
+            }
+        }
         val note = TextView(this).apply {
             text = getString(if (carOdometer != null) R.string.fuel_odometer_from_car else R.string.fuel_odometer_type_it)
             textSize = 12f
@@ -202,7 +253,7 @@ class FuelLogActivity : Activity() {
         val form = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(8), dp(20), 0)
-            listOf(liters, baht, odometer, note, station).forEach { addView(it) }
+            listOf(typeButton, liters, baht, odometer, note, station).forEach { addView(it) }
         }
         AlertDialog.Builder(this)
             .setTitle(unit(R.string.fuel_add_title, R.string.fuel_add_title_ev))
@@ -215,7 +266,11 @@ class FuelLogActivity : Activity() {
                     Toast.makeText(this, unit(R.string.fuel_invalid, R.string.fuel_invalid_ev), Toast.LENGTH_LONG).show()
                     return@setPositiveButton
                 }
-                FuelLogStore.add(this, l, b, number(odometer), station.text.toString())
+                if (!ev && fuelType.isBlank()) {
+                    Toast.makeText(this, getString(R.string.fuel_type_required), Toast.LENGTH_LONG).show()
+                    return@setPositiveButton
+                }
+                FuelLogStore.add(this, l, b, number(odometer), station.text.toString(), fuelType)
                 render()
             }
             .show()

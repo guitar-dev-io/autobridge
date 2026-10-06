@@ -545,6 +545,7 @@
     <string name="aa_hidden_title">Bridge Web ถูกซ่อนใน Android Auto</string>
     <string name="aa_hidden_message">การติดตั้งอัปเดตนี้ทำให้ที่มาของการติดตั้งถูกรีเซ็ต Android Auto จะไม่แสดง Bridge Web จนกว่าจะตั้งค่าใหม่ กดครั้งเดียวผ่าน Shizuku</string>
     <string name="aa_hidden_fix">แก้ตอนนี้</string>
+    <string name="whats_new_0_4_32">• บันทึกค่าน้ำมัน: เลือกชนิดน้ำมันทุกครั้งที่เติม (แก๊สโซฮอล์ 95, 91, E20, E85, เบนซิน 95, ดีเซล, ดีเซลพรีเมียม, LPG, NGV) หรือพิมพ์เอง ระบบจำชนิดครั้งล่าสุดให้ และอยู่ในไฟล์ CSV ด้วย</string>
     <string name="whats_new_0_4_31">• ทริป: ตั้งค่า &gt; ทริป เริ่มและจบทริปพร้อมจำนวนคน แสดงระยะทางและค่าใช้จ่ายต่อคน (ค่าน้ำมันหรือค่าชาร์จ บวกทางด่วนและที่จอดรถ) บนจอรถเริ่มและจบทริปได้ที่ เพิ่มเติม &gt; ทริป\n• สำรองข้อมูล: ตั้งค่า &gt; สำรองและกู้คืนข้อมูล บันทึกค่าน้ำมันหรือค่าชาร์จ การบำรุงรักษา และทริป เป็นไฟล์เดียว เพื่อย้ายไปเครื่องอื่น</string>
     <string name="whats_new_0_4_30">• รองรับรถ EV: สลับบันทึกค่าน้ำมันเป็นรถ EV (⚡) ได้ที่ ตั้งค่า &gt; บันทึกค่าน้ำมัน จะนับเป็น kWh และ กม./kWh และแสดงระดับแบตเตอรี่จากรถถ้ารถรายงาน\n• การบำรุงรักษา: ตั้งค่า &gt; การบำรุงรักษา ติดตามน้ำมันเครื่อง ยาง ภาษี และสำหรับรถ EV คือน้ำยาหล่อเย็นกับแบตเตอรี่ 12 โวลต์ ตามระยะทางและวันที่ บนจอรถดูสิ่งที่ถึงกำหนดได้ที่ เพิ่มเติม &gt; การบำรุงรักษา</string>
     <string name="whats_new_0_4_29">• บันทึกค่าน้ำมัน: ตั้งค่า > บันทึกค่าน้ำมัน จดการเติมแต่ละครั้ง คำนวณ กม./ลิตร บาท/กม. และยอดเดือนนี้ให้ บนจอรถ: More > บันทึกค่าน้ำมัน อนุญาตอ่านเลขไมล์จากรถแล้วจะกรอกให้เองตอนเติมครั้งถัดไป\n• Duo Screen: แอปในแต่ละช่องเริ่มใหม่ทุกครั้ง ไม่ค้างค่าเดิมจากรอบก่อน</string>
@@ -1546,4 +1547,21 @@
     <string name="backup_replace">แทนที่</string>
     <string name="backup_done">กู้คืนแล้ว</string>
     <string name="backup_invalid">ไม่ใช่ไฟล์สำรองของ AutoBridge</string>
+
+    <!-- Fuel grade -->
+    <string name="fuel_type_button">น้ำมัน: %1$s</string>
+    <string name="fuel_type_choose">เลือก</string>
+    <string name="fuel_type_title">ชนิดน้ำมัน</string>
+    <string name="fuel_type_other">อื่น ๆ</string>
+    <string name="fuel_type_other_hint">ชนิดน้ำมัน</string>
+    <string name="fuel_type_required">เลือกชนิดน้ำมัน</string>
+    <string name="fuel_type_gasohol95">แก๊สโซฮอล์ 95</string>
+    <string name="fuel_type_gasohol91">แก๊สโซฮอล์ 91</string>
+    <string name="fuel_type_e20">แก๊สโซฮอล์ E20</string>
+    <string name="fuel_type_e85">แก๊สโซฮอล์ E85</string>
+    <string name="fuel_type_benzine95">เบนซิน 95</string>
+    <string name="fuel_type_diesel">ดีเซล (B7)</string>
+    <string name="fuel_type_diesel_premium">ดีเซลพรีเมียม</string>
+    <string name="fuel_type_lpg">LPG</string>
+    <string name="fuel_type_ngv">NGV</string>
 </resources>

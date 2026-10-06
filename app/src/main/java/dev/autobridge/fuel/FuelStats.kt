@@ -19,6 +19,8 @@ data class FuelEntry(
     val totalBaht: Double,
     val odometerKm: Double?,
     val station: String = "",
+    /** The grade bought (Gasohol 95, diesel...), as the driver chose or typed it; empty for an EV or an old entry. */
+    val fuelType: String = "",
 ) {
     val pricePerLiter: Double get() = if (liters > 0) totalBaht / liters else 0.0
 }
@@ -104,8 +106,8 @@ object FuelStats {
     /** The log as CSV, oldest first, for a spreadsheet. */
     fun csv(entries: List<FuelEntry>, zone: ZoneId = ZoneId.systemDefault(), ev: Boolean = false): String = buildString {
         appendLine(
-            if (ev) "date,kwh,total_baht,price_per_kwh,odometer_km,km_per_kwh,station"
-            else "date,liters,total_baht,price_per_liter,odometer_km,km_per_liter,station"
+            if (ev) "date,kwh,total_baht,price_per_kwh,odometer_km,km_per_kwh,station,fuel_type"
+            else "date,liters,total_baht,price_per_liter,odometer_km,km_per_liter,station,fuel_type"
         )
         entries.sortedBy { it.timeMs }.forEach { entry ->
             val date = Instant.ofEpochMilli(entry.timeMs).atZone(zone).toLocalDateTime().toString().replace('T', ' ')
@@ -119,6 +121,7 @@ object FuelStats {
                     entry.odometerKm?.let { it.roundToLong().toString() }.orEmpty(),
                     kmPerL?.let { "%.2f".format(java.util.Locale.US, it) }.orEmpty(),
                     "\"" + entry.station.replace("\"", "\"\"") + "\"",
+                    "\"" + entry.fuelType.replace("\"", "\"\"") + "\"",
                 ).joinToString(",")
             )
         }
