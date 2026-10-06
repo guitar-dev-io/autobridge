@@ -444,6 +444,19 @@ object AutoBridgeDesign {
             glyphButton(context, corner.first, 15f, onClick = corner.second),
             FrameLayout.LayoutParams(context.dp(32), context.dp(32), Gravity.TOP or Gravity.END)
         )
+        // A small coloured dot in the artwork's bottom-end corner carries the check result at a
+        // glance; the old text label (below) is kept GONE only so setStatus() stays compatible.
+        artwork.addView(View(context).apply {
+            id = R.id.autobridge_status_dot
+            background = GradientDrawable().apply { shape = GradientDrawable.OVAL }
+            status?.let { (_, color) ->
+                (background as GradientDrawable).setColor(color)
+            }
+            visibility = if (status == null) View.GONE else View.VISIBLE
+        }, FrameLayout.LayoutParams(context.dp(8), context.dp(8), Gravity.BOTTOM or Gravity.END).apply {
+            marginEnd = context.dp(4)
+            bottomMargin = context.dp(4)
+        })
         addView(artwork, LinearLayout.LayoutParams(-1, context.dp(88)))
 
         addView(TextView(context).apply {
@@ -466,6 +479,7 @@ object AutoBridgeDesign {
 
         // Built even when there is nothing to show yet: a result that lands later is written into
         // this view, and a page that is already scrolled must not be rebuilt under the user.
+        // The label is kept GONE; the visible indicator is the dot on the artwork corner above.
         addView(TextView(context).apply {
             id = R.id.autobridge_status_label
             textSize = 12f
@@ -477,19 +491,25 @@ object AutoBridgeDesign {
                 this.text = text
                 setTextColor(color)
             }
-            visibility = if (status == null) View.GONE else View.VISIBLE
+            visibility = View.GONE
         }, LinearLayout.LayoutParams(-1, -2))
     }
 
     /** The status line inside a [contentTile], for writing a result into a page already drawn. */
     fun statusLabel(tile: View): TextView? = tile.findViewById(R.id.autobridge_status_label)
 
-    /** Writes [text] in [color] into a tile's status line, or hides it when [text] is blank. */
+    /** Writes [text] in [color] into a tile's status line, or hides it when [text] is blank.
+     *  Also updates the coloured dot on the artwork corner so the tile reads at a glance. */
     fun setStatus(tile: View, text: String, color: Int) {
         val label = statusLabel(tile) ?: return
         label.text = text
         label.setTextColor(color)
-        label.visibility = if (text.isBlank()) View.GONE else View.VISIBLE
+        // The label stays GONE; the visible indicator is the dot.
+        val dot = tile.findViewById<View>(R.id.autobridge_status_dot)
+        if (dot != null) {
+            (dot.background as? GradientDrawable)?.setColor(color)
+            dot.visibility = if (text.isBlank()) View.GONE else View.VISIBLE
+        }
     }
 
     /**

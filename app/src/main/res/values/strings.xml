@@ -1416,4 +1416,10 @@
     <string name="gps_speed_disclosure_title">Use GPS for the speed reading?</string>
     <string name="gps_speed_disclosure_body">AutoBridge needs a speed to know whether the car is parked, and some head units never report one. With this on, the phone\'s GPS fills that gap: the app reads the speed from the location fix while a car session is running.\n\nThe location is used for that number alone. It is not stored, not logged and not sent anywhere, and nothing is read while the app is not connected to a car.\n\nLeave this off and AutoBridge uses the car\'s own speed signal only.</string>
     <string name="gps_speed_denied">Location permission was not granted, so GPS speed stays off</string>
+
+    <!-- Library (TV / radio) screen: category sort control, pin management, and channel check. -->
+    <string name="library_sort_az">A–Z ▼</string>
+    <string name="library_sort_za">Z–A ▲</string>
+    <string name="library_edit_pinned">Edit</string>
+    <string name="library_check_button">↻ Check</string>
 </resources>

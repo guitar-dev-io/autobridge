@@ -1387,4 +1387,10 @@
     <string name="gps_speed_disclosure_title">ใช้ GPS อ่านค่าความเร็วไหม</string>
     <string name="gps_speed_disclosure_body">AutoBridge ต้องรู้ความเร็วเพื่อบอกว่ารถจอดอยู่หรือไม่ แต่หัวจอบางรุ่นไม่รายงานค่านี้มาเลย เมื่อเปิดตัวเลือกนี้ GPS ของโทรศัพท์จะมาเติมส่วนที่ขาด โดยแอปอ่านความเร็วจากตำแหน่งที่ได้ขณะเชื่อมต่อกับรถ\n\nตำแหน่งถูกใช้เพื่อค่าความเร็วนั้นอย่างเดียว ไม่ถูกเก็บ ไม่ถูกบันทึกลง log และไม่ถูกส่งไปที่ใด และจะไม่อ่านค่าใด ๆ เลยเมื่อแอปไม่ได้เชื่อมต่อกับรถ\n\nถ้าปิดไว้ AutoBridge จะใช้สัญญาณความเร็วจากรถเท่านั้น</string>
     <string name="gps_speed_denied">ไม่ได้รับสิทธิ์ตำแหน่ง จึงยังไม่เปิดความเร็วจาก GPS</string>
+
+    <!-- หน้า Library (ทีวี / วิทยุ): ปุ่มเรียงหมวด จัดการการปักหมุด และตรวจสอบช่อง -->
+    <string name="library_sort_az">ก–ฮ ▼</string>
+    <string name="library_sort_za">ฮ–ก ▲</string>
+    <string name="library_edit_pinned">แก้ไข</string>
+    <string name="library_check_button">↻ ตรวจสอบ</string>
 </resources>
