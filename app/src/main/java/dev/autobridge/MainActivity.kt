@@ -2036,6 +2036,8 @@ class MainActivity : androidx.activity.ComponentActivity() {
         SettingsStore.restore(this)
         // What maintenance is due, as a notification (once a day at most; nothing without items).
         runCatching { dev.autobridge.maintenance.MaintenanceReminder.check(this) }
+        // Which screens Android sees (a head unit's rear screen may or may not be one of them).
+        dev.autobridge.display.DisplayInventory.log(this)
         SessionRestoreStore.restore(this)?.let { snapshot ->
             RuntimeContextStore.setCurrentFeature(snapshot.feature, snapshot.packageName)
             RuntimeContextStore.setDisplayPreferences(
