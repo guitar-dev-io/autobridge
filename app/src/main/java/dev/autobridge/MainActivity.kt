@@ -1948,6 +1948,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
 
         const val SUPPORT_URL = "https://buymeacoffee.com/guitar.story"
         const val GITHUB_URL = "https://github.com/guitar-dev-io/autobridge"
+        const val FACEBOOK_URL = "https://www.facebook.com/share/19mw1X5Lou/"
 
         const val STATE_SCREEN = "phone_screen"
         const val STATE_BACK_STACK = "phone_back_stack"
@@ -2933,6 +2934,13 @@ class MainActivity : androidx.activity.ComponentActivity() {
                     R.drawable.ic_tile_web
                 ) {
                     openExternalUrl(GITHUB_URL)
+                },
+                settingsEntry(
+                    getString(R.string.about_facebook),
+                    getString(R.string.about_facebook_caption),
+                    R.drawable.ic_tile_web
+                ) {
+                    openExternalUrl(FACEBOOK_URL)
                 }
             )),
             SettingsGroup(getString(R.string.about_group_credits), listOf(
