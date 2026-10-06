@@ -2,6 +2,7 @@ package dev.autobridge.browser
 
 import android.app.Activity
 import android.graphics.Typeface
+import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -247,13 +248,27 @@ class BrowserMenuSheet(
                 val side = sizes.dpInt(AutoUiSizes.SHEET_ICON_DP)
                 layoutParams = LinearLayout.LayoutParams(side, side).apply { bottomMargin = shell.gap() }
             })
-            addView(TextView(activity).apply {
-                text = label
-                gravity = Gravity.CENTER
-                maxLines = 1
-                textSize = shell.sp(AutoUiSizes.ICON_SMALL_DP * 0.78f)
-                setTextColor(if (enabled) BrowserTheme.textPrimary else BrowserTheme.iconDisabled)
-            })
+            val labelSp = shell.sp(AutoUiSizes.ICON_SMALL_DP * 0.78f)
+            addView(
+                TextView(activity).apply {
+                    text = label
+                    gravity = Gravity.CENTER
+                    maxLines = 1
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                    setTextColor(if (enabled) BrowserTheme.textPrimary else BrowserTheme.iconDisabled)
+                    // Thai labels ("ดาวน์โหลด") run longer than the mockup's English ones and were
+                    // being cut mid-word inside the fixed-width tile. Shrink to fit instead.
+                    setAutoSizeTextTypeUniformWithConfiguration(
+                        (labelSp * 0.72f).toInt().coerceAtLeast(1),
+                        labelSp.toInt().coerceAtLeast(2),
+                        1,
+                        TypedValue.COMPLEX_UNIT_SP,
+                    )
+                },
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+            )
         }
 
     /** One row inside [settingsCard]: a label and a switch, no leading icon, no card of its own. */
