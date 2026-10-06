@@ -18,6 +18,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import dev.autobridge.R
 import dev.autobridge.entertainment.ContentKind
 import dev.autobridge.entertainment.EntertainmentActivity
 import dev.autobridge.entertainment.WebBookmarkStore
@@ -1730,22 +1731,58 @@ class LibraryActivity : Activity() {
     /** The shared [StreamingLinks] catalog, grouped; each row opens the site in the browser. */
     private fun showStreaming() = push {
         val rows = mutableListOf<View>()
+        // Same intent as the YouTube home tile, so the browser is reused if it is open.
+        fun openSite(url: String) = startActivity(
+            Intent(this, dev.autobridge.browser.BrowserActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+                .setData(Uri.parse(url))
+        )
+
+        // The driver's own favourites on top: a tap opens, the cross removes, "Add" takes any address.
+        rows += AutoBridgeDesign.sectionLabel(this, getString(R.string.streaming_favorites))
+        StreamingFavoritesStore.list(this).forEach { favorite ->
+            rows += AutoBridgeDesign.contentRow(
+                context = this,
+                title = favorite.title,
+                subtitle = hostOf(favorite.url),
+                accent = accent,
+                badgeText = "★",
+                trailing = "✕",
+                onTrailing = {
+                    StreamingFavoritesStore.remove(this, favorite.url)
+                    refresh()
+                },
+                onClick = { openSite(favorite.url) }
+            )
+        }
+        rows += AutoBridgeDesign.contentRow(
+            context = this,
+            title = getString(R.string.streaming_add_favorite),
+            subtitle = getString(R.string.streaming_add_favorite_caption),
+            accent = accent,
+            badgeText = "+",
+            onClick = { showAddFavoriteDialog() }
+        )
+
         StreamingLinks.grouped().forEach { (group, links) ->
             rows += AutoBridgeDesign.sectionLabel(this, group.title)
             links.forEach { link ->
+                val saved = StreamingFavoritesStore.contains(this, link.url)
                 rows += AutoBridgeDesign.contentRow(
                     context = this,
                     title = link.title,
-                    subtitle = hostOf(link.url),
+                    subtitle = listOfNotNull(
+                        hostOf(link.url),
+                        getString(R.string.streaming_may_not_play).takeIf { StreamingLinks.mayNotPlay(link) },
+                    ).joinToString(" · "),
                     accent = accent,
-                    onClick = {
-                        // Same intent as the YouTube home tile, so the browser is reused if open.
-                        startActivity(
-                            Intent(this, dev.autobridge.browser.BrowserActivity::class.java)
-                                .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
-                                .setData(Uri.parse(link.url))
-                        )
-                    }
+                    // A star to pin or unpin the site without leaving the list.
+                    trailing = if (saved) "★" else "☆",
+                    onTrailing = {
+                        if (saved) StreamingFavoritesStore.remove(this, link.url) else StreamingFavoritesStore.add(this, link.title, link.url)
+                        refresh()
+                    },
+                    onClick = { openSite(link.url) }
                 )
             }
         }
@@ -1755,6 +1792,34 @@ class LibraryActivity : Activity() {
             rows = rows,
             extraPinned = listOf(chipsRow())
         )
+    }
+
+    /** Adds any website to the favourites: a name (optional) and an address. */
+    private fun showAddFavoriteDialog() {
+        val name = EditText(this).apply { hint = getString(R.string.streaming_field_name) }
+        val address = EditText(this).apply {
+            hint = getString(R.string.streaming_field_address)
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
+        }
+        val form = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            val pad = (20 * resources.displayMetrics.density).toInt()
+            setPadding(pad, pad / 2, pad, 0)
+            addView(name)
+            addView(address)
+        }
+        android.app.AlertDialog.Builder(this)
+            .setTitle(getString(R.string.streaming_add_favorite))
+            .setView(form)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(getString(R.string.fuel_save)) { _, _ ->
+                if (StreamingFavoritesStore.add(this, name.text.toString(), address.text.toString())) {
+                    refresh()
+                } else {
+                    android.widget.Toast.makeText(this, getString(R.string.streaming_invalid_address), android.widget.Toast.LENGTH_LONG).show()
+                }
+            }
+            .show()
     }
 
     // ----- Shared helpers -----
