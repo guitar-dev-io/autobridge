@@ -50,6 +50,7 @@ object MaintenanceStats {
         MaintenancePreset("air_filter", 20_000, 24),
         MaintenancePreset("brake_fluid", 40_000, 24),
         MaintenancePreset("road_tax", 0, 12),
+        MaintenancePreset("compulsory_insurance", 0, 12),
     )
 
     /** An EV has no oil or air filter; it has a cabin filter, a battery coolant and a 12 V battery. */
@@ -60,6 +61,7 @@ object MaintenanceStats {
         MaintenancePreset("battery_coolant", 80_000, 48),
         MaintenancePreset("battery_12v", 0, 36),
         MaintenancePreset("road_tax", 0, 12),
+        MaintenancePreset("compulsory_insurance", 0, 12),
     )
 
     fun presets(ev: Boolean): List<MaintenancePreset> = if (ev) EV_PRESETS else FUEL_PRESETS

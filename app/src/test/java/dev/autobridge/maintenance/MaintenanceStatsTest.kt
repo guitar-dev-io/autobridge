@@ -63,6 +63,15 @@ class MaintenanceStatsTest {
         assertEquals(listOf(2L, 3L, 1L), order)
     }
 
+    @Test fun bothListsOfferTheYearlyPaperwork() {
+        listOf(true, false).forEach { ev ->
+            val keys = MaintenanceStats.presets(ev).associateBy { it.key }
+            assertEquals(12, keys.getValue("road_tax").intervalMonths)
+            assertEquals(12, keys.getValue("compulsory_insurance").intervalMonths)
+            assertEquals(0, keys.getValue("compulsory_insurance").intervalKm)
+        }
+    }
+
     @Test fun anEvIsNotOfferedOilOrAnAirFilter() {
         val ev = MaintenanceStats.presets(ev = true).map { it.key }
         assertTrue("engine_oil" !in ev && "air_filter" !in ev)

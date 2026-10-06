@@ -17,6 +17,7 @@ object MaintenanceText {
         "brake_fluid" -> R.string.maint_brake_fluid
         "battery_coolant" -> R.string.maint_battery_coolant
         "battery_12v" -> R.string.maint_battery_12v
+        "compulsory_insurance" -> R.string.maint_compulsory_insurance
         else -> R.string.maint_road_tax
     }
 
