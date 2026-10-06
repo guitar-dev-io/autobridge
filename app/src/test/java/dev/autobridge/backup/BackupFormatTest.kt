@@ -17,16 +17,6 @@ class BackupFormatTest {
         assertEquals(JSONArray(sample.trips).toString(), back.trips)
     }
 
-    @Test fun anOlderBackupWithoutCheckpointsStillReads() {
-        val back = BackupFormat.read("""{"app":"autobridge","version":1,"ev":false,"fuel":[],"maintenance":[],"trips":[]}""")!!
-        assertEquals("[]", back.checkpoints)
-    }
-
-    @Test fun checkpointsRoundTrip() {
-        val withPoints = sample.copy(checkpoints = """[{"id":3,"lat":13.5,"lon":100.5}]""")
-        assertEquals(JSONArray(withPoints.checkpoints).toString(), BackupFormat.read(BackupFormat.write(withPoints))!!.checkpoints)
-    }
-
     @Test fun somethingElseIsNotABackup() {
         assertNull(BackupFormat.read("not json"))
         assertNull(BackupFormat.read("""{"app":"other","version":1,"fuel":[],"maintenance":[],"trips":[]}"""))

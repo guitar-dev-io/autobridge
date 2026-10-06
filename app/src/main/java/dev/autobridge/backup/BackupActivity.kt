@@ -8,7 +8,6 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.core.content.FileProvider
 import dev.autobridge.R
-import dev.autobridge.checkpoint.CheckpointStore
 import dev.autobridge.fuel.FuelLogStore
 import dev.autobridge.i18n.AppLocale
 import dev.autobridge.maintenance.MaintenanceStore
@@ -77,7 +76,6 @@ class BackupActivity : Activity() {
                 fuel = FuelLogStore.rawJson(this),
                 maintenance = MaintenanceStore.rawJson(this),
                 trips = TripStore.rawJson(this),
-                checkpoints = CheckpointStore.rawJson(this),
             )
         )
         val dir = File(cacheDir, "exports").apply { mkdirs() }
@@ -116,8 +114,7 @@ class BackupActivity : Activity() {
             .setPositiveButton(getString(R.string.backup_replace)) { _, _ ->
                 val ok = FuelLogStore.restore(this, backup.fuel, backup.ev) &&
                     MaintenanceStore.restore(this, backup.maintenance) &&
-                    TripStore.restore(this, backup.trips) &&
-                    CheckpointStore.restore(this, backup.checkpoints)
+                    TripStore.restore(this, backup.trips)
                 Toast.makeText(this, getString(if (ok) R.string.backup_done else R.string.backup_invalid), Toast.LENGTH_LONG).show()
             }
             .show()

@@ -2672,12 +2672,6 @@ class MainActivity : androidx.activity.ComponentActivity() {
                         accent = design.ACCENT
                     ) { startActivity(dev.autobridge.trip.TripActivity.intent(this@MainActivity)) })
                     add(settingsEntry(
-                        getString(R.string.checkpoint_title),
-                        getString(R.string.checkpoint_settings_caption),
-                        R.drawable.ic_tile_car,
-                        accent = design.ACCENT
-                    ) { startActivity(dev.autobridge.checkpoint.CheckpointActivity.intent(this@MainActivity)) })
-                    add(settingsEntry(
                         getString(R.string.backup_title),
                         getString(R.string.backup_settings_caption),
                         R.drawable.ic_tile_car,
