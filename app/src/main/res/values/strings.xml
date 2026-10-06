@@ -467,6 +467,9 @@
     <string name="browser_signin_message">For security, this provider does not allow signing in from a browser embedded in another app.</string>
     <string name="browser_resumed_from_queue">Playing the next item in the queue</string>
 
+    <!-- Phone browser: zoom readout in All Actions sheet. -->
+    <string name="browser_zoom_percent">%1$d%%</string>
+
     <!-- Browser settings sheet ([BrowserSettingsSheet]): the Playback section's YouTube add-ons row. -->
     <string name="browser_settings_youtube_addons">YouTube add-ons</string>
     <string name="browser_settings_youtube_addons_caption">SponsorBlock and playback quality</string>

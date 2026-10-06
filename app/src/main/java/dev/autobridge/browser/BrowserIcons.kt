@@ -26,7 +26,7 @@ enum class BrowserIcon(@DrawableRes val resId: Int) {
     CLOSE(R.drawable.ic_browser_close),
     FULLSCREEN_ENTER(R.drawable.ic_browser_fullscreen),
     FULLSCREEN_EXIT(R.drawable.ic_browser_fullscreen_exit),
-    MENU(R.drawable.ic_browser_menu),
+    MENU(R.drawable.ic_browser_more_vert),
     /** The browser's own start page — distinct from [APP_HOME], which leaves the browser. */
     HOME_PAGE(R.drawable.ic_car_home),
     /** Leaves the browser for AutoBridge's dashboard; see [DrawerAction.APP_HOME]. */
