@@ -528,6 +528,7 @@
 
     <!-- Settings navigation: the root list, Advanced and About -->
     <string name="settings_title">ตั้งค่า</string>
+    <string name="settings_search_hint">ค้นหาการตั้งค่า</string>
     <string name="settings_group_display">การแสดงผลและการควบคุม</string>
     <string name="settings_display_mirror">การแสดงผลและมิเรอร์</string>
     <string name="settings_display_mirror_caption">ตัวเรนเดอร์ การหมุนจอ และเต็มหน้าจอ</string>

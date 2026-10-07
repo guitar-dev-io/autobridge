@@ -807,14 +807,46 @@ class MainActivity : androidx.activity.ComponentActivity() {
         title: String,
         subtitle: String?,
         groups: List<SettingsGroup>,
-        back: (() -> Unit)?
+        back: (() -> Unit)?,
+        searchHint: String? = null
     ): View {
         val design = dev.autobridge.ui.AutoBridgeDesign
-        val ui = dev.autobridge.ui.SettingsUi
         val body = design.body(this)
+        // With a search hint the page gets a filter box on top: typing narrows every group to the
+        // rows whose title or caption matches, so a setting can be found without knowing its group.
+        val groupsHolder = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        if (searchHint != null) {
+            body.addView(
+                design.searchField(this, searchHint, "") { query -> renderSettingsGroups(groupsHolder, groups, query) },
+                LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(14) }
+            )
+        }
+        body.addView(groupsHolder, LinearLayout.LayoutParams(-1, -2))
+        renderSettingsGroups(groupsHolder, groups, "")
+        return design.page(
+            context = this,
+            header = design.header(context = this, title = title, subtitle = subtitle, onBack = back),
+            body = body,
+            applyInsets = false
+        )
+    }
+
+    /** Draws [groups] into [holder], keeping only rows that match [query] (all rows when blank). */
+    private fun renderSettingsGroups(holder: LinearLayout, groups: List<SettingsGroup>, query: String) {
+        val ui = dev.autobridge.ui.SettingsUi
+        val needle = query.trim()
+        holder.removeAllViews()
         groups.forEach { group ->
+            val matching = if (needle.isEmpty()) group.rows else group.rows.filter {
+                it.title.contains(needle, ignoreCase = true) || it.caption.contains(needle, ignoreCase = true) ||
+                    group.label.contains(needle, ignoreCase = true)
+            }
+            // Custom rows are pre-built views with no searchable text; they show with the full list.
+            val custom = if (needle.isEmpty()) group.customRows else emptyList()
+            if (matching.isEmpty() && custom.isEmpty()) return@forEach
+            custom.forEach { (it.parent as? ViewGroup)?.removeView(it) }
             val cardRows = buildList {
-                group.rows.forEach { entry ->
+                matching.forEach { entry ->
                     add(
                         if (entry.value != null) ui.valueRow(
                             context = this@MainActivity,
@@ -831,19 +863,13 @@ class MainActivity : androidx.activity.ComponentActivity() {
                         )
                     )
                 }
-                addAll(group.customRows)
+                addAll(custom)
             }
-            body.addView(
+            holder.addView(
                 ui.group(this, group.label, cardRows),
                 LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(14) }
             )
         }
-        return design.page(
-            context = this,
-            header = design.header(context = this, title = title, subtitle = subtitle, onBack = back),
-            body = body,
-            applyInsets = false
-        )
     }
 
     /**
@@ -894,6 +920,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
             title = getString(R.string.settings_title),
             subtitle = null,
             back = { goBack() },
+            searchHint = getString(R.string.settings_search_hint),
             groups = listOf(
                 SettingsGroup(getString(R.string.settings_group_car_apps), buildList {
                     add(settingsEntry(
@@ -938,43 +965,43 @@ class MainActivity : androidx.activity.ComponentActivity() {
                         getString(R.string.fuel_title),
                         getString(R.string.fuel_settings_caption),
                         R.drawable.ic_tile_car,
-                        accent = design.ACCENT
+                        accent = design.ACCENT_RADIO
                     ) { startActivity(dev.autobridge.fuel.FuelLogActivity.intent(this@MainActivity)) })
                     add(settingsEntry(
                         getString(R.string.maint_title),
                         getString(R.string.maint_settings_caption),
-                        R.drawable.ic_tile_car,
-                        accent = design.ACCENT
+                        R.drawable.ic_tile_settings,
+                        accent = design.ACCENT_RADIO
                     ) { startActivity(dev.autobridge.maintenance.MaintenanceActivity.intent(this@MainActivity)) })
                     add(settingsEntry(
                         getString(R.string.break_reminder_title),
                         breakReminderCaption(),
-                        R.drawable.ic_tile_car,
-                        accent = design.ACCENT
+                        R.drawable.ic_tile_remote,
+                        accent = design.ACCENT_FAVORITE
                     ) { showBreakReminderChoice() })
                     add(settingsEntry(
                         getString(R.string.costs_title),
                         getString(R.string.costs_settings_caption),
-                        R.drawable.ic_tile_car,
-                        accent = design.ACCENT
+                        R.drawable.ic_tile_playlist,
+                        accent = design.ACCENT_FILES
                     ) { startActivity(dev.autobridge.expense.CostsActivity.intent(this@MainActivity)) })
                     add(settingsEntry(
                         getString(R.string.parking_title),
                         getString(R.string.parking_settings_caption),
                         R.drawable.ic_tile_car,
-                        accent = design.ACCENT
+                        accent = design.ACCENT_TV
                     ) { startActivity(dev.autobridge.parking.ParkingActivity.intent(this@MainActivity)) })
                     add(settingsEntry(
                         getString(R.string.emergency_title),
                         getString(R.string.emergency_settings_caption),
-                        R.drawable.ic_tile_car,
-                        accent = design.ACCENT
+                        R.drawable.ic_tile_touch,
+                        accent = design.ACCENT_VIDEO
                     ) { startActivity(dev.autobridge.emergency.EmergencyActivity.intent(this@MainActivity)) })
                     add(settingsEntry(
                         getString(R.string.backup_title),
                         getString(R.string.backup_settings_caption),
-                        R.drawable.ic_tile_car,
-                        accent = design.ACCENT
+                        R.drawable.ic_tile_folder,
+                        accent = design.ACCENT_SYSTEM
                     ) { startActivity(dev.autobridge.backup.BackupActivity.intent(this@MainActivity)) })
                 }),
                 SettingsGroup(getString(R.string.settings_group_playback_web), listOf(

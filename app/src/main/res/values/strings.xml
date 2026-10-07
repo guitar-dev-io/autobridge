@@ -544,6 +544,7 @@
 
     <!-- Settings navigation: the root list, Advanced and About ([MainActivity]). -->
     <string name="settings_title">Settings</string>
+    <string name="settings_search_hint">Search settings</string>
     <string name="settings_group_display">Display &amp; control</string>
     <string name="settings_display_mirror">Display &amp; Mirror</string>
     <string name="settings_display_mirror_caption">Renderer, rotation and fullscreen</string>
