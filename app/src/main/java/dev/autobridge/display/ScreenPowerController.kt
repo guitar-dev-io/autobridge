@@ -67,6 +67,7 @@ object ScreenPowerController {
     fun start(context: Context, preventScreenSleep: Boolean, autoDimDelay: AutoDimDelay) {
         stop()
         if (panel.restoreFailed) return
+        SessionHeatLog.start(context)
         powerManager = context.applicationContext.getSystemService(PowerManager::class.java)
         this.preventScreenSleep = preventScreenSleep
         this.autoDimDelay = autoDimDelay
@@ -131,6 +132,7 @@ object ScreenPowerController {
     @Synchronized
     fun stop() {
         handler.removeCallbacks(dimRunnable)
+        SessionHeatLog.stop()
         // Restore independently of FeaturePolicy: MOVING/UNKNOWN teardown must never leave the
         // physical panel off, even though normal input calls are then denied.
         if (!panel.restore()) {
