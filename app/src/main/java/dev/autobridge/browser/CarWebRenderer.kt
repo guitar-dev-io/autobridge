@@ -147,24 +147,32 @@ class CarWebRenderer(context: Context) {
          */
         const val STABLE_AREA_EPSILON_DP = 4f
 
-        /** Empty band between split panes; the window background shows through as the divider. */
-        const val SPLIT_GAP_DP = 4f
+        /**
+         * Empty band between split panes; the window background shows through as the divider.
+         * Wide enough to read as a channel the seam control sits in, rather than a hairline.
+         */
+        const val SPLIT_GAP_DP = 10f
 
         /** Narrowest pane a split may produce; below this the surface stays single. */
         const val SPLIT_MIN_PANE_DP = 180f
 
         /**
-         * How far either side of the divider a tap still grabs it. The gap itself is 4dp, which no
-         * one can hit from a moving car, so the grab target is a finger's width around it.
+         * How far around the seam control's grip a tap still grabs it: the grip is a slim capsule,
+         * so the grab target is a finger's width around it.
          */
         const val SPLIT_GRAB_DP = 24f
 
-        /** Width of the handle drawn on the divider, and how far the grabbed one widens to. */
-        const val SPLIT_HANDLE_DP = 4f
-        const val SPLIT_HANDLE_GRABBED_DP = 10f
+        /** How long after a tap on the page its focused field is read; see [offerFieldInput]. */
+        const val FIELD_FOCUS_DELAY_MS = 300L
 
-        /** Length of the handle, as a share of the pane height. */
-        const val SPLIT_HANDLE_LENGTH_FRACTION = 0.18f
+        /**
+         * The seam control: a slim capsule on the divider, [SEAM_CAPSULE_THICK_DP] across and
+         * [SEAM_CAPSULE_LONG_DP] along it. Its first [SEAM_CLOSE_DP] is the ✕; the rest is the
+         * grip that is dragged.
+         */
+        const val SEAM_CAPSULE_THICK_DP = 30f
+        const val SEAM_CAPSULE_LONG_DP = 118f
+        const val SEAM_CLOSE_DP = 40f
 
         /** How often a divider drag is allowed to re-measure the panes. See `dragDivider`. */
         const val DIVIDER_LAYOUT_INTERVAL_MS = 80L
@@ -187,6 +195,12 @@ class CarWebRenderer(context: Context) {
      */
     interface Host {
         fun openAddressInput()
+
+        /**
+         * A text field on the page took focus. The host offers a way to type into it, seeded with
+         * [current], and sends the result back through [submitText].
+         */
+        fun openFieldInput(current: String)
         fun openFindInPage()
         fun openAgent()
         fun openBookmarks()
@@ -1609,38 +1623,38 @@ class CarWebRenderer(context: Context) {
             (panes.side.bottom + panes.main.top) / 2f
         }
 
-    /** The handle as drawn. Hit testing grows it by [SPLIT_GRAB_DP]; nothing else moves it. */
-    private fun dividerHandleBox(panes: SplitPanes): Box {
-        val thickness = sizes.dp(if (dividerGrabbed) SPLIT_HANDLE_GRABBED_DP else SPLIT_HANDLE_DP) / 2f
-        if (panes.stacked) {
-            // Lying across the seam between the top and bottom page.
-            val centreX = panes.side.left + panes.side.width / 2f
-            val centreY = dividerCentreY(panes)
-            val halfLength = panes.side.width * SPLIT_HANDLE_LENGTH_FRACTION / 2f
-            return Box(centreX - halfLength, centreY - thickness, centreX + halfLength, centreY + thickness)
+    /**
+     * The seam control as drawn: a capsule centred on the divider, lying along it. See
+     * [SEAM_CAPSULE_LONG_DP].
+     */
+    private fun seamCapsule(panes: SplitPanes): Box {
+        val thick = sizes.dp(SEAM_CAPSULE_THICK_DP) / 2f
+        val long = sizes.dp(SEAM_CAPSULE_LONG_DP) / 2f
+        return if (panes.stacked) {
+            val cx = panes.side.left + panes.side.width / 2f
+            val cy = dividerCentreY(panes)
+            Box(cx - long, cy - thick, cx + long, cy + thick)
+        } else {
+            val cx = dividerCentreX(panes)
+            val cy = panes.side.top + panes.side.height / 2f
+            Box(cx - thick, cy - long, cx + thick, cy + long)
         }
-        val centreX = dividerCentreX(panes)
-        val centreY = panes.side.top + panes.side.height / 2f
-        val halfLength = panes.side.height * SPLIT_HANDLE_LENGTH_FRACTION / 2f
-        return Box(centreX - thickness, centreY - halfLength, centreX + thickness, centreY + halfLength)
     }
 
-    /**
-     * The ✕ that closes the split, drawn on the seam just above the handle (left of it when the
-     * panes are stacked): on the divider rather than in a pane's corner, where the toolbar and
-     * the floating button already sit and where it would cover a page's own controls.
-     */
+    /** The capsule's grip: everything past the ✕. This is what a tap grabs and a drag moves. */
+    private fun dividerHandleBox(panes: SplitPanes): Box {
+        val capsule = seamCapsule(panes)
+        val close = sizes.dp(SEAM_CLOSE_DP)
+        return if (panes.stacked) Box(capsule.left + close, capsule.top, capsule.right, capsule.bottom)
+        else Box(capsule.left, capsule.top + close, capsule.right, capsule.bottom)
+    }
+
+    /** The capsule's ✕ end: the top of it, or its left end when the panes are stacked. */
     private fun sideCloseBox(panes: SplitPanes): Box {
-        val handle = dividerHandleBox(panes)
-        val radius = sizes.touchTarget * 0.4f
-        val gap = sizes.contentGap
-        return if (panes.stacked) {
-            val cx = handle.left - gap - radius
-            Box(cx - radius, handle.centerY - radius, cx + radius, handle.centerY + radius)
-        } else {
-            val cy = handle.top - gap - radius
-            Box(handle.centerX - radius, cy - radius, handle.centerX + radius, cy + radius)
-        }
+        val capsule = seamCapsule(panes)
+        val close = sizes.dp(SEAM_CLOSE_DP)
+        return if (panes.stacked) Box(capsule.left, capsule.top, capsule.left + close, capsule.bottom)
+        else Box(capsule.left, capsule.top, capsule.right, capsule.top + close)
     }
 
     /** A tap on the split's ✕ closes the split. Returns true when the tap was that. */
@@ -1735,6 +1749,20 @@ class CarWebRenderer(context: Context) {
         view.dispatchTouchEvent(up)
         down.recycle()
         up.recycle()
+        // The car surface has no system keyboard: a tap that focused one of the page's text
+        // fields asks the host for a way to type into it.
+        mainHandler.postDelayed({ offerFieldInput(view) }, FIELD_FOCUS_DELAY_MS)
+    }
+
+    /** When [page] has a text field focused, hands its text to [Host.openFieldInput]. */
+    private fun offerFieldInput(page: WebView) {
+        if (page !== webView && page !== sideView) return
+        if (overlay != Overlay.NONE) return
+        page.evaluateJavascript(CarKeyboardPanel.FOCUSED_FIELD_SCRIPT.trimIndent()) { raw ->
+            val parsed = runCatching { org.json.JSONArray("[${raw ?: "null"}]") }.getOrNull()
+            val field = if (parsed == null || parsed.isNull(0)) null else parsed.optString(0)
+            if (field != null && overlay == Overlay.NONE) host?.openFieldInput(field)
+        }
     }
 
     /**
@@ -2940,27 +2968,40 @@ class CarWebRenderer(context: Context) {
      */
     private fun drawSplitDivider(canvas: Canvas) {
         val panes = splitPanes ?: return
-        drawSideClose(canvas, sideCloseBox(panes))
-        val handle = dividerHandleBox(panes)
-        val radius = minOf(handle.width, handle.height) / 2f
-        toolbarPaint.style = Paint.Style.FILL
-        toolbarPaint.color = if (dividerGrabbed) BrowserTheme.dark.accent else Color.WHITE
-        toolbarPaint.alpha = if (dividerGrabbed) 255 else 90
-        canvas.drawRoundRect(
-            handle.left, handle.top, handle.right, handle.bottom, radius, radius, toolbarPaint
-        )
-        toolbarPaint.alpha = 255
-    }
-
-    /** The split's ✕: a dark disc with a light cross, legible over either page. */
-    private fun drawSideClose(canvas: Canvas, box: Box) {
-        val radius = box.width / 2f
+        val capsule = seamCapsule(panes)
+        val radius = minOf(capsule.width, capsule.height) / 2f
+        // The capsule: dark and nearly opaque, so it reads over either page.
         toolbarPaint.style = Paint.Style.FILL
         toolbarPaint.color = BrowserTheme.dark.surfaceContainerHighest
-        toolbarPaint.alpha = 230
-        canvas.drawCircle(box.centerX, box.centerY, radius, toolbarPaint)
+        toolbarPaint.alpha = 235
+        canvas.drawRoundRect(capsule.left, capsule.top, capsule.right, capsule.bottom, radius, radius, toolbarPaint)
         toolbarPaint.alpha = 255
-        drawIcon(canvas, BrowserIcon.CLOSE, box.centerX, box.centerY, radius, BrowserTheme.dark.iconEnabled)
+        // A small ✕ at its end.
+        val close = sideCloseBox(panes)
+        drawIcon(canvas, BrowserIcon.CLOSE, close.centerX, close.centerY, sizes.dp(16f), BrowserTheme.dark.iconEnabled)
+        // A hairline between the ✕ and the grip.
+        val grip = dividerHandleBox(panes)
+        toolbarPaint.color = BrowserTheme.dark.outlineVariant
+        val hair = sizes.dp(1f)
+        if (panes.stacked) {
+            canvas.drawRect(grip.left, grip.top + sizes.dp(7f), grip.left + hair, grip.bottom - sizes.dp(7f), toolbarPaint)
+        } else {
+            canvas.drawRect(grip.left + sizes.dp(7f), grip.top, grip.right - sizes.dp(7f), grip.top + hair, toolbarPaint)
+        }
+        // The grip: two short bars along the seam, lit in the accent while grabbed.
+        toolbarPaint.color = if (dividerGrabbed) BrowserTheme.dark.accent else BrowserTheme.dark.textSecondary
+        val bar = sizes.dp(3f)
+        val len = sizes.dp(26f) / 2f
+        val apart = sizes.dp(4f)
+        for (offset in listOf(-apart, apart)) {
+            if (panes.stacked) {
+                val y = grip.centerY + offset
+                canvas.drawRoundRect(grip.centerX - len, y - bar / 2f, grip.centerX + len, y + bar / 2f, bar, bar, toolbarPaint)
+            } else {
+                val x = grip.centerX + offset
+                canvas.drawRoundRect(x - bar / 2f, grip.centerY - len, x + bar / 2f, grip.centerY + len, bar, bar, toolbarPaint)
+            }
+        }
     }
 
     /** Toolbar, overlays and FAB — shared by the legacy frame and the hardware chrome layer. */

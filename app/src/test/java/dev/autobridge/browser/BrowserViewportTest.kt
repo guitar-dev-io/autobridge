@@ -999,8 +999,11 @@ class CarMenuParityTest {
         val more = BrowserDrawerModel.moreItems(state).map { it.action }
         assertFalse(DrawerAction.SPLIT_LAYOUT in more)
         assertEquals(
-            listOf(DrawerAction.SPLIT_CHOOSE, DrawerAction.SIDE_SHOW_PAGE, DrawerAction.SWAP_SPLIT_SIDES),
-            more.take(3),
+            listOf(
+                DrawerAction.NEW_TAB,
+                DrawerAction.SPLIT_CHOOSE, DrawerAction.SIDE_SHOW_PAGE, DrawerAction.SWAP_SPLIT_SIDES,
+            ),
+            more.take(4),
         )
     }
 
@@ -1030,6 +1033,8 @@ class CarMenuParityTest {
         val actions = BrowserDrawerModel.carMenu(state).map { it.action }
         assertEquals(actions.size, actions.toSet().size)
         assertEquals(DrawerAction.TABS, actions.first())
+        // New tab sits straight under Tabs on the one-list menus, never a dozen rows down.
+        assertEquals(DrawerAction.NEW_TAB, actions[1])
         assertEquals(DrawerAction.APP_HOME, actions.last())
         listOf(
             DrawerAction.BOOKMARKS, DrawerAction.SETTINGS, DrawerAction.HISTORY, DrawerAction.DOWNLOADS,
@@ -1058,6 +1063,42 @@ class CarMenuParityTest {
             BrowserDrawerModel.primaryRows(limited)[1].map { it.action },
         )
         assertTrue(BrowserDrawerModel.moreItems(limited).none { it.action in unsupported })
+    }
+
+    /** Bridge Web and the Duo pane: related entries share a line, so the menu fits a car screen. */
+    @Test fun theListMenusGroupRelatedEntriesOnFewLines() {
+        val bridgeWeb = state.copy(
+            unsupported = setOf(DrawerAction.MEDIA_CENTER, DrawerAction.NOW_PLAYING, DrawerAction.MEDIA_LIBRARY, DrawerAction.AGENT),
+        )
+        val items = BrowserDrawerModel.carMenu(bridgeWeb)
+        val rows = CarMenuList.rows(items)
+        // Swap sides is the "side page on the right" switch in Split options, not a grid button.
+        val gridItems = items.filter { it.action != DrawerAction.SWAP_SPLIT_SIDES }
+        assertEquals(gridItems.map { it.action }.toSet(), rows.flatten().map { it.action }.toSet())
+        assertEquals(gridItems.size, rows.flatten().size)
+        assertTrue(rows.all { it.size in 1..4 })
+        assertTrue("${rows.size} lines", rows.size <= 10)
+        assertEquals(listOf(DrawerAction.TABS, DrawerAction.NEW_TAB), rows.first().map { it.action })
+        fun line(a: DrawerAction) = rows.indexOfFirst { row -> row.any { it.action == a } }
+        assertEquals(line(DrawerAction.TOGGLE_DESKTOP), line(DrawerAction.TOGGLE_FULLSCREEN))
+        assertEquals(line(DrawerAction.ZOOM_IN), line(DrawerAction.ZOOM_OUT))
+        assertEquals(line(DrawerAction.BOOKMARKS), line(DrawerAction.HISTORY))
+        assertEquals(line(DrawerAction.SPLIT_LAYOUT), line(DrawerAction.SPLIT_CHOOSE))
+    }
+
+    @Test fun theDuoPaneGridLeadsWithTheStartPage() {
+        val duo = state.copy(
+            unsupported = setOf(
+                DrawerAction.TABS, DrawerAction.NEW_TAB, DrawerAction.SPLIT_LAYOUT, DrawerAction.SPLIT_CHOOSE,
+                DrawerAction.SIDE_SHOW_PAGE, DrawerAction.SWAP_SPLIT_SIDES, DrawerAction.NAVIGATE_MAPS,
+                DrawerAction.MEDIA_CENTER, DrawerAction.NOW_PLAYING, DrawerAction.MEDIA_LIBRARY,
+                DrawerAction.AGENT, DrawerAction.MIRROR_PHONE, DrawerAction.PIN_TOOLBAR, DrawerAction.APP_HOME,
+            ),
+        )
+        val items = BrowserDrawerModel.carMenu(duo)
+        val rows = CarMenuList.rows(items)
+        assertEquals(listOf(DrawerAction.HOME), rows.first().map { it.action })
+        assertEquals(items.size, rows.flatten().size)
     }
 
     @Test fun thePhoneSheetIsUntouchedByTheCarSplitTile() {

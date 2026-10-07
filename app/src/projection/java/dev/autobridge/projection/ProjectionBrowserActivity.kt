@@ -151,8 +151,16 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
          */
         const val FIELD_FOCUS_DELAY_MS = 250L
 
+        /** The second read, for a field a site focuses after an animation. */
+        const val FIELD_FOCUS_RETRY_MS = 800L
+
         /** Split metrics, in dp; the same values the template route's split uses. */
-        const val SPLIT_GAP = 4
+        const val SPLIT_GAP = 10
+
+        /** The seam control: a capsule this thick and long, its first [SEAM_CLOSE] the ✕. */
+        const val SEAM_THICK = 30
+        const val SEAM_LONG = 118
+        const val SEAM_CLOSE = 40
         const val SPLIT_MIN_PANE = 180
 
         /**
@@ -198,8 +206,14 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
      */
     private var sideView: WebView? = null
 
-    /** The ✕ on the seam that closes the split; see [placeSideClose]. */
-    private var sideCloseButton: TextView? = null
+    /** The seam control (✕ and drag grip) between the panes; see [placeSideClose]. */
+    private var sideCloseButton: View? = null
+
+    /** The split ratio while the seam is being dragged; stored when the finger lifts. */
+    private var liveSideFraction: Float? = null
+
+    /** The panes as they were when the current seam drag began. */
+    private var dragStartPanes: SplitPanes? = null
 
     /**
      * The phone's screen over the page, opened from the menu; null while the browser is showing.
@@ -1035,32 +1049,38 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         dismissOverlay()
         closeKeyboard()
         val parent = root ?: return
-        val card = LinearLayout(this).apply {
+        // The sheet is a fixed title line over a scrolling body. The title carries the ✕ and is
+        // the drag handle, so it has to stay on screen however long the body is: on a tall car
+        // display the body can fill it, leaving no scrim to tap.
+        val body = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            build()
+        }
+        val header = CarMenuList.header(this, heading, menuStyle()) { dismissOverlay() }
+        val sheet = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
                 cornerRadius = 20 * resources.displayMetrics.density
                 setColor(scheme.sheetBackground)
             }
-            setPadding(12.dp(), 12.dp(), 12.dp(), 12.dp())
-            // Swallows its own taps: the scrim dismisses, and a miss inside the card must not.
+            setPadding(12.dp(), 8.dp(), 12.dp(), 12.dp())
+            // Swallows its own taps: the scrim dismisses, and a miss inside the sheet must not.
             isClickable = true
+            addView(header)
+            // Measured after the header, so it gets what is left and scrolls inside that.
             addView(
-                TextView(this@ProjectionBrowserActivity).apply {
-                    text = heading
-                    setTextColor(scheme.textSecondary)
-                    textSize = 14f
-                    setPadding(12.dp(), 4.dp(), 12.dp(), 10.dp())
-                }
+                ScrollView(this@ProjectionBrowserActivity).apply { addView(body) },
+                LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
             )
-            build()
         }
+        CarMenuList.dragToClose(header, sheet) { dismissOverlay() }
         val scrim = FrameLayout(this).apply {
             setBackgroundColor(scheme.scrim)
             isClickable = true
             setOnClickListener { dismissOverlay() }
             addView(
-                ScrollView(this@ProjectionBrowserActivity).apply { addView(card) },
+                sheet,
                 FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -1152,23 +1172,37 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
     private fun openMenu() {
         noteInteraction()
         if (!allowed()) return enforcePolicy()
-        val style = CarMenuList.Style(
-            text = scheme.textPrimary,
-            textSecondary = scheme.textSecondary,
-            rowFill = scheme.sheetCardBackground,
-            accent = scheme.primary,
-            onAccent = scheme.onPrimary,
-        )
-        val rows = CarMenuList.build(this, menuState(), style) { action ->
+        val rows = CarMenuList.build(this, menuState(), menuStyle()) { action ->
             dismissOverlay()
             runMenuAction(action)
         }
         showOverlay(getString(R.string.car_browser_title)) {
             rows.forEach { addView(it) }
-            addView(menuRow("⌨", getString(R.string.bridge_web_menu_keyboard)) { dismissOverlay(); openKeyboard() })
-            addView(menuRow("▭", getString(R.string.bridge_web_menu_car_search)) { dismissOverlay(); openAddressEntry() })
+            // This route's own two ways to type, side by side on one line.
+            addView(LinearLayout(this@ProjectionBrowserActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                addView(
+                    menuRow("⌨", getString(R.string.bridge_web_menu_keyboard)) { dismissOverlay(); openKeyboard() },
+                    LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { topMargin = 6.dp() }
+                )
+                addView(
+                    menuRow("▭", getString(R.string.bridge_web_menu_car_search)) { dismissOverlay(); openAddressEntry() },
+                    LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                        topMargin = 6.dp()
+                        marginStart = 6.dp()
+                    }
+                )
+            })
         }
     }
+
+    private fun menuStyle() = CarMenuList.Style(
+        text = scheme.textPrimary,
+        textSecondary = scheme.textSecondary,
+        rowFill = scheme.sheetCardBackground,
+        accent = scheme.primary,
+        onAccent = scheme.onPrimary,
+    )
 
     private fun menuState(): BrowserMenuState = BrowserMenuState(
         surface = MenuSurface.CAR,
@@ -1362,22 +1396,21 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
      * template browser's settings screen writes, so a change on either is a change on both.
      */
     private fun openSettings() {
-        fun onOff(on: Boolean) = getString(if (on) R.string.browser_menu_on else R.string.browser_menu_off)
         val activity = this
+        val style = menuStyle()
+        fun switch(label: Int, on: Boolean, toggle: () -> Unit) =
+            CarMenuList.switchRow(activity, getString(label), on, style) { toggle(); openSettings() }
         showOverlay(getString(R.string.car_browser_settings_title)) {
-            val pinned = BrowserControlsStore.alwaysShowUrlBar(activity)
-            addView(menuRow("⇧", getString(R.string.car_browser_always_url_bar), onOff(pinned)) {
+            addView(switch(R.string.car_browser_always_url_bar, BrowserControlsStore.alwaysShowUrlBar(activity)) {
                 togglePinnedToolbar()
-                openSettings()
             })
             val alwaysFab = BrowserControlsStore.alwaysShowFloatingButton(activity)
-            addView(menuRow("●", getString(R.string.car_browser_always_fab), onOff(alwaysFab)) {
+            addView(switch(R.string.car_browser_always_fab, alwaysFab) {
                 BrowserControlsStore.setAlwaysShowFloatingButton(activity, !alwaysFab)
                 applyChromeVisible(chromeBar?.visibility == View.VISIBLE)
-                openSettings()
             })
             val fabLeft = BrowserControlsStore.floatingButtonOnLeft(activity)
-            addView(menuRow("◧", getString(R.string.car_browser_fab_left), onOff(fabLeft)) {
+            addView(switch(R.string.car_browser_fab_left, fabLeft) {
                 BrowserControlsStore.setFloatingButtonOnLeft(activity, !fabLeft)
                 fab?.let { button ->
                     (button.layoutParams as? FrameLayout.LayoutParams)?.let { params ->
@@ -1385,39 +1418,27 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
                         button.layoutParams = params
                     }
                 }
-                openSettings()
-            })
-            val split = BrowserSplitStore.projection.layout(activity)
-            addView(menuRow(split.glyph, getString(R.string.car_browser_split), splitDetail(split)) {
-                openSplitChooser()
-            })
-            val sideRight = BrowserSplitStore.projection.sideOnRight(activity)
-            addView(menuRow("◨", getString(R.string.car_browser_side_right), onOff(sideRight)) {
-                BrowserSplitStore.projection.setSideOnRight(activity, !sideRight)
-                layoutPanes()
-                openSettings()
-            })
-            val keepMusic = AudioPlaybackStore.keepPlayingThroughFocusLoss(activity)
-            addView(menuRow("♪", getString(R.string.car_browser_reverse_music), onOff(keepMusic)) {
-                AudioPlaybackStore.setKeepPlayingThroughFocusLoss(activity, !keepMusic)
-                openSettings()
-            })
-            val blockAds = BrowserAdBlock.enabled(activity)
-            addView(menuRow("⛔", getString(R.string.car_browser_block_ads), onOff(blockAds)) {
-                BrowserAdBlock.setEnabled(activity, !blockAds)
-                webView?.reload()
-                openSettings()
             })
             val desktop = BrowserUserAgentStore.isDesktopIdentity(activity)
-            addView(menuRow(
-                "⛶", getString(R.string.car_browser_identity),
-                getString(if (desktop) R.string.car_ua_desktop else R.string.car_ua_mobile)
-            ) {
+            addView(switch(R.string.drawer_request_desktop, desktop) {
                 BrowserUserAgentStore.select(
                     activity, if (desktop) BrowserUserAgentMode.MOBILE else BrowserUserAgentMode.DESKTOP
                 )
                 webView?.reload()
-                openSettings()
+            })
+            val keepMusic = AudioPlaybackStore.keepPlayingThroughFocusLoss(activity)
+            addView(switch(R.string.car_browser_reverse_music, keepMusic) {
+                AudioPlaybackStore.setKeepPlayingThroughFocusLoss(activity, !keepMusic)
+            })
+            val blockAds = BrowserAdBlock.enabled(activity)
+            addView(switch(R.string.car_browser_block_ads, blockAds) {
+                BrowserAdBlock.setEnabled(activity, !blockAds)
+                webView?.reload()
+            })
+            // The split screen has its own sheet; a way there rather than a copy of it.
+            val split = BrowserSplitStore.projection.layout(activity)
+            addView(menuRow(split.glyph, getString(R.string.drawer_split_choose), splitDetail(split)) {
+                openSplitChooser()
             })
         }
     }
@@ -1677,30 +1698,52 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         StructuredLog.i("PROJECTION", "split -> $next (side ${if (sideView != null) "shown" else "none"})")
     }
 
-    /** Picks a layout in one step, rather than stepping through them; and which side the page is on. */
+    /**
+     * Everything about the split screen on one sheet: a switch for the split itself, the layouts
+     * as pictures to tap, which side the side page is on, and putting this page there. It stays
+     * open while switches and layouts change, so the driver sees each choice take hold.
+     */
     private fun openSplitChooser() {
-        val current = BrowserSplitStore.projection.layout(this)
-        showOverlay(getString(R.string.drawer_split_choose)) {
-            BrowserSplitLayout.entries.forEach { layout ->
-                val label = layout.label(this@ProjectionBrowserActivity)
-                addView(menuRow(if (layout == current) "●" else "○", label) {
-                    dismissOverlay()
-                    BrowserSplitStore.projection.setLayout(this@ProjectionBrowserActivity, layout)
-                    layoutPanes()
-                    if (layout != BrowserSplitLayout.SINGLE && sideView == null) {
-                        notice(getString(R.string.car_split_too_narrow, label))
-                    }
-                    StructuredLog.i("PROJECTION", "split chosen -> $layout")
-                })
-            }
-            val sideRight = BrowserSplitStore.projection.sideOnRight(this@ProjectionBrowserActivity)
-            addView(menuRow(
-                "⇆", getString(R.string.car_browser_side_right),
-                getString(if (sideRight) R.string.browser_menu_on else R.string.browser_menu_off)
-            ) {
-                BrowserSplitStore.projection.setSideOnRight(this@ProjectionBrowserActivity, !sideRight)
+        val activity = this
+        val style = menuStyle()
+        val layout = BrowserSplitStore.projection.layout(activity)
+        val on = layout != BrowserSplitLayout.SINGLE
+        showOverlay(getString(R.string.car_browser_split)) {
+            addView(CarMenuList.switchRow(activity, getString(R.string.car_browser_split), on, style) {
+                BrowserSplitStore.projection.toggle(activity)
                 layoutPanes()
                 openSplitChooser()
+            })
+            // On, but too narrow for two panes: say so where the choice is made.
+            if (on && sideView == null) {
+                addView(TextView(activity).apply {
+                    text = getString(R.string.car_split_too_narrow, layout.label(activity))
+                    setTextColor(scheme.textSecondary)
+                    textSize = 14f
+                    setPadding(8.dp(), 8.dp(), 8.dp(), 0)
+                })
+            }
+            addView(TextView(activity).apply {
+                text = getString(R.string.split_layouts_heading)
+                setTextColor(scheme.textSecondary)
+                textSize = 14f
+                setPadding(8.dp(), 14.dp(), 8.dp(), 0)
+            })
+            val sideRight = BrowserSplitStore.projection.sideOnRight(activity)
+            CarMenuList.splitLayoutCards(activity, layout.takeIf { on }, sideRight, style) { picked ->
+                BrowserSplitStore.projection.setLayout(activity, picked)
+                layoutPanes()
+                StructuredLog.i("PROJECTION", "split chosen -> $picked")
+                openSplitChooser()
+            }.forEach { addView(it) }
+            addView(CarMenuList.switchRow(activity, getString(R.string.car_browser_side_right), sideRight, style) {
+                BrowserSplitStore.projection.setSideOnRight(activity, !sideRight)
+                layoutPanes()
+                openSplitChooser()
+            })
+            addView(menuRow("◨", getString(R.string.drawer_side_show_page)) {
+                dismissOverlay()
+                showPageOnSide()
             })
         }
     }
@@ -1749,7 +1792,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
             sideOnRight = BrowserSplitStore.projection.sideOnRight(this),
             gapPx = SPLIT_GAP.dp(),
             minPanePx = SPLIT_MIN_PANE.dp(),
-            sideFraction = BrowserSplitStore.projection.sideFraction(this),
+            sideFraction = liveSideFraction ?: BrowserSplitStore.projection.sideFraction(this),
         )
         if (panes == null) {
             releaseSidePane()
@@ -1764,35 +1807,17 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
     }
 
     /**
-     * The ✕ that closes the split, centred on the seam between the panes: on the divider rather
-     * than in a pane's corner, where the toolbar and the floating button already sit and where it
-     * would cover a page's own controls. The car browser draws its ✕ in the same place.
+     * The seam control, centred on the divider and lying along it: a slim dark capsule whose end
+     * is a small ✕ that closes the split, and whose rest is a grip that drags the divider. On the
+     * seam rather than in a pane's corner, where the toolbar and the floating button already sit.
      */
     private fun placeSideClose(area: FrameLayout, panes: SplitPanes) {
-        val size = TOUCH_TARGET.dp()
-        val button = sideCloseButton ?: TextView(this).apply {
-            text = "\u2715"
-            contentDescription = getString(R.string.split_close_side)
-            setTextColor(scheme.textPrimary)
-            textSize = 18f
-            gravity = Gravity.CENTER
-            background = RippleDrawable(
-                ColorStateList.valueOf(scheme.textSecondary),
-                ShapeDrawable(OvalShape()).apply { paint.color = scheme.surfaceContainerHighest },
-                null
-            )
-            elevation = 4f * resources.displayMetrics.density
-            isClickable = true
-            isFocusable = true
-            setOnClickListener {
-                noteInteraction()
-                if (BrowserSplitStore.projection.layout(this@ProjectionBrowserActivity) != BrowserSplitLayout.SINGLE) {
-                    toggleSplit()
-                }
-            }
-        }.also { created ->
+        val thick = SEAM_THICK.dp()
+        val long = SEAM_LONG.dp()
+        val (w, h) = if (panes.stacked) long to thick else thick to long
+        val capsule = sideCloseButton ?: seamCapsule(panes.stacked).also { created ->
             sideCloseButton = created
-            area.addView(created, FrameLayout.LayoutParams(size, size))
+            area.addView(created, FrameLayout.LayoutParams(w, h))
         }
         val (centreX, centreY) = if (panes.stacked) {
             val top = minOf(panes.main.bottom, panes.side.bottom)
@@ -1803,13 +1828,133 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
             val right = maxOf(panes.main.left, panes.side.left)
             (left + right) / 2 to (panes.side.top + panes.side.height / 2)
         }
-        val params = (button.layoutParams as? FrameLayout.LayoutParams) ?: FrameLayout.LayoutParams(size, size)
+        val params = (capsule.layoutParams as? FrameLayout.LayoutParams) ?: FrameLayout.LayoutParams(w, h)
+        // A capsule built for the other orientation is rebuilt rather than stretched.
+        if (params.width != w || params.height != h) {
+            removeSideClose()
+            return placeSideClose(area, panes)
+        }
         params.gravity = Gravity.TOP or Gravity.START
-        params.leftMargin = centreX - size / 2
-        params.topMargin = centreY - size / 2
-        button.layoutParams = params
-        button.visibility = sideView?.visibility ?: View.VISIBLE
-        button.bringToFront()
+        params.leftMargin = centreX - w / 2
+        params.topMargin = centreY - h / 2
+        capsule.layoutParams = params
+        capsule.visibility = sideView?.visibility ?: View.VISIBLE
+        capsule.bringToFront()
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    private fun seamCapsule(stacked: Boolean): View {
+        val close = TextView(this).apply {
+            text = "\u2715"
+            contentDescription = getString(R.string.split_close_side)
+            setTextColor(scheme.textPrimary)
+            textSize = 13f
+            gravity = Gravity.CENTER
+            background = circleRipple()
+            isClickable = true
+            setOnClickListener {
+                noteInteraction()
+                if (BrowserSplitStore.projection.layout(this@ProjectionBrowserActivity) != BrowserSplitLayout.SINGLE) {
+                    toggleSplit()
+                }
+            }
+        }
+        val grip = LinearLayout(this).apply {
+            orientation = if (stacked) LinearLayout.VERTICAL else LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            repeat(2) { index ->
+                addView(View(this@ProjectionBrowserActivity).apply {
+                    background = GradientDrawable().apply {
+                        shape = GradientDrawable.RECTANGLE
+                        cornerRadius = 2f * resources.displayMetrics.density
+                        setColor(scheme.textSecondary)
+                    }
+                }, if (stacked) {
+                    LinearLayout.LayoutParams(26.dp(), 3.dp()).apply { if (index > 0) topMargin = 5.dp() }
+                } else {
+                    LinearLayout.LayoutParams(3.dp(), 26.dp()).apply { if (index > 0) marginStart = 5.dp() }
+                })
+            }
+            contentDescription = getString(R.string.split_drag_seam)
+            setOnTouchListener { _, event -> dragSeam(event, stacked) }
+        }
+        return LinearLayout(this).apply {
+            orientation = if (stacked) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = SEAM_THICK / 2f * resources.displayMetrics.density
+                setColor(scheme.surfaceContainerHighest)
+                alpha = 235
+            }
+            elevation = 3f * resources.displayMetrics.density
+            val closeParams = if (stacked) {
+                LinearLayout.LayoutParams(SEAM_CLOSE.dp(), ViewGroup.LayoutParams.MATCH_PARENT)
+            } else {
+                LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, SEAM_CLOSE.dp())
+            }
+            addView(close, closeParams)
+            addView(grip, if (stacked) {
+                LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f)
+            } else {
+                LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
+            })
+        }
+    }
+
+    /**
+     * Drags the divider with the grip: the panes follow the finger at once (laid out at most once
+     * a frame), and the ratio is stored when the finger lifts. Starts from the panes as they were
+     * at touch-down, so the divider stays under the finger rather than drifting.
+     */
+    private fun dragSeam(event: MotionEvent, stacked: Boolean): Boolean {
+        val area = pageArea ?: return false
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                noteInteraction()
+                dragStartPanes = currentPanes() ?: return false
+                dragStartRaw = if (stacked) event.rawY else event.rawX
+                return true
+            }
+            MotionEvent.ACTION_MOVE -> {
+                val start = dragStartPanes ?: return false
+                val delta = ((if (stacked) event.rawY else event.rawX) - dragStartRaw).toInt()
+                liveSideFraction = BrowserSplitGeometry.dragSideFraction(
+                    start, delta, BrowserSplitStore.projection.sideOnRight(this), SPLIT_MIN_PANE.dp()
+                )
+                if (!seamLayoutPending) {
+                    seamLayoutPending = true
+                    area.postOnAnimation {
+                        seamLayoutPending = false
+                        layoutPanes()
+                    }
+                }
+                return true
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                liveSideFraction?.let { BrowserSplitStore.projection.setSideFraction(this, it) }
+                liveSideFraction = null
+                dragStartPanes = null
+                layoutPanes()
+                return true
+            }
+        }
+        return false
+    }
+
+    private var dragStartRaw = 0f
+    private var seamLayoutPending = false
+
+    /** The split as it is laid out now, or null when there is none. */
+    private fun currentPanes(): SplitPanes? {
+        val area = pageArea ?: return null
+        return BrowserSplitGeometry.panes(
+            BrowserSplitStore.projection.layout(this),
+            0, 0, area.width, area.height,
+            sideOnRight = BrowserSplitStore.projection.sideOnRight(this),
+            gapPx = SPLIT_GAP.dp(),
+            minPanePx = SPLIT_MIN_PANE.dp(),
+            sideFraction = BrowserSplitStore.projection.sideFraction(this),
+        )
     }
 
     private fun removeSideClose() {
@@ -2343,6 +2488,9 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
     private val pageTouchListener = View.OnTouchListener { view, event ->
         if (event.actionMasked == MotionEvent.ACTION_UP && view is WebView) {
             view.postDelayed({ openKeyboardForFocusedField(view) }, FIELD_FOCUS_DELAY_MS)
+            // Again a little later, for a site whose search icon opens its box and focuses it
+            // only after an animation (YouTube's): too late for the first read.
+            view.postDelayed({ if (keyboardPanel == null) openKeyboardForFocusedField(view) }, FIELD_FOCUS_RETRY_MS)
         }
         false
     }

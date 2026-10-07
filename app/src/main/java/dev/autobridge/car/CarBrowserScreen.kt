@@ -225,6 +225,14 @@ class CarBrowserScreen(carContext: CarContext) :
         }
     }
 
+    /** A page field took focus: type into it with the car's own keyboard, then fill it in and submit. */
+    override fun openFieldInput(current: String) {
+        screenManager.pushForResult(CarBrowserSearchScreen(carContext, current)) { result ->
+            val text = result as? String ?: return@pushForResult
+            if (text.isNotBlank()) renderer.submitText(text, autoSubmit = true)
+        }
+    }
+
     override fun openFindInPage() {
         // Ask for the term first, then open the find controls screen (prev/next + counter).
         screenManager.pushForResult(CarBrowserSearchScreen(carContext, renderer.findQuery)) { result ->

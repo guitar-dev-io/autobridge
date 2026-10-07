@@ -354,6 +354,9 @@ class BrowserDrawerModel private constructor(
             val car = state.copy(surface = MenuSurface.CAR)
             val items = buildList {
                 add(primaryAction(car))
+                // Straight under Tabs, as Bridge Web always had it: on a single list, "More" order
+                // would put it a dozen rows down.
+                add(DrawerItem(DrawerAction.NEW_TAB, R.string.drawer_new_tab, BrowserIcon.ADD))
                 primaryRows(car).flatten().filter { it.action != DrawerAction.MORE }.forEach(::add)
                 add(desktopToggle(car))
                 add(fullscreenToggle(car))
@@ -366,8 +369,11 @@ class BrowserDrawerModel private constructor(
         private fun carMoreItems(state: BrowserMenuState = BrowserMenuState()): List<DrawerItem> = listOf(
             // Fullscreen no longer lives here: it is a primary-sheet toggle next to Desktop (see
             // [fullscreenToggle]), so it is never buried behind "More" on either surface.
+            // New tab first: it is the entry this list is opened for most, and it was pushed out
+            // of sight once the split screen's entries joined the list.
+            DrawerItem(DrawerAction.NEW_TAB, R.string.drawer_new_tab, BrowserIcon.ADD),
             // The split layout itself is on the primary sheet (see [primaryRows]); the rest of the
-            // split screen leads this list.
+            // split screen follows New tab.
             DrawerItem(DrawerAction.SPLIT_CHOOSE, R.string.drawer_split_choose, BrowserIcon.SPLIT_LAYOUT),
             DrawerItem(DrawerAction.SIDE_SHOW_PAGE, R.string.drawer_side_show_page, BrowserIcon.SPLIT_LAYOUT),
             // Listed whether or not a split is up, so it is always in the same place; it can only
@@ -382,7 +388,6 @@ class BrowserDrawerModel private constructor(
                 value = if (state.pinnedToolbar) "✓" else "", on = state.pinnedToolbar,
             ),
             DrawerItem(DrawerAction.MIRROR_PHONE, R.string.drawer_mirror_phone, BrowserIcon.CAR),
-            DrawerItem(DrawerAction.NEW_TAB, R.string.drawer_new_tab, BrowserIcon.ADD),
             DrawerItem(DrawerAction.HOME, R.string.drawer_start_page, BrowserIcon.HOME_PAGE),
             DrawerItem(DrawerAction.HISTORY, R.string.drawer_history, BrowserIcon.HISTORY),
             DrawerItem(DrawerAction.DOWNLOADS, R.string.drawer_downloads, BrowserIcon.DOWNLOAD),
