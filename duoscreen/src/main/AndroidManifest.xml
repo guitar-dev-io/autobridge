@@ -17,7 +17,7 @@
              it, which is the gating this feature needs. -->
         <service android:name="dev.autobridge.duoscreen.car.DuoScreenCarAppService"
             android:exported="true"
-            android:label="Bridge Duo"
+            android:label="@string/duo_screen_car_label"
             android:icon="@mipmap/ic_duoscreen_launcher">
             <intent-filter>
                 <action android:name="androidx.car.app.CarAppService" />

@@ -1,5 +1,6 @@
 package dev.autobridge.duoscreen.car
 
+import androidx.annotation.DrawableRes
 import androidx.car.app.AppManager
 import androidx.car.app.CarContext
 import androidx.car.app.CarToast
@@ -56,9 +57,12 @@ class DuoScreenScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
     }
 
     /**
-     * Reload, arrange and exit are icon-only: as text pills they covered the top of the right-hand
-     * pane on a real head unit. The preset button keeps its glyph title, which already reads as an
-     * icon and changes with the layout.
+     * The controls sit in two places because the template allows no other shape. Preset, reload and
+     * arrange go in the *map* action strip, which the host draws as one compact group of small icon
+     * buttons, like a map's zoom controls; as titled pills in the main strip they covered the top of
+     * a pane on a real head unit. Exit stays alone in the main strip: [NavigationTemplate] refuses
+     * to build without one, an empty strip is invalid, and it keeps the way out apart from the
+     * buttons a driver taps by the dozen.
      *
      * One button toggles edit mode, because the host only reports scroll/fling/scale — there is no
      * separate gesture left to mean "arrange" (see [DuoScreenInputRouter]).
@@ -68,7 +72,7 @@ class DuoScreenScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
         // Presets are a button rather than a sub-screen: it is one tap per layout from the driver's
         // seat, and the result is visible behind the strip while they cycle.
         val preset = Action.Builder()
-            .setTitle(DuoScreenStore.preset(carContext).glyph)
+            .setIcon(icon(DuoScreenStore.preset(carContext).iconRes))
             .setOnClickListener {
                 val applied = controller.cyclePreset()
                 CarToast.makeText(carContext, applied.label(carContext), CarToast.LENGTH_SHORT).show()
@@ -92,9 +96,6 @@ class DuoScreenScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
             }
             .build()
 
-        // The way out, and the fourth action: ACTIONS_CONSTRAINTS_NAVIGATION caps the strip at four
-        // actions, so the strip is now full.
-        //
         // Leaving the screen only detaches (DuoScreenHost.KEEP_ALIVE_MS), by design, so
         // without this there is no way to get the panes off the car display short of waiting the
         // keep-alive out: every pane app keeps running on its own display behind whatever the driver
@@ -121,18 +122,19 @@ class DuoScreenScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
             )
         }
         return builder
-            .setActionStrip(
+            .setActionStrip(ActionStrip.Builder().addAction(exit).build())
+            // ACTIONS_CONSTRAINTS_MAP: at most four actions, none with a custom title.
+            .setMapActionStrip(
                 ActionStrip.Builder()
                     .addAction(preset)
                     .addAction(reload)
                     .addAction(toggle)
-                    .addAction(exit)
                     .build()
             )
             .build()
     }
 
-    private fun icon(resId: Int): CarIcon =
+    private fun icon(@DrawableRes resId: Int): CarIcon =
         CarIcon.Builder(IconCompat.createWithResource(carContext, resId)).build()
 
     override fun onSurfaceAvailable(surfaceContainer: SurfaceContainer) {

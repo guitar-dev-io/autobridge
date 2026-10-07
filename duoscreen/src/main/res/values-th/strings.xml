@@ -3,10 +3,11 @@
     <string name="duo_screen_needs_shizuku">ให้สิทธิ์ Shizuku บนมือถือก่อน</string>
     <string name="duo_screen_banner_title">ต้องอนุญาต Shizuku บนมือถือ</string>
     <string name="duo_screen_banner_text">เปิดแอป Shizuku บนมือถือ ตรวจว่าทำงานอยู่ แล้วกดอนุญาตให้ AutoBridge ถ้ายังไม่อนุญาต ช่องจะแตะไม่ได้ และจะดำเมื่อมือถือหลับ</string>
-    <string name="duo_screen_title">Duo screen</string>
+    <string name="duo_screen_car_label">หลายแอป</string>
+    <string name="duo_screen_title">หลายแอป</string>
     <string name="duo_screen_subtitle">รัน 2–3 แอปพร้อมกันบนจอรถ</string>
     <string name="duo_screen_connection_section">การเชื่อมต่อ</string>
-    <string name="duo_screen_android_auto_hint">ต้องเชื่อมต่อ Android Auto เพื่อแสดง Duo screen บนจอรถ</string>
+    <string name="duo_screen_android_auto_hint">ต้องเชื่อมต่อ Android Auto เพื่อแสดงหลายแอปบนจอรถ</string>
     <string name="duo_screen_shizuku_ready">เชื่อมต่อ Shizuku แล้ว</string>
     <string name="duo_screen_shizuku_missing">ยังไม่ได้สิทธิ์ Shizuku</string>
     <string name="duo_screen_shizuku_hint">ใช้สำหรับเปิดแอปลงแต่ละช่องและส่งการแตะเข้าไป</string>
@@ -40,11 +41,11 @@
     <string name="duo_screen_applied_now">เปลี่ยนบนจอรถแล้ว</string>
     <string name="duo_screen_applied_next">บันทึกแล้ว จะมีผลเมื่อเชื่อมต่อครั้งถัดไป</string>
     <string name="duo_screen_session_section">เซสชัน</string>
-    <string name="duo_screen_end_session">ถอด duo screen ออกเดี๋ยวนี้</string>
+    <string name="duo_screen_end_session">ปิดหลายแอปเดี๋ยวนี้</string>
     <string name="duo_screen_end_session_hint">ปิดทุกช่องและแอปที่กำลังรันอยู่ในช่องนั้น</string>
-    <string name="duo_screen_end_session_confirm_title">ถอด duo screen ตอนนี้เลยไหม?</string>
-    <string name="duo_screen_end_session_confirm_action">ถอดตอนนี้</string>
-    <string name="duo_screen_end_done">ถอด duo screen แล้ว</string>
+    <string name="duo_screen_end_session_confirm_title">ปิดหลายแอปตอนนี้เลยไหม?</string>
+    <string name="duo_screen_end_session_confirm_action">ปิดตอนนี้</string>
+    <string name="duo_screen_end_done">ปิดหลายแอปแล้ว</string>
     <string name="duo_screen_end_none">ยังไม่มีเซสชันที่รันอยู่</string>
 
     <string name="duo_screen_pick_app_why">AutoBridge อ่านรายชื่อแอปที่ติดตั้งในเครื่องนี้ เพื่อให้เลือกแอปไปแสดงในแต่ละแพนได้ รายชื่อนี้ใช้สำหรับหน้าเลือกแอปนี้เท่านั้น และไม่ถูกส่งออกจากเครื่อง</string>

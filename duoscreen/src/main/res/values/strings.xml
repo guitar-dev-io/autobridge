@@ -3,10 +3,11 @@
     <string name="duo_screen_needs_shizuku">Grant Shizuku access on the phone first</string>
     <string name="duo_screen_banner_title">Allow Shizuku on the phone</string>
     <string name="duo_screen_banner_text">Open Shizuku on the phone, make sure it is running, and allow AutoBridge. Until then the panes cannot take touch and go black when the phone sleeps.</string>
-    <string name="duo_screen_title">Duo screen</string>
+    <string name="duo_screen_car_label">Multi-app</string>
+    <string name="duo_screen_title">Multi-app</string>
     <string name="duo_screen_subtitle">Run two or three apps side by side on the car display</string>
     <string name="duo_screen_connection_section">Connection</string>
-    <string name="duo_screen_android_auto_hint">Needed to show Duo screen on the car display</string>
+    <string name="duo_screen_android_auto_hint">Needed to show Multi-app on the car display</string>
     <string name="duo_screen_shizuku_ready">Shizuku connected</string>
     <string name="duo_screen_shizuku_missing">Shizuku not available</string>
     <string name="duo_screen_shizuku_hint">Needed to launch apps into the panes and pass touches to them</string>
@@ -40,11 +41,11 @@
     <string name="duo_screen_applied_now">Changed on the car display</string>
     <string name="duo_screen_applied_next">Saved; applies on the next connection</string>
     <string name="duo_screen_session_section">Session</string>
-    <string name="duo_screen_end_session">End duo screen now</string>
+    <string name="duo_screen_end_session">End Multi-app now</string>
     <string name="duo_screen_end_session_hint">Closes every pane and the apps running in them</string>
-    <string name="duo_screen_end_session_confirm_title">End duo screen now?</string>
+    <string name="duo_screen_end_session_confirm_title">End Multi-app now?</string>
     <string name="duo_screen_end_session_confirm_action">End now</string>
-    <string name="duo_screen_end_done">Duo screen ended</string>
+    <string name="duo_screen_end_done">Multi-app ended</string>
     <string name="duo_screen_end_none">Nothing running</string>
 
     <!-- Why the list below can name every installed app: QUERY_ALL_PACKAGES, which this

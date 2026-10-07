@@ -600,7 +600,7 @@
     <string name="fuel_delete_title">ลบรายการนี้?</string>
     <string name="fuel_delete">ลบ</string>
     <string name="fuel_allow_car_data">อ่านเลขไมล์จากรถ</string>
-    <string name="settings_duo_screen">Duo screen</string>
+    <string name="settings_duo_screen">หลายแอป</string>
     <string name="settings_duo_screen_caption">ช่อง การจัดวาง และขนาดเนื้อหา</string>
     <string name="settings_app_profiles_caption_full">Quick Apps สำหรับรถ การแสดงผลและเสียงแยกตามแอป</string>
     <string name="settings_group_playback_web">สื่อและเว็บ</string>
@@ -688,7 +688,7 @@
     <string name="home_tile_favorites">รายการที่ชอบ</string>
     <string name="home_tile_more">เพิ่มเติม</string>
     <string name="home_mirror_action">มิเรอร์</string>
-    <string name="home_bridge_duo_action">บริดจ์ดูโอ</string>
+    <string name="home_bridge_duo_action">หลายแอป</string>
 
     <!-- หน้า Car & Connection -->
     <string name="car_connection_title">รถและการเชื่อมต่อ</string>

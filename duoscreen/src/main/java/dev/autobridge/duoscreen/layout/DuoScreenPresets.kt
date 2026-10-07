@@ -1,6 +1,7 @@
 package dev.autobridge.duoscreen.layout
 
 import android.content.Context
+import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import dev.autobridge.duoscreen.R
 import dev.autobridge.duoscreen.layout.DuoScreenLayout.Bounds
@@ -19,20 +20,25 @@ import dev.autobridge.duoscreen.layout.DuoScreenLayout.Rect
  * of [WIDE_LEFT]/[WIDE_RIGHT] drops from 65% to 50% at three panes, where 65/17.5/17.5 would put
  * the two side panes under the minimum and the clamp would overlap them.
  */
-enum class DuoScreenPreset(@StringRes val labelRes: Int, val glyph: String) {
-    EVEN_COLUMNS(R.string.duo_screen_preset_even_columns, "◫"),
-    WIDE_LEFT(R.string.duo_screen_preset_wide_left, "◧"),
-    WIDE_RIGHT(R.string.duo_screen_preset_wide_right, "◨"),
-    EVEN_ROWS(R.string.duo_screen_preset_even_rows, "⊟"),
+enum class DuoScreenPreset(
+    @StringRes val labelRes: Int,
+    val glyph: String,
+    /** The car's map action strip takes icons only, so the glyph is drawn again as a vector. */
+    @DrawableRes val iconRes: Int
+) {
+    EVEN_COLUMNS(R.string.duo_screen_preset_even_columns, "◫", R.drawable.ic_duo_preset_even_columns),
+    WIDE_LEFT(R.string.duo_screen_preset_wide_left, "◧", R.drawable.ic_duo_preset_wide_left),
+    WIDE_RIGHT(R.string.duo_screen_preset_wide_right, "◨", R.drawable.ic_duo_preset_wide_right),
+    EVEN_ROWS(R.string.duo_screen_preset_even_rows, "⊟", R.drawable.ic_duo_preset_even_rows),
 
     /**
      * Stacked, the top pane the larger: 60% over 40% (a third pane takes the bottom 40% as two halves).
      * The shape of a portrait head unit with a map above and the music below.
      */
-    STACKED_60_40(R.string.duo_screen_preset_stacked_60_40, "⬒"),
+    STACKED_60_40(R.string.duo_screen_preset_stacked_60_40, "⬒", R.drawable.ic_duo_preset_stacked_60_40),
 
     /** Pane 0 fills the surface; the rest float over its bottom-right corner as small tiles. */
-    PICTURE_IN_PICTURE(R.string.duo_screen_preset_pip, "◰");
+    PICTURE_IN_PICTURE(R.string.duo_screen_preset_pip, "◰", R.drawable.ic_duo_preset_pip);
 
     fun next(): DuoScreenPreset = entries[(ordinal + 1) % entries.size]
 
