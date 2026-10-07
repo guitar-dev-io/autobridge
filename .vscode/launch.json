@@ -11,6 +11,23 @@
   "version": "0.2.0",
   "configurations": [
     {
+      // Next-Gen Ranger 10.1" portrait panel: 800x1280 @ dpi 160, touch.
+      // PLACEHOLDER geometry — not measured on real hardware (docs/FORD_NEXT_GEN.md).
+      "type": "node-terminal",
+      "request": "launch",
+      "name": "DHU: personal — Ranger 10.1\" (800x1280, portrait)",
+      "command": "scripts/dhu-run.sh personal ford-10inch-portrait touch",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      // Same panel, no rebuild: just re-forward + relaunch the DHU.
+      "type": "node-terminal",
+      "request": "launch",
+      "name": "DHU: personal — Ranger 10.1\" (no build, reconnect)",
+      "command": "scripts/dhu-run.sh --no-build personal ford-10inch-portrait touch",
+      "cwd": "${workspaceFolder}"
+    },
+    {
       // 8-inch Ford placeholder, portrait. NOT a measured Ford value — see
       // docs/FORD_NEXT_GEN.md. 720p turned on its side (720x1280).
       "type": "node-terminal",
