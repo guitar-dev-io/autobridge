@@ -2316,6 +2316,8 @@ class CarWebRenderer(context: Context) {
                 }
                 // A map opened in the main page asks for the Maps app the same way the side one does.
                 if (handOffToMaps(target, view.url)) return true
+                // An "open in the app" link: show its web page here instead of nothing.
+                InAppLinks.webPage(target)?.let { view.loadUrl(it); return true }
                 // Only allow HTTPS navigation; block custom schemes/intents on the car surface.
                 if (ContentAddress.https(target) == null) return true
                 // Set the identity before the request leaves; onPageStarted is too late for the

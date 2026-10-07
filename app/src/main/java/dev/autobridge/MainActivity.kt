@@ -2395,7 +2395,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
         android.app.AlertDialog.Builder(this)
             .setTitle(getString(R.string.about_promptpay_title))
             .setItems(arrayOf(getString(R.string.about_support_caption), getString(R.string.about_promptpay))) { _, which ->
-                if (which == 0) openExternalUrl(SUPPORT_URL) else showPromptPayDialog()
+                if (which == 0) openInAppUrl(SUPPORT_URL) else showPromptPayDialog()
             }
             .show()
     }
@@ -2998,7 +2998,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
                     getString(R.string.about_support_caption),
                     R.drawable.ic_tile_favorite
                 ) {
-                    openExternalUrl(SUPPORT_URL)
+                    openInAppUrl(SUPPORT_URL)
                 })
                 // PromptPay donate QR. Off-store payment prompts breach Google Play policy, so the
                 // row only exists on the sideload flavors (personal/lab), never on `safe`.
@@ -3032,14 +3032,14 @@ class MainActivity : androidx.activity.ComponentActivity() {
                     "github.com/guitar-dev-io/autobridge",
                     R.drawable.ic_tile_web
                 ) {
-                    openExternalUrl(GITHUB_URL)
+                    openInAppUrl(GITHUB_URL)
                 },
                 settingsEntry(
                     getString(R.string.about_facebook),
                     getString(R.string.about_facebook_caption),
                     R.drawable.ic_tile_web
                 ) {
-                    openExternalUrl(FACEBOOK_URL)
+                    openInAppUrl(FACEBOOK_URL)
                 }
             )),
             SettingsGroup(getString(R.string.about_group_credits), listOf(
@@ -3091,6 +3091,21 @@ class MainActivity : androidx.activity.ComponentActivity() {
             .show()
     }
 
+    /**
+     * Opens [url] in AutoBridge's own browser, so a link from the app (About, support, the
+     * release page) does not throw the user out to another app. Falls back to the phone's
+     * browser only when it is not a web page this browser loads.
+     */
+    private fun openInAppUrl(url: String) {
+        val page = dev.autobridge.entertainment.ContentAddress.https(url) ?: return openExternalUrl(url)
+        val opened = runCatching {
+            startActivity(browserScreenIntent().setData(android.net.Uri.parse(page)))
+            true
+        }.getOrDefault(false)
+        if (!opened) openExternalUrl(url)
+    }
+
+    /** The phone's own browser: for what this app's browser should not handle (an APK download). */
     private fun openExternalUrl(url: String) {
         val opened = runCatching {
             startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
@@ -3167,12 +3182,12 @@ class MainActivity : androidx.activity.ComponentActivity() {
             .setTitle(getString(R.string.about_update_title))
             .setMessage(message)
             .setNeutralButton(getString(R.string.about_update_release_page)) { _, _ ->
-                openExternalUrl(release.pageUrl)
+                openInAppUrl(release.pageUrl)
             }
             .setNegativeButton(getString(R.string.about_update_later), null)
             .setPositiveButton(getString(R.string.about_update_download)) { _, _ ->
                 val apkUrl = release.apkUrl
-                if (apkUrl == null) openExternalUrl(release.pageUrl) else maintenance.downloadAndOfferInstall(apkUrl)
+                if (apkUrl == null) openInAppUrl(release.pageUrl) else maintenance.downloadAndOfferInstall(apkUrl)
             }
             .show()
     }
@@ -3186,7 +3201,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
             startActivity(Intent(this, Class.forName("com.google.android.gms.oss.licenses.OssLicensesMenuActivity")))
             true
         }.getOrDefault(false)
-        if (!opened) openExternalUrl("$GITHUB_URL/blob/main/LICENSE")
+        if (!opened) openInAppUrl("$GITHUB_URL/blob/main/LICENSE")
     }
 
     /**

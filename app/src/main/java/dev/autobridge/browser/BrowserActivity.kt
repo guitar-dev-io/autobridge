@@ -667,6 +667,8 @@ class BrowserActivity : Activity() {
                     return true
                 }
                 if (allowed() && handOffToMaps(target, view.url)) return true
+                // An "open in the app" link: show its web page here instead of nothing.
+                if (allowed()) InAppLinks.webPage(target)?.let { view.loadUrl(it); return true }
                 return !allowed() || ContentAddress.https(target) == null
             }
 
@@ -1416,11 +1418,10 @@ class BrowserActivity : Activity() {
                 startActivity(dev.autobridge.MainActivityScreens.intent(this, dev.autobridge.ui.PhoneNav.Route.CONTROL))
             DrawerAction.AGENT ->
                 startActivity(dev.autobridge.MainActivityScreens.intent(this, dev.autobridge.ui.PhoneNav.Route.AGENT_COMMANDS))
-            DrawerAction.SUPPORT ->
-                if (!BrowserLauncher.openUrl(this, "https://buymeacoffee.com/guitar.story")) toast("เปิดเบราว์เซอร์ไม่ได้")
+            // Opened here, in this browser, rather than handed to another one.
+            DrawerAction.SUPPORT -> navigate("https://buymeacoffee.com/guitar.story")
             DrawerAction.LICENSES -> showOpenSourceLicenses()
-            DrawerAction.GITHUB ->
-                if (!BrowserLauncher.openUrl(this, "https://github.com/guitar-dev-io/autobridge")) toast("เปิดเบราว์เซอร์ไม่ได้")
+            DrawerAction.GITHUB -> navigate("https://github.com/guitar-dev-io/autobridge")
             // The sheet's own footer pair: leaving the browser is this activity finishing.
             DrawerAction.APP_HOME -> finish()
             DrawerAction.TOGGLE_FULLSCREEN -> setFullscreen(!fullscreen)
@@ -1454,9 +1455,7 @@ class BrowserActivity : Activity() {
             startActivity(Intent(this, clazz))
             true
         }.getOrDefault(false)
-        if (!opened && !BrowserLauncher.openUrl(this, "https://github.com/guitar-dev-io/autobridge/blob/main/LICENSE")) {
-            toast(getString(R.string.browser_cannot_open_licenses))
-        }
+        if (!opened) navigate("https://github.com/guitar-dev-io/autobridge/blob/main/LICENSE")
     }
 
     /** Saves the page on screen, the one action the phone menu could list bookmarks but not add to. */

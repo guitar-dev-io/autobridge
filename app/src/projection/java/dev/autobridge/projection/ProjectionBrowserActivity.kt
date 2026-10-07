@@ -69,6 +69,7 @@ import dev.autobridge.browser.CarKeyboardLanguage
 import dev.autobridge.browser.CarKeyboardLayouts
 import dev.autobridge.browser.CarKeyboardStore
 import dev.autobridge.browser.ChromeVisibility
+import dev.autobridge.browser.InAppLinks
 import dev.autobridge.browser.MapsHandoff
 import dev.autobridge.browser.PaneRect
 import dev.autobridge.browser.SearchEngineStore
@@ -494,7 +495,15 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
                     // for the Maps app, which starts real navigation instead.
                     val scheme = request.url.scheme?.lowercase()
                     if (scheme == "https" || scheme == "http") return false
-                    handOffToMaps(request.url.toString(), view.url)
+                    val link = request.url.toString()
+                    // The Maps app's own links start navigation, even when they carry a web page.
+                    if (MapsHandoff.isMapsAppLink(link)) {
+                        handOffToMaps(link, view.url)
+                        return true
+                    }
+                    // An "open in the app" link: show its web page here instead of nothing.
+                    InAppLinks.webPage(link)?.let { view.loadUrl(it); return true }
+                    handOffToMaps(link, view.url)
                     return true
                 }
 
@@ -2026,7 +2035,15 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
                     if (scheme == "https" || scheme == "http") return false
                     // The map's "Start" / "Open app" link: the mobile web cannot navigate, the
                     // Maps app can, so it is handed over instead of dropped.
-                    handOffToMaps(request.url.toString(), view.url)
+                    val link = request.url.toString()
+                    // The Maps app's own links start navigation, even when they carry a web page.
+                    if (MapsHandoff.isMapsAppLink(link)) {
+                        handOffToMaps(link, view.url)
+                        return true
+                    }
+                    // An "open in the app" link: show its web page here instead of nothing.
+                    InAppLinks.webPage(link)?.let { view.loadUrl(it); return true }
+                    handOffToMaps(link, view.url)
                     return true
                 }
 
