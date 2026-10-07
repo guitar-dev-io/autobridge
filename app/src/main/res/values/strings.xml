@@ -344,6 +344,7 @@
     <string name="drawer_split_choose">Split layout</string>
     <string name="split_closed">Split screen off</string>
     <string name="split_close_side">Close side page</string>
+    <string name="car_keyboard_hint">Search or type a URL</string>
     <string name="browser_about_version">Version</string>
     <string name="browser_about_webview">WebView</string>
     <string name="drawer_swap_sides">Swap sides</string>

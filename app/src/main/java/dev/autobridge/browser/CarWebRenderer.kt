@@ -159,6 +159,9 @@ class CarWebRenderer(context: Context) {
          */
         const val SPLIT_GRAB_DP = 24f
 
+        /** How long after a tap on the page its focused field is read; see [offerFieldInput]. */
+        const val FIELD_FOCUS_DELAY_MS = 300L
+
         /** Width of the handle drawn on the divider, and how far the grabbed one widens to. */
         const val SPLIT_HANDLE_DP = 4f
         const val SPLIT_HANDLE_GRABBED_DP = 10f
@@ -187,6 +190,12 @@ class CarWebRenderer(context: Context) {
      */
     interface Host {
         fun openAddressInput()
+
+        /**
+         * A text field on the page took focus. The host offers a way to type into it, seeded with
+         * [current], and sends the result back through [submitText].
+         */
+        fun openFieldInput(current: String)
         fun openFindInPage()
         fun openAgent()
         fun openBookmarks()
@@ -1735,6 +1744,20 @@ class CarWebRenderer(context: Context) {
         view.dispatchTouchEvent(up)
         down.recycle()
         up.recycle()
+        // The car surface has no system keyboard: a tap that focused one of the page's text
+        // fields asks the host for a way to type into it.
+        mainHandler.postDelayed({ offerFieldInput(view) }, FIELD_FOCUS_DELAY_MS)
+    }
+
+    /** When [page] has a text field focused, hands its text to [Host.openFieldInput]. */
+    private fun offerFieldInput(page: WebView) {
+        if (page !== webView && page !== sideView) return
+        if (overlay != Overlay.NONE) return
+        page.evaluateJavascript(CarKeyboardPanel.FOCUSED_FIELD_SCRIPT.trimIndent()) { raw ->
+            val parsed = runCatching { org.json.JSONArray("[${raw ?: "null"}]") }.getOrNull()
+            val field = if (parsed == null || parsed.isNull(0)) null else parsed.optString(0)
+            if (field != null && overlay == Overlay.NONE) host?.openFieldInput(field)
+        }
     }
 
     /**

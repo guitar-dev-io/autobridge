@@ -151,6 +151,9 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
          */
         const val FIELD_FOCUS_DELAY_MS = 250L
 
+        /** The second read, for a field a site focuses after an animation. */
+        const val FIELD_FOCUS_RETRY_MS = 800L
+
         /** Split metrics, in dp; the same values the template route's split uses. */
         const val SPLIT_GAP = 4
         const val SPLIT_MIN_PANE = 180
@@ -1035,29 +1038,38 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         dismissOverlay()
         closeKeyboard()
         val parent = root ?: return
-        val card = LinearLayout(this).apply {
+        // The sheet is a fixed title line over a scrolling body. The title carries the ✕ and is
+        // the drag handle, so it has to stay on screen however long the body is: on a tall car
+        // display the body can fill it, leaving no scrim to tap.
+        val body = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            build()
+        }
+        val header = CarMenuList.header(this, heading, menuStyle()) { dismissOverlay() }
+        val sheet = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
                 cornerRadius = 20 * resources.displayMetrics.density
                 setColor(scheme.sheetBackground)
             }
-            setPadding(12.dp(), 12.dp(), 12.dp(), 12.dp())
-            // Swallows its own taps: the scrim dismisses, and a miss inside the card must not.
+            setPadding(12.dp(), 8.dp(), 12.dp(), 12.dp())
+            // Swallows its own taps: the scrim dismisses, and a miss inside the sheet must not.
             isClickable = true
-            build()
+            addView(header)
+            // Measured after the header, so it gets what is left and scrolls inside that.
+            addView(
+                ScrollView(this@ProjectionBrowserActivity).apply { addView(body) },
+                LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            )
         }
-        // The title line carries a ✕, and dragging it down closes the sheet too: on a tall car
-        // screen the sheet can fill the display, leaving no scrim to tap.
-        val header = CarMenuList.header(this, heading, menuStyle()) { dismissOverlay() }
-        card.addView(header, 0)
-        CarMenuList.dragToClose(header, card) { dismissOverlay() }
+        CarMenuList.dragToClose(header, sheet) { dismissOverlay() }
         val scrim = FrameLayout(this).apply {
             setBackgroundColor(scheme.scrim)
             isClickable = true
             setOnClickListener { dismissOverlay() }
             addView(
-                ScrollView(this@ProjectionBrowserActivity).apply { addView(card) },
+                sheet,
                 FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -2354,6 +2366,9 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
     private val pageTouchListener = View.OnTouchListener { view, event ->
         if (event.actionMasked == MotionEvent.ACTION_UP && view is WebView) {
             view.postDelayed({ openKeyboardForFocusedField(view) }, FIELD_FOCUS_DELAY_MS)
+            // Again a little later, for a site whose search icon opens its box and focuses it
+            // only after an animation (YouTube's): too late for the first read.
+            view.postDelayed({ if (keyboardPanel == null) openKeyboardForFocusedField(view) }, FIELD_FOCUS_RETRY_MS)
         }
         false
     }

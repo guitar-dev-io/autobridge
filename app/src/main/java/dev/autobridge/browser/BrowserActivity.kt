@@ -444,6 +444,7 @@ class BrowserActivity : Activity() {
                 updateAddressDecorations()
                 (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager)
                     .showSoftInput(this, InputMethodManager.SHOW_IMPLICIT)
+                if (onCarDisplay) postDelayed({ offerCarKeyboardForAddress() }, CAR_KEYBOARD_DELAY_MS)
             } else {
                 // Leaving edit mode collapses back to the compact hostname with no clear button.
                 setHint(HINT_IDLE)
@@ -547,8 +548,17 @@ class BrowserActivity : Activity() {
         collapseAddressEditing(hideKeyboard = true)
     }
 
+    @android.annotation.SuppressLint("ClickableViewAccessibility")
     private fun createWebView(): WebView = WebView(this).apply {
         BrowserDefaults.configure(this@BrowserActivity, this)
+        // On a car display a tap on one of the page's text fields gets the car keyboard when the
+        // system one does not come up there. Never consumes: the page still gets every touch.
+        setOnTouchListener { _, event ->
+            if (onCarDisplay && event.actionMasked == android.view.MotionEvent.ACTION_UP) {
+                postDelayed({ offerCarKeyboardForPage() }, CAR_KEYBOARD_DELAY_MS)
+            }
+            false
+        }
         BrowserDefaults.configureDebugTools()
         // Match the viewport to the saved desktop/mobile preference before the first page loads,
         // so a desktop-mode session opens at desktop width rather than mobile-then-reflow.
@@ -1014,6 +1024,9 @@ class BrowserActivity : Activity() {
         unsupported = if (onCarDisplay) CAR_DISPLAY_UNSUPPORTED else emptySet(),
     )
 
+    /** How long after a tap the focused field and the system keyboard are checked. */
+    private val CAR_KEYBOARD_DELAY_MS = 350L
+
     /**
      * The car-menu entries this activity cannot offer when it runs on a car display. It holds one
      * WebView (no tabs, no split, so nothing to swap or hand to Maps from a split), its toolbar
@@ -1077,6 +1090,94 @@ class BrowserActivity : Activity() {
             runMenuAction(action)
         }.forEach(column::addView)
         shell.show(column)
+    }
+
+    // ------------------------------------------------------------------ car keyboard
+
+    /** The app's own keyboard while it is up on the car display; see [CarKeyboardPanel]. */
+    private var carKeyboard: View? = null
+
+    /** Whether the system keyboard is showing in this window (on whichever display it is). */
+    private fun systemKeyboardShown(): Boolean =
+        ViewCompat.getRootWindowInsets(root)?.isVisible(WindowInsetsCompat.Type.ime()) == true
+
+    /**
+     * After a tap on the page: when a text field has focus and the system keyboard did not come
+     * up on the car display, opens the car keyboard on that field. A tap anywhere else closes it.
+     */
+    private fun offerCarKeyboardForPage() {
+        if (!onCarDisplay || isFinishing) return
+        web.evaluateJavascript(CarKeyboardPanel.FOCUSED_FIELD_SCRIPT.trimIndent()) { raw ->
+            val parsed = runCatching { org.json.JSONArray("[${raw ?: "null"}]") }.getOrNull()
+            val field = if (parsed == null || parsed.isNull(0)) null else parsed.optString(0)
+            when {
+                field == null -> closeCarKeyboard()
+                systemKeyboardShown() -> Unit
+                else -> openCarKeyboard(
+                    seed = field,
+                    onChange = { typeIntoPage(it, submit = false) },
+                    onCommit = { typeIntoPage(it, submit = true) },
+                )
+            }
+        }
+    }
+
+    /** The address bar took focus on the car display and no system keyboard came up for it. */
+    private fun offerCarKeyboardForAddress() {
+        if (!onCarDisplay || isFinishing || !address.hasFocus() || systemKeyboardShown()) return
+        openCarKeyboard(
+            seed = "",
+            onChange = { address.setText(it); address.setSelection(it.length) },
+            onCommit = { value ->
+                address.clearFocus()
+                if (value.isNotBlank()) navigate(value)
+            },
+        )
+    }
+
+    private fun openCarKeyboard(seed: String, onChange: (String) -> Unit, onCommit: (String) -> Unit) {
+        closeCarKeyboard()
+        val panel = CarKeyboardPanel(
+            context = this,
+            colors = CarKeyboardPanel.Colors(
+                tray = BrowserTheme.sheetBackground,
+                letterCap = BrowserTheme.addressPillBackground,
+                modifierCap = BrowserTheme.sheetCardBackground,
+                goCap = BrowserTheme.fabContainer,
+                onGo = BrowserTheme.onFabContainer,
+                text = BrowserTheme.textPrimary,
+                textSecondary = BrowserTheme.textSecondary,
+            ),
+            seed = seed,
+            onChange = onChange,
+            onCommit = { value ->
+                closeCarKeyboard()
+                onCommit(value)
+            },
+            onClose = { closeCarKeyboard() },
+        ).view
+        carKeyboard = panel
+        root.addView(
+            panel,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM
+            )
+        )
+    }
+
+    private fun closeCarKeyboard() {
+        val panel = carKeyboard ?: return
+        carKeyboard = null
+        root.removeView(panel)
+    }
+
+    /** Puts [text] into the page's focused field; on Go with nothing focused, opens it as a search. */
+    private fun typeIntoPage(text: String, submit: Boolean) {
+        val clean = text.trim()
+        if (clean.isEmpty() && submit) return
+        web.evaluateJavascript(CarKeyboardPanel.typeScript(org.json.JSONObject.quote(clean), submit)) { result ->
+            if (submit && result?.contains("OK") != true) navigate(clean)
+        }
     }
 
     /** "About" on a car display; the phone's menu has no such entry. */
@@ -1898,6 +1999,7 @@ class BrowserActivity : Activity() {
      * browser's own fullscreen, then the web history, and only then the screen.
      */
     private fun goBack() {
+        if (carKeyboard != null) { closeCarKeyboard(); return }
         if (fullscreenController.onBackPressed()) return
         if (fullscreen) { setFullscreen(false); return }
         if (showingStartPage) {

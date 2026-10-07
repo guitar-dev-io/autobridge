@@ -37,6 +37,8 @@ ALLOW_THAI_IN_CODE=(
   # Keycaps, for the same reason: the Kedmanee layout *is* the Thai alphabet, and a Thai keyboard
   # types Thai whatever language the UI is drawn in. These are characters the key emits, not copy.
   "dev/autobridge/browser/CarKeyboardLayout.kt"
+  # The layer keys name the layout they switch to in its own script ("ไทย", "กขค"), like the caps.
+  "dev/autobridge/browser/CarKeyboardPanel.kt"
 )
 
 status=0
