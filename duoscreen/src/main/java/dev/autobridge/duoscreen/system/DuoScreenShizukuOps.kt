@@ -6,9 +6,9 @@ import android.content.Intent
 import android.os.Binder
 import android.os.Bundle
 import android.os.IBinder
-import android.util.Log
 import android.view.MotionEvent
 import android.view.Surface
+import dev.autobridge.duoscreen.DuoLog
 import dev.autobridge.shizuku.ShizukuGrant
 import java.lang.reflect.Method
 import java.lang.reflect.Proxy
@@ -98,7 +98,7 @@ object DuoScreenShizukuOps : DuoScreenPrivilegedOps {
      */
     private val hiddenApiExempted: Boolean by lazy {
         runCatching { HiddenApiBypass.addHiddenApiExemptions("") }
-            .onFailure { Log.w(TAG, "Could not lift the hidden-API restriction", it) }
+            .onFailure { DuoLog.w(TAG, "Could not lift the hidden-API restriction", it) }
             .getOrDefault(false)
     }
 
@@ -144,11 +144,11 @@ object DuoScreenShizukuOps : DuoScreenPrivilegedOps {
             val result = api.start.invoke(api.service, *args) as? Int ?: -1
             // ActivityManager.START_* : anything >= 0 started or was already running.
             val started = result >= 0
-            if (!started) Log.w(TAG, "startActivityAsUser($packageName -> display $displayId) returned $result")
+            if (!started) DuoLog.w(TAG, "startActivityAsUser($packageName -> display $displayId) returned $result")
             started
         }.onFailure { error ->
             activityApi = null
-            Log.w(TAG, "startActivityAsUser failed for $packageName on display $displayId", error)
+            DuoLog.w(TAG, "startActivityAsUser failed for $packageName on display $displayId", error)
         }.getOrDefault(false)
     }
 
@@ -161,7 +161,7 @@ object DuoScreenShizukuOps : DuoScreenPrivilegedOps {
             api.inject.invoke(api.service, *args) as? Boolean ?: false
         }.onFailure { error ->
             inputApi = null
-            Log.w(TAG, "injectInputEvent failed on display $displayId", error)
+            DuoLog.w(TAG, "injectInputEvent failed on display $displayId", error)
         }.getOrDefault(false)
     }
 
@@ -183,16 +183,16 @@ object DuoScreenShizukuOps : DuoScreenPrivilegedOps {
             val args = buildCreateDisplayArgs(api.create, config, token)
             val displayId = api.create.invoke(api.service, *args) as? Int ?: -1
             if (displayId < 0) {
-                Log.w(TAG, "createVirtualDisplay(trusted $name) returned $displayId")
+                DuoLog.w(TAG, "createVirtualDisplay(trusted $name) returned $displayId")
             } else {
                 // Keep the token so release/resize can match it later.
                 displayTokens[displayId] = token
-                Log.i(TAG, "Trusted display created: $name -> $displayId (${width}x$height @ ${dpi}dpi)")
+                DuoLog.i(TAG, "Trusted display created: $name -> $displayId (${width}x$height @ ${dpi}dpi)")
             }
             displayId
         }.onFailure { error ->
             displayApi = null
-            Log.w(TAG, "createTrustedVirtualDisplay failed for $name", error)
+            DuoLog.w(TAG, "createTrustedVirtualDisplay failed for $name", error)
         }.getOrDefault(-1)
     }
 
@@ -200,37 +200,37 @@ object DuoScreenShizukuOps : DuoScreenPrivilegedOps {
         val token = displayTokens[displayId] ?: return false
         val api = resolveDisplayApi() ?: return false
         val resize = api.resize ?: run {
-            Log.w(TAG, "No resizeVirtualDisplay method; display $displayId not resized over shell")
+            DuoLog.w(TAG, "No resizeVirtualDisplay method; display $displayId not resized over shell")
             return false
         }
         return runCatching {
             resize.invoke(api.service, token, width, height, dpi)
             true
-        }.onFailure { Log.w(TAG, "resizeVirtualDisplay($displayId) failed", it) }.getOrDefault(false)
+        }.onFailure { DuoLog.w(TAG, "resizeVirtualDisplay($displayId) failed", it) }.getOrDefault(false)
     }
 
     override fun setTrustedVirtualDisplaySurface(displayId: Int, surface: Surface?): Boolean {
         val token = displayTokens[displayId] ?: return false
         val api = resolveDisplayApi() ?: return false
         val setSurface = api.setSurface ?: run {
-            Log.w(TAG, "No setVirtualDisplaySurface method; display $displayId surface not set over shell")
+            DuoLog.w(TAG, "No setVirtualDisplaySurface method; display $displayId surface not set over shell")
             return false
         }
         return runCatching {
             setSurface.invoke(api.service, token, surface)
             true
-        }.onFailure { Log.w(TAG, "setVirtualDisplaySurface($displayId) failed", it) }.getOrDefault(false)
+        }.onFailure { DuoLog.w(TAG, "setVirtualDisplaySurface($displayId) failed", it) }.getOrDefault(false)
     }
 
     override fun releaseTrustedVirtualDisplay(displayId: Int) {
         val token = displayTokens.remove(displayId) ?: return
         val api = resolveDisplayApi() ?: return
         val release = api.release ?: run {
-            Log.w(TAG, "No releaseVirtualDisplay method; display $displayId not released over shell")
+            DuoLog.w(TAG, "No releaseVirtualDisplay method; display $displayId not released over shell")
             return
         }
         runCatching { release.invoke(api.service, token) }
-            .onFailure { Log.w(TAG, "releaseVirtualDisplay($displayId) failed", it) }
+            .onFailure { DuoLog.w(TAG, "releaseVirtualDisplay($displayId) failed", it) }
     }
 
     /**
@@ -254,7 +254,7 @@ object DuoScreenShizukuOps : DuoScreenPrivilegedOps {
         builderClass.getMethod("setFlags", Int::class.javaPrimitiveType).invoke(builder, flags)
         builderClass.getMethod("setSurface", Surface::class.java).invoke(builder, surface)
         builderClass.getMethod("build").invoke(builder)
-    }.onFailure { Log.w(TAG, "Could not build VirtualDisplayConfig", it) }.getOrNull()
+    }.onFailure { DuoLog.w(TAG, "Could not build VirtualDisplayConfig", it) }.getOrNull()
 
     /**
      * A minimal [android.hardware.display.IVirtualDisplayCallback] whose only job is to be a stable
@@ -275,7 +275,7 @@ object DuoScreenShizukuOps : DuoScreenPrivilegedOps {
                 else -> null
             }
         }
-    }.onFailure { Log.w(TAG, "Could not build IVirtualDisplayCallback", it) }.getOrNull()
+    }.onFailure { DuoLog.w(TAG, "Could not build IVirtualDisplayCallback", it) }.getOrNull()
 
     /**
      * Fills createVirtualDisplay's parameters positionally by type: the config, the callback token,
@@ -308,7 +308,7 @@ object DuoScreenShizukuOps : DuoScreenPrivilegedOps {
             val resize = methods.firstOrNull { it.name == "resizeVirtualDisplay" }
             val setSurface = methods.firstOrNull { it.name == "setVirtualDisplaySurface" }
             DisplayApi(service, create, release, resize, setSurface).also { displayApi = it }
-        }.onFailure { Log.w(TAG, "Could not reach the display manager over Shizuku", it) }.getOrNull()
+        }.onFailure { DuoLog.w(TAG, "Could not reach the display manager over Shizuku", it) }.getOrNull()
     }
 
     /**
@@ -351,7 +351,7 @@ object DuoScreenShizukuOps : DuoScreenPrivilegedOps {
             .getMethod("setDisplayId", Int::class.javaPrimitiveType)
             .invoke(event, displayId)
         true
-    }.onFailure { Log.w(TAG, "MotionEvent.setDisplayId is unavailable; cannot target a display", it) }
+    }.onFailure { DuoLog.w(TAG, "MotionEvent.setDisplayId is unavailable; cannot target a display", it) }
         .getOrDefault(false)
 
     private fun resolveActivityApi(): ActivityApi? {
@@ -364,7 +364,7 @@ object DuoScreenShizukuOps : DuoScreenPrivilegedOps {
             val start = service.javaClass.methods.firstOrNull { it.name == "startActivityAsUser" }
                 ?: error("startActivityAsUser not found on ${service.javaClass.name}")
             ActivityApi(service, start).also { activityApi = it }
-        }.onFailure { Log.w(TAG, "Could not reach the activity manager over Shizuku", it) }.getOrNull()
+        }.onFailure { DuoLog.w(TAG, "Could not reach the activity manager over Shizuku", it) }.getOrNull()
     }
 
     private fun resolveInputApi(): InputApi? {
@@ -376,7 +376,7 @@ object DuoScreenShizukuOps : DuoScreenPrivilegedOps {
                 ?: service.javaClass.methods.firstOrNull { it.name == "injectInputEventToTarget" }
                 ?: error("No injectInputEvent method on ${service.javaClass.name}")
             InputApi(service, inject).also { inputApi = it }
-        }.onFailure { Log.w(TAG, "Could not reach the input manager over Shizuku", it) }.getOrNull()
+        }.onFailure { DuoLog.w(TAG, "Could not reach the input manager over Shizuku", it) }.getOrNull()
     }
 
     /** Wraps a system service binder so its transactions run as the shell UID, then asInterface()s it. */
@@ -388,5 +388,5 @@ object DuoScreenShizukuOps : DuoScreenPrivilegedOps {
         Class.forName("$interfaceName\$Stub")
             .getMethod("asInterface", IBinder::class.java)
             .invoke(null, wrapped)
-    }.onFailure { Log.w(TAG, "Could not wrap $serviceName as $interfaceName: $it") }.getOrNull()
+    }.onFailure { DuoLog.w(TAG, "Could not wrap $serviceName as $interfaceName: $it") }.getOrNull()
 }
