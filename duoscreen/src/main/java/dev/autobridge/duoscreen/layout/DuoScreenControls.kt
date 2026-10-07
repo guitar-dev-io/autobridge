@@ -79,17 +79,21 @@ data class DuoScreenControlsLayout(
 }
 
 /**
- * Pure placement for [DuoScreenControlsLayout]. Sizes are in dp and scaled by the surface's
- * density, so a 160 dpi DHU and a 320 dpi head unit get the same physical buttons.
+ * Pure placement for [DuoScreenControlsLayout]. Sizes are the design's own pixels (drawn on a
+ * 1074 px wide surface) multiplied by [DuoScreenChrome.scale], so the bar keeps the proportions of
+ * docs/design/13 on any head unit and always fits the seam gutter [DuoScreenChrome] leaves.
  *
  * Rule (docs/UI_REDESIGN_TASKS.md, Phase 7):
- * - two panes sharing a seam → a compact bar centred on that seam;
+ * - two panes sharing a seam → a bar in the seam gutter: LAYOUT and SWAP at the start of the seam,
+ *   RELOAD and ARRANGE (or DONE) at its end, the drag handle in the middle;
  * - no shared seam (picture in picture, or panes dragged apart) → one floating button.
  */
 object DuoScreenControlsGeometry {
     const val BUTTON_DP = 56f
     const val GAP_DP = 10f
-    const val PANEL_PADDING_DP = 8f
+
+    /** From the end of the seam to the first button: the 12 px margin plus the row's 4 px padding. */
+    const val END_INSET_DP = 16f
     const val HANDLE_LENGTH_DP = 120f
     const val HANDLE_THICKNESS_DP = 8f
 
@@ -106,9 +110,9 @@ object DuoScreenControlsGeometry {
         editing: Boolean,
         menuOpen: Boolean,
         corner: DuoScreenFabCorner,
-        density: Float
+        scale: Float = DuoScreenChrome.scale(bounds)
     ): DuoScreenControlsLayout {
-        val d = if (density.isFinite() && density > 0f) density else 1f
+        val d = if (scale.isFinite() && scale > 0f) scale else 1f
         val seam = sharedSeam(panes)
         return if (seam != null) {
             seamBar(seam, bounds, editing, d)
@@ -130,10 +134,11 @@ object DuoScreenControlsGeometry {
     private fun seamBar(seam: Divider, bounds: Bounds, editing: Boolean, d: Float): DuoScreenControlsLayout {
         val button = px(BUTTON_DP, d)
         val gap = px(GAP_DP, d)
-        val pad = px(PANEL_PADDING_DP, d)
+        val inset = px(END_INSET_DP, d)
         val handleLength = px(HANDLE_LENGTH_DP, d)
         val handleThickness = px(HANDLE_THICKNESS_DP, d)
         val minHit = px(MIN_HIT_DP, d)
+        val gutter = px(DuoScreenChrome.SEAM_GUTTER, d)
 
         val leading = listOf(DuoScreenControl.LAYOUT, DuoScreenControl.SWAP)
         val trailing = if (editing) {
@@ -142,52 +147,53 @@ object DuoScreenControlsGeometry {
             listOf(DuoScreenControl.RELOAD, DuoScreenControl.ARRANGE)
         }
 
-        // Along the seam: pad, leading buttons, handle, trailing buttons, pad.
-        val buttonsLength = (leading.size + trailing.size) * button
-        val gaps = (leading.size + trailing.size) * gap
-        val length = pad * 2 + buttonsLength + gaps + handleLength
-        val thickness = pad * 2 + button
-
-        val centreAlong = (seam.from + seam.to) / 2
         val horizontal = seam.axis == Axis.HORIZONTAL
-        val boundsAlong = if (horizontal) bounds.width else bounds.height
         val boundsAcross = if (horizontal) bounds.height else bounds.width
-        val start = (centreAlong - length / 2).coerceIn(0, (boundsAlong - length).coerceAtLeast(0))
-        val across = (seam.position - thickness / 2).coerceIn(0, (boundsAcross - thickness).coerceAtLeast(0))
+        // Centred across the seam, i.e. in the middle of the gutter between the two panes.
+        val buttonAcross = (seam.position - button / 2).coerceIn(0, (boundsAcross - button).coerceAtLeast(0))
+        val gutterAcross = (seam.position - gutter / 2).coerceIn(0, (boundsAcross - gutter).coerceAtLeast(0))
 
         fun rectAt(along: Int, acrossOffset: Int, alongSize: Int, acrossSize: Int): Rect =
             if (horizontal) Rect(along, acrossOffset, alongSize, acrossSize)
             else Rect(acrossOffset, along, acrossSize, alongSize)
 
-        val panel = rectAt(start, across, length, thickness)
         val placed = mutableListOf<DuoScreenControlButton>()
-        var cursor = start + pad
-        val buttonAcross = across + pad
-        leading.forEach { control ->
-            val rect = rectAt(cursor, buttonAcross, button, button)
+        fun place(control: DuoScreenControl, along: Int) {
+            val rect = rectAt(along, buttonAcross, button, button)
             placed += DuoScreenControlButton(control, rect, hitArea(rect, minHit, bounds))
+        }
+
+        var cursor = seam.from + inset
+        leading.forEach { control ->
+            place(control, cursor)
             cursor += button + gap
         }
+
+        val centre = (seam.from + seam.to) / 2
+        val handleStart = centre - handleLength / 2
         val handleRect = rectAt(
-            cursor,
-            across + (thickness - handleThickness) / 2,
+            handleStart,
+            seam.position - handleThickness / 2,
             handleLength,
             handleThickness
         )
         // The handle is thin to look at but must be as easy to press as a button.
-        val handleHit = rectAt(cursor, across, handleLength, thickness)
+        val handleHit = rectAt(handleStart, gutterAcross, handleLength, gutter)
         placed += DuoScreenControlButton(
             DuoScreenControl.HANDLE,
             handleRect,
             hitArea(handleHit, minHit, bounds)
         )
-        cursor += handleLength + gap
-        trailing.forEach { control ->
-            val rect = rectAt(cursor, buttonAcross, button, button)
-            placed += DuoScreenControlButton(control, rect, hitArea(rect, minHit, bounds))
-            cursor += button + gap
+
+        var end = seam.to - inset
+        trailing.reversed().forEach { control ->
+            end -= button
+            place(control, end)
+            end -= gap
         }
-        return DuoScreenControlsLayout(DuoScreenControlsLayout.Kind.SEAM_BAR, panel, placed)
+        // Keep the order start → end (LAYOUT, SWAP, HANDLE, RELOAD, ARRANGE) for callers and tests.
+        val ordered = placed.take(leading.size + 1) + placed.drop(leading.size + 1).reversed()
+        return DuoScreenControlsLayout(DuoScreenControlsLayout.Kind.SEAM_BAR, panel = null, buttons = ordered)
     }
 
     private fun floating(

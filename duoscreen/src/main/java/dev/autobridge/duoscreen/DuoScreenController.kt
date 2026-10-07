@@ -17,6 +17,7 @@ import dev.autobridge.power.CarScreenPower
 import dev.autobridge.duoscreen.input.DuoScreenInputPort
 import dev.autobridge.duoscreen.input.DuoScreenInputRouter
 import dev.autobridge.duoscreen.input.DuoScreenTouchController
+import dev.autobridge.duoscreen.layout.DuoScreenChrome
 import dev.autobridge.duoscreen.layout.DuoScreenControl
 import dev.autobridge.duoscreen.layout.DuoScreenControlsGeometry
 import dev.autobridge.duoscreen.layout.DuoScreenControlsLayout
@@ -69,6 +70,12 @@ class DuoScreenController(
 
     /** The controls drawn on the surface right now; taps inside them never reach a pane. */
     private var controls: DuoScreenControlsLayout? = null
+
+    /**
+     * Where each pane is actually drawn: its rect less the margin and seam gutter
+     * ([DuoScreenChrome]). The pane's display is sized to this, and taps are mapped through it.
+     */
+    private var visualRects: Map<Int, Rect> = emptyMap()
 
     /** Whether the floating button's menu is open (picture in picture only). */
     private var menuOpen = false
@@ -171,6 +178,8 @@ class DuoScreenController(
         appliedPreset = DuoScreenStore.preset(context)
 
         router = DuoScreenInputRouter(paneSet, bounds, this)
+        visualRects = DuoScreenChrome.visualRects(paneSet.panes, bounds)
+        compositor.setCornerRadius(DuoScreenChrome.cornerRadius(bounds))
         paneSet.panes.forEach(::openPane)
         // The panes run on untrusted VirtualDisplays, which the system stops resuming once the
         // phone sleeps or locks, so the display has to be held awake for as long as the session
@@ -249,6 +258,7 @@ class DuoScreenController(
         hostSurface = output
         val bounds = Bounds(width, height)
         sessionBounds = bounds
+        compositor.setCornerRadius(DuoScreenChrome.cornerRadius(bounds))
         if (bounds != previous) {
             DuoScreenLayoutCodec.refit(active.panes.panes.sortedBy { it.id }, previous, bounds)
                 .forEach { pane -> active.setRect(pane.id, pane.rect) }
@@ -287,12 +297,13 @@ class DuoScreenController(
         (baseDpi * 100 / DuoScreenStore.contentScale(context)).coerceAtLeast(1)
 
     private fun openPane(pane: DuoScreenPane) {
-        val surface = compositor.addPaneBlocking(pane.id, pane.rect) ?: run {
+        val visual = visualRect(pane)
+        val surface = compositor.addPaneBlocking(pane.id, visual) ?: run {
             StructuredLog.e(TAG, "Pane ${pane.id} got no compositor surface")
             return
         }
         val displayId = DuoScreenDisplays.create(
-            context, pane.id, surface, pane.rect.width, pane.rect.height, paneDpi, ops
+            context, pane.id, surface, visual.width, visual.height, paneDpi, ops
         )
         if (displayId < 0) {
             StructuredLog.e(TAG, "Pane ${pane.id} got no display")
@@ -561,14 +572,14 @@ class DuoScreenController(
             controls = null
             return
         }
-        val density = if (dpi > 0) dpi / 160f else 1f
+        // Sized from the surface, not its dpi: the design is drawn in surface pixels, and the bar
+        // has to fit the seam gutter DuoScreenChrome leaves, which scales the same way.
         val next = DuoScreenControlsGeometry.layout(
             panes = active.panes.panes,
             bounds = bounds,
             editing = active.mode == DuoScreenInputRouter.Mode.EDIT,
             menuOpen = menuOpen,
-            corner = DuoScreenStore.fabCorner(context),
-            density = density
+            corner = DuoScreenStore.fabCorner(context)
         )
         if (!force && next == controls) return
         controls = next
@@ -627,6 +638,7 @@ class DuoScreenController(
         selectedPaneId = null
         controls = null
         menuOpen = false
+        visualRects = emptyMap()
         mainHandler.removeCallbacksAndMessages(null)
         debouncer.cancelAll()
         pendingSizes.clear()
@@ -695,7 +707,15 @@ class DuoScreenController(
         val size = DuoScreenDisplays.size(paneId) ?: return
         // The router hands over pane-local surface pixels; the display may be running at another
         // size, in which case the image is stretched and the touch has to be stretched with it.
-        val (x, y) = DuoScreenLayout.scaleToDisplay(localX, localY, pane.rect, size.width, size.height)
+        // The router measures from the pane's rect; the display shows the (smaller) visual rect.
+        val visual = visualRect(pane)
+        val (x, y) = DuoScreenLayout.scaleToDisplay(
+            localX + pane.rect.left - visual.left,
+            localY + pane.rect.top - visual.top,
+            visual,
+            size.width,
+            size.height
+        )
         // Geometry is read here, on the caller's thread, where the pane set and the displays are
         // written; only the injection itself goes to the input thread.
         onInputThread {
@@ -726,7 +746,7 @@ class DuoScreenController(
         val centreX = size.width / 2
         val centreY = size.height / 2
         val (scrollX, scrollY) =
-            DuoScreenLayout.scaleDeltaToDisplay(dx, dy, pane.rect, size.width, size.height)
+            DuoScreenLayout.scaleDeltaToDisplay(dx, dy, visualRect(pane), size.width, size.height)
         // The whole drag is one unit of work on the input thread, so its down, moves and up stay
         // in order and none of the six injections it costs lands on the caller's thread.
         onInputThread {
@@ -770,13 +790,29 @@ class DuoScreenController(
      * the expensive half and the hosted app relayouts for every size it is given.
      */
     override fun onPaneRectChanged(paneId: Int, rect: Rect) {
-        compositor.setRect(paneId, rect)
+        // A pane's visual rect depends on its neighbours too (a seam opens a gutter on both sides),
+        // so every pane is re-derived, and each one whose visual rect moved follows.
+        val bounds = sessionBounds
+        val current = router?.panes?.panes.orEmpty()
+        val next = if (bounds != null && current.isNotEmpty()) {
+            DuoScreenChrome.visualRects(current, bounds)
+        } else {
+            mapOf(paneId to rect)
+        }
+        val now = SystemClock.uptimeMillis()
+        next.forEach { (id, visual) ->
+            if (id != paneId && visualRects[id] == visual) return@forEach
+            compositor.setRect(id, visual)
+            pendingSizes[id] = visual
+            debouncer.onResizeActivity(id, now)
+        }
+        visualRects = next
         refreshControls()
-        pendingSizes[paneId] = rect
-        debouncer.onResizeActivity(paneId, SystemClock.uptimeMillis())
         mainHandler.removeCallbacks(commitPoll)
         mainHandler.postDelayed(commitPoll, QUIET_PERIOD_MS)
     }
+
+    private fun visualRect(pane: DuoScreenPane): Rect = visualRects[pane.id] ?: pane.rect
 
     // Explicit type: the lambda reschedules itself, which inference cannot resolve on its own.
     private val commitPoll: Runnable = Runnable {

@@ -39,7 +39,7 @@ class DuoScreenControlsTest {
         editing: Boolean = false,
         menuOpen: Boolean = false,
         corner: DuoScreenFabCorner = DuoScreenFabCorner.BOTTOM_RIGHT
-    ) = DuoScreenControlsGeometry.layout(panes, bounds, editing, menuOpen, corner, density = 1f)
+    ) = DuoScreenControlsGeometry.layout(panes, bounds, editing, menuOpen, corner, scale = 1f)
 
     @Test
     fun stackedPanesGetASeamBarCentredOnTheSeam() {
@@ -48,9 +48,11 @@ class DuoScreenControlsTest {
         val result = layout(panes, portrait)
 
         assertEquals(DuoScreenControlsLayout.Kind.SEAM_BAR, result.kind)
-        val panel = assertNotNullAndGet(result.panel)
-        assertTrue("panel straddles the seam", panel.top < seamY && panel.bottom > seamY)
-        assertTrue("panel centred", kotlin.math.abs(portrait.width / 2 - (panel.left + panel.width / 2)) <= 1)
+        assertNull("the bar sits in the gutter, with no backing panel", result.panel)
+        result.buttons.forEach { button ->
+            val centreY = button.rect.top + button.rect.height / 2
+            assertTrue("${button.control} centred on the seam", kotlin.math.abs(centreY - seamY) <= 1)
+        }
         assertEquals(
             listOf(
                 DuoScreenControl.LAYOUT, DuoScreenControl.SWAP, DuoScreenControl.HANDLE,
@@ -61,14 +63,32 @@ class DuoScreenControlsTest {
     }
 
     @Test
+    fun seamBarPutsButtonsAtBothEndsAndTheHandleInTheMiddle() {
+        val result = layout(stacked(portrait), portrait)
+        val byControl = result.buttons.associateBy { it.control }
+        // As drawn in docs/design/13: 16 px in from each end, 56 px buttons 10 px apart.
+        assertEquals(16, byControl.getValue(DuoScreenControl.LAYOUT).rect.left)
+        assertEquals(82, byControl.getValue(DuoScreenControl.SWAP).rect.left)
+        assertEquals(portrait.width - 16, byControl.getValue(DuoScreenControl.ARRANGE).rect.right)
+        assertEquals(portrait.width - 16 - 56 - 10, byControl.getValue(DuoScreenControl.RELOAD).rect.right)
+        val handle = byControl.getValue(DuoScreenControl.HANDLE).rect
+        assertEquals(portrait.width / 2, handle.left + handle.width / 2)
+        assertEquals(56, byControl.getValue(DuoScreenControl.LAYOUT).rect.width)
+    }
+
+    @Test
     fun sideBySidePanesGetAVerticalBar() {
         val panes = columns(landscape)
         val seamX = panes[0].rect.right
         val result = layout(panes, landscape)
 
-        val panel = assertNotNullAndGet(result.panel)
-        assertTrue("panel is taller than wide", panel.height > panel.width)
-        assertTrue("panel straddles the seam", panel.left < seamX && panel.right > seamX)
+        val layoutButton = result.buttons.first { it.control == DuoScreenControl.LAYOUT }.rect
+        val arrange = result.buttons.first { it.control == DuoScreenControl.ARRANGE }.rect
+        assertTrue("buttons run down the seam", arrange.top > layoutButton.bottom)
+        result.buttons.forEach { button ->
+            val centreX = button.rect.left + button.rect.width / 2
+            assertTrue(kotlin.math.abs(centreX - seamX) <= 1)
+        }
     }
 
     @Test
@@ -134,10 +154,10 @@ class DuoScreenControlsTest {
     }
 
     @Test
-    fun densityScalesTheButtons() {
+    fun scaleScalesTheButtons() {
         val one = layout(stacked(portrait), portrait).buttons.first().rect
         val two = DuoScreenControlsGeometry.layout(
-            stacked(portrait), portrait, false, false, DuoScreenFabCorner.BOTTOM_RIGHT, density = 2f
+            stacked(portrait), portrait, false, false, DuoScreenFabCorner.BOTTOM_RIGHT, scale = 2f
         ).buttons.first().rect
         assertEquals(one.width * 2, two.width)
     }

@@ -54,13 +54,35 @@ class DuoScreenCompositor {
             }
         """
 
+        /**
+         * Rounded-rect coverage in window pixels (gl_FragCoord, bottom-left origin). [uClip] is
+         * left, bottom, right, top; a radius of 0 turns it off. highp where the GPU has it: at
+         * mediump a coordinate past 1024 px is only good to about a pixel.
+         */
+        const val ROUNDED_CLIP = """
+            #ifdef GL_FRAGMENT_PRECISION_HIGH
+            precision highp float;
+            #else
+            precision mediump float;
+            #endif
+            uniform vec4 uClip;
+            uniform float uRadius;
+            float coverage() {
+                if (uRadius <= 0.0) return 1.0;
+                vec2 p = gl_FragCoord.xy;
+                vec2 c = clamp(p, uClip.xy + uRadius, uClip.zw - uRadius);
+                return clamp(uRadius - length(p - c) + 0.5, 0.0, 1.0);
+            }
+        """
+
         const val FRAGMENT_SHADER = """
             #extension GL_OES_EGL_image_external : require
-            precision mediump float;
+        """ + ROUNDED_CLIP + """
             varying vec2 vTexCoord;
             uniform samplerExternalOES uTexture;
             void main() {
-                gl_FragColor = texture2D(uTexture, vTexCoord);
+                // Pane content is opaque; only the rounded corners are blended.
+                gl_FragColor = vec4(texture2D(uTexture, vTexCoord).rgb, coverage());
             }
         """
 
@@ -71,11 +93,10 @@ class DuoScreenCompositor {
             }
         """
 
-        const val SOLID_FRAGMENT_SHADER = """
-            precision mediump float;
+        const val SOLID_FRAGMENT_SHADER = ROUNDED_CLIP + """
             uniform vec4 uColor;
             void main() {
-                gl_FragColor = uColor;
+                gl_FragColor = vec4(uColor.rgb, uColor.a * coverage());
             }
         """
 
@@ -117,6 +138,9 @@ class DuoScreenCompositor {
             0f, 1f, 0f, 1f,
             1f, 1f, 0f, 1f
         )
+
+        /** What shows between and around the panes: the design's surface colour, #0B0D10. */
+        val BACKGROUND_COLOR = floatArrayOf(0x0B / 255f, 0x0D / 255f, 0x10 / 255f, 1f)
 
         /** Selection frame drawn in edit mode: thickness in px and its colour. */
         const val HIGHLIGHT_THICKNESS_PX = 8
@@ -175,6 +199,13 @@ class DuoScreenCompositor {
     private var solidProgram = 0
     private var solidPositionHandle = 0
     private var solidColorHandle = 0
+    private var clipHandle = 0
+    private var radiusHandle = 0
+    private var solidClipHandle = 0
+    private var solidRadiusHandle = 0
+
+    /** Corner radius of every pane, in surface pixels; set on the GL thread via [setCornerRadius]. */
+    private var cornerRadius = 0f
 
     private var overlayProgram = 0
     private var overlayPositionHandle = 0
@@ -349,6 +380,15 @@ class DuoScreenCompositor {
         }
     }
 
+    /** Rounds every pane's corners by [radiusPx] (0 = square), as in the design. */
+    fun setCornerRadius(radiusPx: Int) {
+        val threadHandler = handler ?: return
+        threadHandler.post {
+            cornerRadius = radiusPx.coerceAtLeast(0).toFloat()
+            scheduleRender()
+        }
+    }
+
     /**
      * Draws [bitmap] over every pane at [rect] (surface pixels), or removes the overlay when either
      * is null. Takes ownership of [bitmap]: it is recycled once uploaded, or if it is replaced by a
@@ -400,8 +440,11 @@ class DuoScreenCompositor {
             applyOverlay(pending)
         }
         GLES20.glViewport(0, 0, outputWidth, outputHeight)
-        GLES20.glClearColor(0f, 0f, 0f, 1f)
+        GLES20.glClearColor(BACKGROUND_COLOR[0], BACKGROUND_COLOR[1], BACKGROUND_COLOR[2], 1f)
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+        // Blending is on for the whole frame: it is what anti-aliases the rounded pane corners.
+        GLES20.glEnable(GLES20.GL_BLEND)
+        GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
         GLES20.glUseProgram(program)
 
         // Insertion order is z-order: a pane brought to front is re-inserted last and draws on top.
@@ -477,7 +520,7 @@ class DuoScreenCompositor {
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
         GLES20.glDisableVertexAttribArray(overlayPositionHandle)
         GLES20.glDisableVertexAttribArray(overlayTexCoordHandle)
-        GLES20.glDisable(GLES20.GL_BLEND)
+        GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
         GLES20.glUseProgram(program)
     }
 
@@ -502,6 +545,8 @@ class DuoScreenCompositor {
         if (thickness <= 0) return
         GLES20.glUseProgram(solidProgram)
         GLES20.glUniform4fv(solidColorHandle, 1, HIGHLIGHT_COLOR, 0)
+        // Clipped to the pane's own rounded outline, so the frame follows its corners.
+        setClip(solidClipHandle, solidRadiusHandle, rect, cornerRadius)
         GLES20.glEnableVertexAttribArray(solidPositionHandle)
 
         drawBand(rect.left, rect.top, rect.right, rect.top + thickness)
@@ -521,6 +566,7 @@ class DuoScreenCompositor {
         GLES20.glUniform4fv(
             solidColorHandle, 1, EMPTY_PANE_COLORS[Math.floorMod(pane.id, EMPTY_PANE_COLORS.size)], 0
         )
+        setClip(solidClipHandle, solidRadiusHandle, rect, cornerRadius)
         GLES20.glEnableVertexAttribArray(solidPositionHandle)
         drawBand(rect.left, rect.top, rect.right, rect.bottom)
         GLES20.glDisableVertexAttribArray(solidPositionHandle)
@@ -533,6 +579,7 @@ class DuoScreenCompositor {
         if (band.width <= 0 || band.height <= 0) return
         GLES20.glUseProgram(solidProgram)
         GLES20.glUniform4fv(solidColorHandle, 1, DIVIDER_COLOR, 0)
+        setClip(solidClipHandle, solidRadiusHandle, band, 0f)
         GLES20.glEnableVertexAttribArray(solidPositionHandle)
         drawBand(band.left, band.top, band.right, band.bottom)
         GLES20.glDisableVertexAttribArray(solidPositionHandle)
@@ -548,8 +595,21 @@ class DuoScreenCompositor {
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
     }
 
+    /** Sets a program's rounded-rect clip to [rect] (top-left origin) in window coordinates. */
+    private fun setClip(clip: Int, radius: Int, rect: Rect, radiusPx: Float) {
+        GLES20.glUniform4f(
+            clip,
+            rect.left.toFloat(),
+            (outputHeight - rect.bottom).toFloat(),
+            rect.right.toFloat(),
+            (outputHeight - rect.top).toFloat()
+        )
+        GLES20.glUniform1f(radius, radiusPx.coerceAtMost(minOf(rect.width, rect.height) / 2f))
+    }
+
     private fun drawPane(pane: Pane) {
         writeVertices(pane.rect)
+        setClip(clipHandle, radiusHandle, pane.rect, cornerRadius)
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, pane.textureId)
         GLES20.glUniform1i(textureHandle, 0)
@@ -657,11 +717,15 @@ class DuoScreenCompositor {
         texCoordHandle = GLES20.glGetAttribLocation(program, "aTexCoord")
         texMatrixHandle = GLES20.glGetUniformLocation(program, "uTexMatrix")
         textureHandle = GLES20.glGetUniformLocation(program, "uTexture")
+        clipHandle = GLES20.glGetUniformLocation(program, "uClip")
+        radiusHandle = GLES20.glGetUniformLocation(program, "uRadius")
 
         solidProgram = linkProgram(SOLID_VERTEX_SHADER, SOLID_FRAGMENT_SHADER)
         if (solidProgram != 0) {
             solidPositionHandle = GLES20.glGetAttribLocation(solidProgram, "aPosition")
             solidColorHandle = GLES20.glGetUniformLocation(solidProgram, "uColor")
+            solidClipHandle = GLES20.glGetUniformLocation(solidProgram, "uClip")
+            solidRadiusHandle = GLES20.glGetUniformLocation(solidProgram, "uRadius")
         } else {
             // The panes still composite; only the edit-mode frame and empty-pane tint are missing.
             Log.w(TAG, "Solid-colour program unavailable")
