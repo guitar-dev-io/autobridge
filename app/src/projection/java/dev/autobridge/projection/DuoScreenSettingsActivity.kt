@@ -44,6 +44,15 @@ class DuoScreenSettingsActivity : Activity() {
 
         /** Platform glyph for the "leave this pane empty" cell, so the grid has no gap in it. */
         private const val CLEAR_ICON = android.R.drawable.ic_menu_close_clear_cancel
+
+        private const val MAPS_PACKAGE = "com.google.android.apps.maps"
+
+        /** Tried in this order for the bottom pane of the Maps + music shortcut, when none is chosen yet. */
+        private val MUSIC_APPS = listOf(
+            "com.google.android.apps.youtube.music",
+            "com.spotify.music",
+            "com.apple.android.music",
+        )
     }
 
     override fun attachBaseContext(newBase: Context) {
@@ -64,6 +73,19 @@ class DuoScreenSettingsActivity : Activity() {
         // with a single banner card. AA status is shown on Home already; only
         // the Shizuku state matters on this screen.
         body.stack(shizukuBanner(shizukuReady))
+
+        // ── SHORTCUT ─────────────────────────────────────────────────────────
+        // One tap to the arrangement a portrait head unit is made for: the map on top, music below.
+        body.stack(
+            AutoBridgeDesign.contentRow(
+                context = this,
+                title = getString(R.string.duo_screen_shortcut_title),
+                subtitle = getString(R.string.duo_screen_shortcut_caption),
+                accent = AutoBridgeDesign.ACCENT,
+                badgeText = DuoScreenPreset.STACKED_60_40.glyph,
+            ) { applyMapsAndMusic() },
+            gap = 14
+        )
 
         // ── PANES ────────────────────────────────────────────────────────────
         // One card (design 08): the "Number of panes" segment row, then one row per pane,
@@ -502,6 +524,18 @@ class DuoScreenSettingsActivity : Activity() {
                     }, LinearLayout.LayoutParams(-1, 0, 1f).apply { topMargin = gap })
                 }
             }
+            DuoScreenPreset.STACKED_60_40 -> {
+                // Two horizontal rectangles stacked, the top one taller (3:2, which is 60:40)
+                LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    addView(View(this@DuoScreenSettingsActivity).apply {
+                        background = AutoBridgeDesign.surface(this@DuoScreenSettingsActivity, rectFill, 4, rectStroke)
+                    }, LinearLayout.LayoutParams(-1, 0, 3f))
+                    addView(View(this@DuoScreenSettingsActivity).apply {
+                        background = AutoBridgeDesign.surface(this@DuoScreenSettingsActivity, rectFill, 4, rectStroke)
+                    }, LinearLayout.LayoutParams(-1, 0, 2f).apply { topMargin = gap })
+                }
+            }
             DuoScreenPreset.PICTURE_IN_PICTURE -> {
                 // Full rect with a small rect in the bottom-right corner
                 FrameLayout(this).apply {
@@ -653,6 +687,34 @@ class DuoScreenSettingsActivity : Activity() {
             }
             .show()
     }
+
+    /**
+     * The shortcut: two panes, stacked 60/40, Google Maps in the top one and a music app in the
+     * bottom one. The music app already in the second pane is kept; failing that, the first of the
+     * usual music apps that is installed; failing that, the picker opens for it. Maps is not
+     * optional: without it the arrangement means nothing, so the phone says so and changes nothing.
+     */
+    private fun applyMapsAndMusic() {
+        if (!launchable(MAPS_PACKAGE)) {
+            Toast.makeText(this, R.string.duo_screen_maps_missing, Toast.LENGTH_LONG).show()
+            return
+        }
+        DuoScreenStore.setPaneCount(this, 2)
+        DuoScreenStore.setPackage(this, 0, MAPS_PACKAGE)
+        val kept = DuoScreenStore.packages(this).getOrNull(1)?.takeIf { it != MAPS_PACKAGE && launchable(it) }
+        val music = kept ?: MUSIC_APPS.firstOrNull { launchable(it) }
+        if (music != null) DuoScreenStore.setPackage(this, 1, music)
+        // Last, because choosing a preset drops any hand-made arrangement, which is wanted here.
+        DuoScreenStore.setPreset(this, DuoScreenPreset.STACKED_60_40)
+        applied()
+        render()
+        if (music == null) {
+            Toast.makeText(this, R.string.duo_screen_pick_music, Toast.LENGTH_LONG).show()
+            pickAppFor(1)
+        }
+    }
+
+    private fun launchable(packageName: String): Boolean = packageManager.getLaunchIntentForPackage(packageName) != null
 
     /**
      * Hands the change to a running session and says which way it went. Called after every write,
