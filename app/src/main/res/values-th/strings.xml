@@ -709,6 +709,7 @@
     <string name="home_tile_tv_radio">ทีวี / วิทยุ</string>
     <string name="home_tile_favorites">รายการที่ชอบ</string>
     <string name="home_tile_more">เพิ่มเติม</string>
+    <string name="home_more_subtitle">สื่อในเครื่อง สตรีมมิ่ง สภาพอากาศ และมิเรอร์</string>
     <string name="home_mirror_action">มิเรอร์</string>
     <string name="home_bridge_duo_action">Duo Screen</string>
 

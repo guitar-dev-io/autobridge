@@ -393,7 +393,14 @@ class MainActivity : androidx.activity.ComponentActivity() {
             PhoneScreen.CAR_CONNECTION -> buildCarConnectionScreen()
             PhoneScreen.AGENT_COMMANDS -> buildAgentCommandsScreen()
             PhoneScreen.ABOUT -> buildAboutScreen()
-            PhoneScreen.HOME_MORE -> buildHomeGroupScreen("More", "Local media, streaming, weather and mirror", dev.autobridge.ui.PhoneHomeLayout.moreSections)
+            // Two-column cards rather than a long list: More is a handful of places to go, each
+            // with its own colour, so they read as destinations instead of settings rows.
+            PhoneScreen.HOME_MORE -> buildHomeGroupScreen(
+                getString(R.string.home_tile_more),
+                getString(R.string.home_more_subtitle),
+                dev.autobridge.ui.PhoneHomeLayout.moreSections,
+                grid = true
+            )
         }
         screenContainer.addView(
             screen,
@@ -563,7 +570,12 @@ class MainActivity : androidx.activity.ComponentActivity() {
     }
 
     /** Home > Music / TV / Radio / More: a short list of the sections grouped behind one tile. */
-    private fun buildHomeGroupScreen(title: String, subtitle: String, sections: List<dev.autobridge.library.HomeSection>): View =
+    private fun buildHomeGroupScreen(
+        title: String,
+        subtitle: String,
+        sections: List<dev.autobridge.library.HomeSection>,
+        grid: Boolean = false
+    ): View =
         dev.autobridge.ui.PhoneLauncherUi.screen(
             context = this,
             title = title,
@@ -577,7 +589,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
                     open = { openHomeSection(section) }
                 )
             },
-            grid = false,
+            grid = grid,
             home = { goBack() },
             applyInsets = false
         )
