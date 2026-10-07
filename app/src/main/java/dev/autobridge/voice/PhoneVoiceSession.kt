@@ -38,6 +38,8 @@ class PhoneVoiceSession(private val activity: Activity, private val actions: Act
         fun openBrowser()
         fun goHome()
         fun goBack()
+        /** Opens a home section the way tapping its tile does. */
+        fun openSection(section: dev.autobridge.library.HomeSection)
         /** The pre-existing Agent path, for anything the voice grammar does not cover. */
         fun runAgentCommand(text: String)
     }
@@ -165,6 +167,7 @@ class PhoneVoiceSession(private val activity: Activity, private val actions: Act
         when (command.command.action) {
             VoiceAction.GO_HOME -> actions.goHome()
             VoiceAction.GO_BACK -> actions.goBack()
+            VoiceAction.OPEN_SCREEN -> command.command.screen?.let { actions.openSection(it.section) }
             VoiceAction.SEND_TO_CAR -> if (url != null) sendToCar(url)
             VoiceAction.OPEN_APP, VoiceAction.SEARCH, VoiceAction.PLAY, VoiceAction.OPEN_URL ->
                 if (url == null) actions.openBrowser() else actions.openUrl(url)

@@ -2128,6 +2128,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
             override fun openBrowser() = openBrowserOnCar()
             override fun goHome() = showPhoneScreen(PhoneScreen.HOME)
             override fun goBack() { this@MainActivity.goBack() }
+            override fun openSection(section: dev.autobridge.library.HomeSection) = openHomeSection(section)
             override fun runAgentCommand(text: String) = runPhoneVoiceCommand(text)
         })
     }

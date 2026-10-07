@@ -110,10 +110,18 @@ class CommandValidatorTest {
         assertEquals(Validation.Reason.UNSUPPORTED_SCHEME, rejected(VoiceCommand(VoiceAction.SEND_TO_CAR, url = "intent://x")))
     }
 
+    @Test fun `opening a screen runs without asking and needs a screen`() {
+        val settings = valid(VoiceCommand(VoiceAction.OPEN_SCREEN, screen = VoiceScreen.SETTINGS))
+        assertTrue(settings.autoExecute)
+        assertNull(settings.url)
+        assertEquals(Validation.Reason.MISSING_TARGET, rejected(VoiceCommand(VoiceAction.OPEN_SCREEN)))
+    }
+
     @Test fun `parser output for the required phrases validates`() {
         listOf(
             "เปิดยูทูบ", "เปิด youtube", "เปิด youtube เพลง bodyslam", "ค้นหา Taylor Swift ใน youtube music",
-            "เปิดติ๊กต็อก", "เปิด iQIYI", "กลับหน้าแรก", "ย้อนกลับ", "go back", "เปิดเว็บ google.com"
+            "เปิดติ๊กต็อก", "เปิด iQIYI", "กลับหน้าแรก", "ย้อนกลับ", "go back", "เปิดเว็บ google.com",
+            "เปิดการตั้งค่า", "เปิดทีวี", "เปิดวิทยุ", "เปิดสภาพอากาศ"
         ).forEach { phrase ->
             assertTrue(phrase, CommandValidator.validate(VoiceCommandParser.parse(phrase)) is Validation.Valid)
         }

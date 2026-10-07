@@ -2,10 +2,27 @@ package dev.autobridge.voice
 
 import dev.autobridge.agent.AgentCommandParser
 import dev.autobridge.agent.AgentCommandRouter.AgentAction
+import dev.autobridge.library.HomeSection
 
-enum class VoiceAction { OPEN_APP, SEARCH, PLAY, OPEN_URL, SEND_TO_CAR, GO_HOME, GO_BACK, UNKNOWN }
+enum class VoiceAction { OPEN_APP, SEARCH, PLAY, OPEN_URL, SEND_TO_CAR, GO_HOME, GO_BACK, OPEN_SCREEN, UNKNOWN }
 
 enum class VoiceTarget { YOUTUBE, YOUTUBE_MUSIC, TIKTOK, IQIYI, BROWSER }
+
+/**
+ * An AutoBridge screen a voice command can open. Each is one of the home sections, so it opens
+ * through the same entry point a tap on that tile uses - `openHomeSection` on the phone,
+ * `CarHomeNavigator` on the car - and behaves exactly like the tile.
+ */
+enum class VoiceScreen(val section: HomeSection) {
+    SETTINGS(HomeSection.SETTINGS),
+    TV(HomeSection.TV),
+    RADIO(HomeSection.RADIO),
+    WEATHER(HomeSection.WEATHER),
+    STREAMING(HomeSection.STREAMING),
+    FAVORITES(HomeSection.FAVORITES),
+    PLAYLISTS(HomeSection.PLAYLISTS),
+    GALLERY(HomeSection.GALLERY)
+}
 
 /**
  * What a transcript asks for. A description only: nothing here can run anything. [CommandValidator]
@@ -20,6 +37,8 @@ data class VoiceCommand(
     val target: VoiceTarget? = null,
     val query: String? = null,
     val url: String? = null,
+    /** For [VoiceAction.OPEN_SCREEN]: which screen. */
+    val screen: VoiceScreen? = null,
     val confidence: Float = 0f,
     val text: String = ""
 )
@@ -116,6 +135,31 @@ object VoiceCommandParser {
             "(?:\\s*(?:ไป|หน่อย))*$",
         RegexOption.IGNORE_CASE
     )
+    /**
+     * Screen names, matched like Home and Back against the whole utterance (an optional "open"/"go
+     * to" verb and "page"/"menu" word around the name, nothing else). "เปิดทีวี" opens TV; "วันนี้
+     * อากาศเป็นยังไง" is a question, not "open Weather", and stays with the Agent.
+     */
+    private val SCREEN_ALIASES: List<Pair<VoiceScreen, List<String>>> = listOf(
+        VoiceScreen.SETTINGS to listOf("การตั้งค่า", "ตั้งค่า", "settings", "setting"),
+        VoiceScreen.TV to listOf("ทีวี", "โทรทัศน์", "ช่องทีวี", "iptv", "tv"),
+        VoiceScreen.RADIO to listOf("วิทยุ", "radio"),
+        VoiceScreen.WEATHER to listOf("พยากรณ์อากาศ", "สภาพอากาศ", "อากาศ", "weather"),
+        VoiceScreen.STREAMING to listOf("สตรีมมิ่ง", "สตรีมมิง", "streaming"),
+        VoiceScreen.FAVORITES to listOf("รายการโปรด", "favorites", "favourites"),
+        VoiceScreen.PLAYLISTS to listOf("เพลย์ลิสต์", "playlists", "playlist"),
+        VoiceScreen.GALLERY to listOf("แกลเลอรี่", "แกลเลอรี", "แกลลอรี่", "รูปภาพ", "gallery", "photos")
+    )
+
+    private val SCREEN_PATTERNS: List<Pair<VoiceScreen, Regex>> = SCREEN_ALIASES.map { (screen, names) ->
+        val name = names.sortedByDescending { it.length }.joinToString("|") { Regex.escape(it) }
+        screen to Regex(
+            "^(?:(?:เปิด|ไปที่|ไป|เข้า|ขอดู|ดู|open|go to|show)\\s*)?(?:(?:หน้า|เมนู|the)\\s*)?" +
+                "(?:$name)(?:\\s*(?:page|screen|menu))?$",
+            RegexOption.IGNORE_CASE
+        )
+    }
+
     private val SEND_TO_CAR = Regex(
         "(?:ส่ง\\s*(?:ไป|ขึ้น)?\\s*(?:ที่|ยัง|บน)?\\s*(?:หน้าจอ\\s*)?รถ|send(?: it)? to(?: the)? car|(?:on|to) the car|ไปที่รถ|ขึ้นจอรถ)",
         RegexOption.IGNORE_CASE
@@ -151,6 +195,9 @@ object VoiceCommandParser {
 
         if (HOME.matches(text)) return VoiceCommand(VoiceAction.GO_HOME, confidence = 0.95f, text = text)
         if (BACK.matches(text)) return VoiceCommand(VoiceAction.GO_BACK, confidence = 0.95f, text = text)
+        SCREEN_PATTERNS.firstOrNull { it.second.matches(text) }?.let { (screen, _) ->
+            return VoiceCommand(VoiceAction.OPEN_SCREEN, screen = screen, confidence = 0.95f, text = text)
+        }
 
         // The Agent's own intents (resume, mirror, desktop mode, fullscreen, recent, a fuel log) keep
         // their meaning by voice: "เล่นต่อ" is "resume", not "play ต่อ".

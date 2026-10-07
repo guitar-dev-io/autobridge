@@ -1725,6 +1725,7 @@
     <string name="parking_photo_on_phone">Photo saved on the phone</string>
 
     <!-- Voice Recognition (offline Whisper); see dev.autobridge.voice -->
+    <string name="car_agent_safety_from_home">Turn this on from Settings on the Home screen</string>
     <string name="voice_settings_title">Voice Recognition</string>
     <string name="voice_settings_subtitle">Offline speech-to-text with Whisper</string>
     <string name="voice_settings_caption">Whisper model, language, test</string>

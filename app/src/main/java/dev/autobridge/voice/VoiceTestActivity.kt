@@ -269,6 +269,7 @@ class VoiceTestActivity : Activity() {
         command.target?.let { append("\ntarget: ").append(it) }
         command.query?.let { append("\nquery: ").append(it) }
         command.url?.let { append("\nurl: ").append(it) }
+        command.screen?.let { append("\nscreen: ").append(it) }
         append("\nconfidence: ").append(VoiceFormat.ratio(command.confidence.toDouble()))
         when (val validation = CommandValidator.validate(command)) {
             is Validation.Valid -> validation.command.url?.let { append("\nopens: ").append(it) }

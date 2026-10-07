@@ -127,6 +127,54 @@ class VoiceCommandParserTest {
         assertEquals(VoiceTarget.TIKTOK, command.target)
     }
 
+    // --- Opening screens ---------------------------------------------------------------------------
+
+    private fun assertScreen(text: String, screen: VoiceScreen) {
+        val command = parse(text)
+        assertEquals("action for \"$text\"", VoiceAction.OPEN_SCREEN, command.action)
+        assertEquals("screen for \"$text\"", screen, command.screen)
+    }
+
+    @Test fun `open settings`() {
+        assertScreen("เปิดการตั้งค่า", VoiceScreen.SETTINGS)
+        assertScreen("ไปที่หน้าตั้งค่า", VoiceScreen.SETTINGS)
+        assertScreen("open settings", VoiceScreen.SETTINGS)
+        assertScreen("ตั้งค่า ครับ", VoiceScreen.SETTINGS)
+    }
+
+    @Test fun `open tv and radio`() {
+        assertScreen("เปิดทีวี", VoiceScreen.TV)
+        assertScreen("ดูทีวี", VoiceScreen.TV)
+        assertScreen("open TV", VoiceScreen.TV)
+        assertScreen("เปิดวิทยุ", VoiceScreen.RADIO)
+        assertScreen("radio", VoiceScreen.RADIO)
+    }
+
+    @Test fun `open weather, streaming, favorites, playlists, gallery`() {
+        assertScreen("เปิดสภาพอากาศ", VoiceScreen.WEATHER)
+        assertScreen("พยากรณ์อากาศ", VoiceScreen.WEATHER)
+        assertScreen("show the weather", VoiceScreen.WEATHER)
+        assertScreen("เปิดสตรีมมิ่ง", VoiceScreen.STREAMING)
+        assertScreen("เปิดรายการโปรด", VoiceScreen.FAVORITES)
+        assertScreen("เปิดเพลย์ลิสต์", VoiceScreen.PLAYLISTS)
+        assertScreen("เปิดรูปภาพ", VoiceScreen.GALLERY)
+        assertScreen("open gallery", VoiceScreen.GALLERY)
+    }
+
+    @Test fun `a screen name inside a sentence is not a menu command`() {
+        // A question about the weather is not "open Weather".
+        assertEquals(VoiceAction.UNKNOWN, parse("วันนี้อากาศเป็นยังไง").action)
+        // A search that mentions TV stays a search.
+        val search = parse("ค้นหา ทีวี ราคาถูก")
+        assertEquals(VoiceAction.SEARCH, search.action)
+        assertEquals(VoiceTarget.BROWSER, search.target)
+        // YouTube TV is a YouTube search, not the TV screen.
+        assertEquals(VoiceAction.SEARCH, parse("เปิด YouTube ทีวี").action)
+    }
+
+    @Test fun `music still plays rather than opening a menu`() =
+        assertCommand("เปิดเพลง Bodyslam", VoiceAction.PLAY, VoiceTarget.YOUTUBE, "Bodyslam")
+
     // --- What stays the Agent's -------------------------------------------------------------------
 
     @Test fun `resume keeps meaning resume`() {
