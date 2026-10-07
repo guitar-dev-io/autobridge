@@ -89,20 +89,24 @@ data class DuoScreenControlsLayout(
  * - no shared seam (picture in picture, or panes dragged apart) → one floating button.
  */
 object DuoScreenControlsGeometry {
-    const val BUTTON_DP = 56f
-    const val GAP_DP = 10f
+    const val BUTTON_DP = 44f
+    const val GAP_DP = 8f
 
     /** From the end of the seam to the first button: the 12 px margin plus the row's 4 px padding. */
     const val END_INSET_DP = 16f
-    const val HANDLE_LENGTH_DP = 120f
-    const val HANDLE_THICKNESS_DP = 8f
+    const val HANDLE_LENGTH_DP = 96f
+    const val HANDLE_THICKNESS_DP = 6f
 
-    /** Smallest area a press may land in, whatever the drawn size. */
-    const val MIN_HIT_DP = 76f
-    const val FAB_DP = 76f
-    const val MENU_BUTTON_DP = 68f
-    const val FAB_MARGIN_DP = 36f
-    const val MENU_GAP_DP = 16f
+    /**
+     * Smallest area a press may land in, whatever the drawn size. Larger than the 44 px button and
+     * the 52 px gutter on purpose: a fingertip on a car panel misses by more than the button is
+     * wide, so the hit area reaches a few pixels into the panes beside each button.
+     */
+    const val MIN_HIT_DP = 64f
+    const val FAB_DP = 60f
+    const val MENU_BUTTON_DP = 52f
+    const val FAB_MARGIN_DP = 28f
+    const val MENU_GAP_DP = 12f
 
     fun layout(
         panes: List<DuoScreenPane>,

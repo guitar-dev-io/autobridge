@@ -66,14 +66,14 @@ class DuoScreenControlsTest {
     fun seamBarPutsButtonsAtBothEndsAndTheHandleInTheMiddle() {
         val result = layout(stacked(portrait), portrait)
         val byControl = result.buttons.associateBy { it.control }
-        // As drawn in docs/design/13: 16 px in from each end, 56 px buttons 10 px apart.
+        // 16 px in from each end, 44 px buttons 8 px apart.
         assertEquals(16, byControl.getValue(DuoScreenControl.LAYOUT).rect.left)
-        assertEquals(82, byControl.getValue(DuoScreenControl.SWAP).rect.left)
+        assertEquals(16 + 44 + 8, byControl.getValue(DuoScreenControl.SWAP).rect.left)
         assertEquals(portrait.width - 16, byControl.getValue(DuoScreenControl.ARRANGE).rect.right)
-        assertEquals(portrait.width - 16 - 56 - 10, byControl.getValue(DuoScreenControl.RELOAD).rect.right)
+        assertEquals(portrait.width - 16 - 44 - 8, byControl.getValue(DuoScreenControl.RELOAD).rect.right)
         val handle = byControl.getValue(DuoScreenControl.HANDLE).rect
         assertEquals(portrait.width / 2, handle.left + handle.width / 2)
-        assertEquals(56, byControl.getValue(DuoScreenControl.LAYOUT).rect.width)
+        assertEquals(44, byControl.getValue(DuoScreenControl.LAYOUT).rect.width)
     }
 
     @Test
@@ -108,8 +108,8 @@ class DuoScreenControlsTest {
             layout(pip(landscape), landscape, menuOpen = true)
         ).forEach { result ->
             result.buttons.forEach { button ->
-                assertTrue("${button.control} hit width", button.hit.width >= 76)
-                assertTrue("${button.control} hit height", button.hit.height >= 76)
+                assertTrue("${button.control} hit width", button.hit.width >= 64)
+                assertTrue("${button.control} hit height", button.hit.height >= 64)
                 assertTrue(button.hit.left >= 0 && button.hit.top >= 0)
             }
         }
@@ -130,8 +130,8 @@ class DuoScreenControlsTest {
         assertNull(result.panel)
         assertEquals(listOf(DuoScreenControl.MENU), result.buttons.map { it.control })
         val fab = result.buttons.single().rect
-        assertEquals(landscape.width - 36 - 76, fab.left)
-        assertEquals(landscape.height - 36 - 76, fab.top)
+        assertEquals(landscape.width - 28 - 60, fab.left)
+        assertEquals(landscape.height - 28 - 60, fab.top)
     }
 
     @Test

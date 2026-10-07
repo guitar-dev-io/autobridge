@@ -24,7 +24,7 @@ object DuoScreenChrome {
     const val MAX_SCALE = 1.6f
 
     const val OUTER_MARGIN = 12f
-    const val SEAM_GUTTER = 72f
+    const val SEAM_GUTTER = 52f
     const val CORNER_RADIUS = 20f
 
     fun scale(bounds: Bounds): Float {
