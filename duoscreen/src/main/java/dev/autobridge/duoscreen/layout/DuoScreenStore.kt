@@ -149,7 +149,9 @@ object DuoScreenStore {
         prefs(context).getInt(KEY_PANE_COUNT, DEFAULT_PANE_COUNT).coerceIn(MIN_PANES, MAX_PANES)
 
     fun setPaneCount(context: Context, count: Int) {
-        prefs(context).edit {
+        // Written synchronously: changing the count rebuilds a live session straight away, and an
+        // apply() still in flight if that goes wrong would quietly bring back the old count.
+        prefs(context).edit(commit = true) {
             putInt(KEY_PANE_COUNT, count.coerceIn(MIN_PANES, MAX_PANES))
             // The stored arrangement was built for the old count, so it cannot describe the new one.
             putBoolean(KEY_ARRANGED, false)
@@ -207,6 +209,11 @@ object DuoScreenStore {
     fun restore(context: Context, bounds: Bounds): List<DuoScreenPane>? {
         if (!prefs(context).getBoolean(KEY_ARRANGED, false)) return null
         val saved = DuoScreenLayoutCodec.decode(prefs(context).getString(KEY_LAYOUT, null)) ?: return null
+        // An arrangement for another pane count cannot describe this one. It happens when the
+        // count changes while a session is live: tearing that session down saves its old panes
+        // (and marks them arranged) just before the rebuild reads them back, which used to bring
+        // the old two panes straight back after choosing three.
+        if (saved.panes.size != paneCount(context)) return null
         return DuoScreenLayoutCodec.refit(saved.panes, saved.bounds, bounds)
     }
 
