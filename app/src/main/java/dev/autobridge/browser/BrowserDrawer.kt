@@ -200,6 +200,10 @@ data class BrowserMenuState(
      * it here rather than keeping a list of its own, so the menus cannot drift apart again.
      */
     val unsupported: Set<DrawerAction> = emptySet(),
+    /** Whether the page on screen is already bookmarked: the car menu's star then shows "Saved". */
+    val bookmarked: Boolean = false,
+    /** The split's current layout, named beside the split switch while it is on. */
+    val splitLayout: BrowserSplitLayout? = null,
 ) {
     val secure: Boolean get() = url.startsWith("https://", ignoreCase = true)
 }

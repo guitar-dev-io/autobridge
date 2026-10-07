@@ -1846,4 +1846,21 @@
     <string name="voice_home_open_settings">Open settings</string>
     <string name="voice_home_unsafe">That address cannot be opened by voice</string>
     <string name="voice_mic_disclosure_body">The microphone listens only after you tap it, and stops when you stop speaking. What you said is turned into text on this phone by the Whisper model you downloaded, then run as a command. No recording is kept and nothing is sent anywhere.\n\nAndroid will now ask for microphone permission.</string>
+    <string name="drawer_forward_short">Forward</string>
+    <string name="drawer_bookmark_save">Save</string>
+    <string name="drawer_bookmark_saved">Saved</string>
+    <string name="drawer_desktop_site">Desktop site</string>
+    <string name="drawer_zoom">Zoom</string>
+    <string name="drawer_section_page">This page</string>
+    <string name="drawer_section_split">Split screen</string>
+    <string name="drawer_section_goto">Go to</string>
+    <string name="drawer_section_app">AutoBridge</string>
+    <string name="drawer_split_hint">Tap the name for layouts</string>
+    <string name="drawer_side_show_page_long">Open this page on the side</string>
+    <string name="drawer_more_hint">Find · Copy · Other app · Maps</string>
+    <string name="drawer_find_long">Find in page</string>
+    <string name="drawer_paste_and_go_long">Paste link and go</string>
+    <string name="drawer_external_long">Open in another app</string>
+    <string name="drawer_navigate_maps_long">Navigate in Maps</string>
+    <string name="drawer_navigate_maps_hint">Send the address on this page to Maps</string>
 </resources>

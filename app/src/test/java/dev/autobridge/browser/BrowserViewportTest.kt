@@ -1065,28 +1065,49 @@ class CarMenuParityTest {
         assertTrue(BrowserDrawerModel.moreItems(limited).none { it.action in unsupported })
     }
 
-    /** Bridge Web and the Duo pane: related entries share a line, so the menu fits a car screen. */
-    @Test fun theListMenusGroupRelatedEntriesOnFewLines() {
+    /**
+     * Bridge Web and the Duo pane (docs/design/18–19): two lines of four on the first page, the
+     * page switches and the split in their own cards, the rarer actions on a More page — and every
+     * entry exactly once.
+     */
+    @Test fun theListMenuPutsEveryEntryInOnePlace() {
         val bridgeWeb = state.copy(
             unsupported = setOf(DrawerAction.MEDIA_CENTER, DrawerAction.NOW_PLAYING, DrawerAction.MEDIA_LIBRARY, DrawerAction.AGENT),
         )
         val items = BrowserDrawerModel.carMenu(bridgeWeb)
-        val rows = CarMenuList.rows(items)
-        // Swap sides is the "side page on the right" switch in Split options, not a grid button.
-        val gridItems = items.filter { it.action != DrawerAction.SWAP_SPLIT_SIDES }
-        assertEquals(gridItems.map { it.action }.toSet(), rows.flatten().map { it.action }.toSet())
-        assertEquals(gridItems.size, rows.flatten().size)
-        assertTrue(rows.all { it.size in 1..4 })
-        assertTrue("${rows.size} lines", rows.size <= 10)
-        assertEquals(listOf(DrawerAction.TABS, DrawerAction.NEW_TAB), rows.first().map { it.action })
-        fun line(a: DrawerAction) = rows.indexOfFirst { row -> row.any { it.action == a } }
-        assertEquals(line(DrawerAction.TOGGLE_DESKTOP), line(DrawerAction.TOGGLE_FULLSCREEN))
-        assertEquals(line(DrawerAction.ZOOM_IN), line(DrawerAction.ZOOM_OUT))
-        assertEquals(line(DrawerAction.BOOKMARKS), line(DrawerAction.HISTORY))
-        assertEquals(line(DrawerAction.SPLIT_LAYOUT), line(DrawerAction.SPLIT_CHOOSE))
+        val plan = CarMenuList.plan(items)
+        // Swap sides is the "side page on the right" switch in Split options, not a menu entry.
+        val expected = items.filter { it.action != DrawerAction.SWAP_SPLIT_SIDES }.map { it.action }
+        val placed = plan.all.map { it.action }
+        assertEquals(placed.size, placed.toSet().size)
+        assertEquals(expected.toSet(), placed.toSet())
+
+        assertEquals(
+            listOf(
+                listOf(DrawerAction.NAV_BACK, DrawerAction.RELOAD, DrawerAction.NAV_FORWARD, DrawerAction.TABS),
+                listOf(DrawerAction.BOOKMARK_PAGE, DrawerAction.BOOKMARKS, DrawerAction.HISTORY, DrawerAction.NEW_TAB),
+            ),
+            plan.grid.map { line -> line.map { it.action } },
+        )
+        assertEquals(
+            listOf(DrawerAction.TOGGLE_DESKTOP, DrawerAction.TOGGLE_FULLSCREEN, DrawerAction.PIN_TOOLBAR),
+            plan.switches.map { it.action },
+        )
+        assertEquals(DrawerAction.ZOOM_OUT to DrawerAction.ZOOM_IN, plan.zoom?.let { it.first.action to it.second.action })
+        assertEquals(DrawerAction.SPLIT_LAYOUT, plan.split?.action)
+        assertEquals(DrawerAction.SPLIT_CHOOSE, plan.splitChoose?.action)
+        assertEquals(DrawerAction.SIDE_SHOW_PAGE, plan.sideShow?.action)
+        assertEquals(DrawerAction.APP_HOME, plan.exit?.action)
+        // Nothing that is not about the page in front of the driver crowds the first page.
+        val more = plan.more.flatMap { it.second }.map { it.action }
+        listOf(
+            DrawerAction.FIND_IN_PAGE, DrawerAction.COPY_URL, DrawerAction.PASTE_AND_GO, DrawerAction.OPEN_EXTERNAL,
+            DrawerAction.HOME, DrawerAction.DOWNLOADS, DrawerAction.NAVIGATE_MAPS, DrawerAction.MIRROR_PHONE,
+            DrawerAction.SETTINGS, DrawerAction.CLEAR_DATA, DrawerAction.DIAGNOSTICS,
+        ).forEach { assertTrue("$it should be on the More page", it in more) }
     }
 
-    @Test fun theDuoPaneGridLeadsWithTheStartPage() {
+    @Test fun theDuoPaneMenuLeadsWithTheStartPageWhereTabsWouldBe() {
         val duo = state.copy(
             unsupported = setOf(
                 DrawerAction.TABS, DrawerAction.NEW_TAB, DrawerAction.SPLIT_LAYOUT, DrawerAction.SPLIT_CHOOSE,
@@ -1096,9 +1117,21 @@ class CarMenuParityTest {
             ),
         )
         val items = BrowserDrawerModel.carMenu(duo)
-        val rows = CarMenuList.rows(items)
-        assertEquals(listOf(DrawerAction.HOME), rows.first().map { it.action })
-        assertEquals(items.size, rows.flatten().size)
+        val plan = CarMenuList.plan(items)
+        assertEquals(DrawerAction.HOME, plan.grid[0].last().action)
+        assertEquals(DrawerAction.DOWNLOADS, plan.grid[1].last().action)
+        assertTrue(plan.grid.all { it.size == 4 })
+        assertEquals(null, plan.split)
+        assertEquals(null, plan.exit)
+        assertEquals(items.map { it.action }.toSet(), plan.all.map { it.action }.toSet())
+        assertEquals(items.size, plan.all.size)
+    }
+
+    @Test fun anEntryTheLayoutDoesNotKnowStillLandsOnTheMorePage() {
+        val items = BrowserDrawerModel.carMenu(state) +
+            DrawerItem(DrawerAction.SUPPORT, dev.autobridge.R.string.drawer_support, BrowserIcon.SUPPORT)
+        val plan = CarMenuList.plan(items)
+        assertEquals(DrawerAction.SUPPORT, plan.more.last().second.last().action)
     }
 
     @Test fun thePhoneSheetIsUntouchedByTheCarSplitTile() {

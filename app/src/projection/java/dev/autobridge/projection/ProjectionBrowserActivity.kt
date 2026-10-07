@@ -1045,7 +1045,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
      * One at a time by construction — [overlay] is replaced, never stacked — so the menu and the
      * tab list can never end up on screen together with no way to tell which tap belongs to which.
      */
-    private fun showOverlay(heading: String, build: LinearLayout.() -> Unit) {
+    private fun showOverlay(heading: String, subheading: String? = null, build: LinearLayout.() -> Unit) {
         dismissOverlay()
         closeKeyboard()
         val parent = root ?: return
@@ -1056,7 +1056,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
             orientation = LinearLayout.VERTICAL
             build()
         }
-        val header = CarMenuList.header(this, heading, menuStyle()) { dismissOverlay() }
+        val header = CarMenuList.header(this, heading, menuStyle(), subheading) { dismissOverlay() }
         val sheet = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = GradientDrawable().apply {
@@ -1176,7 +1176,10 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
             dismissOverlay()
             runMenuAction(action)
         }
-        showOverlay(getString(R.string.car_browser_title)) {
+        // The page's own name and host, so the menu says which page it acts on.
+        val pageTitle = webView?.title?.takeIf { it.isNotBlank() }
+        val host = runCatching { android.net.Uri.parse(currentUrl).host }.getOrNull()?.removePrefix("www.")
+        showOverlay(pageTitle ?: host ?: getString(R.string.car_browser_title), host.takeIf { pageTitle != null }) {
             rows.forEach { addView(it) }
             // This route's own two ways to type, side by side on one line.
             addView(LinearLayout(this@ProjectionBrowserActivity).apply {
@@ -1215,6 +1218,8 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         pinnedToolbar = BrowserControlsStore.alwaysShowUrlBar(this),
         splitActive = sideView != null,
         unsupported = UNSUPPORTED_ACTIONS,
+        bookmarked = WebBookmarkStore.contains(this, currentUrl),
+        splitLayout = BrowserSplitStore.projection.layout(this),
     )
 
     /** What each menu entry does here. Entries in [UNSUPPORTED_ACTIONS] are never offered. */
