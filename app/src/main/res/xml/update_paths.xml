@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Shared read-only, one file at a time, with the app the user picks: update APKs
+     (UpdateDownloader) and log reports (LogReport). -->
+<paths>
+    <cache-path name="updates" path="updates/" />
+    <cache-path name="reports" path="reports/" />
+    <cache-path name="exports" path="exports/" />
+    <!-- The camera writes the parking photo here (ParkingActivity), through a URI granted to it for that one file. -->
+    <files-path name="parking" path="parking/" />
+</paths>

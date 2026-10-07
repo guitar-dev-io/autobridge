@@ -30,7 +30,14 @@ class AutoBridgeSession : Session(), CarScreenController.Host {
                 // handshake. Without this the runtime context stayed false for the whole drive, so
                 // the phone UI read "Not connected" and the Mobile Remote showed the car offline
                 // while the head unit was plainly running our screens.
-                RuntimeContextStore.setConnected(true)
+                CarConnectionMonitor.publish()
+                // Odometer and fuel level for the fuel log, when the car reports them and the
+                // driver has allowed it (CarFuelScreen asks); nothing happens otherwise.
+                dev.autobridge.fuel.CarVehicleData.start(carContext)
+                // What maintenance is due, as a phone notification: the drive is about to start.
+                runCatching { dev.autobridge.maintenance.MaintenanceReminder.check(carContext) }
+                // "Time for a break" every N hours of this connection, when the driver turned it on.
+                runCatching { dev.autobridge.breakreminder.BreakReminder.start(carContext) }
                 dev.autobridge.logging.StructuredLog.i(TAG, "car session connected")
                 // The bridge learns about the connection here rather than polling for it, and
                 // this is where a Send-to-Car that arrived while nothing was plugged in gets
@@ -39,11 +46,15 @@ class AutoBridgeSession : Session(), CarScreenController.Host {
             }
 
             override fun onDestroy(owner: LifecycleOwner) {
+                dev.autobridge.breakreminder.BreakReminder.stop()
+                dev.autobridge.fuel.CarVehicleData.stop()
                 CarScreenController.unregister(this@AutoBridgeSession)
                 // A replacement session can be created before the outgoing one is destroyed, so the
                 // registered host - not this callback - decides whether anything is still attached.
-                val stillConnected = CarScreenController.isConnected
-                RuntimeContextStore.setConnected(stillConnected)
+                // The host's own connection signal still counts after this session is gone: the car
+                // stays connected while the driver is in Bridge Web, Duo Screen or Maps.
+                CarConnectionMonitor.publish()
+                val stillConnected = RuntimeContextStore.context.value.connected
                 dev.autobridge.logging.StructuredLog.i(TAG, "car session destroyed connected=$stillConnected")
                 dev.autobridge.bridge.AutoBridgeSessionManager.onCarDisconnected(carContext)
                 // The browser renderer outlives individual screens on purpose, so the session is

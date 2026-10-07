@@ -17,6 +17,20 @@ class AgentCommandParserTest {
     private fun action(text: String) = parse(text)?.action
 
     @Test
+    fun `a spoken fill-up is a fuel entry and keeps what was said`() {
+        val command = parse("เติม 40 ลิตร 1,400 บาท")!!
+        assertEquals(AgentAction.LOG_FUEL, command.action)
+        assertEquals("เติม 40 ลิตร 1,400 บาท", command.argument)
+        assertEquals(AgentAction.LOG_FUEL, action("ชาร์จ 30 kWh 200 บาทครับ"))
+    }
+
+    @Test
+    fun `a request that only mentions fuel is still a search`() {
+        assertEquals(AgentAction.OPEN_URL, action("ค้นหาปั๊มน้ำมันใกล้ฉัน"))
+        assertEquals(AgentAction.OPEN_URL, action("เติมน้ำมัน 40 ลิตร"))
+    }
+
+    @Test
     fun `blank input is not a command`() {
         assertNull(parse(""))
         assertNull(parse("   "))

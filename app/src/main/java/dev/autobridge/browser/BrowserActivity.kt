@@ -656,6 +656,7 @@ class BrowserActivity : Activity() {
                     promptExternalSignIn(target)
                     return true
                 }
+                if (allowed() && handOffToMaps(target, view.url)) return true
                 return !allowed() || ContentAddress.https(target) == null
             }
 
@@ -1262,7 +1263,8 @@ class BrowserActivity : Activity() {
             // multiple tabs and split layout have nothing to switch between here. [MenuSurface.PHONE]
             // never lists these; see [MoreActionsSheet] for the phone's actual AUTOBRIDGE section.
             DrawerAction.NEW_TAB, DrawerAction.TABS, DrawerAction.MEDIA_CENTER,
-            DrawerAction.DIAGNOSTICS, DrawerAction.SPLIT_LAYOUT -> Unit
+            DrawerAction.DIAGNOSTICS, DrawerAction.SPLIT_LAYOUT,
+            DrawerAction.SIDE_SHOW_PAGE, DrawerAction.NAVIGATE_MAPS -> Unit
             // Sheet navigation, resolved before an action is dispatched.
             DrawerAction.MORE, DrawerAction.BACK_TO_MENU, DrawerAction.CLOSE_SHEET -> Unit
         }
@@ -1666,6 +1668,30 @@ class BrowserActivity : Activity() {
      * Opened as a Custom Tab (shares Chrome's cookie jar) rather than a full external browser
      * switch, so a device already signed in to Chrome skips the credential prompt entirely.
      */
+    /**
+     * The mobile Google Maps page has no turn-by-turn of its own: its "Start" and "Open app" buttons
+     * only try to launch the Maps app through an `intent://` or `google.navigation:` link, which this
+     * browser used to drop, so they did nothing. Starts navigation in the Maps app to the link's
+     * destination (or to what the page is showing) and returns true; false for every other link.
+     */
+    private fun handOffToMaps(target: String, pageUrl: String?): Boolean {
+        if (!MapsHandoff.isMapsAppLink(target) && MapsHandoff.destinationFromLink(target) == null) return false
+        val destination = MapsHandoff.handoffDestination(target, pageUrl)
+        if (destination == null) {
+            android.widget.Toast.makeText(this, getString(R.string.car_maps_no_destination), android.widget.Toast.LENGTH_LONG).show()
+            return true
+        }
+        val navigate = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(MapsHandoff.navigationUri(destination)))
+            .setPackage(MapsHandoff.MAPS_PACKAGE)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val started = runCatching { startActivity(navigate) }.isSuccess
+        android.util.Log.i("AutoBridgeBrowser", "maps hand-off started=$started")
+        if (!started) {
+            android.widget.Toast.makeText(this, getString(R.string.maps_app_missing), android.widget.Toast.LENGTH_LONG).show()
+        }
+        return true
+    }
+
     private fun promptExternalSignIn(url: String) {
         AlertDialog.Builder(this)
             .setTitle(R.string.browser_signin_title)

@@ -1,0 +1,75 @@
+name: Auto release
+
+# Tags and releases a new version on its own, once CI has passed on main.
+#
+# Until now a release needed a hand-made tag, and a tag that never reached GitHub (created but not
+# pushed, or a release saved as a draft) meant no build with nothing saying why. This runs after
+# every successful CI on main: if version.properties names a version that has no v<version> tag
+# yet, it tags that commit and starts the Release workflow on the tag.
+#
+# Bump the version as the LAST commit of a batch of changes: the first green commit carrying a new
+# version is the one that gets tagged, and later commits on the same version are not released.
+# A tag pushed by hand still works as before (Release runs on it, and this then finds it exists).
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: write  # push the tag
+  actions: write   # start the Release workflow
+
+jobs:
+  tag:
+    name: Tag the new version and start the release
+    # Only a CI run that passed, on a push to main.
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the commit CI passed on
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      - name: Read the version
+        id: version
+        run: |
+          set -euo pipefail
+          name="$(sed -n 's/^versionName=//p' version.properties | tr -d '[:space:]')"
+          if ! printf '%s' "$name" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$'; then
+            echo "::error::versionName '$name' is not a version this workflow tags."
+            exit 1
+          fi
+          echo "tag=v$name" >> "$GITHUB_OUTPUT"
+
+      - name: Skip when the tag already exists
+        id: exists
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --tags origin "refs/tags/${{ steps.version.outputs.tag }}" >/dev/null; then
+            echo "Tag ${{ steps.version.outputs.tag }} exists; nothing to release."
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Tag the commit
+        if: steps.exists.outputs.exists == 'false'
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          tag="${{ steps.version.outputs.tag }}"
+          git tag -a "$tag" -m "AutoBridge ${tag#v}" "${{ github.event.workflow_run.head_sha }}"
+          git push origin "refs/tags/$tag"
+
+      # A tag pushed with GITHUB_TOKEN does not start other workflows, so the Release workflow is
+      # started explicitly on the tag; workflow_dispatch is the one event that token may trigger.
+      - name: Start the Release workflow on the tag
+        if: steps.exists.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run release.yml --repo "${{ github.repository }}" --ref "${{ steps.version.outputs.tag }}"

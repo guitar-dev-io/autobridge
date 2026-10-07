@@ -21,6 +21,33 @@ class DuoScreenPresetTest {
         assertEquals(Rect(0, 400, 1000, 400), rects[1])
     }
 
+    @Test fun aWideSurfaceStartsSideBySide() {
+        assertEquals(DuoScreenPreset.EVEN_COLUMNS, DuoScreenPresetGeometry.defaultFor(Bounds(800, 400)))
+        assertEquals(DuoScreenPreset.EVEN_COLUMNS, DuoScreenPresetGeometry.defaultFor(Bounds(1000, 800)))
+    }
+
+    @Test fun aSquarishOrTallSurfaceStartsStacked() {
+        // The 780 x 770 area a portrait Ford head unit gives an app, and a properly tall one.
+        assertEquals(DuoScreenPreset.EVEN_ROWS, DuoScreenPresetGeometry.defaultFor(Bounds(780, 770)))
+        assertEquals(DuoScreenPreset.EVEN_ROWS, DuoScreenPresetGeometry.defaultFor(Bounds(600, 1000)))
+    }
+
+    @Test fun noSizeYetStartsSideBySide() {
+        assertEquals(DuoScreenPreset.EVEN_COLUMNS, DuoScreenPresetGeometry.defaultFor(Bounds(0, 0)))
+    }
+
+    @Test fun stackedSixtyFortyPutsTheLargerPaneOnTop() {
+        val rects = DuoScreenPreset.STACKED_60_40.rects(2, bounds)
+        assertEquals(Rect(0, 0, 1000, 480), rects[0])
+        assertEquals(Rect(0, 480, 1000, 320), rects[1])
+    }
+
+    @Test fun stackedSixtyFortyWithThreePanesHalvesTheBottom() {
+        val rects = DuoScreenPreset.STACKED_60_40.rects(3, bounds)
+        assertEquals(listOf(400, 200, 200), rects.map { it.height })
+        assertEquals(listOf(0, 400, 600), rects.map { it.top })
+    }
+
     @Test fun wideLeftGivesTheFirstPaneTwoThirdsOfTheWidth() {
         val rects = DuoScreenPreset.WIDE_LEFT.rects(2, bounds)
         assertEquals(650, rects[0].width)

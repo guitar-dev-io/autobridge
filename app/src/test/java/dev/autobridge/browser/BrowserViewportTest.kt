@@ -964,6 +964,7 @@ class BrowserDrawerModelTest {
                     DrawerAction.TABS, DrawerAction.NEW_TAB, DrawerAction.AGENT,
                     DrawerAction.MEDIA_CENTER, DrawerAction.NOW_PLAYING,
                     DrawerAction.MEDIA_LIBRARY, DrawerAction.DIAGNOSTICS,
+                    DrawerAction.SIDE_SHOW_PAGE, DrawerAction.NAVIGATE_MAPS,
                 )
             }
             assertEquals(emptySet<DrawerAction>(), offered intersect foreign)

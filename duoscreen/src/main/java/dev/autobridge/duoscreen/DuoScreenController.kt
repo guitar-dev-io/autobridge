@@ -116,6 +116,7 @@ class DuoScreenController(
         val bounds = Bounds(width, height)
         dpi = panelDpi
         paneDpi = storedPaneDpi(panelDpi)
+        DuoScreenStore.noteSurface(context, bounds)
         val restored = DuoScreenStore.restore(context, bounds)
         val preset = DuoScreenStore.presetPanes(context, bounds)
         val paneSet = when {
@@ -436,7 +437,13 @@ class DuoScreenController(
     // --- host gestures, forwarded to the router which decides what they mean in the current mode ---
 
     fun onClick(x: Int, y: Int) {
-        router?.onClick(x, y)
+        val active = router
+        if (active == null) {
+            StructuredLog.w(TAG, "Car tap at $x,$y dropped: no live session")
+            return
+        }
+        StructuredLog.i(TAG, "Car tap at $x,$y (${active.mode})")
+        active.onClick(x, y)
     }
 
     fun onScroll(dx: Int, dy: Int) {
@@ -522,7 +529,10 @@ class DuoScreenController(
     override fun forwardTap(paneId: Int, localX: Int, localY: Int) {
         CarScreenPower.carInput()
         val displayId = DuoScreenDisplays.displayId(paneId)
-        if (displayId < 0) return
+        if (displayId < 0) {
+            StructuredLog.w(TAG, "Tap on pane $paneId dropped: it has no display")
+            return
+        }
         val pane = router?.panes?.pane(paneId) ?: return
         val size = DuoScreenDisplays.size(paneId) ?: return
         // The router hands over pane-local surface pixels; the display may be running at another
@@ -530,7 +540,16 @@ class DuoScreenController(
         val (x, y) = DuoScreenLayout.scaleToDisplay(localX, localY, pane.rect, size.width, size.height)
         // Geometry is read here, on the caller's thread, where the pane set and the displays are
         // written; only the injection itself goes to the input thread.
-        onInputThread { touch.tap(displayId, x, y) }
+        onInputThread {
+            val injected = touch.tap(displayId, x, y)
+            // A refused injection is silent otherwise: it is what an unavailable Shizuku looks
+            // like from the car, a screen that simply does not react.
+            StructuredLog.i(
+                TAG,
+                "Tap on pane $paneId -> display $displayId at $x,$y injected=$injected" +
+                    " (shizuku=${ops.isAvailable})"
+            )
+        }
     }
 
     /**

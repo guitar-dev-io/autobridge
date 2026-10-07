@@ -22,8 +22,11 @@ import dev.autobridge.R
 import dev.autobridge.browser.CarBrowserRuntime
 import dev.autobridge.core.state.RecentActivityStore
 import dev.autobridge.iptv.IptvCatalog
+import dev.autobridge.iptv.ChannelQueue
 import dev.autobridge.iptv.IptvCatalogData
+import dev.autobridge.iptv.IptvChannelQueue
 import dev.autobridge.iptv.IptvEntry
+import dev.autobridge.iptv.IptvEpg
 import dev.autobridge.iptv.IptvHistoryStore
 import dev.autobridge.iptv.IptvKind
 import dev.autobridge.iptv.IptvPlayback
@@ -55,6 +58,60 @@ class CarIptvSourcesScreen(
     private val title = carContext.getString(
         if (kind == IptvKind.RADIO) R.string.car_iptv_radio else R.string.car_iptv_tv
     )
+    private val mediaPlayback = MediaPlaybackClient(carContext)
+    private val logos = CarChannelLogos(carContext) { repaint() }
+
+    init {
+        mediaPlayback.connect(onConnected = { invalidate() }, onError = { invalidate() })
+        lifecycle.addObserver(object : DefaultLifecycleObserver {
+            // The channels the driver actually picks from first — favourites and recent — are
+            // checked as soon as TV / Radio opens, quietly, so a dead one has already dropped off
+            // the quick rows by the time a finger reaches them.
+            override fun onStart(owner: LifecycleOwner) {
+                val urls = (IptvHistoryStore.favorites(carContext, kind) + IptvHistoryStore.recent(carContext, kind))
+                    .filter { it.playback == IptvPlayback.STREAM }
+                    .map { it.url }
+                CarIptvCheck.start(carContext, urls, quiet = true) { repaint() }
+            }
+
+            override fun onDestroy(owner: LifecycleOwner) {
+                logos.stop()
+                mediaPlayback.disconnect()
+            }
+        })
+    }
+
+    private fun repaint() {
+        if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) invalidate()
+    }
+
+    /**
+     * Favourite and recent channels as rows that play straight away, at the top of the list.
+     * Few enough to stay inside the host's list limit while driving, so a channel the driver
+     * watches every day is one tap away instead of a scroll the host locks.
+     */
+    private fun addQuickRows(list: ItemList.Builder) {
+        val favorites = IptvHistoryStore.favorites(carContext, kind)
+        val quick = IptvChannelQueue.quick(favorites, IptvHistoryStore.recent(carContext, kind), CarIptvCheck::isDead)
+        quick.forEach { item ->
+            val favorite = favorites.any { it.url == item.url }
+            val row = Row.Builder()
+                .setTitle(item.title)
+                .addText(
+                    carContext.getString(
+                        if (favorite) R.string.car_iptv_favourite else R.string.car_iptv_recent
+                    )
+                )
+                .setOnClickListener {
+                    CarIptvPlayback.play(
+                        this, carContext, mediaPlayback, item.title, item.url, item.kind,
+                        item.playback, IptvChannelQueue.aroundItems(quick, item, CarIptvCheck::isDead)
+                    )
+                }
+            logos.icon(item.logo)?.let { row.setImage(it, Row.IMAGE_TYPE_SMALL) }
+            list.addItem(row.build())
+        }
+    }
 
     override fun onGetTemplate(): Template {
         val sources = IptvSourceStore.list(carContext, kind)
@@ -71,7 +128,9 @@ class CarIptvSourcesScreen(
                 .build()
         }
 
+        logos.beginTemplate()
         val list = ItemList.Builder()
+        addQuickRows(list)
         val recent = IptvHistoryStore.recent(carContext, kind)
         if (recent.isNotEmpty()) {
             list.addItem(
@@ -247,12 +306,18 @@ class CarIptvEntriesScreen(
         // The logo budget is per template, so it starts over for the rows about to be built.
         logos.beginTemplate()
         val list = ItemList.Builder()
-        paged.items.forEach { entry ->
+        // Pages are cut from the full category, and dead channels are dropped only from the page
+        // in view, so a check landing mid-scroll never moves a channel onto another page.
+        val shown = paged.items.filterNot { CarIptvCheck.isDead(it.url) }
+        // What is on now, for the live channels in view; each answer repaints as it lands.
+        IptvEpg.load(source, shown) { repaint() }
+        shown.forEach { entry ->
             val favorite = entry.url.isNotBlank() && IptvHistoryStore.isFavorite(carContext, entry.url)
             val row = Row.Builder()
                 .setTitle(entry.title)
                 .addText(
                     listOfNotNull(
+                        IptvEpg.cached(source, entry)?.let { "▶ $it" },
                         entry.subtitle.takeIf { it.isNotBlank() },
                         carContext.getString(R.string.car_iptv_opens_in_browser)
                             .takeIf { entry.isWebPage },
@@ -269,6 +334,7 @@ class CarIptvEntriesScreen(
             StreamPing.cached(entry.url)?.let { row.addText(CarIptvCheck.text(carContext, it)) }
             list.addItem(row.build())
         }
+        CarIptvCheck.hiddenRow(carContext, paged.items.size - shown.size)?.let { list.addItem(it) }
         if (paged.hasMore) {
             list.addItem(
                 Row.Builder()
@@ -328,7 +394,8 @@ class CarIptvEntriesScreen(
         }
         IptvHistoryStore.recordPlayback(carContext, source, entry)
         CarIptvPlayback.play(
-            this, carContext, mediaPlayback, entry.title, entry.url, source.kind, entry.playback
+            this, carContext, mediaPlayback, entry.title, entry.url, source.kind, entry.playback,
+            IptvChannelQueue.around(entries, entry, CarIptvCheck::isDead)
         )
     }
 }
@@ -358,7 +425,8 @@ class CarIptvRecentScreen(carContext: CarContext, private val kind: IptvKind) : 
     }
 
     override fun onGetTemplate(): Template {
-        val items = IptvHistoryStore.recent(carContext, kind)
+        val all = IptvHistoryStore.recent(carContext, kind)
+        val items = all.filterNot { CarIptvCheck.isDead(it.url) }
         logos.beginTemplate()
         val list = ItemList.Builder()
         items.forEach { item ->
@@ -368,13 +436,14 @@ class CarIptvRecentScreen(carContext: CarContext, private val kind: IptvKind) : 
                 .setOnClickListener {
                     CarIptvPlayback.play(
                         this, carContext, mediaPlayback, item.title, item.url, item.kind,
-                        item.playback
+                        item.playback, IptvChannelQueue.aroundItems(items, item, CarIptvCheck::isDead)
                     )
                 }
             logos.icon(item.logo)?.let { row.setImage(it, Row.IMAGE_TYPE_SMALL) }
             StreamPing.cached(item.url)?.let { row.addText(CarIptvCheck.text(carContext, it)) }
             list.addItem(row.build())
         }
+        CarIptvCheck.hiddenRow(carContext, all.size - items.size)?.let { list.addItem(it) }
         return ListTemplate.Builder()
             .setHeader(
                 Header.Builder()
@@ -383,7 +452,7 @@ class CarIptvRecentScreen(carContext: CarContext, private val kind: IptvKind) : 
                     .apply {
                         // The replay list is where "does this still work?" matters most: these are
                         // the channels the driver already chose once.
-                        val urls = items.filter { it.playback == IptvPlayback.STREAM }.map { it.url }
+                        val urls = all.filter { it.playback == IptvPlayback.STREAM }.map { it.url }
                         CarIptvCheck.action(carContext, urls) { repaint() }
                             ?.let { addEndHeaderAction(it) }
                     }
@@ -440,6 +509,15 @@ internal object CarIptvCheck {
      * A host honours `ForegroundCarColorSpan` on row text (and ignores every other span), which is
      * the only way an app colours anything inside a template it does not draw itself.
      */
+    /** The check found [url] unreachable: the "not responding" rows, which are left off the lists. */
+    fun isDead(url: String): Boolean = StreamPing.cached(url) is StreamPing.Result.Unreachable
+
+    /** A plain row saying how many dead channels this list is not showing, or null for none. */
+    fun hiddenRow(carContext: CarContext, count: Int): Row? =
+        if (count <= 0) null else Row.Builder()
+            .setTitle(carContext.getString(R.string.car_iptv_hidden_dead, count))
+            .build()
+
     fun text(carContext: CarContext, result: StreamPing.Result): CharSequence {
         val label = when (result) {
             is StreamPing.Result.Alive ->
@@ -520,7 +598,8 @@ internal object CarIptvPlayback {
         title: String,
         url: String,
         kind: IptvKind,
-        playback: IptvPlayback = IptvPlayback.STREAM
+        playback: IptvPlayback = IptvPlayback.STREAM,
+        queue: ChannelQueue? = null,
     ) {
         if (url.isBlank()) {
             CarToast.makeText(
@@ -555,10 +634,16 @@ internal object CarIptvPlayback {
                 ).show()
                 return
             }
-            mediaPlayback.play(url, title)
+            if (queue == null) {
+                mediaPlayback.play(url, title)
+            } else {
+                mediaPlayback.playPlaylist(
+                    queue.channels.map { it.url }, queue.startIndex, queue.channels.map { it.title }
+                )
+            }
             screens.push(CarNowPlayingScreen(carContext))
         } else {
-            CarVideoLauncher.open(screens, carContext, url, title)
+            CarVideoLauncher.open(screens, carContext, url, title, queue)
         }
     }
 

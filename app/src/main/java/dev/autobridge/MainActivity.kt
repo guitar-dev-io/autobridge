@@ -1948,6 +1948,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
 
         const val SUPPORT_URL = "https://buymeacoffee.com/guitar.story"
         const val GITHUB_URL = "https://github.com/guitar-dev-io/autobridge"
+        const val FACEBOOK_URL = "https://www.facebook.com/share/19mw1X5Lou/"
 
         const val STATE_SCREEN = "phone_screen"
         const val STATE_BACK_STACK = "phone_back_stack"
@@ -2033,6 +2034,10 @@ class MainActivity : androidx.activity.ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         SettingsStore.restore(this)
+        // What maintenance is due, as a notification (once a day at most; nothing without items).
+        runCatching { dev.autobridge.maintenance.MaintenanceReminder.check(this) }
+        // Which screens Android sees (a head unit's rear screen may or may not be one of them).
+        dev.autobridge.display.DisplayInventory.log(this)
         SessionRestoreStore.restore(this)?.let { snapshot ->
             RuntimeContextStore.setCurrentFeature(snapshot.feature, snapshot.packageName)
             RuntimeContextStore.setDisplayPreferences(
@@ -2105,10 +2110,16 @@ class MainActivity : androidx.activity.ComponentActivity() {
         return true
     }
 
+    /** Update, What's-new and Send-log flows; see [PhoneMaintenance]. */
+    private val maintenance by lazy {
+        PhoneMaintenance(this, openUrl = ::openExternalUrl, fallbackShare = ::shareDiagnostics)
+    }
+
     override fun onResume() {
         super.onResume()
         statusHandler.removeCallbacks(refreshStatusRunnable)
         refreshStatusRunnable.run()
+        maintenance.runPostUpdateChecks()
     }
 
     override fun onPause() {
@@ -2268,6 +2279,16 @@ class MainActivity : androidx.activity.ComponentActivity() {
         }
         val body = design.body(this).apply {
             addView(dashboard, LinearLayout.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT))
+            // Same rule as the About page: an off-store payment prompt is for the sideload flavors only.
+            if (BuildConfig.AUTOBRIDGE_MODE != "SAFE") {
+                addView(
+                    design.pill(this@MainActivity, getString(R.string.home_donate), accent = design.ACCENT_FAVORITE) { showDonateChoices() },
+                    LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                        topMargin = dp(12)
+                        gravity = android.view.Gravity.CENTER_HORIZONTAL
+                    }
+                )
+            }
         }
 
         val bar = homeMiniPlayer ?: dev.autobridge.ui.MiniPlayer(this, mediaPlayback) {
@@ -2292,6 +2313,9 @@ class MainActivity : androidx.activity.ComponentActivity() {
             header = design.header(
                 context = this,
                 title = getString(R.string.app_name),
+                // The installed version, so which build is on the phone can be read at a glance
+                // when a fix is being checked on the car.
+                subtitle = "v${BuildConfig.VERSION_NAME}",
                 logo = R.mipmap.ic_launcher_round,
                 // Outdoor temperature when a Weather place is saved; the connection itself is
                 // the status card right below, so the chip no longer repeats it.
@@ -2307,6 +2331,40 @@ class MainActivity : androidx.activity.ComponentActivity() {
             bottomBar = bottom,
             applyInsets = false
         )
+    }
+
+    /** What the break-reminder row says: off, or how often. */
+    private fun breakReminderCaption(): String {
+        val hours = dev.autobridge.breakreminder.BreakReminder.hours(this)
+        return if (hours == 0) getString(R.string.break_reminder_off) else resources.getQuantityString(R.plurals.break_reminder_every, hours, hours)
+    }
+
+    /** Off, or every 1 to 4 hours of driving with the car connected. */
+    private fun showBreakReminderChoice() {
+        val options = dev.autobridge.breakreminder.BreakReminderOptions.HOURS
+        val labels = (listOf(getString(R.string.break_reminder_off)) +
+            options.map { resources.getQuantityString(R.plurals.break_reminder_every, it, it) }).toTypedArray()
+        val current = dev.autobridge.breakreminder.BreakReminder.hours(this)
+        android.app.AlertDialog.Builder(this)
+            .setTitle(getString(R.string.break_reminder_title))
+            .setMessage(getString(R.string.break_reminder_explain))
+            .setSingleChoiceItems(labels, if (current == 0) 0 else options.indexOf(current) + 1) { dialog, which ->
+                dev.autobridge.breakreminder.BreakReminder.setHours(this, if (which == 0) 0 else options[which - 1])
+                dialog.dismiss()
+                showPhoneScreen(PhoneScreen.SETTINGS, force = true)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    /** The coffee button on Home: the same two ways to say thanks as the About page. */
+    private fun showDonateChoices() {
+        android.app.AlertDialog.Builder(this)
+            .setTitle(getString(R.string.about_promptpay_title))
+            .setItems(arrayOf(getString(R.string.about_support_caption), getString(R.string.about_promptpay))) { _, which ->
+                if (which == 0) openExternalUrl(SUPPORT_URL) else showPromptPayDialog()
+            }
+            .show()
     }
 
     /** Home > Music / TV / Radio / More: a short list of the sections grouped behind one tile. */
@@ -2455,6 +2513,8 @@ class MainActivity : androidx.activity.ComponentActivity() {
                 mediaPlayback.resume()
                 toast(getString(R.string.agent_toast_resuming_playback))
             }
+            dev.autobridge.agent.AgentCommandRouter.AgentAction.LOG_FUEL ->
+                toast(dev.autobridge.fuel.FuelVoiceLogger.log(this, command.argument.orEmpty()).message)
             dev.autobridge.agent.AgentCommandRouter.AgentAction.OPEN_RECENT ->
                 toast(getString(R.string.car_agent_recent_on_car))
             dev.autobridge.agent.AgentCommandRouter.AgentAction.ENABLE_DESKTOP -> {
@@ -2643,6 +2703,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
                         showPhoneScreen(PhoneScreen.CAR_CONNECTION)
                     })
                     addAll(duoScreenEntry())
+                    addAll(projectionSetupEntry())
                     add(settingsEntry(
                         getString(R.string.settings_app_profiles),
                         getString(R.string.settings_app_profiles_caption_full),
@@ -2668,6 +2729,51 @@ class MainActivity : androidx.activity.ComponentActivity() {
                     ) {
                         showPhoneScreen(PhoneScreen.INPUT_TOUCH)
                     })
+                }),
+                // The driver's own paperwork on the car: what it burns, what it is due for, and a copy of both.
+                SettingsGroup(getString(R.string.settings_group_utilities), buildList {
+                    add(settingsEntry(
+                        getString(R.string.fuel_title),
+                        getString(R.string.fuel_settings_caption),
+                        R.drawable.ic_tile_car,
+                        accent = design.ACCENT
+                    ) { startActivity(dev.autobridge.fuel.FuelLogActivity.intent(this@MainActivity)) })
+                    add(settingsEntry(
+                        getString(R.string.maint_title),
+                        getString(R.string.maint_settings_caption),
+                        R.drawable.ic_tile_car,
+                        accent = design.ACCENT
+                    ) { startActivity(dev.autobridge.maintenance.MaintenanceActivity.intent(this@MainActivity)) })
+                    add(settingsEntry(
+                        getString(R.string.break_reminder_title),
+                        breakReminderCaption(),
+                        R.drawable.ic_tile_car,
+                        accent = design.ACCENT
+                    ) { showBreakReminderChoice() })
+                    add(settingsEntry(
+                        getString(R.string.costs_title),
+                        getString(R.string.costs_settings_caption),
+                        R.drawable.ic_tile_car,
+                        accent = design.ACCENT
+                    ) { startActivity(dev.autobridge.expense.CostsActivity.intent(this@MainActivity)) })
+                    add(settingsEntry(
+                        getString(R.string.parking_title),
+                        getString(R.string.parking_settings_caption),
+                        R.drawable.ic_tile_car,
+                        accent = design.ACCENT
+                    ) { startActivity(dev.autobridge.parking.ParkingActivity.intent(this@MainActivity)) })
+                    add(settingsEntry(
+                        getString(R.string.emergency_title),
+                        getString(R.string.emergency_settings_caption),
+                        R.drawable.ic_tile_car,
+                        accent = design.ACCENT
+                    ) { startActivity(dev.autobridge.emergency.EmergencyActivity.intent(this@MainActivity)) })
+                    add(settingsEntry(
+                        getString(R.string.backup_title),
+                        getString(R.string.backup_settings_caption),
+                        R.drawable.ic_tile_car,
+                        accent = design.ACCENT
+                    ) { startActivity(dev.autobridge.backup.BackupActivity.intent(this@MainActivity)) })
                 }),
                 SettingsGroup(getString(R.string.settings_group_playback_web), listOf(
                     settingsEntry(
@@ -2718,6 +2824,11 @@ class MainActivity : androidx.activity.ComponentActivity() {
                         showPhoneScreen(PhoneScreen.ADVANCED)
                     },
                     settingsEntry(
+                        getString(R.string.settings_send_log),
+                        getString(R.string.settings_send_log_caption),
+                        R.drawable.ic_tile_debug
+                    ) { maintenance.sendLogReport() },
+                    settingsEntry(
                         getString(R.string.settings_about),
                         getString(R.string.settings_about_caption),
                         R.drawable.ic_tile_settings
@@ -2743,6 +2854,24 @@ class MainActivity : androidx.activity.ComponentActivity() {
             settingsEntry(
                 getString(R.string.settings_duo_screen),
                 getString(R.string.settings_duo_screen_caption),
+                R.drawable.ic_tile_settings,
+                accent = dev.autobridge.ui.AutoBridgeDesign.ACCENT_SYSTEM
+            ) { startActivity(intent) }
+        )
+    }
+
+    /**
+     * Bridge Web / Bridge Mirror on Android Auto: re-running the install-source step after an
+     * update, and listing or unlisting Bridge Mirror. Resolved by name like [duoScreenIntent], and
+     * absent from the safe build, which has no projection route.
+     */
+    private fun projectionSetupEntry(): List<SettingsRow> {
+        val intent = Intent().setClassName(this, "dev.autobridge.projection.ProjectionSetupActivity")
+            .takeIf { packageManager.resolveActivity(it, 0) != null } ?: return emptyList()
+        return listOf(
+            settingsEntry(
+                getString(R.string.settings_projection_setup),
+                getString(R.string.settings_projection_setup_caption),
                 R.drawable.ic_tile_settings,
                 accent = dev.autobridge.ui.AutoBridgeDesign.ACCENT_SYSTEM
             ) { startActivity(intent) }
@@ -2857,6 +2986,13 @@ class MainActivity : androidx.activity.ComponentActivity() {
                     R.drawable.ic_tile_web
                 ) {
                     openExternalUrl(GITHUB_URL)
+                },
+                settingsEntry(
+                    getString(R.string.about_facebook),
+                    getString(R.string.about_facebook_caption),
+                    R.drawable.ic_tile_web
+                ) {
+                    openExternalUrl(FACEBOOK_URL)
                 }
             )),
             SettingsGroup(getString(R.string.about_group_credits), listOf(
@@ -2965,8 +3101,8 @@ class MainActivity : androidx.activity.ComponentActivity() {
     }
 
     /**
-     * Offers the newer release without installing anything: the APK link goes to the browser and
-     * the package installer, which is where a decision to replace this app belongs.
+     * Offers the newer release without installing anything itself: the APK is downloaded and
+     * handed to the installer the user picks, which is where a decision to replace this app belongs.
      */
     private fun showUpdateDialog(update: UpdateChecker.Result.Available) {
         val release = update.release
@@ -2988,7 +3124,8 @@ class MainActivity : androidx.activity.ComponentActivity() {
             }
             .setNegativeButton(getString(R.string.about_update_later), null)
             .setPositiveButton(getString(R.string.about_update_download)) { _, _ ->
-                openExternalUrl(release.apkUrl ?: release.pageUrl)
+                val apkUrl = release.apkUrl
+                if (apkUrl == null) openExternalUrl(release.pageUrl) else maintenance.downloadAndOfferInstall(apkUrl)
             }
             .show()
     }
@@ -3635,7 +3772,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
 
         val crashActions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         crashActions.addView(
-            actionCard("SHARE") { shareDiagnostics() },
+            actionCard("SHARE") { maintenance.sendLogReport() },
             LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(6) }
         )
         crashActions.addView(

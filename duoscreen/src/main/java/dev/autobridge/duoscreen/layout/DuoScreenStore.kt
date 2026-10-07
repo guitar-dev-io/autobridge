@@ -102,6 +102,9 @@ object DuoScreenStore {
     private const val KEY_PANE_COUNT = "pane_count"
     private const val KEY_PRESET = "preset"
 
+    /** The layout worked out from the surface when none was ever chosen; see [noteSurface]. */
+    private const val KEY_DERIVED_PRESET = "preset_derived"
+
     /**
      * Whether the stored rects are the driver's own arrangement rather than a preset laid out for
      * them. Only an arrangement is restored as-is; a preset is re-derived from the real surface, so
@@ -150,10 +153,25 @@ object DuoScreenStore {
         }
     }
 
-    fun preset(context: Context): DuoScreenPreset =
-        prefs(context).getString(KEY_PRESET, null)
-            ?.let { name -> DuoScreenPreset.entries.firstOrNull { it.name == name } }
-            ?: DuoScreenPreset.EVEN_COLUMNS
+    /** The driver's choice; failing that, the layout derived from the surface; failing that, side by side. */
+    fun preset(context: Context): DuoScreenPreset {
+        val prefs = prefs(context)
+        return listOf(KEY_PRESET, KEY_DERIVED_PRESET).firstNotNullOfOrNull { key ->
+            prefs.getString(key, null)?.let { name -> DuoScreenPreset.entries.firstOrNull { it.name == name } }
+        } ?: DuoScreenPreset.EVEN_COLUMNS
+    }
+
+    /**
+     * Called with the real surface when a session starts. Until the driver picks a layout, the one
+     * that fits the surface's shape is used — stacked on a squarish or tall area — and remembered,
+     * so the settings page and the layout button show what is actually on the car. Never touches a
+     * layout the driver chose or arranged.
+     */
+    fun noteSurface(context: Context, bounds: Bounds) {
+        val prefs = prefs(context)
+        if (prefs.contains(KEY_PRESET)) return
+        prefs.edit { putString(KEY_DERIVED_PRESET, DuoScreenPresetGeometry.defaultFor(bounds).name) }
+    }
 
     /** Choosing a preset drops the hand-made arrangement; the chosen apps are kept. */
     fun setPreset(context: Context, preset: DuoScreenPreset) {

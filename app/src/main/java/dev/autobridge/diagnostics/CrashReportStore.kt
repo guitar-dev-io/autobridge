@@ -48,6 +48,7 @@ object CrashReportStore {
     private const val MAX_REPORTS = 5
 
     private val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+    private val clock = SimpleDateFormat("MM-dd HH:mm:ss.SSS", Locale.US)
     private val lock = Any()
 
     @Volatile private var installed = false
@@ -85,7 +86,9 @@ object CrashReportStore {
                 // Restart rather than rotate: the run-up to the *current* problem is what matters,
                 // and keeping a second generation doubles the disk for history nobody reads.
                 if (file.length() > MAX_SESSION_BYTES) file.writeText("--- log restarted (size cap) ---\n")
-                file.appendText("${entry.level.name.first()}/${entry.tag}: ${entry.message}\n")
+                // Wall-clock time, so a line can be matched to "it happened at 21:43 on the car".
+                val time = synchronized(clock) { clock.format(Date()) }
+                file.appendText("$time ${entry.level.name.first()}/${entry.tag}: ${entry.message}\n")
             }
         }
     }

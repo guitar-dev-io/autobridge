@@ -198,6 +198,13 @@ class CarWebRenderer(context: Context) {
         fun openSettings()
         fun openDiagnostics()
         fun openExternal(url: String)
+
+        /**
+         * Starts turn-by-turn navigation to [destination] in the car's navigation app. Called when
+         * the split's Google Maps page asks for the Maps app, which the mobile web needs for any
+         * actual navigation; see [MapsHandoff].
+         */
+        fun startNavigation(destination: String)
         fun showMessage(text: String)
         /** Leaves the browser entirely and returns to AutoBridge's main dashboard. */
         fun openAppHome()
@@ -447,6 +454,7 @@ class CarWebRenderer(context: Context) {
      * itself if another app takes over. Any other loss is applied as before.
      */
     private fun applyFocusAction(action: dev.autobridge.audio.AudioFocusAction) {
+        dev.autobridge.logging.StructuredLog.i("CARWEB", "audio focus action=$action state=${audioFocus.state}")
         val selfHandOverPossible = action == dev.autobridge.audio.AudioFocusAction.PAUSE &&
             audioFocus.state == dev.autobridge.audio.AudioFocusState.PERMANENT_LOSS
         if (!selfHandOverPossible) {
@@ -720,6 +728,70 @@ class CarWebRenderer(context: Context) {
         host?.showMessage(message)
     }
 
+    /**
+     * Drawer: shows the page the main pane is on in the side pane as well — the way to put a video
+     * or a site beside the map without typing its address again. Splits 50/50 first when the
+     * surface is not split.
+     */
+    fun showMainPageOnSide() = runOnMain {
+        val target = webView?.url?.let(ContentAddress::https)
+        if (target == null) {
+            host?.showMessage(appContext.getString(R.string.car_side_show_failed))
+            return@runOnMain
+        }
+        val hadSide = sideView != null
+        sideUrl = target
+        BrowserSplitStore.setSideUrl(appContext, target)
+        if (splitLayout == BrowserSplitLayout.SINGLE) {
+            dividerGrabbed = false
+            BrowserSplitStore.setLayout(appContext, BrowserSplitLayout.HALF)
+            applyControlSettings()
+        }
+        // A side pane created just now already opened [sideUrl].
+        if (hadSide) sideView?.loadUrl(target)
+        val label = splitLayout.label(appContext)
+        host?.showMessage(
+            when {
+                isSplit -> appContext.getString(R.string.car_side_shown)
+                !hardwareMode -> appContext.getString(R.string.car_split_unavailable_legacy, label)
+                else -> appContext.getString(R.string.car_split_too_narrow, label)
+            }
+        )
+    }
+
+    /**
+     * Drawer: starts real navigation to what the split's map is showing (a route's end, a place or
+     * a search), or failing that what the main page is showing.
+     */
+    fun navigateInMaps() = runOnMain {
+        val destination = MapsHandoff.destinationFromPage(sideView?.url)
+            ?: MapsHandoff.destinationFromPage(webView?.url)
+        if (destination == null) {
+            host?.showMessage(appContext.getString(R.string.car_maps_no_destination))
+        } else {
+            host?.startNavigation(destination)
+        }
+    }
+
+    /**
+     * When [target] is a link asking for the Google Maps app, starts navigation to its destination
+     * (or to what [pageUrl], the map page that asked, is showing) and returns true; the mobile web
+     * map has no navigation of its own. Says why when there is nowhere to navigate to, rather than
+     * leaving the tap to do nothing. False for every other link. Callable from any thread.
+     */
+    private fun handOffToMaps(target: String, pageUrl: String?): Boolean {
+        if (!MapsHandoff.isMapsAppLink(target) && MapsHandoff.destinationFromLink(target) == null) return false
+        val destination = MapsHandoff.handoffDestination(target, pageUrl)
+        mainHandler.post {
+            if (destination != null) {
+                host?.startNavigation(destination)
+            } else {
+                host?.showMessage(appContext.getString(R.string.car_maps_no_destination))
+            }
+        }
+        return true
+    }
+
     // ------------------------------------------------------------------ find
 
     fun findInPage(query: String) = runOnMain {
@@ -779,6 +851,7 @@ class CarWebRenderer(context: Context) {
             reattachRasterHost()
             running = true
             pumpIdle = false
+            dev.autobridge.logging.StructuredLog.i("CARWEB", "surface back ${width}x$height")
             // Give the user the full idle window from the moment the browser appears.
             val startNow = SystemClock.uptimeMillis()
             visibility.onInteraction(startNow)
@@ -896,6 +969,12 @@ class CarWebRenderer(context: Context) {
                 sideAudio.markPlayingForResume { sidePlaying ->
                     // A newer start()/stop() has taken over; its own decision stands.
                     if (generation != surfaceGeneration || running) return@markPlayingForResume
+                    // In the Send log (the video log below goes to Logcat only): what the page was doing
+                    // when the car took the screen, which decides whether its sound carries on.
+                    dev.autobridge.logging.StructuredLog.i(
+                        "CARWEB",
+                        "surface lost: mainPlaying=$mainPlaying sidePlaying=$sidePlaying focus=${audioFocus.state}"
+                    )
                     if (!mainPlaying && !sidePlaying) {
                         audioFocus.isPlaying = false
                         audioFocus.abandon()
@@ -1491,13 +1570,28 @@ class CarWebRenderer(context: Context) {
             (panes.side.right + panes.main.left) / 2f
         }
 
+    /** [dividerCentreX] for stacked panes: the middle of the horizontal gap between them. */
+    private fun dividerCentreY(panes: SplitPanes): Float =
+        if (splitSideOnRight) {
+            (panes.main.bottom + panes.side.top) / 2f
+        } else {
+            (panes.side.bottom + panes.main.top) / 2f
+        }
+
     /** The handle as drawn. Hit testing grows it by [SPLIT_GRAB_DP]; nothing else moves it. */
     private fun dividerHandleBox(panes: SplitPanes): Box {
+        val thickness = sizes.dp(if (dividerGrabbed) SPLIT_HANDLE_GRABBED_DP else SPLIT_HANDLE_DP) / 2f
+        if (panes.stacked) {
+            // Lying across the seam between the top and bottom page.
+            val centreX = panes.side.left + panes.side.width / 2f
+            val centreY = dividerCentreY(panes)
+            val halfLength = panes.side.width * SPLIT_HANDLE_LENGTH_FRACTION / 2f
+            return Box(centreX - halfLength, centreY - thickness, centreX + halfLength, centreY + thickness)
+        }
         val centreX = dividerCentreX(panes)
         val centreY = panes.side.top + panes.side.height / 2f
-        val halfWidth = sizes.dp(if (dividerGrabbed) SPLIT_HANDLE_GRABBED_DP else SPLIT_HANDLE_DP) / 2f
         val halfLength = panes.side.height * SPLIT_HANDLE_LENGTH_FRACTION / 2f
-        return Box(centreX - halfWidth, centreY - halfLength, centreX + halfWidth, centreY + halfLength)
+        return Box(centreX - thickness, centreY - halfLength, centreX + thickness, centreY + halfLength)
     }
 
     /**
@@ -1522,15 +1616,16 @@ class CarWebRenderer(context: Context) {
      * WebViews thirty times a second is what a drag on a head unit cannot afford. The pending pass
      * is flushed on release, so where the finger stops is exactly where the panes land.
      */
-    private fun dragDivider(distanceX: Float): Boolean {
+    private fun dragDivider(distanceX: Float, distanceY: Float): Boolean {
         val panes = splitPanes?.takeIf { isSplit }
         if (panes == null) {
             dividerGrabbed = false
             return false
         }
         // The host reports the distance *scrolled*, which is the negative of the way the finger
-        // went; the divider follows the finger.
-        val delta = -distanceX.roundToInt()
+        // went; the divider follows the finger. Stacked panes are divided by a horizontal seam,
+        // which moves with the vertical part of the drag.
+        val delta = -(if (panes.stacked) distanceY else distanceX).roundToInt()
         if (delta == 0) return true
         val next = BrowserSplitGeometry.dragSideFraction(
             panes,
@@ -1631,7 +1726,7 @@ class CarWebRenderer(context: Context) {
         }
         if (overlay == Overlay.TABS) return@runOnMain
         // A grabbed divider owns the drag; the page under it must not scroll with it.
-        if (dividerGrabbed && dragDivider(distanceX)) return@runOnMain
+        if (dividerGrabbed && dragDivider(distanceX, distanceY)) return@runOnMain
         val scale = viewport.scale.takeIf { it > 0f } ?: 1f
         scrollPageBy((distanceX / scale).toInt(), (distanceY / scale).toInt())
     }
@@ -1868,6 +1963,8 @@ class CarWebRenderer(context: Context) {
             DrawerAction.TOGGLE_DESKTOP -> toggleDesktopMode(appContext)
             DrawerAction.TOGGLE_FULLSCREEN -> toggleFullscreen()
             DrawerAction.SPLIT_LAYOUT -> cycleSplitLayout()
+            DrawerAction.SIDE_SHOW_PAGE -> showMainPageOnSide()
+            DrawerAction.NAVIGATE_MAPS -> navigateInMaps()
             DrawerAction.ZOOM_IN -> zoomIn()
             DrawerAction.ZOOM_OUT -> zoomOut()
             DrawerAction.RELOAD -> reload()
@@ -2012,13 +2109,19 @@ class CarWebRenderer(context: Context) {
             override fun onGeolocationPermissionsShowPrompt(
                 origin: String,
                 callback: GeolocationPermissions.Callback,
-            ) = BrowserGeolocation.answerForCar(appContext, origin, callback) {
-                mainHandler.post {
-                    host?.showMessage(
-                        appContext.getString(R.string.car_needs_location_permission)
-                    )
-                }
-            }
+            ) = BrowserGeolocation.answerForCar(
+                appContext, origin, callback,
+                onMissingPermission = {
+                    mainHandler.post {
+                        host?.showMessage(
+                            appContext.getString(R.string.car_needs_location_permission)
+                        )
+                    }
+                },
+                onLocationOff = {
+                    mainHandler.post { host?.showMessage(appContext.getString(R.string.geo_location_off)) }
+                },
+            )
 
             /**
              * HTML5 fullscreen (YouTube's fullscreen button, `requestFullscreen()` on a video).
@@ -2061,6 +2164,11 @@ class CarWebRenderer(context: Context) {
                             request: WebResourceRequest,
                         ): Boolean {
                             val target = request.url.toString()
+                            // "Open in the Maps app" can arrive as a popup rather than a link.
+                            if (handOffToMaps(target, webView?.url)) {
+                                mainHandler.post { probeView.destroy() }
+                                return true
+                            }
                             mainHandler.post {
                                 ContentAddress.https(target)?.let { url ->
                                     // The car surface can only show one WebView, so a popup cannot
@@ -2099,6 +2207,8 @@ class CarWebRenderer(context: Context) {
                     onExternalSignInRequired?.invoke(target)
                     return true
                 }
+                // A map opened in the main page asks for the Maps app the same way the side one does.
+                if (handOffToMaps(target, view.url)) return true
                 // Only allow HTTPS navigation; block custom schemes/intents on the car surface.
                 if (ContentAddress.https(target) == null) return true
                 // Set the identity before the request leaves; onPageStarted is too late for the
@@ -2397,6 +2507,8 @@ class CarWebRenderer(context: Context) {
     private fun newSideWebView(context: Context): ScrollableWebView = ScrollableWebView(context).apply {
         BrowserDefaults.configureDebugTools()
         BrowserDefaults.configure(appContext, this)
+        // The side page must never take audio focus off the main page; see [SidePaneAudio].
+        SidePaneAudio.install(this)
         // Split only exists in HARDWARE mode, where the view is on a real display (see newWebView).
         settings.setOffscreenPreRaster(false)
         setDownloadListener(
@@ -2413,13 +2525,19 @@ class CarWebRenderer(context: Context) {
             override fun onGeolocationPermissionsShowPrompt(
                 origin: String,
                 callback: GeolocationPermissions.Callback,
-            ) = BrowserGeolocation.answerForCar(appContext, origin, callback) {
-                mainHandler.post {
-                    host?.showMessage(
-                        appContext.getString(R.string.car_needs_location_permission)
-                    )
-                }
-            }
+            ) = BrowserGeolocation.answerForCar(
+                appContext, origin, callback,
+                onMissingPermission = {
+                    mainHandler.post {
+                        host?.showMessage(
+                            appContext.getString(R.string.car_needs_location_permission)
+                        )
+                    }
+                },
+                onLocationOff = {
+                    mainHandler.post { host?.showMessage(appContext.getString(R.string.geo_location_off)) }
+                },
+            )
 
             override fun onShowCustomView(view: View, callback: CustomViewCallback) =
                 hostFullscreen(view, callback)
@@ -2442,6 +2560,10 @@ class CarWebRenderer(context: Context) {
                     webViewClient = object : WebViewClient() {
                         override fun shouldOverrideUrlLoading(probeView: WebView, request: WebResourceRequest): Boolean {
                             val target = request.url.toString()
+                            if (handOffToMaps(target, sideView?.url)) {
+                                mainHandler.post { probeView.destroy() }
+                                return true
+                            }
                             mainHandler.post {
                                 ContentAddress.https(target)?.let { url -> sideView?.loadUrl(url) }
                                 probeView.destroy()
@@ -2472,6 +2594,9 @@ class CarWebRenderer(context: Context) {
                     onExternalSignInRequired?.invoke(target)
                     return true
                 }
+                // The map's "Start" / "Open app" link: the mobile web cannot navigate, the Maps
+                // app can. Handed over rather than dropped like every other non-web link.
+                if (handOffToMaps(target, view.url)) return true
                 if (ContentAddress.https(target) == null) return true
                 if (request.isForMainFrame) BrowserDefaults.applyIdentity(appContext, view, target)
                 return false
@@ -2742,7 +2867,7 @@ class CarWebRenderer(context: Context) {
      */
     private fun drawSplitDivider(canvas: Canvas) {
         val handle = dividerHandleBox(splitPanes ?: return)
-        val radius = handle.width / 2f
+        val radius = minOf(handle.width, handle.height) / 2f
         toolbarPaint.style = Paint.Style.FILL
         toolbarPaint.color = if (dividerGrabbed) BrowserTheme.dark.accent else Color.WHITE
         toolbarPaint.alpha = if (dividerGrabbed) 255 else 90

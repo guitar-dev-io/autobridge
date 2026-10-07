@@ -120,6 +120,28 @@ class CarHomeMoreScreen(
             .map(::section)
     )
 
+    /** The fuel (or charging) log and what the car is due for: looked at now and then, kept together. */
+    private fun utilitiesGroup() = Group(
+        R.string.car_more_group_utilities,
+        listOf(
+            entry(R.string.car_more_fuel) {
+                CarNavigation.open(screenManager, "CarFuelScreen") { CarFuelScreen(carContext) }
+            },
+            entry(R.string.maint_title) {
+                CarNavigation.open(screenManager, "CarMaintenanceScreen") { CarMaintenanceScreen(carContext) }
+            },
+            entry(R.string.costs_title) {
+                CarNavigation.open(screenManager, "CarCostsScreen") { CarCostsScreen(carContext) }
+            },
+            entry(R.string.parking_title) {
+                CarNavigation.open(screenManager, "CarParkingScreen") { CarParkingScreen(carContext) }
+            },
+            entry(R.string.emergency_title) {
+                CarNavigation.open(screenManager, "CarEmergencyScreen") { CarEmergencyScreen(carContext) }
+            }
+        )
+    )
+
     private fun otherGroup() = Group(
         R.string.car_more_group_other,
         listOf(
@@ -133,7 +155,7 @@ class CarHomeMoreScreen(
     )
 
     private fun groups(): List<Group> =
-        listOf(frequentGroup(), contentGroup(), deviceGroup(), otherGroup())
+        listOf(frequentGroup(), contentGroup(), deviceGroup(), utilitiesGroup(), otherGroup())
             .filter { it.entries.isNotEmpty() }
 
     override fun onGetTemplate(): Template {

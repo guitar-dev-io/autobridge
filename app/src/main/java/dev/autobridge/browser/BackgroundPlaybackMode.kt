@@ -63,6 +63,10 @@ object BackgroundPlaybackMode {
      * does not have to be reloaded to survive the first time the screen is taken away.
      */
     fun install(webView: WebView) {
+        if (handlers[webView] == null) {
+            // Once per WebView, in the Send log: whether this phone's WebView can pin the page visible at all.
+            dev.autobridge.logging.StructuredLog.i("BGAUDIO", "visibility pin supported=${isSupported()}")
+        }
         if (isSupported() && handlers[webView] == null) {
             runCatching { WebViewCompat.addDocumentStartJavaScript(webView, SCRIPT, setOf("*")) }
                 .onSuccess { handlers[webView] = it }

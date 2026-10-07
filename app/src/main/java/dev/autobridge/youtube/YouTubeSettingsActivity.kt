@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
+import android.widget.TextView
+import dev.autobridge.R
 import dev.autobridge.i18n.AppLocale
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.stack
@@ -77,6 +79,16 @@ class YouTubeSettingsActivity : Activity() {
                 YouTubeSettings.setSponsorBlockEnabled(this, !sponsorOn)
                 render()
             }
+        )
+        // It is community data skipped by script on someone else's website: say plainly it is best effort.
+        body.stack(
+            TextView(this).apply {
+                text = getString(R.string.youtube_sponsorblock_caveat)
+                textSize = 13f
+                setTextColor(AutoBridgeDesign.TEXT_MUTED)
+                setPadding(0, (4 * resources.displayMetrics.density).toInt(), 0, (4 * resources.displayMetrics.density).toInt())
+            },
+            gap = 12
         )
 
         body.stack(

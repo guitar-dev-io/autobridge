@@ -32,11 +32,19 @@ object DuoScreenDisplays {
     /** Documented AOSP bit values; the constants are not all in the public SDK. */
     private const val FLAG_OWN_CONTENT_ONLY = 1 shl 3
     private const val FLAG_SUPPORTS_TOUCH = 1 shl 6
+    private const val FLAG_DESTROY_CONTENT_ON_REMOVAL = 1 shl 8
     private const val FLAG_TRUSTED = 1 shl 10
     private const val FLAG_OWN_DISPLAY_GROUP = 1 shl 11
 
-    /** The untrusted fallback flags — what an app may set with no permission. */
-    private const val FLAGS = FLAG_OWN_CONTENT_ONLY or FLAG_SUPPORTS_TOUCH
+    /**
+     * The untrusted fallback flags — what an app may set with no permission.
+     *
+     * [FLAG_DESTROY_CONTENT_ON_REMOVAL]: without it, releasing a pane's display moves the app in it
+     * onto the phone screen and keeps its task alive, so the next session's launch brought that
+     * same task back — the calculator still showing the last sum, Settings still on the last page.
+     * A pane's app now ends with its pane and starts clean next time.
+     */
+    private const val FLAGS = FLAG_OWN_CONTENT_ONLY or FLAG_SUPPORTS_TOUCH or FLAG_DESTROY_CONTENT_ON_REMOVAL
 
     /**
      * The trusted flags for the Shizuku path. [FLAG_OWN_DISPLAY_GROUP] is the decisive one for

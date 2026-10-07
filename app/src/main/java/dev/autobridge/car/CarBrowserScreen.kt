@@ -330,6 +330,26 @@ class CarBrowserScreen(carContext: CarContext) :
         }
     }
 
+    /**
+     * The car's own navigation intent: Android Auto hands it to the navigation app (Google Maps),
+     * which starts real turn-by-turn guidance — what the map in the split cannot do on the web.
+     */
+    override fun startNavigation(destination: String) {
+        val uri = android.net.Uri.parse("geo:0,0?q=" + android.net.Uri.encode(destination))
+        val started = runCatching {
+            carContext.startCarApp(android.content.Intent(androidx.car.app.CarContext.ACTION_NAVIGATE, uri))
+            true
+        }.getOrDefault(false)
+        dev.autobridge.logging.StructuredLog.i(TAG, "maps hand-off started=$started")
+        if (!started) {
+            CarToast.makeText(
+                carContext,
+                carContext.getString(R.string.car_browser_no_external),
+                CarToast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
     override fun reload() {
         renderer.reload()
         invalidate()

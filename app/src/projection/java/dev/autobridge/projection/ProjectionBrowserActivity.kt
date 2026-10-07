@@ -10,8 +10,10 @@ import android.graphics.drawable.RippleDrawable
 import android.graphics.drawable.ShapeDrawable
 import android.graphics.drawable.shapes.OvalShape
 import android.os.Bundle
+import android.os.Message
 import android.os.SystemClock
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.PermissionRequest
@@ -31,6 +33,7 @@ import com.google.android.apps.auto.sdk.CarActivity
 import com.google.android.apps.auto.sdk.SearchCallback
 import com.google.android.apps.auto.sdk.SearchController
 import com.google.android.apps.auto.sdk.SearchItem
+import dev.autobridge.R
 import dev.autobridge.audio.AudioEnvironment
 import dev.autobridge.audio.AudioFocusAction
 import dev.autobridge.audio.AudioFocusController
@@ -43,6 +46,9 @@ import dev.autobridge.browser.BrowserControlsStore
 import dev.autobridge.browser.BrowserDefaults
 import dev.autobridge.browser.BrowserDisplayUrl
 import dev.autobridge.browser.BrowserInputResolver
+import dev.autobridge.browser.BrowserSplitGeometry
+import dev.autobridge.browser.BrowserSplitLayout
+import dev.autobridge.browser.BrowserSplitStore
 import dev.autobridge.browser.BrowserTab
 import dev.autobridge.browser.BrowserTabStore
 import dev.autobridge.browser.BrowserTabsState
@@ -54,7 +60,10 @@ import dev.autobridge.browser.CarKeyboardLanguage
 import dev.autobridge.browser.CarKeyboardLayouts
 import dev.autobridge.browser.CarKeyboardStore
 import dev.autobridge.browser.ChromeVisibility
+import dev.autobridge.browser.MapsHandoff
+import dev.autobridge.browser.PaneRect
 import dev.autobridge.browser.SearchEngineStore
+import dev.autobridge.browser.SidePaneAudio
 import dev.autobridge.browser.WebViewTimerGate
 import dev.autobridge.core.model.Feature
 import dev.autobridge.core.policy.FeaturePolicy
@@ -66,6 +75,7 @@ import dev.autobridge.remote.AutoBridgeStateRepository
 import dev.autobridge.remote.CarScreenController
 import dev.autobridge.safety.ParkingStateStore
 import dev.autobridge.safety.SafetyEnforcement
+import org.json.JSONArray
 import org.json.JSONObject
 
 /**
@@ -115,6 +125,36 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         /** On-screen keyboard metrics, in dp. */
         const val KEY_HEIGHT = 56
         const val KEY_GAP = 4
+
+        /**
+         * How long after a tap on the page its focused field is read. Long enough for the page to
+         * have moved focus (a tap focuses on touch-up, and some sites focus a different, real input
+         * from a click handler); short enough that the keyboard reads as the tap's answer.
+         */
+        const val FIELD_FOCUS_DELAY_MS = 250L
+
+        /** Split metrics, in dp; the same values the template route's split uses. */
+        const val SPLIT_GAP = 4
+        const val SPLIT_MIN_PANE = 180
+
+        /**
+         * Reads the page's focused field: its current text when it is one a driver types into, or
+         * null. Password fields are left out on purpose — the car keyboard echoes what is typed in
+         * large print on the car display. Fixed string; takes nothing from the page.
+         */
+        const val FOCUSED_FIELD_SCRIPT = """
+            (function(){
+              var el = document.activeElement;
+              if (!el) return null;
+              if (el.isContentEditable) return el.textContent || '';
+              if (el.readOnly || el.disabled) return null;
+              if (el.tagName === 'TEXTAREA') return el.value || '';
+              if (el.tagName !== 'INPUT') return null;
+              var t = (el.type || 'text').toLowerCase();
+              if (['text', 'search', 'url', 'email', 'tel', 'number'].indexOf(t) < 0) return null;
+              return el.value || '';
+            })();
+        """
         // Destinations the toolbar is worth spending width on. Google is deliberately absent: it
         // is [BrowserDefaults.HOME], so a Google chip was the Home button under a second name.
         val QUICK_SITES = listOf(
@@ -125,6 +165,28 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
 
     private var webView: WebView? = null
     private var root: FrameLayout? = null
+
+    /**
+     * Holds the page — or, in a split, both pages. The pinned toolbar's inset is applied here
+     * rather than on [webView], so both panes sit below it.
+     */
+    private var pageArea: FrameLayout? = null
+
+    /**
+     * The split's second page (a map by default; see [BrowserSplitLayout]), beside the main one.
+     * A plain page — no tabs, no history list — and it only exists while a split layout is active
+     * and the display is wide enough for one. It shares [BrowserSplitStore] with the template
+     * route, so a layout chosen on either surface is the layout on both.
+     */
+    private var sideView: WebView? = null
+
+    /**
+     * The phone's screen over the page, opened from the menu; null while the browser is showing.
+     * Bridge Mirror inside Bridge Web, so the mirror needs no second projection service — the one
+     * that cost Bridge Web Android Auto's split screen beside Maps. See [ProjectionMirrorPane].
+     */
+    private var mirrorPane: ProjectionMirrorPane? = null
+    private var mirrorLayer: View? = null
     private var blocked: TextView? = null
     private var fullscreenView: View? = null
     private var fullscreenCallback: WebChromeClient.CustomViewCallback? = null
@@ -226,6 +288,12 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
     private var keyboardSymbols = false
     private var keyboardLanguage = CarKeyboardLanguage.THAI
 
+    /**
+     * The page the keyboard is typing into: the main page when it was opened from the address pill
+     * or the menu, whichever pane was tapped when it was opened from a field on the page.
+     */
+    private var keyboardTarget: WebView? = null
+
     // SDK (com.google.android.apps.auto.sdk.SearchController): the host-serviced search surface.
     // Acquired in onCreate; the callback below is registered BEFORE any box call because
     // showSearchBox/hideSearchBox/startSearch/stopSearch throw IllegalStateException until a
@@ -240,8 +308,24 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
             navigateFromInput(query)
             runCatching { searchController?.stopSearch() }
                 .onFailure { StructuredLog.w("PROJECTION", "stopSearch failed: ${it.message}") }
+            hideHostSearchBox()
             return true
         }
+
+        // Closed without submitting (Back on the host keyboard): the box goes with it.
+        override fun onSearchStop() = hideHostSearchBox()
+    }
+
+    /**
+     * Takes the car host's own search box ("ค้นหา") off the screen. Once a search callback is
+     * registered the host shows that box over the page on its own and nothing ever hid it again,
+     * so it sat over the top right of every site. The app's keyboard is the way to type on this
+     * route; the host box is only for the hosts where it works, opened from the menu
+     * ([openAddressEntry]) and hidden again as soon as that search ends.
+     */
+    private fun hideHostSearchBox() {
+        runCatching { searchController?.hideSearchBox() }
+            .onFailure { StructuredLog.w("PROJECTION", "hideSearchBox failed: ${it.message}") }
     }
 
     private val audio = WebAudioBridge { webView }
@@ -329,6 +413,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
             runCatching { controller.setSearchCallback(searchCallback) }
                 .onFailure { StructuredLog.w("PROJECTION", "setSearchCallback failed: ${it.message}") }
         }
+        hideHostSearchBox()
         ParkingStateStore.addListener(parkingListener)
         WebMediaHub.register(this, mediaSource)
         // Held for the activity's whole life, not just while it is on top. The template route
@@ -343,10 +428,11 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         StructuredLog.i("PROJECTION", "browser activity created, ${tabs.count} tab(s)")
     }
 
-    @SuppressLint("SetJavaScriptEnabled")
+    @SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
     private fun buildLayout(): View {
-        val web = WebView(this).apply {
+        val web = CarPageWebView(this).apply {
             BrowserDefaults.configure(this@ProjectionBrowserActivity, this)
+            setOnTouchListener(pageTouchListener)
             webViewClient = object : WebViewClient() {
                 /**
                  * Drops advertising and tracking subresources when the user has turned blocking on.
@@ -360,13 +446,19 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
 
                 override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                     // Only web pages load here; app links and other schemes are dropped rather than
-                    // handed to an intent the car display cannot show.
+                    // handed to an intent the car display cannot show — except a map's request
+                    // for the Maps app, which starts real navigation instead.
                     val scheme = request.url.scheme?.lowercase()
-                    return scheme != "https" && scheme != "http"
+                    if (scheme == "https" || scheme == "http") return false
+                    handOffToMaps(request.url.toString(), view.url)
+                    return true
                 }
 
                 override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
                     BrowserDefaults.applyIdentity(this@ProjectionBrowserActivity, view, url)
+                    // The page the keyboard was typing into is going away — usually because the
+                    // search it typed was just submitted. The keyboard goes with it.
+                    if (keyboardTarget === view) closeKeyboard()
                     // The previous page's icon must not survive into this one, even for the second
                     // it takes the new one to arrive — a stale favicon is a lie about where you are.
                     pageIcon = favicon
@@ -397,6 +489,13 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
             webChromeClient = object : WebChromeClient() {
                 override fun onPermissionRequest(request: PermissionRequest) =
                     BrowserDefaults.grantProtectedMediaPermission(request)
+
+                override fun onCreateWindow(
+                    view: WebView,
+                    isDialog: Boolean,
+                    isUserGesture: Boolean,
+                    resultMsg: Message,
+                ): Boolean = isUserGesture && openPopupIn(view, resultMsg)
 
                 override fun onShowCustomView(view: View, callback: CustomViewCallback) = enterFullscreen(view, callback)
 
@@ -538,11 +637,25 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         // single currentUrl/syncAddress() helper (HOME on cold start, last URL once resolved).
         syncAddress()
 
+        val pages = FrameLayout(this).apply {
+            addView(web, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+            // The split is measured against the area the pages actually get, so it follows the
+            // host resizing the activity (its own split with the navigation app included) and
+            // the pinned toolbar's inset. Posted: changing children's params inside a layout pass
+            // would only be picked up on the next one anyway.
+            addOnLayoutChangeListener { view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
+                if (right - left != oldRight - oldLeft || bottom - top != oldBottom - oldTop) {
+                    view.post { layoutPanes() }
+                }
+            }
+        }
+        pageArea = pages
+
         return FrameLayout(this).apply {
             setBackgroundColor(scheme.background)
-            // Order is z-order: page, then the band that recalls chrome, then chrome itself, then
+            // Order is z-order: pages, then the band that recalls chrome, then chrome itself, then
             // the floating button, and the denial message over all of it.
-            addView(web, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+            addView(pages, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
             addView(
                 reveal,
                 FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, EDGE_REVEAL.dp(), Gravity.TOP)
@@ -866,7 +979,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
     private fun applyChromePinning() {
         pinnedChrome = BrowserControlsStore.alwaysShowUrlBar(this)
         chromeVisibility.setAutoHide(SystemClock.uptimeMillis(), !pinnedChrome)
-        webView?.let { view ->
+        pageArea?.let { view ->
             // The declared metrics, not a measured height: this runs before the first layout pass.
             val inset = if (pinnedChrome) (BAR_HEIGHT + 3).dp() + 1 else 0
             (view.layoutParams as? FrameLayout.LayoutParams)?.let { params ->
@@ -1028,6 +1141,37 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
                 applyChromePinning()
             })
             addView(menuRow("⌨", "Keyboard") { dismissOverlay(); openKeyboard() })
+            addView(menuRow("▢", "Mirror phone screen", "Back to the web with ✕") {
+                dismissOverlay()
+                openMirror()
+            })
+            val split = BrowserSplitStore.projection.layout(this@ProjectionBrowserActivity)
+            addView(menuRow(split.glyph, getString(R.string.car_browser_split), splitDetail(split)) {
+                dismissOverlay()
+                cycleSplitLayout()
+            })
+            addView(menuRow("◨", getString(R.string.drawer_side_show_page)) {
+                dismissOverlay()
+                showPageOnSide()
+            })
+            if (sideView != null) {
+                val destination = MapsHandoff.destinationFromPage(sideView?.url)
+                addView(menuRow(
+                    "➤", "Navigate in Google Maps",
+                    destination ?: "Open a route or a place on the map first"
+                ) {
+                    dismissOverlay()
+                    destination?.let { startMapsNavigation(it) }
+                })
+                addView(menuRow("⇆", "Swap split sides") {
+                    BrowserSplitStore.projection.setSideOnRight(
+                        this@ProjectionBrowserActivity,
+                        !BrowserSplitStore.projection.sideOnRight(this@ProjectionBrowserActivity)
+                    )
+                    dismissOverlay()
+                    layoutPanes()
+                })
+            }
             addView(menuRow("▭", "Car's own search box") { dismissOverlay(); openAddressEntry() })
         }
     }
@@ -1196,6 +1340,292 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         webView?.loadUrl(url)
     }
 
+    /** [navigateFromInput] for the split's side page. */
+    private fun navigateSideFromInput(input: String) {
+        if (!allowed()) return enforcePolicy()
+        val url = BrowserInputResolver.resolveBrowserInput(input, SearchEngineStore.engine(this))
+        StructuredLog.i("PROJECTION", "side address entry -> $url")
+        sideView?.loadUrl(url)
+    }
+
+    // ------------------------------------------------------------------ split
+
+    /** Steps to the next split layout and applies it, saying so when the display cannot fit it. */
+    private fun cycleSplitLayout() {
+        val next = BrowserSplitStore.projection.layout(this).next()
+        BrowserSplitStore.projection.setLayout(this, next)
+        layoutPanes()
+        StructuredLog.i("PROJECTION", "split -> $next (side ${if (sideView != null) "shown" else "none"})")
+    }
+
+    /**
+     * Puts the page the main pane is on in the side pane too — a video or a site beside the map,
+     * without typing its address again. Splits 50/50 first when the screen is not split.
+     */
+    private fun showPageOnSide() {
+        val target = webView?.url?.let { ContentAddress.https(it) } ?: return
+        val hadSide = sideView != null
+        BrowserSplitStore.projection.setSideUrl(this, target)
+        if (BrowserSplitStore.projection.layout(this) == BrowserSplitLayout.SINGLE) {
+            BrowserSplitStore.projection.setLayout(this, BrowserSplitLayout.HALF)
+        }
+        // A side pane created by this layout pass opens the stored address by itself.
+        layoutPanes()
+        if (hadSide) sideView?.loadUrl(target)
+        StructuredLog.i("PROJECTION", "main page shown on the side (side ${if (sideView != null) "shown" else "none"})")
+    }
+
+    /** The menu's second line for the split row: the layout, or why it is not showing. */
+    private fun splitDetail(layout: BrowserSplitLayout): String {
+        val label = layout.label(this)
+        return if (layout != BrowserSplitLayout.SINGLE && sideView == null) {
+            getString(R.string.car_split_too_narrow, label)
+        } else {
+            label
+        }
+    }
+
+    /**
+     * Lays the page area out for the stored split: the main page alone, or the main page and the
+     * side page side by side. Falls back to the main page alone when the area is too narrow for two
+     * usable panes ([BrowserSplitGeometry.panes] returns null), which drops the side page.
+     */
+    private fun layoutPanes() {
+        val area = pageArea ?: return
+        val main = webView ?: return
+        val width = area.width
+        val height = area.height
+        if (width <= 0 || height <= 0) return
+        val panes = BrowserSplitGeometry.panes(
+            BrowserSplitStore.projection.layout(this),
+            0, 0, width, height,
+            sideOnRight = BrowserSplitStore.projection.sideOnRight(this),
+            gapPx = SPLIT_GAP.dp(),
+            minPanePx = SPLIT_MIN_PANE.dp(),
+            sideFraction = BrowserSplitStore.projection.sideFraction(this),
+        )
+        if (panes == null) {
+            releaseSidePane()
+            fill(main)
+            return
+        }
+        val side = sideView ?: createSidePane(area)
+        place(main, panes.main)
+        place(side, panes.side)
+    }
+
+    private fun fill(view: View) {
+        val params = view.layoutParams as? FrameLayout.LayoutParams ?: return
+        if (params.width == ViewGroup.LayoutParams.MATCH_PARENT &&
+            params.height == ViewGroup.LayoutParams.MATCH_PARENT &&
+            params.leftMargin == 0 && params.topMargin == 0
+        ) return
+        view.layoutParams = FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+        )
+    }
+
+    private fun place(view: View, rect: PaneRect) {
+        val params = view.layoutParams as? FrameLayout.LayoutParams
+        if (params != null &&
+            params.width == rect.width && params.height == rect.height &&
+            params.leftMargin == rect.left && params.topMargin == rect.top
+        ) return
+        view.layoutParams = FrameLayout.LayoutParams(rect.width, rect.height, Gravity.TOP or Gravity.START)
+            .apply {
+                leftMargin = rect.left
+                topMargin = rect.top
+            }
+    }
+
+    /**
+     * The side page: the same identity, ad blocking and http(s)-only rule as the main page, muted
+     * so it can never take the audio away from it ([SidePaneAudio]), and nothing else — no tabs,
+     * no media session, no fullscreen.
+     */
+    @SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
+    private fun createSidePane(area: FrameLayout): WebView {
+        val side = CarPageWebView(this).apply {
+            BrowserDefaults.configure(this@ProjectionBrowserActivity, this)
+            SidePaneAudio.install(this)
+            setOnTouchListener(pageTouchListener)
+            webViewClient = object : WebViewClient() {
+                override fun shouldInterceptRequest(
+                    view: WebView,
+                    request: WebResourceRequest,
+                ): WebResourceResponse? =
+                    BrowserAdBlock.intercept(this@ProjectionBrowserActivity, request)
+
+                override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                    val scheme = request.url.scheme?.lowercase()
+                    if (scheme == "https" || scheme == "http") return false
+                    // The map's "Start" / "Open app" link: the mobile web cannot navigate, the
+                    // Maps app can, so it is handed over instead of dropped.
+                    handOffToMaps(request.url.toString(), view.url)
+                    return true
+                }
+
+                override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
+                    BrowserDefaults.applyIdentity(this@ProjectionBrowserActivity, view, url)
+                    if (keyboardTarget === view) closeKeyboard()
+                }
+
+                override fun onPageFinished(view: WebView, url: String) {
+                    // Remembered, so the next split reopens the page the driver left there.
+                    BrowserSplitStore.projection.setSideUrl(this@ProjectionBrowserActivity, url)
+                }
+            }
+            webChromeClient = object : WebChromeClient() {
+                override fun onCreateWindow(
+                    view: WebView,
+                    isDialog: Boolean,
+                    isUserGesture: Boolean,
+                    resultMsg: Message,
+                ): Boolean = isUserGesture && openPopupIn(view, resultMsg)
+
+                override fun onGeolocationPermissionsShowPrompt(
+                    origin: String,
+                    callback: android.webkit.GeolocationPermissions.Callback,
+                ) = dev.autobridge.browser.BrowserGeolocation.answerForCar(
+                    this@ProjectionBrowserActivity, origin, callback
+                ) {
+                    StructuredLog.w("PROJECTION", "side page wants location; app has no permission")
+                }
+            }
+            visibility = if (allowed()) View.VISIBLE else View.INVISIBLE
+        }
+        // Index 1: above the main page, below nothing else in the page area.
+        area.addView(side, 1, FrameLayout.LayoutParams(0, 0))
+        sideView = side
+        side.loadUrl(BrowserSplitStore.projection.sideUrl(this))
+        StructuredLog.i("PROJECTION", "split side page created")
+        return side
+    }
+
+    /**
+     * Starts turn-by-turn navigation to [destination] in the Google Maps app, which Android Auto
+     * then shows as the car's navigation. The map in the split is Google Maps for the mobile web,
+     * which can show a route but has no navigation of its own; see [MapsHandoff].
+     */
+    private fun startMapsNavigation(destination: String) {
+        val intent = android.content.Intent(
+            android.content.Intent.ACTION_VIEW,
+            android.net.Uri.parse(MapsHandoff.navigationUri(destination))
+        )
+            .setPackage(MapsHandoff.MAPS_PACKAGE)
+            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { applicationContext.startActivity(intent) }
+            .onSuccess { StructuredLog.i("PROJECTION", "maps hand-off started") }
+            .onFailure { StructuredLog.w("PROJECTION", "maps hand-off failed: ${it.message}") }
+    }
+
+    /**
+     * When [link] asks for the Google Maps app, navigates to its destination — or to what
+     * [pageUrl], the map page that asked, is showing. Other links are left alone (dropped by the
+     * caller). The mobile site's "Open Google Maps app? → Continue" is such a link with no place
+     * in it, which is why the page's own address is the fallback.
+     */
+    private fun handOffToMaps(link: String, pageUrl: String?) {
+        if (!MapsHandoff.isMapsAppLink(link) && MapsHandoff.destinationFromLink(link) == null) return
+        val destination = MapsHandoff.handoffDestination(link, pageUrl)
+        if (destination != null) {
+            startMapsNavigation(destination)
+        } else {
+            StructuredLog.w("PROJECTION", "maps hand-off: no destination in the link or the page")
+        }
+    }
+
+    /**
+     * A link that opens a new window (`target="_blank"`, `window.open`) — which the car display
+     * has no room for, and which until now did nothing at all. The window's first address is
+     * read from a throwaway probe and opened in [page] itself, or, when it asks for the Maps app
+     * (the map's "Open app → Continue" can arrive this way), handed to [handOffToMaps].
+     */
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun openPopupIn(page: WebView, resultMsg: Message): Boolean {
+        val transport = resultMsg.obj as? WebView.WebViewTransport ?: return false
+        val probe = WebView(this).apply {
+            BrowserDefaults.configure(this@ProjectionBrowserActivity, this)
+            webViewClient = object : WebViewClient() {
+                override fun shouldOverrideUrlLoading(probeView: WebView, request: WebResourceRequest): Boolean {
+                    val target = request.url.toString()
+                    val scheme = request.url.scheme?.lowercase()
+                    page.post {
+                        if (scheme == "https" || scheme == "http") page.loadUrl(target)
+                        else handOffToMaps(target, page.url)
+                        probeView.destroy()
+                    }
+                    return true
+                }
+            }
+        }
+        transport.webView = probe
+        resultMsg.sendToTarget()
+        return true
+    }
+
+    // ------------------------------------------------------------------ mirror
+
+    /**
+     * Shows the phone's screen over the whole browser, with a ✕ that comes back to the page. The
+     * page keeps running underneath (audio included), so going back to it loses nothing.
+     */
+    private fun openMirror() {
+        if (mirrorLayer != null) return
+        val parent = root ?: return
+        closeKeyboard()
+        val pane = ProjectionMirrorPane(this)
+        val close = TextView(this).apply {
+            text = "\u2715  Web"
+            contentDescription = "Back to the browser"
+            setTextColor(scheme.onFabContainer)
+            textSize = 16f
+            gravity = Gravity.CENTER
+            background = roundedRipple(scheme.fabContainer, TOUCH_TARGET / 2f)
+            setPadding(16.dp(), 0, 16.dp(), 0)
+            isClickable = true
+            setOnClickListener { closeMirror() }
+        }
+        val layer = FrameLayout(this).apply {
+            addView(pane, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+            addView(
+                close,
+                FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, TOUCH_TARGET.dp(), Gravity.TOP or Gravity.END)
+                    .apply { setMargins(FAB_MARGIN.dp(), FAB_MARGIN.dp(), FAB_MARGIN.dp(), FAB_MARGIN.dp()) }
+            )
+        }
+        parent.addView(layer, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        mirrorPane = pane
+        mirrorLayer = layer
+        fab?.visibility = View.INVISIBLE
+        pane.start()
+        StructuredLog.i("PROJECTION", "mirror opened inside Bridge Web")
+    }
+
+    private fun closeMirror() {
+        val layer = mirrorLayer ?: return
+        mirrorPane?.stop()
+        mirrorPane = null
+        mirrorLayer = null
+        root?.removeView(layer)
+        // Back to whatever the chrome state already says, as closing the keyboard does.
+        applyChromeVisible(chromeVisibility.isShown)
+        scheduleChromeTick()
+        StructuredLog.i("PROJECTION", "mirror closed; back to the browser")
+    }
+
+    /** Drops the side page; its URL is kept, so the next split reopens it. */
+    private fun releaseSidePane() {
+        val side = sideView ?: return
+        sideView = null
+        if (keyboardTarget === side) closeKeyboard()
+        side.url?.let { BrowserSplitStore.projection.setSideUrl(this, it) }
+        (side.parent as? ViewGroup)?.removeView(side)
+        side.stopLoading()
+        side.destroy()
+        StructuredLog.i("PROJECTION", "split side page released")
+    }
+
     /**
      * One step back: out of a fullscreen video first, then through page history. Named apart from
      * the [CarScreenController.BrowserTarget.goBack] override, which has to report whether there
@@ -1217,11 +1647,12 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
      * almost always wants to search for something new rather than edit the URL they are on, and
      * editing a long URL a key at a time in a car is not a thing anyone does.
      */
-    private fun openKeyboard(seed: String = "") {
+    private fun openKeyboard(seed: String = "", target: WebView? = webView) {
         if (!allowed()) return enforcePolicy()
         if (keyboardPanel != null) return
         dismissOverlay()
         val parent = root ?: return
+        keyboardTarget = target
         keyboardLanguage = CarKeyboardStore.language(this)
         keyboardShift = false
         keyboardSymbols = false
@@ -1319,6 +1750,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         keyboardPanel = null
         keyboardRows = null
         keyboardPreview = null
+        keyboardTarget = null
         typed.setLength(0)
         root?.removeView(panel)
         // Restores the floating button and the bar to whatever the chrome state already says —
@@ -1459,7 +1891,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         // Re-send the full authoritative buffer on every mutating key (empty included, so
         // backspace-to-empty clears the page field). autoSubmit = false: live mirror only, never
         // submit — Go alone commits, via commitTyped() above.
-        if (mutated) sendTextToSearch(typed.toString(), autoSubmit = false)
+        if (mutated) typeInto(keyboardTarget, typed.toString(), autoSubmit = false)
     }
 
     private fun syncKeyboardPreview() {
@@ -1482,10 +1914,45 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
      */
     private fun commitTyped() {
         val value = typed.toString().trim()
+        val target = keyboardTarget
         closeKeyboard()
         if (value.isEmpty()) return
         StructuredLog.i("PROJECTION", "car keyboard -> ${value.length} chars")
-        sendTextToSearch(value, autoSubmit = true)
+        typeInto(target, value, autoSubmit = true)
+    }
+
+    // ------------------------------------------------------------------ page fields
+
+    /**
+     * Watches for taps on the page so that a tap on one of its text fields opens the car keyboard,
+     * the way a tap on a field opens the keyboard on a phone. Never consumes the event: the page
+     * still gets every tap, scroll and fling exactly as before.
+     */
+    private val pageTouchListener = View.OnTouchListener { view, event ->
+        if (event.actionMasked == MotionEvent.ACTION_UP && view is WebView) {
+            view.postDelayed({ openKeyboardForFocusedField(view) }, FIELD_FOCUS_DELAY_MS)
+        }
+        false
+    }
+
+    /**
+     * Answers a tap on [page] the way a phone does: a tap on a text field opens the keyboard on it,
+     * seeded with what it already holds; a tap on another field moves the keyboard there; a tap
+     * anywhere else on the page closes it, since the field it was typing into has lost focus.
+     */
+    private fun openKeyboardForFocusedField(page: WebView) {
+        if (overlay != null || fullscreenView != null) return
+        if (page !== webView && page !== sideView) return
+        page.evaluateJavascript(FOCUSED_FIELD_SCRIPT.trimIndent()) { raw ->
+            // evaluateJavascript hands back JSON: "null" for no field, a quoted string otherwise.
+            val parsed = runCatching { JSONArray("[${raw ?: "null"}]") }.getOrNull()
+            val field = if (parsed == null || parsed.isNull(0)) null else parsed.optString(0)
+            // The state may have moved while the script ran: the menu went up, or the pane went.
+            if (overlay != null || fullscreenView != null) return@evaluateJavascript
+            if (page !== webView && page !== sideView) return@evaluateJavascript
+            if (keyboardPanel != null) closeKeyboard()
+            if (field != null) openKeyboard(seed = field, target = page)
+        }
     }
 
     // ------------------------------------------------------------------ phone remote
@@ -1557,12 +2024,21 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
      * from the Google box they could not type into.
      */
     override fun sendTextToSearch(text: String, autoSubmit: Boolean) = onUi {
+        typeInto(webView, text, autoSubmit)
+    }
+
+    /**
+     * Types [text] into [target]'s focused field, submitting it when [autoSubmit]. A submit that
+     * finds no field navigates instead: the main page to the search or URL, the side page likewise.
+     * Main thread only.
+     */
+    private fun typeInto(target: WebView?, text: String, autoSubmit: Boolean) {
         val clean = text.trim()
         // A submit (Go) on an empty buffer stays a no-op, matching commitTyped(). A live
         // (non-submit) empty update must still reach the page so backspace-to-empty clears the
         // focused field (el.value = "") rather than leaving stale text behind.
-        if (clean.isEmpty() && autoSubmit) return@onUi
-        val view = webView ?: return@onUi
+        if (clean.isEmpty() && autoSubmit) return
+        val view = target ?: return
         // JSONObject.quote produces a complete, escaped JS string literal (quotes included), so no
         // hand-rolled escaper has to be kept correct here.
         val value = JSONObject.quote(clean)
@@ -1586,7 +2062,9 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
             // The navigation fallback is a Go-time decision only: a live (non-submit) keystroke
             // landing on NO_FOCUS just means the page has nothing focused yet, not that the driver
             // is done typing, so it must not fire loadUrl() on every character pressed.
-            if (result?.contains("OK") != true && clean.isNotEmpty() && autoSubmit) navigateFromInput(clean)
+            if (result?.contains("OK") != true && clean.isNotEmpty() && autoSubmit) {
+                if (view === sideView) navigateSideFromInput(clean) else navigateFromInput(clean)
+            }
         }
     }
 
@@ -1600,6 +2078,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
             closeKeyboard()
         }
         webView?.visibility = if (permitted) View.VISIBLE else View.INVISIBLE
+        sideView?.visibility = if (permitted) View.VISIBLE else View.INVISIBLE
         blocked?.visibility = if (permitted) View.GONE else View.VISIBLE
         blocked?.text = if (permitted) "" else FeaturePolicy.app.denialMessage(Feature.BROWSER)
         chromeBar?.visibility = if (permitted) View.VISIBLE else View.INVISIBLE
@@ -1640,6 +2119,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
 
     override fun onBackPressed() {
         // An open sheet or keyboard is the top of the stack: back dismisses it before the page.
+        if (mirrorLayer != null) return closeMirror()
         if (overlay != null) return dismissOverlay()
         if (keyboardPanel != null) return closeKeyboard()
         if (fullscreenView != null || webView?.canGoBack() == true) navigateBack()
@@ -1648,6 +2128,8 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
 
     override fun onResume() {
         super.onResume()
+        // The host can bring its search box back when the activity returns to the screen.
+        hideHostSearchBox()
         webView?.onResume()
         webView?.let { WebViewTimerGate.hold(TIMER_GATE_OWNER, it) }
         audioFocus.isPlaying = true
@@ -1686,6 +2168,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         tabStates.clear()
         dismissOverlay()
         closeKeyboard()
+        closeMirror()
         // After closeKeyboard(), which re-arms the ticker on its way out.
         chromeBar?.removeCallbacks(chromeTicker)
         ParkingStateStore.removeListener(parkingListener)
@@ -1697,12 +2180,14 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
             .onFailure { StructuredLog.w("PROJECTION", "stopSearch failed: ${it.message}") }
         runCatching { searchController?.hideSearchBox() }
             .onFailure { StructuredLog.w("PROJECTION", "hideSearchBox failed: ${it.message}") }
+        releaseSidePane()
         webView?.let { view ->
             WebViewTimerGate.release(TIMER_GATE_OWNER, view)
             view.stopLoading()
             view.destroy()
         }
         webView = null
+        pageArea = null
         root = null
         searchController = null
         urlField = null

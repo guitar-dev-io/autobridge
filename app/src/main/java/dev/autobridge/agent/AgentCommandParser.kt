@@ -62,6 +62,8 @@ object AgentCommandParser {
         val off = OFF.containsMatchIn(lower)
 
         return when {
+            // "เติม 40 ลิตร 1,400 บาท": an amount with its unit and a price, nothing less.
+            dev.autobridge.fuel.FuelVoiceParser.parse(text) != null -> Command(AgentAction.LOG_FUEL, text)
             has(MOBILE_MODE) -> Command(AgentAction.DISABLE_DESKTOP)
             has(DESKTOP) ->
                 Command(if (off) AgentAction.DISABLE_DESKTOP else AgentAction.ENABLE_DESKTOP)

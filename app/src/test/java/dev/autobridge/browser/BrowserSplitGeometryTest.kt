@@ -161,4 +161,31 @@ class BrowserSplitGeometryTest {
             }
         }
     }
+
+    @Test fun aPortraitPanelStacksThePanes() {
+        val panes = split(BrowserSplitLayout.HALF, 1080, 1600)!!
+        assertTrue(panes.stacked)
+        assertEquals(PaneRect(0, 0, 1080, 798), panes.side)
+        assertEquals(PaneRect(0, 802, 1080, 1600), panes.main)
+    }
+
+    @Test fun stackedSideOnRightPutsTheSidePageAtTheBottom() {
+        val panes = split(BrowserSplitLayout.SIXTY_FIVE_THIRTY_FIVE, 1080, 1600, sideOnRight = true)!!
+        assertEquals(1600, panes.side.bottom)
+        assertEquals(0, panes.main.top)
+        assertEquals(559, panes.side.height) // 35% of 1596, rounded
+    }
+
+    @Test fun stackedSixteenByNineKeepsTheMainPaneFullWidthSixteenByNine() {
+        val panes = split(BrowserSplitLayout.PORTRAIT_LANDSCAPE, 1080, 1600)!!
+        assertEquals(1080, panes.main.width)
+        assertEquals(608, panes.main.height)
+        assertEquals(1596 - 608, panes.side.height)
+    }
+
+    @Test fun stackedDividerDragsVertically() {
+        val panes = split(BrowserSplitLayout.HALF, 1080, 1600)!!
+        val grown = BrowserSplitGeometry.dragSideFraction(panes, 100, sideOnRight = false, minPanePx = minPane)
+        assertEquals((798 + 100) / 1596f, grown, 0.001f)
+    }
 }

@@ -18,6 +18,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import dev.autobridge.R
 import dev.autobridge.entertainment.ContentKind
 import dev.autobridge.entertainment.EntertainmentActivity
 import dev.autobridge.entertainment.WebBookmarkStore
@@ -89,6 +90,10 @@ class LibraryActivity : Activity() {
     companion object {
         const val EXTRA_SECTION = "dev.autobridge.extra.LIBRARY_SECTION"
         private const val REQUEST_MEDIA = 4711
+
+        /** The Streaming grid: icons to a row, and the size they are drawn at. */
+        private const val STREAM_COLUMNS = 4
+        private const val STREAM_ICON_PX = 168
 
         /** Below this a search field is clutter; above it, a long list is unusable without one. */
         private const val SEARCH_THRESHOLD = 12
@@ -1730,24 +1735,53 @@ class LibraryActivity : Activity() {
     /** The shared [StreamingLinks] catalog, grouped; each row opens the site in the browser. */
     private fun showStreaming() = push {
         val rows = mutableListOf<View>()
+        // Same intent as the YouTube home tile, so the browser is reused if it is open.
+        fun openSite(url: String) = startActivity(
+            Intent(this, dev.autobridge.browser.BrowserActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+                .setData(Uri.parse(url))
+        )
+
+        // The driver's own favourites on top, then the catalog, as an icon grid like the car's. A tap
+        // opens; a long press stars or unstars (favourites are starred, the + tile adds any address).
+        fun tile(title: String, url: String, starred: Boolean, caption: String? = null) = StreamingTile(
+            title = title,
+            icon = StreamingIcons.bitmap(StreamingIcons.styleFor(title, url), STREAM_ICON_PX, starred),
+            caption = caption,
+            onClick = { openSite(url) },
+            onLongClick = {
+                if (starred) StreamingFavoritesStore.remove(this, url) else StreamingFavoritesStore.add(this, title, url)
+                refresh()
+            }
+        )
+        val favorites = StreamingFavoritesStore.list(this)
+        val favoriteUrls = favorites.map { it.url }.toSet()
+        rows += AutoBridgeDesign.sectionLabel(this, getString(R.string.streaming_favorites))
+        rows += streamingGrid(
+            favorites.map { tile(it.title, it.url, starred = true) } + StreamingTile(
+                title = getString(R.string.streaming_add_favorite),
+                icon = StreamingIcons.bitmap(StreamingIcons.ADD, STREAM_ICON_PX),
+                caption = null,
+                onClick = { showAddFavoriteDialog() },
+                onLongClick = {}
+            )
+        )
+        rows += TextView(this).apply {
+            text = getString(R.string.streaming_long_press_hint)
+            textSize = 12f
+            setTextColor(AutoBridgeDesign.TEXT_MUTED)
+            setPadding(0, (6 * resources.displayMetrics.density).toInt(), 0, 0)
+        }
         StreamingLinks.grouped().forEach { (group, links) ->
             rows += AutoBridgeDesign.sectionLabel(this, group.title)
-            links.forEach { link ->
-                rows += AutoBridgeDesign.contentRow(
-                    context = this,
-                    title = link.title,
-                    subtitle = hostOf(link.url),
-                    accent = accent,
-                    onClick = {
-                        // Same intent as the YouTube home tile, so the browser is reused if open.
-                        startActivity(
-                            Intent(this, dev.autobridge.browser.BrowserActivity::class.java)
-                                .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
-                                .setData(Uri.parse(link.url))
-                        )
-                    }
-                )
-            }
+            rows += streamingGrid(
+                links.map { link ->
+                    tile(
+                        link.title, link.url, starred = link.url in favoriteUrls,
+                        caption = getString(R.string.streaming_may_not_play).takeIf { StreamingLinks.mayNotPlay(link) }
+                    )
+                }
+            )
         }
         render(
             title = "Streaming",
@@ -1755,6 +1789,91 @@ class LibraryActivity : Activity() {
             rows = rows,
             extraPinned = listOf(chipsRow())
         )
+    }
+
+    /** One icon in the Streaming grid. */
+    private class StreamingTile(
+        val title: String,
+        val icon: android.graphics.Bitmap,
+        val caption: String?,
+        val onClick: () -> Unit,
+        val onLongClick: () -> Unit,
+    )
+
+    /** [tiles] as rows of icons with their names under them, [STREAM_COLUMNS] to a row. */
+    private fun streamingGrid(tiles: List<StreamingTile>): View {
+        val density = resources.displayMetrics.density
+        val grid = android.widget.GridLayout(this).apply { columnCount = STREAM_COLUMNS }
+        tiles.forEach { tile ->
+            val cell = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = android.view.Gravity.CENTER_HORIZONTAL
+                setPadding((4 * density).toInt(), (8 * density).toInt(), (4 * density).toInt(), (8 * density).toInt())
+                isClickable = true
+                isLongClickable = true
+                contentDescription = tile.title
+                setOnClickListener { tile.onClick() }
+                setOnLongClickListener { tile.onLongClick(); true }
+                addView(
+                    android.widget.ImageView(this@LibraryActivity).apply { setImageBitmap(tile.icon) },
+                    LinearLayout.LayoutParams((56 * density).toInt(), (56 * density).toInt())
+                )
+                addView(TextView(this@LibraryActivity).apply {
+                    text = tile.title
+                    textSize = 12f
+                    maxLines = 2
+                    gravity = android.view.Gravity.CENTER
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                    setTextColor(AutoBridgeDesign.TEXT)
+                    setPadding(0, (4 * density).toInt(), 0, 0)
+                })
+                tile.caption?.let { caption ->
+                    addView(TextView(this@LibraryActivity).apply {
+                        text = caption
+                        textSize = 10f
+                        maxLines = 2
+                        gravity = android.view.Gravity.CENTER
+                        setTextColor(AutoBridgeDesign.TEXT_MUTED)
+                    })
+                }
+            }
+            grid.addView(
+                cell,
+                android.widget.GridLayout.LayoutParams(
+                    android.widget.GridLayout.spec(android.widget.GridLayout.UNDEFINED),
+                    android.widget.GridLayout.spec(android.widget.GridLayout.UNDEFINED, 1f)
+                ).apply { width = 0 }
+            )
+        }
+        return grid
+    }
+
+    /** Adds any website to the favourites: a name (optional) and an address. */
+    private fun showAddFavoriteDialog() {
+        val name = EditText(this).apply { hint = getString(R.string.streaming_field_name) }
+        val address = EditText(this).apply {
+            hint = getString(R.string.streaming_field_address)
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
+        }
+        val form = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            val pad = (20 * resources.displayMetrics.density).toInt()
+            setPadding(pad, pad / 2, pad, 0)
+            addView(name)
+            addView(address)
+        }
+        android.app.AlertDialog.Builder(this)
+            .setTitle(getString(R.string.streaming_add_favorite))
+            .setView(form)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(getString(R.string.fuel_save)) { _, _ ->
+                if (StreamingFavoritesStore.add(this, name.text.toString(), address.text.toString())) {
+                    refresh()
+                } else {
+                    android.widget.Toast.makeText(this, getString(R.string.streaming_invalid_address), android.widget.Toast.LENGTH_LONG).show()
+                }
+            }
+            .show()
     }
 
     // ----- Shared helpers -----

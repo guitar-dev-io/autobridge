@@ -13,8 +13,11 @@ object DuoScreenLayout {
     const val MIN_HEIGHT_FRACTION = 0.25f
     const val SNAP_THRESHOLD_PX = 24
 
-    /** How far from a seam a tap still counts as grabbing it, rather than selecting a pane. */
-    const val DIVIDER_GRAB_PX = 40
+    /**
+     * How far from a seam a tap still counts as grabbing it, rather than selecting a pane. A
+     * fingertip on a car panel lands well over 40 px from where it was aimed, so the zone is wide.
+     */
+    const val DIVIDER_GRAB_PX = 72
 
     /** How far two pane edges may sit apart and still be treated as one shared seam. */
     const val SEAM_TOLERANCE_PX = 8

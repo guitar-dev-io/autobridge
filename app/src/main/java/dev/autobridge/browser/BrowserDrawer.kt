@@ -20,6 +20,15 @@ enum class DrawerAction {
 
     /** Car only: steps through [BrowserSplitLayout] (100, 50/50, 40/60, portrait + landscape). */
     SPLIT_LAYOUT,
+
+    /** Car only: puts the main page on the split's side page too, splitting 50/50 if needed. */
+    SIDE_SHOW_PAGE,
+
+    /**
+     * Car only: hands the destination on the split's map to the car's navigation app; see
+     * [MapsHandoff]. The mobile-web map has no turn-by-turn navigation of its own.
+     */
+    NAVIGATE_MAPS,
     BOOKMARK_PAGE, OPEN_EXTERNAL, SETTINGS, CLEAR_DATA, DIAGNOSTICS,
 
     /** Page history, the two controls the address row sits between. */
@@ -283,6 +292,8 @@ class BrowserDrawerModel private constructor(
             // Fullscreen no longer lives here: it is a primary-sheet toggle next to Desktop (see
             // [fullscreenToggle]), so it is never buried behind "More" on either surface.
             DrawerItem(DrawerAction.SPLIT_LAYOUT, R.string.drawer_split, BrowserIcon.SPLIT_LAYOUT),
+            DrawerItem(DrawerAction.SIDE_SHOW_PAGE, R.string.drawer_side_show_page, BrowserIcon.SPLIT_LAYOUT),
+            DrawerItem(DrawerAction.NAVIGATE_MAPS, R.string.drawer_navigate_maps, BrowserIcon.CAR),
             DrawerItem(DrawerAction.NEW_TAB, R.string.drawer_new_tab, BrowserIcon.ADD),
             DrawerItem(DrawerAction.HOME, R.string.drawer_start_page, BrowserIcon.HOME_PAGE),
             DrawerItem(DrawerAction.HISTORY, R.string.drawer_history, BrowserIcon.HISTORY),

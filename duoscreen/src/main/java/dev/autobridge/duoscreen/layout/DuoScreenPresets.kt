@@ -25,6 +25,12 @@ enum class DuoScreenPreset(@StringRes val labelRes: Int, val glyph: String) {
     WIDE_RIGHT(R.string.duo_screen_preset_wide_right, "◨"),
     EVEN_ROWS(R.string.duo_screen_preset_even_rows, "⊟"),
 
+    /**
+     * Stacked, the top pane the larger: 60% over 40% (a third pane takes the bottom 40% as two halves).
+     * The shape of a portrait head unit with a map above and the music below.
+     */
+    STACKED_60_40(R.string.duo_screen_preset_stacked_60_40, "⬒"),
+
     /** Pane 0 fills the surface; the rest float over its bottom-right corner as small tiles. */
     PICTURE_IN_PICTURE(R.string.duo_screen_preset_pip, "◰");
 
@@ -47,6 +53,18 @@ object DuoScreenPresetGeometry {
     private const val PIP_TILE_FRACTION = 0.32f
     private const val PIP_MARGIN_FRACTION = 0.02f
 
+    /**
+     * The layout to start from when the driver has never picked one: side by side on a wide
+     * surface, stacked on one that is as tall as it is wide or taller (a portrait head unit gives
+     * an app a nearly square area, where two columns would each be too narrow to use).
+     */
+    fun defaultFor(bounds: Bounds): DuoScreenPreset =
+        if (bounds.width > 0 && bounds.height >= bounds.width * SQUARISH) DuoScreenPreset.EVEN_ROWS
+        else DuoScreenPreset.EVEN_COLUMNS
+
+    /** Height over width from which a surface counts as "tall enough to stack". */
+    private const val SQUARISH = 0.9f
+
     fun rects(preset: DuoScreenPreset, paneCount: Int, bounds: Bounds): List<Rect> {
         require(paneCount in 2..3) { "Duo Screen supports 2-3 panes, got $paneCount" }
         if (bounds.width <= 0 || bounds.height <= 0) {
@@ -55,6 +73,7 @@ object DuoScreenPresetGeometry {
         return when (preset) {
             DuoScreenPreset.EVEN_COLUMNS -> columns(evenWeights(paneCount), bounds)
             DuoScreenPreset.EVEN_ROWS -> rows(evenWeights(paneCount), bounds)
+            DuoScreenPreset.STACKED_60_40 -> rows(stackedWeights(paneCount), bounds)
             DuoScreenPreset.WIDE_LEFT -> columns(mainFirstWeights(paneCount), bounds)
             DuoScreenPreset.WIDE_RIGHT -> columns(mainFirstWeights(paneCount).reversed(), bounds)
             DuoScreenPreset.PICTURE_IN_PICTURE -> pictureInPicture(paneCount, bounds)
@@ -62,6 +81,13 @@ object DuoScreenPresetGeometry {
     }
 
     private fun evenWeights(paneCount: Int): List<Float> = List(paneCount) { 1f / paneCount }
+
+    /**
+     * 60/40 for two panes. Three panes cannot be 60/20/20 (20% is under the minimum height), so
+     * the top pane takes half and the other two a quarter each.
+     */
+    private fun stackedWeights(paneCount: Int): List<Float> =
+        if (paneCount == 2) listOf(0.6f, 0.4f) else listOf(0.5f, 0.25f, 0.25f)
 
     private fun mainFirstWeights(paneCount: Int): List<Float> {
         val main = if (paneCount == 2) MAIN_FRACTION_TWO_PANES else MAIN_FRACTION_THREE_PANES
