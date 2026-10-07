@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -549,7 +550,7 @@ class UrlConnectionModelHttp(
                 connection.getHeaderField("Content-Range")
                     ?.substringAfterLast('/')?.trim()?.toLongOrNull() ?: -1L
             } else length
-            val body = if (code in 200..299) connection.inputStream else (connection.errorStream ?: InputStream.nullInputStream())
+            val body = if (code in 200..299) connection.inputStream else (connection.errorStream ?: ByteArrayInputStream(ByteArray(0)))
             return ModelHttpResponse(
                 code = code,
                 contentLength = length,
