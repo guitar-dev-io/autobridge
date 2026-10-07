@@ -341,6 +341,9 @@
     <string name="bridge_web_menu_keyboard">Keyboard</string>
     <string name="bridge_web_menu_car_search">Car\'s own search box</string>
     <string name="bridge_web_maps_no_destination">Open a route or a place on the map first</string>
+    <string name="drawer_split_choose">Split layout</string>
+    <string name="split_closed">Split screen off</string>
+    <string name="split_close_side">Close side page</string>
     <string name="browser_about_version">Version</string>
     <string name="browser_about_webview">WebView</string>
     <string name="drawer_swap_sides">Swap sides</string>

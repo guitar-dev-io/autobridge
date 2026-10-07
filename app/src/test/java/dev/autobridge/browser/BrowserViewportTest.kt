@@ -998,7 +998,16 @@ class CarMenuParityTest {
         )
         val more = BrowserDrawerModel.moreItems(state).map { it.action }
         assertFalse(DrawerAction.SPLIT_LAYOUT in more)
-        assertEquals(listOf(DrawerAction.SIDE_SHOW_PAGE, DrawerAction.SWAP_SPLIT_SIDES), more.take(2))
+        assertEquals(
+            listOf(DrawerAction.SPLIT_CHOOSE, DrawerAction.SIDE_SHOW_PAGE, DrawerAction.SWAP_SPLIT_SIDES),
+            more.take(3),
+        )
+    }
+
+    @Test fun theSplitTileIsASwitchThatShowsWhetherASplitIsUp() {
+        fun split(s: BrowserMenuState) = BrowserDrawerModel.primaryRows(s).flatten().single { it.action == DrawerAction.SPLIT_LAYOUT }
+        assertFalse(split(state).on)
+        assertTrue(split(state.copy(splitActive = true)).on)
     }
 
     @Test fun theFourTileRowSharesTheSheetWidth() {

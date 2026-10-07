@@ -1023,7 +1023,7 @@ class BrowserActivity : Activity() {
      */
     private val CAR_DISPLAY_UNSUPPORTED = setOf(
         DrawerAction.TABS, DrawerAction.NEW_TAB, DrawerAction.SPLIT_LAYOUT,
-        DrawerAction.SIDE_SHOW_PAGE, DrawerAction.SWAP_SPLIT_SIDES, DrawerAction.NAVIGATE_MAPS,
+        DrawerAction.SIDE_SHOW_PAGE, DrawerAction.SWAP_SPLIT_SIDES, DrawerAction.SPLIT_CHOOSE, DrawerAction.NAVIGATE_MAPS,
         DrawerAction.MEDIA_CENTER, DrawerAction.NOW_PLAYING, DrawerAction.MEDIA_LIBRARY,
         DrawerAction.AGENT, DrawerAction.MIRROR_PHONE, DrawerAction.PIN_TOOLBAR,
         DrawerAction.APP_HOME,
@@ -1321,7 +1321,8 @@ class BrowserActivity : Activity() {
             // [MenuSurface.PHONE] (phone), neither of which lists them.
             DrawerAction.NEW_TAB, DrawerAction.TABS, DrawerAction.MEDIA_CENTER,
             DrawerAction.SPLIT_LAYOUT, DrawerAction.SIDE_SHOW_PAGE, DrawerAction.NAVIGATE_MAPS,
-            DrawerAction.PIN_TOOLBAR, DrawerAction.SWAP_SPLIT_SIDES, DrawerAction.MIRROR_PHONE -> Unit
+            DrawerAction.PIN_TOOLBAR, DrawerAction.SWAP_SPLIT_SIDES, DrawerAction.MIRROR_PHONE,
+            DrawerAction.SPLIT_CHOOSE -> Unit
             // Sheet navigation, resolved before an action is dispatched.
             DrawerAction.MORE, DrawerAction.BACK_TO_MENU, DrawerAction.CLOSE_SHEET -> Unit
         }

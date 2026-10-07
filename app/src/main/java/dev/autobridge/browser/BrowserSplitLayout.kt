@@ -225,6 +225,7 @@ open class BrowserSplitPrefs internal constructor(private val keyPrefix: String)
     private val keySideOnRight = keyPrefix + "split_side_on_right"
     private val keySideUrl = keyPrefix + "split_side_url"
     private val keySideFraction = keyPrefix + "split_side_fraction"
+    private val keyLastLayout = keyPrefix + "split_last_layout"
 
     private fun prefs(context: Context) =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -234,12 +235,34 @@ open class BrowserSplitPrefs internal constructor(private val keyPrefix: String)
             ?.let { runCatching { BrowserSplitLayout.valueOf(it) }.getOrNull() }
             ?: BrowserSplitLayout.SINGLE
 
-    /** Choosing a preset drops a dragged ratio: picking one again is how you get its shape back. */
+    /**
+     * Choosing a preset drops a dragged ratio: picking one again is how you get its shape back.
+     * A split preset is also remembered as the one the split switch turns back on ([toggle]).
+     */
     fun setLayout(context: Context, layout: BrowserSplitLayout) {
         prefs(context).edit {
             putString(keyLayout, layout.name)
+            if (layout != BrowserSplitLayout.SINGLE) putString(keyLastLayout, layout.name)
             remove(keySideFraction)
         }
+    }
+
+    /** The split preset used last, which the split switch turns back on; 50/50 before any. */
+    fun lastLayout(context: Context): BrowserSplitLayout =
+        prefs(context).getString(keyLastLayout, null)
+            ?.let { runCatching { BrowserSplitLayout.valueOf(it) }.getOrNull() }
+            ?.takeIf { it != BrowserSplitLayout.SINGLE }
+            ?: BrowserSplitLayout.HALF
+
+    /**
+     * The split switch: one tap closes a split, the next brings back the layout it had. Returns
+     * the layout now stored. A dragged ratio survives the round trip only when nothing else moved
+     * it; closing goes through [setLayout], which drops it, so reopening gives the preset's shape.
+     */
+    fun toggle(context: Context): BrowserSplitLayout {
+        val next = toggled(layout(context), lastLayout(context))
+        setLayout(context, next)
+        return next
     }
 
     /** The side pane's share of the width after a drag, or null while the preset's own applies. */
@@ -269,6 +292,11 @@ open class BrowserSplitPrefs internal constructor(private val keyPrefix: String)
 
     companion object {
         private const val PREFS_NAME = "autobridge_browser"
+
+        /** [toggle] without the storage: off when split, else back to [last]. */
+        fun toggled(current: BrowserSplitLayout, last: BrowserSplitLayout): BrowserSplitLayout =
+            if (current != BrowserSplitLayout.SINGLE) BrowserSplitLayout.SINGLE
+            else last.takeIf { it != BrowserSplitLayout.SINGLE } ?: BrowserSplitLayout.HALF
 
         /** What the side pane opens the first time: the map case this feature exists for. */
         const val DEFAULT_SIDE_URL = "https://www.google.com/maps"

@@ -73,6 +73,7 @@ import dev.autobridge.browser.MapsHandoff
 import dev.autobridge.browser.PaneRect
 import dev.autobridge.browser.SearchEngineStore
 import dev.autobridge.browser.SidePaneAudio
+import dev.autobridge.browser.SplitPanes
 import dev.autobridge.browser.WebViewTimerGate
 import dev.autobridge.core.model.Feature
 import dev.autobridge.core.policy.FeaturePolicy
@@ -196,6 +197,9 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
      * route, so a layout chosen on either surface is the layout on both.
      */
     private var sideView: WebView? = null
+
+    /** The ✕ on the seam that closes the split; see [placeSideClose]. */
+    private var sideCloseButton: TextView? = null
 
     /**
      * The phone's screen over the page, opened from the menu; null while the browser is showing.
@@ -1203,7 +1207,8 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
             }
             DrawerAction.TOGGLE_FULLSCREEN -> setFullscreen(!chromeVisibility.fullscreen)
             DrawerAction.PIN_TOOLBAR -> togglePinnedToolbar()
-            DrawerAction.SPLIT_LAYOUT -> cycleSplitLayout()
+            DrawerAction.SPLIT_LAYOUT -> toggleSplit()
+            DrawerAction.SPLIT_CHOOSE -> openSplitChooser()
             DrawerAction.SIDE_SHOW_PAGE -> showPageOnSide()
             DrawerAction.SWAP_SPLIT_SIDES -> if (sideView != null) {
                 BrowserSplitStore.projection.setSideOnRight(this, !BrowserSplitStore.projection.sideOnRight(this))
@@ -1383,8 +1388,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
             })
             val split = BrowserSplitStore.projection.layout(activity)
             addView(menuRow(split.glyph, getString(R.string.car_browser_split), splitDetail(split)) {
-                cycleSplitLayout()
-                openSettings()
+                openSplitChooser()
             })
             val sideRight = BrowserSplitStore.projection.sideOnRight(activity)
             addView(menuRow("◨", getString(R.string.car_browser_side_right), onOff(sideRight)) {
@@ -1661,11 +1665,43 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
     // ------------------------------------------------------------------ split
 
     /** Steps to the next split layout and applies it, saying so when the display cannot fit it. */
-    private fun cycleSplitLayout() {
-        val next = BrowserSplitStore.projection.layout(this).next()
-        BrowserSplitStore.projection.setLayout(this, next)
+    /**
+     * The split switch (the menu's Split screen button, the ✕ on the seam): one tap closes a
+     * split, the next brings back the layout it had. See [dev.autobridge.browser.BrowserSplitPrefs.toggle].
+     */
+    private fun toggleSplit() {
+        val next = BrowserSplitStore.projection.toggle(this)
         layoutPanes()
+        notice(if (next == BrowserSplitLayout.SINGLE) getString(R.string.split_closed) else splitDetail(next))
         StructuredLog.i("PROJECTION", "split -> $next (side ${if (sideView != null) "shown" else "none"})")
+    }
+
+    /** Picks a layout in one step, rather than stepping through them; and which side the page is on. */
+    private fun openSplitChooser() {
+        val current = BrowserSplitStore.projection.layout(this)
+        showOverlay(getString(R.string.drawer_split_choose)) {
+            BrowserSplitLayout.entries.forEach { layout ->
+                val label = layout.label(this@ProjectionBrowserActivity)
+                addView(menuRow(if (layout == current) "●" else "○", label) {
+                    dismissOverlay()
+                    BrowserSplitStore.projection.setLayout(this@ProjectionBrowserActivity, layout)
+                    layoutPanes()
+                    if (layout != BrowserSplitLayout.SINGLE && sideView == null) {
+                        notice(getString(R.string.car_split_too_narrow, label))
+                    }
+                    StructuredLog.i("PROJECTION", "split chosen -> $layout")
+                })
+            }
+            val sideRight = BrowserSplitStore.projection.sideOnRight(this@ProjectionBrowserActivity)
+            addView(menuRow(
+                "⇆", getString(R.string.car_browser_side_right),
+                getString(if (sideRight) R.string.browser_menu_on else R.string.browser_menu_off)
+            ) {
+                BrowserSplitStore.projection.setSideOnRight(this@ProjectionBrowserActivity, !sideRight)
+                layoutPanes()
+                openSplitChooser()
+            })
+        }
     }
 
     /**
@@ -1717,11 +1753,68 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         if (panes == null) {
             releaseSidePane()
             fill(main)
+            removeSideClose()
             return
         }
         val side = sideView ?: createSidePane(area)
         place(main, panes.main)
         place(side, panes.side)
+        placeSideClose(area, panes)
+    }
+
+    /**
+     * The ✕ that closes the split, centred on the seam between the panes: on the divider rather
+     * than in a pane's corner, where the toolbar and the floating button already sit and where it
+     * would cover a page's own controls. The car browser draws its ✕ in the same place.
+     */
+    private fun placeSideClose(area: FrameLayout, panes: SplitPanes) {
+        val size = TOUCH_TARGET.dp()
+        val button = sideCloseButton ?: TextView(this).apply {
+            text = "\u2715"
+            contentDescription = getString(R.string.split_close_side)
+            setTextColor(scheme.textPrimary)
+            textSize = 18f
+            gravity = Gravity.CENTER
+            background = RippleDrawable(
+                ColorStateList.valueOf(scheme.textSecondary),
+                ShapeDrawable(OvalShape()).apply { paint.color = scheme.surfaceContainerHighest },
+                null
+            )
+            elevation = 4f * resources.displayMetrics.density
+            isClickable = true
+            isFocusable = true
+            setOnClickListener {
+                noteInteraction()
+                if (BrowserSplitStore.projection.layout(this@ProjectionBrowserActivity) != BrowserSplitLayout.SINGLE) {
+                    toggleSplit()
+                }
+            }
+        }.also { created ->
+            sideCloseButton = created
+            area.addView(created, FrameLayout.LayoutParams(size, size))
+        }
+        val (centreX, centreY) = if (panes.stacked) {
+            val top = minOf(panes.main.bottom, panes.side.bottom)
+            val bottom = maxOf(panes.main.top, panes.side.top)
+            (panes.side.left + panes.side.width / 2) to (top + bottom) / 2
+        } else {
+            val left = minOf(panes.main.right, panes.side.right)
+            val right = maxOf(panes.main.left, panes.side.left)
+            (left + right) / 2 to (panes.side.top + panes.side.height / 2)
+        }
+        val params = (button.layoutParams as? FrameLayout.LayoutParams) ?: FrameLayout.LayoutParams(size, size)
+        params.gravity = Gravity.TOP or Gravity.START
+        params.leftMargin = centreX - size / 2
+        params.topMargin = centreY - size / 2
+        button.layoutParams = params
+        button.visibility = sideView?.visibility ?: View.VISIBLE
+        button.bringToFront()
+    }
+
+    private fun removeSideClose() {
+        val button = sideCloseButton ?: return
+        sideCloseButton = null
+        (button.parent as? ViewGroup)?.removeView(button)
     }
 
     private fun fill(view: View) {
@@ -2397,6 +2490,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         }
         webView?.visibility = if (permitted) View.VISIBLE else View.INVISIBLE
         sideView?.visibility = if (permitted) View.VISIBLE else View.INVISIBLE
+        sideCloseButton?.visibility = if (permitted) View.VISIBLE else View.INVISIBLE
         blocked?.visibility = if (permitted) View.GONE else View.VISIBLE
         blocked?.text = if (permitted) "" else FeaturePolicy.app.denialMessage(Feature.BROWSER)
         chromeBar?.visibility = if (permitted) View.VISIBLE else View.INVISIBLE
@@ -2500,6 +2594,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         runCatching { searchController?.hideSearchBox() }
             .onFailure { StructuredLog.w("PROJECTION", "hideSearchBox failed: ${it.message}") }
         releaseSidePane()
+        removeSideClose()
         webView?.let { view ->
             WebViewTimerGate.release(TIMER_GATE_OWNER, view)
             view.stopLoading()

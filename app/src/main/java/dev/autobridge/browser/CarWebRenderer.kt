@@ -200,6 +200,9 @@ class CarWebRenderer(context: Context) {
 
         /** Shows the phone's screen (Bridge Mirror) in place of the browser. */
         fun openMirror()
+
+        /** Lets the driver pick a split layout; the renderer re-reads it on return. */
+        fun openSplitChooser()
         fun openExternal(url: String)
 
         /**
@@ -729,6 +732,30 @@ class CarWebRenderer(context: Context) {
             else -> appContext.getString(R.string.car_split_too_narrow, label)
         }
         host?.showMessage(message)
+    }
+
+    /**
+     * The split switch (the drawer's Split screen tile, the side pane's ✕): one tap closes a
+     * split, the next brings back the layout it had. See [BrowserSplitPrefs.toggle].
+     */
+    fun toggleSplit() = runOnMain {
+        dividerGrabbed = false
+        val next = BrowserSplitStore.toggle(appContext)
+        applyControlSettings()
+        val label = next.label(appContext)
+        host?.showMessage(
+            when {
+                next == BrowserSplitLayout.SINGLE -> appContext.getString(R.string.split_closed)
+                isSplit -> label
+                !hardwareMode -> appContext.getString(R.string.car_split_unavailable_legacy, label)
+                else -> appContext.getString(R.string.car_split_too_narrow, label)
+            }
+        )
+    }
+
+    /** Closes the split from the ✕ on the divider. */
+    fun closeSplit() = runOnMain {
+        if (splitLayout != BrowserSplitLayout.SINGLE) toggleSplit()
     }
 
     /**
@@ -1507,6 +1534,7 @@ class CarWebRenderer(context: Context) {
      */
     private fun pageTap(x: Float, y: Float) {
         if (hardwareWindow?.fullscreen?.container == null) {
+            if (tapSideClose(x, y)) return
             if (grabDivider(x, y)) return
             val side = sideViewport
             val tappedSide = isSplit && side != null && side.contains(x, y)
@@ -1595,6 +1623,33 @@ class CarWebRenderer(context: Context) {
         val centreY = panes.side.top + panes.side.height / 2f
         val halfLength = panes.side.height * SPLIT_HANDLE_LENGTH_FRACTION / 2f
         return Box(centreX - thickness, centreY - halfLength, centreX + thickness, centreY + halfLength)
+    }
+
+    /**
+     * The ✕ that closes the split, drawn on the seam just above the handle (left of it when the
+     * panes are stacked): on the divider rather than in a pane's corner, where the toolbar and
+     * the floating button already sit and where it would cover a page's own controls.
+     */
+    private fun sideCloseBox(panes: SplitPanes): Box {
+        val handle = dividerHandleBox(panes)
+        val radius = sizes.touchTarget * 0.4f
+        val gap = sizes.contentGap
+        return if (panes.stacked) {
+            val cx = handle.left - gap - radius
+            Box(cx - radius, handle.centerY - radius, cx + radius, handle.centerY + radius)
+        } else {
+            val cy = handle.top - gap - radius
+            Box(handle.centerX - radius, cy - radius, handle.centerX + radius, cy + radius)
+        }
+    }
+
+    /** A tap on the split's ✕ closes the split. Returns true when the tap was that. */
+    private fun tapSideClose(x: Float, y: Float): Boolean {
+        val panes = splitPanes?.takeIf { isSplit && !isVideoFullscreen } ?: return false
+        if (!sideCloseBox(panes).contains(x, y)) return false
+        trace(ViewportDebug.Event.SPLIT_LAYOUT, "close")
+        closeSplit()
+        return true
     }
 
     /**
@@ -1967,7 +2022,8 @@ class CarWebRenderer(context: Context) {
             }
             DrawerAction.TOGGLE_DESKTOP -> toggleDesktopMode(appContext)
             DrawerAction.TOGGLE_FULLSCREEN -> toggleFullscreen()
-            DrawerAction.SPLIT_LAYOUT -> cycleSplitLayout()
+            DrawerAction.SPLIT_LAYOUT -> toggleSplit()
+            DrawerAction.SPLIT_CHOOSE -> target?.openSplitChooser()
             DrawerAction.SIDE_SHOW_PAGE -> showMainPageOnSide()
             DrawerAction.NAVIGATE_MAPS -> navigateInMaps()
             DrawerAction.ZOOM_IN -> zoomIn()
@@ -2883,7 +2939,9 @@ class CarWebRenderer(context: Context) {
      * the only feedback the driver gets that the next drag moves the panes rather than the page.
      */
     private fun drawSplitDivider(canvas: Canvas) {
-        val handle = dividerHandleBox(splitPanes ?: return)
+        val panes = splitPanes ?: return
+        drawSideClose(canvas, sideCloseBox(panes))
+        val handle = dividerHandleBox(panes)
         val radius = minOf(handle.width, handle.height) / 2f
         toolbarPaint.style = Paint.Style.FILL
         toolbarPaint.color = if (dividerGrabbed) BrowserTheme.dark.accent else Color.WHITE
@@ -2892,6 +2950,17 @@ class CarWebRenderer(context: Context) {
             handle.left, handle.top, handle.right, handle.bottom, radius, radius, toolbarPaint
         )
         toolbarPaint.alpha = 255
+    }
+
+    /** The split's ✕: a dark disc with a light cross, legible over either page. */
+    private fun drawSideClose(canvas: Canvas, box: Box) {
+        val radius = box.width / 2f
+        toolbarPaint.style = Paint.Style.FILL
+        toolbarPaint.color = BrowserTheme.dark.surfaceContainerHighest
+        toolbarPaint.alpha = 230
+        canvas.drawCircle(box.centerX, box.centerY, radius, toolbarPaint)
+        toolbarPaint.alpha = 255
+        drawIcon(canvas, BrowserIcon.CLOSE, box.centerX, box.centerY, radius, BrowserTheme.dark.iconEnabled)
     }
 
     /** Toolbar, overlays and FAB — shared by the legacy frame and the hardware chrome layer. */
@@ -3272,10 +3341,16 @@ class CarWebRenderer(context: Context) {
     private fun drawSheetTile(canvas: Canvas, row: DrawerRow) {
         val tile = row.bounds
         val enabled = row.item.enabled
+        // A switch tile that is on (the split, while one is up) is accent-filled, so the sheet
+        // says whether tapping it will close or open.
+        val on = enabled && row.item.on
         // The phone sheet's tile: a tonal rounded rectangle, a glyph over a label.
         val radius = sizes.dp(AutoUiSizes.SHEET_CORNER_RADIUS_DP).coerceAtMost(tile.height * 0.3f)
-        toolbarPaint.color =
-            if (enabled) BrowserTheme.dark.tileBackground else BrowserTheme.dark.tileDisabledBackground
+        toolbarPaint.color = when {
+            on -> BrowserTheme.dark.accent
+            enabled -> BrowserTheme.dark.tileBackground
+            else -> BrowserTheme.dark.tileDisabledBackground
+        }
         canvas.drawRoundRect(tile.left, tile.top, tile.right, tile.bottom, radius, radius, toolbarPaint)
 
         val glyphSize = sizes.dp(AutoUiSizes.SHEET_ICON_DP).coerceAtMost(tile.height * 0.36f)
@@ -3284,10 +3359,18 @@ class CarWebRenderer(context: Context) {
         val spacing = (sizes.contentGap * 0.75f).coerceAtMost(tile.height * 0.1f)
         val blockTop = tile.centerY - (glyphSize + spacing + labelSize) / 2f
 
-        val tileIconColor = if (enabled) BrowserTheme.dark.iconEnabled else BrowserTheme.dark.iconDisabled
+        val tileIconColor = when {
+            on -> BrowserTheme.dark.onPrimary
+            enabled -> BrowserTheme.dark.iconEnabled
+            else -> BrowserTheme.dark.iconDisabled
+        }
         drawIcon(canvas, row.item.icon, tile.centerX, blockTop + glyphSize / 2f, glyphSize, tileIconColor)
 
-        detailPaint.color = if (enabled) BrowserTheme.dark.textPrimary else BrowserTheme.dark.iconDisabled
+        detailPaint.color = when {
+            on -> BrowserTheme.dark.onPrimary
+            enabled -> BrowserTheme.dark.textPrimary
+            else -> BrowserTheme.dark.iconDisabled
+        }
         detailPaint.textSize = labelSize
         drawCentered(
             canvas, detailPaint,

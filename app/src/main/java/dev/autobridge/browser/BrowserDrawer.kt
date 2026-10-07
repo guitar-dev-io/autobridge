@@ -87,6 +87,12 @@ enum class DrawerAction {
 
     /** Car only: shows the phone's screen (Bridge Mirror) in place of the browser. */
     MIRROR_PHONE,
+
+    /**
+     * Car only: picks a split layout (50/50, 40/60, …) in one step. [SPLIT_LAYOUT] is the on/off
+     * switch; this is where the shape is chosen.
+     */
+    SPLIT_CHOOSE,
 }
 
 /**
@@ -288,7 +294,11 @@ class BrowserDrawerModel private constructor(
             sharedPrimaryRows(state).mapIndexed { index, row ->
                 if (index == 1 && state.surface == MenuSurface.CAR) {
                     row.take(row.lastIndex) +
-                        DrawerItem(DrawerAction.SPLIT_LAYOUT, R.string.drawer_split, BrowserIcon.SPLIT_LAYOUT) +
+                        // A switch: one tap closes a split, the next brings its layout back.
+                        DrawerItem(
+                            DrawerAction.SPLIT_LAYOUT, R.string.drawer_split, BrowserIcon.SPLIT_LAYOUT,
+                            on = state.splitActive,
+                        ) +
                         row.last()
                 } else row
             }.map { row -> row.filterNot { it.action in state.unsupported } }.filter { it.isNotEmpty() }
@@ -358,6 +368,7 @@ class BrowserDrawerModel private constructor(
             // [fullscreenToggle]), so it is never buried behind "More" on either surface.
             // The split layout itself is on the primary sheet (see [primaryRows]); the rest of the
             // split screen leads this list.
+            DrawerItem(DrawerAction.SPLIT_CHOOSE, R.string.drawer_split_choose, BrowserIcon.SPLIT_LAYOUT),
             DrawerItem(DrawerAction.SIDE_SHOW_PAGE, R.string.drawer_side_show_page, BrowserIcon.SPLIT_LAYOUT),
             // Listed whether or not a split is up, so it is always in the same place; it can only
             // act while one is.

@@ -67,7 +67,10 @@ object CarMenuList {
     /** Entries drawn side by side as one row of buttons rather than a row each. */
     private val GROUPS = listOf(
         setOf(DrawerAction.NAV_BACK, DrawerAction.RELOAD, DrawerAction.NAV_FORWARD),
-        setOf(DrawerAction.SPLIT_LAYOUT, DrawerAction.SIDE_SHOW_PAGE, DrawerAction.SWAP_SPLIT_SIDES),
+        setOf(
+            DrawerAction.SPLIT_LAYOUT, DrawerAction.SPLIT_CHOOSE,
+            DrawerAction.SIDE_SHOW_PAGE, DrawerAction.SWAP_SPLIT_SIDES,
+        ),
     )
 
     private fun Context.dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
@@ -84,7 +87,8 @@ object CarMenuList {
 
     /** The switches report their state as On/Off; a tab count or ✓ shows as given. */
     private fun detail(context: Context, item: DrawerItem): String = when (item.action) {
-        DrawerAction.TOGGLE_DESKTOP, DrawerAction.TOGGLE_FULLSCREEN, DrawerAction.PIN_TOOLBAR ->
+        DrawerAction.TOGGLE_DESKTOP, DrawerAction.TOGGLE_FULLSCREEN, DrawerAction.PIN_TOOLBAR,
+        DrawerAction.SPLIT_LAYOUT ->
             context.getString(if (item.on) R.string.browser_menu_on else R.string.browser_menu_off)
         else -> item.value.takeIf { it != "✓" }.orEmpty()
     }
@@ -142,7 +146,10 @@ object CarMenuList {
         }
     }
 
-    /** Up to three equal buttons on one line (Back / Reload / Forward, the split row). */
+    /**
+     * Equal buttons on one line (Back / Reload / Forward, the split row). A switch that is on
+     * (the split, while one is up) is filled with the accent, so the row says whether it is.
+     */
     private fun buttonRow(
         context: Context,
         items: List<DrawerItem>,
@@ -151,21 +158,24 @@ object CarMenuList {
     ): View = LinearLayout(context).apply {
         orientation = LinearLayout.HORIZONTAL
         items.forEachIndexed { index, item ->
+            val fg = if (item.on) style.onAccent else style.text
             addView(LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER
-                background = background(context, style.rowFill, style.textSecondary)
+                background = background(context, if (item.on) style.accent else style.rowFill, style.textSecondary)
                 minimumHeight = context.dp(64)
                 setPadding(context.dp(4), context.dp(8), context.dp(4), context.dp(8))
-                contentDescription = item.label(context)
+                contentDescription = detail(context, item).let { state ->
+                    if (state.isBlank()) item.label(context) else "${item.label(context)}, $state"
+                }
                 alpha = if (item.enabled) 1f else 0.4f
                 isClickable = item.enabled
                 isFocusable = item.enabled
                 if (item.enabled) setOnClickListener { onAction(item.action) }
-                addView(icon(context, item, style.text), LinearLayout.LayoutParams(context.dp(26), context.dp(26)))
+                addView(icon(context, item, fg), LinearLayout.LayoutParams(context.dp(26), context.dp(26)))
                 addView(TextView(context).apply {
                     text = item.label(context)
-                    setTextColor(style.text)
+                    setTextColor(fg)
                     textSize = 14f
                     gravity = Gravity.CENTER
                     maxLines = 2

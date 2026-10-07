@@ -189,3 +189,26 @@ class BrowserSplitGeometryTest {
         assertEquals((798 + 100) / 1596f, grown, 0.001f)
     }
 }
+
+/** The split switch: one tap closes a split, the next brings back the layout it had. */
+class BrowserSplitToggleTest {
+    @Test fun aSplitClosesInOneTap() {
+        BrowserSplitLayout.entries.filter { it != BrowserSplitLayout.SINGLE }.forEach { layout ->
+            assertEquals(BrowserSplitLayout.SINGLE, BrowserSplitPrefs.toggled(layout, BrowserSplitLayout.HALF))
+        }
+    }
+
+    @Test fun reopeningBringsBackTheLastLayout() {
+        assertEquals(
+            BrowserSplitLayout.PORTRAIT_LANDSCAPE,
+            BrowserSplitPrefs.toggled(BrowserSplitLayout.SINGLE, BrowserSplitLayout.PORTRAIT_LANDSCAPE),
+        )
+    }
+
+    @Test fun reopeningWithNothingRememberedSplitsInHalf() {
+        assertEquals(
+            BrowserSplitLayout.HALF,
+            BrowserSplitPrefs.toggled(BrowserSplitLayout.SINGLE, BrowserSplitLayout.SINGLE),
+        )
+    }
+}

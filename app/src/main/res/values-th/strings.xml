@@ -328,6 +328,9 @@
     <string name="bridge_web_menu_keyboard">แป้นพิมพ์</string>
     <string name="bridge_web_menu_car_search">ช่องค้นหาของรถ</string>
     <string name="bridge_web_maps_no_destination">เปิดเส้นทางหรือสถานที่บนแผนที่ก่อน</string>
+    <string name="drawer_split_choose">รูปแบบแบ่งจอ</string>
+    <string name="split_closed">ปิดการแบ่งจอแล้ว</string>
+    <string name="split_close_side">ปิดหน้าด้านข้าง</string>
     <string name="browser_about_version">เวอร์ชัน</string>
     <string name="browser_about_webview">WebView</string>
     <string name="drawer_swap_sides">สลับฝั่ง</string>

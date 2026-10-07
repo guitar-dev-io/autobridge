@@ -252,7 +252,7 @@ class CarBrowserSettingsScreen(carContext: CarContext) : Screen(carContext) {
 }
 
 /** How the car surface is divided between the main page and the side page. */
-private class CarSplitLayoutScreen(carContext: CarContext) : Screen(carContext) {
+internal class CarSplitLayoutScreen(carContext: CarContext) : Screen(carContext) {
     override fun onGetTemplate(): Template {
         val current = BrowserSplitStore.layout(carContext)
         val list = ItemList.Builder()
