@@ -407,8 +407,8 @@ class MainActivity : androidx.activity.ComponentActivity() {
     }
 
     /**
-     * Home: a launcher/dashboard rather than a grid of every feature. Android Auto status, six
-     * Quick Launch tiles ([dev.autobridge.ui.PhoneHomeLayout]), Send to Car and Recent. Every
+     * Home: a launcher/dashboard rather than a grid of every feature. Android Auto status, Send
+     * to Car with its recent sends, then six Quick Launch tiles ([dev.autobridge.ui.PhoneHomeLayout]). Every
      * section the old grid showed is still reachable: directly, through Music / TV / Radio, or
      * behind More. The car's own grid is unchanged.
      */

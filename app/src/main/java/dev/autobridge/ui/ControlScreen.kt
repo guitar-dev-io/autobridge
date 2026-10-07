@@ -29,6 +29,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -44,6 +45,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -526,6 +528,7 @@ fun AndroidAutoStatusCard(
     caption: String? = null,
     onClick: (() -> Unit)?,
     showPill: Boolean = false,
+    homeStyle: Boolean = false,
     actions: (@Composable () -> Unit)? = null
 ) {
     val runtime by RuntimeContextStore.context.collectAsState()
@@ -540,25 +543,42 @@ fun AndroidAutoStatusCard(
     val status = ConnectionStatusText.of(runtime, labels)
     val body: @Composable () -> Unit = {
         Column {
-            Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.padding(if (homeStyle) 18.dp else 14.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(
-                    Modifier.size(46.dp)
-                        .background(ComposeTokens.Ok.copy(alpha = 0.16f), RoundedCornerShape(12.dp))
-                        .border(1.dp, ComposeTokens.Ok.copy(alpha = 0.3f), RoundedCornerShape(12.dp)),
+                    if (homeStyle) {
+                        Modifier.size(44.dp).background(HomeCardIconChip, RoundedCornerShape(14.dp))
+                    } else {
+                        Modifier.size(46.dp)
+                            .background(ComposeTokens.Ok.copy(alpha = 0.16f), RoundedCornerShape(12.dp))
+                            .border(1.dp, ComposeTokens.Ok.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                    },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         painterResource(R.drawable.ic_tile_car),
                         contentDescription = null,
-                        tint = if (status.connected) AccentGreen else TextMuted,
+                        tint = when {
+                            homeStyle -> Accent
+                            status.connected -> AccentGreen
+                            else -> TextMuted
+                        },
                         modifier = Modifier.size(24.dp)
                     )
                 }
                 Column(Modifier.padding(start = 12.dp).weight(1f)) {
-                    Text(title, color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                    Text(
+                        title,
+                        color = TextPrimary,
+                        fontSize = if (homeStyle) 17.sp else 16.sp,
+                        fontWeight = if (homeStyle) FontWeight.Bold else FontWeight.Medium
+                    )
                     Text(
                         status.summary,
-                        color = if (status.connected) AccentGreen else TextMuted,
+                        color = when {
+                            homeStyle -> HomeCardCaption
+                            status.connected -> AccentGreen
+                            else -> TextMuted
+                        },
                         fontSize = 13.sp,
                         modifier = Modifier.semantics { contentDescription = "$title: ${status.summary}" }
                     )
@@ -571,17 +591,24 @@ fun AndroidAutoStatusCard(
                 }
             }
             if (actions != null) {
-                Box(Modifier.padding(start = 14.dp, end = 14.dp, bottom = 14.dp)) { actions() }
+                val edge = if (homeStyle) 18.dp else 14.dp
+                Box(Modifier.padding(start = edge, end = edge, bottom = edge)) { actions() }
             }
         }
     }
-    val shape = RoundedCornerShape(16.dp)
+    val shape = RoundedCornerShape(if (homeStyle) 24.dp else 16.dp)
+    val color = if (homeStyle) HomeCardColor else CardColor
     if (onClick != null) {
-        Surface(onClick = onClick, color = CardColor, shape = shape, modifier = Modifier.fillMaxWidth()) { body() }
+        Surface(onClick = onClick, color = color, shape = shape, modifier = Modifier.fillMaxWidth()) { body() }
     } else {
-        Surface(color = CardColor, shape = shape, modifier = Modifier.fillMaxWidth()) { body() }
+        Surface(color = color, shape = shape, modifier = Modifier.fillMaxWidth()) { body() }
     }
 }
+
+/** Home's reading of [AndroidAutoStatusCard]: a blue-tinted card, the one hero block on Home. */
+private val HomeCardColor = Color(0xFF16243A)
+private val HomeCardIconChip = Color(0xFF1E3A66)
+private val HomeCardCaption = Color(0xFFA9C3E3)
 
 /** A small accent dot plus one word — [AndroidAutoStatusCard]'s Home-only connection pill. */
 @Composable
@@ -609,7 +636,7 @@ private fun StatusPill(label: String, connected: Boolean) {
  * so Home's "Send to Car" field behaves the same way it always has.
  */
 @Composable
-fun CommandField(placeholder: String, onSubmitted: (String) -> Unit = {}) {
+fun CommandField(placeholder: String, filled: Boolean = false, onSubmitted: (String) -> Unit = {}) {
     var text by remember { mutableStateOf("") }
     fun send() {
         val sent = text
@@ -626,13 +653,26 @@ fun CommandField(placeholder: String, onSubmitted: (String) -> Unit = {}) {
             singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
             keyboardActions = KeyboardActions(onSend = { send() }),
+            // Home's field sits on the page as a filled, rounded box (the design's Send to Car
+            // row); Control keeps the plain outlined field.
+            shape = if (filled) RoundedCornerShape(16.dp) else OutlinedTextFieldDefaults.shape,
+            colors = if (filled) {
+                OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = CardColor,
+                    unfocusedContainerColor = CardColor,
+                    unfocusedBorderColor = ComposeTokens.Hairline,
+                    focusedBorderColor = Accent
+                )
+            } else {
+                OutlinedTextFieldDefaults.colors()
+            },
             modifier = Modifier.weight(1f)
         )
         Spacer(Modifier.width(8.dp))
         Surface(
             onClick = { send() },
-            color = Accent,
-            shape = RoundedCornerShape(12.dp),
+            color = if (filled) TextPrimary else Accent,
+            shape = RoundedCornerShape(if (filled) 16.dp else 12.dp),
             modifier = Modifier.size(52.dp).semantics { contentDescription = "Send" }
         ) {
             Box(contentAlignment = Alignment.Center) { Text("➤", fontSize = 20.sp, color = ComposeTokens.Ink) }
