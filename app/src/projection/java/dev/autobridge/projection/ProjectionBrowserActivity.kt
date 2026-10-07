@@ -48,9 +48,9 @@ import dev.autobridge.browser.CarBrowserAbout
 import dev.autobridge.browser.CarMenuList
 import dev.autobridge.browser.DrawerAction
 import dev.autobridge.browser.MenuSurface
-import dev.autobridge.browser.WebBookmarkStore
-import dev.autobridge.browser.WebHistoryStore
 import dev.autobridge.entertainment.BrowserLauncher
+import dev.autobridge.entertainment.WebBookmarkStore
+import dev.autobridge.entertainment.WebHistoryStore
 import dev.autobridge.browser.BrowserControlsStore
 import dev.autobridge.browser.BrowserDefaults
 import dev.autobridge.browser.BrowserDisplayUrl
@@ -1205,7 +1205,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
                 // The identity is read at navigation time, so the open page only changes on reload.
                 page?.reload()
             }
-            DrawerAction.TOGGLE_FULLSCREEN -> setFullscreen(!chromeVisibility.fullscreen)
+            DrawerAction.TOGGLE_FULLSCREEN -> setPageFullscreen(!chromeVisibility.fullscreen)
             DrawerAction.PIN_TOOLBAR -> togglePinnedToolbar()
             DrawerAction.SPLIT_LAYOUT -> toggleSplit()
             DrawerAction.SPLIT_CHOOSE -> openSplitChooser()
@@ -1251,7 +1251,8 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
                     addView(menuRow("ⓘ", label, value) { })
                 }
             }
-            DrawerAction.APP_HOME -> finish()
+            // A CarActivity has no finish(): leaving is what back does at the root.
+            DrawerAction.APP_HOME -> super.onBackPressed()
             // Not offered here (see UNSUPPORTED_ACTIONS), or phone-sheet entries.
             else -> Unit
         }
@@ -1260,7 +1261,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
     /** Pinning the toolbar also leaves fullscreen: a pinned bar that stays hidden is no pin. */
     private fun togglePinnedToolbar() {
         BrowserControlsStore.setAlwaysShowUrlBar(this, !BrowserControlsStore.alwaysShowUrlBar(this))
-        if (chromeVisibility.fullscreen) setFullscreen(false) else applyChromePinning()
+        if (chromeVisibility.fullscreen) setPageFullscreen(false) else applyChromePinning()
     }
 
     private fun clipboard(): android.content.ClipboardManager? =
@@ -1271,7 +1272,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
      * The edge band and the floating button still bring the toolbar back over the page; leaving
      * fullscreen restores whatever the pin setting says.
      */
-    private fun setFullscreen(enabled: Boolean) {
+    private fun setPageFullscreen(enabled: Boolean) {
         val now = SystemClock.uptimeMillis()
         chromeVisibility.setFullscreen(now, enabled)
         if (!enabled) return applyChromePinning()
@@ -2411,11 +2412,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
      * script can — so on this route "fullscreen" means the one thing this app does control: every
      * pixel of chrome off the page, or back.
      */
-    override fun setFullscreen(enabled: Boolean) = onUi {
-        chromeVisibility.setFullscreen(SystemClock.uptimeMillis(), enabled)
-        applyChromeVisible(!enabled)
-        if (!enabled) scheduleChromeTick()
-    }
+    override fun setFullscreen(enabled: Boolean) = onUi { setPageFullscreen(enabled) }
 
     override fun setDesktopMode(enabled: Boolean) = onUi {
         BrowserUserAgentStore.select(
