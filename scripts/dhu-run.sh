@@ -246,14 +246,81 @@ echo "== wiring adb forward tcp:$PORT =="
 # The head unit server serves exactly ONE connection, and a gearhead process left from the previous
 # session is still holding it. Skip this and the DHU reports `connected` and then dies with
 # USB_ISSUE_PROJECTION_NOT_STARTED - which reads like an app fault and is not one.
+#
+# We do NOT try to launch the head unit server directly: the activity the three-dot "Start head
+# unit server" menu opens is not exported and its name changes across gearhead versions, so an
+# `am start -n ...` guess fails on real devices. Instead we just open Android Auto so the menu is
+# one tap away, then WAIT until the server is genuinely listening before launching the DHU.
+
+# True only if the head unit server is actually listening on tcp:5277 INSIDE the device.
+#
+# Probing the forwarded port on this host is NOT a valid test: `adb forward` accepts the host-side
+# connection even when nothing listens on the device, so the DHU prints "connected." and then dies
+# with "Failed to read from transport - disconnect". The authoritative check is the device's own
+# socket table: port 5277 == 0x1495, and a LISTEN socket shows state 0A. We read both IPv4
+# (/proc/net/tcp) and IPv6 (/proc/net/tcp6).
+server_is_up() {
+  local out
+  out="$("${ADB[@]}" shell 'cat /proc/net/tcp /proc/net/tcp6 2>/dev/null' 2>/dev/null)" || return 1
+  # Columns: sl  local_address rem_address st ...   local_address is HEX_IP:HEX_PORT.
+  # Match local port 1495 (=5277) in state 0A (LISTEN).
+  awk '
+    { split($2, l, ":");
+      if (toupper(l[2]) == "1495" && toupper($4) == "0A") { found = 1 }
+    }
+    END { exit(found ? 0 : 1) }
+  ' <<< "$out"
+}
+
+# Open the Android Auto app on the device via its launcher intent. This does not need an exported
+# component name - it is the normal "tap the app icon" path - so it works across versions. It just
+# brings the UI up so the "Start head unit server" menu is reachable; it does not start the server.
+open_android_auto() {
+  "${ADB[@]}" shell monkey -p "$GEARHEAD" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1 || true
+}
+
 if [[ "$RESTART" -eq 1 ]]; then
   echo
   echo "== force-stopping Android Auto =="
   "${ADB[@]}" shell am force-stop "$GEARHEAD"
-  echo "   now on the device: Android Auto > three-dot menu > 'Start head unit server'"
-  if [[ -t 0 ]]; then
-    printf '   press Enter once it is started (Ctrl-C to abort)... '
-    read -r _
+
+  if server_is_up; then
+    echo "   head unit server is already up (tcp:$PORT listening on device)."
+  else
+    echo "== opening Android Auto on the device =="
+    open_android_auto
+    echo "   on the device: Android Auto > three-dot menu > 'Start head unit server'"
+    echo
+    if [[ -t 0 ]]; then
+      echo "   waiting for the server to actually listen on the device..."
+      echo "   (press Enter to launch the DHU anyway, Ctrl-C to abort)"
+      waited=0
+      until server_is_up; do
+        # read with a 1s timeout doubles as the poll delay: Enter breaks out immediately,
+        # otherwise we loop and re-probe the device's own socket table.
+        if read -r -t 1 _; then
+          echo "   launching anyway on your request (server not detected yet)."
+          break
+        fi
+        waited=$((waited + 1))
+        if [[ $((waited % 15)) -eq 0 ]]; then
+          echo "   still waiting (${waited}s). Tap 'Start head unit server' on the phone, or press Enter."
+        fi
+      done
+      if server_is_up; then
+        echo "   head unit server is up (tcp:$PORT listening on device). launching DHU."
+      fi
+    else
+      # Non-interactive (IDE task runner): can't prompt. Poll up to 60s for the server, then proceed
+      # and let the DHU surface the error if it never came up.
+      waited=0
+      until server_is_up; do
+        sleep 1
+        waited=$((waited + 1))
+        [[ "$waited" -ge 60 ]] && { echo "   server not detected after ${waited}s; launching DHU anyway."; break; }
+      done
+      server_is_up && echo "   head unit server is up (tcp:$PORT listening on device)."
+    fi
   fi
 fi
 
