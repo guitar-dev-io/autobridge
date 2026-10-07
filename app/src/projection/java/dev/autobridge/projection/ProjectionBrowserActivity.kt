@@ -1045,16 +1045,13 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
             setPadding(12.dp(), 12.dp(), 12.dp(), 12.dp())
             // Swallows its own taps: the scrim dismisses, and a miss inside the card must not.
             isClickable = true
-            addView(
-                TextView(this@ProjectionBrowserActivity).apply {
-                    text = heading
-                    setTextColor(scheme.textSecondary)
-                    textSize = 14f
-                    setPadding(12.dp(), 4.dp(), 12.dp(), 10.dp())
-                }
-            )
             build()
         }
+        // The title line carries a ✕, and dragging it down closes the sheet too: on a tall car
+        // screen the sheet can fill the display, leaving no scrim to tap.
+        val header = CarMenuList.header(this, heading, menuStyle()) { dismissOverlay() }
+        card.addView(header, 0)
+        CarMenuList.dragToClose(header, card) { dismissOverlay() }
         val scrim = FrameLayout(this).apply {
             setBackgroundColor(scheme.scrim)
             isClickable = true
@@ -1152,23 +1149,37 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
     private fun openMenu() {
         noteInteraction()
         if (!allowed()) return enforcePolicy()
-        val style = CarMenuList.Style(
-            text = scheme.textPrimary,
-            textSecondary = scheme.textSecondary,
-            rowFill = scheme.sheetCardBackground,
-            accent = scheme.primary,
-            onAccent = scheme.onPrimary,
-        )
-        val rows = CarMenuList.build(this, menuState(), style) { action ->
+        val rows = CarMenuList.build(this, menuState(), menuStyle()) { action ->
             dismissOverlay()
             runMenuAction(action)
         }
         showOverlay(getString(R.string.car_browser_title)) {
             rows.forEach { addView(it) }
-            addView(menuRow("⌨", getString(R.string.bridge_web_menu_keyboard)) { dismissOverlay(); openKeyboard() })
-            addView(menuRow("▭", getString(R.string.bridge_web_menu_car_search)) { dismissOverlay(); openAddressEntry() })
+            // This route's own two ways to type, side by side on one line.
+            addView(LinearLayout(this@ProjectionBrowserActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                addView(
+                    menuRow("⌨", getString(R.string.bridge_web_menu_keyboard)) { dismissOverlay(); openKeyboard() },
+                    LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { topMargin = 6.dp() }
+                )
+                addView(
+                    menuRow("▭", getString(R.string.bridge_web_menu_car_search)) { dismissOverlay(); openAddressEntry() },
+                    LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                        topMargin = 6.dp()
+                        marginStart = 6.dp()
+                    }
+                )
+            })
         }
     }
+
+    private fun menuStyle() = CarMenuList.Style(
+        text = scheme.textPrimary,
+        textSecondary = scheme.textSecondary,
+        rowFill = scheme.sheetCardBackground,
+        accent = scheme.primary,
+        onAccent = scheme.onPrimary,
+    )
 
     private fun menuState(): BrowserMenuState = BrowserMenuState(
         surface = MenuSurface.CAR,

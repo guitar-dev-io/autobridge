@@ -1057,17 +1057,21 @@ class BrowserActivity : Activity() {
     private fun showCarMenu() {
         val shell = BrowserSheetShell(this, sizes)
         val column = shell.contentColumn()
-        column.addView(shell.grip())
+        val style = CarMenuList.Style(
+            text = BrowserTheme.textPrimary,
+            textSecondary = BrowserTheme.textSecondary,
+            rowFill = BrowserTheme.sheetCardBackground,
+            accent = BrowserTheme.accent,
+            onAccent = BrowserTheme.onPrimary,
+        )
+        // A ✕ and drag-down to close: the grid can fill a car display, leaving no outside to tap.
+        val header = CarMenuList.header(this, getString(R.string.car_browser_title), style) { shell.dismiss() }
+        column.addView(header)
+        CarMenuList.dragToClose(header, column) { shell.dismiss() }
         CarMenuList.build(
             context = this,
             state = menuState(),
-            style = CarMenuList.Style(
-                text = BrowserTheme.textPrimary,
-                textSecondary = BrowserTheme.textSecondary,
-                rowFill = BrowserTheme.sheetCardBackground,
-                accent = BrowserTheme.accent,
-                onAccent = BrowserTheme.onPrimary,
-            ),
+            style = style,
         ) { action ->
             shell.dismiss()
             runMenuAction(action)

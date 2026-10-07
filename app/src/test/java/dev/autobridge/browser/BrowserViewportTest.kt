@@ -1065,6 +1065,40 @@ class CarMenuParityTest {
         assertTrue(BrowserDrawerModel.moreItems(limited).none { it.action in unsupported })
     }
 
+    /** Bridge Web and the Duo pane: related entries share a line, so the menu fits a car screen. */
+    @Test fun theListMenusGroupRelatedEntriesOnFewLines() {
+        val bridgeWeb = state.copy(
+            unsupported = setOf(DrawerAction.MEDIA_CENTER, DrawerAction.NOW_PLAYING, DrawerAction.MEDIA_LIBRARY, DrawerAction.AGENT),
+        )
+        val items = BrowserDrawerModel.carMenu(bridgeWeb)
+        val rows = CarMenuList.rows(items)
+        assertEquals(items.map { it.action }.toSet(), rows.flatten().map { it.action }.toSet())
+        assertEquals(items.size, rows.flatten().size)
+        assertTrue(rows.all { it.size in 1..4 })
+        assertTrue("${rows.size} lines", rows.size <= 10)
+        assertEquals(listOf(DrawerAction.TABS, DrawerAction.NEW_TAB), rows.first().map { it.action })
+        fun line(a: DrawerAction) = rows.indexOfFirst { row -> row.any { it.action == a } }
+        assertEquals(line(DrawerAction.TOGGLE_DESKTOP), line(DrawerAction.TOGGLE_FULLSCREEN))
+        assertEquals(line(DrawerAction.ZOOM_IN), line(DrawerAction.ZOOM_OUT))
+        assertEquals(line(DrawerAction.BOOKMARKS), line(DrawerAction.HISTORY))
+        assertEquals(line(DrawerAction.SPLIT_LAYOUT), line(DrawerAction.SWAP_SPLIT_SIDES))
+    }
+
+    @Test fun theDuoPaneGridLeadsWithTheStartPage() {
+        val duo = state.copy(
+            unsupported = setOf(
+                DrawerAction.TABS, DrawerAction.NEW_TAB, DrawerAction.SPLIT_LAYOUT, DrawerAction.SPLIT_CHOOSE,
+                DrawerAction.SIDE_SHOW_PAGE, DrawerAction.SWAP_SPLIT_SIDES, DrawerAction.NAVIGATE_MAPS,
+                DrawerAction.MEDIA_CENTER, DrawerAction.NOW_PLAYING, DrawerAction.MEDIA_LIBRARY,
+                DrawerAction.AGENT, DrawerAction.MIRROR_PHONE, DrawerAction.PIN_TOOLBAR, DrawerAction.APP_HOME,
+            ),
+        )
+        val items = BrowserDrawerModel.carMenu(duo)
+        val rows = CarMenuList.rows(items)
+        assertEquals(listOf(DrawerAction.HOME), rows.first().map { it.action })
+        assertEquals(items.size, rows.flatten().size)
+    }
+
     @Test fun thePhoneSheetIsUntouchedByTheCarSplitTile() {
         val phone = state.copy(surface = MenuSurface.PHONE)
         assertTrue(BrowserDrawerModel.primaryRows(phone).flatten().none { it.action == DrawerAction.SPLIT_LAYOUT })
