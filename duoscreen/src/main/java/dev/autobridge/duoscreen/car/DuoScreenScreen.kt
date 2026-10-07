@@ -8,9 +8,11 @@ import androidx.car.app.SurfaceCallback
 import androidx.car.app.SurfaceContainer
 import androidx.car.app.model.Action
 import androidx.car.app.model.ActionStrip
+import androidx.car.app.model.CarIcon
 import androidx.car.app.model.Template
 import androidx.car.app.navigation.model.MessageInfo
 import androidx.car.app.navigation.model.NavigationTemplate
+import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import dev.autobridge.duoscreen.R
@@ -54,6 +56,10 @@ class DuoScreenScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
     }
 
     /**
+     * Reload, arrange and exit are icon-only: as text pills they covered the top of the right-hand
+     * pane on a real head unit. The preset button keeps its glyph title, which already reads as an
+     * icon and changes with the layout.
+     *
      * One button toggles edit mode, because the host only reports scroll/fling/scale — there is no
      * separate gesture left to mean "arrange" (see [DuoScreenInputRouter]).
      */
@@ -70,11 +76,7 @@ class DuoScreenScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
             }
             .build()
         val toggle = Action.Builder()
-            .setTitle(
-                carContext.getString(
-                    if (editing) R.string.duo_screen_done else R.string.duo_screen_edit_layout
-                )
-            )
+            .setIcon(icon(if (editing) R.drawable.ic_duo_done else R.drawable.ic_duo_arrange))
             .setOnClickListener {
                 controller.toggleMode()
                 invalidate()
@@ -83,7 +85,7 @@ class DuoScreenScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
         // A pane whose app was killed in the background comes back as a black rectangle; this
         // re-launches it rather than making the driver restart the whole session.
         val reload = Action.Builder()
-            .setTitle(carContext.getString(R.string.duo_screen_reload))
+            .setIcon(icon(R.drawable.ic_duo_reload))
             .setOnClickListener {
                 val reloaded = controller.reloadSelectedOrAll()
                 StructuredLog.i(TAG, "Reloaded $reloaded pane(s)")
@@ -91,7 +93,7 @@ class DuoScreenScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
             .build()
 
         // The way out, and the fourth action: ACTIONS_CONSTRAINTS_NAVIGATION caps the strip at four
-        // actions (and four custom titles), so the strip is now full.
+        // actions, so the strip is now full.
         //
         // Leaving the screen only detaches (DuoScreenHost.KEEP_ALIVE_MS), by design, so
         // without this there is no way to get the panes off the car display short of waiting the
@@ -100,7 +102,7 @@ class DuoScreenScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
         // launcher, which is as far as an app can take "disconnect" — only the driver can end the
         // phone's Android Auto connection itself.
         val exit = Action.Builder()
-            .setTitle(carContext.getString(R.string.duo_screen_exit))
+            .setIcon(icon(R.drawable.ic_duo_exit))
             .setOnClickListener {
                 val ended = DuoScreenHost.release()
                 StructuredLog.i(TAG, "Exit requested; session ended=$ended")
@@ -129,6 +131,9 @@ class DuoScreenScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
             )
             .build()
     }
+
+    private fun icon(resId: Int): CarIcon =
+        CarIcon.Builder(IconCompat.createWithResource(carContext, resId)).build()
 
     override fun onSurfaceAvailable(surfaceContainer: SurfaceContainer) {
         val surface = surfaceContainer.surface ?: return

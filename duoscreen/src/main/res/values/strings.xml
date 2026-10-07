@@ -1,9 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="duo_screen_edit_layout">Arrange</string>
-    <string name="duo_screen_done">Done</string>
-    <string name="duo_screen_reload">Reload</string>
-    <string name="duo_screen_exit">Exit</string>
     <string name="duo_screen_needs_shizuku">Grant Shizuku access on the phone first</string>
     <string name="duo_screen_banner_title">Allow Shizuku on the phone</string>
     <string name="duo_screen_banner_text">Open Shizuku on the phone, make sure it is running, and allow AutoBridge. Until then the panes cannot take touch and go black when the phone sleeps.</string>

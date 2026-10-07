@@ -1,9 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="duo_screen_edit_layout">จัดหน้าจอ</string>
-    <string name="duo_screen_done">เสร็จสิ้น</string>
-    <string name="duo_screen_reload">โหลดใหม่</string>
-    <string name="duo_screen_exit">ออก</string>
     <string name="duo_screen_needs_shizuku">ให้สิทธิ์ Shizuku บนมือถือก่อน</string>
     <string name="duo_screen_banner_title">ต้องอนุญาต Shizuku บนมือถือ</string>
     <string name="duo_screen_banner_text">เปิดแอป Shizuku บนมือถือ ตรวจว่าทำงานอยู่ แล้วกดอนุญาตให้ AutoBridge ถ้ายังไม่อนุญาต ช่องจะแตะไม่ได้ และจะดำเมื่อมือถือหลับ</string>
