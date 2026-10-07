@@ -30,6 +30,9 @@ SRC_DIR="$ROOT_DIR/app/src/main/java"
 ALLOW_THAI_IN_CODE=(
   "dev/autobridge/agent/AgentCommandParser.kt"
   "dev/autobridge/remote/CommandParser.kt"
+  # Offline voice commands: the aliases Whisper writes for each service in Thai script, and the
+  # recognition prompt that keeps brand names in Latin script inside a Thai sentence.
+  "dev/autobridge/voice/VoiceCommandParser.kt"
   "dev/autobridge/iptv/XtreamClient.kt"
   # Keycaps, for the same reason: the Kedmanee layout *is* the Thai alphabet, and a Thai keyboard
   # types Thai whatever language the UI is drawn in. These are characters the key emits, not copy.

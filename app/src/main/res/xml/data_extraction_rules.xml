@@ -18,15 +18,22 @@
          phone would decrypt to nothing there and the user would find their sources silently empty;
          leaving the file behind means they re-enter the account knowingly instead.
 
+     The downloaded Whisper models (files/whisper, see dev.autobridge.voice.WhisperModelStore) are
+     excluded from both as well, for size rather than secrecy: up to a few hundred megabytes each,
+     far past the 25 MB cloud-backup quota, which would fail the whole backup, and free to download
+     again on the new phone.
+
      Everything not named here is still backed up and still transferred. -->
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="sharedpref" path="autobridge_iptv_sources.xml" />
         <exclude domain="sharedpref" path="autobridge_iptv_history.xml" />
+        <exclude domain="file" path="whisper/" />
     </cloud-backup>
 
     <device-transfer>
         <exclude domain="sharedpref" path="autobridge_iptv_sources.xml" />
         <exclude domain="sharedpref" path="autobridge_iptv_history.xml" />
+        <exclude domain="file" path="whisper/" />
     </device-transfer>
 </data-extraction-rules>

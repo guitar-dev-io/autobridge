@@ -45,4 +45,13 @@ class AutoBridgeApplication : Application() {
         // car screen session that used to set it; see CarConnectionMonitor.
         dev.autobridge.car.CarConnectionMonitor.install(this)
     }
+
+    /**
+     * A loaded Whisper model is the largest thing this process holds that it can rebuild on demand,
+     * so it is the first thing given back under memory pressure; see [dev.autobridge.voice.VoiceRuntime].
+     */
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        dev.autobridge.voice.VoiceRuntime.onTrimMemory(level)
+    }
 }

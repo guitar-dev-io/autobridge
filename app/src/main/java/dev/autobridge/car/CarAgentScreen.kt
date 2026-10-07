@@ -16,6 +16,10 @@ import dev.autobridge.agent.AgentCommandRouter
 import dev.autobridge.audio.VoiceFeedback
 import dev.autobridge.core.state.RecentActivityStore
 import dev.autobridge.settings.AppPreferences
+import dev.autobridge.voice.CommandValidator
+import dev.autobridge.voice.Validation
+import dev.autobridge.voice.VoiceAction
+import dev.autobridge.voice.VoiceCommandParser
 
 /**
  * Agent surface: "Ask, search, and control". The user speaks/types a phrase; [AgentCommandRouter]
@@ -162,6 +166,7 @@ class CarAgentScreen(carContext: CarContext) : Screen(carContext) {
         Action.Builder().setTitle(title).setOnClickListener { onClick() }.build()
 
     private fun run(input: String, fromVoice: Boolean) {
+        if (runVoiceCommand(input, fromVoice)) return
         val command = AgentCommandRouter.parse(input)
         if (command == null) {
             // Same prompt the phone shows for unparseable input; see AgentCommandRouter.
@@ -175,6 +180,46 @@ class CarAgentScreen(carContext: CarContext) : Screen(carContext) {
             RecentActivityStore.Entry(RecentActivityStore.Kind.AGENT, input.trim())
         )
         runCommand(command, fromVoice)
+    }
+
+    /**
+     * The offline voice grammar ([VoiceCommandParser] + [CommandValidator]) first: it knows YouTube
+     * Music, TikTok and iQIYI by name in Thai and English, and Home/Back. What it opens goes through
+     * the same [AgentCommandRouter] browser action as everything else here. Returns false for a
+     * phrase it does not recognise, which then takes the Agent's own path below unchanged.
+     *
+     * Validated commands run at once on the car, as every Agent command always has: there is no
+     * confirmation step to show a driver. A rejected address (not HTTPS, a private host) is refused.
+     */
+    private fun runVoiceCommand(input: String, fromVoice: Boolean): Boolean {
+        val command = VoiceCommandParser.parse(input)
+        val validated = when (val validation = CommandValidator.validate(command)) {
+            is Validation.Valid -> validation.command
+            is Validation.Rejected -> {
+                if (validation.reason == Validation.Reason.UNKNOWN_COMMAND) return false
+                val message = carContext.getString(R.string.agent_toast_invalid_website)
+                CarToast.makeText(carContext, message, CarToast.LENGTH_SHORT).show()
+                if (fromVoice) feedback.speak(carContext.getString(R.string.agent_spoken_invalid_website))
+                return true
+            }
+        }
+        RecentActivityStore.record(
+            carContext,
+            RecentActivityStore.Entry(RecentActivityStore.Kind.AGENT, input.trim())
+        )
+        when (validated.command.action) {
+            VoiceAction.GO_BACK -> screenManager.pop()
+            VoiceAction.GO_HOME -> screenManager.popToRoot()
+            else -> {
+                val url = validated.url
+                runCommand(
+                    if (url == null) AgentCommandRouter.Command(AgentCommandRouter.AgentAction.OPEN_BROWSER)
+                    else AgentCommandRouter.Command(AgentCommandRouter.AgentAction.OPEN_URL, url),
+                    fromVoice
+                )
+            }
+        }
+        return true
     }
 
     private fun runCommand(command: AgentCommandRouter.Command, fromVoice: Boolean) {

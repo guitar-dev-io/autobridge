@@ -188,6 +188,20 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    packaging {
+        jniLibs {
+            // Native libraries are extracted to nativeLibraryDir at install instead of being mapped
+            // straight out of the APK. :whisper needs that: ggml picks the CPU backend this phone
+            // supports (dotprod, fp16, i8mm...) by scanning that directory for
+            // libggml-cpu-android_*.so at runtime, and an uncompressed-in-APK library is not a file
+            // there to be found. The cost is install size, not download size.
+            useLegacyPackaging = true
+            // whisper.cpp's CMake always builds its Parakeet ASR library next to libwhisper; nothing
+            // here loads it.
+            excludes += "**/libparakeet.so"
+        }
+    }
+
     buildFeatures {
         aidl = true
         buildConfig = true
@@ -259,6 +273,10 @@ android.sourceSets {
 
 dependencies {
     implementation(project(":common"))
+    // Offline voice recognition: whisper.cpp and its JNI binding (see whisper/build.gradle.kts).
+    // Every flavor gets it - it runs on the phone, talks to no server, and the models it reads are
+    // downloaded on request rather than shipped in the APK.
+    implementation(project(":whisper"))
     // Unofficial Android Auto SDK (CarActivity/CarActivityService), the same archive Fermata Auto
     // ships as fermata/lib/auto/aauto.aar. Not published by Google and carries no license file.
     // sha256 99337c3b591ac9670c12b508da38886aedba61dd494f39f5f166f02580ec584b

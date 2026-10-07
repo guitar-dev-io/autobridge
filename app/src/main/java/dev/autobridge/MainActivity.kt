@@ -2115,6 +2115,23 @@ class MainActivity : androidx.activity.ComponentActivity() {
         PhoneMaintenance(this, openUrl = ::openExternalUrl, fallbackShare = ::shareDiagnostics)
     }
 
+    /**
+     * The Home microphone with offline Whisper ([dev.autobridge.voice.PhoneVoiceSession]). Its
+     * commands land on the same entry points the screens use: the browser, Home, Back, and the
+     * Agent parser for anything outside the voice grammar.
+     */
+    private val voiceSession by lazy {
+        dev.autobridge.voice.PhoneVoiceSession(this, object : dev.autobridge.voice.PhoneVoiceSession.Actions {
+            override fun openUrl(url: String) {
+                startActivity(browserScreenIntent().setData(android.net.Uri.parse(url)))
+            }
+            override fun openBrowser() = openBrowserOnCar()
+            override fun goHome() = showPhoneScreen(PhoneScreen.HOME)
+            override fun goBack() { this@MainActivity.goBack() }
+            override fun runAgentCommand(text: String) = runPhoneVoiceCommand(text)
+        })
+    }
+
     override fun onResume() {
         super.onResume()
         statusHandler.removeCallbacks(refreshStatusRunnable)
@@ -2127,7 +2144,22 @@ class MainActivity : androidx.activity.ComponentActivity() {
         super.onPause()
     }
 
+    override fun onStop() {
+        // Going to the background mid-sentence releases the microphone.
+        voiceSession.stop()
+        super.onStop()
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        voiceSession.onPermissionResult(
+            requestCode,
+            grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED
+        )
+    }
+
     override fun onDestroy() {
+        voiceSession.destroy()
         Shizuku.removeRequestPermissionResultListener(shizukuPermissionListener)
         homeMiniPlayer?.stop()
         mediaPlayback.disconnect()
@@ -2460,10 +2492,17 @@ class MainActivity : androidx.activity.ComponentActivity() {
     }
 
     /**
-     * Header microphone: dictate a command or search (see [runPhoneVoiceCommand]). Falls back to the browser's
-     * own search entry when the device has no speech recognizer.
+     * Header microphone: dictate a command or search. With Settings > Voice Recognition on (the
+     * default) and a 64-bit phone, speech is transcribed offline by Whisper and parsed by
+     * [dev.autobridge.voice.VoiceCommandParser]; otherwise the phone's own speech service is used and
+     * the phrase goes through [runPhoneVoiceCommand], as before. Falls back to the browser's own
+     * search entry when the device has no speech recognizer.
      */
     private fun homeVoiceSearch() {
+        if (dev.autobridge.voice.VoiceSettings.enabled(this) && dev.autobridge.voice.VoiceRuntime.isSupported(this)) {
+            voiceSession.start()
+            return
+        }
         val intent = Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(
                 android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL,
@@ -2811,6 +2850,13 @@ class MainActivity : androidx.activity.ComponentActivity() {
                         getString(R.string.agent_screen_subtitle)
                     ) {
                         showPhoneScreen(PhoneScreen.AGENT_COMMANDS)
+                    },
+                    settingsEntry(
+                        getString(R.string.voice_settings_title),
+                        getString(R.string.voice_settings_caption),
+                        R.drawable.ic_car_mic
+                    ) {
+                        startActivity(dev.autobridge.voice.VoiceSettingsActivity.intent(this))
                     },
                     settingsValueEntry(
                         getString(R.string.settings_language),
