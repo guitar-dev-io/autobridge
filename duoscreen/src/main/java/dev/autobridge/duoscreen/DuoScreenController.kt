@@ -185,6 +185,11 @@ class DuoScreenController(
         if (resume(output, width, height, panelDpi)) {
             CarScreenPower.sessionStarted(context)
             DuoSessionState.sessionStarted()
+            // Anything changed on the phone while the car showed something else — most visibly the
+            // pane count (2 → 3) — could not be applied then: there was no surface to rebuild on,
+            // and resuming alone would bring back the old panes. Apply it now that there is one.
+            // Only what differs is touched, and a different pane count rebuilds the session.
+            applyStoredSettings()
             return true
         }
         stop()
