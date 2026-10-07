@@ -25,7 +25,7 @@
     <string name="duo_screen_preset_wide_right">ขวากว้าง</string>
     <string name="duo_screen_preset_even_rows">แบ่งบน-ล่าง</string>
     <string name="duo_screen_preset_stacked_60_40">บน 60 / ล่าง 40</string>
-    <string name="duo_screen_shortcut_title">ปุ่มลัด: Maps 60% / เพลง 40%</string>
+    <string name="duo_screen_shortcut_title">ปุ่มลัด: Maps บน เพลงล่าง (60/40)</string>
     <string name="duo_screen_shortcut_caption">แบ่งบน-ล่าง: Google Maps ด้านบน แอปเพลงด้านล่าง แตะเพื่อตั้งค่าให้</string>
     <string name="duo_screen_maps_missing">ไม่ได้ติดตั้ง Google Maps ในโทรศัพท์เครื่องนี้</string>
     <string name="duo_screen_pick_music">เลือกแอปเพลงสำหรับช่องด้านล่าง</string>

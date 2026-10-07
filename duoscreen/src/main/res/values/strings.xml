@@ -25,7 +25,7 @@
     <string name="duo_screen_preset_wide_right">Wide right</string>
     <string name="duo_screen_preset_even_rows">Stacked rows</string>
     <string name="duo_screen_preset_stacked_60_40">Top 60 / 40</string>
-    <string name="duo_screen_shortcut_title">Shortcut: Maps 60% / Music 40%</string>
+    <string name="duo_screen_shortcut_title">Shortcut: Maps on top, music below (60/40)</string>
     <string name="duo_screen_shortcut_caption">Stacked: Google Maps on top, a music app below. Tap to set it up.</string>
     <string name="duo_screen_maps_missing">Google Maps is not installed on this phone.</string>
     <string name="duo_screen_pick_music">Pick the music app for the bottom pane.</string>
