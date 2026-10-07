@@ -23,8 +23,9 @@
 #   scripts/dhu-run.sh --no-build            # launch only: no gradle, just
 #                                            # forward + restart + DHU
 #   scripts/dhu-run.sh personal              # personal debug variant
-#   scripts/dhu-run.sh safe default_1080p    # pick a screen config
-#   scripts/dhu-run.sh lab default_720p rotary
+#   scripts/dhu-run.sh safe 1080            # pick a screen config
+#   scripts/dhu-run.sh lab 720 rotary
+#   screen configs: small 720 720-hidpi 1080 1080-hidpi 1440 portrait
 #   scripts/dhu-run.sh --no-restart          # leave Android Auto alone
 #   scripts/dhu-run.sh --drive               # simulate a moving car (city)
 #   scripts/dhu-run.sh --drive highway       # simulate a highway drive
@@ -51,7 +52,7 @@ SERIAL="${ANDROID_SERIAL:-}"
 BUILD=1
 RESTART=1
 FLAVOR="safe"
-CONFIG="default_720p"
+CONFIG="720"
 INPUT="touch"
 DRIVE=0
 DRIVE_SCENARIO="city"
@@ -60,8 +61,8 @@ WANT_ROUTE_VALUE=0
 NAV_DEST=""
 WANT_NAV_VALUE=0
 
-# Screen configs: this repo's own first, then the DHU's stock ones. `docs/dhu/` is where they used
-# to live and is no longer tracked, so it is a fallback rather than the source.
+# Screen configs resolved in order: scripts/dhu/ (if present), then docs/dhu/ (where this repo's
+# profiles live: small 720 720-hidpi 1080 1080-hidpi 1440 portrait), then the DHU's stock configs.
 config_ini() {
   local name="$1" dir
   for dir in "$ROOT/scripts/dhu" "$ROOT/docs/dhu" "$DHU_HOME/config"; do

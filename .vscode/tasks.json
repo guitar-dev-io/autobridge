@@ -55,6 +55,88 @@
         "clear": true
       }
     },
+    // Screen-size matrix on the personal flavor (the projection/aauto.aar route).
+    // Orientation noted: Android Auto is landscape-first; portrait is a
+    // Chinese-headunit edge case, not mainstream.
+    {
+      "label": "DHU: personal — 800x480 (landscape, smallest)",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/dhu-run.sh personal small touch",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "DHU: personal — 1280x720 hi-dpi (landscape)",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/dhu-run.sh personal 720-hidpi touch",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "DHU: personal — 1920x1080 (landscape, Full HD)",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/dhu-run.sh personal 1080 touch",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "DHU: personal — 1920x1080 hi-dpi (landscape)",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/dhu-run.sh personal 1080-hidpi touch",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "DHU: personal — 2560x1440 (landscape, max)",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/dhu-run.sh personal 1440 touch",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "DHU: personal — 1080x1920 (portrait, edge case)",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/dhu-run.sh personal portrait touch",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      // 8-inch Ford placeholder, portrait. NOT a measured Ford value — see
+      // docs/FORD_NEXT_GEN.md. 720p turned on its side (720x1280).
+      "label": "DHU: personal — 720x1280 (portrait, 8-inch Ford placeholder)",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/dhu-run.sh personal 8inch-portrait touch",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
     // Build + install the debug APK onto the connected device/emulator. Used as
     // the preLaunchTask for the matching "App: <flavor> (build+run)" configs in
     // launch.json, so one F5 rebuilds the latest code before relaunching.

@@ -11,6 +11,15 @@
   "version": "0.2.0",
   "configurations": [
     {
+      // 8-inch Ford placeholder, portrait. NOT a measured Ford value — see
+      // docs/FORD_NEXT_GEN.md. 720p turned on its side (720x1280).
+      "type": "node-terminal",
+      "request": "launch",
+      "name": "DHU: personal — 720x1280 (portrait, 8-inch Ford placeholder)",
+      "command": "scripts/dhu-run.sh personal 8inch-portrait touch",
+      "cwd": "${workspaceFolder}"
+    },
+    {
       // Build + install the chosen flavor, wire adb forward tcp:5277, and open
       // the Desktop Head Unit — all through scripts/dhu-run.sh. Pick it from the
       // Run and Debug dropdown and press F5. Start the phone's "head unit server"
@@ -123,6 +132,52 @@
       "appSrcRoot": "${workspaceRoot}/app/src/main",
       "adbPort": 5037,
       "processId": "${command:PickAndroidProcess}"
-    }
+    },
+    {
+      // Screen-size matrix on the personal flavor (the projection/aauto.aar
+      // route). Each config picks a docs/dhu/*.ini profile. Orientation is noted
+      // because Android Auto is landscape-first; portrait is a Chinese-headunit
+      // edge case, not mainstream.
+      "type": "node-terminal",
+      "request": "launch",
+      "name": "DHU: personal — 800x480 (landscape, smallest)",
+      "command": "scripts/dhu-run.sh personal small touch",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "node-terminal",
+      "request": "launch",
+      "name": "DHU: personal — 1280x720 hi-dpi (landscape)",
+      "command": "scripts/dhu-run.sh personal 720-hidpi touch",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "node-terminal",
+      "request": "launch",
+      "name": "DHU: personal — 1920x1080 (landscape, Full HD)",
+      "command": "scripts/dhu-run.sh personal 1080 touch",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "node-terminal",
+      "request": "launch",
+      "name": "DHU: personal — 1920x1080 hi-dpi (landscape)",
+      "command": "scripts/dhu-run.sh personal 1080-hidpi touch",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "node-terminal",
+      "request": "launch",
+      "name": "DHU: personal — 2560x1440 (landscape, max)",
+      "command": "scripts/dhu-run.sh personal 1440 touch",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "node-terminal",
+      "request": "launch",
+      "name": "DHU: personal — 1080x1920 (portrait, edge case)",
+      "command": "scripts/dhu-run.sh personal portrait touch",
+      "cwd": "${workspaceFolder}"
+    },
   ]
 }
