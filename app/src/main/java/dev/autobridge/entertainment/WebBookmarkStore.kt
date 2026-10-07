@@ -33,6 +33,12 @@ object WebBookmarkStore {
         return decode(prefs.getStringSet(KEY_ITEMS, emptySet()).orEmpty())
     }
 
+    /** Whether [rawUrl] is already saved, compared the way [add] stores it. */
+    fun contains(context: Context, rawUrl: String): Boolean {
+        val url = ContentAddress.https(rawUrl) ?: return false
+        return runCatching { list(context).any { it.url == url } }.getOrDefault(false)
+    }
+
     fun add(context: Context, title: String, rawUrl: String): Boolean {
         val url = ContentAddress.https(rawUrl) ?: return false
         val safeTitle = title.trim().ifEmpty { url }

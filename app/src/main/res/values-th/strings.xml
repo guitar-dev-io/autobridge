@@ -1816,4 +1816,21 @@
     <string name="voice_home_open_settings">เปิดการตั้งค่า</string>
     <string name="voice_home_unsafe">เปิดที่อยู่นี้ด้วยเสียงไม่ได้</string>
     <string name="voice_mic_disclosure_body">ไมโครโฟนจะฟังหลังจากที่คุณแตะเท่านั้น และหยุดเมื่อคุณหยุดพูด คำพูดจะถูกแปลงเป็นข้อความบนโทรศัพท์นี้ด้วยโมเดล Whisper ที่คุณดาวน์โหลดไว้ แล้วทำงานตามคำสั่ง ไม่มีการเก็บไฟล์เสียงและไม่ส่งข้อมูลไปที่ใด\n\nต่อจากนี้ Android จะขอสิทธิ์ใช้ไมโครโฟน</string>
+    <string name="drawer_forward_short">ถัดไป</string>
+    <string name="drawer_bookmark_save">บันทึก</string>
+    <string name="drawer_bookmark_saved">บันทึกแล้ว</string>
+    <string name="drawer_desktop_site">เวอร์ชันเดสก์ท็อป</string>
+    <string name="drawer_zoom">ซูม</string>
+    <string name="drawer_section_page">หน้านี้</string>
+    <string name="drawer_section_split">แบ่งจอ</string>
+    <string name="drawer_section_goto">ไปที่</string>
+    <string name="drawer_section_app">AutoBridge</string>
+    <string name="drawer_split_hint">แตะชื่อเพื่อเลือกรูปแบบ</string>
+    <string name="drawer_side_show_page_long">เปิดหน้านี้ในจอข้าง</string>
+    <string name="drawer_more_hint">ค้นหา · คัดลอก · แอปอื่น · Maps</string>
+    <string name="drawer_find_long">ค้นหาในหน้า</string>
+    <string name="drawer_paste_and_go_long">วางลิงก์แล้วไป</string>
+    <string name="drawer_external_long">เปิดในแอปอื่น</string>
+    <string name="drawer_navigate_maps_long">นำทางใน Maps</string>
+    <string name="drawer_navigate_maps_hint">ส่งที่อยู่บนหน้านี้ไป Maps</string>
 </resources>

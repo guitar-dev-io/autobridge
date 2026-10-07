@@ -1022,6 +1022,7 @@ class BrowserActivity : Activity() {
         // what a single-page window cannot do; see [CAR_DISPLAY_UNSUPPORTED].
         surface = if (onCarDisplay) MenuSurface.CAR else MenuSurface.PHONE,
         unsupported = if (onCarDisplay) CAR_DISPLAY_UNSUPPORTED else emptySet(),
+        bookmarked = !showingStartPage && WebBookmarkStore.contains(this, web.url.orEmpty()),
     )
 
     /** How long after a tap the focused field and the system keyboard are checked. */
@@ -1078,12 +1079,20 @@ class BrowserActivity : Activity() {
             onAccent = BrowserTheme.onPrimary,
         )
         // A ✕ and drag-down to close: the grid can fill a car display, leaving no outside to tap.
-        val header = CarMenuList.header(this, getString(R.string.car_browser_title), style) { shell.dismiss() }
+        // The page's own name and host, so the menu says which page it acts on.
+        val pageState = menuState()
+        val host = runCatching { android.net.Uri.parse(pageState.url).host }.getOrNull()?.removePrefix("www.")
+        val header = CarMenuList.header(
+            this,
+            pageState.pageTitle.ifBlank { getString(R.string.car_browser_title) },
+            style,
+            host.takeIf { pageState.pageTitle.isNotBlank() },
+        ) { shell.dismiss() }
         column.addView(header)
         CarMenuList.dragToClose(header, column) { shell.dismiss() }
         CarMenuList.build(
             context = this,
-            state = menuState(),
+            state = pageState,
             style = style,
         ) { action ->
             shell.dismiss()
