@@ -12,4 +12,6 @@ scripts/m3u/
 docs/
 
 .agents
-whisper
+# CMake's intermediate tree for the :whisper native build. The module itself (sources,
+# CMake script, the whisper.cpp submodule) must stay tracked: the app builds against it.
+whisper/.cxx/
