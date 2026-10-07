@@ -51,6 +51,8 @@ class DuoScreenController(
         const val SCROLL_STEPS = 4
 
         const val INPUT_THREAD_NAME = "AutoBridgeDuoInput"
+
+        const val GESTURE_LOG_INTERVAL_MS = 1_000L
     }
 
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -447,15 +449,33 @@ class DuoScreenController(
     }
 
     fun onScroll(dx: Int, dy: Int) {
+        logGesture("scroll", "$dx,$dy")
         router?.onScroll(dx, dy)
     }
 
     fun onFling(velocityX: Int, velocityY: Int) {
+        logGesture("fling", "$velocityX,$velocityY")
         router?.onFling(velocityX, velocityY)
     }
 
     fun onScale(focusX: Int, focusY: Int, scaleFactor: Float) {
+        logGesture("scale", "focus $focusX,$focusY x$scaleFactor")
         router?.onScale(focusX, focusY, scaleFactor)
+    }
+
+    private var lastGestureLogMs = 0L
+
+    /**
+     * Writes the first drag, fling or pinch the car host sends in each second. A head unit that
+     * never delivers one of them is the difference between a layout that can be dragged on the
+     * desktop head unit and one that cannot in the car, and without this line the log could not
+     * say which it is. Throttled because a drag is dozens of events.
+     */
+    private fun logGesture(kind: String, detail: String) {
+        val now = SystemClock.uptimeMillis()
+        if (now - lastGestureLogMs < GESTURE_LOG_INTERVAL_MS) return
+        lastGestureLogMs = now
+        StructuredLog.i(TAG, "Car $kind $detail (${mode})")
     }
 
     /**
