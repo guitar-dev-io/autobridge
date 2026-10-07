@@ -70,6 +70,9 @@ object CarMenuList {
             val fresh = row.filter { emitted.add(it.action) }
             if (fresh.isNotEmpty()) rows += fresh
         }
+        // Lives in Split options as "side page on the right"; a second control for it here was
+        // one more button in an already crowded line.
+        emitted += DrawerAction.SWAP_SPLIT_SIDES
         emit(listOfNotNull(primary, byAction[DrawerAction.NEW_TAB]))
         LAYOUT.forEach { group -> emit(group.mapNotNull { byAction[it] }) }
         items.filterNot { it.action in emitted }.chunked(3).forEach(::emit)
@@ -80,10 +83,8 @@ object CarMenuList {
     private val LAYOUT = listOf(
         listOf(DrawerAction.NAV_BACK, DrawerAction.RELOAD, DrawerAction.NAV_FORWARD),
         listOf(DrawerAction.BOOKMARKS, DrawerAction.BOOKMARK_PAGE, DrawerAction.HISTORY, DrawerAction.DOWNLOADS),
-        listOf(
-            DrawerAction.SPLIT_LAYOUT, DrawerAction.SPLIT_CHOOSE,
-            DrawerAction.SIDE_SHOW_PAGE, DrawerAction.SWAP_SPLIT_SIDES,
-        ),
+        // Swap sides is a switch inside Split options, not a button of its own here.
+        listOf(DrawerAction.SPLIT_LAYOUT, DrawerAction.SPLIT_CHOOSE, DrawerAction.SIDE_SHOW_PAGE),
         listOf(DrawerAction.TOGGLE_DESKTOP, DrawerAction.TOGGLE_FULLSCREEN, DrawerAction.PIN_TOOLBAR),
         listOf(DrawerAction.FIND_IN_PAGE, DrawerAction.ZOOM_OUT, DrawerAction.ZOOM_IN),
         listOf(DrawerAction.COPY_URL, DrawerAction.PASTE_AND_GO, DrawerAction.OPEN_EXTERNAL),
@@ -198,6 +199,172 @@ object CarMenuList {
         importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
     }
 
+    /** Entries that are on/off settings: drawn with a switch rather than as a plain button. */
+    private val SWITCHES = setOf(
+        DrawerAction.TOGGLE_DESKTOP, DrawerAction.TOGGLE_FULLSCREEN,
+        DrawerAction.PIN_TOOLBAR, DrawerAction.SPLIT_LAYOUT,
+    )
+
+    /**
+     * A switch, drawn: a rounded track with a round knob at the "on" end in the accent, or at the
+     * other end in grey. Display only; the row or tile around it takes the tap, so the whole
+     * line is the target rather than a 44dp control.
+     */
+    fun switchView(context: Context, on: Boolean, style: Style): View {
+        val width = context.dp(44)
+        val height = context.dp(26)
+        val knob = context.dp(20)
+        return android.widget.FrameLayout(context).apply {
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = height / 2f
+                setColor(if (on) style.accent else style.textSecondary)
+                alpha = if (on) 255 else 110
+            }
+            addView(View(context).apply {
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(if (on) style.onAccent else style.text)
+                }
+            }, android.widget.FrameLayout.LayoutParams(knob, knob).apply {
+                gravity = Gravity.CENTER_VERTICAL or (if (on) Gravity.END else Gravity.START)
+                marginStart = context.dp(3)
+                marginEnd = context.dp(3)
+            })
+            layoutParams = ViewGroup.LayoutParams(width, height)
+            minimumWidth = width
+            minimumHeight = height
+        }
+    }
+
+    /**
+     * A settings line: [label] on the left, a [switchView] on the right, the whole line toggling.
+     * The state is the switch; no "On"/"Off" text.
+     */
+    fun switchRow(context: Context, label: String, on: Boolean, style: Style, onToggle: () -> Unit): View =
+        LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = background(context, style.rowFill, style.textSecondary)
+            minimumHeight = context.dp(60)
+            setPadding(context.dp(16), context.dp(6), context.dp(14), context.dp(6))
+            contentDescription = "$label, ${context.getString(if (on) R.string.browser_menu_on else R.string.browser_menu_off)}"
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { onToggle() }
+            addView(TextView(context).apply {
+                text = label
+                setTextColor(style.text)
+                textSize = 17f
+                maxLines = 2
+                ellipsize = TextUtils.TruncateAt.END
+            }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            addView(switchView(context, on, style), LinearLayout.LayoutParams(context.dp(44), context.dp(26)).apply {
+                marginStart = context.dp(12)
+            })
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = context.dp(6) }
+        }
+
+    /**
+     * The split layouts as picture cards, two to a line: each draws its two panes at their real
+     * proportions (the side page in the accent, on the side it will be on), with its name under
+     * it. [current] is outlined. Tapping a card calls [onPick].
+     */
+    fun splitLayoutCards(
+        context: Context,
+        current: BrowserSplitLayout?,
+        sideOnRight: Boolean,
+        style: Style,
+        onPick: (BrowserSplitLayout) -> Unit,
+    ): List<View> = BrowserSplitLayout.entries
+        .filter { it != BrowserSplitLayout.SINGLE }
+        .chunked(2)
+        .map { pair ->
+            LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                pair.forEachIndexed { index, layout ->
+                    addView(splitCard(context, layout, layout == current, sideOnRight, style, onPick),
+                        LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                            if (index > 0) marginStart = context.dp(8)
+                        })
+                }
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+                ).apply { topMargin = context.dp(8) }
+            }
+        }
+
+    /** The side page's share of the width in each layout's picture. */
+    private fun sideShare(layout: BrowserSplitLayout): Float = when (layout) {
+        BrowserSplitLayout.SINGLE -> 0f
+        BrowserSplitLayout.HALF -> 0.5f
+        BrowserSplitLayout.FORTY_SIXTY -> 0.4f
+        BrowserSplitLayout.SIXTY_FIVE_THIRTY_FIVE -> 0.35f
+        BrowserSplitLayout.PORTRAIT_LANDSCAPE -> 0.3f
+    }
+
+    private fun splitCard(
+        context: Context,
+        layout: BrowserSplitLayout,
+        selected: Boolean,
+        sideOnRight: Boolean,
+        style: Style,
+        onPick: (BrowserSplitLayout) -> Unit,
+    ): View = LinearLayout(context).apply {
+        orientation = LinearLayout.VERTICAL
+        gravity = Gravity.CENTER_HORIZONTAL
+        setPadding(context.dp(10), context.dp(10), context.dp(10), context.dp(8))
+        background = RippleDrawable(
+            ColorStateList.valueOf(style.textSecondary),
+            GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = context.dp(14).toFloat()
+                setColor(style.rowFill)
+                if (selected) setStroke(context.dp(3), style.accent)
+            },
+            null
+        )
+        val label = layout.label(context)
+        contentDescription = label
+        isClickable = true
+        isFocusable = true
+        setOnClickListener { onPick(layout) }
+        val side = sideShare(layout)
+        fun pane(fill: Int) = View(context).apply {
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = context.dp(4).toFloat()
+                setColor(fill)
+            }
+        }
+        addView(LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            val sidePane = pane(if (selected) style.accent else style.textSecondary)
+            val mainPane = pane(style.text).apply { alpha = 0.35f }
+            val sideParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, side)
+            val mainParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f - side)
+            if (sideOnRight) {
+                addView(mainPane, mainParams)
+                addView(sidePane, sideParams.apply { marginStart = context.dp(3) })
+            } else {
+                addView(sidePane, sideParams)
+                addView(mainPane, mainParams.apply { marginStart = context.dp(3) })
+            }
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, context.dp(44)))
+        addView(TextView(context).apply {
+            text = label
+            setTextColor(if (selected) style.text else style.textSecondary)
+            textSize = 14f
+            gravity = Gravity.CENTER
+            maxLines = 2
+            if (selected) typeface = Typeface.create(typeface, Typeface.BOLD)
+            setPadding(0, context.dp(6), 0, 0)
+        })
+    }
+
     /**
      * Up to four equal buttons on one line: an icon over a label of at most two lines. The
      * primary entry and any switch that is on are accent-filled, so the grid says which page
@@ -212,7 +379,8 @@ object CarMenuList {
     ): View = LinearLayout(context).apply {
         orientation = LinearLayout.HORIZONTAL
         items.forEachIndexed { index, item ->
-            val filled = item.enabled && (item.on || item.action == primary)
+            val isSwitch = item.action in SWITCHES
+            val filled = item.enabled && !isSwitch && (item.on || item.action == primary)
             val fg = if (filled) style.onAccent else style.text
             val label = item.label(context)
             val state = detail(context, item)
@@ -238,6 +406,11 @@ object CarMenuList {
                     ellipsize = TextUtils.TruncateAt.END
                     if (item.action == primary) typeface = Typeface.create(typeface, Typeface.BOLD)
                 })
+                if (isSwitch) {
+                    addView(switchView(context, item.on, style), LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
+                    ).apply { topMargin = context.dp(4) })
+                }
             }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f).apply {
                 if (index > 0) marginStart = context.dp(6)
             })

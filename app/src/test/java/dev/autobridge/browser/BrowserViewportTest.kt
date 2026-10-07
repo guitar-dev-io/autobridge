@@ -1072,8 +1072,10 @@ class CarMenuParityTest {
         )
         val items = BrowserDrawerModel.carMenu(bridgeWeb)
         val rows = CarMenuList.rows(items)
-        assertEquals(items.map { it.action }.toSet(), rows.flatten().map { it.action }.toSet())
-        assertEquals(items.size, rows.flatten().size)
+        // Swap sides is the "side page on the right" switch in Split options, not a grid button.
+        val gridItems = items.filter { it.action != DrawerAction.SWAP_SPLIT_SIDES }
+        assertEquals(gridItems.map { it.action }.toSet(), rows.flatten().map { it.action }.toSet())
+        assertEquals(gridItems.size, rows.flatten().size)
         assertTrue(rows.all { it.size in 1..4 })
         assertTrue("${rows.size} lines", rows.size <= 10)
         assertEquals(listOf(DrawerAction.TABS, DrawerAction.NEW_TAB), rows.first().map { it.action })
@@ -1081,7 +1083,7 @@ class CarMenuParityTest {
         assertEquals(line(DrawerAction.TOGGLE_DESKTOP), line(DrawerAction.TOGGLE_FULLSCREEN))
         assertEquals(line(DrawerAction.ZOOM_IN), line(DrawerAction.ZOOM_OUT))
         assertEquals(line(DrawerAction.BOOKMARKS), line(DrawerAction.HISTORY))
-        assertEquals(line(DrawerAction.SPLIT_LAYOUT), line(DrawerAction.SWAP_SPLIT_SIDES))
+        assertEquals(line(DrawerAction.SPLIT_LAYOUT), line(DrawerAction.SPLIT_CHOOSE))
     }
 
     @Test fun theDuoPaneGridLeadsWithTheStartPage() {

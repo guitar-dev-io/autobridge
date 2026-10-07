@@ -1385,22 +1385,21 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
      * template browser's settings screen writes, so a change on either is a change on both.
      */
     private fun openSettings() {
-        fun onOff(on: Boolean) = getString(if (on) R.string.browser_menu_on else R.string.browser_menu_off)
         val activity = this
+        val style = menuStyle()
+        fun switch(label: Int, on: Boolean, toggle: () -> Unit) =
+            CarMenuList.switchRow(activity, getString(label), on, style) { toggle(); openSettings() }
         showOverlay(getString(R.string.car_browser_settings_title)) {
-            val pinned = BrowserControlsStore.alwaysShowUrlBar(activity)
-            addView(menuRow("⇧", getString(R.string.car_browser_always_url_bar), onOff(pinned)) {
+            addView(switch(R.string.car_browser_always_url_bar, BrowserControlsStore.alwaysShowUrlBar(activity)) {
                 togglePinnedToolbar()
-                openSettings()
             })
             val alwaysFab = BrowserControlsStore.alwaysShowFloatingButton(activity)
-            addView(menuRow("●", getString(R.string.car_browser_always_fab), onOff(alwaysFab)) {
+            addView(switch(R.string.car_browser_always_fab, alwaysFab) {
                 BrowserControlsStore.setAlwaysShowFloatingButton(activity, !alwaysFab)
                 applyChromeVisible(chromeBar?.visibility == View.VISIBLE)
-                openSettings()
             })
             val fabLeft = BrowserControlsStore.floatingButtonOnLeft(activity)
-            addView(menuRow("◧", getString(R.string.car_browser_fab_left), onOff(fabLeft)) {
+            addView(switch(R.string.car_browser_fab_left, fabLeft) {
                 BrowserControlsStore.setFloatingButtonOnLeft(activity, !fabLeft)
                 fab?.let { button ->
                     (button.layoutParams as? FrameLayout.LayoutParams)?.let { params ->
@@ -1408,39 +1407,27 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
                         button.layoutParams = params
                     }
                 }
-                openSettings()
-            })
-            val split = BrowserSplitStore.projection.layout(activity)
-            addView(menuRow(split.glyph, getString(R.string.car_browser_split), splitDetail(split)) {
-                openSplitChooser()
-            })
-            val sideRight = BrowserSplitStore.projection.sideOnRight(activity)
-            addView(menuRow("◨", getString(R.string.car_browser_side_right), onOff(sideRight)) {
-                BrowserSplitStore.projection.setSideOnRight(activity, !sideRight)
-                layoutPanes()
-                openSettings()
-            })
-            val keepMusic = AudioPlaybackStore.keepPlayingThroughFocusLoss(activity)
-            addView(menuRow("♪", getString(R.string.car_browser_reverse_music), onOff(keepMusic)) {
-                AudioPlaybackStore.setKeepPlayingThroughFocusLoss(activity, !keepMusic)
-                openSettings()
-            })
-            val blockAds = BrowserAdBlock.enabled(activity)
-            addView(menuRow("⛔", getString(R.string.car_browser_block_ads), onOff(blockAds)) {
-                BrowserAdBlock.setEnabled(activity, !blockAds)
-                webView?.reload()
-                openSettings()
             })
             val desktop = BrowserUserAgentStore.isDesktopIdentity(activity)
-            addView(menuRow(
-                "⛶", getString(R.string.car_browser_identity),
-                getString(if (desktop) R.string.car_ua_desktop else R.string.car_ua_mobile)
-            ) {
+            addView(switch(R.string.drawer_request_desktop, desktop) {
                 BrowserUserAgentStore.select(
                     activity, if (desktop) BrowserUserAgentMode.MOBILE else BrowserUserAgentMode.DESKTOP
                 )
                 webView?.reload()
-                openSettings()
+            })
+            val keepMusic = AudioPlaybackStore.keepPlayingThroughFocusLoss(activity)
+            addView(switch(R.string.car_browser_reverse_music, keepMusic) {
+                AudioPlaybackStore.setKeepPlayingThroughFocusLoss(activity, !keepMusic)
+            })
+            val blockAds = BrowserAdBlock.enabled(activity)
+            addView(switch(R.string.car_browser_block_ads, blockAds) {
+                BrowserAdBlock.setEnabled(activity, !blockAds)
+                webView?.reload()
+            })
+            // The split screen has its own sheet; a way there rather than a copy of it.
+            val split = BrowserSplitStore.projection.layout(activity)
+            addView(menuRow(split.glyph, getString(R.string.drawer_split_choose), splitDetail(split)) {
+                openSplitChooser()
             })
         }
     }
@@ -1700,30 +1687,52 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         StructuredLog.i("PROJECTION", "split -> $next (side ${if (sideView != null) "shown" else "none"})")
     }
 
-    /** Picks a layout in one step, rather than stepping through them; and which side the page is on. */
+    /**
+     * Everything about the split screen on one sheet: a switch for the split itself, the layouts
+     * as pictures to tap, which side the side page is on, and putting this page there. It stays
+     * open while switches and layouts change, so the driver sees each choice take hold.
+     */
     private fun openSplitChooser() {
-        val current = BrowserSplitStore.projection.layout(this)
-        showOverlay(getString(R.string.drawer_split_choose)) {
-            BrowserSplitLayout.entries.forEach { layout ->
-                val label = layout.label(this@ProjectionBrowserActivity)
-                addView(menuRow(if (layout == current) "●" else "○", label) {
-                    dismissOverlay()
-                    BrowserSplitStore.projection.setLayout(this@ProjectionBrowserActivity, layout)
-                    layoutPanes()
-                    if (layout != BrowserSplitLayout.SINGLE && sideView == null) {
-                        notice(getString(R.string.car_split_too_narrow, label))
-                    }
-                    StructuredLog.i("PROJECTION", "split chosen -> $layout")
-                })
-            }
-            val sideRight = BrowserSplitStore.projection.sideOnRight(this@ProjectionBrowserActivity)
-            addView(menuRow(
-                "⇆", getString(R.string.car_browser_side_right),
-                getString(if (sideRight) R.string.browser_menu_on else R.string.browser_menu_off)
-            ) {
-                BrowserSplitStore.projection.setSideOnRight(this@ProjectionBrowserActivity, !sideRight)
+        val activity = this
+        val style = menuStyle()
+        val layout = BrowserSplitStore.projection.layout(activity)
+        val on = layout != BrowserSplitLayout.SINGLE
+        showOverlay(getString(R.string.car_browser_split)) {
+            addView(CarMenuList.switchRow(activity, getString(R.string.car_browser_split), on, style) {
+                BrowserSplitStore.projection.toggle(activity)
                 layoutPanes()
                 openSplitChooser()
+            })
+            // On, but too narrow for two panes: say so where the choice is made.
+            if (on && sideView == null) {
+                addView(TextView(activity).apply {
+                    text = getString(R.string.car_split_too_narrow, layout.label(activity))
+                    setTextColor(scheme.textSecondary)
+                    textSize = 14f
+                    setPadding(8.dp(), 8.dp(), 8.dp(), 0)
+                })
+            }
+            addView(TextView(activity).apply {
+                text = getString(R.string.split_layouts_heading)
+                setTextColor(scheme.textSecondary)
+                textSize = 14f
+                setPadding(8.dp(), 14.dp(), 8.dp(), 0)
+            })
+            val sideRight = BrowserSplitStore.projection.sideOnRight(activity)
+            CarMenuList.splitLayoutCards(activity, layout.takeIf { on }, sideRight, style) { picked ->
+                BrowserSplitStore.projection.setLayout(activity, picked)
+                layoutPanes()
+                StructuredLog.i("PROJECTION", "split chosen -> $picked")
+                openSplitChooser()
+            }.forEach { addView(it) }
+            addView(CarMenuList.switchRow(activity, getString(R.string.car_browser_side_right), sideRight, style) {
+                BrowserSplitStore.projection.setSideOnRight(activity, !sideRight)
+                layoutPanes()
+                openSplitChooser()
+            })
+            addView(menuRow("◨", getString(R.string.drawer_side_show_page)) {
+                dismissOverlay()
+                showPageOnSide()
             })
         }
     }
