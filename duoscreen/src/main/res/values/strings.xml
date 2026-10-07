@@ -5,6 +5,8 @@
     <string name="duo_screen_reload">Reload</string>
     <string name="duo_screen_exit">Exit</string>
     <string name="duo_screen_needs_shizuku">Grant Shizuku access on the phone first</string>
+    <string name="duo_screen_banner_title">Allow Shizuku on the phone</string>
+    <string name="duo_screen_banner_text">Open Shizuku on the phone, make sure it is running, and allow AutoBridge. Until then the panes cannot take touch and go black when the phone sleeps.</string>
     <string name="duo_screen_title">Duo screen</string>
     <string name="duo_screen_subtitle">Run two or three apps side by side on the car display</string>
     <string name="duo_screen_connection_section">Connection</string>

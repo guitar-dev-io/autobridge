@@ -561,6 +561,7 @@
     <string name="aa_hidden_title">Bridge Web is hidden on Android Auto</string>
     <string name="aa_hidden_message">Installing this update reset the install source, so Android Auto will not show Bridge Web until it is set again. It takes one tap with Shizuku.</string>
     <string name="aa_hidden_fix">Fix now</string>
+    <string name="whats_new_0_4_45">• Duo Screen: when Shizuku is not allowed, the car screen now keeps a message on it saying to allow Shizuku on the phone, instead of a toast that disappears.</string>
     <string name="whats_new_0_4_44">• Duo Screen: Send log now says whether each pane got a trusted display (it survives the phone\'s power button) or an untrusted one, and why a trusted one could not be made.</string>
     <string name="whats_new_0_4_43">• Send log now records how hot the phone and its battery get during a car session (every minute, plus a summary when it ends), so a long drive that overheats the phone can be seen.</string>
     <string name="whats_new_0_4_42">• Car browser: the menu\'s \"Navigate in Google Maps\" now also appears when a Maps page is open full screen, not only in the split.</string>
