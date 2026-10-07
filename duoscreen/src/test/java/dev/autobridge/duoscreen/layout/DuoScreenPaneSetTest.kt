@@ -101,6 +101,11 @@ class DuoScreenPaneSetTest {
         assertEquals(600, set.dividerAt(590, 300)?.position)
     }
 
+    @Test fun dividerAtGrabsASeamFromAFingertipAwayFromIt() {
+        val set = DuoScreenPaneSet.evenColumns(bounds, listOf("a", "b", "c"))
+        assertEquals(300, set.dividerAt(300 + 60, 300)?.position)
+    }
+
     @Test fun dividerAtIsNullInTheMiddleOfAPane() {
         val set = DuoScreenPaneSet.evenColumns(bounds, listOf("a", "b"))
         assertNull(set.dividerAt(225, 300))
