@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -29,6 +30,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -44,6 +46,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -205,17 +208,20 @@ fun ControlScreen(
             item { OnTheCarCard(bridgeState, onOpenConnection) }
 
             item {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SegmentChip(
-                        stringResource(R.string.control_mode_open_search),
-                        selected = mode == ControlInputMode.OPEN_SEARCH,
-                        modifier = Modifier.weight(1f)
-                    ) { mode = ControlInputMode.OPEN_SEARCH }
-                    SegmentChip(
-                        stringResource(R.string.control_mode_type),
-                        selected = mode == ControlInputMode.TYPE,
-                        modifier = Modifier.weight(1f)
-                    ) { mode = ControlInputMode.TYPE }
+                // One capsule with two halves, so the pair reads as a single either/or switch.
+                Surface(color = CardColor, shape = RoundedCornerShape(22.dp), modifier = Modifier.fillMaxWidth()) {
+                    Row(Modifier.padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        SegmentChip(
+                            stringResource(R.string.control_mode_open_search),
+                            selected = mode == ControlInputMode.OPEN_SEARCH,
+                            modifier = Modifier.weight(1f)
+                        ) { mode = ControlInputMode.OPEN_SEARCH }
+                        SegmentChip(
+                            stringResource(R.string.control_mode_type),
+                            selected = mode == ControlInputMode.TYPE,
+                            modifier = Modifier.weight(1f)
+                        ) { mode = ControlInputMode.TYPE }
+                    }
                 }
             }
 
@@ -277,11 +283,11 @@ fun ControlScreen(
             }
 
             item {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                     ControlTab.entries.forEach { entry ->
-                        val label = stringResource(entry.labelRes)
                         UnderlineTab(
-                            label = if (entry == ControlTab.QUEUE && queue.isNotEmpty()) "$label · ${queue.size}" else label,
+                            label = stringResource(entry.labelRes),
+                            count = if (entry == ControlTab.QUEUE) queue.size else 0,
                             selected = tab == entry
                         ) { tab = entry }
                     }
@@ -294,18 +300,34 @@ fun ControlScreen(
                         item { EmptyRow(stringResource(R.string.bridge_controller_queue_empty)) }
                     } else {
                         item {
+                            // Play next is the action; Clear is a quiet secondary one, not a warning.
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                TextButton(onClick = {
-                                    AutoBridgeSessionManager.next(context)
-                                    revision++
-                                }) {
-                                    Text(stringResource(R.string.bridge_controller_play_next), color = Accent)
+                                Surface(
+                                    onClick = {
+                                        AutoBridgeSessionManager.next(context)
+                                        revision++
+                                    },
+                                    color = CardAltColor,
+                                    shape = RoundedCornerShape(22.dp),
+                                    modifier = Modifier.weight(1f).height(44.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(
+                                            "⏭  " + stringResource(R.string.bridge_controller_play_next),
+                                            color = TextPrimary,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
                                 }
-                                TextButton(onClick = {
-                                    AutoBridgeSessionManager.queueClear(context)
-                                    revision++
-                                }) {
-                                    Text(stringResource(R.string.bridge_controller_clear_queue), color = ComposeTokens.Danger)
+                                TextButton(
+                                    onClick = {
+                                        AutoBridgeSessionManager.queueClear(context)
+                                        revision++
+                                    },
+                                    modifier = Modifier.height(44.dp)
+                                ) {
+                                    Text(stringResource(R.string.bridge_controller_clear_queue), color = TextMuted, fontSize = 14.sp)
                                 }
                             }
                         }
@@ -526,6 +548,7 @@ fun AndroidAutoStatusCard(
     caption: String? = null,
     onClick: (() -> Unit)?,
     showPill: Boolean = false,
+    homeStyle: Boolean = false,
     actions: (@Composable () -> Unit)? = null
 ) {
     val runtime by RuntimeContextStore.context.collectAsState()
@@ -540,25 +563,42 @@ fun AndroidAutoStatusCard(
     val status = ConnectionStatusText.of(runtime, labels)
     val body: @Composable () -> Unit = {
         Column {
-            Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.padding(if (homeStyle) 18.dp else 14.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(
-                    Modifier.size(46.dp)
-                        .background(ComposeTokens.Ok.copy(alpha = 0.16f), RoundedCornerShape(12.dp))
-                        .border(1.dp, ComposeTokens.Ok.copy(alpha = 0.3f), RoundedCornerShape(12.dp)),
+                    if (homeStyle) {
+                        Modifier.size(44.dp).background(HomeCardIconChip, RoundedCornerShape(14.dp))
+                    } else {
+                        Modifier.size(46.dp)
+                            .background(ComposeTokens.Ok.copy(alpha = 0.16f), RoundedCornerShape(12.dp))
+                            .border(1.dp, ComposeTokens.Ok.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                    },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         painterResource(R.drawable.ic_tile_car),
                         contentDescription = null,
-                        tint = if (status.connected) AccentGreen else TextMuted,
+                        tint = when {
+                            homeStyle -> Accent
+                            status.connected -> AccentGreen
+                            else -> TextMuted
+                        },
                         modifier = Modifier.size(24.dp)
                     )
                 }
                 Column(Modifier.padding(start = 12.dp).weight(1f)) {
-                    Text(title, color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                    Text(
+                        title,
+                        color = TextPrimary,
+                        fontSize = if (homeStyle) 17.sp else 16.sp,
+                        fontWeight = if (homeStyle) FontWeight.Bold else FontWeight.Medium
+                    )
                     Text(
                         status.summary,
-                        color = if (status.connected) AccentGreen else TextMuted,
+                        color = when {
+                            homeStyle -> HomeCardCaption
+                            status.connected -> AccentGreen
+                            else -> TextMuted
+                        },
                         fontSize = 13.sp,
                         modifier = Modifier.semantics { contentDescription = "$title: ${status.summary}" }
                     )
@@ -571,17 +611,24 @@ fun AndroidAutoStatusCard(
                 }
             }
             if (actions != null) {
-                Box(Modifier.padding(start = 14.dp, end = 14.dp, bottom = 14.dp)) { actions() }
+                val edge = if (homeStyle) 18.dp else 14.dp
+                Box(Modifier.padding(start = edge, end = edge, bottom = edge)) { actions() }
             }
         }
     }
-    val shape = RoundedCornerShape(16.dp)
+    val shape = RoundedCornerShape(if (homeStyle) 24.dp else 16.dp)
+    val color = if (homeStyle) HomeCardColor else CardColor
     if (onClick != null) {
-        Surface(onClick = onClick, color = CardColor, shape = shape, modifier = Modifier.fillMaxWidth()) { body() }
+        Surface(onClick = onClick, color = color, shape = shape, modifier = Modifier.fillMaxWidth()) { body() }
     } else {
-        Surface(color = CardColor, shape = shape, modifier = Modifier.fillMaxWidth()) { body() }
+        Surface(color = color, shape = shape, modifier = Modifier.fillMaxWidth()) { body() }
     }
 }
+
+/** Home's reading of [AndroidAutoStatusCard]: a blue-tinted card, the one hero block on Home. */
+private val HomeCardColor = Color(0xFF16243A)
+private val HomeCardIconChip = Color(0xFF1E3A66)
+private val HomeCardCaption = Color(0xFFA9C3E3)
 
 /** A small accent dot plus one word — [AndroidAutoStatusCard]'s Home-only connection pill. */
 @Composable
@@ -609,7 +656,7 @@ private fun StatusPill(label: String, connected: Boolean) {
  * so Home's "Send to Car" field behaves the same way it always has.
  */
 @Composable
-fun CommandField(placeholder: String, onSubmitted: (String) -> Unit = {}) {
+fun CommandField(placeholder: String, filled: Boolean = false, onSubmitted: (String) -> Unit = {}) {
     var text by remember { mutableStateOf("") }
     fun send() {
         val sent = text
@@ -626,13 +673,26 @@ fun CommandField(placeholder: String, onSubmitted: (String) -> Unit = {}) {
             singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
             keyboardActions = KeyboardActions(onSend = { send() }),
+            // Home's field sits on the page as a filled, rounded box (the design's Send to Car
+            // row); Control keeps the plain outlined field.
+            shape = if (filled) RoundedCornerShape(16.dp) else OutlinedTextFieldDefaults.shape,
+            colors = if (filled) {
+                OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = CardColor,
+                    unfocusedContainerColor = CardColor,
+                    unfocusedBorderColor = ComposeTokens.Hairline,
+                    focusedBorderColor = Accent
+                )
+            } else {
+                OutlinedTextFieldDefaults.colors()
+            },
             modifier = Modifier.weight(1f)
         )
         Spacer(Modifier.width(8.dp))
         Surface(
             onClick = { send() },
-            color = Accent,
-            shape = RoundedCornerShape(12.dp),
+            color = if (filled) TextPrimary else Accent,
+            shape = RoundedCornerShape(if (filled) 16.dp else 12.dp),
             modifier = Modifier.size(52.dp).semantics { contentDescription = "Send" }
         ) {
             Box(contentAlignment = Alignment.Center) { Text("➤", fontSize = 20.sp, color = ComposeTokens.Ink) }
@@ -758,55 +818,64 @@ private fun RoundGlyph(glyph: String, description: String, size: Int, onClick: (
 @Composable
 private fun OnTheCarCard(state: AutoBridgeSessionManager.SessionState, onOpenConnection: () -> Unit) {
     val context = LocalContext.current
+    val sourceTint = state.source?.let { linkTint(it.url) } ?: TextMuted
     Surface(
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(24.dp),
         color = CardColor,
-        modifier = Modifier.fillMaxWidth().border(1.dp, ComposeTokens.Hairline, RoundedCornerShape(16.dp))
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            if (!state.connected) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        stringResource(R.string.bridge_controller_disconnected),
-                        color = ComposeTokens.Warn,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.weight(1f)
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            // Status line: a dot and one phrase, plus where the media comes from.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.size(8.dp).background(
+                        if (state.connected) AccentGreen else ComposeTokens.Warn,
+                        CircleShape
                     )
+                )
+                Text(
+                    if (state.connected) stringResource(R.string.control_on_the_car) + " · " + engineLabel(context, state.engine)
+                    else stringResource(R.string.bridge_controller_disconnected),
+                    color = if (state.connected) TextMuted else ComposeTokens.Warn,
+                    fontSize = 12.5.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(start = 8.dp).weight(1f)
+                )
+                if (!state.connected) {
                     TextButton(onClick = onOpenConnection) {
                         Text(stringResource(R.string.control_how_to_connect), color = Accent, fontSize = 12.sp)
                     }
                 }
-            } else {
-                Text(
-                    (stringResource(R.string.control_on_the_car) + " · " + engineLabel(context, state.engine)).uppercase(),
-                    color = TextMuted,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    letterSpacing = 1.sp
-                )
             }
-            Text(
-                state.source?.displayTitle ?: stringResource(R.string.bridge_car_nothing_playing),
-                color = TextPrimary,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-            val detail = buildString {
-                if (state.source != null) append(state.source.displayHost)
-                val playback = context.getString(playbackLabel(state.playback))
-                if (isNotEmpty()) append(" · ")
-                append(playback)
-                if (state.durationMs > 0) {
-                    append(" · ")
-                        .append(BrowserResumePoint.clock(state.positionMs))
-                        .append(" / ")
-                        .append(BrowserResumePoint.clock(state.durationMs))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.size(64.dp).background(sourceTint.copy(alpha = 0.16f), RoundedCornerShape(14.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(if (state.isPlaying) "♪" else "▶", color = sourceTint, fontSize = 24.sp)
+                }
+                Column(Modifier.padding(start = 12.dp).weight(1f)) {
+                    Text(
+                        state.source?.displayTitle ?: stringResource(R.string.bridge_car_nothing_playing),
+                        color = TextPrimary,
+                        fontSize = 16.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        buildString {
+                            if (state.source != null) append(state.source.displayHost).append(" · ")
+                            append(context.getString(playbackLabel(state.playback)))
+                        },
+                        color = TextMuted,
+                        fontSize = 12.5.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
-            Text(detail, color = TextMuted, fontSize = 13.sp)
             state.error?.let {
                 Text(context.getString(it.messageRes), color = ComposeTokens.Danger, fontSize = 13.sp)
             }
@@ -860,35 +929,54 @@ private fun TransportRow(state: AutoBridgeSessionManager.SessionState) {
                 scrubbing = null
             },
             enabled = seekable,
-            modifier = Modifier.fillMaxWidth().semantics {
+            modifier = Modifier.fillMaxWidth().height(28.dp).semantics {
                 contentDescription = context.getString(R.string.bridge_controller_seek)
             }
         )
+        if (seekable) {
+            Row(Modifier.fillMaxWidth()) {
+                Text(BrowserResumePoint.clock(state.positionMs), color = TextMuted, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                Text(BrowserResumePoint.clock(state.durationMs), color = TextMuted, fontSize = 12.sp)
+            }
+        }
+        // Five round buttons of one size, with play/pause larger and filled so it is the one
+        // the thumb finds first.
         Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
+            Modifier.fillMaxWidth().padding(top = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             TransportButton("⏮", R.string.bridge_controller_previous) { AutoBridgeSessionManager.previous() }
-            TransportButton("⏪", R.string.bridge_controller_back_10) { AutoBridgeSessionManager.seekBy(-10_000L) }
+            TransportButton("↺10", R.string.bridge_controller_back_10) { AutoBridgeSessionManager.seekBy(-10_000L) }
             TransportButton(
                 if (state.isPlaying) "⏸" else "▶",
-                if (state.isPlaying) R.string.bridge_controller_pause else R.string.bridge_controller_play
+                if (state.isPlaying) R.string.bridge_controller_pause else R.string.bridge_controller_play,
+                primary = true
             ) { AutoBridgeSessionManager.togglePlayPause() }
-            TransportButton("⏩", R.string.bridge_controller_forward_10) { AutoBridgeSessionManager.seekBy(10_000L) }
+            TransportButton("10↻", R.string.bridge_controller_forward_10) { AutoBridgeSessionManager.seekBy(10_000L) }
             TransportButton("⏭", R.string.bridge_controller_next) { AutoBridgeSessionManager.next(context) }
         }
     }
 }
 
 @Composable
-private fun TransportButton(glyph: String, descriptionRes: Int, onClick: () -> Unit) {
+private fun TransportButton(glyph: String, descriptionRes: Int, primary: Boolean = false, onClick: () -> Unit) {
     val description = stringResource(descriptionRes)
-    TextButton(
+    val size = if (primary) 68.dp else 50.dp
+    Surface(
         onClick = onClick,
-        modifier = Modifier.semantics { contentDescription = description }
+        shape = CircleShape,
+        color = if (primary) Accent else CardAltColor,
+        modifier = Modifier.size(size).semantics { contentDescription = description }
     ) {
-        Text(glyph, color = TextPrimary, fontSize = 22.sp)
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                glyph,
+                color = if (primary) ComposeTokens.Ink else TextPrimary,
+                fontSize = if (primary) 26.sp else if (glyph.length > 1) 13.sp else 18.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
     }
 }
 
@@ -930,13 +1018,21 @@ private fun BridgeInputField(value: String, onValueChange: (String) -> Unit, pla
             singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
             keyboardActions = KeyboardActions(onSend = { onSend() }),
+            // Same filled box and light send button as Home's Send to Car field.
+            shape = RoundedCornerShape(16.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = CardColor,
+                unfocusedContainerColor = CardColor,
+                unfocusedBorderColor = ComposeTokens.Hairline,
+                focusedBorderColor = Accent
+            ),
             modifier = Modifier.weight(1f)
         )
         Spacer(Modifier.width(8.dp))
         Surface(
             onClick = onSend,
-            color = Accent,
-            shape = RoundedCornerShape(12.dp),
+            color = TextPrimary,
+            shape = RoundedCornerShape(16.dp),
             modifier = Modifier.size(52.dp).semantics { contentDescription = sendDesc }
         ) {
             Box(contentAlignment = Alignment.Center) { Text("➤", fontSize = 20.sp, color = ComposeTokens.Ink) }
@@ -949,47 +1045,55 @@ private fun BridgeInputField(value: String, onValueChange: (String) -> Unit, pla
 private fun SegmentChip(label: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(14.dp),
-        color = if (selected) ComposeTokens.AccentSoft else CardColor,
-        modifier = modifier.border(
-            1.dp,
-            if (selected) Accent else ComposeTokens.Hairline,
-            RoundedCornerShape(14.dp)
-        )
+        shape = RoundedCornerShape(18.dp),
+        color = if (selected) SelectedSegment else Color.Transparent,
+        modifier = modifier.height(36.dp)
     ) {
-        Text(
-            label,
-            color = if (selected) Accent else TextMuted,
-            fontSize = 13.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(vertical = 10.dp, horizontal = 8.dp)
-        )
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                label,
+                color = if (selected) TextPrimary else TextMuted,
+                fontSize = 14.sp,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 8.dp)
+            )
+        }
     }
 }
+
+/** The selected half of a segmented capsule: deep blue under white text, readable at a glance. */
+private val SelectedSegment = Color(0xFF22344F)
 
 /**
  * A plain-text tab with a 2dp accent underline when selected — the Queue/Recent/Favorites group.
  * Unlike [SegmentChip] it has no fill or border, so the row reads as text tabs rather than pills.
  */
 @Composable
-private fun UnderlineTab(label: String, selected: Boolean, onClick: () -> Unit) {
-    Column(
-        Modifier.clickable(onClick = onClick),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            label,
-            color = if (selected) Accent else TextMuted,
-            fontSize = 14.sp,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(vertical = 8.dp)
-        )
-        if (selected) {
-            Box(Modifier.width(24.dp).height(2.dp).background(Accent, RoundedCornerShape(1.dp)))
+private fun UnderlineTab(label: String, count: Int = 0, selected: Boolean, onClick: () -> Unit) {
+    Column(Modifier.width(IntrinsicSize.Max).clickable(onClick = onClick)) {
+        Row(Modifier.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                label,
+                color = if (selected) TextPrimary else TextMuted,
+                fontSize = 15.sp,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (count > 0) {
+                Box(
+                    Modifier.padding(start = 6.dp).height(20.dp).background(SelectedSegment, RoundedCornerShape(10.dp))
+                        .padding(horizontal = 7.dp),
+                    contentAlignment = Alignment.Center
+                ) { Text(count.toString(), color = TextPrimary, fontSize = 12.sp) }
+            }
         }
+        Box(
+            Modifier.fillMaxWidth().height(3.dp)
+                .background(if (selected) Accent else Color.Transparent, RoundedCornerShape(2.dp))
+        )
     }
 }
 
@@ -1014,16 +1118,19 @@ private fun LinkRow(
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Leading thumbnail / placeholder
+            // Tinted by where the link goes (video, music, web), so a queue reads at a glance.
+            val tint = linkTint(subtitle)
             Box(
-                Modifier.size(40.dp)
-                    .background(ComposeTokens.AccentSoft, RoundedCornerShape(12.dp)),
+                Modifier.size(42.dp)
+                    .background(tint.copy(alpha = 0.16f), RoundedCornerShape(12.dp))
+                    .border(1.dp, tint.copy(alpha = 0.3f), RoundedCornerShape(12.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     title.firstOrNull()?.uppercase().orEmpty(),
-                    color = Accent,
+                    color = tint,
                     fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.Bold
                 )
             }
             Spacer(Modifier.width(10.dp))
@@ -1060,6 +1167,18 @@ private fun LinkRow(
             }
         }
     }
+}
+
+/** Accent for a queue/recent row from its URL: video red, music pink, everything else web teal. */
+internal fun linkTint(url: String): Color {
+    val host = url.lowercase()
+    return Color(
+        when {
+            "music.youtube" in host || "spotify" in host -> AutoBridgeDesign.ACCENT_FAVORITE
+            "youtube" in host || "youtu.be" in host || "twitch" in host || "tiktok" in host -> AutoBridgeDesign.ACCENT_VIDEO
+            else -> AutoBridgeDesign.ACCENT_WEB
+        }
+    )
 }
 
 @Composable

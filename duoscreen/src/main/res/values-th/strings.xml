@@ -16,6 +16,7 @@
     <string name="duo_screen_panes_section">ช่อง</string>
     <string name="duo_screen_pane_count">จำนวนช่อง</string>
     <string name="duo_screen_pane_label">ช่องที่ %1$d</string>
+    <string name="duo_screen_preview_tap_hint">%1$s · แตะเพื่อเปลี่ยน</string>
     <string name="duo_screen_pane_empty">ยังไม่ได้เลือกแอป</string>
     <string name="duo_screen_layout_section">การจัดวาง</string>
     <string name="duo_screen_preset">รูปแบบการแบ่งจอ</string>

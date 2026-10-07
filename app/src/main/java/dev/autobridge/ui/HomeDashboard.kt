@@ -2,10 +2,11 @@ package dev.autobridge.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
@@ -48,12 +48,13 @@ data class HomeTileUi(val title: String, val icon: Int, val accent: Int, val onC
 
 /**
  * Body of the phone Home (below the AutoBridge header, above the mini player):
- * Android Auto status, Quick Launch, Send to Car and Recent.
+ * Android Auto status, Send to Car with its recent sends, then Quick Launch.
  *
  * Send to Car is the same [CommandField] as the Control tab, so a URL, a search query or plain
  * text all go through the one [dev.autobridge.remote.CommandParser] / command bus. Recent is read
  * from [CommandHistoryStore], the single command history.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun HomeDashboard(
     tiles: List<HomeTileUi>,
@@ -76,8 +77,9 @@ fun HomeDashboard(
             title = stringResource(R.string.control_android_auto),
             onClick = onOpenConnection,
             showPill = true,
+            homeStyle = true,
             actions = {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     CardActionButton(
                         stringResource(R.string.home_mirror_action),
                         icon = R.drawable.ic_tile_mirror,
@@ -98,7 +100,41 @@ fun HomeDashboard(
             }
         )
 
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        // Send to Car comes before Quick Launch: sending something to the car is what Home is
+        // opened for most, so the field sits right under the connection card.
+        Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            SectionLabel(stringResource(R.string.home_send_to_car), Modifier.weight(1f))
+            // The full controller: queue, recents, favorites and the transport bar. The field
+            // below stays because one-shot sending is the common case and should not need a
+            // navigation step; this is the way in when the driver wants to manage what is queued.
+            TextButton(onClick = onOpenController) {
+                Text(stringResource(R.string.home_open_controller), color = ComposeTokens.Accent, fontSize = 13.sp)
+            }
+        }
+        CommandField(
+            placeholder = stringResource(R.string.home_send_placeholder),
+            filled = true,
+            onSubmitted = { lastSubmittedText = it }
+        )
+        lastResult.value?.let {
+            ResultBanner(
+                it,
+                onRetry = { submitCommand(lastSubmittedText) },
+                onOpenConnection = onOpenConnection
+            )
+        }
+        if (recents.isNotEmpty()) {
+            // Recent sends as chips right under the field, so sending the same page again is one
+            // tap from where it was typed.
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                recents.forEach { recent -> RecentChip(recent) }
+            }
+        }
+
+        Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             SectionLabel(stringResource(R.string.home_quick_launch), Modifier.weight(1f))
             TextButton(onClick = onEditQuickLaunch) {
                 Text(stringResource(R.string.home_quick_launch_edit), color = ComposeTokens.Accent, fontSize = 13.sp)
@@ -110,71 +146,51 @@ fun HomeDashboard(
                 repeat(3 - row.size) { Box(Modifier.weight(1f)) }
             }
         }
+    }
+}
 
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            SectionLabel(stringResource(R.string.home_send_to_car), Modifier.weight(1f))
-            // The full controller: queue, recents, favorites and the transport bar. The field
-            // below stays because one-shot sending is the common case and should not need a
-            // navigation step; this is the way in when the driver wants to manage what is queued.
-            TextButton(onClick = onOpenController) {
-                Text(stringResource(R.string.home_open_controller), color = ComposeTokens.Accent, fontSize = 13.sp)
-            }
-        }
-        CommandField(
-            placeholder = stringResource(R.string.home_send_placeholder),
-            onSubmitted = { lastSubmittedText = it }
-        )
-        lastResult.value?.let {
-            ResultBanner(
-                it,
-                onRetry = { submitCommand(lastSubmittedText) },
-                onOpenConnection = onOpenConnection
+/** One recent send under the field: outlined pill, tap sends the same command again. */
+@Composable
+private fun RecentChip(recent: PhoneHomeLayout.RecentSend) {
+    val sendAgainDescription = stringResource(R.string.home_recent_send_again, recent.label)
+    Surface(
+        onClick = {
+            AutoBridgeCommandBus.send(
+                AutoBridgeCommand(type = recent.type, payload = recent.payload, source = CommandSource.MOBILE)
             )
-        }
-
-        if (recents.isNotEmpty()) {
-            SectionLabel(stringResource(R.string.home_recent))
-            Row(
-                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                recents.forEach { recent ->
-                    val sendAgainDescription = stringResource(R.string.home_recent_send_again, recent.label)
-                    Surface(
-                        onClick = {
-                            AutoBridgeCommandBus.send(
-                                AutoBridgeCommand(type = recent.type, payload = recent.payload, source = CommandSource.MOBILE)
-                            )
-                        },
-                        shape = RoundedCornerShape(18.dp),
-                        color = ComposeTokens.Surface,
-                        modifier = Modifier.border(1.dp, ComposeTokens.Hairline, RoundedCornerShape(18.dp))
-                            .semantics { contentDescription = sendAgainDescription }
-                    ) {
-                        Text(
-                            recent.label,
-                            color = ComposeTokens.Text,
-                            fontSize = 13.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
-                        )
-                    }
-                }
-            }
+        },
+        shape = RoundedCornerShape(18.dp),
+        color = Color.Transparent,
+        modifier = Modifier.height(36.dp)
+            .border(1.dp, ComposeTokens.Hairline, RoundedCornerShape(18.dp))
+            .semantics { contentDescription = sendAgainDescription }
+    ) {
+        Box(Modifier.padding(horizontal = 14.dp), contentAlignment = Alignment.Center) {
+            Text(
+                recent.label,
+                color = RecentChipText,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }
 
+private val RecentChipText = Color(0xFFD5DAE0)
+private val DuoButtonColor = Color(0xFF22344F)
+private val DuoButtonText = Color(0xFFDCEBFF)
+
 /** Mirror / Bridge Duo button on the Home Android Auto card. [primary] fills with the accent. */
 @Composable
 private fun CardActionButton(label: String, icon: Int, primary: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val tint = if (primary) ComposeTokens.Ink else ComposeTokens.Text
+    val tint = if (primary) ComposeTokens.Ink else DuoButtonText
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(12.dp),
-        color = if (primary) ComposeTokens.Accent else ComposeTokens.SurfaceRaised,
-        modifier = modifier.height(44.dp)
+        shape = RoundedCornerShape(16.dp),
+        color = if (primary) ComposeTokens.Accent else DuoButtonColor,
+        modifier = modifier.height(48.dp)
     ) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -183,8 +199,8 @@ private fun CardActionButton(label: String, icon: Int, primary: Boolean, onClick
                 Text(
                     label,
                     color = tint,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
+                    fontSize = 15.sp,
+                    fontWeight = if (primary) FontWeight.ExtraBold else FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -198,19 +214,13 @@ private fun QuickLaunchTile(tile: HomeTileUi, modifier: Modifier) {
     val accent = Color(tile.accent)
     Surface(
         onClick = tile.onClick,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(20.dp),
         color = ComposeTokens.Surface,
-        modifier = modifier.height(96.dp).semantics { contentDescription = tile.title }
+        modifier = modifier.height(100.dp).semantics { contentDescription = tile.title }
     ) {
-        Column(
-            Modifier.padding(8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.SpaceBetween) {
             Box(
-                Modifier.size(42.dp)
-                    .background(accent.copy(alpha = 0.16f), RoundedCornerShape(12.dp))
-                    .border(1.dp, accent.copy(alpha = 0.3f), RoundedCornerShape(12.dp)),
+                Modifier.size(40.dp).background(accent.copy(alpha = 0.16f), RoundedCornerShape(12.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(painterResource(tile.icon), contentDescription = null, tint = accent, modifier = Modifier.size(22.dp))
@@ -218,11 +228,10 @@ private fun QuickLaunchTile(tile: HomeTileUi, modifier: Modifier) {
             Text(
                 tile.title,
                 color = ComposeTokens.Text,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 8.dp)
+                overflow = TextOverflow.Ellipsis
             )
         }
     }

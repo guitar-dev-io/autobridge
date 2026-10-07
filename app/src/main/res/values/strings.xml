@@ -544,6 +544,7 @@
 
     <!-- Settings navigation: the root list, Advanced and About ([MainActivity]). -->
     <string name="settings_title">Settings</string>
+    <string name="settings_search_hint">Search settings</string>
     <string name="settings_group_display">Display &amp; control</string>
     <string name="settings_display_mirror">Display &amp; Mirror</string>
     <string name="settings_display_mirror_caption">Renderer, rotation and fullscreen</string>
@@ -577,6 +578,7 @@
     <string name="aa_hidden_title">Bridge Web is hidden on Android Auto</string>
     <string name="aa_hidden_message">Installing this update reset the install source, so Android Auto will not show Bridge Web until it is set again. It takes one tap with Shizuku.</string>
     <string name="aa_hidden_fix">Fix now</string>
+    <string name="whats_new_0_4_51">• Home: Send to Car now sits right under the Android Auto card, with what you sent recently as chips under the field. A blue Android Auto card and larger Quick Launch tiles.\n• Control: round transport buttons with a big play/pause, a thin seek bar with times, one switch for Open/search vs Type on car, and queue rows coloured by where the link goes.\n• Settings: a search box, and each utility has its own icon and colour.\n• More: cards in two columns, and the title is now translated.\n• Multi-app: a preview of the car screen at the top; tap a pane to choose its app.</string>
     <string name="whats_new_0_4_50">• Car browser menu (Bridge Web and Duo Screen): two pages instead of one long grid. The first has the everyday buttons, switches, zoom and the split screen; More holds the rest, grouped. The header shows the page\'s title and site.\n• Save and Bookmarks are now two clearly different buttons; Save turns into a filled star when the page is already saved.</string>
     <string name="whats_new_0_4_49">• Split screen: the handle on the seam between the two pages is slimmer, with a smaller ✕ and finer grip bars, and just as easy to grab.</string>
     <string name="whats_new_0_4_48">• Car browser menu: a compact grid, one subject per line, with switches instead of On/Off text. Close it with the ✕ or by dragging its title down. New tab is back next to Tabs.\n• Split screen: one sheet with the layouts as pictures, a Split switch and a side-on-the-right switch. The seam between the pages is wider and carries a slim handle with a small ✕; in Bridge Web it can be dragged to resize.\n• Typing in the car: tapping a search box on a page brings up AutoBridge\'s car keyboard where the system keyboard does not appear (Duo Screen), or the car\'s own text entry (Android Auto browser).</string>
@@ -724,6 +726,7 @@
     <string name="home_tile_tv_radio">TV / Radio</string>
     <string name="home_tile_favorites">Favorites</string>
     <string name="home_tile_more">More</string>
+    <string name="home_more_subtitle">Local media, streaming, weather and mirror</string>
     <string name="home_mirror_action">Mirror</string>
     <string name="home_bridge_duo_action">Multi-app</string>
 
