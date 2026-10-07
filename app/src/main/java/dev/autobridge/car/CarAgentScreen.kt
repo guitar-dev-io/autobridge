@@ -210,6 +210,17 @@ class CarAgentScreen(carContext: CarContext) : Screen(carContext) {
         when (validated.command.action) {
             VoiceAction.GO_BACK -> screenManager.pop()
             VoiceAction.GO_HOME -> screenManager.popToRoot()
+            VoiceAction.OPEN_SCREEN -> validated.command.screen?.let { screen ->
+                // Through the same navigator the home tiles use. The speed-safety row on Settings
+                // needs the Home screen's vehicle-state session, so from here it points there.
+                CarHomeNavigator.open(carContext, screenManager, screen.section) {
+                    CarToast.makeText(
+                        carContext,
+                        carContext.getString(R.string.car_agent_safety_from_home),
+                        CarToast.LENGTH_LONG
+                    ).show()
+                }
+            }
             else -> {
                 val url = validated.url
                 runCommand(

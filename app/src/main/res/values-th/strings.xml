@@ -1694,6 +1694,7 @@
     <string name="parking_photo_on_phone">มีรูปในโทรศัพท์</string>
 
     <!-- Voice Recognition (offline Whisper); see dev.autobridge.voice -->
+    <string name="car_agent_safety_from_home">เปิดใช้จาก การตั้งค่า ในหน้าแรก</string>
     <string name="voice_settings_title">การจดจำเสียง</string>
     <string name="voice_settings_subtitle">แปลงเสียงเป็นข้อความแบบออฟไลน์ด้วย Whisper</string>
     <string name="voice_settings_caption">โมเดล Whisper ภาษา และการทดสอบ</string>

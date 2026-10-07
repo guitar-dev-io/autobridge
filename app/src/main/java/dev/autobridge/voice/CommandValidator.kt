@@ -42,7 +42,8 @@ object CommandValidator {
     const val MAX_QUERY_LENGTH = 200
 
     private val AUTO_EXECUTABLE = setOf(
-        VoiceAction.OPEN_APP, VoiceAction.SEARCH, VoiceAction.PLAY, VoiceAction.GO_HOME, VoiceAction.GO_BACK
+        VoiceAction.OPEN_APP, VoiceAction.SEARCH, VoiceAction.PLAY, VoiceAction.GO_HOME, VoiceAction.GO_BACK,
+        VoiceAction.OPEN_SCREEN
     )
 
     /** Schemes a spoken address may not use; everything but https is refused anyway, these are named for the log. */
@@ -56,6 +57,9 @@ object CommandValidator {
         return when (command.action) {
             VoiceAction.UNKNOWN -> Validation.Rejected(Validation.Reason.UNKNOWN_COMMAND)
             VoiceAction.GO_HOME, VoiceAction.GO_BACK -> valid(command, null, auto)
+            VoiceAction.OPEN_SCREEN ->
+                if (command.screen == null) Validation.Rejected(Validation.Reason.MISSING_TARGET)
+                else valid(command, null, auto)
             VoiceAction.OPEN_APP -> {
                 val target = command.target ?: return Validation.Rejected(Validation.Reason.MISSING_TARGET)
                 valid(command, homeUrl(target), auto)
