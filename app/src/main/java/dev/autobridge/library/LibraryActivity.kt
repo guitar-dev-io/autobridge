@@ -18,6 +18,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.annotation.StringRes
 import dev.autobridge.R
 import dev.autobridge.entertainment.ContentKind
 import dev.autobridge.entertainment.EntertainmentActivity
@@ -64,16 +65,19 @@ class LibraryActivity : Activity() {
      * [FILES], but stay as their own [Section] so an external launch (the voice agent opens
      * [PLAYLISTS] directly) still lands on the right page with [FILES] highlighted.
      */
-    enum class Section(val title: String, val accent: Int) {
-        TV("TV", AutoBridgeDesign.ACCENT_TV),
-        RADIO("Radio", AutoBridgeDesign.ACCENT_RADIO),
-        MUSIC("Music", AutoBridgeDesign.ACCENT_VIDEO),
-        STREAMING("Streaming", AutoBridgeDesign.ACCENT_VIDEO),
-        FILES("Files", AutoBridgeDesign.ACCENT_FILES),
-        FAVORITES("Favorites", AutoBridgeDesign.ACCENT_FAVORITE),
-        FOLDERS("Folders", AutoBridgeDesign.ACCENT_FILES),
-        PLAYLISTS("Playlists", AutoBridgeDesign.ACCENT_FILES),
-        GALLERY("Gallery", AutoBridgeDesign.ACCENT_WEB)
+    enum class Section(@StringRes val titleRes: Int, val accent: Int) {
+        TV(R.string.section_tv, AutoBridgeDesign.ACCENT_TV),
+        RADIO(R.string.section_radio, AutoBridgeDesign.ACCENT_RADIO),
+        MUSIC(R.string.home_tile_music, AutoBridgeDesign.ACCENT_VIDEO),
+        STREAMING(R.string.section_streaming, AutoBridgeDesign.ACCENT_VIDEO),
+        FILES(R.string.library_section_files, AutoBridgeDesign.ACCENT_FILES),
+        FAVORITES(R.string.section_favorites, AutoBridgeDesign.ACCENT_FAVORITE),
+        FOLDERS(R.string.section_folders, AutoBridgeDesign.ACCENT_FILES),
+        PLAYLISTS(R.string.section_playlists, AutoBridgeDesign.ACCENT_FILES),
+        GALLERY(R.string.section_gallery, AutoBridgeDesign.ACCENT_WEB);
+
+        /** The chip / page name in the current UI language. */
+        fun title(context: Context): String = context.getString(titleRes)
     }
 
     /** The chip row, in order. [FOLDERS]/[PLAYLISTS]/[GALLERY] fall under [Section.FILES]. */
@@ -255,7 +259,7 @@ class LibraryActivity : Activity() {
         val pinned = mutableListOf<View>()
         pinned += extraPinned
         if (search != null) {
-            pinned += AutoBridgeDesign.searchField(this, "Search", search.first, search.second)
+            pinned += AutoBridgeDesign.searchField(this, getString(R.string.action_search), search.first, search.second)
         }
         if (actions.isNotEmpty()) {
             val row = LinearLayout(this)
@@ -312,8 +316,8 @@ class LibraryActivity : Activity() {
     }
 
     /** "1 entry" / "13 categories": a count the user reads, not a template with an s stuck on. */
-    private fun plural(count: Int, singular: String, plural: String = singular + "s"): String =
-        "$count " + if (count == 1) singular else plural
+    private fun plural(@androidx.annotation.PluralsRes id: Int, count: Int): String =
+        resources.getQuantityString(id, count, count)
 
     // ----- IPTV: sources -> categories -> entries -----
 
@@ -327,19 +331,19 @@ class LibraryActivity : Activity() {
         val sources = IptvSourceStore.list(this, iptvKind)
         if (sources.isEmpty()) {
             render(
-                title = "Library",
-                subtitle = "No ${section.title} source yet",
+                title = getString(R.string.library_title),
+                subtitle = getString(R.string.library_no_source, section.title(this)),
                 rows = emptyList(),
                 empty = AutoBridgeDesign.emptyState(
                     context = this,
-                    title = "No ${section.title} source yet",
-                    message = "Pick a free public list, or add your own Xtream account or M3U playlist.",
-                    action = "Browse public lists" to { addFromDirectory() },
+                    title = getString(R.string.library_no_source, section.title(this)),
+                    message = getString(R.string.library_no_source_message),
+                    action = getString(R.string.library_browse_public_lists) to { addFromDirectory() },
                     accent = accent
                 ),
                 headerActions = listOf(AutoBridgeDesign.HeaderAction("+", onClick = { addSourceChooser() })),
                 actions = listOf(
-                    "Public lists" to { addFromDirectory() },
+                    getString(R.string.library_public_lists) to { addFromDirectory() },
                     "+ Xtream" to { addSource(IptvSourceType.XTREAM) },
                     "+ M3U" to { addSource(IptvSourceType.M3U) }
                 ),
@@ -360,12 +364,12 @@ class LibraryActivity : Activity() {
             showLibraryCategories(source, allSources, cached)
             return
         }
-        val dialog = progressDialog("Loading ${source.name}…")
+        val dialog = progressDialog(getString(R.string.library_loading, source.name))
         IptvCatalog.load(this, source) { result ->
             dialog.dismiss()
             when (result) {
                 is IptvCatalog.Result.Ready -> showLibraryCategories(source, allSources, result.data)
-                is IptvCatalog.Result.Failed -> alert("Could not load ${source.name}", result.message)
+                is IptvCatalog.Result.Failed -> alert(getString(R.string.library_load_failed, source.name), result.message)
             }
         }
     }
@@ -429,23 +433,27 @@ class LibraryActivity : Activity() {
                     .take(MAX_SEARCH_MATCHES)
                 val matchingCategories = data.categories.filter { it.name.contains(q, ignoreCase = true) }
                 if (matchingEntries.isNotEmpty()) {
-                    rows += AutoBridgeDesign.sectionLabel(this, "Channels")
+                    rows += AutoBridgeDesign.sectionLabel(this, getString(R.string.car_favorites_channels))
                     rows += matchingEntries.map { entryRow(source, it, matchingEntries) }
                 }
                 if (matchingCategories.isNotEmpty()) {
-                    rows += AutoBridgeDesign.sectionLabel(this, "Categories")
+                    rows += AutoBridgeDesign.sectionLabel(this, getString(R.string.library_categories))
                     rows += matchingCategories.map { categoryRow(source, data, it) }
                 }
             }
 
             val page = render(
-                title = "Library",
+                title = getString(R.string.library_title),
                 subtitle = null,
                 rows = rows,
                 empty = if (q.isNotBlank()) {
-                    AutoBridgeDesign.emptyState(this, "No matches", "Nothing matches \"$q\".")
+                    AutoBridgeDesign.emptyState(
+                        this, getString(R.string.car_find_no_matches), getString(R.string.library_no_matches_query, q)
+                    )
                 } else {
-                    AutoBridgeDesign.emptyState(this, "Nothing here", "This source returned no categories.")
+                    AutoBridgeDesign.emptyState(
+                        this, getString(R.string.library_nothing_here), getString(R.string.library_no_categories)
+                    )
                 },
                 headerActions = listOf(AutoBridgeDesign.HeaderAction("+", onClick = { addSourceChooser() })),
                 search = query to { value -> query = value; draw() },
@@ -465,7 +473,7 @@ class LibraryActivity : Activity() {
             val isSelected = chip == selected
             row.addView(
                 TextView(this).apply {
-                    text = chip.title
+                    text = chip.title(this@LibraryActivity)
                     textSize = 14f
                     gravity = Gravity.CENTER
                     setTextColor(if (isSelected) AutoBridgeDesign.INK else AutoBridgeDesign.TEXT)
@@ -495,8 +503,8 @@ class LibraryActivity : Activity() {
         val type = if (source.type == IptvSourceType.XTREAM) "Xtream" else "M3U"
         val cached = IptvCatalog.cached(source.id)
         val subtitle = if (cached != null) {
-            "$type • " + plural(cached.categories.size, "category", "categories") + " • " +
-                plural(cached.entries.size, "channel")
+            "$type • " + plural(R.plurals.library_categories_count, cached.categories.size) + " • " +
+                plural(R.plurals.library_channels_count, cached.entries.size)
         } else {
             "$type • ${hostOf(source.url)}"
         }
@@ -518,7 +526,7 @@ class LibraryActivity : Activity() {
             return
         }
         AlertDialog.Builder(this)
-            .setTitle("Switch source")
+            .setTitle(R.string.library_switch_source)
             .setItems(allSources.map { it.name }.toTypedArray()) { _, index ->
                 val chosen = allSources[index]
                 if (chosen.id != current.id) {
@@ -527,21 +535,27 @@ class LibraryActivity : Activity() {
                     openLibrarySource(chosen, allSources)
                 }
             }
-            .setNegativeButton("Cancel", null)
+            .setNegativeButton(R.string.action_cancel, null)
             .show()
     }
 
     private fun addSourceChooser() {
         AlertDialog.Builder(this)
-            .setTitle("Add a source")
-            .setItems(arrayOf("Browse public lists", "Add Xtream account", "Add M3U playlist")) { _, index ->
+            .setTitle(R.string.library_add_source)
+            .setItems(
+                arrayOf(
+                    getString(R.string.library_browse_public_lists),
+                    getString(R.string.library_add_xtream),
+                    getString(R.string.library_add_m3u)
+                )
+            ) { _, index ->
                 when (index) {
                     0 -> addFromDirectory()
                     1 -> addSource(IptvSourceType.XTREAM)
                     else -> addSource(IptvSourceType.M3U)
                 }
             }
-            .setNegativeButton("Cancel", null)
+            .setNegativeButton(R.string.action_cancel, null)
             .show()
     }
 
@@ -551,7 +565,7 @@ class LibraryActivity : Activity() {
         return AutoBridgeDesign.contentRow(
             context = this,
             title = category.name,
-            subtitle = plural(category.count, "entry", "entries"),
+            subtitle = plural(R.plurals.library_entries_count, category.count),
             accent = accent,
             trailing = if (pinned) "★" else "☆",
             onTrailing = {
@@ -571,11 +585,11 @@ class LibraryActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             addView(
-                AutoBridgeDesign.sectionLabel(this@LibraryActivity, "All categories • $count"),
+                AutoBridgeDesign.sectionLabel(this@LibraryActivity, getString(R.string.library_all_categories_count, count)),
                 LinearLayout.LayoutParams(0, -2, 1f)
             )
             addView(TextView(this@LibraryActivity).apply {
-                text = if (ascending) "A–Z ▼" else "Z–A ▲"
+                text = getString(if (ascending) R.string.library_sort_az else R.string.library_sort_za)
                 textSize = 12f
                 setTextColor(AutoBridgeDesign.ACCENT)
                 typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
@@ -596,11 +610,11 @@ class LibraryActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             addView(
-                AutoBridgeDesign.sectionLabel(this@LibraryActivity, "Pinned"),
+                AutoBridgeDesign.sectionLabel(this@LibraryActivity, getString(R.string.library_pinned)),
                 LinearLayout.LayoutParams(0, -2, 1f)
             )
             addView(TextView(this@LibraryActivity).apply {
-                text = "Edit"
+                text = getString(R.string.library_edit_pinned)
                 textSize = 12f
                 setTextColor(AutoBridgeDesign.ACCENT)
                 typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
@@ -620,14 +634,14 @@ class LibraryActivity : Activity() {
             IptvPinnedCategoryStore.isPinned(this, source.id, categories[it].id)
         }
         AlertDialog.Builder(this)
-            .setTitle("Pinned categories")
+            .setTitle(R.string.library_pinned_categories)
             .setMultiChoiceItems(names, checked) { _, which, isChecked ->
                 if (isChecked != IptvPinnedCategoryStore.isPinned(this, source.id, categories[which].id)) {
                     IptvPinnedCategoryStore.toggle(this, source.id, categories[which].id)
                 }
             }
             .setOnDismissListener { refresh() }
-            .setPositiveButton("Done", null)
+            .setPositiveButton(R.string.control_quick_actions_done, null)
             .show()
     }
 
@@ -649,7 +663,7 @@ class LibraryActivity : Activity() {
         }
         if (hasRecent) {
             row.addView(
-                chip("↺ Last watched", AutoBridgeDesign.ACCENT_FILES) { showRecent() },
+                chip(getString(R.string.library_last_watched), AutoBridgeDesign.ACCENT_FILES) { showRecent() },
                 LinearLayout.LayoutParams(-2, -2)
             )
         }
@@ -745,8 +759,8 @@ class LibraryActivity : Activity() {
                 filtered
             }
             val shown = visible.take(MAX_VISIBLE_ENTRIES)
-            val counted = if (query.isBlank()) "${all.size} channels · ${source.name}"
-            else "${filtered.size} of ${all.size} match \"$query\""
+            val counted = if (query.isBlank()) getString(R.string.library_entries_counted, all.size, source.name)
+            else getString(R.string.library_entries_matched, filtered.size, all.size, query)
             // The tiles about to be built are the ones a landing result writes into.
             pingTiles.clear()
             val rows = mutableListOf<View>()
@@ -772,13 +786,13 @@ class LibraryActivity : Activity() {
                 // A country-grouped public playlist puts thousands of channels in "All". Saying
                 // "2080 entries" above 300 rows is a miscount the user has no way to notice.
                 subtitle = if (shown.size < filtered.size) {
-                    "${all.size} channels · ${source.name} • showing first ${shown.size}, search to narrow"
+                    getString(R.string.library_entries_truncated, all.size, source.name, shown.size)
                 } else {
                     counted
                 },
                 rows = rows,
                 empty = AutoBridgeDesign.emptyState(
-                    this, "No matches", "Nothing in this category matches that search."
+                    this, getString(R.string.car_find_no_matches), getString(R.string.library_no_matches_category)
                 ),
                 // A filled star to pin this category, then the grid/list toggle. The channel
                 // check moved to a button on the status summary row (see checkSummaryRow).
@@ -837,14 +851,14 @@ class LibraryActivity : Activity() {
                 android.text.style.ForegroundColorSpan(AutoBridgeDesign.ACCENT_ONLINE),
                 onlineStart, summary.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
             )
-            summary.append(" $online online   ")
+            summary.append(" ").append(getString(R.string.library_online_count, online)).append("   ")
             val offlineStart = summary.length
             summary.append("●")
             summary.setSpan(
                 android.text.style.ForegroundColorSpan(AutoBridgeDesign.DANGER),
                 offlineStart, summary.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
             )
-            summary.append(" $offline offline")
+            summary.append(" ").append(getString(R.string.library_offline_count, offline))
             addView(TextView(this@LibraryActivity).apply {
                 text = summary
                 textSize = 12f
@@ -853,7 +867,7 @@ class LibraryActivity : Activity() {
             addView(
                 AutoBridgeDesign.pill(
                     this@LibraryActivity,
-                    "↻ Check",
+                    getString(R.string.library_check_button),
                     primary = false,
                     accent = accent,
                     onClick = onCheck
@@ -863,7 +877,7 @@ class LibraryActivity : Activity() {
             addView(
                 AutoBridgeDesign.pill(
                     this@LibraryActivity,
-                    if (hideOffline) "Show all" else "Hide offline",
+                    getString(if (hideOffline) R.string.library_show_all else R.string.library_hide_offline),
                     primary = hideOffline,
                     accent = accent,
                     onClick = onToggleHide
@@ -890,8 +904,8 @@ class LibraryActivity : Activity() {
             title = entry.title,
             subtitle = listOfNotNull(
                 entry.subtitle.takeIf { it.isNotBlank() },
-                "Opens in browser".takeIf { entry.isWebPage },
-                "Catch-up".takeIf { entry.supportsCatchup }
+                getString(R.string.car_iptv_opens_in_browser).takeIf { entry.isWebPage },
+                getString(R.string.car_iptv_catchup).takeIf { entry.supportsCatchup }
             ).joinToString(" • "),
             accent = accent,
             artworkUrl = entry.logo,
@@ -926,7 +940,7 @@ class LibraryActivity : Activity() {
         })
         addView(
             TextView(this@LibraryActivity).apply {
-                text = "ON CAR"
+                text = getString(R.string.library_on_car)
                 textSize = 10f
                 setTextColor(AutoBridgeDesign.INK)
                 typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
@@ -1001,10 +1015,10 @@ class LibraryActivity : Activity() {
             context = this,
             title = entry.title,
             subtitle = listOfNotNull(
-                "ON CAR".takeIf { onCar },
+                getString(R.string.library_on_car).takeIf { onCar },
                 entry.subtitle.takeIf { it.isNotBlank() },
-                "Opens in browser".takeIf { entry.isWebPage },
-                "Catch-up".takeIf { entry.supportsCatchup },
+                getString(R.string.car_iptv_opens_in_browser).takeIf { entry.isWebPage },
+                getString(R.string.car_iptv_catchup).takeIf { entry.supportsCatchup },
                 // Whatever the last check said about this address, for as long as it stays true;
                 // the row says nothing extra until something has actually been checked.
                 StreamPing.cached(entry.url)?.let { StreamPing.describe(it) }
@@ -1032,7 +1046,13 @@ class LibraryActivity : Activity() {
     private fun sendChannelMenu(source: IptvSource, entry: IptvEntry) {
         AlertDialog.Builder(this)
             .setTitle(entry.title)
-            .setItems(arrayOf("Play here", "Send to car", "Ping")) { _, index ->
+            .setItems(
+                arrayOf(
+                    getString(R.string.library_play_here),
+                    getString(R.string.drawer_send_to_car),
+                    getString(R.string.library_ping)
+                )
+            ) { _, index ->
                 when (index) {
                     0 -> openEntry(source, entry)
                     1 -> sendToCar(source, entry)
@@ -1054,7 +1074,7 @@ class LibraryActivity : Activity() {
     private fun pingEntries(entries: List<IptvEntry>, quiet: Boolean = false) {
         val urls = checkableUrls(entries)
         if (urls.isEmpty()) {
-            if (!quiet) Toast.makeText(this, "Nothing here can be checked.", Toast.LENGTH_SHORT).show()
+            if (!quiet) Toast.makeText(this, getString(R.string.library_nothing_to_check), Toast.LENGTH_SHORT).show()
             return
         }
         StreamPing.checkAll(urls) { progress ->
@@ -1063,7 +1083,7 @@ class LibraryActivity : Activity() {
             if (progress.done && !quiet) {
                 Toast.makeText(
                     this,
-                    "${progress.alive} of ${progress.total} channels answered.",
+                    getString(R.string.library_channels_answered, progress.alive, progress.total),
                     Toast.LENGTH_LONG
                 ).show()
             }
@@ -1071,7 +1091,7 @@ class LibraryActivity : Activity() {
         // The automatic pass says nothing at all: it is background work the user did not ask for,
         // and its whole output is the colour on the tiles.
         if (quiet) return
-        Toast.makeText(this, "Checking ${urls.size} channels…", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, getString(R.string.library_checking_channels, urls.size), Toast.LENGTH_SHORT).show()
     }
 
     /**
@@ -1095,7 +1115,7 @@ class LibraryActivity : Activity() {
 
     /** One channel, checked from its long-press menu and reported in full rather than in a row. */
     private fun pingEntry(entry: IptvEntry) {
-        val dialog = progressDialog("Checking ${entry.title}…")
+        val dialog = progressDialog(getString(R.string.library_checking, entry.title))
         StreamPing.check(entry.url) { result ->
             dialog.dismiss()
             if (isFinishing || isDestroyed) return@check
@@ -1105,16 +1125,11 @@ class LibraryActivity : Activity() {
     }
 
     private fun pingSentence(result: StreamPing.Result): String = when (result) {
-        is StreamPing.Result.Alive -> "The server answered in ${result.millis} ms."
-        is StreamPing.Result.Refused ->
-            "The server answered HTTP ${result.status}: it is reachable, but it refused this " +
-                "address. An expired token or a geo-block looks like this."
+        is StreamPing.Result.Alive -> getString(R.string.library_ping_alive, result.millis)
+        is StreamPing.Result.Refused -> getString(R.string.library_ping_refused, result.status)
         is StreamPing.Result.Unreachable ->
-            "No answer: ${result.reason.lowercase()}. The channel is offline, or this network " +
-                "cannot reach it."
-        StreamPing.Result.Unsupported ->
-            "This address cannot be checked: it is a multicast or non-standard stream, which " +
-                "answers no connection of its own."
+            getString(R.string.library_ping_unreachable, result.reason.lowercase())
+        StreamPing.Result.Unsupported -> getString(R.string.library_ping_unsupported)
     }
 
     /**
@@ -1135,7 +1150,7 @@ class LibraryActivity : Activity() {
                 extras = mapOf("title" to entry.title)
             )
         )
-        Toast.makeText(this, "Sending \"${entry.title}\" to the car…", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, getString(R.string.library_sending_to_car, entry.title), Toast.LENGTH_SHORT).show()
     }
 
     private fun openEntry(
@@ -1144,10 +1159,10 @@ class LibraryActivity : Activity() {
         siblings: List<IptvEntry> = emptyList()
     ) {
         if (entry.isSeriesFolder) {
-            val dialog = progressDialog("Loading ${entry.title}…")
+            val dialog = progressDialog(getString(R.string.library_loading, entry.title))
             IptvCatalog.loadEpisodes(source, entry) { episodes ->
                 dialog.dismiss()
-                if (episodes.isEmpty()) alert("No episodes", "The provider returned no episode list.")
+                if (episodes.isEmpty()) alert(getString(R.string.library_no_episodes), getString(R.string.library_no_episode_list))
                 else showEpisodes(source, entry, episodes)
             }
             return
@@ -1207,17 +1222,19 @@ class LibraryActivity : Activity() {
     private fun showEpisodeList(source: IptvSource, title: String, episodes: List<IptvEntry>) = push {
         render(
             title = title,
-            subtitle = "${episodes.size} episodes",
+            subtitle = getString(R.string.library_episodes_count, episodes.size),
             rows = episodes.map { entryRow(source, it, episodes) },
-            empty = AutoBridgeDesign.emptyState(this, "No episodes", "Nothing to play here.")
+            empty = AutoBridgeDesign.emptyState(
+                this, getString(R.string.library_no_episodes), getString(R.string.library_nothing_to_play_here)
+            )
         )
     }
 
     private fun showRecent() = push {
         val items = IptvHistoryStore.recent(this, iptvKind)
         render(
-            title = "Recently played",
-            subtitle = "${items.size} items",
+            title = getString(R.string.car_iptv_recent),
+            subtitle = getString(R.string.library_items_count, items.size),
             rows = items.map { item ->
                 AutoBridgeDesign.contentRow(
                     context = this,
@@ -1234,8 +1251,10 @@ class LibraryActivity : Activity() {
                     }
                 )
             },
-            empty = AutoBridgeDesign.emptyState(this, "Nothing yet", "Channels you play show up here."),
-            actions = listOf("Clear history" to {
+            empty = AutoBridgeDesign.emptyState(
+                this, getString(R.string.library_nothing_yet), getString(R.string.library_recent_empty)
+            ),
+            actions = listOf(getString(R.string.history_clear) to {
                 IptvHistoryStore.clearRecent(this)
                 refresh()
             })
@@ -1247,7 +1266,13 @@ class LibraryActivity : Activity() {
     private fun sourceMenu(source: IptvSource) {
         AlertDialog.Builder(this)
             .setTitle(source.name)
-            .setItems(arrayOf("Refresh", "Edit", "Delete")) { _, index ->
+            .setItems(
+                arrayOf(
+                    getString(R.string.car_diag_refresh),
+                    getString(R.string.library_edit_pinned),
+                    getString(R.string.action_delete)
+                )
+            ) { _, index ->
                 when (index) {
                     0 -> {
                         // Replace the stale categories page rather than stacking a second copy.
@@ -1268,20 +1293,19 @@ class LibraryActivity : Activity() {
      */
     private fun confirmDelete(source: IptvSource) {
         AlertDialog.Builder(this)
-            .setTitle("Remove ${source.name}?")
+            .setTitle(getString(R.string.library_remove_source_title, source.name))
             .setMessage(
                 if (IptvDirectory.list(iptvKind).any { it.url == source.url }) {
-                    "This is one of the built-in public lists. It will not come back on its own, " +
-                        "but you can add it again from \"Public lists\"."
+                    getString(R.string.library_remove_builtin_message)
                 } else {
-                    "The source is removed from this device. Channels you favourited stay."
+                    getString(R.string.library_remove_message)
                 }
             )
-            .setPositiveButton("Remove") { _, _ ->
+            .setPositiveButton(R.string.bridge_controller_remove) { _, _ ->
                 IptvSourceStore.remove(this, source.id)
                 refresh()
             }
-            .setNegativeButton("Cancel", null)
+            .setNegativeButton(R.string.action_cancel, null)
             .show()
     }
 
@@ -1295,26 +1319,26 @@ class LibraryActivity : Activity() {
     private fun addFromDirectory() {
         val offers = IptvDirectory.list(iptvKind)
         if (offers.isEmpty()) {
-            alert("No public lists", "There is no built-in list for this section.")
+            alert(getString(R.string.library_no_public_lists), getString(R.string.library_no_public_lists_message))
             return
         }
         val existing = IptvSourceStore.list(this).map { it.url }.toSet()
         val labels = offers.map { offer ->
-            val suffix = if (offer.url in existing) " (already added)" else ""
-            offer.name + "\n" + offer.note + suffix
+            val note = if (offer.url in existing) getString(R.string.library_already_added, offer.note) else offer.note
+            offer.name + "\n" + note
         }
         AlertDialog.Builder(this)
-            .setTitle("Free public lists")
+            .setTitle(R.string.library_free_public_lists)
             .setItems(labels.toTypedArray()) { _, index ->
                 val offer = offers[index]
                 if (offer.url in existing) {
-                    alert(offer.name, "This list is already one of your sources.")
+                    alert(offer.name, getString(R.string.library_already_source))
                     return@setItems
                 }
                 IptvSourceStore.save(this, IptvDirectory.toSource(offer, IptvSourceStore.newId()))
                 refresh()
             }
-            .setNegativeButton("Cancel", null)
+            .setNegativeButton(R.string.action_cancel, null)
             .show()
     }
 
@@ -1340,24 +1364,24 @@ class LibraryActivity : Activity() {
                 container.addView(this)
             }
 
-        val name = field("Name", existing?.name.orEmpty())
+        val name = field(getString(R.string.maint_field_name), existing?.name.orEmpty())
         val url = field(
-            if (xtream) "Portal URL or full player_api.php link" else "M3U playlist URL",
+            getString(if (xtream) R.string.library_xtream_url_hint else R.string.library_m3u_url_hint),
             existing?.url.orEmpty()
         )
-        val username = if (xtream) field("Username", existing?.username.orEmpty()) else null
-        val password = if (xtream) field("Password", existing?.password.orEmpty(), password = true) else null
+        val username = if (xtream) field(getString(R.string.library_username), existing?.username.orEmpty()) else null
+        val password = if (xtream) field(getString(R.string.library_password), existing?.password.orEmpty(), password = true) else null
 
         AlertDialog.Builder(this)
             .setTitle(
-                if (existing == null) "Add ${if (xtream) "Xtream account" else "M3U playlist"}"
-                else "Edit source"
+                if (existing == null) getString(if (xtream) R.string.library_add_xtream else R.string.library_add_m3u)
+                else getString(R.string.library_edit_source)
             )
             .setView(container)
-            .setPositiveButton("Save") { _, _ ->
+            .setPositiveButton(R.string.action_save) { _, _ ->
                 val address = url.text.toString().trim()
                 if (address.isEmpty()) {
-                    alert("Missing URL", "Enter the provider address first.")
+                    alert(getString(R.string.library_missing_url), getString(R.string.library_missing_url_message))
                     return@setPositiveButton
                 }
                 if (xtream) {
@@ -1366,8 +1390,8 @@ class LibraryActivity : Activity() {
                     )
                     if (credentials == null) {
                         alert(
-                            "Incomplete account",
-                            "Enter a username and password, or paste a link that contains them."
+                            getString(R.string.library_incomplete_account),
+                            getString(R.string.library_incomplete_account_message)
                         )
                         return@setPositiveButton
                     }
@@ -1385,7 +1409,7 @@ class LibraryActivity : Activity() {
                     )
                 } else {
                     if (!address.startsWith("http://", true) && !address.startsWith("https://", true)) {
-                        alert("Invalid URL", "The playlist address must start with http:// or https://.")
+                        alert(getString(R.string.library_invalid_url), getString(R.string.library_invalid_url_message))
                         return@setPositiveButton
                     }
                     IptvSourceStore.save(
@@ -1401,7 +1425,7 @@ class LibraryActivity : Activity() {
                 }
                 refresh()
             }
-            .setNegativeButton("Cancel", null)
+            .setNegativeButton(R.string.action_cancel, null)
             .show()
     }
 
@@ -1410,18 +1434,18 @@ class LibraryActivity : Activity() {
     private fun showFolders() = push {
         val types = setOf(LocalMediaRepository.MediaType.AUDIO, LocalMediaRepository.MediaType.VIDEO)
         if (!hasMediaPermission(types)) {
-            renderPermissionNeeded("Folders", types)
+            renderPermissionNeeded(getString(R.string.section_folders), types)
             return@push
         }
         val folders = LocalMediaRepository.folders(this)
         render(
-            title = "Folders",
-            subtitle = "${folders.size} folders on this device",
+            title = getString(R.string.section_folders),
+            subtitle = getString(R.string.library_folders_count, folders.size),
             rows = folders.map { folder ->
                 AutoBridgeDesign.contentRow(
                     context = this,
                     title = folder.name,
-                    subtitle = "${folder.count} files",
+                    subtitle = getString(R.string.library_files_count, folder.count),
                     accent = accent,
                     badgeText = "▣",
                     trailing = "›",
@@ -1429,7 +1453,7 @@ class LibraryActivity : Activity() {
                 )
             },
             empty = AutoBridgeDesign.emptyState(
-                this, "No media folders", "No audio or video was found on this device."
+                this, getString(R.string.library_no_media_folders), getString(R.string.library_no_media_folders_message)
             )
         )
     }
@@ -1439,7 +1463,7 @@ class LibraryActivity : Activity() {
         val audio = items.filter { it.subtitle == "Audio" }
         render(
             title = folder.name,
-            subtitle = "${items.size} files",
+            subtitle = getString(R.string.library_files_count, items.size),
             rows = items.map { item ->
                 AutoBridgeDesign.contentRow(
                     context = this,
@@ -1460,32 +1484,34 @@ class LibraryActivity : Activity() {
                     }
                 )
             },
-            empty = AutoBridgeDesign.emptyState(this, "Empty folder", "Nothing to play here.")
+            empty = AutoBridgeDesign.emptyState(
+                this, getString(R.string.library_empty_folder), getString(R.string.library_nothing_to_play_here)
+            )
         )
     }
 
     private fun showPlaylists() = push {
         val types = setOf(LocalMediaRepository.MediaType.AUDIO)
         if (!hasMediaPermission(types)) {
-            renderPermissionNeeded("Playlists", types)
+            renderPermissionNeeded(getString(R.string.section_playlists), types)
             return@push
         }
         val playlists = LocalMediaRepository.playlists(this)
         val rows = mutableListOf<View>()
         rows += AutoBridgeDesign.contentRow(
             context = this,
-            title = "All music",
-            subtitle = "Every track on this device",
+            title = getString(R.string.car_all_music),
+            subtitle = getString(R.string.library_every_track),
             accent = accent,
             badgeText = "♪",
             trailing = "›",
-            onClick = { showTracks("All music", LocalMediaRepository.allAudio(this)) }
+            onClick = { showTracks(getString(R.string.car_all_music), LocalMediaRepository.allAudio(this)) }
         )
         playlists.forEach { playlist ->
             rows += AutoBridgeDesign.contentRow(
                 context = this,
                 title = playlist.name,
-                subtitle = "Playlist",
+                subtitle = getString(R.string.library_playlist),
                 accent = accent,
                 badgeText = "≡",
                 trailing = "›",
@@ -1493,8 +1519,8 @@ class LibraryActivity : Activity() {
             )
         }
         render(
-            title = "Playlists",
-            subtitle = "${playlists.size} device playlists",
+            title = getString(R.string.section_playlists),
+            subtitle = getString(R.string.library_device_playlists_count, playlists.size),
             rows = rows
         )
     }
@@ -1502,7 +1528,7 @@ class LibraryActivity : Activity() {
     private fun showTracks(title: String, items: List<LocalMediaRepository.Item>) = push {
         render(
             title = title,
-            subtitle = "${items.size} tracks",
+            subtitle = getString(R.string.library_tracks_count, items.size),
             rows = items.mapIndexed { index, item ->
                 AutoBridgeDesign.contentRow(
                     context = this,
@@ -1525,8 +1551,8 @@ class LibraryActivity : Activity() {
             },
             empty = AutoBridgeDesign.emptyState(
                 this,
-                "No tracks",
-                "Android 11 and later hide MediaStore playlists from apps, so this can be empty even when the playlist exists."
+                getString(R.string.library_no_tracks),
+                getString(R.string.library_no_tracks_message)
             )
         )
     }
@@ -1534,18 +1560,18 @@ class LibraryActivity : Activity() {
     private fun showGalleryAlbums() = push {
         val types = setOf(LocalMediaRepository.MediaType.IMAGE, LocalMediaRepository.MediaType.VIDEO)
         if (!hasMediaPermission(types)) {
-            renderPermissionNeeded("Gallery", types)
+            renderPermissionNeeded(getString(R.string.section_gallery), types)
             return@push
         }
         val albums = LocalMediaRepository.galleryAlbums(this)
         render(
-            title = "Gallery",
-            subtitle = "${albums.size} albums",
+            title = getString(R.string.section_gallery),
+            subtitle = getString(R.string.library_albums_count, albums.size),
             rows = albums.map { album ->
                 AutoBridgeDesign.contentRow(
                     context = this,
                     title = album.name,
-                    subtitle = "${album.count} items",
+                    subtitle = getString(R.string.library_items_count, album.count),
                     accent = accent,
                     badgeText = "◱",
                     trailing = "›",
@@ -1553,7 +1579,7 @@ class LibraryActivity : Activity() {
                 )
             },
             empty = AutoBridgeDesign.emptyState(
-                this, "No albums", "No photos or videos were found on this device."
+                this, getString(R.string.library_no_albums), getString(R.string.library_no_albums_message)
             )
         )
     }
@@ -1562,19 +1588,21 @@ class LibraryActivity : Activity() {
         val items = LocalMediaRepository.galleryItems(this, album.id)
         render(
             title = album.name,
-            subtitle = "${items.size} items",
+            subtitle = getString(R.string.library_items_count, items.size),
             rows = items.map { item ->
                 AutoBridgeDesign.contentRow(
                     context = this,
                     title = item.title,
-                    subtitle = if (item.durationMs > 0) durationText(item.durationMs) else "Photo",
+                    subtitle = if (item.durationMs > 0) durationText(item.durationMs) else getString(R.string.media_kind_photo),
                     accent = accent,
                     artworkUrl = item.uri,
                     badgeText = if (item.durationMs > 0) "▶" else "◱",
                     onClick = { openGalleryItem(item) }
                 )
             },
-            empty = AutoBridgeDesign.emptyState(this, "Empty album", "Nothing in this album.")
+            empty = AutoBridgeDesign.emptyState(
+                this, getString(R.string.library_empty_album), getString(R.string.library_empty_album_message)
+            )
         )
     }
 
@@ -1591,7 +1619,7 @@ class LibraryActivity : Activity() {
                     .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             )
         }.isSuccess
-        if (!opened) alert("No viewer", "No app on this phone can open that image.")
+        if (!opened) alert(getString(R.string.library_no_viewer), getString(R.string.library_no_viewer_message))
     }
 
     // ----- Favorites -----
@@ -1605,7 +1633,7 @@ class LibraryActivity : Activity() {
             rows += AutoBridgeDesign.contentRow(
                 context = this,
                 title = item.title,
-                subtitle = if (item.kind == IptvKind.RADIO) "Radio" else "TV",
+                subtitle = getString(if (item.kind == IptvKind.RADIO) R.string.section_radio else R.string.section_tv),
                 accent = if (item.kind == IptvKind.RADIO) {
                     AutoBridgeDesign.ACCENT_RADIO
                 } else {
@@ -1649,13 +1677,13 @@ class LibraryActivity : Activity() {
         }
 
         render(
-            title = "Favorites",
-            subtitle = "${channels.size} channels • ${bookmarks.size} pages",
+            title = getString(R.string.section_favorites),
+            subtitle = getString(R.string.library_favorites_count, channels.size, bookmarks.size),
             rows = rows,
             empty = AutoBridgeDesign.emptyState(
                 this,
-                "Nothing saved yet",
-                "Star a channel in TV or Radio, or save a page in the browser, and it appears here."
+                getString(R.string.library_nothing_saved),
+                getString(R.string.library_nothing_saved_message)
             ),
             extraPinned = listOf(chipsRow())
         )
@@ -1668,7 +1696,7 @@ class LibraryActivity : Activity() {
         val rows = listOf(
             AutoBridgeDesign.contentRow(
                 context = this,
-                title = "YouTube Music",
+                title = getString(R.string.section_youtube_music),
                 subtitle = "music.youtube.com",
                 accent = accent,
                 badgeText = "▶",
@@ -1683,15 +1711,15 @@ class LibraryActivity : Activity() {
             ),
             AutoBridgeDesign.contentRow(
                 context = this,
-                title = "Playlists",
-                subtitle = "Audio on this device",
+                title = getString(R.string.section_playlists),
+                subtitle = getString(R.string.library_audio_on_device),
                 accent = accent,
                 badgeText = "♪",
                 trailing = "›",
                 onClick = { showPlaylists() }
             )
         )
-        render(title = "Music", subtitle = null, rows = rows, extraPinned = listOf(chipsRow()))
+        render(title = getString(R.string.home_tile_music), subtitle = null, rows = rows, extraPinned = listOf(chipsRow()))
     }
 
     // ----- Files -----
@@ -1701,8 +1729,8 @@ class LibraryActivity : Activity() {
         val rows = listOf(
             AutoBridgeDesign.contentRow(
                 context = this,
-                title = "Folders",
-                subtitle = "Audio and video on this device",
+                title = getString(R.string.section_folders),
+                subtitle = getString(R.string.library_audio_video_on_device),
                 accent = accent,
                 badgeText = "▣",
                 trailing = "›",
@@ -1710,8 +1738,8 @@ class LibraryActivity : Activity() {
             ),
             AutoBridgeDesign.contentRow(
                 context = this,
-                title = "Playlists",
-                subtitle = "Audio on this device",
+                title = getString(R.string.section_playlists),
+                subtitle = getString(R.string.library_audio_on_device),
                 accent = accent,
                 badgeText = "♪",
                 trailing = "›",
@@ -1719,15 +1747,15 @@ class LibraryActivity : Activity() {
             ),
             AutoBridgeDesign.contentRow(
                 context = this,
-                title = "Gallery",
-                subtitle = "Photos and videos on this device",
+                title = getString(R.string.section_gallery),
+                subtitle = getString(R.string.library_photos_videos_on_device),
                 accent = accent,
                 badgeText = "◱",
                 trailing = "›",
                 onClick = { showGalleryAlbums() }
             )
         )
-        render(title = "Files", subtitle = null, rows = rows, extraPinned = listOf(chipsRow()))
+        render(title = getString(R.string.library_section_files), subtitle = null, rows = rows, extraPinned = listOf(chipsRow()))
     }
 
     // ----- Streaming -----
@@ -1784,8 +1812,8 @@ class LibraryActivity : Activity() {
             )
         }
         render(
-            title = "Streaming",
-            subtitle = "${StreamingLinks.all.size} sites",
+            title = getString(R.string.section_streaming),
+            subtitle = getString(R.string.library_sites_count, StreamingLinks.all.size),
             rows = rows,
             extraPinned = listOf(chipsRow())
         )
@@ -1890,7 +1918,7 @@ class LibraryActivity : Activity() {
         queueIndex: Int = 0
     ) {
         if (url.isBlank()) {
-            alert("Nothing to play", "This entry has no stream address.")
+            alert(getString(R.string.library_nothing_to_play), getString(R.string.library_no_stream_address))
             return
         }
         startActivity(
@@ -1923,14 +1951,13 @@ class LibraryActivity : Activity() {
     private fun renderPermissionNeeded(title: String, types: Set<LocalMediaRepository.MediaType>) {
         render(
             title = title,
-            subtitle = "Media access required",
+            subtitle = getString(R.string.library_media_access_required),
             rows = emptyList(),
             empty = AutoBridgeDesign.emptyState(
                 context = this,
-                title = "AutoBridge needs media access",
-                message = "Allow access to this device's audio, video and photos to browse $title. " +
-                    "If the system no longer asks, grant it in Android settings.",
-                action = "Allow access" to { requestMediaPermission(types) },
+                title = getString(R.string.library_needs_media_access),
+                message = getString(R.string.library_media_access_message, title),
+                action = getString(R.string.library_allow_access) to { requestMediaPermission(types) },
                 accent = accent
             )
         )
@@ -1958,7 +1985,7 @@ class LibraryActivity : Activity() {
                 Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
                     .setData(Uri.fromParts("package", packageName, null))
             )
-        }.onFailure { alert("Settings unavailable", "Grant media access from Android settings.") }
+        }.onFailure { alert(getString(R.string.library_settings_unavailable), getString(R.string.library_grant_media_access)) }
     }
 
     override fun onRequestPermissionsResult(
@@ -1977,7 +2004,7 @@ class LibraryActivity : Activity() {
 
     private fun alert(title: String, message: String) {
         AlertDialog.Builder(this).setTitle(title).setMessage(message)
-            .setPositiveButton("OK", null).show()
+            .setPositiveButton(android.R.string.ok, null).show()
     }
 
     private fun durationText(durationMs: Long): String {

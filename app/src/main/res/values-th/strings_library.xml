@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Library screen (LibraryActivity). Keys mirror res/values/strings_library.xml. -->
+<resources>
+    <string name="library_title">คลังสื่อ</string>
+    <string name="library_section_files">ไฟล์</string>
+
+    <!-- IPTV sources -->
+    <string name="library_no_source">ยังไม่มีแหล่ง%1$s</string>
+    <string name="library_no_source_message">เลือกรายการสาธารณะฟรี หรือเพิ่มบัญชี Xtream หรือเพลย์ลิสต์ M3U ของคุณเอง</string>
+    <string name="library_browse_public_lists">ดูรายการสาธารณะ</string>
+    <string name="library_public_lists">รายการสาธารณะ</string>
+    <string name="library_loading">กำลังโหลด %1$s…</string>
+    <string name="library_load_failed">โหลด %1$s ไม่ได้</string>
+    <string name="library_switch_source">สลับแหล่ง</string>
+    <string name="library_add_source">เพิ่มแหล่ง</string>
+    <string name="library_add_xtream">เพิ่มบัญชี Xtream</string>
+    <string name="library_add_m3u">เพิ่มเพลย์ลิสต์ M3U</string>
+    <string name="library_edit_source">แก้ไขแหล่ง</string>
+    <string name="library_remove_source_title">นำ %1$s ออกไหม</string>
+    <string name="library_remove_builtin_message">นี่คือรายการสาธารณะที่มีมาให้ในแอป จะไม่กลับมาเอง แต่คุณเพิ่มกลับได้จาก \"รายการสาธารณะ\"</string>
+    <string name="library_remove_message">แหล่งนี้จะถูกนำออกจากอุปกรณ์ ช่องที่อยู่ในรายการโปรดยังคงอยู่</string>
+    <string name="library_no_public_lists">ไม่มีรายการสาธารณะ</string>
+    <string name="library_no_public_lists_message">ส่วนนี้ไม่มีรายการที่มีมาให้ในแอป</string>
+    <string name="library_free_public_lists">รายการสาธารณะฟรี</string>
+    <string name="library_already_added">%1$s (เพิ่มแล้ว)</string>
+    <string name="library_already_source">รายการนี้เป็นแหล่งของคุณอยู่แล้ว</string>
+    <string name="library_xtream_url_hint">URL พอร์ทัล หรือลิงก์ player_api.php แบบเต็ม</string>
+    <string name="library_m3u_url_hint">URL เพลย์ลิสต์ M3U</string>
+    <string name="library_username">ชื่อผู้ใช้</string>
+    <string name="library_password">รหัสผ่าน</string>
+    <string name="library_missing_url">ไม่มี URL</string>
+    <string name="library_missing_url_message">ใส่ที่อยู่ของผู้ให้บริการก่อน</string>
+    <string name="library_incomplete_account">ข้อมูลบัญชีไม่ครบ</string>
+    <string name="library_incomplete_account_message">ใส่ชื่อผู้ใช้และรหัสผ่าน หรือวางลิงก์ที่มีข้อมูลเหล่านี้</string>
+    <string name="library_invalid_url">URL ไม่ถูกต้อง</string>
+    <string name="library_invalid_url_message">ที่อยู่เพลย์ลิสต์ต้องขึ้นต้นด้วย http:// หรือ https://</string>
+
+    <plurals name="library_categories_count">
+        <item quantity="other">%1$d หมวด</item>
+    </plurals>
+    <plurals name="library_channels_count">
+        <item quantity="other">%1$d ช่อง</item>
+    </plurals>
+    <plurals name="library_entries_count">
+        <item quantity="other">%1$d รายการ</item>
+    </plurals>
+
+    <!-- Categories page -->
+    <string name="library_categories">หมวดหมู่</string>
+    <string name="library_no_matches_query">ไม่มีรายการที่ตรงกับ \"%1$s\"</string>
+    <string name="library_nothing_here">ไม่มีรายการ</string>
+    <string name="library_no_categories">แหล่งนี้ไม่มีหมวดหมู่</string>
+    <string name="library_all_categories_count">หมวดทั้งหมด • %1$d</string>
+    <string name="library_pinned">ปักหมุด</string>
+    <string name="library_pinned_categories">หมวดที่ปักหมุด</string>
+    <string name="library_last_watched">↺ ดูล่าสุด</string>
+
+    <!-- Entries page -->
+    <string name="library_entries_counted">%1$d ช่อง · %2$s</string>
+    <string name="library_entries_matched">ตรงกับ \"%3$s\" %1$d จาก %2$d ช่อง</string>
+    <string name="library_entries_truncated">%1$d ช่อง · %2$s • แสดง %3$d ช่องแรก ค้นหาเพื่อกรอง</string>
+    <string name="library_no_matches_category">ไม่มีรายการในหมวดนี้ที่ตรงกับคำค้นหา</string>
+    <string name="library_online_count">ออนไลน์ %1$d</string>
+    <string name="library_offline_count">ออฟไลน์ %1$d</string>
+    <string name="library_show_all">แสดงทั้งหมด</string>
+    <string name="library_hide_offline">ซ่อนช่องออฟไลน์</string>
+    <string name="library_on_car">บนรถ</string>
+    <string name="library_play_here">เล่นที่นี่</string>
+    <string name="library_ping">ตรวจสัญญาณ</string>
+    <string name="library_nothing_to_check">ไม่มีรายการที่ตรวจสอบได้</string>
+    <string name="library_channels_answered">ตอบกลับ %1$d จาก %2$d ช่อง</string>
+    <string name="library_checking_channels">กำลังตรวจสอบ %1$d ช่อง…</string>
+    <string name="library_checking">กำลังตรวจสอบ %1$s…</string>
+    <string name="library_ping_alive">เซิร์ฟเวอร์ตอบกลับใน %1$d ms</string>
+    <string name="library_ping_refused">เซิร์ฟเวอร์ตอบกลับ HTTP %1$d: เข้าถึงได้ แต่ปฏิเสธที่อยู่นี้ อาจเกิดจากโทเค็นหมดอายุหรือถูกจำกัดตามพื้นที่</string>
+    <string name="library_ping_unreachable">ไม่มีการตอบกลับ: %1$s ช่องนี้ออฟไลน์ หรือเครือข่ายนี้เข้าถึงไม่ได้</string>
+    <string name="library_ping_unsupported">ตรวจสอบที่อยู่นี้ไม่ได้: เป็นสตรีมมัลติแคสต์หรือสตรีมที่ไม่เป็นมาตรฐาน ซึ่งไม่ตอบรับการเชื่อมต่อโดยตรง</string>
+    <string name="library_sending_to_car">กำลังส่ง \"%1$s\" ไปที่รถ…</string>
+    <string name="library_no_episodes">ไม่มีตอน</string>
+    <string name="library_no_episode_list">ผู้ให้บริการไม่ได้ส่งรายการตอนมา</string>
+    <string name="library_episodes_count">%1$d ตอน</string>
+    <string name="library_nothing_to_play_here">ไม่มีอะไรให้เล่นที่นี่</string>
+    <string name="library_items_count">%1$d รายการ</string>
+    <string name="library_nothing_yet">ยังไม่มีรายการ</string>
+    <string name="library_recent_empty">ช่องที่คุณเล่นจะแสดงที่นี่</string>
+
+    <!-- Local media -->
+    <string name="library_folders_count">%1$d โฟลเดอร์ในอุปกรณ์นี้</string>
+    <string name="library_files_count">%1$d ไฟล์</string>
+    <string name="library_no_media_folders">ไม่มีโฟลเดอร์สื่อ</string>
+    <string name="library_no_media_folders_message">ไม่พบไฟล์เสียงหรือวิดีโอในอุปกรณ์นี้</string>
+    <string name="library_empty_folder">โฟลเดอร์ว่าง</string>
+    <string name="library_every_track">ทุกแทร็กในอุปกรณ์นี้</string>
+    <string name="library_playlist">เพลย์ลิสต์</string>
+    <string name="library_device_playlists_count">%1$d เพลย์ลิสต์ในอุปกรณ์</string>
+    <string name="library_tracks_count">%1$d แทร็ก</string>
+    <string name="library_no_tracks">ไม่มีแทร็ก</string>
+    <string name="library_no_tracks_message">Android 11 ขึ้นไปซ่อนเพลย์ลิสต์ MediaStore จากแอป จึงอาจว่างเปล่าแม้เพลย์ลิสต์จะมีอยู่</string>
+    <string name="library_albums_count">%1$d อัลบั้ม</string>
+    <string name="library_no_albums">ไม่มีอัลบั้ม</string>
+    <string name="library_no_albums_message">ไม่พบรูปภาพหรือวิดีโอในอุปกรณ์นี้</string>
+    <string name="library_empty_album">อัลบั้มว่าง</string>
+    <string name="library_empty_album_message">ไม่มีอะไรในอัลบั้มนี้</string>
+    <string name="library_no_viewer">ไม่มีแอปดูรูป</string>
+    <string name="library_no_viewer_message">ไม่มีแอปในโทรศัพท์นี้ที่เปิดรูปนี้ได้</string>
+    <string name="library_audio_on_device">เสียงในอุปกรณ์นี้</string>
+    <string name="library_audio_video_on_device">เสียงและวิดีโอในอุปกรณ์นี้</string>
+    <string name="library_photos_videos_on_device">รูปภาพและวิดีโอในอุปกรณ์นี้</string>
+
+    <!-- Favorites, Streaming -->
+    <string name="library_favorites_count">%1$d ช่อง • %2$d หน้า</string>
+    <string name="library_nothing_saved">ยังไม่ได้บันทึกอะไร</string>
+    <string name="library_nothing_saved_message">ติดดาวช่องในทีวีหรือวิทยุ หรือบันทึกหน้าเว็บในเบราว์เซอร์ แล้วจะแสดงที่นี่</string>
+    <string name="library_sites_count">%1$d เว็บไซต์</string>
+
+    <!-- Playback and permissions -->
+    <string name="library_nothing_to_play">ไม่มีอะไรให้เล่น</string>
+    <string name="library_no_stream_address">รายการนี้ไม่มีที่อยู่สตรีม</string>
+    <string name="library_media_access_required">ต้องใช้สิทธิ์เข้าถึงสื่อ</string>
+    <string name="library_needs_media_access">AutoBridge ต้องใช้สิทธิ์เข้าถึงสื่อ</string>
+    <string name="library_media_access_message">อนุญาตให้เข้าถึงเสียง วิดีโอ และรูปภาพในอุปกรณ์นี้เพื่อเรียกดู%1$s หากระบบไม่ถามอีก ให้อนุญาตในการตั้งค่า Android</string>
+    <string name="library_allow_access">อนุญาตการเข้าถึง</string>
+    <string name="library_settings_unavailable">เปิดการตั้งค่าไม่ได้</string>
+    <string name="library_grant_media_access">อนุญาตการเข้าถึงสื่อจากการตั้งค่า Android</string>
+</resources>

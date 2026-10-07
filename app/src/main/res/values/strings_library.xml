@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Library screen (LibraryActivity): TV / Radio / Music / Streaming / Files chips, IPTV sources,
+     categories and entries, local folders / playlists / gallery, and favourites.
+     Generic labels (Cancel, Save, Search, section names...) reuse the keys in strings.xml. -->
+<resources>
+    <string name="library_title">Library</string>
+    <string name="library_section_files">Files</string>
+
+    <!-- IPTV sources -->
+    <string name="library_no_source">No %1$s source yet</string>
+    <string name="library_no_source_message">Pick a free public list, or add your own Xtream account or M3U playlist.</string>
+    <string name="library_browse_public_lists">Browse public lists</string>
+    <string name="library_public_lists">Public lists</string>
+    <string name="library_loading">Loading %1$s…</string>
+    <string name="library_load_failed">Could not load %1$s</string>
+    <string name="library_switch_source">Switch source</string>
+    <string name="library_add_source">Add a source</string>
+    <string name="library_add_xtream">Add Xtream account</string>
+    <string name="library_add_m3u">Add M3U playlist</string>
+    <string name="library_edit_source">Edit source</string>
+    <string name="library_remove_source_title">Remove %1$s?</string>
+    <string name="library_remove_builtin_message">This is one of the built-in public lists. It will not come back on its own, but you can add it again from \"Public lists\".</string>
+    <string name="library_remove_message">The source is removed from this device. Channels you favourited stay.</string>
+    <string name="library_no_public_lists">No public lists</string>
+    <string name="library_no_public_lists_message">There is no built-in list for this section.</string>
+    <string name="library_free_public_lists">Free public lists</string>
+    <string name="library_already_added">%1$s (already added)</string>
+    <string name="library_already_source">This list is already one of your sources.</string>
+    <string name="library_xtream_url_hint">Portal URL or full player_api.php link</string>
+    <string name="library_m3u_url_hint">M3U playlist URL</string>
+    <string name="library_username">Username</string>
+    <string name="library_password">Password</string>
+    <string name="library_missing_url">Missing URL</string>
+    <string name="library_missing_url_message">Enter the provider address first.</string>
+    <string name="library_incomplete_account">Incomplete account</string>
+    <string name="library_incomplete_account_message">Enter a username and password, or paste a link that contains them.</string>
+    <string name="library_invalid_url">Invalid URL</string>
+    <string name="library_invalid_url_message">The playlist address must start with http:// or https://.</string>
+
+    <plurals name="library_categories_count">
+        <item quantity="one">%1$d category</item>
+        <item quantity="other">%1$d categories</item>
+    </plurals>
+    <plurals name="library_channels_count">
+        <item quantity="one">%1$d channel</item>
+        <item quantity="other">%1$d channels</item>
+    </plurals>
+    <plurals name="library_entries_count">
+        <item quantity="one">%1$d entry</item>
+        <item quantity="other">%1$d entries</item>
+    </plurals>
+
+    <!-- Categories page -->
+    <string name="library_categories">Categories</string>
+    <string name="library_no_matches_query">Nothing matches \"%1$s\".</string>
+    <string name="library_nothing_here">Nothing here</string>
+    <string name="library_no_categories">This source returned no categories.</string>
+    <string name="library_all_categories_count">All categories • %1$d</string>
+    <string name="library_pinned">Pinned</string>
+    <string name="library_pinned_categories">Pinned categories</string>
+    <string name="library_last_watched">↺ Last watched</string>
+
+    <!-- Entries page -->
+    <string name="library_entries_counted">%1$d channels · %2$s</string>
+    <string name="library_entries_matched">%1$d of %2$d match \"%3$s\"</string>
+    <string name="library_entries_truncated">%1$d channels · %2$s • showing first %3$d, search to narrow</string>
+    <string name="library_no_matches_category">Nothing in this category matches that search.</string>
+    <string name="library_online_count">%1$d online</string>
+    <string name="library_offline_count">%1$d offline</string>
+    <string name="library_show_all">Show all</string>
+    <string name="library_hide_offline">Hide offline</string>
+    <string name="library_on_car">ON CAR</string>
+    <string name="library_play_here">Play here</string>
+    <string name="library_ping">Ping</string>
+    <string name="library_nothing_to_check">Nothing here can be checked.</string>
+    <string name="library_channels_answered">%1$d of %2$d channels answered.</string>
+    <string name="library_checking_channels">Checking %1$d channels…</string>
+    <string name="library_checking">Checking %1$s…</string>
+    <string name="library_ping_alive">The server answered in %1$d ms.</string>
+    <string name="library_ping_refused">The server answered HTTP %1$d: it is reachable, but it refused this address. An expired token or a geo-block looks like this.</string>
+    <string name="library_ping_unreachable">No answer: %1$s. The channel is offline, or this network cannot reach it.</string>
+    <string name="library_ping_unsupported">This address cannot be checked: it is a multicast or non-standard stream, which answers no connection of its own.</string>
+    <string name="library_sending_to_car">Sending \"%1$s\" to the car…</string>
+    <string name="library_no_episodes">No episodes</string>
+    <string name="library_no_episode_list">The provider returned no episode list.</string>
+    <string name="library_episodes_count">%1$d episodes</string>
+    <string name="library_nothing_to_play_here">Nothing to play here.</string>
+    <string name="library_items_count">%1$d items</string>
+    <string name="library_nothing_yet">Nothing yet</string>
+    <string name="library_recent_empty">Channels you play show up here.</string>
+
+    <!-- Local media -->
+    <string name="library_folders_count">%1$d folders on this device</string>
+    <string name="library_files_count">%1$d files</string>
+    <string name="library_no_media_folders">No media folders</string>
+    <string name="library_no_media_folders_message">No audio or video was found on this device.</string>
+    <string name="library_empty_folder">Empty folder</string>
+    <string name="library_every_track">Every track on this device</string>
+    <string name="library_playlist">Playlist</string>
+    <string name="library_device_playlists_count">%1$d device playlists</string>
+    <string name="library_tracks_count">%1$d tracks</string>
+    <string name="library_no_tracks">No tracks</string>
+    <string name="library_no_tracks_message">Android 11 and later hide MediaStore playlists from apps, so this can be empty even when the playlist exists.</string>
+    <string name="library_albums_count">%1$d albums</string>
+    <string name="library_no_albums">No albums</string>
+    <string name="library_no_albums_message">No photos or videos were found on this device.</string>
+    <string name="library_empty_album">Empty album</string>
+    <string name="library_empty_album_message">Nothing in this album.</string>
+    <string name="library_no_viewer">No viewer</string>
+    <string name="library_no_viewer_message">No app on this phone can open that image.</string>
+    <string name="library_audio_on_device">Audio on this device</string>
+    <string name="library_audio_video_on_device">Audio and video on this device</string>
+    <string name="library_photos_videos_on_device">Photos and videos on this device</string>
+
+    <!-- Favorites, Streaming -->
+    <string name="library_favorites_count">%1$d channels • %2$d pages</string>
+    <string name="library_nothing_saved">Nothing saved yet</string>
+    <string name="library_nothing_saved_message">Star a channel in TV or Radio, or save a page in the browser, and it appears here.</string>
+    <string name="library_sites_count">%1$d sites</string>
+
+    <!-- Playback and permissions -->
+    <string name="library_nothing_to_play">Nothing to play</string>
+    <string name="library_no_stream_address">This entry has no stream address.</string>
+    <string name="library_media_access_required">Media access required</string>
+    <string name="library_needs_media_access">AutoBridge needs media access</string>
+    <string name="library_media_access_message">Allow access to this device\'s audio, video and photos to browse %1$s. If the system no longer asks, grant it in Android settings.</string>
+    <string name="library_allow_access">Allow access</string>
+    <string name="library_settings_unavailable">Settings unavailable</string>
+    <string name="library_grant_media_access">Grant media access from Android settings.</string>
+</resources>
