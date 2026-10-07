@@ -38,6 +38,7 @@ import com.google.common.collect.ImmutableList
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import dev.autobridge.MainActivity
+import dev.autobridge.car.DuoSessionState
 import dev.autobridge.core.model.Feature
 import dev.autobridge.core.policy.FeaturePolicy
 import dev.autobridge.audio.WebMediaStatus
@@ -504,7 +505,12 @@ class MediaPlaybackService : MediaLibraryService() {
         mainHandler.post(webPoll)
     }
 
+    /** Pure gate decision: surface the session only when Duo is not active AND the controller is authorized. */
+    internal fun shouldSurfaceSession(duoActive: Boolean, authorized: Boolean): Boolean =
+        !duoActive && authorized
+
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? {
+        val duoActive = DuoSessionState.isActive
         val allowed = MediaControllerAuthorization.isAllowed(
             packageName = controllerInfo.packageName,
             uid = controllerInfo.uid,
@@ -512,11 +518,13 @@ class MediaPlaybackService : MediaLibraryService() {
             ownUid = applicationInfo.uid,
             systemUid = Process.SYSTEM_UID
         )
+        val surface = shouldSurfaceSession(duoActive, allowed)
         StructuredLog.i(
             "MEDIA",
-            "MediaSession controller package=${controllerInfo.packageName} uid=${controllerInfo.uid} allowed=$allowed"
+            "MediaSession controller package=${controllerInfo.packageName} uid=${controllerInfo.uid} " +
+                "allowed=$allowed duoActive=$duoActive surfaced=$surface"
         )
-        return session.takeIf { allowed }
+        return session.takeIf { surface }
     }
 
     override fun onDestroy() {

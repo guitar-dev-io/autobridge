@@ -187,6 +187,8 @@ class DuoScreenSpikeActivity : Activity() {
 
     private fun stopSession() {
         started = false
+        // Real teardown: let stop() clear the Duo-active media gate (restart()'s internal stop() does not).
+        controller.tearingDown = true
         controller.stop()
         StructuredLog.i(TAG, "session stopped")
     }

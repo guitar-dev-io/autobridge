@@ -13,6 +13,7 @@ import android.os.Looper
 import androidx.core.content.edit
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
+import dev.autobridge.car.DuoSessionState
 import dev.autobridge.logging.StructuredLog
 
 /**
@@ -56,7 +57,14 @@ object MediaAutoStart {
      * The binding is released after [HOLD_MS] so an idle session does not hold the process open —
      * by then the car has enumerated it.
      */
+    /** Pure gate decision: start the session only when Duo is not active. */
+    internal fun shouldStartSession(duoActive: Boolean): Boolean = !duoActive
+
     fun startSession(context: Context) {
+        if (!shouldStartSession(DuoSessionState.isActive)) {
+            StructuredLog.i("MEDIA", "auto-start: Duo session active; not bringing the session up")
+            return
+        }
         val appContext = context.applicationContext
         val token = SessionToken(appContext, ComponentName(appContext, MediaPlaybackService::class.java))
         val future = MediaController.Builder(appContext, token).buildAsync()

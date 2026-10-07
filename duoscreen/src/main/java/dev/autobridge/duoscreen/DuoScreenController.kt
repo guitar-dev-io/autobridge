@@ -11,6 +11,7 @@ import android.os.HandlerThread
 import android.os.Looper
 import android.os.SystemClock
 import android.view.Surface
+import dev.autobridge.car.DuoSessionState
 import dev.autobridge.logging.StructuredLog
 import dev.autobridge.power.CarScreenPower
 import dev.autobridge.duoscreen.input.DuoScreenInputPort
@@ -86,6 +87,14 @@ class DuoScreenController(
     private var selectedPaneId: Int? = null
 
     /**
+     * Whether the next [stop] is a real teardown (set by [DuoScreenHost.release] and the on-phone
+     * harness) rather than [restart]'s internal rebuild. Only a real teardown clears the Duo-active
+     * media gate; [restart] leaves this false so the flag stays true across a live rebuild. Read and
+     * written only on the controller's calling thread, so it needs no synchronisation.
+     */
+    internal var tearingDown = false
+
+    /**
      * The host's Surface, kept so the session can be rebuilt on it without waiting for the host to
      * hand it over again — which it has no reason to do when it is the *phone* settings that
      * changed. We do not own it; it is only borrowed for as long as the host says it is valid.
@@ -112,6 +121,7 @@ class DuoScreenController(
     ): Boolean {
         if (resume(output, width, height, panelDpi)) {
             CarScreenPower.sessionStarted(context)
+            DuoSessionState.sessionStarted()
             return true
         }
         stop()
@@ -150,6 +160,7 @@ class DuoScreenController(
         // running, and the keep-alive window is exactly when the driver is looking at Maps with
         // the phone untouched.
         CarScreenPower.sessionStarted(context)
+        DuoSessionState.sessionStarted()
         StructuredLog.i(
             TAG,
             "Session started: ${paneSet.panes.size} panes on ${width}x$height" +
@@ -342,6 +353,8 @@ class DuoScreenController(
             StructuredLog.w(TAG, "The host surface is gone; the session is left for the next entry")
             return false
         }
+        // This stop() is a rebuild, not an end: do NOT clear the Duo-active media gate.
+        tearingDown = false
         stop()
         return start(output, bounds.width, bounds.height, panelDpi, emptyList())
     }
@@ -505,6 +518,10 @@ class DuoScreenController(
         sessionBounds = null
         compositor.stopBlocking()
         CarScreenPower.sessionEnded()
+        // Clear the Duo-active media gate ONLY on real teardown, never on restart()'s internal
+        // stop(): restart() leaves tearingDown false so the flag stays true across a live rebuild;
+        // a true teardown (release()/harness) sets it true so the flag drops exactly once.
+        if (tearingDown) DuoSessionState.sessionEnded()
         StructuredLog.i(TAG, "Session stopped")
     }
 

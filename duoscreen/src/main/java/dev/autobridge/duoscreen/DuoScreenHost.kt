@@ -81,6 +81,8 @@ object DuoScreenHost {
     fun release(): Boolean {
         mainHandler.removeCallbacks(expire)
         val active = controller ?: return false
+        // Real teardown: let stop() clear the Duo-active media gate (restart()'s internal stop() does not).
+        active.tearingDown = true
         active.stop()
         controller = null
         StructuredLog.i(TAG, "Duo Screen session released")
