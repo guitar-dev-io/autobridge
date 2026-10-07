@@ -16,6 +16,7 @@
     <string name="duo_screen_panes_section">Panes</string>
     <string name="duo_screen_pane_count">Number of panes</string>
     <string name="duo_screen_pane_label">Pane %1$d</string>
+    <string name="duo_screen_preview_tap_hint">%1$s · tap to change</string>
     <string name="duo_screen_pane_empty">No app chosen</string>
     <string name="duo_screen_layout_section">Layout</string>
     <string name="duo_screen_preset">Layout preset</string>

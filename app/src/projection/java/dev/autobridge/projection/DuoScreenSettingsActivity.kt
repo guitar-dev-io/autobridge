@@ -21,6 +21,7 @@ import android.widget.TextView
 import android.widget.Toast
 import dev.autobridge.duoscreen.DuoScreenHost
 import dev.autobridge.duoscreen.R
+import dev.autobridge.duoscreen.layout.DuoScreenLayout
 import dev.autobridge.duoscreen.layout.DuoScreenPreset
 import dev.autobridge.duoscreen.layout.DuoScreenStore
 import dev.autobridge.duoscreen.system.DuoScreenSelfPane
@@ -85,6 +86,14 @@ class DuoScreenSettingsActivity : Activity() {
                 badgeText = DuoScreenPreset.STACKED_60_40.glyph,
             ) { applyMapsAndMusic() },
             gap = 14
+        )
+
+        // ── PREVIEW ──────────────────────────────────────────────────────────
+        // The car screen as it will look: each pane drawn where the current layout puts it, with
+        // the app it holds. Tapping a pane picks its app, the same as the rows below.
+        body.addView(
+            layoutPreview(DuoScreenStore.preset(this), DuoScreenStore.paneCount(this), DuoScreenStore.packages(this)),
+            LinearLayout.LayoutParams(-1, dp(200)).apply { bottomMargin = dp(14) }
         )
 
         // ── PANES ────────────────────────────────────────────────────────────
@@ -322,6 +331,83 @@ class DuoScreenSettingsActivity : Activity() {
                 setTextColor(AutoBridgeDesign.TEXT_MUTED)
                 importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
             }, LinearLayout.LayoutParams(dp(24), -2))
+        }
+    }
+
+    // ── Car screen preview ───────────────────────────────────────────────────
+
+    /**
+     * A small model of the car screen: [paneCount] tiles placed by [DuoScreenPreset.rects] on a
+     * 16:9 surface, each tinted with its pane accent and naming its app. The rects are only known
+     * once the frame has a width, so the tiles are positioned from a layout listener.
+     */
+    private fun layoutPreview(preset: DuoScreenPreset, paneCount: Int, packages: List<String?>): View {
+        val frame = FrameLayout(this).apply {
+            background = AutoBridgeDesign.surface(
+                this@DuoScreenSettingsActivity, 0xFF0B0D10.toInt(), 20, AutoBridgeDesign.HAIRLINE
+            )
+            setPadding(dp(6), dp(6), dp(6), dp(6))
+        }
+        val tiles = List(paneCount) { index -> previewTile(index, packages.getOrNull(index)) }
+        tiles.forEach { frame.addView(it, FrameLayout.LayoutParams(0, 0)) }
+        var placedWidth = -1
+        frame.addOnLayoutChangeListener { view, left, top, right, bottom, _, _, _, _ ->
+            val width = right - left - view.paddingLeft - view.paddingRight
+            val height = bottom - top - view.paddingTop - view.paddingBottom
+            if (width <= 0 || height <= 0 || width == placedWidth) return@addOnLayoutChangeListener
+            placedWidth = width
+            val gap = dp(3)
+            val rects = preset.rects(paneCount, DuoScreenLayout.Bounds(width, height))
+            view.post {
+                rects.forEachIndexed { index, rect ->
+                    tiles.getOrNull(index)?.layoutParams = FrameLayout.LayoutParams(
+                        (rect.width - 2 * gap).coerceAtLeast(1),
+                        (rect.height - 2 * gap).coerceAtLeast(1)
+                    ).apply {
+                        leftMargin = rect.left + gap
+                        topMargin = rect.top + gap
+                    }
+                }
+                // Picture-in-picture tiles sit over pane 1: keep the later panes on top.
+                tiles.drop(1).forEach { it.bringToFront() }
+            }
+        }
+        return frame
+    }
+
+    private fun previewTile(index: Int, chosen: String?): View {
+        val accent = paneAccent(index)
+        val paneTitle = getString(R.string.duo_screen_pane_label, index + 1)
+        val appName = chosen?.let(::paneLabel) ?: getString(R.string.duo_screen_pane_empty)
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            background = AutoBridgeDesign.tappable(
+                this@DuoScreenSettingsActivity,
+                AutoBridgeDesign.tint(accent, 0.16f), 12,
+                accent, stroke = AutoBridgeDesign.tint(accent, 0.35f)
+            )
+            isClickable = true
+            isFocusable = true
+            contentDescription = "$paneTitle, $appName"
+            setOnClickListener { pickAppFor(index) }
+            addView(TextView(this@DuoScreenSettingsActivity).apply {
+                text = appName
+                textSize = 14f
+                gravity = Gravity.CENTER
+                setTextColor(AutoBridgeDesign.TEXT)
+                typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+                maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
+            })
+            addView(TextView(this@DuoScreenSettingsActivity).apply {
+                text = getString(R.string.duo_screen_preview_tap_hint, paneTitle)
+                textSize = 11.5f
+                gravity = Gravity.CENTER
+                setTextColor(accent)
+                maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
+            })
         }
     }
 
