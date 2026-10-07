@@ -1,5 +1,6 @@
 package dev.autobridge.duoscreen.render
 
+import android.graphics.Bitmap
 import android.graphics.SurfaceTexture
 import android.opengl.EGL14
 import android.opengl.EGLConfig
@@ -8,6 +9,7 @@ import android.opengl.EGLDisplay
 import android.opengl.EGLSurface
 import android.opengl.GLES11Ext
 import android.opengl.GLES20
+import android.opengl.GLUtils
 import android.os.Handler
 import android.os.HandlerThread
 import android.util.Log
@@ -77,6 +79,37 @@ class DuoScreenCompositor {
             }
         """
 
+        /** The controls overlay: a plain 2D texture (a painted Bitmap), drawn with alpha blending. */
+        const val OVERLAY_VERTEX_SHADER = """
+            attribute vec4 aPosition;
+            attribute vec2 aTexCoord;
+            varying vec2 vTexCoord;
+            void main() {
+                gl_Position = aPosition;
+                vTexCoord = aTexCoord;
+            }
+        """
+
+        const val OVERLAY_FRAGMENT_SHADER = """
+            precision mediump float;
+            varying vec2 vTexCoord;
+            uniform sampler2D uTexture;
+            void main() {
+                gl_FragColor = texture2D(uTexture, vTexCoord);
+            }
+        """
+
+        /**
+         * Overlay tex coords in strip order (bottom-left, bottom-right, top-left, top-right). A
+         * Bitmap uploads with its top row at t = 0, so the top corners take t = 0.
+         */
+        val OVERLAY_TEX_COORDS = floatArrayOf(
+            0f, 1f,
+            1f, 1f,
+            0f, 0f,
+            1f, 0f
+        )
+
         /** Tex coords for a triangle strip: bottom-left, bottom-right, top-left, top-right. */
         val TEX_COORDS = floatArrayOf(
             0f, 0f, 0f, 1f,
@@ -143,6 +176,23 @@ class DuoScreenCompositor {
     private var solidPositionHandle = 0
     private var solidColorHandle = 0
 
+    private var overlayProgram = 0
+    private var overlayPositionHandle = 0
+    private var overlayTexCoordHandle = 0
+    private var overlayTextureHandle = 0
+    private var overlayTextureId = 0
+
+    /** Where the uploaded overlay is drawn, or null when there is none. */
+    private var overlayRect: Rect? = null
+
+    /**
+     * An overlay handed over by [setOverlay] and not uploaded yet. Uploading needs the context
+     * current on a surface, which only [render] guarantees, so the swap happens there.
+     */
+    private var pendingOverlay: PendingOverlay? = null
+
+    private class PendingOverlay(val bitmap: Bitmap?, val rect: Rect?)
+
     private val panes = LinkedHashMap<Int, Pane>()
     private var outputWidth = 0
     private var outputHeight = 0
@@ -151,6 +201,7 @@ class DuoScreenCompositor {
     private var dividerBand: Rect? = null
 
     private val texCoordBuffer: FloatBuffer = floatBuffer(TEX_COORDS)
+    private val overlayTexCoordBuffer: FloatBuffer = floatBuffer(OVERLAY_TEX_COORDS)
     private val vertexBuffer: FloatBuffer = floatBuffer(FloatArray(8))
 
     /** True once a GL context exists, whether or not a host Surface is bound to it right now. */
@@ -298,6 +349,24 @@ class DuoScreenCompositor {
         }
     }
 
+    /**
+     * Draws [bitmap] over every pane at [rect] (surface pixels), or removes the overlay when either
+     * is null. Takes ownership of [bitmap]: it is recycled once uploaded, or if it is replaced by a
+     * newer one first. Used for the controls Duo Screen draws on the car surface itself.
+     */
+    fun setOverlay(bitmap: Bitmap?, rect: Rect?) {
+        val threadHandler = handler
+        if (threadHandler == null) {
+            bitmap?.recycle()
+            return
+        }
+        threadHandler.post {
+            pendingOverlay?.bitmap?.recycle()
+            pendingOverlay = PendingOverlay(bitmap, rect)
+            scheduleRender()
+        }
+    }
+
     /** Releases every pane, the EGL context and the GL thread. Safe to call more than once. */
     fun stopBlocking() {
         val threadHandler = handler ?: return
@@ -326,6 +395,10 @@ class DuoScreenCompositor {
             Log.w(TAG, "eglMakeCurrent failed: ${EGL14.eglGetError()}")
             return
         }
+        pendingOverlay?.let { pending ->
+            pendingOverlay = null
+            applyOverlay(pending)
+        }
         GLES20.glViewport(0, 0, outputWidth, outputHeight)
         GLES20.glClearColor(0f, 0f, 0f, 1f)
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
@@ -345,10 +418,80 @@ class DuoScreenCompositor {
 
         highlightedPaneId?.let { id -> panes[id]?.let(::drawHighlight) }
         dividerBand?.let(::drawDividerBand)
+        drawOverlay()
 
         if (!EGL14.eglSwapBuffers(eglDisplay, eglSurface)) {
             Log.w(TAG, "eglSwapBuffers failed: ${EGL14.eglGetError()}")
         }
+    }
+
+    /** Uploads (or clears) the overlay on the GL thread, with the context current. */
+    private fun applyOverlay(pending: PendingOverlay) {
+        val bitmap = pending.bitmap
+        val rect = pending.rect
+        if (bitmap == null || rect == null || overlayProgram == 0) {
+            overlayRect = null
+            bitmap?.recycle()
+            return
+        }
+        if (overlayTextureId == 0) overlayTextureId = createOverlayTexture()
+        if (overlayTextureId == 0) {
+            overlayRect = null
+            bitmap.recycle()
+            return
+        }
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, overlayTextureId)
+        runCatching { GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bitmap, 0) }
+            .onSuccess { overlayRect = rect }
+            .onFailure {
+                overlayRect = null
+                Log.w(TAG, "Overlay upload failed", it)
+            }
+        bitmap.recycle()
+    }
+
+    /**
+     * The controls, above every pane. The painted Bitmap is premultiplied, hence ONE /
+     * ONE_MINUS_SRC_ALPHA rather than SRC_ALPHA.
+     */
+    private fun drawOverlay() {
+        val rect = overlayRect ?: return
+        if (overlayProgram == 0 || overlayTextureId == 0) return
+        if (rect.width <= 0 || rect.height <= 0) return
+        GLES20.glEnable(GLES20.GL_BLEND)
+        GLES20.glBlendFunc(GLES20.GL_ONE, GLES20.GL_ONE_MINUS_SRC_ALPHA)
+        GLES20.glUseProgram(overlayProgram)
+        writeVertices(rect)
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, overlayTextureId)
+        GLES20.glUniform1i(overlayTextureHandle, 0)
+        GLES20.glEnableVertexAttribArray(overlayPositionHandle)
+        GLES20.glVertexAttribPointer(
+            overlayPositionHandle, COORDS_PER_VERTEX, GLES20.GL_FLOAT, false,
+            COORDS_PER_VERTEX * FLOAT_BYTES, vertexBuffer
+        )
+        GLES20.glEnableVertexAttribArray(overlayTexCoordHandle)
+        GLES20.glVertexAttribPointer(
+            overlayTexCoordHandle, 2, GLES20.GL_FLOAT, false, 2 * FLOAT_BYTES, overlayTexCoordBuffer
+        )
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
+        GLES20.glDisableVertexAttribArray(overlayPositionHandle)
+        GLES20.glDisableVertexAttribArray(overlayTexCoordHandle)
+        GLES20.glDisable(GLES20.GL_BLEND)
+        GLES20.glUseProgram(program)
+    }
+
+    private fun createOverlayTexture(): Int {
+        val textures = IntArray(1)
+        GLES20.glGenTextures(1, textures, 0)
+        val textureId = textures[0]
+        if (textureId == 0) return 0
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureId)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
+        return textureId
     }
 
     /** Four filled bands inside the pane's edges; GL line width above 1px is not portable. */
@@ -523,6 +666,16 @@ class DuoScreenCompositor {
             // The panes still composite; only the edit-mode frame and empty-pane tint are missing.
             Log.w(TAG, "Solid-colour program unavailable")
         }
+
+        overlayProgram = linkProgram(OVERLAY_VERTEX_SHADER, OVERLAY_FRAGMENT_SHADER)
+        if (overlayProgram != 0) {
+            overlayPositionHandle = GLES20.glGetAttribLocation(overlayProgram, "aPosition")
+            overlayTexCoordHandle = GLES20.glGetAttribLocation(overlayProgram, "aTexCoord")
+            overlayTextureHandle = GLES20.glGetUniformLocation(overlayProgram, "uTexture")
+        } else {
+            // The panes still composite; only the on-surface controls are missing.
+            Log.w(TAG, "Overlay program unavailable")
+        }
         return true
     }
 
@@ -590,6 +743,17 @@ class DuoScreenCompositor {
             GLES20.glDeleteProgram(solidProgram)
             solidProgram = 0
         }
+        if (overlayProgram != 0) {
+            GLES20.glDeleteProgram(overlayProgram)
+            overlayProgram = 0
+        }
+        if (overlayTextureId != 0) {
+            GLES20.glDeleteTextures(1, intArrayOf(overlayTextureId), 0)
+            overlayTextureId = 0
+        }
+        overlayRect = null
+        pendingOverlay?.bitmap?.recycle()
+        pendingOverlay = null
         if (eglDisplay != EGL14.EGL_NO_DISPLAY) {
             releaseWindowSurface()
             EGL14.eglMakeCurrent(

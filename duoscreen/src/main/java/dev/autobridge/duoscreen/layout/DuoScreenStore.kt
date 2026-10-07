@@ -113,6 +113,9 @@ object DuoScreenStore {
      */
     private const val KEY_ARRANGED = "arranged"
     private const val KEY_CONTENT_SCALE = "content_scale"
+
+    /** Where the floating controls button sits when the panes share no seam (picture in picture). */
+    private const val KEY_FAB_CORNER = "fab_corner"
     private const val DEFAULT_PANE_COUNT = 2
 
     const val MIN_PANES = 2
@@ -243,5 +246,14 @@ object DuoScreenStore {
     /** Drops the arrangement but keeps the chosen apps, which is what "reset layout" means. */
     fun resetLayout(context: Context) {
         prefs(context).edit { putBoolean(KEY_ARRANGED, false) }
+    }
+
+    fun fabCorner(context: Context): DuoScreenFabCorner {
+        val name = prefs(context).getString(KEY_FAB_CORNER, null)
+        return DuoScreenFabCorner.entries.firstOrNull { it.name == name } ?: DuoScreenFabCorner.BOTTOM_RIGHT
+    }
+
+    fun setFabCorner(context: Context, corner: DuoScreenFabCorner) {
+        prefs(context).edit { putString(KEY_FAB_CORNER, corner.name) }
     }
 }

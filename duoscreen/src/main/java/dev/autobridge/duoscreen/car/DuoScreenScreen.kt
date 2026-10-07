@@ -18,17 +18,18 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import dev.autobridge.duoscreen.R
 import dev.autobridge.logging.StructuredLog
+import dev.autobridge.duoscreen.DuoScreenController
 import dev.autobridge.duoscreen.DuoScreenHost
-import dev.autobridge.duoscreen.input.DuoScreenInputRouter
-import dev.autobridge.duoscreen.layout.DuoScreenStore
+import dev.autobridge.duoscreen.layout.DuoScreenPreset
 import dev.autobridge.duoscreen.system.DuoScreenShizukuOps
 
 /**
  * The car side of a Duo Screen session: hands the host's Surface and gestures to
  * [dev.autobridge.duoscreen.DuoScreenController] and does nothing else itself.
  *
- * Panes start from the preset chosen in [DuoScreenStore] and are rearranged by hand in edit mode;
- * [DEFAULT_PANES] fills them only until an app has been picked on the phone.
+ * Panes start from the preset chosen in [dev.autobridge.duoscreen.layout.DuoScreenStore] and are
+ * rearranged by hand in edit mode; [DEFAULT_PANES] fills them only until an app has been picked
+ * on the phone.
  */
 class DuoScreenScreen(carContext: CarContext) : Screen(carContext), SurfaceCallback {
     private companion object {
@@ -42,14 +43,23 @@ class DuoScreenScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
     // and coming back must not relaunch every pane.
     private val controller = DuoScreenHost.controller(carContext)
 
+    /** The layout button on the surface names the layout it switched to, as the host button did. */
+    private val presetToast = object : DuoScreenController.ControlListener {
+        override fun onPresetApplied(preset: DuoScreenPreset) {
+            CarToast.makeText(carContext, preset.label(carContext), CarToast.LENGTH_SHORT).show()
+        }
+    }
+
     init {
         lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) {
                 carContext.getCarService(AppManager::class.java)
                     .setSurfaceCallback(this@DuoScreenScreen)
+                controller.controlListener = presetToast
             }
 
             override fun onDestroy(owner: LifecycleOwner) {
+                if (controller.controlListener === presetToast) controller.controlListener = null
                 carContext.getCarService(AppManager::class.java).setSurfaceCallback(null)
                 DuoScreenHost.onScreenGone()
             }
@@ -57,45 +67,15 @@ class DuoScreenScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
     }
 
     /**
-     * The controls sit in two places because the template allows no other shape. Preset, reload and
-     * arrange go in the *map* action strip, which the host draws as one compact group of small icon
-     * buttons, like a map's zoom controls; as titled pills in the main strip they covered the top of
-     * a pane on a real head unit. Exit stays alone in the main strip: [NavigationTemplate] refuses
-     * to build without one, an empty strip is invalid, and it keeps the way out apart from the
-     * buttons a driver taps by the dozen.
-     *
-     * One button toggles edit mode, because the host only reports scroll/fling/scale — there is no
-     * separate gesture left to mean "arrange" (see [DuoScreenInputRouter]).
+     * Only Exit is a host action. Layout, swap, reload and arrange are drawn by the app on the car
+     * surface itself, on the seam between the panes (or as one floating button in picture in
+     * picture) — see [dev.autobridge.duoscreen.layout.DuoScreenControlsGeometry]. Host buttons are
+     * drawn at a size the app cannot change, and on a portrait head unit the map strip covered the
+     * right-hand pane. Exit has to stay: [NavigationTemplate] refuses to build without an action
+     * strip, an empty strip is invalid, and it keeps the way out apart from the buttons a driver
+     * taps by the dozen.
      */
     override fun onGetTemplate(): Template {
-        val editing = controller.mode == DuoScreenInputRouter.Mode.EDIT
-        // Presets are a button rather than a sub-screen: it is one tap per layout from the driver's
-        // seat, and the result is visible behind the strip while they cycle.
-        val preset = Action.Builder()
-            .setIcon(icon(DuoScreenStore.preset(carContext).iconRes))
-            .setOnClickListener {
-                val applied = controller.cyclePreset()
-                CarToast.makeText(carContext, applied.label(carContext), CarToast.LENGTH_SHORT).show()
-                invalidate()
-            }
-            .build()
-        val toggle = Action.Builder()
-            .setIcon(icon(if (editing) R.drawable.ic_duo_done else R.drawable.ic_duo_arrange))
-            .setOnClickListener {
-                controller.toggleMode()
-                invalidate()
-            }
-            .build()
-        // A pane whose app was killed in the background comes back as a black rectangle; this
-        // re-launches it rather than making the driver restart the whole session.
-        val reload = Action.Builder()
-            .setIcon(icon(R.drawable.ic_duo_reload))
-            .setOnClickListener {
-                val reloaded = controller.reloadSelectedOrAll()
-                StructuredLog.i(TAG, "Reloaded $reloaded pane(s)")
-            }
-            .build()
-
         // Leaving the screen only detaches (DuoScreenHost.KEEP_ALIVE_MS), by design, so
         // without this there is no way to get the panes off the car display short of waiting the
         // keep-alive out: every pane app keeps running on its own display behind whatever the driver
@@ -123,14 +103,6 @@ class DuoScreenScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
         }
         return builder
             .setActionStrip(ActionStrip.Builder().addAction(exit).build())
-            // ACTIONS_CONSTRAINTS_MAP: at most four actions, none with a custom title.
-            .setMapActionStrip(
-                ActionStrip.Builder()
-                    .addAction(preset)
-                    .addAction(reload)
-                    .addAction(toggle)
-                    .build()
-            )
             .build()
     }
 

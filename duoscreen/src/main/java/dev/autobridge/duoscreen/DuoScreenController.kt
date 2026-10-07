@@ -17,6 +17,9 @@ import dev.autobridge.power.CarScreenPower
 import dev.autobridge.duoscreen.input.DuoScreenInputPort
 import dev.autobridge.duoscreen.input.DuoScreenInputRouter
 import dev.autobridge.duoscreen.input.DuoScreenTouchController
+import dev.autobridge.duoscreen.layout.DuoScreenControl
+import dev.autobridge.duoscreen.layout.DuoScreenControlsGeometry
+import dev.autobridge.duoscreen.layout.DuoScreenControlsLayout
 import dev.autobridge.duoscreen.layout.DuoScreenLayout
 import dev.autobridge.duoscreen.layout.DuoScreenLayout.Bounds
 import dev.autobridge.duoscreen.layout.DuoScreenLayout.Rect
@@ -26,6 +29,7 @@ import dev.autobridge.duoscreen.layout.DuoScreenPaneSet
 import dev.autobridge.duoscreen.layout.DuoScreenPreset
 import dev.autobridge.duoscreen.layout.DuoScreenStore
 import dev.autobridge.duoscreen.render.DuoScreenCompositor
+import dev.autobridge.duoscreen.render.DuoScreenControlsPainter
 import dev.autobridge.duoscreen.render.DuoScreenDisplays
 import dev.autobridge.duoscreen.render.DuoScreenResizeDebouncer
 import dev.autobridge.duoscreen.system.DuoScreenLauncherResolver
@@ -61,6 +65,21 @@ class DuoScreenController(
     private val touch = DuoScreenTouchController(ops)
     private val debouncer = DuoScreenResizeDebouncer(QUIET_PERIOD_MS)
     private val pendingSizes = HashMap<Int, Rect>()
+    private val controlsPainter = DuoScreenControlsPainter(context)
+
+    /** The controls drawn on the surface right now; taps inside them never reach a pane. */
+    private var controls: DuoScreenControlsLayout? = null
+
+    /** Whether the floating button's menu is open (picture in picture only). */
+    private var menuOpen = false
+
+    /** Told when an on-surface control did something worth confirming to the driver. */
+    interface ControlListener {
+        fun onPresetApplied(preset: DuoScreenPreset)
+    }
+
+    /** Set by the car Screen to show a toast; called on the thread [onClick] runs on. */
+    var controlListener: ControlListener? = null
 
     private var router: DuoScreenInputRouter? = null
 
@@ -166,6 +185,7 @@ class DuoScreenController(
             "Session started: ${paneSet.panes.size} panes on ${width}x$height" +
                 if (restored != null) " (restored)" else " (${DuoScreenStore.preset(context).name})"
         )
+        refreshControls(force = true)
         return true
     }
 
@@ -238,6 +258,8 @@ class DuoScreenController(
             "Session resumed on ${width}x$height" +
                 if (bounds != previous) " (re-fitted from ${previous.width}x${previous.height})" else ""
         )
+        // The surface may be a new size (or a new density); the overlay itself survives re-attach.
+        refreshControls(force = true)
         return true
     }
 
@@ -436,6 +458,7 @@ class DuoScreenController(
 
     fun setMode(mode: DuoScreenInputRouter.Mode) {
         router?.setMode(mode)
+        refreshControls()
     }
 
     /** Returns the mode now in effect, for a caller that drives this from one button. */
@@ -457,8 +480,104 @@ class DuoScreenController(
             StructuredLog.w(TAG, "Car tap at $x,$y dropped: no live session")
             return
         }
+        val control = controls?.controlAt(x, y)
+        if (control != null) {
+            StructuredLog.i(TAG, "Car tap at $x,$y on control $control (${active.mode})")
+            onControl(control, x, y)
+            return
+        }
         StructuredLog.i(TAG, "Car tap at $x,$y (${active.mode})")
+        // A tap anywhere else closes the floating menu as well as doing its normal job.
+        if (menuOpen) {
+            menuOpen = false
+            refreshControls()
+        }
         active.onClick(x, y)
+    }
+
+    // --- on-surface controls (UI_REDESIGN_TASKS.md, Phase 7) ---
+
+    private fun onControl(control: DuoScreenControl, x: Int, y: Int) {
+        CarScreenPower.carInput()
+        when (control) {
+            DuoScreenControl.LAYOUT -> {
+                val preset = cyclePreset()
+                controlListener?.onPresetApplied(preset)
+            }
+            DuoScreenControl.SWAP -> swapPanes()
+            DuoScreenControl.RELOAD -> {
+                val count = reloadSelectedOrAll()
+                StructuredLog.i(TAG, "Reload from the controls: $count pane(s)")
+            }
+            DuoScreenControl.ARRANGE, DuoScreenControl.DONE -> {
+                menuOpen = false
+                toggleMode()
+            }
+            DuoScreenControl.HANDLE -> {
+                // The handle sits on the seam, so the same tap that enters arrange mode grabs it:
+                // the very next drag already slides the seam.
+                if (mode != DuoScreenInputRouter.Mode.EDIT) router?.setMode(DuoScreenInputRouter.Mode.EDIT)
+                router?.onClick(x, y)
+            }
+            DuoScreenControl.MENU -> menuOpen = !menuOpen
+            DuoScreenControl.MOVE -> {
+                DuoScreenStore.setFabCorner(context, DuoScreenStore.fabCorner(context).next())
+                menuOpen = false
+            }
+        }
+        refreshControls()
+    }
+
+    /**
+     * Trades the places of the two lowest-id panes (the ones the seam bar sits between). The
+     * smaller one is raised afterwards so a picture-in-picture tile stays on top.
+     */
+    private fun swapPanes() {
+        val active = router ?: return
+        val byId = active.panes.panes.sortedBy { it.id }
+        if (byId.size < 2) return
+        val first = byId[0]
+        val second = byId[1]
+        active.setRect(first.id, second.rect)
+        active.setRect(second.id, first.rect)
+        // After the swap each pane holds the other's old rect, so whichever had the smaller rect
+        // before, its partner has it now.
+        val firstWasSmaller = first.rect.width * first.rect.height < second.rect.width * second.rect.height
+        val smaller = if (firstWasSmaller) second.id else first.id
+        active.bringToFront(smaller)
+        compositor.bringToFront(smaller)
+        StructuredLog.i(TAG, "Swapped panes ${first.id} and ${second.id}")
+    }
+
+    /**
+     * Re-lays the controls out for the current panes and mode, and repaints them only when that
+     * changed — a seam drag moves the bar with it, everything else leaves it where it is.
+     */
+    private fun refreshControls(force: Boolean = false) {
+        val bounds = sessionBounds
+        val active = router
+        if (!running || bounds == null || active == null) {
+            if (controls != null) compositor.setOverlay(null, null)
+            controls = null
+            return
+        }
+        val density = if (dpi > 0) dpi / 160f else 1f
+        val next = DuoScreenControlsGeometry.layout(
+            panes = active.panes.panes,
+            bounds = bounds,
+            editing = active.mode == DuoScreenInputRouter.Mode.EDIT,
+            menuOpen = menuOpen,
+            corner = DuoScreenStore.fabCorner(context),
+            density = density
+        )
+        if (!force && next == controls) return
+        controls = next
+        val painted = controlsPainter.paint(next, DuoScreenStore.preset(context).iconRes)
+        if (painted == null) {
+            compositor.setOverlay(null, null)
+        } else {
+            compositor.setOverlay(painted.bitmap, painted.area)
+        }
     }
 
     fun onScroll(dx: Int, dy: Int) {
@@ -506,6 +625,8 @@ class DuoScreenController(
         saveLayout()
         running = false
         selectedPaneId = null
+        controls = null
+        menuOpen = false
         mainHandler.removeCallbacksAndMessages(null)
         debouncer.cancelAll()
         pendingSizes.clear()
@@ -650,6 +771,7 @@ class DuoScreenController(
      */
     override fun onPaneRectChanged(paneId: Int, rect: Rect) {
         compositor.setRect(paneId, rect)
+        refreshControls()
         pendingSizes[paneId] = rect
         debouncer.onResizeActivity(paneId, SystemClock.uptimeMillis())
         mainHandler.removeCallbacks(commitPoll)
