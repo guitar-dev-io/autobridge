@@ -91,6 +91,17 @@ class DuoScreenCompositor {
 
         /** The grabbed seam, drawn brighter than the selection frame so the grab is unmistakable. */
         val DIVIDER_COLOR = floatArrayOf(1f, 0.85f, 0.3f, 1f)
+
+        /**
+         * Fill for a pane with nothing to show yet — no app picked, or its app still starting — so
+         * the driver sees where each pane sits instead of one black screen. Dark tints from
+         * docs/design/02_CarDuo.png (green, rose), plus a blue for a third pane; picked by pane id.
+         */
+        val EMPTY_PANE_COLORS = arrayOf(
+            floatArrayOf(0x16 / 255f, 0x24 / 255f, 0x1F / 255f, 1f),
+            floatArrayOf(0x24 / 255f, 0x1B / 255f, 0x20 / 255f, 1f),
+            floatArrayOf(0x17 / 255f, 0x1E / 255f, 0x2A / 255f, 1f)
+        )
     }
 
     private class Pane(
@@ -327,6 +338,8 @@ class DuoScreenCompositor {
                     .onFailure { Log.w(TAG, "updateTexImage failed for pane ${pane.id}", it) }
                 pane.surfaceTexture.getTransformMatrix(pane.transform)
                 drawPane(pane)
+            } else {
+                drawEmptyPane(pane)
             }
         }
 
@@ -353,6 +366,20 @@ class DuoScreenCompositor {
         drawBand(rect.left, rect.top, rect.left + thickness, rect.bottom)
         drawBand(rect.right - thickness, rect.top, rect.right, rect.bottom)
 
+        GLES20.glDisableVertexAttribArray(solidPositionHandle)
+        GLES20.glUseProgram(program)
+    }
+
+    private fun drawEmptyPane(pane: Pane) {
+        if (solidProgram == 0) return
+        val rect = pane.rect
+        if (rect.width <= 0 || rect.height <= 0) return
+        GLES20.glUseProgram(solidProgram)
+        GLES20.glUniform4fv(
+            solidColorHandle, 1, EMPTY_PANE_COLORS[Math.floorMod(pane.id, EMPTY_PANE_COLORS.size)], 0
+        )
+        GLES20.glEnableVertexAttribArray(solidPositionHandle)
+        drawBand(rect.left, rect.top, rect.right, rect.bottom)
         GLES20.glDisableVertexAttribArray(solidPositionHandle)
         GLES20.glUseProgram(program)
     }
@@ -493,8 +520,8 @@ class DuoScreenCompositor {
             solidPositionHandle = GLES20.glGetAttribLocation(solidProgram, "aPosition")
             solidColorHandle = GLES20.glGetUniformLocation(solidProgram, "uColor")
         } else {
-            // The panes still composite; only the edit-mode frame is missing.
-            Log.w(TAG, "Selection-frame program unavailable")
+            // The panes still composite; only the edit-mode frame and empty-pane tint are missing.
+            Log.w(TAG, "Solid-colour program unavailable")
         }
         return true
     }
