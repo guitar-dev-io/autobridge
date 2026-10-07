@@ -346,6 +346,7 @@
     <string name="split_close_side">Close side page</string>
     <string name="car_keyboard_hint">Search or type a URL</string>
     <string name="split_layouts_heading">Layout</string>
+    <string name="split_drag_seam">Drag to resize the split</string>
     <string name="browser_about_version">Version</string>
     <string name="browser_about_webview">WebView</string>
     <string name="drawer_swap_sides">Swap sides</string>

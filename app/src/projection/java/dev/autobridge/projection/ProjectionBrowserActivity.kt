@@ -155,7 +155,12 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         const val FIELD_FOCUS_RETRY_MS = 800L
 
         /** Split metrics, in dp; the same values the template route's split uses. */
-        const val SPLIT_GAP = 4
+        const val SPLIT_GAP = 10
+
+        /** The seam control: a capsule this thick and long, its first [SEAM_CLOSE] the ✕. */
+        const val SEAM_THICK = 30
+        const val SEAM_LONG = 118
+        const val SEAM_CLOSE = 40
         const val SPLIT_MIN_PANE = 180
 
         /**
@@ -201,8 +206,14 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
      */
     private var sideView: WebView? = null
 
-    /** The ✕ on the seam that closes the split; see [placeSideClose]. */
-    private var sideCloseButton: TextView? = null
+    /** The seam control (✕ and drag grip) between the panes; see [placeSideClose]. */
+    private var sideCloseButton: View? = null
+
+    /** The split ratio while the seam is being dragged; stored when the finger lifts. */
+    private var liveSideFraction: Float? = null
+
+    /** The panes as they were when the current seam drag began. */
+    private var dragStartPanes: SplitPanes? = null
 
     /**
      * The phone's screen over the page, opened from the menu; null while the browser is showing.
@@ -1781,7 +1792,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
             sideOnRight = BrowserSplitStore.projection.sideOnRight(this),
             gapPx = SPLIT_GAP.dp(),
             minPanePx = SPLIT_MIN_PANE.dp(),
-            sideFraction = BrowserSplitStore.projection.sideFraction(this),
+            sideFraction = liveSideFraction ?: BrowserSplitStore.projection.sideFraction(this),
         )
         if (panes == null) {
             releaseSidePane()
@@ -1796,35 +1807,17 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
     }
 
     /**
-     * The ✕ that closes the split, centred on the seam between the panes: on the divider rather
-     * than in a pane's corner, where the toolbar and the floating button already sit and where it
-     * would cover a page's own controls. The car browser draws its ✕ in the same place.
+     * The seam control, centred on the divider and lying along it: a slim dark capsule whose end
+     * is a small ✕ that closes the split, and whose rest is a grip that drags the divider. On the
+     * seam rather than in a pane's corner, where the toolbar and the floating button already sit.
      */
     private fun placeSideClose(area: FrameLayout, panes: SplitPanes) {
-        val size = TOUCH_TARGET.dp()
-        val button = sideCloseButton ?: TextView(this).apply {
-            text = "\u2715"
-            contentDescription = getString(R.string.split_close_side)
-            setTextColor(scheme.textPrimary)
-            textSize = 18f
-            gravity = Gravity.CENTER
-            background = RippleDrawable(
-                ColorStateList.valueOf(scheme.textSecondary),
-                ShapeDrawable(OvalShape()).apply { paint.color = scheme.surfaceContainerHighest },
-                null
-            )
-            elevation = 4f * resources.displayMetrics.density
-            isClickable = true
-            isFocusable = true
-            setOnClickListener {
-                noteInteraction()
-                if (BrowserSplitStore.projection.layout(this@ProjectionBrowserActivity) != BrowserSplitLayout.SINGLE) {
-                    toggleSplit()
-                }
-            }
-        }.also { created ->
+        val thick = SEAM_THICK.dp()
+        val long = SEAM_LONG.dp()
+        val (w, h) = if (panes.stacked) long to thick else thick to long
+        val capsule = sideCloseButton ?: seamCapsule(panes.stacked).also { created ->
             sideCloseButton = created
-            area.addView(created, FrameLayout.LayoutParams(size, size))
+            area.addView(created, FrameLayout.LayoutParams(w, h))
         }
         val (centreX, centreY) = if (panes.stacked) {
             val top = minOf(panes.main.bottom, panes.side.bottom)
@@ -1835,13 +1828,133 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
             val right = maxOf(panes.main.left, panes.side.left)
             (left + right) / 2 to (panes.side.top + panes.side.height / 2)
         }
-        val params = (button.layoutParams as? FrameLayout.LayoutParams) ?: FrameLayout.LayoutParams(size, size)
+        val params = (capsule.layoutParams as? FrameLayout.LayoutParams) ?: FrameLayout.LayoutParams(w, h)
+        // A capsule built for the other orientation is rebuilt rather than stretched.
+        if (params.width != w || params.height != h) {
+            removeSideClose()
+            return placeSideClose(area, panes)
+        }
         params.gravity = Gravity.TOP or Gravity.START
-        params.leftMargin = centreX - size / 2
-        params.topMargin = centreY - size / 2
-        button.layoutParams = params
-        button.visibility = sideView?.visibility ?: View.VISIBLE
-        button.bringToFront()
+        params.leftMargin = centreX - w / 2
+        params.topMargin = centreY - h / 2
+        capsule.layoutParams = params
+        capsule.visibility = sideView?.visibility ?: View.VISIBLE
+        capsule.bringToFront()
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    private fun seamCapsule(stacked: Boolean): View {
+        val close = TextView(this).apply {
+            text = "\u2715"
+            contentDescription = getString(R.string.split_close_side)
+            setTextColor(scheme.textPrimary)
+            textSize = 13f
+            gravity = Gravity.CENTER
+            background = circleRipple()
+            isClickable = true
+            setOnClickListener {
+                noteInteraction()
+                if (BrowserSplitStore.projection.layout(this@ProjectionBrowserActivity) != BrowserSplitLayout.SINGLE) {
+                    toggleSplit()
+                }
+            }
+        }
+        val grip = LinearLayout(this).apply {
+            orientation = if (stacked) LinearLayout.VERTICAL else LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            repeat(2) { index ->
+                addView(View(this@ProjectionBrowserActivity).apply {
+                    background = GradientDrawable().apply {
+                        shape = GradientDrawable.RECTANGLE
+                        cornerRadius = 2f * resources.displayMetrics.density
+                        setColor(scheme.textSecondary)
+                    }
+                }, if (stacked) {
+                    LinearLayout.LayoutParams(26.dp(), 3.dp()).apply { if (index > 0) topMargin = 5.dp() }
+                } else {
+                    LinearLayout.LayoutParams(3.dp(), 26.dp()).apply { if (index > 0) marginStart = 5.dp() }
+                })
+            }
+            contentDescription = getString(R.string.split_drag_seam)
+            setOnTouchListener { _, event -> dragSeam(event, stacked) }
+        }
+        return LinearLayout(this).apply {
+            orientation = if (stacked) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = SEAM_THICK / 2f * resources.displayMetrics.density
+                setColor(scheme.surfaceContainerHighest)
+                alpha = 235
+            }
+            elevation = 3f * resources.displayMetrics.density
+            val closeParams = if (stacked) {
+                LinearLayout.LayoutParams(SEAM_CLOSE.dp(), ViewGroup.LayoutParams.MATCH_PARENT)
+            } else {
+                LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, SEAM_CLOSE.dp())
+            }
+            addView(close, closeParams)
+            addView(grip, if (stacked) {
+                LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f)
+            } else {
+                LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
+            })
+        }
+    }
+
+    /**
+     * Drags the divider with the grip: the panes follow the finger at once (laid out at most once
+     * a frame), and the ratio is stored when the finger lifts. Starts from the panes as they were
+     * at touch-down, so the divider stays under the finger rather than drifting.
+     */
+    private fun dragSeam(event: MotionEvent, stacked: Boolean): Boolean {
+        val area = pageArea ?: return false
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                noteInteraction()
+                dragStartPanes = currentPanes() ?: return false
+                dragStartRaw = if (stacked) event.rawY else event.rawX
+                return true
+            }
+            MotionEvent.ACTION_MOVE -> {
+                val start = dragStartPanes ?: return false
+                val delta = ((if (stacked) event.rawY else event.rawX) - dragStartRaw).toInt()
+                liveSideFraction = BrowserSplitGeometry.dragSideFraction(
+                    start, delta, BrowserSplitStore.projection.sideOnRight(this), SPLIT_MIN_PANE.dp()
+                )
+                if (!seamLayoutPending) {
+                    seamLayoutPending = true
+                    area.postOnAnimation {
+                        seamLayoutPending = false
+                        layoutPanes()
+                    }
+                }
+                return true
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                liveSideFraction?.let { BrowserSplitStore.projection.setSideFraction(this, it) }
+                liveSideFraction = null
+                dragStartPanes = null
+                layoutPanes()
+                return true
+            }
+        }
+        return false
+    }
+
+    private var dragStartRaw = 0f
+    private var seamLayoutPending = false
+
+    /** The split as it is laid out now, or null when there is none. */
+    private fun currentPanes(): SplitPanes? {
+        val area = pageArea ?: return null
+        return BrowserSplitGeometry.panes(
+            BrowserSplitStore.projection.layout(this),
+            0, 0, area.width, area.height,
+            sideOnRight = BrowserSplitStore.projection.sideOnRight(this),
+            gapPx = SPLIT_GAP.dp(),
+            minPanePx = SPLIT_MIN_PANE.dp(),
+            sideFraction = BrowserSplitStore.projection.sideFraction(this),
+        )
     }
 
     private fun removeSideClose() {
