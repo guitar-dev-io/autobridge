@@ -30,4 +30,10 @@ object CarSessionScreenPower : CarScreenPowerPolicy {
     override fun onSessionEnd() {
         ScreenPowerController.stopCarSession()
     }
+
+    override fun turnPanelOff(): Boolean = ScreenPowerController.panelOffNow()
+
+    override fun turnPanelOn(): Boolean = ScreenPowerController.restorePhoneScreen()
+
+    override val isPanelOff: Boolean get() = ScreenPowerController.isPanelOff()
 }

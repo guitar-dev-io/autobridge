@@ -1,16 +1,21 @@
 package dev.autobridge.duoscreen
 
+import android.app.KeyguardManager
+import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
 import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
+import android.os.PowerManager
 import android.os.SystemClock
 import android.view.Surface
+import androidx.core.content.ContextCompat
 import dev.autobridge.car.DuoSessionState
 import dev.autobridge.logging.StructuredLog
 import dev.autobridge.power.CarScreenPower
@@ -59,6 +64,9 @@ class DuoScreenController(
         const val INPUT_THREAD_NAME = "AutoBridgeDuoInput"
 
         const val GESTURE_LOG_INTERVAL_MS = 1_000L
+
+        /** After an unlock, give the system a moment to resume the displays before relaunching. */
+        const val WAKE_RELOAD_DELAY_MS = 600L
     }
 
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -83,7 +91,36 @@ class DuoScreenController(
     /** Told when an on-surface control did something worth confirming to the driver. */
     interface ControlListener {
         fun onPresetApplied(preset: DuoScreenPreset)
+
+        /** The phone-screen button worked: [off] is the phone panel's new state. */
+        fun onPhoneScreenChanged(off: Boolean) {}
+
+        /** The phone-screen button could not turn the panel off (no Shizuku, or not allowed). */
+        fun onPhoneScreenUnavailable() {}
     }
+
+    /**
+     * True while the phone is really asleep or locked — the power key, or the screen timing out
+     * anyway — as opposed to the panel being turned off on purpose, which keeps the phone awake
+     * and fires none of these broadcasts. The panes cannot run then (their displays are untrusted,
+     * see CarScreenPower), so the car shows why instead of two black rectangles.
+     */
+    private var phoneAsleep = false
+    private var sleepReceiverRegistered = false
+
+    private val sleepReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            when (intent.action) {
+                Intent.ACTION_SCREEN_OFF -> onPhoneSleepChanged(asleep = true)
+                // Screen on behind the keyguard still pauses the panes; only an unlock brings them back.
+                Intent.ACTION_SCREEN_ON -> if (!isKeyguardLocked()) onPhoneSleepChanged(asleep = false)
+                Intent.ACTION_USER_PRESENT -> onPhoneSleepChanged(asleep = false)
+            }
+        }
+    }
+
+    /** What was last painted, so a repaint happens only when something on screen changed. */
+    private var paintedState: Any? = null
 
     /** Set by the car Screen to show a toast; called on the thread [onClick] runs on. */
     var controlListener: ControlListener? = null
@@ -194,6 +231,7 @@ class DuoScreenController(
             "Session started: ${paneSet.panes.size} panes on ${width}x$height" +
                 if (restored != null) " (restored)" else " (${DuoScreenStore.preset(context).name})"
         )
+        registerSleepReceiver()
         refreshControls(force = true)
         return true
     }
@@ -269,6 +307,7 @@ class DuoScreenController(
                 if (bounds != previous) " (re-fitted from ${previous.width}x${previous.height})" else ""
         )
         // The surface may be a new size (or a new density); the overlay itself survives re-attach.
+        registerSleepReceiver()
         refreshControls(force = true)
         return true
     }
@@ -531,12 +570,67 @@ class DuoScreenController(
                 router?.onClick(x, y)
             }
             DuoScreenControl.MENU -> menuOpen = !menuOpen
+            DuoScreenControl.PHONE_SCREEN -> togglePhoneScreen()
             DuoScreenControl.MOVE -> {
                 DuoScreenStore.setFabCorner(context, DuoScreenStore.fabCorner(context).next())
                 menuOpen = false
             }
         }
         refreshControls()
+    }
+
+    private fun togglePhoneScreen() {
+        val wasOff = CarScreenPower.isPanelOff
+        val ok = if (wasOff) CarScreenPower.turnPanelOn() else CarScreenPower.turnPanelOff()
+        StructuredLog.i(TAG, "Phone screen ${if (wasOff) "on" else "off"} from the car: ok=$ok")
+        when {
+            ok -> controlListener?.onPhoneScreenChanged(off = !wasOff)
+            !wasOff -> controlListener?.onPhoneScreenUnavailable()
+        }
+    }
+
+    // --- the phone really sleeping (power key / timeout) ---
+
+    private fun registerSleepReceiver() {
+        if (!sleepReceiverRegistered) {
+            val filter = IntentFilter().apply {
+                addAction(Intent.ACTION_SCREEN_OFF)
+                addAction(Intent.ACTION_SCREEN_ON)
+                addAction(Intent.ACTION_USER_PRESENT)
+            }
+            runCatching {
+                ContextCompat.registerReceiver(context, sleepReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+                sleepReceiverRegistered = true
+            }.onFailure { StructuredLog.w(TAG, "Could not watch the phone's screen state: $it") }
+        }
+        // The phone may already be asleep or locked when the car hands over its surface.
+        phoneAsleep = !isInteractive() || isKeyguardLocked()
+    }
+
+    private fun unregisterSleepReceiver() {
+        if (!sleepReceiverRegistered) return
+        runCatching { context.unregisterReceiver(sleepReceiver) }
+        sleepReceiverRegistered = false
+        phoneAsleep = false
+    }
+
+    private fun isInteractive(): Boolean =
+        context.getSystemService(PowerManager::class.java)?.isInteractive ?: true
+
+    private fun isKeyguardLocked(): Boolean =
+        context.getSystemService(KeyguardManager::class.java)?.isKeyguardLocked ?: false
+
+    private fun onPhoneSleepChanged(asleep: Boolean) {
+        if (!running || asleep == phoneAsleep) return
+        phoneAsleep = asleep
+        StructuredLog.i(TAG, if (asleep) "Phone went to sleep; panes paused" else "Phone unlocked; reloading panes")
+        refreshControls()
+        if (!asleep) {
+            // The paused pane apps usually come back as black; relaunching brings each to front.
+            mainHandler.postDelayed({
+                if (running && !phoneAsleep) panes.forEach { reload(it.id) }
+            }, WAKE_RELOAD_DELAY_MS)
+        }
     }
 
     /**
@@ -581,9 +675,31 @@ class DuoScreenController(
             menuOpen = menuOpen,
             corner = DuoScreenStore.fabCorner(context)
         )
-        if (!force && next == controls) return
+        val panelOff = CarScreenPower.isPanelOff
+        val state = listOf(next, panelOff, phoneAsleep)
+        if (!force && state == paintedState) return
         controls = next
-        val painted = controlsPainter.paint(next, DuoScreenStore.preset(context).iconRes)
+        paintedState = state
+        val notice = if (phoneAsleep) {
+            // Centred on the largest pane, where it is least likely to sit under the seam bar.
+            val area = active.panes.panes.maxByOrNull { it.rect.width * it.rect.height }
+                ?.let(::visualRect) ?: Rect(0, 0, bounds.width, bounds.height)
+            DuoScreenControlsPainter.Notice(
+                context.getString(R.string.duo_screen_phone_asleep_title),
+                context.getString(R.string.duo_screen_phone_asleep_text),
+                area
+            )
+        } else {
+            null
+        }
+        val painted = controlsPainter.paint(
+            next,
+            DuoScreenStore.preset(context).iconRes,
+            phoneScreenOff = panelOff,
+            notice = notice,
+            bounds = bounds,
+            scale = DuoScreenChrome.scale(bounds)
+        )
         if (painted == null) {
             compositor.setOverlay(null, null)
         } else {
@@ -639,6 +755,8 @@ class DuoScreenController(
         controls = null
         menuOpen = false
         visualRects = emptyMap()
+        paintedState = null
+        unregisterSleepReceiver()
         mainHandler.removeCallbacksAndMessages(null)
         debouncer.cancelAll()
         pendingSizes.clear()

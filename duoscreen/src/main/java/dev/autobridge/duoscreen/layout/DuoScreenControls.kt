@@ -27,7 +27,13 @@ enum class DuoScreenControl {
     MENU,
 
     /** In the floating menu: sends the floating button to the next corner. */
-    MOVE
+    MOVE,
+
+    /**
+     * Turns the phone's panel off (or back on) without letting the phone sleep — the screen-off
+     * the panes survive, unlike the power key. See CarScreenPower.turnPanelOff.
+     */
+    PHONE_SCREEN
 }
 
 /**
@@ -85,7 +91,7 @@ data class DuoScreenControlsLayout(
  *
  * Rule (docs/UI_REDESIGN_TASKS.md, Phase 7):
  * - two panes sharing a seam → a bar in the seam gutter: LAYOUT and SWAP at the start of the seam,
- *   RELOAD and ARRANGE (or DONE) at its end, the drag handle in the middle;
+ *   PHONE_SCREEN, RELOAD and ARRANGE (or DONE) at its end, the drag handle in the middle;
  * - no shared seam (picture in picture, or panes dragged apart) → one floating button.
  */
 object DuoScreenControlsGeometry {
@@ -148,7 +154,7 @@ object DuoScreenControlsGeometry {
         val trailing = if (editing) {
             listOf(DuoScreenControl.DONE)
         } else {
-            listOf(DuoScreenControl.RELOAD, DuoScreenControl.ARRANGE)
+            listOf(DuoScreenControl.PHONE_SCREEN, DuoScreenControl.RELOAD, DuoScreenControl.ARRANGE)
         }
 
         val horizontal = seam.axis == Axis.HORIZONTAL
@@ -195,7 +201,7 @@ object DuoScreenControlsGeometry {
             place(control, end)
             end -= gap
         }
-        // Keep the order start → end (LAYOUT, SWAP, HANDLE, RELOAD, ARRANGE) for callers and tests.
+        // Keep the order start → end (LAYOUT, SWAP, HANDLE, PHONE_SCREEN, RELOAD, ARRANGE).
         val ordered = placed.take(leading.size + 1) + placed.drop(leading.size + 1).reversed()
         return DuoScreenControlsLayout(DuoScreenControlsLayout.Kind.SEAM_BAR, panel = null, buttons = ordered)
     }
@@ -225,6 +231,7 @@ object DuoScreenControlsGeometry {
                 DuoScreenControl.LAYOUT,
                 DuoScreenControl.SWAP,
                 DuoScreenControl.RELOAD,
+                DuoScreenControl.PHONE_SCREEN,
                 if (editing) DuoScreenControl.DONE else DuoScreenControl.ARRANGE,
                 DuoScreenControl.MOVE
             )

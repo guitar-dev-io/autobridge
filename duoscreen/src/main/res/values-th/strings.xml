@@ -49,4 +49,9 @@
     <string name="duo_screen_end_none">ยังไม่มีเซสชันที่รันอยู่</string>
 
     <string name="duo_screen_pick_app_why">AutoBridge อ่านรายชื่อแอปที่ติดตั้งในเครื่องนี้ เพื่อให้เลือกแอปไปแสดงในแต่ละแพนได้ รายชื่อนี้ใช้สำหรับหน้าเลือกแอปนี้เท่านั้น และไม่ถูกส่งออกจากเครื่อง</string>
+    <string name="duo_screen_phone_asleep_title">หน้าจอโทรศัพท์ดับอยู่</string>
+    <string name="duo_screen_phone_asleep_text">Android หยุดแอปในช่องจอระหว่างที่โทรศัพท์หลับหรือล็อกอยู่ ปลดล็อกโทรศัพท์เพื่อให้แอปกลับมา\n\nถ้าอยากให้แอปทำงานต่อตอนจอโทรศัพท์ดับ ให้กดปุ่มจอโทรศัพท์บนแถบนี้แทนปุ่ม power</string>
+    <string name="duo_screen_phone_screen_off">ปิดจอโทรศัพท์แล้ว แอปยังทำงานต่อ</string>
+    <string name="duo_screen_phone_screen_on">เปิดจอโทรศัพท์แล้ว</string>
+    <string name="duo_screen_phone_screen_unavailable">ปิดจอโทรศัพท์ไม่ได้ ต้องอนุญาต Shizuku บนโทรศัพท์ก่อน</string>
 </resources>

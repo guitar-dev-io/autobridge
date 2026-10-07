@@ -43,10 +43,23 @@ class DuoScreenScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
     // and coming back must not relaunch every pane.
     private val controller = DuoScreenHost.controller(carContext)
 
-    /** The layout button on the surface names the layout it switched to, as the host button did. */
+    /** Confirms what the on-surface buttons did: the layout picked, the phone screen state. */
     private val presetToast = object : DuoScreenController.ControlListener {
         override fun onPresetApplied(preset: DuoScreenPreset) {
             CarToast.makeText(carContext, preset.label(carContext), CarToast.LENGTH_SHORT).show()
+        }
+
+        override fun onPhoneScreenChanged(off: Boolean) {
+            val text = if (off) R.string.duo_screen_phone_screen_off else R.string.duo_screen_phone_screen_on
+            CarToast.makeText(carContext, carContext.getString(text), CarToast.LENGTH_SHORT).show()
+        }
+
+        override fun onPhoneScreenUnavailable() {
+            CarToast.makeText(
+                carContext,
+                carContext.getString(R.string.duo_screen_phone_screen_unavailable),
+                CarToast.LENGTH_LONG
+            ).show()
         }
     }
 

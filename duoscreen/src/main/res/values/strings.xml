@@ -52,4 +52,9 @@
          sideload-only build declares. Shown in the picker so the user is told rather than left
          to notice. -->
     <string name="duo_screen_pick_app_why">AutoBridge reads the list of installed apps on this phone so a pane can run one of them. The list is used for this picker only and never leaves the device.</string>
+    <string name="duo_screen_phone_asleep_title">The phone screen is off</string>
+    <string name="duo_screen_phone_asleep_text">Android pauses the apps in the panes while the phone sleeps or is locked. Unlock the phone to bring them back.\n\nTo keep them running with the phone dark, use the phone-screen button on this bar instead of the power key.</string>
+    <string name="duo_screen_phone_screen_off">Phone screen off. The apps keep running.</string>
+    <string name="duo_screen_phone_screen_on">Phone screen on</string>
+    <string name="duo_screen_phone_screen_unavailable">Cannot turn the phone screen off: allow Shizuku on the phone first</string>
 </resources>

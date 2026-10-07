@@ -33,6 +33,19 @@ interface CarScreenPowerPolicy {
 
     /** The session is over. The panel must be restored even if it was turned off privileged. */
     fun onSessionEnd()
+
+    /**
+     * The driver asked, from the car, for the phone's panel to go dark *now* without the phone
+     * sleeping — the only kind of "screen off" the panes survive. False when it could not be done
+     * (no privileged backend, or no live session); the phone is then left as it was.
+     */
+    fun turnPanelOff(): Boolean = false
+
+    /** Lights the phone's panel again after [turnPanelOff]. */
+    fun turnPanelOn(): Boolean = false
+
+    /** Whether the panel is currently off through [turnPanelOff] (or the auto-dim panel-off). */
+    val isPanelOff: Boolean get() = false
 }
 
 /**
@@ -63,4 +76,10 @@ object CarScreenPower {
     fun sessionEnded() {
         policy?.onSessionEnd()
     }
+
+    fun turnPanelOff(): Boolean = policy?.turnPanelOff() ?: false
+
+    fun turnPanelOn(): Boolean = policy?.turnPanelOn() ?: false
+
+    val isPanelOff: Boolean get() = policy?.isPanelOff ?: false
 }

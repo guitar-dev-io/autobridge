@@ -166,6 +166,32 @@ object ScreenPowerController {
         return panel.isOff || dimApplied
     }
 
+    /**
+     * Turns only the phone's panel off right away, whatever the auto-dim settings say: the car's
+     * own "phone screen off" button. Unlike [dimNow] there is no dimming fallback — a dimmed phone
+     * is not what the driver asked for — so this returns false when the privileged backend is
+     * missing, and the phone is left as it was.
+     */
+    @Synchronized
+    fun panelOffNow(): Boolean {
+        if (panel.isOff) return true
+        if (powerManager == null || !sessionActive ||
+            !FeaturePolicy.app.isAvailable(Feature.SCREEN_OFF)) return false
+        handler.removeCallbacks(dimRunnable)
+        if (panel.hide()) {
+            StructuredLog.i(TAG, "Privileged panel-only screen-off applied from the car")
+            return true
+        }
+        // hide() took a dim wake lock first; go back to the normal awake policy.
+        acquire(dim = false)
+        scheduleDim()
+        StructuredLog.w(TAG, "Panel-off requested from the car but the backend is unavailable")
+        return false
+    }
+
+    @Synchronized
+    fun isPanelOff(): Boolean = panel.isOff
+
     /** Restoration is always permitted, including after speed loss or failed teardown. */
     @Synchronized
     fun restorePhoneScreen(): Boolean {

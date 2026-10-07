@@ -56,7 +56,7 @@ class DuoScreenControlsTest {
         assertEquals(
             listOf(
                 DuoScreenControl.LAYOUT, DuoScreenControl.SWAP, DuoScreenControl.HANDLE,
-                DuoScreenControl.RELOAD, DuoScreenControl.ARRANGE
+                DuoScreenControl.PHONE_SCREEN, DuoScreenControl.RELOAD, DuoScreenControl.ARRANGE
             ),
             result.buttons.map { it.control }
         )
@@ -71,6 +71,7 @@ class DuoScreenControlsTest {
         assertEquals(16 + 44 + 8, byControl.getValue(DuoScreenControl.SWAP).rect.left)
         assertEquals(portrait.width - 16, byControl.getValue(DuoScreenControl.ARRANGE).rect.right)
         assertEquals(portrait.width - 16 - 44 - 8, byControl.getValue(DuoScreenControl.RELOAD).rect.right)
+        assertEquals(portrait.width - 16 - 2 * (44 + 8), byControl.getValue(DuoScreenControl.PHONE_SCREEN).rect.right)
         val handle = byControl.getValue(DuoScreenControl.HANDLE).rect
         assertEquals(portrait.width / 2, handle.left + handle.width / 2)
         assertEquals(44, byControl.getValue(DuoScreenControl.LAYOUT).rect.width)
@@ -98,6 +99,7 @@ class DuoScreenControlsTest {
         assertTrue(DuoScreenControl.DONE in controls)
         assertTrue(DuoScreenControl.ARRANGE !in controls)
         assertTrue(DuoScreenControl.RELOAD !in controls)
+        assertTrue(DuoScreenControl.PHONE_SCREEN !in controls)
     }
 
     @Test
