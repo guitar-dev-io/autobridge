@@ -53,6 +53,18 @@ object DuoScreenPresetGeometry {
     private const val PIP_TILE_FRACTION = 0.32f
     private const val PIP_MARGIN_FRACTION = 0.02f
 
+    /**
+     * The layout to start from when the driver has never picked one: side by side on a wide
+     * surface, stacked on one that is as tall as it is wide or taller (a portrait head unit gives
+     * an app a nearly square area, where two columns would each be too narrow to use).
+     */
+    fun defaultFor(bounds: Bounds): DuoScreenPreset =
+        if (bounds.width > 0 && bounds.height >= bounds.width * SQUARISH) DuoScreenPreset.EVEN_ROWS
+        else DuoScreenPreset.EVEN_COLUMNS
+
+    /** Height over width from which a surface counts as "tall enough to stack". */
+    private const val SQUARISH = 0.9f
+
     fun rects(preset: DuoScreenPreset, paneCount: Int, bounds: Bounds): List<Rect> {
         require(paneCount in 2..3) { "Duo Screen supports 2-3 panes, got $paneCount" }
         if (bounds.width <= 0 || bounds.height <= 0) {

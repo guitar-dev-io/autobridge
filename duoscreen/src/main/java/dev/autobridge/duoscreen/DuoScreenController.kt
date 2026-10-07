@@ -116,6 +116,7 @@ class DuoScreenController(
         val bounds = Bounds(width, height)
         dpi = panelDpi
         paneDpi = storedPaneDpi(panelDpi)
+        DuoScreenStore.noteSurface(context, bounds)
         val restored = DuoScreenStore.restore(context, bounds)
         val preset = DuoScreenStore.presetPanes(context, bounds)
         val paneSet = when {
