@@ -3,8 +3,8 @@ package dev.autobridge.duoscreen.render
 import android.content.Context
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
-import android.util.Log
 import android.view.Surface
+import dev.autobridge.duoscreen.DuoLog
 import dev.autobridge.duoscreen.system.DuoScreenPrivilegedOps
 import java.util.concurrent.ConcurrentHashMap
 
@@ -97,10 +97,12 @@ object DuoScreenDisplays {
             val trustedId = ops.createTrustedVirtualDisplay(name, width, height, dpi, surface, TRUSTED_FLAGS)
             if (trustedId >= 0) {
                 displays[paneId] = PaneDisplay(null, width, height, dpi, trustedDisplayId = trustedId, ops = ops)
-                Log.i(TAG, "Pane $paneId -> trusted display $trustedId (${width}x$height @ ${dpi}dpi)")
+                DuoLog.i(TAG, "Pane $paneId -> trusted display $trustedId (${width}x$height @ ${dpi}dpi)")
                 return trustedId
             }
-            Log.w(TAG, "Pane $paneId trusted display unavailable; falling back to untrusted")
+            DuoLog.w(TAG, "Pane $paneId trusted display unavailable; falling back to untrusted")
+        } else {
+            DuoLog.w(TAG, "Pane $paneId: Shizuku is not granted, so the display is untrusted and will stop when the phone sleeps")
         }
 
         val manager = context.getSystemService(DisplayManager::class.java) ?: return -1
@@ -108,12 +110,12 @@ object DuoScreenDisplays {
             manager.createVirtualDisplay(name, width, height, dpi, surface, FLAGS)
                 ?: error("createVirtualDisplay returned null")
         }.getOrElse { error ->
-            Log.w(TAG, "Pane $paneId display creation failed (${width}x$height @ ${dpi}dpi)", error)
+            DuoLog.w(TAG, "Pane $paneId display creation failed (${width}x$height @ ${dpi}dpi)", error)
             return -1
         }
         displays[paneId] = PaneDisplay(display, width, height, dpi)
         val displayId = display.display.displayId
-        Log.i(TAG, "Pane $paneId -> untrusted display $displayId (${width}x$height @ ${dpi}dpi)")
+        DuoLog.i(TAG, "Pane $paneId -> untrusted display $displayId (${width}x$height @ ${dpi}dpi)")
         return displayId
     }
 
@@ -142,7 +144,7 @@ object DuoScreenDisplays {
             pane.ops?.resizeTrustedVirtualDisplay(pane.trustedDisplayId, width, height, dpi) ?: false
         } else {
             runCatching { pane.display?.resize(width, height, dpi) }
-                .onFailure { Log.w(TAG, "Pane $paneId resize failed", it) }
+                .onFailure { DuoLog.w(TAG, "Pane $paneId resize failed", it) }
                 .isSuccess
         }
         if (resized) {
@@ -150,7 +152,7 @@ object DuoScreenDisplays {
             pane.height = height
             pane.dpi = dpi
         } else {
-            Log.w(TAG, "Pane $paneId resize failed (${if (pane.isTrusted) "trusted" else "untrusted"})")
+            DuoLog.w(TAG, "Pane $paneId resize failed (${if (pane.isTrusted) "trusted" else "untrusted"})")
         }
         return resized
     }
@@ -167,7 +169,7 @@ object DuoScreenDisplays {
             pane.ops?.setTrustedVirtualDisplaySurface(pane.trustedDisplayId, surface) ?: false
         } else {
             runCatching { pane.display?.surface = surface }
-                .onFailure { Log.w(TAG, "Pane $paneId setSurface failed", it) }
+                .onFailure { DuoLog.w(TAG, "Pane $paneId setSurface failed", it) }
                 .isSuccess
         }
     }
@@ -176,10 +178,10 @@ object DuoScreenDisplays {
         val pane = displays.remove(paneId) ?: return
         if (pane.isTrusted) {
             runCatching { pane.ops?.releaseTrustedVirtualDisplay(pane.trustedDisplayId) }
-                .onFailure { Log.w(TAG, "Pane $paneId trusted release failed", it) }
+                .onFailure { DuoLog.w(TAG, "Pane $paneId trusted release failed", it) }
         } else {
             runCatching { pane.display?.release() }
-                .onFailure { Log.w(TAG, "Pane $paneId release failed", it) }
+                .onFailure { DuoLog.w(TAG, "Pane $paneId release failed", it) }
         }
     }
 
