@@ -250,6 +250,19 @@ class CarBrowserScreen(carContext: CarContext) :
         CarNavigation.open(screenManager, "CarAgentScreen") { CarAgentScreen(carContext) }
     }
 
+    override fun openMirror() {
+        CarNavigation.open(screenManager, "MirrorCarScreen") { MirrorCarScreen(carContext) }
+    }
+
+    override fun openSplitChooser() {
+        screenManager.pushForResult(CarSplitLayoutScreen(carContext)) { changed ->
+            if (changed == true) {
+                renderer.applyControlSettings()
+                invalidate()
+            }
+        }
+    }
+
     override fun openDownloads() {
         screenManager.push(CarBrowserDownloadsScreen(carContext))
     }

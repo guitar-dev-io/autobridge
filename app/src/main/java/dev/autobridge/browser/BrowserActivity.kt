@@ -1008,7 +1008,25 @@ class BrowserActivity : Activity() {
         canGoBack = web.canGoBack(),
         canGoForward = web.canGoForward(),
         version = "v${dev.autobridge.BuildConfig.VERSION_NAME}",
-        surface = MenuSurface.PHONE,
+        // On a car display (a Duo Screen pane) this is a car browser and gets the car menu, less
+        // what a single-page window cannot do; see [CAR_DISPLAY_UNSUPPORTED].
+        surface = if (onCarDisplay) MenuSurface.CAR else MenuSurface.PHONE,
+        unsupported = if (onCarDisplay) CAR_DISPLAY_UNSUPPORTED else emptySet(),
+    )
+
+    /**
+     * The car-menu entries this activity cannot offer when it runs on a car display. It holds one
+     * WebView (no tabs, no split, so nothing to swap or hand to Maps from a split), its toolbar
+     * does not auto-hide (nothing to pin), and the media, agent and mirror entries open Android
+     * Auto screens that a Duo Screen pane cannot show. Exit is left to Duo Screen's own controls:
+     * finishing here would only leave an empty pane.
+     */
+    private val CAR_DISPLAY_UNSUPPORTED = setOf(
+        DrawerAction.TABS, DrawerAction.NEW_TAB, DrawerAction.SPLIT_LAYOUT,
+        DrawerAction.SIDE_SHOW_PAGE, DrawerAction.SWAP_SPLIT_SIDES, DrawerAction.SPLIT_CHOOSE, DrawerAction.NAVIGATE_MAPS,
+        DrawerAction.MEDIA_CENTER, DrawerAction.NOW_PLAYING, DrawerAction.MEDIA_LIBRARY,
+        DrawerAction.AGENT, DrawerAction.MIRROR_PHONE, DrawerAction.PIN_TOOLBAR,
+        DrawerAction.APP_HOME,
     )
 
     /**
@@ -1020,6 +1038,7 @@ class BrowserActivity : Activity() {
      * used to be buried in a secondary list of ten.
      */
     private fun showMenu() {
+        if (onCarDisplay) return showCarMenu()
         BrowserMenuSheet(
             activity = this,
             sizes = sizes,
@@ -1028,6 +1047,41 @@ class BrowserActivity : Activity() {
             onSendToCar = { openSendToCar() },
             onMore = { openMoreActions() },
         ).show()
+    }
+
+    /**
+     * The car browser menu, when this activity is on a car display: the same entries, order and
+     * names as the Android Auto browser and Bridge Web ([CarMenuList]), instead of the phone's
+     * sheet with its Send to car / Get from car / support links that make no sense on the car.
+     */
+    private fun showCarMenu() {
+        val shell = BrowserSheetShell(this, sizes)
+        val column = shell.contentColumn()
+        column.addView(shell.grip())
+        CarMenuList.build(
+            context = this,
+            state = menuState(),
+            style = CarMenuList.Style(
+                text = BrowserTheme.textPrimary,
+                textSecondary = BrowserTheme.textSecondary,
+                rowFill = BrowserTheme.sheetCardBackground,
+                accent = BrowserTheme.accent,
+                onAccent = BrowserTheme.onPrimary,
+            ),
+        ) { action ->
+            shell.dismiss()
+            runMenuAction(action)
+        }.forEach(column::addView)
+        shell.show(column)
+    }
+
+    /** "About" on a car display; the phone's menu has no such entry. */
+    private fun showAbout() {
+        android.app.AlertDialog.Builder(this)
+            .setTitle(R.string.drawer_about)
+            .setMessage(CarBrowserAbout.lines(this).joinToString("\n") { (label, value) -> "$label: $value" })
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
     }
 
     // ------------------------------------------------------------------ send / get to car
@@ -1262,9 +1316,13 @@ class BrowserActivity : Activity() {
             // Car-only concepts the phone genuinely does not have — one WebView, one pane, so
             // multiple tabs and split layout have nothing to switch between here. [MenuSurface.PHONE]
             // never lists these; see [MoreActionsSheet] for the phone's actual AUTOBRIDGE section.
+            DrawerAction.DIAGNOSTICS -> showAbout()
+            // Not offered here: see [CAR_DISPLAY_UNSUPPORTED] (car display) and
+            // [MenuSurface.PHONE] (phone), neither of which lists them.
             DrawerAction.NEW_TAB, DrawerAction.TABS, DrawerAction.MEDIA_CENTER,
-            DrawerAction.DIAGNOSTICS, DrawerAction.SPLIT_LAYOUT,
-            DrawerAction.SIDE_SHOW_PAGE, DrawerAction.NAVIGATE_MAPS -> Unit
+            DrawerAction.SPLIT_LAYOUT, DrawerAction.SIDE_SHOW_PAGE, DrawerAction.NAVIGATE_MAPS,
+            DrawerAction.PIN_TOOLBAR, DrawerAction.SWAP_SPLIT_SIDES, DrawerAction.MIRROR_PHONE,
+            DrawerAction.SPLIT_CHOOSE -> Unit
             // Sheet navigation, resolved before an action is dispatched.
             DrawerAction.MORE, DrawerAction.BACK_TO_MENU, DrawerAction.CLOSE_SHEET -> Unit
         }

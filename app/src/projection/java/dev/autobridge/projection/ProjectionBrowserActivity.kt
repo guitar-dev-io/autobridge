@@ -42,6 +42,15 @@ import dev.autobridge.audio.AudioPlaybackStore
 import dev.autobridge.audio.WebAudioBridge
 import dev.autobridge.audio.WebMediaStatus
 import dev.autobridge.browser.BrowserAdBlock
+import dev.autobridge.browser.BrowserDownloads
+import dev.autobridge.browser.BrowserMenuState
+import dev.autobridge.browser.CarBrowserAbout
+import dev.autobridge.browser.CarMenuList
+import dev.autobridge.browser.DrawerAction
+import dev.autobridge.browser.MenuSurface
+import dev.autobridge.entertainment.BrowserLauncher
+import dev.autobridge.entertainment.WebBookmarkStore
+import dev.autobridge.entertainment.WebHistoryStore
 import dev.autobridge.browser.BrowserControlsStore
 import dev.autobridge.browser.BrowserDefaults
 import dev.autobridge.browser.BrowserDisplayUrl
@@ -64,6 +73,7 @@ import dev.autobridge.browser.MapsHandoff
 import dev.autobridge.browser.PaneRect
 import dev.autobridge.browser.SearchEngineStore
 import dev.autobridge.browser.SidePaneAudio
+import dev.autobridge.browser.SplitPanes
 import dev.autobridge.browser.WebViewTimerGate
 import dev.autobridge.core.model.Feature
 import dev.autobridge.core.policy.FeaturePolicy
@@ -109,6 +119,14 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         /** Toolbar metrics, in dp. The touch target is the car minimum; nothing here goes under it. */
         const val BAR_HEIGHT = 60
         const val TOUCH_TARGET = 52
+
+        /** How long a [notice] stays up. */
+        const val NOTICE_MS = 2_500L
+
+        /** Car menu entries this route has no screen for: they live on Android Auto templates. */
+        val UNSUPPORTED_ACTIONS = setOf(
+            DrawerAction.MEDIA_CENTER, DrawerAction.NOW_PLAYING, DrawerAction.MEDIA_LIBRARY, DrawerAction.AGENT,
+        )
         const val PILL_HEIGHT = 44
         const val FAB_SIZE = 60
         const val FAB_MARGIN = 16
@@ -179,6 +197,9 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
      * route, so a layout chosen on either surface is the layout on both.
      */
     private var sideView: WebView? = null
+
+    /** The ✕ on the seam that closes the split; see [placeSideClose]. */
+    private var sideCloseButton: TextView? = null
 
     /**
      * The phone's screen over the page, opened from the menu; null while the browser is showing.
@@ -293,6 +314,9 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
      * or the menu, whichever pane was tapped when it was opened from a field on the page.
      */
     private var keyboardTarget: WebView? = null
+
+    /** Where the typed text goes instead of the page, when the keyboard was opened for something else (Find). */
+    private var keyboardCommit: ((String) -> Unit)? = null
 
     // SDK (com.google.android.apps.auto.sdk.SearchController): the host-serviced search surface.
     // Acquired in onCreate; the callback below is registered BEFORE any box call because
@@ -433,6 +457,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         val web = CarPageWebView(this).apply {
             BrowserDefaults.configure(this@ProjectionBrowserActivity, this)
             setOnTouchListener(pageTouchListener)
+            setDownloadListener(BrowserDownloads.listener(this@ProjectionBrowserActivity) { message -> notice(message) })
             webViewClient = object : WebViewClient() {
                 /**
                  * Drops advertising and tracking subresources when the user has turned blocking on.
@@ -471,6 +496,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
 
                 override fun onPageFinished(view: WebView, url: String) {
                     BrowserDefaults.remember(this@ProjectionBrowserActivity, url)
+                    WebHistoryStore.record(this@ProjectionBrowserActivity, view.title, url)
                     audio.installPlayTracking()
                     syncAddress()
                     syncTabs(url, view.title)
@@ -1118,66 +1144,351 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         }
     }
 
-    /** The floating button's sheet: the controls that do not earn permanent width on the bar. */
+    /**
+     * The floating button's sheet: the car browser menu every car browser shows, from
+     * [BrowserDrawerModel.carMenu] through [CarMenuList] — same entries, same order, same names as
+     * the Android Auto template browser — followed by the two things only this route has.
+     */
     private fun openMenu() {
         noteInteraction()
         if (!allowed()) return enforcePolicy()
-        val desktop = BrowserUserAgentStore.isDesktopIdentity(this)
-        showOverlay("Browser") {
-            addView(menuRow("▣", "Tabs", "${tabs.count} open") { dismissOverlay(); openTabList() })
-            addView(menuRow("+", "New tab") { dismissOverlay(); openInNewTab(BrowserDefaults.HOME) })
-            addView(menuRow("⛶", "Desktop site", if (desktop) "On" else "Off") {
-                BrowserUserAgentStore.select(
-                    this@ProjectionBrowserActivity,
-                    if (desktop) BrowserUserAgentMode.MOBILE else BrowserUserAgentMode.DESKTOP
-                )
-                dismissOverlay()
-                // The identity is read at navigation time, so the open page only changes on reload.
-                webView?.reload()
-            })
-            addView(menuRow("⇧", "Keep toolbar on screen", if (pinnedChrome) "On" else "Off") {
-                BrowserControlsStore.setAlwaysShowUrlBar(this@ProjectionBrowserActivity, !pinnedChrome)
-                dismissOverlay()
-                applyChromePinning()
-            })
-            addView(menuRow("⌨", "Keyboard") { dismissOverlay(); openKeyboard() })
-            addView(menuRow("▢", "Mirror phone screen", "Back to the web with ✕") {
-                dismissOverlay()
-                openMirror()
-            })
-            val split = BrowserSplitStore.projection.layout(this@ProjectionBrowserActivity)
-            addView(menuRow(split.glyph, getString(R.string.car_browser_split), splitDetail(split)) {
-                dismissOverlay()
-                cycleSplitLayout()
-            })
-            addView(menuRow("◨", getString(R.string.drawer_side_show_page)) {
-                dismissOverlay()
-                showPageOnSide()
-            })
-            // The split's map first, then the full-screen page: either one can be showing the place.
-            val destination = MapsHandoff.destinationFromPage(sideView?.url)
-                ?: MapsHandoff.destinationFromPage(webView?.url)
-            if (sideView != null || destination != null) {
-                addView(menuRow(
-                    "➤", "Navigate in Google Maps",
-                    destination ?: "Open a route or a place on the map first"
-                ) {
-                    dismissOverlay()
-                    destination?.let { startMapsNavigation(it) }
-                })
-            }
-            if (sideView != null) {
-                addView(menuRow("⇆", "Swap split sides") {
-                    BrowserSplitStore.projection.setSideOnRight(
-                        this@ProjectionBrowserActivity,
-                        !BrowserSplitStore.projection.sideOnRight(this@ProjectionBrowserActivity)
-                    )
-                    dismissOverlay()
-                    layoutPanes()
-                })
-            }
-            addView(menuRow("▭", "Car's own search box") { dismissOverlay(); openAddressEntry() })
+        val style = CarMenuList.Style(
+            text = scheme.textPrimary,
+            textSecondary = scheme.textSecondary,
+            rowFill = scheme.sheetCardBackground,
+            accent = scheme.primary,
+            onAccent = scheme.onPrimary,
+        )
+        val rows = CarMenuList.build(this, menuState(), style) { action ->
+            dismissOverlay()
+            runMenuAction(action)
         }
+        showOverlay(getString(R.string.car_browser_title)) {
+            rows.forEach { addView(it) }
+            addView(menuRow("⌨", getString(R.string.bridge_web_menu_keyboard)) { dismissOverlay(); openKeyboard() })
+            addView(menuRow("▭", getString(R.string.bridge_web_menu_car_search)) { dismissOverlay(); openAddressEntry() })
+        }
+    }
+
+    private fun menuState(): BrowserMenuState = BrowserMenuState(
+        surface = MenuSurface.CAR,
+        tabCount = tabs.count,
+        isDesktop = BrowserUserAgentStore.isDesktopIdentity(this),
+        fullscreen = chromeVisibility.fullscreen,
+        canGoBack = webView?.canGoBack() == true,
+        canGoForward = webView?.canGoForward() == true,
+        // The setting, not [pinnedChrome]: fullscreen unpins the bar without changing it.
+        pinnedToolbar = BrowserControlsStore.alwaysShowUrlBar(this),
+        splitActive = sideView != null,
+        unsupported = UNSUPPORTED_ACTIONS,
+    )
+
+    /** What each menu entry does here. Entries in [UNSUPPORTED_ACTIONS] are never offered. */
+    private fun runMenuAction(action: DrawerAction) {
+        val page = webView
+        when (action) {
+            DrawerAction.TABS -> openTabList()
+            DrawerAction.NEW_TAB -> openInNewTab(BrowserDefaults.HOME)
+            DrawerAction.NAV_BACK -> navigateBack()
+            DrawerAction.NAV_FORWARD -> if (page?.canGoForward() == true) page.goForward()
+            DrawerAction.RELOAD -> page?.reload()
+            DrawerAction.HOME -> page?.loadUrl(BrowserDefaults.HOME)
+            DrawerAction.BOOKMARKS -> openBookmarks()
+            DrawerAction.HISTORY -> openHistory()
+            DrawerAction.DOWNLOADS -> openDownloads()
+            DrawerAction.SETTINGS -> openSettings()
+            DrawerAction.TOGGLE_DESKTOP -> {
+                val desktop = BrowserUserAgentStore.isDesktopIdentity(this)
+                BrowserUserAgentStore.select(
+                    this, if (desktop) BrowserUserAgentMode.MOBILE else BrowserUserAgentMode.DESKTOP
+                )
+                // The identity is read at navigation time, so the open page only changes on reload.
+                page?.reload()
+            }
+            DrawerAction.TOGGLE_FULLSCREEN -> setPageFullscreen(!chromeVisibility.fullscreen)
+            DrawerAction.PIN_TOOLBAR -> togglePinnedToolbar()
+            DrawerAction.SPLIT_LAYOUT -> toggleSplit()
+            DrawerAction.SPLIT_CHOOSE -> openSplitChooser()
+            DrawerAction.SIDE_SHOW_PAGE -> showPageOnSide()
+            DrawerAction.SWAP_SPLIT_SIDES -> if (sideView != null) {
+                BrowserSplitStore.projection.setSideOnRight(this, !BrowserSplitStore.projection.sideOnRight(this))
+                layoutPanes()
+            }
+            DrawerAction.NAVIGATE_MAPS -> {
+                // The split's map first, then the full-screen page: either one can be showing the place.
+                val destination = MapsHandoff.destinationFromPage(sideView?.url)
+                    ?: MapsHandoff.destinationFromPage(page?.url)
+                if (destination != null) startMapsNavigation(destination)
+                else notice(getString(R.string.bridge_web_maps_no_destination))
+            }
+            DrawerAction.MIRROR_PHONE -> openMirror()
+            DrawerAction.BOOKMARK_PAGE -> notice(getString(
+                if (WebBookmarkStore.add(this, page?.title.orEmpty(), currentUrl)) R.string.car_bookmark_saved
+                else R.string.car_bookmark_failed
+            ))
+            DrawerAction.FIND_IN_PAGE -> openKeyboard(onCommit = ::findInPage)
+            DrawerAction.COPY_URL -> notice(getString(
+                if (runCatching { clipboard()?.setPrimaryClip(android.content.ClipData.newPlainText("URL", currentUrl)) }
+                        .getOrNull() != null
+                ) R.string.car_url_copied else R.string.car_copy_failed
+            ))
+            DrawerAction.PASTE_AND_GO -> {
+                val text = runCatching { clipboard()?.primaryClip?.getItemAt(0)?.coerceToText(this)?.toString() }
+                    .getOrNull()?.trim()
+                if (text.isNullOrEmpty()) notice(getString(R.string.car_clipboard_unreadable))
+                else navigateFromInput(text)
+            }
+            DrawerAction.OPEN_EXTERNAL ->
+                if (!BrowserLauncher.openUrl(this, currentUrl)) notice(getString(R.string.car_browser_no_external))
+            DrawerAction.ZOOM_IN -> page?.zoomBy(1.25f)
+            DrawerAction.ZOOM_OUT -> page?.zoomBy(0.8f)
+            DrawerAction.CLEAR_DATA -> {
+                clearBrowsingData()
+                notice(getString(R.string.car_browsing_data_cleared))
+            }
+            DrawerAction.DIAGNOSTICS -> showOverlay(getString(R.string.drawer_about)) {
+                CarBrowserAbout.lines(this@ProjectionBrowserActivity).forEach { (label, value) ->
+                    addView(menuRow("ⓘ", label, value) { })
+                }
+            }
+            // A CarActivity has no finish(): leaving is what back does at the root.
+            DrawerAction.APP_HOME -> super.onBackPressed()
+            // Not offered here (see UNSUPPORTED_ACTIONS), or phone-sheet entries.
+            else -> Unit
+        }
+    }
+
+    /** Pinning the toolbar also leaves fullscreen: a pinned bar that stays hidden is no pin. */
+    private fun togglePinnedToolbar() {
+        BrowserControlsStore.setAlwaysShowUrlBar(this, !BrowserControlsStore.alwaysShowUrlBar(this))
+        if (chromeVisibility.fullscreen) setPageFullscreen(false) else applyChromePinning()
+    }
+
+    private fun clipboard(): android.content.ClipboardManager? =
+        getSystemService(android.content.ClipboardManager::class.java)
+
+    /**
+     * Fullscreen: the toolbar goes and the page takes its space, even when the toolbar is pinned.
+     * The edge band and the floating button still bring the toolbar back over the page; leaving
+     * fullscreen restores whatever the pin setting says.
+     */
+    private fun setPageFullscreen(enabled: Boolean) {
+        val now = SystemClock.uptimeMillis()
+        chromeVisibility.setFullscreen(now, enabled)
+        if (!enabled) return applyChromePinning()
+        chromeVisibility.setAutoHide(now, true)
+        pinnedChrome = false
+        pageArea?.let { view ->
+            (view.layoutParams as? FrameLayout.LayoutParams)?.let { params ->
+                if (params.topMargin != 0) {
+                    params.topMargin = 0
+                    view.layoutParams = params
+                }
+            }
+        }
+        chromeBar?.removeCallbacks(chromeTicker)
+        applyChromeVisible(false)
+    }
+
+    private fun clearBrowsingData() {
+        runCatching {
+            android.webkit.CookieManager.getInstance().removeAllCookies(null)
+            android.webkit.CookieManager.getInstance().flush()
+            android.webkit.WebStorage.getInstance().deleteAllData()
+            webView?.clearCache(true)
+            webView?.clearFormData()
+            webView?.clearHistory()
+            sideView?.clearFormData()
+            sideView?.clearHistory()
+        }
+        WebHistoryStore.clear(this)
+        tabStates.clear()
+        updateNav()
+    }
+
+    /** A short message over the page that goes away on its own (or on a tap). */
+    private fun notice(message: String) {
+        showOverlay(message) { }
+        val shown = overlay
+        root?.postDelayed({ if (overlay === shown) dismissOverlay() }, NOTICE_MS)
+    }
+
+    private fun openBookmarks() {
+        val bookmarks = WebBookmarkStore.list(this)
+        showOverlay(getString(R.string.car_browser_bookmarks_title)) {
+            if (bookmarks.isEmpty()) addView(emptyRow(R.string.car_browser_bookmarks_empty))
+            bookmarks.forEach { mark ->
+                addView(menuRow("★", mark.title.ifBlank { mark.url }, BrowserDisplayUrl.compact(mark.url)) {
+                    dismissOverlay()
+                    webView?.loadUrl(mark.url)
+                })
+            }
+        }
+    }
+
+    private fun openHistory() {
+        val entries = WebHistoryStore.list(this)
+        showOverlay(getString(R.string.car_browser_history_title)) {
+            if (entries.isEmpty()) addView(emptyRow(R.string.car_browser_history_empty))
+            entries.forEach { entry ->
+                addView(menuRow("↺", entry.title.ifBlank { entry.url }, BrowserDisplayUrl.compact(entry.url)) {
+                    dismissOverlay()
+                    webView?.loadUrl(entry.url)
+                })
+            }
+        }
+    }
+
+    private fun openDownloads() {
+        val downloads = BrowserDownloads.list(this)
+        showOverlay(getString(R.string.car_browser_downloads_title)) {
+            if (downloads.isEmpty()) addView(emptyRow(R.string.car_browser_downloads_empty))
+            downloads.forEach { entry ->
+                val status = BrowserDownloads.status(this@ProjectionBrowserActivity, entry.id)
+                addView(menuRow("⤓", entry.fileName, status ?: BrowserDisplayUrl.compact(entry.url)) { })
+            }
+        }
+    }
+
+    private fun emptyRow(text: Int): View = TextView(this).apply {
+        setText(text)
+        setTextColor(scheme.textSecondary)
+        textSize = 15f
+        setPadding(12.dp(), 8.dp(), 12.dp(), 12.dp())
+    }
+
+    /**
+     * The settings this browser honours, each a switch that applies at once. The same stores the
+     * template browser's settings screen writes, so a change on either is a change on both.
+     */
+    private fun openSettings() {
+        fun onOff(on: Boolean) = getString(if (on) R.string.browser_menu_on else R.string.browser_menu_off)
+        val activity = this
+        showOverlay(getString(R.string.car_browser_settings_title)) {
+            val pinned = BrowserControlsStore.alwaysShowUrlBar(activity)
+            addView(menuRow("⇧", getString(R.string.car_browser_always_url_bar), onOff(pinned)) {
+                togglePinnedToolbar()
+                openSettings()
+            })
+            val alwaysFab = BrowserControlsStore.alwaysShowFloatingButton(activity)
+            addView(menuRow("●", getString(R.string.car_browser_always_fab), onOff(alwaysFab)) {
+                BrowserControlsStore.setAlwaysShowFloatingButton(activity, !alwaysFab)
+                applyChromeVisible(chromeBar?.visibility == View.VISIBLE)
+                openSettings()
+            })
+            val fabLeft = BrowserControlsStore.floatingButtonOnLeft(activity)
+            addView(menuRow("◧", getString(R.string.car_browser_fab_left), onOff(fabLeft)) {
+                BrowserControlsStore.setFloatingButtonOnLeft(activity, !fabLeft)
+                fab?.let { button ->
+                    (button.layoutParams as? FrameLayout.LayoutParams)?.let { params ->
+                        params.gravity = fabGravity()
+                        button.layoutParams = params
+                    }
+                }
+                openSettings()
+            })
+            val split = BrowserSplitStore.projection.layout(activity)
+            addView(menuRow(split.glyph, getString(R.string.car_browser_split), splitDetail(split)) {
+                openSplitChooser()
+            })
+            val sideRight = BrowserSplitStore.projection.sideOnRight(activity)
+            addView(menuRow("◨", getString(R.string.car_browser_side_right), onOff(sideRight)) {
+                BrowserSplitStore.projection.setSideOnRight(activity, !sideRight)
+                layoutPanes()
+                openSettings()
+            })
+            val keepMusic = AudioPlaybackStore.keepPlayingThroughFocusLoss(activity)
+            addView(menuRow("♪", getString(R.string.car_browser_reverse_music), onOff(keepMusic)) {
+                AudioPlaybackStore.setKeepPlayingThroughFocusLoss(activity, !keepMusic)
+                openSettings()
+            })
+            val blockAds = BrowserAdBlock.enabled(activity)
+            addView(menuRow("⛔", getString(R.string.car_browser_block_ads), onOff(blockAds)) {
+                BrowserAdBlock.setEnabled(activity, !blockAds)
+                webView?.reload()
+                openSettings()
+            })
+            val desktop = BrowserUserAgentStore.isDesktopIdentity(activity)
+            addView(menuRow(
+                "⛶", getString(R.string.car_browser_identity),
+                getString(if (desktop) R.string.car_ua_desktop else R.string.car_ua_mobile)
+            ) {
+                BrowserUserAgentStore.select(
+                    activity, if (desktop) BrowserUserAgentMode.MOBILE else BrowserUserAgentMode.DESKTOP
+                )
+                webView?.reload()
+                openSettings()
+            })
+        }
+    }
+
+    // ------------------------------------------------------------------ find in page
+
+    private var findBar: View? = null
+
+    /**
+     * Highlights [query] on the page and puts a slim bar at the top with the match count and
+     * previous / next / close. A bar, not an overlay, so the matches stay visible underneath.
+     */
+    private fun findInPage(query: String) {
+        val page = webView ?: return
+        val parent = root ?: return
+        closeFindBar()
+        val counter = TextView(this).apply {
+            setTextColor(scheme.textPrimary)
+            textSize = 16f
+            isSingleLine = true
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            text = getString(R.string.car_find_quoted, query)
+        }
+        page.setFindListener { active, count, done ->
+            if (done) counter.text = if (count == 0) getString(R.string.car_find_no_matches)
+            else getString(R.string.car_find_quoted, query) + "  ${active + 1}/$count"
+        }
+        fun button(glyph: String, label: String, onClick: () -> Unit) = TextView(this).apply {
+            text = glyph
+            contentDescription = label
+            setTextColor(scheme.textPrimary)
+            textSize = 20f
+            gravity = Gravity.CENTER
+            background = circleRipple()
+            isClickable = true
+            setOnClickListener { onClick() }
+        }
+        val bar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = 16f * resources.displayMetrics.density
+                setColor(scheme.sheetBackground)
+            }
+            setPadding(16.dp(), 4.dp(), 8.dp(), 4.dp())
+            isClickable = true
+            addView(counter, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            addView(button("‹", getString(R.string.drawer_back)) { page.findNext(false) },
+                LinearLayout.LayoutParams(TOUCH_TARGET.dp(), TOUCH_TARGET.dp()))
+            addView(button("›", getString(R.string.drawer_forward)) { page.findNext(true) },
+                LinearLayout.LayoutParams(TOUCH_TARGET.dp(), TOUCH_TARGET.dp()))
+            addView(button("\u2715", getString(R.string.car_find_title)) { closeFindBar() },
+                LinearLayout.LayoutParams(TOUCH_TARGET.dp(), TOUCH_TARGET.dp()))
+        }
+        findBar = bar
+        parent.addView(
+            bar,
+            FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP)
+                .apply { setMargins(24.dp(), (BAR_HEIGHT + 8).dp(), 24.dp(), 0) }
+        )
+        blocked?.bringToFront()
+        page.findAllAsync(query)
+    }
+
+    private fun closeFindBar() {
+        val bar = findBar ?: return
+        findBar = null
+        webView?.clearMatches()
+        webView?.setFindListener(null)
+        root?.removeView(bar)
     }
 
     // ------------------------------------------------------------------ tabs
@@ -1355,11 +1666,43 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
     // ------------------------------------------------------------------ split
 
     /** Steps to the next split layout and applies it, saying so when the display cannot fit it. */
-    private fun cycleSplitLayout() {
-        val next = BrowserSplitStore.projection.layout(this).next()
-        BrowserSplitStore.projection.setLayout(this, next)
+    /**
+     * The split switch (the menu's Split screen button, the ✕ on the seam): one tap closes a
+     * split, the next brings back the layout it had. See [dev.autobridge.browser.BrowserSplitPrefs.toggle].
+     */
+    private fun toggleSplit() {
+        val next = BrowserSplitStore.projection.toggle(this)
         layoutPanes()
+        notice(if (next == BrowserSplitLayout.SINGLE) getString(R.string.split_closed) else splitDetail(next))
         StructuredLog.i("PROJECTION", "split -> $next (side ${if (sideView != null) "shown" else "none"})")
+    }
+
+    /** Picks a layout in one step, rather than stepping through them; and which side the page is on. */
+    private fun openSplitChooser() {
+        val current = BrowserSplitStore.projection.layout(this)
+        showOverlay(getString(R.string.drawer_split_choose)) {
+            BrowserSplitLayout.entries.forEach { layout ->
+                val label = layout.label(this@ProjectionBrowserActivity)
+                addView(menuRow(if (layout == current) "●" else "○", label) {
+                    dismissOverlay()
+                    BrowserSplitStore.projection.setLayout(this@ProjectionBrowserActivity, layout)
+                    layoutPanes()
+                    if (layout != BrowserSplitLayout.SINGLE && sideView == null) {
+                        notice(getString(R.string.car_split_too_narrow, label))
+                    }
+                    StructuredLog.i("PROJECTION", "split chosen -> $layout")
+                })
+            }
+            val sideRight = BrowserSplitStore.projection.sideOnRight(this@ProjectionBrowserActivity)
+            addView(menuRow(
+                "⇆", getString(R.string.car_browser_side_right),
+                getString(if (sideRight) R.string.browser_menu_on else R.string.browser_menu_off)
+            ) {
+                BrowserSplitStore.projection.setSideOnRight(this@ProjectionBrowserActivity, !sideRight)
+                layoutPanes()
+                openSplitChooser()
+            })
+        }
     }
 
     /**
@@ -1411,11 +1754,68 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         if (panes == null) {
             releaseSidePane()
             fill(main)
+            removeSideClose()
             return
         }
         val side = sideView ?: createSidePane(area)
         place(main, panes.main)
         place(side, panes.side)
+        placeSideClose(area, panes)
+    }
+
+    /**
+     * The ✕ that closes the split, centred on the seam between the panes: on the divider rather
+     * than in a pane's corner, where the toolbar and the floating button already sit and where it
+     * would cover a page's own controls. The car browser draws its ✕ in the same place.
+     */
+    private fun placeSideClose(area: FrameLayout, panes: SplitPanes) {
+        val size = TOUCH_TARGET.dp()
+        val button = sideCloseButton ?: TextView(this).apply {
+            text = "\u2715"
+            contentDescription = getString(R.string.split_close_side)
+            setTextColor(scheme.textPrimary)
+            textSize = 18f
+            gravity = Gravity.CENTER
+            background = RippleDrawable(
+                ColorStateList.valueOf(scheme.textSecondary),
+                ShapeDrawable(OvalShape()).apply { paint.color = scheme.surfaceContainerHighest },
+                null
+            )
+            elevation = 4f * resources.displayMetrics.density
+            isClickable = true
+            isFocusable = true
+            setOnClickListener {
+                noteInteraction()
+                if (BrowserSplitStore.projection.layout(this@ProjectionBrowserActivity) != BrowserSplitLayout.SINGLE) {
+                    toggleSplit()
+                }
+            }
+        }.also { created ->
+            sideCloseButton = created
+            area.addView(created, FrameLayout.LayoutParams(size, size))
+        }
+        val (centreX, centreY) = if (panes.stacked) {
+            val top = minOf(panes.main.bottom, panes.side.bottom)
+            val bottom = maxOf(panes.main.top, panes.side.top)
+            (panes.side.left + panes.side.width / 2) to (top + bottom) / 2
+        } else {
+            val left = minOf(panes.main.right, panes.side.right)
+            val right = maxOf(panes.main.left, panes.side.left)
+            (left + right) / 2 to (panes.side.top + panes.side.height / 2)
+        }
+        val params = (button.layoutParams as? FrameLayout.LayoutParams) ?: FrameLayout.LayoutParams(size, size)
+        params.gravity = Gravity.TOP or Gravity.START
+        params.leftMargin = centreX - size / 2
+        params.topMargin = centreY - size / 2
+        button.layoutParams = params
+        button.visibility = sideView?.visibility ?: View.VISIBLE
+        button.bringToFront()
+    }
+
+    private fun removeSideClose() {
+        val button = sideCloseButton ?: return
+        sideCloseButton = null
+        (button.parent as? ViewGroup)?.removeView(button)
     }
 
     private fun fill(view: View) {
@@ -1651,12 +2051,17 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
      * almost always wants to search for something new rather than edit the URL they are on, and
      * editing a long URL a key at a time in a car is not a thing anyone does.
      */
-    private fun openKeyboard(seed: String = "", target: WebView? = webView) {
+    private fun openKeyboard(
+        seed: String = "",
+        target: WebView? = webView,
+        onCommit: ((String) -> Unit)? = null,
+    ) {
         if (!allowed()) return enforcePolicy()
         if (keyboardPanel != null) return
         dismissOverlay()
         val parent = root ?: return
         keyboardTarget = target
+        keyboardCommit = onCommit
         keyboardLanguage = CarKeyboardStore.language(this)
         keyboardShift = false
         keyboardSymbols = false
@@ -1755,6 +2160,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         keyboardRows = null
         keyboardPreview = null
         keyboardTarget = null
+        keyboardCommit = null
         typed.setLength(0)
         root?.removeView(panel)
         // Restores the floating button and the bar to whatever the chrome state already says —
@@ -1919,8 +2325,10 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
     private fun commitTyped() {
         val value = typed.toString().trim()
         val target = keyboardTarget
+        val commit = keyboardCommit
         closeKeyboard()
         if (value.isEmpty()) return
+        if (commit != null) return commit(value)
         StructuredLog.i("PROJECTION", "car keyboard -> ${value.length} chars")
         typeInto(target, value, autoSubmit = true)
     }
@@ -2004,11 +2412,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
      * script can — so on this route "fullscreen" means the one thing this app does control: every
      * pixel of chrome off the page, or back.
      */
-    override fun setFullscreen(enabled: Boolean) = onUi {
-        chromeVisibility.setFullscreen(SystemClock.uptimeMillis(), enabled)
-        applyChromeVisible(!enabled)
-        if (!enabled) scheduleChromeTick()
-    }
+    override fun setFullscreen(enabled: Boolean) = onUi { setPageFullscreen(enabled) }
 
     override fun setDesktopMode(enabled: Boolean) = onUi {
         BrowserUserAgentStore.select(
@@ -2083,6 +2487,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         }
         webView?.visibility = if (permitted) View.VISIBLE else View.INVISIBLE
         sideView?.visibility = if (permitted) View.VISIBLE else View.INVISIBLE
+        sideCloseButton?.visibility = if (permitted) View.VISIBLE else View.INVISIBLE
         blocked?.visibility = if (permitted) View.GONE else View.VISIBLE
         blocked?.text = if (permitted) "" else FeaturePolicy.app.denialMessage(Feature.BROWSER)
         chromeBar?.visibility = if (permitted) View.VISIBLE else View.INVISIBLE
@@ -2171,6 +2576,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         BrowserTabStore.save(this, tabs)
         tabStates.clear()
         dismissOverlay()
+        closeFindBar()
         closeKeyboard()
         closeMirror()
         // After closeKeyboard(), which re-arms the ticker on its way out.
@@ -2185,6 +2591,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         runCatching { searchController?.hideSearchBox() }
             .onFailure { StructuredLog.w("PROJECTION", "hideSearchBox failed: ${it.message}") }
         releaseSidePane()
+        removeSideClose()
         webView?.let { view ->
             WebViewTimerGate.release(TIMER_GATE_OWNER, view)
             view.stopLoading()

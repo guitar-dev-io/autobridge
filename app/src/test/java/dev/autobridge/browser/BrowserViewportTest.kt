@@ -889,8 +889,9 @@ class BrowserDrawerModelTest {
 
     /**
      * The car sheet mirrors the phone's [BrowserMenuSheet]: one accent primary button, then
-     * Back / Reload / Forward and Bookmarks / Settings / More, then the desktop and fullscreen
-     * switches. Growing it is how the old menu ended up with a fold.
+     * Back / Reload / Forward and Bookmarks / Settings / Split screen / More, then the desktop
+     * and fullscreen switches. Growing it is how the old menu ended up with a fold: the split
+     * screen joined the second row rather than adding a third.
      */
     @Test fun thePrimarySheetMirrorsThePhoneSheet() {
         val model = modelFor(1024, 600, 160)
@@ -900,7 +901,7 @@ class BrowserDrawerModelTest {
         assertEquals(
             listOf(
                 DrawerAction.NAV_BACK, DrawerAction.RELOAD, DrawerAction.NAV_FORWARD,
-                DrawerAction.BOOKMARKS, DrawerAction.SETTINGS, DrawerAction.MORE,
+                DrawerAction.BOOKMARKS, DrawerAction.SETTINGS, DrawerAction.SPLIT_LAYOUT, DrawerAction.MORE,
             ),
             model.tiles.map { it.item.action }
         )
@@ -976,11 +977,92 @@ class BrowserDrawerModelTest {
     @Test fun thePhoneSheetKeepsTheShapeAndSwapsWhatItCannotDo() {
         val phoneState = state.copy(surface = MenuSurface.PHONE)
         assertEquals(
-            BrowserDrawerModel.primaryRows(state).map { row -> row.map { it.action } },
+            BrowserDrawerModel.primaryRows(state).map { row -> row.map { it.action } - DrawerAction.SPLIT_LAYOUT },
             BrowserDrawerModel.primaryRows(phoneState).map { row -> row.map { it.action } },
         )
         assertEquals(DrawerAction.TABS, BrowserDrawerModel.primaryAction(state).action)
         assertEquals(DrawerAction.SEND_TO_CAR, BrowserDrawerModel.primaryAction(phoneState).action)
+    }
+}
+
+
+class CarMenuParityTest {
+    private val state = BrowserMenuState(tabCount = 3, canGoBack = true)
+
+    @Test fun theCarSheetPutsTheSplitScreenUpFront() {
+        val rows = BrowserDrawerModel.primaryRows(state)
+        assertEquals(2, rows.size)
+        assertEquals(
+            listOf(DrawerAction.BOOKMARKS, DrawerAction.SETTINGS, DrawerAction.SPLIT_LAYOUT, DrawerAction.MORE),
+            rows[1].map { it.action },
+        )
+        val more = BrowserDrawerModel.moreItems(state).map { it.action }
+        assertFalse(DrawerAction.SPLIT_LAYOUT in more)
+        assertEquals(
+            listOf(DrawerAction.SPLIT_CHOOSE, DrawerAction.SIDE_SHOW_PAGE, DrawerAction.SWAP_SPLIT_SIDES),
+            more.take(3),
+        )
+    }
+
+    @Test fun theSplitTileIsASwitchThatShowsWhetherASplitIsUp() {
+        fun split(s: BrowserMenuState) = BrowserDrawerModel.primaryRows(s).flatten().single { it.action == DrawerAction.SPLIT_LAYOUT }
+        assertFalse(split(state).on)
+        assertTrue(split(state.copy(splitActive = true)).on)
+    }
+
+    @Test fun theFourTileRowSharesTheSheetWidth() {
+        val sizes = AutoUiSizes.forCarSurface(160)
+        val model = BrowserDrawerModel.create(sizes, BrowserViewport.create(1024, 600, sizes.density), state)
+        val second = model.tiles.filter { it.item.action in setOf(DrawerAction.BOOKMARKS, DrawerAction.MORE) }
+        val first = model.tiles.first { it.item.action == DrawerAction.NAV_BACK }
+        assertTrue(second.all { it.bounds.width < first.bounds.width })
+        val more = model.tiles.single { it.item.action == DrawerAction.MORE }
+        assertEquals(model.tiles.single { it.item.action == DrawerAction.NAV_FORWARD }.bounds.right, more.bounds.right, 0.5f)
+    }
+
+    @Test fun swappingSidesOnlyActsWhileASplitIsUp() {
+        fun swap(s: BrowserMenuState) = BrowserDrawerModel.carMenu(s).single { it.action == DrawerAction.SWAP_SPLIT_SIDES }
+        assertFalse(swap(state).enabled)
+        assertTrue(swap(state.copy(splitActive = true)).enabled)
+    }
+
+    @Test fun theCarMenuListsEveryCarActionOnceInSheetOrder() {
+        val actions = BrowserDrawerModel.carMenu(state).map { it.action }
+        assertEquals(actions.size, actions.toSet().size)
+        assertEquals(DrawerAction.TABS, actions.first())
+        assertEquals(DrawerAction.APP_HOME, actions.last())
+        listOf(
+            DrawerAction.BOOKMARKS, DrawerAction.SETTINGS, DrawerAction.HISTORY, DrawerAction.DOWNLOADS,
+            DrawerAction.FIND_IN_PAGE, DrawerAction.ZOOM_IN, DrawerAction.CLEAR_DATA, DrawerAction.TOGGLE_DESKTOP,
+            DrawerAction.TOGGLE_FULLSCREEN, DrawerAction.PIN_TOOLBAR, DrawerAction.MIRROR_PHONE,
+        ).forEach { assertTrue("$it missing", it in actions) }
+        assertFalse(DrawerAction.MORE in actions)
+        assertFalse(DrawerAction.SEND_TO_CAR in actions)
+        // The split layout is on the primary sheet, ahead of everything behind "More".
+        assertTrue(actions.indexOf(DrawerAction.SPLIT_LAYOUT) < actions.indexOf(DrawerAction.TOGGLE_DESKTOP))
+    }
+
+    @Test fun aBrowserLeavesOutWhatItCannotDoEverywhere() {
+        val unsupported = setOf(
+            DrawerAction.TABS, DrawerAction.NEW_TAB, DrawerAction.SPLIT_LAYOUT, DrawerAction.SIDE_SHOW_PAGE,
+            DrawerAction.SWAP_SPLIT_SIDES, DrawerAction.AGENT,
+        )
+        val limited = state.copy(unsupported = unsupported)
+        val actions = BrowserDrawerModel.carMenu(limited).map { it.action }
+        assertTrue((actions intersect unsupported).isEmpty())
+        // No tabs: the start page leads instead.
+        assertEquals(DrawerAction.HOME, BrowserDrawerModel.primaryAction(limited).action)
+        assertEquals(DrawerAction.HOME, actions.first())
+        assertEquals(
+            listOf(DrawerAction.BOOKMARKS, DrawerAction.SETTINGS, DrawerAction.MORE),
+            BrowserDrawerModel.primaryRows(limited)[1].map { it.action },
+        )
+        assertTrue(BrowserDrawerModel.moreItems(limited).none { it.action in unsupported })
+    }
+
+    @Test fun thePhoneSheetIsUntouchedByTheCarSplitTile() {
+        val phone = state.copy(surface = MenuSurface.PHONE)
+        assertTrue(BrowserDrawerModel.primaryRows(phone).flatten().none { it.action == DrawerAction.SPLIT_LAYOUT })
     }
 }
 
