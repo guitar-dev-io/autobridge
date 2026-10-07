@@ -18,3 +18,4 @@ rootProject.name = "AutoBridge"
 include(":app")
 include(":common")
 include(":duoscreen")
+include(":whisper")

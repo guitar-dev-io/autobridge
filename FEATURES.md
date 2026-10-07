@@ -107,6 +107,7 @@
 
 - **Remote:** สั่งงานจอรถด้วยคำสั่ง มีประวัติคำสั่งและคำสั่งด่วน (ผมสรุปจากชื่อโมดูล ยังไม่ได้ตรวจรายละเอียดการใช้งาน)
 - **Agent (เสียง):** สั่งเป็นประโยคธรรมดา เช่น บันทึกน้ำมัน
+- **จดจำเสียงแบบออฟไลน์ (Whisper):** การตั้งค่า > การจดจำเสียง ดาวน์โหลดโมเดล Whisper (แนะนำ Base Q8_0 ประมาณ 82 MB) แล้วไมค์หน้าแรกและ Agent บนรถจะถอดเสียงบนมือถือโดยไม่ใช้เน็ต รองรับไทย อังกฤษ และไทยปนอังกฤษ เช่น "เปิด YouTube เพลง Bodyslam" "ค้นหา Taylor Swift ใน YouTube Music" "เปิด TikTok" "เปิด iQIYI" "กลับหน้าแรก" "ย้อนกลับ" มีหน้าทดสอบที่แสดงข้อความ เวลาที่ใช้ และ RTF ไว้เทียบโมเดล (ต้องใช้มือถือ 64 บิต)
 - **แชร์ไปรถ:** แชร์ลิงก์หรือเนื้อหาจากแอปอื่นมายังจอรถ
 - แป้นพิมพ์บนรถสำหรับพิมพ์ในแอป
 
@@ -152,7 +153,8 @@ AutoBridge lets you, from the phone and from the Android Auto screen: watch IPTV
 listen to radio; play local audio and video; browse the web beside Google Maps and hand a place to the
 Google Maps app for real turn-by-turn navigation (web Maps cannot navigate by itself); split the car
 screen between several apps (Duo Screen, needs Shizuku); mirror the phone screen; keep a fuel or
-charging log (by voice too), maintenance reminders, car costs, an emergency card, a parking spot and a
+charging log (by voice too), give voice commands transcribed offline on the phone by Whisper (Thai,
+English, or both in one sentence; the model is downloaded from Settings > Voice Recognition), maintenance reminders, car costs, an emergency card, a parking spot and a
 break reminder; back everything up to one file; check for and install updates in the app; and send a
 log that records touches, display type, temperature and battery for troubleshooting. Optional
 safety overrides exist, are off by default, and are used at your own risk.

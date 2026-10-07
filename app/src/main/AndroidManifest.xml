@@ -49,9 +49,11 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
 
-    <!-- Voice commands on the car Agent screen (CarVoiceInput): the car microphone through
-         CarAudioRecord, or the phone microphone as a fallback. Requested at runtime only when the
-         user starts listening; nothing is recorded outside a listen session. -->
+    <!-- Voice commands on the car Agent screen (CarVoiceInput) and the phone Home microphone: the
+         car microphone through CarAudioRecord, or the phone microphone as a fallback, transcribed
+         on the phone by the offline Whisper model (dev.autobridge.voice) when one is downloaded.
+         Requested at runtime only when the user starts listening; nothing is recorded outside a
+         listen session and no audio is kept. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <queries>
@@ -207,6 +209,10 @@
         <activity android:name=".library.VideoEnhancementActivity" android:exported="false" />
         <!-- On-device subtitle translation settings and Opus-MT model management. -->
         <activity android:name=".library.SubtitleSettingsActivity" android:exported="false" />
+        <!-- Settings > Voice Recognition: Whisper models and voice-command options, and the test
+             screen that benchmarks a model on this phone. -->
+        <activity android:name=".voice.VoiceSettingsActivity" android:exported="false" />
+        <activity android:name=".voice.VoiceTestActivity" android:exported="false" />
         <!-- Clear cache / reset app data. -->
         <activity android:name=".library.StorageSettingsActivity" android:exported="false" />
 

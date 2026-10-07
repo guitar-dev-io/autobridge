@@ -193,6 +193,19 @@ Version comparison and the release parsing are unit-tested in
 `app/src/test/java/dev/autobridge/update/UpdateCheckTest.kt`, which is where a tag shape that the
 check should understand (`v0.5.0`, `0.5.0-rc1`) belongs.
 
+### whisper.cpp submodule (offline voice recognition)
+
+The `:whisper` module builds [whisper.cpp](https://github.com/ggml-org/whisper.cpp) from a git
+submodule pinned to a release tag, so the NDK and CMake are needed and the submodule has to be
+checked out before the first build:
+
+```bash
+git submodule update --init --recursive
+```
+
+Whisper models are not in the APK; they are downloaded (or imported) on the phone from
+Settings > Voice Recognition. The model list lives in `WhisperModelCatalog`.
+
 ### Installing on a physical phone
 
 The debug variants are signed with the local Android debug key and can be installed directly for development:
@@ -602,7 +615,7 @@ wording and the Data safety answers live in [PLAY_DECLARATIONS.md](PLAY_DECLARAT
 | `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MEDIA_PLAYBACK` | Audio/video that keeps playing with the screen off or another app in front / เล่นเสียง-วิดีโอต่อเมื่อปิดจอหรือสลับแอป | Install time | Yes |
 | `FOREGROUND_SERVICE_MEDIA_PROJECTION` + screen-capture consent | Mirroring the phone screen onto the car display; Android asks for capture consent per session and it cannot be remembered / ฉายจอมือถือขึ้นจอรถ — ระบบขอยืนยันการจับภาพทุกครั้งที่เริ่ม และจำค่าไว้ไม่ได้ | Each time mirroring starts | Mirroring only |
 | `WAKE_LOCK` | Prevent-sleep and auto-dim while a car session runs / กันเครื่องหลับและหรี่จออัตโนมัติระหว่างต่อรถ | Install time | Mirroring only |
-| `RECORD_AUDIO` | Voice commands on the car Agent screen, through the car microphone where the head unit offers one. Recording starts on the mic press and ends on a result, an error or a timeout; nothing is stored or sent to this project / คำสั่งเสียงบนหน้า Agent ในรถ ใช้ไมค์ของรถถ้ามี เริ่มอัดเมื่อกดไมค์และหยุดเมื่อได้ผล/ผิดพลาด/หมดเวลา ไม่เก็บและไม่ส่งไปที่ไหน | First mic press | Voice only |
+| `RECORD_AUDIO` | Voice commands on the car Agent screen (through the car microphone where the head unit offers one) and the phone Home microphone. With a Whisper model downloaded, speech is transcribed on the phone, offline. Recording starts on the mic press and ends on a pause, a result, an error or a timeout; nothing is stored or sent to this project / คำสั่งเสียงบนหน้า Agent ในรถ (ใช้ไมค์ของรถถ้ามี) และไมค์หน้าแรกบนมือถือ ถ้าดาวน์โหลดโมเดล Whisper ไว้ จะถอดเสียงบนมือถือแบบออฟไลน์ เริ่มอัดเมื่อกดไมค์และหยุดเมื่อเงียบ/ได้ผล/ผิดพลาด/หมดเวลา ไม่เก็บและไม่ส่งไปที่ไหน | First mic press | Voice only |
 | `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION` | Two separate uses, foreground only, never in the background: a web page calling `navigator.geolocation` (asked per HTTPS site), and the opt-in **GPS speed** fallback for the parked/moving decision on head units that report no speed / สองกรณีและเฉพาะตอนเปิดแอป ไม่มีการใช้เบื้องหลัง: หน้าเว็บเรียก `navigator.geolocation` (ถามแยกต่อเว็บไซต์) และ **GPS speed** ที่ผู้ใช้เปิดเองสำหรับตัดสินว่ารถจอดหรือวิ่ง เมื่อจอรถไม่รายงานความเร็ว | On the page's request, or on enabling GPS speed | Optional |
 | `READ_MEDIA_AUDIO` / `_VIDEO` / `_IMAGES` (`READ_EXTERNAL_STORAGE` on Android 12L and older) | Read-only listing for the Folders, Playlists and Gallery sections / อ่านรายการไฟล์สำหรับหัวข้อ โฟลเดอร์, เพลย์ลิสต์ และแกลเลอรี (อ่านเท่านั้น) | Opening one of those sections | Optional |
 | `BLUETOOTH_CONNECT` | Only so Android delivers the `ACL_CONNECTED` broadcast, which is what the "start media when the car connects" option listens for. No device is read and nothing is scanned / มีไว้ให้ระบบส่ง broadcast `ACL_CONNECTED` มาเท่านั้น ซึ่งเป็นตัวจุดออปชัน "เริ่มเล่นสื่อเมื่อต่อรถ" ไม่อ่านข้อมูลอุปกรณ์และไม่สแกนหาอะไร | Enabling Bluetooth media auto-start | Optional |

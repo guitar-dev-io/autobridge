@@ -1,0 +1,4 @@
+[submodule "whisper/third_party/whisper.cpp"]
+	path = whisper/third_party/whisper.cpp
+	url = https://github.com/ggml-org/whisper.cpp
+	shallow = true

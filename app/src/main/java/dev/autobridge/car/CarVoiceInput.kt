@@ -23,6 +23,16 @@ import androidx.car.app.versioning.CarAppApiLevels
 import androidx.core.content.ContextCompat
 import dev.autobridge.R
 import dev.autobridge.logging.StructuredLog
+import dev.autobridge.voice.CarMicSource
+import dev.autobridge.voice.PhoneMicSource
+import dev.autobridge.voice.VoiceError
+import dev.autobridge.voice.VoiceMessages
+import dev.autobridge.voice.VoiceRecognizer
+import dev.autobridge.voice.VoiceRuntime
+import dev.autobridge.voice.VoiceSettings
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.launch
 import java.io.IOException
 
 /**
@@ -40,6 +50,10 @@ import java.io.IOException
  * Audio focus is taken (transient exclusive, as the car-microphone guide requires) so playing media
  * pauses and is not transcribed, and it is released before results are delivered so the caller's
  * spoken reply is not fighting this request for focus.
+ *
+ * **Offline Whisper** takes over both routes when Settings > Voice Recognition is on and a model is
+ * downloaded ([VoiceRecognizer]): the same car or phone microphone, transcribed on the phone with no
+ * network. Without a model the [SpeechRecognizer] routes above are used, exactly as before.
  *
  * All public methods and listener callbacks run on the main thread. [SpeechRecognizer] requires it.
  */
@@ -72,7 +86,11 @@ class CarVoiceInput(
         recognizer?.stopListening()
     }
 
-    val isListening: Boolean get() = recognizer != null
+    private val scope = MainScope()
+    private var whisper: VoiceRecognizer? = null
+    private var whisperWatch: Job? = null
+
+    val isListening: Boolean get() = recognizer != null || whisper?.isActive == true
 
     /** True when listening would need a permission the app does not hold yet. */
     val needsMicPermission: Boolean
@@ -103,6 +121,10 @@ class CarVoiceInput(
 
     fun start() {
         if (isListening) return
+        if (!needsMicPermission && whisperReady()) {
+            startWhisper(if (carMicSupported()) Source.CAR_MIC else Source.PHONE_MIC)
+            return
+        }
         if (!SpeechRecognizer.isRecognitionAvailable(carContext)) {
             listener.onError(carContext.getString(R.string.voice_error_no_recognizer))
             return
@@ -124,9 +146,63 @@ class CarVoiceInput(
 
     /** Stops without delivering a result. Safe to call when idle. */
     fun cancel() {
+        whisperWatch?.cancel()
+        whisperWatch = null
+        whisper?.cancel()
+        whisper = null
         main.removeCallbacks(timeout)
         teardownSession()
         abandonFocus()
+    }
+
+    /** Whisper is on, this phone can run it, and a model is installed and selected. */
+    private fun whisperReady(): Boolean =
+        VoiceSettings.enabled(carContext) &&
+            VoiceRuntime.isSupported(carContext) &&
+            VoiceRuntime.modelStore(carContext).getSelectedModel() != null
+
+    /**
+     * Listens through [VoiceRecognizer]. A car microphone that cannot be opened falls back once to the
+     * phone's, the same way the [SpeechRecognizer] route does.
+     */
+    private fun startWhisper(source: Source) {
+        val session = VoiceRecognizer(carContext, scope)
+        whisper = session
+        val pcm = if (source == Source.CAR_MIC && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            CarMicSource(carContext)
+        } else {
+            PhoneMicSource(carContext)
+        }
+        StructuredLog.i("VOICE", "whisper listening source=$source")
+        session.start(pcm)
+        var announced = false
+        whisperWatch = scope.launch {
+            session.state.collect { state ->
+                when (state) {
+                    is VoiceRecognizer.State.Listening -> if (!announced) {
+                        announced = true
+                        listener.onListening(source)
+                    }
+                    is VoiceRecognizer.State.Done -> finishWhisper { listener.onResult(state.text) }
+                    is VoiceRecognizer.State.Failed -> {
+                        if (state.error == VoiceError.RECORDER_FAILED && source == Source.CAR_MIC) {
+                            finishWhisper { startWhisper(Source.PHONE_MIC) }
+                        } else {
+                            finishWhisper { listener.onError(VoiceMessages.error(carContext, state.error)) }
+                        }
+                    }
+                    else -> Unit
+                }
+            }
+        }
+    }
+
+    private fun finishWhisper(then: () -> Unit) {
+        whisperWatch?.cancel()
+        whisperWatch = null
+        whisper = null
+        // Off the collector's own frame, so cancelling it above cannot swallow the callback.
+        main.post(then)
     }
 
     private fun carMicSupported(): Boolean =
