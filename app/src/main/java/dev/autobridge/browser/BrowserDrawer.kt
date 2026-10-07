@@ -78,6 +78,15 @@ enum class DrawerAction {
 
     /** Phone only: flips [BrowserAdBlock], same switch as Settings ▸ Content blocking. */
     TOGGLE_AD_BLOCK,
+
+    /** Car only: keeps the toolbar on screen instead of letting it fade; [BrowserControlsStore]. */
+    PIN_TOOLBAR,
+
+    /** Car only: moves the split's side page to the other side; [BrowserSplitStore]. */
+    SWAP_SPLIT_SIDES,
+
+    /** Car only: shows the phone's screen (Bridge Mirror) in place of the browser. */
+    MIRROR_PHONE,
 }
 
 /**
@@ -172,6 +181,19 @@ data class BrowserMenuState(
     val canGoForward: Boolean = false,
     val version: String = "",
     val surface: MenuSurface = MenuSurface.CAR,
+    /** Whether the toolbar is pinned on screen ([DrawerAction.PIN_TOOLBAR]). */
+    val pinnedToolbar: Boolean = false,
+    /** Whether a split is showing, so swapping its sides has something to act on. */
+    val splitActive: Boolean = false,
+    /**
+     * Car actions this particular car browser cannot perform, left out of every list it is shown.
+     *
+     * The car has three browsers - the Android Auto template one, Bridge Web on the projection
+     * route, and the browser running in a Duo Screen pane - and they offer one menu, built here. A
+     * browser that genuinely lacks something (a Duo pane has one page, so no tabs or split) names
+     * it here rather than keeping a list of its own, so the menus cannot drift apart again.
+     */
+    val unsupported: Set<DrawerAction> = emptySet(),
 ) {
     val secure: Boolean get() = url.startsWith("https://", ignoreCase = true)
 }
@@ -242,7 +264,10 @@ class BrowserDrawerModel private constructor(
          * browser exists to hand pages to the car.
          */
         fun primaryAction(state: BrowserMenuState): DrawerItem = when (state.surface) {
-            MenuSurface.CAR -> DrawerItem(
+            // A car browser without tabs (a Duo Screen pane) leads with the start page instead.
+            MenuSurface.CAR -> if (DrawerAction.TABS in state.unsupported) DrawerItem(
+                DrawerAction.HOME, R.string.drawer_start_page, BrowserIcon.HOME_PAGE,
+            ) else DrawerItem(
                 DrawerAction.TABS, R.string.drawer_tabs, BrowserIcon.TABS, value = state.tabCount.toString(),
                 detailRes = R.string.browser_tabs_detail,
             )
@@ -252,8 +277,23 @@ class BrowserDrawerModel private constructor(
             )
         }
 
-        /** The two rows of three under the primary button; identical on both surfaces. */
-        fun primaryRows(state: BrowserMenuState): List<List<DrawerItem>> = listOf(
+        /**
+         * The rows under the primary button. Identical on both surfaces, except that the car's
+         * second row also carries the split screen, which is used often enough on the head unit to
+         * sit up front rather than behind "More" (what the side pane shows, and which side it is
+         * on, lead the "More" list). Entries the browser cannot perform
+         * ([BrowserMenuState.unsupported]) are left out.
+         */
+        fun primaryRows(state: BrowserMenuState): List<List<DrawerItem>> =
+            sharedPrimaryRows(state).mapIndexed { index, row ->
+                if (index == 1 && state.surface == MenuSurface.CAR) {
+                    row.take(row.lastIndex) +
+                        DrawerItem(DrawerAction.SPLIT_LAYOUT, R.string.drawer_split, BrowserIcon.SPLIT_LAYOUT) +
+                        row.last()
+                } else row
+            }.map { row -> row.filterNot { it.action in state.unsupported } }.filter { it.isNotEmpty() }
+
+        private fun sharedPrimaryRows(state: BrowserMenuState): List<List<DrawerItem>> = listOf(
             // Navigation first: it is what a menu opened mid-page is usually opened for, and the
             // toolbar it duplicates auto-hides.
             listOf(
@@ -288,12 +328,49 @@ class BrowserDrawerModel private constructor(
             MenuSurface.PHONE -> phoneMoreItems()
         }
 
-        private fun carMoreItems(): List<DrawerItem> = listOf(
+        /** The "More" list for [state]: its surface's list, less what that browser cannot do. */
+        fun moreItems(state: BrowserMenuState): List<DrawerItem> = when (state.surface) {
+            MenuSurface.CAR -> carMoreItems(state).filterNot { it.action in state.unsupported }
+            MenuSurface.PHONE -> phoneMoreItems()
+        }
+
+        /**
+         * Every entry of the car menu in one list, in sheet order: the primary button, the two
+         * rows of three, the two switches, everything behind "More", and Exit. The Android Auto
+         * template browser draws this as its two-page sheet; Bridge Web and the Duo Screen pane
+         * show it as one list. Same items, same order, same names on all three.
+         */
+        fun carMenu(state: BrowserMenuState): List<DrawerItem> {
+            val car = state.copy(surface = MenuSurface.CAR)
+            val items = buildList {
+                add(primaryAction(car))
+                primaryRows(car).flatten().filter { it.action != DrawerAction.MORE }.forEach(::add)
+                add(desktopToggle(car))
+                add(fullscreenToggle(car))
+                addAll(moreItems(car))
+                add(DrawerItem(DrawerAction.APP_HOME, R.string.drawer_exit, BrowserIcon.APP_HOME))
+            }
+            return items.filterNot { it.action in car.unsupported }.distinctBy { it.action }
+        }
+
+        private fun carMoreItems(state: BrowserMenuState = BrowserMenuState()): List<DrawerItem> = listOf(
             // Fullscreen no longer lives here: it is a primary-sheet toggle next to Desktop (see
             // [fullscreenToggle]), so it is never buried behind "More" on either surface.
-            DrawerItem(DrawerAction.SPLIT_LAYOUT, R.string.drawer_split, BrowserIcon.SPLIT_LAYOUT),
+            // The split layout itself is on the primary sheet (see [primaryRows]); the rest of the
+            // split screen leads this list.
             DrawerItem(DrawerAction.SIDE_SHOW_PAGE, R.string.drawer_side_show_page, BrowserIcon.SPLIT_LAYOUT),
+            // Listed whether or not a split is up, so it is always in the same place; it can only
+            // act while one is.
+            DrawerItem(
+                DrawerAction.SWAP_SPLIT_SIDES, R.string.drawer_swap_sides, BrowserIcon.SPLIT_LAYOUT,
+                enabled = state.splitActive,
+            ),
             DrawerItem(DrawerAction.NAVIGATE_MAPS, R.string.drawer_navigate_maps, BrowserIcon.CAR),
+            DrawerItem(
+                DrawerAction.PIN_TOOLBAR, R.string.drawer_pin_toolbar, BrowserIcon.MENU,
+                value = if (state.pinnedToolbar) "✓" else "", on = state.pinnedToolbar,
+            ),
+            DrawerItem(DrawerAction.MIRROR_PHONE, R.string.drawer_mirror_phone, BrowserIcon.CAR),
             DrawerItem(DrawerAction.NEW_TAB, R.string.drawer_new_tab, BrowserIcon.ADD),
             DrawerItem(DrawerAction.HOME, R.string.drawer_start_page, BrowserIcon.HOME_PAGE),
             DrawerItem(DrawerAction.HISTORY, R.string.drawer_history, BrowserIcon.HISTORY),
@@ -413,7 +490,7 @@ class BrowserDrawerModel private constructor(
             if (more) {
                 // As many columns as the width allows, and more once the rows would not fit at
                 // their minimum height — a scroll-free list beats wide tiles.
-                val items = moreItems(state.surface)
+                val items = moreItems(state)
                 var cols = sizes.menuColumns(innerWidth).coerceAtLeast(PRIMARY_COLUMNS)
                 fun rowsFor(c: Int) = (items.size + c - 1) / c
                 while (cols < AutoUiSizes.MENU_COLUMNS_MAX &&
@@ -484,8 +561,11 @@ class BrowserDrawerModel private constructor(
             }
 
             val tiles = ArrayList<DrawerRow>()
-            val tileWidth = (innerWidth - tileGap * (columns - 1)) / columns
             itemRows.forEachIndexed { rowIndex, row ->
+                // The "More" grid keeps a fixed column width so a short last row stays aligned;
+                // a primary row shares the width between its own tiles (the car's second row has four).
+                val rowColumns = if (more) columns else row.size.coerceAtLeast(1)
+                val tileWidth = (innerWidth - tileGap * (rowColumns - 1)) / rowColumns
                 val height = take()
                 row.forEachIndexed { column, item ->
                     val tileLeft = innerLeft + column * (tileWidth + tileGap)

@@ -250,6 +250,10 @@ class CarBrowserScreen(carContext: CarContext) :
         CarNavigation.open(screenManager, "CarAgentScreen") { CarAgentScreen(carContext) }
     }
 
+    override fun openMirror() {
+        CarNavigation.open(screenManager, "MirrorCarScreen") { MirrorCarScreen(carContext) }
+    }
+
     override fun openDownloads() {
         screenManager.push(CarBrowserDownloadsScreen(carContext))
     }

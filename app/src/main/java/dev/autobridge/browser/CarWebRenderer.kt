@@ -197,6 +197,9 @@ class CarWebRenderer(context: Context) {
         fun openMediaLibrary()
         fun openSettings()
         fun openDiagnostics()
+
+        /** Shows the phone's screen (Bridge Mirror) in place of the browser. */
+        fun openMirror()
         fun openExternal(url: String)
 
         /**
@@ -1911,6 +1914,8 @@ class CarWebRenderer(context: Context) {
         canGoBack = canGoBack,
         canGoForward = canGoForward,
         version = "v${dev.autobridge.BuildConfig.VERSION_NAME}",
+        pinnedToolbar = alwaysShowUrlBar,
+        splitActive = isSplit,
     )
 
     private fun rebuildDrawer() {
@@ -1976,6 +1981,18 @@ class CarWebRenderer(context: Context) {
                 target?.showMessage(appContext.getString(R.string.car_browsing_data_cleared))
             }
             DrawerAction.DIAGNOSTICS -> target?.openDiagnostics()
+            // The same stores the browser's Settings screen writes; applyControlSettings re-reads
+            // them and re-lays out the page when the bar's inset or the split's side moved.
+            DrawerAction.PIN_TOOLBAR -> {
+                BrowserControlsStore.setAlwaysShowUrlBar(appContext, !alwaysShowUrlBar)
+                if (!alwaysShowUrlBar) BrowserControlsStore.setHideUrlBar(appContext, false)
+                applyControlSettings()
+            }
+            DrawerAction.SWAP_SPLIT_SIDES -> if (isSplit) {
+                BrowserSplitStore.setSideOnRight(appContext, !BrowserSplitStore.sideOnRight(appContext))
+                applyControlSettings()
+            }
+            DrawerAction.MIRROR_PHONE -> target?.openMirror()
             // Handled directly in onSurfaceClick before performDrawerAction is called, since these
             // change what the sheet shows rather than performing a browser action.
             DrawerAction.MORE, DrawerAction.BACK_TO_MENU, DrawerAction.CLOSE_SHEET -> Unit

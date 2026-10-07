@@ -323,6 +323,16 @@
     <string name="drawer_fullscreen">เต็มหน้าจอ</string>
     <string name="drawer_side_show_page">เปิดในจอข้าง</string>
     <string name="drawer_navigate_maps">นำทาง Maps</string>
+    <string name="browser_menu_on">เปิด</string>
+    <string name="browser_menu_off">ปิด</string>
+    <string name="bridge_web_menu_keyboard">แป้นพิมพ์</string>
+    <string name="bridge_web_menu_car_search">ช่องค้นหาของรถ</string>
+    <string name="bridge_web_maps_no_destination">เปิดเส้นทางหรือสถานที่บนแผนที่ก่อน</string>
+    <string name="browser_about_version">เวอร์ชัน</string>
+    <string name="browser_about_webview">WebView</string>
+    <string name="drawer_swap_sides">สลับฝั่ง</string>
+    <string name="drawer_pin_toolbar">ตรึงแถบเครื่องมือ</string>
+    <string name="drawer_mirror_phone">มิเรอร์มือถือ</string>
     <string name="car_side_shown">เปิดหน้านี้ในจอข้างแล้ว</string>
     <string name="car_side_show_failed">เปิดหน้านี้ในจอข้างไม่ได้</string>
     <string name="car_maps_no_destination">เปิดเส้นทางหรือสถานที่บนแผนที่ก่อน</string>
