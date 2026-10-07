@@ -1154,8 +1154,10 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
                 dismissOverlay()
                 showPageOnSide()
             })
-            if (sideView != null) {
-                val destination = MapsHandoff.destinationFromPage(sideView?.url)
+            // The split's map first, then the full-screen page: either one can be showing the place.
+            val destination = MapsHandoff.destinationFromPage(sideView?.url)
+                ?: MapsHandoff.destinationFromPage(webView?.url)
+            if (sideView != null || destination != null) {
                 addView(menuRow(
                     "➤", "Navigate in Google Maps",
                     destination ?: "Open a route or a place on the map first"
@@ -1163,6 +1165,8 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
                     dismissOverlay()
                     destination?.let { startMapsNavigation(it) }
                 })
+            }
+            if (sideView != null) {
                 addView(menuRow("⇆", "Swap split sides") {
                     BrowserSplitStore.projection.setSideOnRight(
                         this@ProjectionBrowserActivity,
