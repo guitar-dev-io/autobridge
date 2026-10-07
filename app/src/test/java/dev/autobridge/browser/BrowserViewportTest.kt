@@ -999,8 +999,11 @@ class CarMenuParityTest {
         val more = BrowserDrawerModel.moreItems(state).map { it.action }
         assertFalse(DrawerAction.SPLIT_LAYOUT in more)
         assertEquals(
-            listOf(DrawerAction.SPLIT_CHOOSE, DrawerAction.SIDE_SHOW_PAGE, DrawerAction.SWAP_SPLIT_SIDES),
-            more.take(3),
+            listOf(
+                DrawerAction.NEW_TAB,
+                DrawerAction.SPLIT_CHOOSE, DrawerAction.SIDE_SHOW_PAGE, DrawerAction.SWAP_SPLIT_SIDES,
+            ),
+            more.take(4),
         )
     }
 
@@ -1030,6 +1033,8 @@ class CarMenuParityTest {
         val actions = BrowserDrawerModel.carMenu(state).map { it.action }
         assertEquals(actions.size, actions.toSet().size)
         assertEquals(DrawerAction.TABS, actions.first())
+        // New tab sits straight under Tabs on the one-list menus, never a dozen rows down.
+        assertEquals(DrawerAction.NEW_TAB, actions[1])
         assertEquals(DrawerAction.APP_HOME, actions.last())
         listOf(
             DrawerAction.BOOKMARKS, DrawerAction.SETTINGS, DrawerAction.HISTORY, DrawerAction.DOWNLOADS,
