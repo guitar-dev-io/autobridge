@@ -170,9 +170,9 @@ class CarWebRenderer(context: Context) {
          * [SEAM_CAPSULE_LONG_DP] along it. Its first [SEAM_CLOSE_DP] is the ✕; the rest is the
          * grip that is dragged.
          */
-        const val SEAM_CAPSULE_THICK_DP = 30f
-        const val SEAM_CAPSULE_LONG_DP = 118f
-        const val SEAM_CLOSE_DP = 40f
+        const val SEAM_CAPSULE_THICK_DP = 22f
+        const val SEAM_CAPSULE_LONG_DP = 92f
+        const val SEAM_CLOSE_DP = 32f
 
         /** How often a divider drag is allowed to re-measure the panes. See `dragDivider`. */
         const val DIVIDER_LAYOUT_INTERVAL_MS = 80L
@@ -1660,7 +1660,13 @@ class CarWebRenderer(context: Context) {
     /** A tap on the split's ✕ closes the split. Returns true when the tap was that. */
     private fun tapSideClose(x: Float, y: Float): Boolean {
         val panes = splitPanes?.takeIf { isSplit && !isVideoFullscreen } ?: return false
-        if (!sideCloseBox(panes).contains(x, y)) return false
+        // The ✕ is drawn small; a tap a little outside it still counts.
+        val close = sideCloseBox(panes)
+        val slop = sizes.dp(8f)
+        // Grown on every side but the one the grip is on.
+        val target = if (panes.stacked) Box(close.left - slop, close.top - slop, close.right, close.bottom + slop)
+        else Box(close.left - slop, close.top - slop, close.right + slop, close.bottom)
+        if (!target.contains(x, y)) return false
         trace(ViewportDebug.Event.SPLIT_LAYOUT, "close")
         closeSplit()
         return true
@@ -2978,21 +2984,21 @@ class CarWebRenderer(context: Context) {
         toolbarPaint.alpha = 255
         // A small ✕ at its end.
         val close = sideCloseBox(panes)
-        drawIcon(canvas, BrowserIcon.CLOSE, close.centerX, close.centerY, sizes.dp(16f), BrowserTheme.dark.iconEnabled)
+        drawIcon(canvas, BrowserIcon.CLOSE, close.centerX, close.centerY, sizes.dp(12f), BrowserTheme.dark.iconEnabled)
         // A hairline between the ✕ and the grip.
         val grip = dividerHandleBox(panes)
         toolbarPaint.color = BrowserTheme.dark.outlineVariant
         val hair = sizes.dp(1f)
         if (panes.stacked) {
-            canvas.drawRect(grip.left, grip.top + sizes.dp(7f), grip.left + hair, grip.bottom - sizes.dp(7f), toolbarPaint)
+            canvas.drawRect(grip.left, grip.top + sizes.dp(5f), grip.left + hair, grip.bottom - sizes.dp(5f), toolbarPaint)
         } else {
-            canvas.drawRect(grip.left + sizes.dp(7f), grip.top, grip.right - sizes.dp(7f), grip.top + hair, toolbarPaint)
+            canvas.drawRect(grip.left + sizes.dp(5f), grip.top, grip.right - sizes.dp(5f), grip.top + hair, toolbarPaint)
         }
         // The grip: two short bars along the seam, lit in the accent while grabbed.
         toolbarPaint.color = if (dividerGrabbed) BrowserTheme.dark.accent else BrowserTheme.dark.textSecondary
-        val bar = sizes.dp(3f)
-        val len = sizes.dp(26f) / 2f
-        val apart = sizes.dp(4f)
+        val bar = sizes.dp(2f)
+        val len = sizes.dp(16f) / 2f
+        val apart = sizes.dp(3f)
         for (offset in listOf(-apart, apart)) {
             if (panes.stacked) {
                 val y = grip.centerY + offset

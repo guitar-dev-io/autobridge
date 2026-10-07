@@ -157,10 +157,15 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         /** Split metrics, in dp; the same values the template route's split uses. */
         const val SPLIT_GAP = 10
 
-        /** The seam control: a capsule this thick and long, its first [SEAM_CLOSE] the ✕. */
-        const val SEAM_THICK = 30
-        const val SEAM_LONG = 118
-        const val SEAM_CLOSE = 40
+        /**
+         * The seam control: a capsule [SEAM_DRAWN] thick as drawn, inside a [SEAM_THICK] touch
+         * strip so the slimmer capsule stays as easy to grab; [SEAM_LONG] long, its first
+         * [SEAM_CLOSE] the ✕.
+         */
+        const val SEAM_THICK = 36
+        const val SEAM_DRAWN = 22
+        const val SEAM_LONG = 92
+        const val SEAM_CLOSE = 32
         const val SPLIT_MIN_PANE = 180
 
         /**
@@ -1848,7 +1853,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
             text = "\u2715"
             contentDescription = getString(R.string.split_close_side)
             setTextColor(scheme.textPrimary)
-            textSize = 13f
+            textSize = 11f
             gravity = Gravity.CENTER
             background = circleRipple()
             isClickable = true
@@ -1870,9 +1875,9 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
                         setColor(scheme.textSecondary)
                     }
                 }, if (stacked) {
-                    LinearLayout.LayoutParams(26.dp(), 3.dp()).apply { if (index > 0) topMargin = 5.dp() }
+                    LinearLayout.LayoutParams(16.dp(), 2.dp()).apply { if (index > 0) topMargin = 4.dp() }
                 } else {
-                    LinearLayout.LayoutParams(3.dp(), 26.dp()).apply { if (index > 0) marginStart = 5.dp() }
+                    LinearLayout.LayoutParams(2.dp(), 16.dp()).apply { if (index > 0) marginStart = 4.dp() }
                 })
             }
             contentDescription = getString(R.string.split_drag_seam)
@@ -1880,12 +1885,18 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         }
         return LinearLayout(this).apply {
             orientation = if (stacked) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE
-                cornerRadius = SEAM_THICK / 2f * resources.displayMetrics.density
-                setColor(scheme.surfaceContainerHighest)
-                alpha = 235
-            }
+            // Drawn [SEAM_DRAWN] thick in the middle of the wider touch strip.
+            val inset = (SEAM_THICK - SEAM_DRAWN).dp() / 2
+            background = android.graphics.drawable.InsetDrawable(
+                GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = SEAM_DRAWN / 2f * resources.displayMetrics.density
+                    setColor(scheme.surfaceContainerHighest)
+                    alpha = 235
+                },
+                if (stacked) 0 else inset, if (stacked) inset else 0,
+                if (stacked) 0 else inset, if (stacked) inset else 0,
+            )
             elevation = 3f * resources.displayMetrics.density
             val closeParams = if (stacked) {
                 LinearLayout.LayoutParams(SEAM_CLOSE.dp(), ViewGroup.LayoutParams.MATCH_PARENT)
