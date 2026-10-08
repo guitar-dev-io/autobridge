@@ -75,6 +75,25 @@ class DuoScreenSettingsActivity : Activity() {
         // the Shizuku state matters on this screen.
         body.stack(shizukuBanner(shizukuReady))
 
+        // ── PANES ────────────────────────────────────────────────────────────
+        // The car screen as it will look: each pane drawn where the current layout puts it, with
+        // the app it holds. Tapping a pane picks its app. This is the only pane list on the page:
+        // a row per pane under it said the same thing again.
+        val paneCount = DuoScreenStore.paneCount(this)
+        body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.duo_screen_panes_section)), gap = 2)
+        body.addView(
+            layoutPreview(DuoScreenStore.preset(this), paneCount, DuoScreenStore.packages(this)),
+            LinearLayout.LayoutParams(-1, dp(200)).apply { bottomMargin = dp(14) }
+        )
+
+        // ── LAYOUT ───────────────────────────────────────────────────────────
+        body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.duo_screen_layout_section)), gap = 2)
+
+        // Layout preset visual chips + content scale chips inside one card
+        val preset = DuoScreenStore.preset(this)
+        val scale = DuoScreenStore.contentScale(this)
+        body.stack(layoutCard(paneCount, preset, scale))
+
         // ── SHORTCUT ─────────────────────────────────────────────────────────
         // One tap to the arrangement a portrait head unit is made for: the map on top, music below.
         body.stack(
@@ -85,62 +104,8 @@ class DuoScreenSettingsActivity : Activity() {
                 accent = AutoBridgeDesign.ACCENT,
                 badgeText = DuoScreenPreset.STACKED_60_40.glyph,
             ) { applyMapsAndMusic() },
-            gap = 14
+            gap = 8
         )
-
-        // ── PREVIEW ──────────────────────────────────────────────────────────
-        // The car screen as it will look: each pane drawn where the current layout puts it, with
-        // the app it holds. Tapping a pane picks its app, the same as the rows below.
-        body.addView(
-            layoutPreview(DuoScreenStore.preset(this), DuoScreenStore.paneCount(this), DuoScreenStore.packages(this)),
-            LinearLayout.LayoutParams(-1, dp(200)).apply { bottomMargin = dp(14) }
-        )
-
-        // ── PANES ────────────────────────────────────────────────────────────
-        // One card (design 08): the "Number of panes" segment row, then one row per pane,
-        // divided by hairlines.
-        val paneCount = DuoScreenStore.paneCount(this)
-
-        // Number of panes: 2/3 segmented control, title on the left.
-        val paneCountRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            minimumHeight = dp(56)
-            setPadding(dp(14), dp(12), dp(12), dp(12))
-            addView(
-                TextView(this@DuoScreenSettingsActivity).apply {
-                    text = getString(R.string.duo_screen_pane_count)
-                    textSize = 15f
-                    setTextColor(AutoBridgeDesign.TEXT)
-                    typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-                },
-                LinearLayout.LayoutParams(0, -2, 1f)
-            )
-            addView(paneCountSegments(paneCount), LinearLayout.LayoutParams(-2, -2))
-        }
-
-        // Pane app picker rows: a numbered badge, the "Pane N" caption over the chosen app's name.
-        val packages = DuoScreenStore.packages(this)
-        val paneRows = buildList {
-            add(paneCountRow)
-            repeat(paneCount) { index ->
-                val chosen = packages.getOrNull(index)
-                add(paneRow(index, chosen))
-            }
-        }
-        body.stack(dev.autobridge.ui.SettingsUi.group(
-            this,
-            getString(R.string.duo_screen_panes_section),
-            paneRows
-        ), gap = 14)
-
-        // ── LAYOUT ───────────────────────────────────────────────────────────
-        body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.duo_screen_layout_section)), gap = 2)
-
-        // Layout preset visual chips + content scale chips inside one card
-        val preset = DuoScreenStore.preset(this)
-        val scale = DuoScreenStore.contentScale(this)
-        body.stack(layoutCard(preset, scale))
 
         // Reset arrangement row: a standalone card (no icon badge, design 08), title over hint
         // with a trailing chevron.
@@ -260,78 +225,6 @@ class DuoScreenSettingsActivity : Activity() {
         0 -> AutoBridgeDesign.ACCENT_ONLINE
         1 -> AutoBridgeDesign.ACCENT_FAVORITE
         else -> AutoBridgeDesign.ACCENT
-    }
-
-    /**
-     * One pane row inside the PANES card: a numbered square badge, the quiet "Pane N" label over
-     * the bold app name (or "empty" placeholder), and a trailing chevron. Opens the app picker.
-     */
-    private fun paneRow(index: Int, chosen: String?): View {
-        val paneNumber = index + 1
-        val rowAccent = paneAccent(index)
-        @Suppress("StringFormatMatches")
-        val paneTitle = getString(R.string.duo_screen_pane_label, paneNumber)
-        val appName = chosen?.let(::paneLabel) ?: getString(R.string.duo_screen_pane_empty)
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            minimumHeight = dp(56)
-            setPadding(dp(14), dp(12), dp(12), dp(12))
-            background = AutoBridgeDesign.tappable(
-                this@DuoScreenSettingsActivity,
-                android.graphics.Color.TRANSPARENT, 0,
-                rowAccent, stroke = android.graphics.Color.TRANSPARENT
-            )
-            isClickable = true
-            isFocusable = true
-            contentDescription = "$paneTitle, $appName"
-            setOnClickListener { pickAppFor(index) }
-
-            // Numbered badge
-            addView(FrameLayout(this@DuoScreenSettingsActivity).apply {
-                background = AutoBridgeDesign.surface(
-                    this@DuoScreenSettingsActivity,
-                    AutoBridgeDesign.tint(rowAccent, 0.16f), 12,
-                    AutoBridgeDesign.tint(rowAccent, 0.3f)
-                )
-                addView(TextView(this@DuoScreenSettingsActivity).apply {
-                    text = "$paneNumber"
-                    textSize = 16f
-                    gravity = Gravity.CENTER
-                    setTextColor(rowAccent)
-                    typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
-                }, FrameLayout.LayoutParams(-1, -1))
-            }, LinearLayout.LayoutParams(dp(40), dp(40)))
-
-            // "Pane N" caption over the chosen app name
-            addView(LinearLayout(this@DuoScreenSettingsActivity).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(dp(12), 0, dp(8), 0)
-                addView(TextView(this@DuoScreenSettingsActivity).apply {
-                    text = paneTitle
-                    textSize = 12f
-                    setTextColor(AutoBridgeDesign.TEXT_MUTED)
-                })
-                addView(TextView(this@DuoScreenSettingsActivity).apply {
-                    text = appName
-                    textSize = 15f
-                    setTextColor(AutoBridgeDesign.TEXT)
-                    typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-                    maxLines = 1
-                    ellipsize = TextUtils.TruncateAt.END
-                    setPadding(0, dp(1), 0, 0)
-                })
-            }, LinearLayout.LayoutParams(0, -2, 1f))
-
-            // Chevron
-            addView(TextView(this@DuoScreenSettingsActivity).apply {
-                text = "›"
-                textSize = 20f
-                gravity = Gravity.CENTER
-                setTextColor(AutoBridgeDesign.TEXT_MUTED)
-                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-            }, LinearLayout.LayoutParams(dp(24), -2))
-        }
     }
 
     // ── Car screen preview ───────────────────────────────────────────────────
@@ -454,12 +347,32 @@ class DuoScreenSettingsActivity : Activity() {
      * A single card containing: "Layout preset" label + 5 mini-diagram chips, then a hairline,
      * then "Content size in a pane" label + hint + 4 percentage chips.
      */
-    private fun layoutCard(selectedPreset: DuoScreenPreset, selectedScale: Int): View {
+    private fun layoutCard(paneCount: Int, selectedPreset: DuoScreenPreset, selectedScale: Int): View {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = AutoBridgeDesign.surface(this@DuoScreenSettingsActivity, AutoBridgeDesign.SURFACE, 20)
             clipToOutline = true
             setPadding(dp(14), dp(14), dp(14), dp(14))
+
+            // Number of panes: 2/3 segmented control, title on the left.
+            addView(LinearLayout(this@DuoScreenSettingsActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                addView(TextView(this@DuoScreenSettingsActivity).apply {
+                    text = getString(R.string.duo_screen_pane_count)
+                    textSize = 15f
+                    setTextColor(AutoBridgeDesign.TEXT)
+                    typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                }, LinearLayout.LayoutParams(0, -2, 1f))
+                addView(paneCountSegments(paneCount), LinearLayout.LayoutParams(-2, -2))
+            }, LinearLayout.LayoutParams(-1, -2))
+
+            addView(View(this@DuoScreenSettingsActivity).apply {
+                setBackgroundColor(AutoBridgeDesign.HAIRLINE)
+            }, LinearLayout.LayoutParams(-1, maxOf(1, dp(1) / 2)).apply {
+                topMargin = dp(14)
+                bottomMargin = dp(14)
+            })
 
             // Preset label
             addView(TextView(this@DuoScreenSettingsActivity).apply {
