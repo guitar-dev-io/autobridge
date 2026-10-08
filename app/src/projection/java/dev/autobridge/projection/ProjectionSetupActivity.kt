@@ -5,18 +5,19 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.pm.PackageManager
 import android.content.Intent
-import android.graphics.Color
+import android.graphics.Typeface
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
-import android.view.ViewGroup
-import android.widget.Button
 import android.widget.LinearLayout
-import android.widget.ScrollView
-import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
+import dev.autobridge.R
+import dev.autobridge.i18n.AppLocale
 import dev.autobridge.input.ShizukuInputBackend
+import dev.autobridge.ui.AutoBridgeDesign
+import dev.autobridge.ui.AutoBridgeDesign.stack
+import dev.autobridge.ui.SettingsUi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -37,16 +38,19 @@ class ProjectionSetupActivity : Activity() {
     }
 
     private val scope = CoroutineScope(Dispatchers.Main)
-    private lateinit var status: TextView
-    private lateinit var action: Button
-    private lateinit var mirrorSwitch: Switch
+
+    /** True while the installer rewrite runs, so the button reads "Working…" and ignores taps. */
+    private var working = false
 
     private val permissionListener = Shizuku.OnRequestPermissionResultListener { _, _ -> render() }
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AppLocale.rebase(newBase))
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         runCatching { Shizuku.addRequestPermissionResultListener(permissionListener) }
-        setContentView(buildLayout())
         render()
     }
 
@@ -60,102 +64,149 @@ class ProjectionSetupActivity : Activity() {
         super.onDestroy()
     }
 
-    private fun buildLayout(): View {
-        fun pad(v: Int) = (v * resources.displayMetrics.density).toInt()
-        val column = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(pad(24), pad(24), pad(24), pad(24))
-        }
-        column.addView(TextView(this).apply {
-            text = "AutoBridge on Android Auto"
-            textSize = 22f
-            setTextColor(Color.WHITE)
-        })
-        status = TextView(this).apply {
-            textSize = 15f
-            setTextColor(Color.LTGRAY)
-            setPadding(0, pad(16), 0, pad(16))
-        }
-        column.addView(status)
-        action = Button(this).apply {
-            text = "Enable on Android Auto"
-            setOnClickListener { onAction() }
-        }
-        column.addView(action, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-
-        mirrorSwitch = Switch(this).apply {
-            text = "Show Bridge Mirror on Android Auto"
-            textSize = 15f
-            setTextColor(Color.WHITE)
-            setPadding(0, pad(24), 0, 0)
-            setOnCheckedChangeListener { _, checked -> setMirrorShown(checked) }
-        }
-        column.addView(mirrorSwitch)
-        column.addView(TextView(this).apply {
-            text = MIRROR_NOTE
-            textSize = 13f
-            setTextColor(Color.GRAY)
-        })
-
-        column.addView(TextView(this).apply {
-            text = MANUAL_STEPS
-            textSize = 13f
-            setTextColor(Color.GRAY)
-            setPadding(0, pad(24), 0, 0)
-        })
-
-        return ScrollView(this).apply {
-            setBackgroundColor(Color.rgb(18, 18, 18))
-            addView(column, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-        }
-    }
-
+    /**
+     * The page in the app's settings style: a status card, the one action as a full-width button,
+     * the Bridge Mirror switch, and the manual Android Auto steps as a numbered card. Rebuilt on
+     * every change, like the other settings pages, so it never shows a stale state.
+     */
     private fun render() {
         val visible = InstallerSpoofController.isAlreadyVisible(this)
-        val installer = InstallerSpoofController.currentInstaller(this) ?: "none"
-        val shizuku = when {
-            !runCatching { Shizuku.pingBinder() }.getOrDefault(false) -> "not running"
-            ShizukuInputBackend.isPermissionGranted -> "ready"
-            else -> "needs permission"
+        val installer = InstallerSpoofController.currentInstaller(this) ?: getString(R.string.projection_setup_installer_none)
+        val shizukuRunning = runCatching { Shizuku.pingBinder() }.getOrDefault(false)
+        val shizuku = getString(
+            when {
+                !shizukuRunning -> R.string.projection_setup_shizuku_not_running
+                ShizukuInputBackend.isPermissionGranted -> R.string.projection_setup_shizuku_ready
+                else -> R.string.projection_setup_shizuku_needs_permission
+            }
+        )
+        val body = AutoBridgeDesign.body(this)
+
+        body.stack(SettingsUi.group(this, getString(R.string.projection_setup_status_section), listOf(
+            SettingsUi.valueRow(
+                this, getString(R.string.projection_setup_status_label),
+                getString(if (visible) R.string.projection_setup_status_visible else R.string.projection_setup_status_hidden)
+            ) {},
+            SettingsUi.valueRow(this, getString(R.string.projection_setup_installer_label), installer) {},
+            SettingsUi.valueRow(this, "Shizuku", shizuku) {},
+        )), gap = 14)
+
+        if (!visible) {
+            val label = when {
+                working -> getString(R.string.projection_setup_working)
+                InstallerSpoofController.canAttempt() -> getString(R.string.projection_setup_enable)
+                shizukuRunning -> getString(R.string.projection_setup_grant_shizuku)
+                else -> getString(R.string.projection_setup_enable)
+            }
+            body.stack(primaryButton(label, enabled = !working) { onAction() }, gap = 14)
         }
-        status.text = buildString {
-            appendLine(if (visible) "Status: visible on Android Auto" else "Status: hidden (sideloaded)")
-            appendLine("Recorded installer: $installer")
-            append("Shizuku: $shizuku")
-        }
-        action.visibility = if (visible) View.GONE else View.VISIBLE
-        val shown = isMirrorShown()
-        if (mirrorSwitch.isChecked != shown) mirrorSwitch.isChecked = shown
-        action.text = when {
-            InstallerSpoofController.canAttempt() -> "Enable on Android Auto"
-            runCatching { Shizuku.pingBinder() }.getOrDefault(false) -> "Grant Shizuku permission"
-            else -> "Enable on Android Auto"
-        }
+
+        val mirrorShown = isMirrorShown()
+        body.stack(SettingsUi.group(this, "Bridge Mirror", listOf(
+            SettingsUi.switchRow(
+                this,
+                title = getString(R.string.projection_setup_mirror_title),
+                caption = getString(R.string.projection_setup_mirror_caption),
+                icon = R.drawable.ic_tile_mirror,
+                accent = AutoBridgeDesign.ACCENT,
+                checked = mirrorShown,
+            ) { setMirrorShown(!mirrorShown); render() },
+        )), gap = 14)
+
+        body.stack(SettingsUi.group(this, getString(R.string.projection_setup_steps_section), listOf(
+            stepRow(1, getString(R.string.projection_setup_step_1)),
+            stepRow(2, getString(R.string.projection_setup_step_2)),
+            stepRow(3, getString(R.string.projection_setup_step_3)),
+        )), gap = 14)
+
+        body.stack(TextView(this).apply {
+            text = getString(R.string.projection_setup_why)
+            textSize = 13f
+            setTextColor(AutoBridgeDesign.TEXT_MUTED)
+            setPadding(dp(4), 0, dp(4), 0)
+        })
+
+        setContentView(
+            AutoBridgeDesign.page(
+                context = this,
+                header = AutoBridgeDesign.header(
+                    context = this,
+                    title = getString(R.string.settings_projection_setup),
+                    subtitle = getString(R.string.settings_projection_setup_caption),
+                    onBack = { finish() }
+                ),
+                body = body
+            )
+        )
+    }
+
+    /** The page's one action: a full-width accent button. */
+    private fun primaryButton(label: String, enabled: Boolean, onClick: () -> Unit): View = TextView(this).apply {
+        text = label
+        textSize = 16f
+        gravity = Gravity.CENTER
+        typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+        setTextColor(AutoBridgeDesign.INK)
+        minHeight = dp(52)
+        background = AutoBridgeDesign.tappable(
+            this@ProjectionSetupActivity, AutoBridgeDesign.ACCENT, 16, AutoBridgeDesign.INK, stroke = AutoBridgeDesign.ACCENT
+        )
+        alpha = if (enabled) 1f else 0.5f
+        isEnabled = enabled
+        isClickable = true
+        isFocusable = true
+        setOnClickListener { onClick() }
+    }
+
+    /** A numbered step: an accent-tinted number badge beside the instruction. */
+    private fun stepRow(number: Int, text: String): View = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding(dp(14), dp(12), dp(14), dp(12))
+        addView(TextView(this@ProjectionSetupActivity).apply {
+            this.text = number.toString()
+            textSize = 15f
+            gravity = Gravity.CENTER
+            setTextColor(AutoBridgeDesign.ACCENT)
+            typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+            background = AutoBridgeDesign.surface(
+                this@ProjectionSetupActivity, AutoBridgeDesign.tint(AutoBridgeDesign.ACCENT, 0.16f), 12,
+                AutoBridgeDesign.tint(AutoBridgeDesign.ACCENT, 0.3f)
+            )
+        }, LinearLayout.LayoutParams(dp(36), dp(36)))
+        addView(TextView(this@ProjectionSetupActivity).apply {
+            this.text = text
+            textSize = 14.5f
+            setTextColor(AutoBridgeDesign.TEXT)
+            setPadding(dp(12), 0, 0, 0)
+        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
     }
 
     private fun onAction() {
+        if (working) return
         // No privilege yet: ask Shizuku for permission if it is running, else point at the manual
         // steps below. Root, when present, needs no prompt and is used directly by the controller.
         if (!InstallerSpoofController.canAttempt()) {
             if (runCatching { Shizuku.pingBinder() }.getOrDefault(false)) {
                 ShizukuInputBackend.requestPermission()
             } else {
-                toast("Start Shizuku first, or install through a store-spoofing installer")
+                toast(getString(R.string.projection_setup_start_shizuku))
             }
             return
         }
-        action.isEnabled = false
+        working = true
+        render()
         scope.launch {
             val result = withContext(Dispatchers.IO) { InstallerSpoofController.makeVisible(this@ProjectionSetupActivity) }
-            action.isEnabled = true
+            working = false
             when (result) {
-                is InstallerSpoofController.Result.AlreadyTrusted -> toast("Already visible on Android Auto")
+                is InstallerSpoofController.Result.AlreadyTrusted -> toast(getString(R.string.projection_setup_already_visible))
                 is InstallerSpoofController.Result.Success ->
-                    toast("Done via ${result.method}. Reconnect Android Auto to see AutoBridge Browser.")
-                is InstallerSpoofController.Result.NoPrivilege -> toast("No root or Shizuku permission available")
-                is InstallerSpoofController.Result.Failed -> toast("Could not enable: ${result.detail}")
+                    toast(getString(R.string.projection_setup_done, result.method.toString()))
+                is InstallerSpoofController.Result.NoPrivilege -> toast(getString(R.string.projection_setup_no_privilege))
+                is InstallerSpoofController.Result.Failed -> toast(getString(R.string.projection_setup_failed, result.detail))
             }
-            render()
+            if (!isFinishing && !isDestroyed) render()
         }
     }
 
@@ -179,25 +230,10 @@ class ProjectionSetupActivity : Activity() {
             if (shown) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DEFAULT,
             PackageManager.DONT_KILL_APP
         )
-        toast("Reconnect Android Auto for the change to show on the car")
+        toast(getString(R.string.projection_setup_reconnect))
     }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     private fun toast(message: String) = Toast.makeText(this, message, Toast.LENGTH_LONG).show()
 }
-
-private val MIRROR_NOTE = """
-    Off by default. The mirror is also inside Bridge Web (menu > Mirror phone screen), which keeps
-    Android Auto's split screen (Bridge Web beside Maps, as with Fermata). Listing Bridge Mirror as
-    its own icon may cost that split. Reconnect Android Auto after changing it.
-""".trimIndent()
-
-private val MANUAL_STEPS = """
-    Android Auto only shows apps it believes came from the Play Store, so a sideloaded build is
-    hidden until its recorded install source is rewritten. The button above does that through root
-    or Shizuku (no root needed - start Shizuku via wireless debugging first).
-
-    One manual step remains in Android Auto's own settings:
-    1. Open Android Auto settings and tap the Version line 10 times to unlock Developer settings.
-    2. In the three-dot menu, open Developer settings and turn on "Unknown sources".
-    3. Reconnect to the car. "AutoBridge Browser" then appears in the Android Auto app list.
-""".trimIndent()
