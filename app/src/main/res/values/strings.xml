@@ -489,6 +489,20 @@
     <string name="browser_resumed_from_queue">Playing the next item in the queue</string>
 
     <!-- Phone browser: zoom readout in All Actions sheet. -->
+    <string name="voice_group_shortcuts">My commands</string>
+    <string name="voice_shortcut_add">Add a command</string>
+    <string name="voice_shortcut_add_caption">Pick your own words and where they take you</string>
+    <string name="voice_shortcut_delete">Delete</string>
+    <string name="voice_shortcut_phrase_title">What will you say?</string>
+    <string name="voice_shortcut_phrase_hint">e.g. morning news</string>
+    <string name="voice_shortcut_too_short">Use at least two letters.</string>
+    <string name="voice_shortcut_kind_title">“%1$s” should…</string>
+    <string name="voice_shortcut_kind_screen">Open an AutoBridge screen</string>
+    <string name="voice_shortcut_kind_url">Open a web address</string>
+    <string name="voice_shortcut_kind_command">Run another command</string>
+    <string name="voice_shortcut_url_hint">e.g. youtube.com/@channel</string>
+    <string name="voice_shortcut_command_hint">e.g. play Bodyslam on YouTube Music</string>
+    <string name="voice_shortcut_saved">Saved “%1$s”</string>
     <string name="browser_zoom_percent">%1$d%%</string>
 
     <!-- Browser settings sheet ([BrowserSettingsSheet]): the Playback section's YouTube add-ons row. -->

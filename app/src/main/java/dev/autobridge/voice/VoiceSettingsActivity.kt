@@ -111,6 +111,7 @@ class VoiceSettingsActivity : Activity() {
         if (!supported) body.stack(hint(getString(R.string.voice_unsupported)), gap = 12)
 
         body.stack(settingsGroup(selected, installed), gap = 14)
+        body.stack(shortcutsGroup(), gap = 14)
 
         if (installed.isEmpty()) {
             body.stack(requiredCard(downloads), gap = 14)
@@ -321,6 +322,111 @@ class VoiceSettingsActivity : Activity() {
             }
         }
         if (buttons.childCount > 0) addView(buttons, LinearLayout.LayoutParams(-1, -2))
+    }
+
+    /**
+     * "My commands": the driver's own phrases and where each goes ([VoiceShortcut]). Listed as
+     * "phrase → destination"; tapping one offers to delete it.
+     */
+    private fun shortcutsGroup(): View {
+        val rows = VoiceShortcutStore.all(this).map { shortcut ->
+            SettingsUi.valueRow(this, "“${shortcut.phrase}”", destination(shortcut)) { confirmRemove(shortcut) }
+        } + SettingsUi.row(
+            this, getString(R.string.voice_shortcut_add), getString(R.string.voice_shortcut_add_caption),
+            R.drawable.ic_car_mic, accent
+        ) { addShortcut() }
+        return SettingsUi.group(this, getString(R.string.voice_group_shortcuts), rows)
+    }
+
+    private fun destination(shortcut: VoiceShortcut): String = when (shortcut.kind) {
+        VoiceShortcut.Kind.SCREEN -> VoiceScreen.entries.firstOrNull { it.name == shortcut.value }
+            ?.let { getString(it.section.titleRes) } ?: shortcut.value
+        VoiceShortcut.Kind.URL -> shortcut.value.removePrefix("https://").removePrefix("http://")
+        VoiceShortcut.Kind.COMMAND -> "“${shortcut.value}”"
+    }
+
+    private fun confirmRemove(shortcut: VoiceShortcut) {
+        AlertDialog.Builder(this)
+            .setTitle("“${shortcut.phrase}”")
+            .setMessage(destination(shortcut))
+            .setPositiveButton(R.string.voice_shortcut_delete) { _, _ ->
+                VoiceShortcutStore.remove(this, shortcut)
+                render()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    /** Step 1: the words. Step 2: what they do. Step 3: where (a screen, an address, a command). */
+    private fun addShortcut() {
+        val phrase = android.widget.EditText(this).apply {
+            hint = getString(R.string.voice_shortcut_phrase_hint)
+            setSingleLine()
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.voice_shortcut_phrase_title)
+            .setView(padded(phrase))
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                val words = phrase.text.toString().trim()
+                if (words.length < 2) toast(getString(R.string.voice_shortcut_too_short)) else chooseKind(words)
+            }
+            .show()
+    }
+
+    private fun chooseKind(words: String) {
+        val kinds = listOf(VoiceShortcut.Kind.SCREEN, VoiceShortcut.Kind.URL, VoiceShortcut.Kind.COMMAND)
+        val labels = listOf(R.string.voice_shortcut_kind_screen, R.string.voice_shortcut_kind_url, R.string.voice_shortcut_kind_command)
+            .map { getString(it) }
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.voice_shortcut_kind_title, words))
+            .setItems(labels.toTypedArray()) { _, index ->
+                when (kinds[index]) {
+                    VoiceShortcut.Kind.SCREEN -> chooseScreen(words)
+                    VoiceShortcut.Kind.URL -> askValue(words, VoiceShortcut.Kind.URL, R.string.voice_shortcut_url_hint)
+                    VoiceShortcut.Kind.COMMAND -> askValue(words, VoiceShortcut.Kind.COMMAND, R.string.voice_shortcut_command_hint)
+                }
+            }
+            .show()
+    }
+
+    private fun chooseScreen(words: String) {
+        val screens = VoiceScreen.entries
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.voice_shortcut_kind_title, words))
+            .setItems(screens.map { getString(it.section.titleRes) }.toTypedArray()) { _, index ->
+                save(VoiceShortcut(words, VoiceShortcut.Kind.SCREEN, screens[index].name))
+            }
+            .show()
+    }
+
+    private fun askValue(words: String, kind: VoiceShortcut.Kind, hintRes: Int) {
+        val field = android.widget.EditText(this).apply {
+            hint = getString(hintRes)
+            setSingleLine()
+            if (kind == VoiceShortcut.Kind.URL) inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
+        }
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.voice_shortcut_kind_title, words))
+            .setView(padded(field))
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                val value = field.text.toString().trim()
+                if (value.isEmpty()) return@setPositiveButton
+                save(VoiceShortcut(words, kind, value))
+            }
+            .show()
+    }
+
+    private fun save(shortcut: VoiceShortcut) {
+        VoiceShortcutStore.add(this, shortcut)
+        toast(getString(R.string.voice_shortcut_saved, shortcut.phrase))
+        render()
+    }
+
+    private fun padded(view: View): View = LinearLayout(this).apply {
+        setPadding(dp(20), dp(8), dp(20), 0)
+        addView(view, LinearLayout.LayoutParams(-1, -2))
     }
 
     private fun advancedGroup(): View {

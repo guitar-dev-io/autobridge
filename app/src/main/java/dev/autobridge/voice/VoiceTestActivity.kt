@@ -197,7 +197,7 @@ class VoiceTestActivity : Activity() {
                 button.text = getString(R.string.voice_test_start)
                 status.text = ""
                 transcript.text = state.text
-                parsed.text = describe(VoiceCommandParser.parse(state.text))
+                parsed.text = describe(VoiceCommandParser.parse(state.text, VoiceShortcutStore.all(this@VoiceTestActivity)))
                 showBenchmark(state.transcription)
                 history.add(0, state.transcription)
                 renderHistory()

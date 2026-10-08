@@ -192,7 +192,7 @@ class CarAgentScreen(carContext: CarContext) : Screen(carContext) {
      * confirmation step to show a driver. A rejected address (not HTTPS, a private host) is refused.
      */
     private fun runVoiceCommand(input: String, fromVoice: Boolean): Boolean {
-        val command = VoiceCommandParser.parse(input)
+        val command = VoiceCommandParser.parse(input, dev.autobridge.voice.VoiceShortcutStore.all(carContext))
         val validated = when (val validation = CommandValidator.validate(command)) {
             is Validation.Valid -> validation.command
             is Validation.Rejected -> {
