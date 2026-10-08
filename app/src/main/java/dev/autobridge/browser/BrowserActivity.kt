@@ -1254,11 +1254,17 @@ class BrowserActivity : Activity() {
             }
             val title = if (input == null) web.title.orEmpty() else ""
             val size = BrowserPlayQueue.add(this@BrowserActivity, url, title)
+            // Nothing playing on the car: the queue starts there instead of waiting for Next.
+            val started = size != null && !onCarDisplay &&
+                dev.autobridge.bridge.AutoBridgeSessionManager.startQueueIfIdle(this@BrowserActivity)
             toast(
-            if (size == null) getString(R.string.browser_already_queued)
-            // A quantity, so a plural rather than a format string: English needs "1 item" and
-            // "2 items", and a language with more grammatical numbers needs its own forms.
-            else resources.getQuantityString(R.plurals.browser_queued, size, size)
+            when {
+                size == null -> getString(R.string.browser_already_queued)
+                started -> getString(R.string.queue_started_on_car)
+                // A quantity, so a plural rather than a format string: English needs "1 item" and
+                // "2 items", and a language with more grammatical numbers needs its own forms.
+                else -> resources.getQuantityString(R.plurals.browser_queued, size, size)
+            }
         )
             return size
         }

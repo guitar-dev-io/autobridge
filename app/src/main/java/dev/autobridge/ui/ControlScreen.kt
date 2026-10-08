@@ -191,10 +191,14 @@ fun ControlScreen(
 
     fun addToQueue(url: String, title: String = "") {
         val size = AutoBridgeSessionManager.queueAdd(context, BridgeSource(url, title))
+        val started = size != null && AutoBridgeSessionManager.startQueueIfIdle(context)
         Toast.makeText(
             context,
-            if (size == null) context.getString(R.string.browser_already_queued)
-            else context.getString(R.string.bridge_controller_queued),
+            when {
+                size == null -> context.getString(R.string.browser_already_queued)
+                started -> context.getString(R.string.queue_started_on_car)
+                else -> context.getString(R.string.bridge_controller_queued)
+            },
             Toast.LENGTH_SHORT
         ).show()
         revision++

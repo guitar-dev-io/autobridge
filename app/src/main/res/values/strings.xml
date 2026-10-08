@@ -489,6 +489,7 @@
     <string name="browser_resumed_from_queue">Playing the next item in the queue</string>
 
     <!-- Phone browser: zoom readout in All Actions sheet. -->
+    <string name="queue_started_on_car">Nothing was playing on the car, so it is playing now</string>
     <string name="browser_audio_held">Sound is off while the car plays music · Tap to turn it on</string>
     <string name="browser_zoom_percent">%1$d%%</string>
 
