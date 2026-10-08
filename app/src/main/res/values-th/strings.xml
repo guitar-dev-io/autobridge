@@ -1871,6 +1871,11 @@
     <string name="voice_err_load">โหลดโมเดลไม่ได้ ตรวจสอบหรือดาวน์โหลดใหม่</string>
     <string name="voice_err_transcribe">ถอดข้อความไม่สำเร็จ ลองอีกครั้ง</string>
     <string name="voice_home_listening_body">พูดได้เลย ระบบจะหยุดฟังเมื่อคุณเงียบ</string>
+    <string name="voice_home_edit">แก้คำ</string>
+    <string name="voice_home_edit_hint">แก้คำให้ถูก แล้วกดทำงาน</string>
+    <string name="voice_home_check_words">ยังไม่แน่ใจว่าหมายถึงอะไร กดทำงานเลย หรือแก้คำก่อนก็ได้</string>
+    <string name="voice_home_remember_fix">จำคำนี้ไว้ใช้ครั้งหน้า</string>
+    <string name="voice_home_fix_saved">บันทึกแล้ว: “%1$s” จะหมายถึง “%2$s”</string>
     <string name="voice_home_run">ทำงาน</string>
     <string name="voice_home_open_settings">เปิดการตั้งค่า</string>
     <string name="voice_home_unsafe">เปิดที่อยู่นี้ด้วยเสียงไม่ได้</string>
