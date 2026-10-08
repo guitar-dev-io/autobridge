@@ -141,6 +141,8 @@ struct SettingsView: View {
                 }
             }
 
+            CarScreenVideoSection()
+
             Section(NSLocalizedString("Not on iOS", comment: "Settings")) {
                 Text(
                     "Screen mirroring, touch injection into other apps and an arbitrary video surface on the car display are absent, not hidden: ReplayKit only captures this app's own screen, the App Sandbox has no equivalent of Shizuku or an accessibility input backend, and CarPlay is template-based with no mirroring category."

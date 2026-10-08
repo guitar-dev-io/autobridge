@@ -193,10 +193,19 @@ public final class PlaybackController: NSObject, ObservableObject {
             }
         }
         player.replaceCurrentItem(with: item)
-        player.allowsExternalPlayback = track.isVideo
+        applyExternalPlayback()
         player.play()
         publishNowPlaying()
         loadArtwork(for: track)
+    }
+
+    /// Whether a video's picture may go to an AirPlay screen: only with `CarScreenVideo` on. Off,
+    /// AirPlay still carries the sound and the picture stays on the phone. Applied again when the
+    /// option changes, so it takes effect on what is already playing.
+    func applyExternalPlayback() {
+        let video = current?.isVideo ?? false
+        player.allowsExternalPlayback = video && CarScreenVideo.enabled
+        player.usesExternalPlaybackWhileExternalScreenIsActive = player.allowsExternalPlayback
     }
 
     /// `.playback` either way — a Radio channel has to survive the screen locking — with the mode

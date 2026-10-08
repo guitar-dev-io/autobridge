@@ -135,6 +135,9 @@ struct BrowserView: View {
             Button { model.goForward() } label: { Image(systemName: "chevron.right") }
                 .disabled(!model.canGoForward)
             Spacer()
+            if CarScreenVideo.enabled {
+                AirPlayButton().frame(width: 28, height: 28)
+            }
             Button {
                 model.isLoading ? model.stop() : model.reload()
             } label: {
@@ -219,6 +222,8 @@ final class WebViewModel: NSObject, ObservableObject {
         configuration.allowsInlineMediaPlayback = true
         configuration.allowsPictureInPictureMediaPlayback = true
         configuration.mediaTypesRequiringUserActionForPlayback = []
+        // A page's video goes to an AirPlay screen only with the car-screen option on.
+        configuration.allowsAirPlayForMediaPlayback = CarScreenVideo.enabled
         webView = WKWebView(frame: .zero, configuration: configuration)
         super.init()
         webView.navigationDelegate = self

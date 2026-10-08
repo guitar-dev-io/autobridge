@@ -39,6 +39,15 @@ struct PlayerView: View {
         .navigationTitle(playback.current?.title ?? NSLocalizedString("Player", comment: "Player"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            // Audio always goes to AirPlay speakers; a video's picture only with the car-screen
+            // option on, so the button is offered for video only then.
+            ToolbarItem(placement: .topBarTrailing) {
+                if let track = playback.current, !track.isVideo || CarScreenVideo.enabled {
+                    AirPlayButton()
+                        .frame(width: 32, height: 32)
+                        .accessibilityLabel(Text("AirPlay"))
+                }
+            }
             // Leaving the screen keeps a station playing; this is the one that ends it.
             ToolbarItem(placement: .topBarTrailing) {
                 if playback.current != nil {

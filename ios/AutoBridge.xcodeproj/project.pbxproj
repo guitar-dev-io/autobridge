@@ -58,6 +58,7 @@
 		C7790A56AF8E8B9B7623E514 /* StreamPingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2966E828D29584E0E837522E /* StreamPingTests.swift */; };
 		CD47912CB25B082F58AC5C31 /* PlaybackController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4221DBC44D4F8244659B983 /* PlaybackController.swift */; };
 		D4C36BDB3E1FD10DFFEAA6A1 /* CarPlaySceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10B9EB0C4091B8889867EAC1 /* CarPlaySceneDelegate.swift */; };
+		D54826F43212E3201F66F889 /* AirPlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D8B6EF12DFDDFCD2CE0BC92 /* AirPlay.swift */; };
 		D9119D33C9038E9A805356F7 /* IptvLogos.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC27C741D4CDE73F36C0CF16 /* IptvLogos.swift */; };
 		DA92F3A20D463D1D2CBEF204 /* AutoBridgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC2DC46EF46D56B3DCAE7B87 /* AutoBridgeApp.swift */; };
 		E8F5F6FB291459300CAFC018 /* SourceEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 550645EFF34BB231101D7681 /* SourceEditorView.swift */; };
@@ -93,6 +94,7 @@
 		1C3DC95AD866C8BC32B6A802 /* YouTubeAdSkip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YouTubeAdSkip.swift; sourceTree = "<group>"; };
 		1C7243F20A7F9072F4DA9C06 /* SponsorBlockClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SponsorBlockClient.swift; sourceTree = "<group>"; };
 		1D5801B5316F3325CAE7139E /* AutoBridgeTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = AutoBridgeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		1D8B6EF12DFDDFCD2CE0BC92 /* AirPlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirPlay.swift; sourceTree = "<group>"; };
 		1E11482FFF9C334DEDDD0347 /* BrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserView.swift; sourceTree = "<group>"; };
 		223C495FD3D4E548509835FC /* AutoBridgeStores.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoBridgeStores.swift; sourceTree = "<group>"; };
 		260F3892EF81DCA14F0F1E65 /* AutoBridge.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AutoBridge.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -287,6 +289,7 @@
 		EE4A7E584703393C3FBE9957 /* UI */ = {
 			isa = PBXGroup;
 			children = (
+				1D8B6EF12DFDDFCD2CE0BC92 /* AirPlay.swift */,
 				1A7F594C1B644B794A02CDD4 /* AutoBridgeDesign.swift */,
 				1E11482FFF9C334DEDDD0347 /* BrowserView.swift */,
 				E4EEFD36366253809E393E28 /* CategoriesView.swift */,
@@ -419,6 +422,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D54826F43212E3201F66F889 /* AirPlay.swift in Sources */,
 				DA92F3A20D463D1D2CBEF204 /* AutoBridgeApp.swift in Sources */,
 				6ED1D9C801A96F9E075E5782 /* AutoBridgeDesign.swift in Sources */,
 				C2CF7348E34F0E7FC397D1B9 /* AutoBridgeStores.swift in Sources */,

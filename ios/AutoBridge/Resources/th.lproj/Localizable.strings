@@ -366,3 +366,11 @@
 "Snow showers" = "หิมะตกเป็นช่วง";
 "Thunderstorm" = "พายุฝนฟ้าคะนอง";
 "Thunderstorm with hail" = "พายุฝนฟ้าคะนองมีลูกเห็บ";
+
+/* Video on a car screen over AirPlay. */
+"Video on a car screen (AirPlay)" = "วิดีโอบนจอรถ (AirPlay)";
+"Sends the picture, not only the sound, to an AirPlay screen in the car, and keeps it playing while the phone is locked." = "ส่งทั้งภาพและเสียงไปจอในรถที่รับ AirPlay ได้ และเล่นต่อแม้ล็อกจอมือถือ";
+"Advanced (off by default)" = "ตัวเลือกขั้นสูง (ปิดเป็นค่าเริ่มต้น)";
+"Turning this on lifts a protection; you take the risk and the responsibility. Watching video the driver can see while the car moves is dangerous and against Thai traffic law." = "เปิดแล้วคือการยกเลิกการป้องกัน ผู้ใช้รับความเสี่ยงและความรับผิดชอบเอง การดูวิดีโอบนจอที่คนขับมองเห็นขณะรถวิ่งเป็นอันตรายและผิดกฎหมายจราจร";
+"Turn on" = "เปิด";
+"The car screen will show video whether the car is parked or moving; nothing here checks. Do not watch while driving. Turn it on only for passengers, or for when you are parked." = "จอรถจะแสดงวิดีโอทั้งตอนจอดและตอนรถวิ่ง แอปไม่ได้ตรวจสถานะรถ ห้ามดูขณะขับ เปิดใช้เพื่อผู้โดยสาร หรือตอนจอดรถเท่านั้น";
