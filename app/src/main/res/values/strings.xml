@@ -603,6 +603,7 @@
     <string name="aa_hidden_title">Bridge Web is hidden on Android Auto</string>
     <string name="aa_hidden_message">Installing this update reset the install source, so Android Auto will not show Bridge Web until it is set again. It takes one tap with Shizuku.</string>
     <string name="aa_hidden_fix">Fix now</string>
+    <string name="whats_new_0_4_55">• Duo Screen settings are shorter: tap a pane in the car-screen preview to pick its app, and Number of panes now sits in the Layout card.</string>
     <string name="whats_new_0_4_54">• Updating shows its progress: a bar with the percent and size downloaded, and a Cancel button.</string>
     <string name="whats_new_0_4_53">• Voice commands send at the right moment: a short command goes as soon as you stop, a longer sentence waits through a thinking pause, and a click or bump after you finish no longer holds it back.\n• Car browser menu: the zoom row shows the page zoom (for example 125%) between − and +.</string>
     <string name="whats_new_0_4_52">• Car browser menu (Android Auto): the same layout as Bridge Web, two rows of big buttons, This page switches with a zoom stepper, Split screen, and More as grouped rows.\n• Zoom, the switches and Save no longer close the menu, so you can press them again.\n• Home tells you when a new version is out; Check for updates shows a loading spinner.\n• Library is now fully translated.\n• Bridge Web on Android Auto setup has the app\'s settings look.</string>
