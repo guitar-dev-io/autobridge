@@ -200,7 +200,7 @@ class CarWebRenderer(context: Context) {
          * A text field on the page took focus. The host offers a way to type into it, seeded with
          * [current], and sends the result back through [submitText].
          */
-        fun openFieldInput(current: String)
+        fun openFieldInput(current: String, label: String = "", type: String = "text")
         fun openFindInPage()
         fun openAgent()
         fun openBookmarks()
@@ -1791,10 +1791,14 @@ class CarWebRenderer(context: Context) {
     private fun offerFieldInput(page: WebView) {
         if (page !== webView && page !== sideView) return
         if (overlay != Overlay.NONE) return
-        page.evaluateJavascript(CarKeyboardPanel.FOCUSED_FIELD_SCRIPT.trimIndent()) { raw ->
+        page.evaluateJavascript(CarKeyboardPanel.FOCUSED_FIELD_INFO_SCRIPT.trimIndent()) { raw ->
+            // evaluateJavascript hands back the JSON string as a JS string literal: unwrap, then parse.
             val parsed = runCatching { org.json.JSONArray("[${raw ?: "null"}]") }.getOrNull()
-            val field = if (parsed == null || parsed.isNull(0)) null else parsed.optString(0)
-            if (field != null && overlay == Overlay.NONE) host?.openFieldInput(field)
+            val json = if (parsed == null || parsed.isNull(0)) null else parsed.optString(0)
+            val info = json?.let { runCatching { org.json.JSONObject(it) }.getOrNull() }
+            if (info != null && overlay == Overlay.NONE) {
+                host?.openFieldInput(info.optString("value"), info.optString("label"), info.optString("type", "text"))
+            }
         }
     }
 
