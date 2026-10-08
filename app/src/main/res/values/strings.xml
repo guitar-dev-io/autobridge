@@ -1909,6 +1909,11 @@
     <string name="voice_err_load">The model could not be loaded. Verify it or download it again.</string>
     <string name="voice_err_transcribe">Transcription failed. Try again.</string>
     <string name="voice_home_listening_body">Speak now. Listening stops when you pause.</string>
+    <string name="voice_home_edit">Edit</string>
+    <string name="voice_home_edit_hint">Fix the words, then Run.</string>
+    <string name="voice_home_check_words">Not sure what this means. Run it, or fix the words first.</string>
+    <string name="voice_home_remember_fix">Remember this fix for next time</string>
+    <string name="voice_home_fix_saved">Saved: “%1$s” now means “%2$s”</string>
     <string name="voice_home_run">Run</string>
     <string name="voice_home_open_settings">Open settings</string>
     <string name="voice_home_unsafe">That address cannot be opened by voice</string>

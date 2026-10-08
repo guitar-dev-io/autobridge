@@ -51,6 +51,7 @@ class PhoneVoiceSession(private val activity: Activity, private val actions: Act
     private var heard: TextView? = null
     private var watcher: Job? = null
     private var pending: (() -> Unit)? = null
+    private var editing: (() -> Unit)? = null
 
     /** Entry point for the microphone button. */
     fun start() {
@@ -130,20 +131,36 @@ class PhoneVoiceSession(private val activity: Activity, private val actions: Act
     private fun onTranscript(text: String) {
         dialog?.setTitle(R.string.voice_test_transcript)
         heard?.text = text
+        handle(text, heardAs = text, allowAuto = true)
+    }
+
+    /**
+     * Parses [text] and runs it, or offers to. [heardAs] is what Whisper wrote, kept so a fix the
+     * driver types can be remembered against it.
+     *
+     * Runs at once only when the command was understood: a transcript nothing recognised used to
+     * go straight to the Agent too, and a misheard word then did whatever the Agent made of it
+     * before the driver could see the mistake. Now it waits, with Edit beside Run.
+     */
+    private fun handle(text: String, heardAs: String, allowAuto: Boolean) {
         val command = VoiceCommandParser.parse(text, VoiceShortcutStore.all(activity))
         StructuredLog.i(VoiceRuntime.TAG, "phone voice command ${command.action} ${command.target} conf=${command.confidence}")
-        val run: (() -> Unit)? = when (val validation = CommandValidator.validate(command)) {
+        val validation = CommandValidator.validate(command)
+        val run: (() -> Unit)? = when (validation) {
             is Validation.Valid -> ({ execute(validation.command) })
             is Validation.Rejected ->
                 if (validation.reason == Validation.Reason.UNKNOWN_COMMAND) ({ actions.runAgentCommand(command.text.ifBlank { text }) })
                 else null
         }
-        val auto = VoiceSettings.autoExecute(activity) &&
-            when (val validation = CommandValidator.validate(command)) {
-                is Validation.Valid -> validation.command.autoExecute
-                is Validation.Rejected -> validation.reason == Validation.Reason.UNKNOWN_COMMAND
-            }
+        val understood = when (validation) {
+            is Validation.Valid -> validation.command.autoExecute
+            is Validation.Rejected -> validation.reason == Validation.Reason.UNKNOWN_COMMAND &&
+                dev.autobridge.agent.AgentCommandParser.parse(text) != null
+        }
+        val recognised = validation is Validation.Valid || understood
+        val auto = allowAuto && VoiceSettings.autoExecute(activity) && understood
         val positive = dialog?.getButton(DialogInterface.BUTTON_POSITIVE)
+        val neutral = dialog?.getButton(DialogInterface.BUTTON_NEUTRAL)
         when {
             run == null -> {
                 status?.text = activity.getString(R.string.voice_home_unsafe)
@@ -152,12 +169,64 @@ class PhoneVoiceSession(private val activity: Activity, private val actions: Act
             auto -> {
                 dismiss()
                 run()
+                return
+            }
+            !allowAuto -> {
+                // A corrected command: the driver already said Run by fixing it.
+                dismiss()
+                run()
+                return
             }
             else -> {
-                status?.text = ""
+                status?.text = if (recognised) "" else activity.getString(R.string.voice_home_check_words)
                 positive?.text = activity.getString(R.string.voice_home_run)
                 positive?.visibility = View.VISIBLE
                 pending = { dismiss(); run() }
+            }
+        }
+        neutral?.text = activity.getString(R.string.voice_home_edit)
+        neutral?.visibility = View.VISIBLE
+        editing = { startEditing(heardAs) }
+    }
+
+    /**
+     * Swaps the transcript for an editable copy. Run executes the fixed words; with "remember"
+     * ticked (the default) the fix is saved as one of the driver's commands, so the next time
+     * Whisper writes the same thing it means what was typed here ([VoiceShortcut.Kind.COMMAND]).
+     */
+    private fun startEditing(heardAs: String) {
+        val content = heard?.parent as? LinearLayout ?: return
+        val field = android.widget.EditText(activity).apply {
+            setText(heardAs)
+            setSelection(heardAs.length)
+            textSize = 19f
+            setTextColor(AutoBridgeDesign.TEXT)
+            setSingleLine()
+        }
+        val remember = android.widget.CheckBox(activity).apply {
+            isChecked = true
+            text = activity.getString(R.string.voice_home_remember_fix)
+            setTextColor(AutoBridgeDesign.TEXT_MUTED)
+        }
+        heard?.let { content.removeView(it) }
+        content.addView(field)
+        content.addView(remember)
+        field.requestFocus()
+        status?.text = activity.getString(R.string.voice_home_edit_hint)
+        dialog?.getButton(DialogInterface.BUTTON_NEUTRAL)?.visibility = View.GONE
+        val positive = dialog?.getButton(DialogInterface.BUTTON_POSITIVE)
+        positive?.text = activity.getString(R.string.voice_home_run)
+        positive?.visibility = View.VISIBLE
+        pending = {
+            val fixed = field.text.toString().trim()
+            if (fixed.isNotEmpty()) {
+                if (remember.isChecked && VoiceShortcutMatcher.key(fixed) != VoiceShortcutMatcher.key(heardAs) &&
+                    VoiceShortcutMatcher.key(heardAs).length >= 2
+                ) {
+                    VoiceShortcutStore.add(activity, VoiceShortcut(heardAs, VoiceShortcut.Kind.COMMAND, fixed))
+                    toast(activity.getString(R.string.voice_home_fix_saved, heardAs, fixed))
+                }
+                handle(fixed, heardAs = heardAs, allowAuto = false)
             }
         }
     }
@@ -210,11 +279,16 @@ class PhoneVoiceSession(private val activity: Activity, private val actions: Act
             .setView(content)
             .setNegativeButton(R.string.voice_action_cancel) { _, _ -> recognizer.cancel() }
             .setPositiveButton(R.string.voice_test_stop, null)
+            .setNeutralButton(R.string.voice_home_edit, null)
             .setOnCancelListener { recognizer.cancel() }
             .create()
         built.setOnShowListener {
             // Set here rather than in the builder so a tap does not also dismiss the dialog.
             built.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener { pending?.invoke() }
+            built.getButton(DialogInterface.BUTTON_NEUTRAL).apply {
+                visibility = View.GONE
+                setOnClickListener { editing?.invoke() }
+            }
         }
         dialog = built
         built.show()
@@ -226,6 +300,7 @@ class PhoneVoiceSession(private val activity: Activity, private val actions: Act
         status = null
         heard = null
         pending = null
+        editing = null
     }
 
     private fun toast(message: String) = Toast.makeText(activity, message, Toast.LENGTH_SHORT).show()
