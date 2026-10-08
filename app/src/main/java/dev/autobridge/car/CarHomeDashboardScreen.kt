@@ -24,6 +24,9 @@ import dev.autobridge.R
 import dev.autobridge.bridge.AutoBridgeSessionManager
 import dev.autobridge.bridge.BridgePlaybackState
 import dev.autobridge.bridge.BridgeSource
+import dev.autobridge.bridge.BridgeStore
+import dev.autobridge.audio.WebMediaStatus
+import dev.autobridge.media.WebMediaHub
 import dev.autobridge.bridge.EngineKind
 import dev.autobridge.core.state.VehicleStateSession
 import dev.autobridge.logging.StructuredLog
@@ -39,16 +42,17 @@ import kotlinx.coroutines.launch
  * AutoBridge Home Dashboard.
  *
  * The home is drawn by the app on the car surface (NavigationTemplate) under a compact AutoBridge
- * header: the Now Playing card with its previous / play-pause / next buttons beside the 3 × 2 grid
+ * header: the Now Playing card with its previous / play-pause / next buttons (or, with no session
+ * yet, an empty-state card in the same place) beside the 3 × 2 grid
  * of [HomeMenuCard]s (TV, Radio, Web browser, YouTube, YouTube Music, Streaming), then the items
- * recently sent from the phone with a link to the queue - so it reads as one dark design system
+ * recently sent from the phone with the queue button - so it reads as one dark design system
  * instead of host-styled tiles. Layout is computed from the surface size,
  * density and the host's stable area ([HomeDashboardLayout]); Android Auto's own rail, bottom bar,
  * clock and status icons sit outside the surface and are never drawn over or imitated.
  *
- * Every section shows real state or is absent: [HomeDashboardContent] reads the bridge's own
- * session snapshot, the recents the phone sent, and the play queue, and a section with nothing in
- * it gives its space back to the cards.
+ * Every section shows real state: [HomeDashboardContent] reads the bridge's own session snapshot,
+ * the recents the phone sent, and the play queue. A section with nothing in it shows its empty
+ * state in place rather than collapsing, so the cards never move.
  *
  * Everything else, and a rotary-friendly route to the six cards, is behind the single action-strip
  * button ([CarHomeMoreScreen]). Hosts older than Car API 5 cannot deliver surface taps, so they keep
@@ -85,6 +89,26 @@ class CarHomeDashboardScreen(
     private var pressed: HomeHit? = null
     private var active = false
 
+    /**
+     * What the car browser's page is playing, read once a second while the home is on screen.
+     *
+     * Playback started from Quick Access (YouTube, a radio site, any page) runs in the car browser,
+     * not through the bridge, so [AutoBridgeSessionManager] never hears of it. The browser hands its
+     * page audio to [WebMediaHub] for the media session already; reading the same source here is
+     * what lets the Now Playing card show it and its buttons drive it.
+     */
+    private var web: WebNow? = null
+
+    private data class WebNow(val source: dev.autobridge.media.WebMediaSource, val url: String, val status: WebMediaStatus)
+
+    private val webPoll = object : Runnable {
+        override fun run() {
+            if (!active) return
+            readWeb()
+            handler.postDelayed(this, WEB_POLL_MS)
+        }
+    }
+
     /** Repaints the Now Playing card as the live session plays, pauses and moves on. */
     private val scope = MainScope()
     private var sessionWatch: Job? = null
@@ -115,6 +139,7 @@ class CarHomeDashboardScreen(
                 MirrorSurfaceOwnership.claim(this@CarHomeDashboardScreen)
                 appManager.setSurfaceCallback(this@CarHomeDashboardScreen)
                 sessionWatch = scope.launch { AutoBridgeSessionManager.state.collect { renderMenu() } }
+                handler.post(webPoll)
                 // The surface may have survived the screen above (both are surface templates).
                 renderMenu()
             }
@@ -228,7 +253,45 @@ class CarHomeDashboardScreen(
      * while this screen is still connected. Releasing unconditionally would blank the home on the
      * one path that stays here, which is a send the router refuses.
      */
-    private fun actionFor(hit: HomeHit): (() -> Unit)? = when (hit.region) {
+    private fun actionFor(hit: HomeHit): (() -> Unit)? {
+        webPlaying()?.let { now -> webAction(hit, now)?.let { return it } }
+        return bridgeAction(hit)
+    }
+
+    /**
+     * The card's taps while it shows the car browser's page: the buttons act on the page where it
+     * is, and the card itself brings the browser back to the front. Anything else falls through.
+     */
+    private fun webAction(hit: HomeHit, now: WebNow): (() -> Unit)? = when (hit.region) {
+        HomeRegion.CONTINUE -> {
+            {
+                releaseSurface()
+                CarHomeNavigator.open(carContext, screenManager, HomeSection.WEB, ::requestSafety)
+            }
+        }
+        HomeRegion.CONTROL_PLAY -> {
+            {
+                if (now.status.playing) now.source.pause() else now.source.play()
+                readWeb()
+            }
+        }
+        HomeRegion.CONTROL_PREVIOUS -> {
+            {
+                now.source.seekTo(0L)
+                readWeb()
+            }
+        }
+        HomeRegion.CONTROL_NEXT -> if (!content.hasQueue) null else {
+            {
+                now.source.skipToNext()
+                refreshContent()
+                readWeb()
+            }
+        }
+        else -> null
+    }
+
+    private fun bridgeAction(hit: HomeHit): (() -> Unit)? = when (hit.region) {
         HomeRegion.CONTINUE -> content.continueWatching?.let { item ->
             {
                 if (handOverSurface(item.source)) {
@@ -242,13 +305,13 @@ class CarHomeDashboardScreen(
         HomeRegion.CONTROL_PLAY -> content.continueWatching?.let { item ->
             if (isLive(item)) {
                 { AutoBridgeSessionManager.togglePlayPause() }
-            } else actionFor(HomeHit(HomeRegion.CONTINUE))
+            } else bridgeAction(HomeHit(HomeRegion.CONTINUE))
         }
 
         HomeRegion.CONTROL_PREVIOUS -> content.continueWatching?.let { item ->
             if (isLive(item)) {
                 { AutoBridgeSessionManager.previous() }
-            } else actionFor(HomeHit(HomeRegion.CONTINUE))
+            } else bridgeAction(HomeHit(HomeRegion.CONTINUE))
         }
 
         // Next plays the head of the queue, the same route as a queue tap: there is no other
@@ -299,6 +362,58 @@ class CarHomeDashboardScreen(
             live.source?.url == item.source.url &&
             live.playback in LIVE_STATES
     }
+
+    /** Reads the car browser's page audio, if a browser is alive, and repaints on what changed. */
+    private fun readWeb() {
+        val source = WebMediaHub.source
+        if (source == null) {
+            updateWeb(null)
+            return
+        }
+        source.readMediaStatus { status ->
+            if (!active) return@readMediaStatus
+            updateWeb(source.pageUrl?.takeIf { it.isNotBlank() }?.let { WebNow(source, it, status) })
+        }
+    }
+
+    private fun updateWeb(next: WebNow?) {
+        val hadCard = shownContent().hasContinueWatching
+        web = next
+        // The card appearing or going changes the layout (card vs. its empty state), not just paint.
+        if (shownContent().hasContinueWatching != hadCard) dashboardLayout = null
+        renderMenu()
+    }
+
+    /**
+     * The browser's page, when it is worth a card: playing now, or paused part-way through
+     * something with a length or a name. A page that merely has a video element does not count.
+     */
+    private fun webPlaying(): WebNow? = web?.takeIf {
+        val s = it.status
+        s.playing || (s.positionMs > 0L && (s.durationMs > 0L || s.hasMetadata))
+    }
+
+    private fun webItem(now: WebNow): ContinueItem {
+        val s = now.status
+        val title = s.title.ifBlank { s.pageTitle }.ifBlank { BridgeSource(now.url).displayHost }
+        val source = BridgeSource(now.url, title)
+        val artwork = HomeDashboardSource.artwork(now.url).let {
+            if (s.artworkUrl.isNotBlank()) it.copy(thumbnailUrl = s.artworkUrl) else it
+        }
+        return ContinueItem(
+            source = source,
+            snapshot = BridgeStore.Snapshot(source, EngineKind.BROWSER, s.positionMs, System.currentTimeMillis(), s.durationMs),
+            title = title,
+            sourceLabel = HomeDashboardSource.label(carContext, now.url),
+            artwork = artwork,
+            positionMs = s.positionMs,
+            durationMs = s.durationMs
+        )
+    }
+
+    /** What the card shows: the browser's page when it is playing something, else the bridge's. */
+    private fun shownContent(): HomeDashboardContent =
+        webPlaying()?.let { content.copy(continueWatching = webItem(it)) } ?: liveContent()
 
     /** The content to draw, with the live position when the card is the session playing now. */
     private fun liveContent(): HomeDashboardContent {
@@ -378,11 +493,12 @@ class CarHomeDashboardScreen(
         if (surfaceWidth <= 0 || surfaceHeight <= 0) return
         // The head unit's dpi, never the phone's: it decides every dp on this screen.
         val density = (if (surfaceDpi > 0) surfaceDpi else BASELINE_DPI) / BASELINE_DPI.toFloat()
+        val shown = shownContent()
         val layout = dashboardLayout ?: HomeDashboardLayout.compute(
-            safeArea(), density, menuItems.map { it.title(carContext) }, content,
+            safeArea(), density, menuItems.map { it.title(carContext) }, shown,
             dashboardRenderer::measureLabel,
             recentTitle = carContext.getString(R.string.car_home_recent_from_phone),
-            queueLink = content.queueTotal.takeIf { it > 0 }?.let(dashboardRenderer::queueLink)
+            queueLabel = dashboardRenderer.queueLink(content.queueTotal)
         ).also {
             dashboardLayout = it
             scroll = scroll.coerceIn(0f, it.maxScroll)
@@ -397,11 +513,14 @@ class CarHomeDashboardScreen(
         // later, uncatchably. See [dev.autobridge.display.CarSurfaceCanvas].
         dev.autobridge.display.CarSurfaceCanvas.draw(carContext, target) { canvas ->
             val focused = menuItems.indexOfFirst { it.section == focusedSection }
-            val playing = content.continueWatching?.let { isLive(it) } == true &&
-                AutoBridgeSessionManager.current.isPlaying
+            val webNow = webPlaying()
+            val live = webNow == null && content.continueWatching?.let { isLive(it) } == true
+            val playing = webNow?.status?.playing ?: (live && AutoBridgeSessionManager.current.isPlaying)
+            val paused = if (webNow != null) !webNow.status.playing
+            else live && AutoBridgeSessionManager.current.playback == BridgePlaybackState.PAUSED
             dashboardRenderer.draw(
-                canvas, layout, menuItems, liveContent(),
-                HomeDashboardRenderer.State(focused, pressed, scroll, playing, nextEnabled = content.hasQueue),
+                canvas, layout, menuItems, shown,
+                HomeDashboardRenderer.State(focused, pressed, scroll, playing, paused, nextEnabled = content.hasQueue),
                 thumbnails
             )
         }
@@ -563,6 +682,9 @@ class CarHomeDashboardScreen(
         var resumedThisLaunch = false
         const val TAG = "CarHome"
         const val BASELINE_DPI = 160
+
+        /** How often the browser's page audio is read: the media service polls it at the same pace. */
+        const val WEB_POLL_MS = 1000L
 
         /** Session states in which the Now Playing buttons can act on the engine directly. */
         val LIVE_STATES = setOf(BridgePlaybackState.LOADING, BridgePlaybackState.PLAYING, BridgePlaybackState.PAUSED)

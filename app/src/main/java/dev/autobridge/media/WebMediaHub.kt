@@ -25,6 +25,9 @@ interface WebMediaSource {
      * knows to leave the finished page where it is.
      */
     fun skipToNext(): Boolean
+
+    /** The address of the page making the sound, for a UI that names it; null when not known. */
+    val pageUrl: String? get() = null
 }
 
 /**
