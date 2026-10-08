@@ -11,6 +11,7 @@
 
 #include <atomic>
 #include <cstring>
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -135,7 +136,9 @@ Java_dev_autobridge_whisper_WhisperNative_initContext(JNIEnv * env, jclass, jstr
     whisper_context_params params = whisper_context_default_params();
     // CPU only: no GPU backend is compiled in (see CMakeLists.txt).
     params.use_gpu = false;
-    params.flash_attn = false;
+    // Flash attention has a CPU path in ggml and cuts the encoder's attention cost; whisper.cpp
+    // turns it on by default in current releases.
+    params.flash_attn = true;
     whisper_context * ctx = whisper_init_from_file_with_params(model_path.c_str(), params);
     if (ctx == nullptr) {
         LOGW("whisper_init failed for %s", model_path.c_str());
@@ -216,6 +219,14 @@ Java_dev_autobridge_whisper_WhisperNative_transcribe(
     params.suppress_blank = true;
     params.suppress_nst = true;
     params.initial_prompt = initial_prompt.empty() ? nullptr : initial_prompt.c_str();
+    // The encoder always works on a 30 s window (1500 frames, 50 per second) however short the
+    // recording, and for a 3 s command most of that work is silence. audio_ctx shrinks the window
+    // to the speech that is there, rounded up and with headroom; it is the single biggest saving
+    // for short audio. Floored at 512 frames (~10 s): narrower windows start to cost accuracy.
+    const int frames = static_cast<int>((static_cast<long long>(count) * 50 + 15999) / 16000);
+    params.audio_ctx = std::min(1500, std::max(512, ((frames + 64 + 63) / 64) * 64));
+    // A command is a sentence. A cap stops a rare repetition loop from decoding to the limit.
+    params.max_tokens = 96;
     params.abort_callback = abort_requested;
     params.abort_callback_user_data = session;
     params.encoder_begin_callback = encoder_may_begin;
