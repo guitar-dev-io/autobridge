@@ -1335,8 +1335,8 @@ class CarWebRenderer(context: Context) {
 
     // ------------------------------------------------------------------ tools
 
-    fun zoomIn() = runOnMain { focusedView?.zoomBy(ZOOM_STEP) }
-    fun zoomOut() = runOnMain { focusedView?.zoomBy(1f / ZOOM_STEP) }
+    fun zoomIn() = runOnMain { focusedView?.let { PageZoom.zoomBy(it, ZOOM_STEP) } }
+    fun zoomOut() = runOnMain { focusedView?.let { PageZoom.zoomBy(it, 1f / ZOOM_STEP) } }
 
     fun copyUrl(): Boolean {
         val manager = appContext.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
@@ -1868,7 +1868,7 @@ class CarWebRenderer(context: Context) {
         if (overlay != Overlay.NONE) return@runOnMain
         if (!factor.isFinite() || factor <= 0f) return@runOnMain
         lastInputMs = SystemClock.uptimeMillis()
-        focusedView?.zoomBy(factor.coerceIn(0.8f, 1.25f))
+        focusedView?.let { PageZoom.zoomBy(it, factor.coerceIn(0.8f, 1.25f)) }
     }
 
     // ------------------------------------------------------------------ overlays
@@ -2010,6 +2010,7 @@ class CarWebRenderer(context: Context) {
         version = "v${dev.autobridge.BuildConfig.VERSION_NAME}",
         pinnedToolbar = alwaysShowUrlBar,
         splitActive = isSplit,
+        zoomPercent = PageZoom.percent(focusedView),
     )
 
     private fun rebuildDrawer() {
@@ -2331,6 +2332,7 @@ class CarWebRenderer(context: Context) {
             }
 
             override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
+                PageZoom.reset(view)
                 loadError = null
                 // A redirect into a sign-in origin (e.g. desktop-mode YouTube handing off to
                 // accounts.google.com) must switch to the mobile UA Google accepts. Doing it here
@@ -2716,6 +2718,7 @@ class CarWebRenderer(context: Context) {
             }
 
             override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
+                PageZoom.reset(view)
                 BrowserDefaults.applyIdentity(appContext, view, url)
             }
 
@@ -3224,6 +3227,7 @@ class CarWebRenderer(context: Context) {
         }
         model.sectionLabels.forEach { (labelRes, box) -> drawSheetSectionLabel(canvas, labelRes, box) }
         model.plates.forEach { (labelRes, box) -> drawSheetPlate(canvas, labelRes, box) }
+        model.zoomReadout?.let { (text, box) -> drawSheetZoomReadout(canvas, text, box) }
         model.tiles.forEach {
             when (it.kind) {
                 DrawerKind.LIST -> drawSheetListRow(canvas, it)
@@ -3423,6 +3427,16 @@ class CarWebRenderer(context: Context) {
             appContext.getString(labelRes), glyphX + iconSize / 2f + sizes.horizontalPadding,
             box.centerY + titlePaint.textSize * 0.34f, titlePaint
         )
+    }
+
+    /** The zoom now, centred between the − and + buttons. */
+    private fun drawSheetZoomReadout(canvas: Canvas, text: String, box: Box) {
+        titlePaint.color = BrowserTheme.dark.textPrimary
+        titlePaint.textSize = (sizes.iconSmall * 0.85f).coerceAtMost(box.height * 0.42f)
+        val align = titlePaint.textAlign
+        titlePaint.textAlign = Paint.Align.CENTER
+        canvas.drawText(fit(text, titlePaint, box.width), box.centerX, box.centerY + titlePaint.textSize * 0.34f, titlePaint)
+        titlePaint.textAlign = align
     }
 
     /** The zoom stepper's − / + buttons: a tonal rounded square with the glyph. */

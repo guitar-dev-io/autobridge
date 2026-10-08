@@ -207,6 +207,8 @@ data class BrowserMenuState(
     val bookmarked: Boolean = false,
     /** The split's current layout, named beside the split switch while it is on. */
     val splitLayout: BrowserSplitLayout? = null,
+    /** The page zoom, in percent of the page as loaded, shown between the zoom − and + buttons. */
+    val zoomPercent: Int = 100,
 ) {
     val secure: Boolean get() = url.startsWith("https://", ignoreCase = true)
 }
@@ -273,6 +275,8 @@ class BrowserDrawerModel private constructor(
     val sectionLabels: List<Pair<Int, Box>> = emptyList(),
     /** Labelled rows that do nothing themselves but hold buttons (the zoom stepper). */
     val plates: List<Pair<Int, Box>> = emptyList(),
+    /** The zoom readout ("100%") and where it sits, between the − and + buttons. */
+    val zoomReadout: Pair<String, Box>? = null,
 ) {
     companion object {
         /**
@@ -475,9 +479,10 @@ class BrowserDrawerModel private constructor(
             val labels = ArrayList<Pair<Int, Box>>()
             val plates = ArrayList<Pair<Int, Box>>()
             var address: DrawerAddress? = null
+            var zoomReadout: Pair<String, Box>? = null
 
             fun layout(start: Float): Float {
-                rows.clear(); toggles.clear(); labels.clear(); plates.clear(); address = null
+                rows.clear(); toggles.clear(); labels.clear(); plates.clear(); address = null; zoomReadout = null
                 var y = start
                 fun label(res: Int) {
                     labels += res to Box(innerLeft, y, innerRight, y + labelHeight)
@@ -531,10 +536,13 @@ class BrowserDrawerModel private constructor(
                         plates += R.string.drawer_zoom to plate
                         val buttonHeight = (rowHeight - gap).coerceAtLeast(sizes.touchTarget * 0.8f)
                         val buttonWidth = buttonHeight * 1.2f
+                        val readoutWidth = buttonWidth * 1.3f
                         val inRight = plate.right - gap
-                        val outRight = inRight - buttonWidth - gap
+                        val readoutRight = inRight - buttonWidth
+                        val outRight = readoutRight - readoutWidth
                         val top = plate.centerY - buttonHeight / 2f
                         rows += DrawerRow(out, Box(outRight - buttonWidth, top, outRight, top + buttonHeight), DrawerKind.ROUND)
+                        zoomReadout = "${state.zoomPercent}%" to Box(outRight, top, readoutRight, top + buttonHeight)
                         rows += DrawerRow(zoomIn, Box(inRight - buttonWidth, top, inRight, top + buttonHeight), DrawerKind.ROUND)
                         y += rowHeight
                     }
@@ -583,6 +591,7 @@ class BrowserDrawerModel private constructor(
                 scrollOffset = offset,
                 sectionLabels = labels.toList(),
                 plates = plates.toList(),
+                zoomReadout = zoomReadout,
             )
         }
 

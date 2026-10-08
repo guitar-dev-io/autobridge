@@ -213,7 +213,7 @@ object CarMenuList {
                     switchView(context, item.on, style)
                 }.withState(context, item.on))
             }
-            plan.zoom?.let { (out, zoomIn) -> add(zoomRow(context, out, zoomIn, style, onAction)) }
+            plan.zoom?.let { (out, zoomIn) -> add(zoomRow(context, out, zoomIn, state.zoomPercent, style, onAction)) }
         }
         if (pageRows.isNotEmpty()) {
             addView(sectionLabel(context, context.getString(R.string.drawer_section_page), style))
@@ -474,11 +474,12 @@ object CarMenuList {
         ) { chevron(context, style) }
     }
 
-    /** "Zoom" with − and + buttons; there is no page zoom value to show, so none is invented. */
+    /** "Zoom" with − and + buttons and the page zoom between them ([PageZoom]). */
     private fun zoomRow(
         context: Context,
         out: DrawerItem,
         zoomIn: DrawerItem,
+        percent: Int,
         style: Style,
         onAction: (DrawerAction) -> Unit,
     ): View = cardRow(
@@ -487,6 +488,15 @@ object CarMenuList {
         LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             listOf(out, zoomIn).forEachIndexed { index, item ->
+                if (index > 0) {
+                    addView(TextView(context).apply {
+                        text = context.getString(R.string.browser_zoom_percent, percent)
+                        setTextColor(style.text)
+                        textSize = 15f
+                        typeface = Typeface.DEFAULT_BOLD
+                        gravity = Gravity.CENTER
+                    }, LinearLayout.LayoutParams(context.dp(64), context.dp(44)))
+                }
                 addView(ImageView(context).apply {
                     setImageResource(item.icon.resId)
                     setColorFilter(style.text)
@@ -497,9 +507,7 @@ object CarMenuList {
                     background = background(context, style.textSecondary.withAlpha(0x33), style.textSecondary, 12)
                     isClickable = item.enabled
                     if (item.enabled) setOnClickListener { onAction(item.action) }
-                }, LinearLayout.LayoutParams(context.dp(52), context.dp(44)).apply {
-                    if (index > 0) marginStart = context.dp(GAP_DP)
-                })
+                }, LinearLayout.LayoutParams(context.dp(52), context.dp(44)))
             }
         }
     }.apply {
