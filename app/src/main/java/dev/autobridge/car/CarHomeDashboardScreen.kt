@@ -21,20 +21,28 @@ import androidx.car.app.navigation.model.NavigationTemplate
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import dev.autobridge.R
+import dev.autobridge.bridge.AutoBridgeSessionManager
+import dev.autobridge.bridge.BridgePlaybackState
 import dev.autobridge.bridge.BridgeSource
+import dev.autobridge.bridge.EngineKind
 import dev.autobridge.core.state.VehicleStateSession
 import dev.autobridge.logging.StructuredLog
 import dev.autobridge.library.HomeSection
 import dev.autobridge.mirror.MirrorSurfaceOwnership
 import dev.autobridge.mirror.ProjectionService
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 /**
  * AutoBridge Home Dashboard.
  *
- * The home is drawn by the app on the car surface (NavigationTemplate) as one column under a
- * compact AutoBridge header - Continue Watching, the 3 × 2 grid of [HomeMenuCard]s (TV, Radio, Web
- * browser, YouTube, YouTube Music, Streaming), then Recently Sent and Queue - so it reads as one
- * dark design system instead of host-styled tiles. Layout is computed from the surface size,
+ * The home is drawn by the app on the car surface (NavigationTemplate) under a compact AutoBridge
+ * header: the Now Playing card with its previous / play-pause / next buttons beside the 3 × 2 grid
+ * of [HomeMenuCard]s (TV, Radio, Web browser, YouTube, YouTube Music, Streaming), then the items
+ * recently sent from the phone with a link to the queue - so it reads as one dark design system
+ * instead of host-styled tiles. Layout is computed from the surface size,
  * density and the host's stable area ([HomeDashboardLayout]); Android Auto's own rail, bottom bar,
  * clock and status icons sit outside the surface and are never drawn over or imitated.
  *
@@ -77,6 +85,10 @@ class CarHomeDashboardScreen(
     private var pressed: HomeHit? = null
     private var active = false
 
+    /** Repaints the Now Playing card as the live session plays, pauses and moves on. */
+    private val scope = MainScope()
+    private var sessionWatch: Job? = null
+
     /**
      * Thumbnails for the hero and the rows.
      *
@@ -102,6 +114,7 @@ class CarHomeDashboardScreen(
                 refreshContent()
                 MirrorSurfaceOwnership.claim(this@CarHomeDashboardScreen)
                 appManager.setSurfaceCallback(this@CarHomeDashboardScreen)
+                sessionWatch = scope.launch { AutoBridgeSessionManager.state.collect { renderMenu() } }
                 // The surface may have survived the screen above (both are surface templates).
                 renderMenu()
             }
@@ -109,6 +122,8 @@ class CarHomeDashboardScreen(
             override fun onStop(owner: LifecycleOwner) {
                 if (!drawsMenu) return
                 active = false
+                sessionWatch?.cancel()
+                sessionWatch = null
                 handler.removeCallbacksAndMessages(null)
                 releaseSurface()
                 if (MirrorSurfaceOwnership.release(this@CarHomeDashboardScreen)) appManager.setSurfaceCallback(null)
@@ -117,6 +132,7 @@ class CarHomeDashboardScreen(
             override fun onDestroy(owner: LifecycleOwner) {
                 vehicleStateSession.close()
                 speedSubscription.close()
+                scope.cancel()
             }
         })
     }
@@ -221,6 +237,32 @@ class CarHomeDashboardScreen(
             }
         }
 
+        // The buttons act on the live session in place when the card is the one playing; when it is
+        // only a resumable snapshot, previous and play resume it, exactly as tapping the card does.
+        HomeRegion.CONTROL_PLAY -> content.continueWatching?.let { item ->
+            if (isLive(item)) {
+                { AutoBridgeSessionManager.togglePlayPause() }
+            } else actionFor(HomeHit(HomeRegion.CONTINUE))
+        }
+
+        HomeRegion.CONTROL_PREVIOUS -> content.continueWatching?.let { item ->
+            if (isLive(item)) {
+                { AutoBridgeSessionManager.previous() }
+            } else actionFor(HomeHit(HomeRegion.CONTINUE))
+        }
+
+        // Next plays the head of the queue, the same route as a queue tap: there is no other
+        // "next" to have (the queue is consumed as it plays).
+        HomeRegion.CONTROL_NEXT -> content.queue.firstOrNull()?.let { item ->
+            {
+                val source = BridgeSource(item.url, item.title, origin = BridgeSource.Origin.QUEUE)
+                if (handOverSurface(source)) {
+                    AutoBridgeSessionManager.queueRemove(carContext, item.url)
+                    AutoBridgeSessionManager.open(carContext, source)
+                }
+            }
+        }
+
         HomeRegion.QUICK_ACCESS -> menuItems.getOrNull(hit.index)?.let { item ->
             {
                 focusedSection = item.section
@@ -247,20 +289,28 @@ class CarHomeDashboardScreen(
             }
         }
 
-        HomeRegion.QUEUE_ITEM -> content.queue.getOrNull(hit.index)?.let { item ->
-            {
-                val source = BridgeSource(item.url, item.title, origin = BridgeSource.Origin.QUEUE)
-                // The queue is consumed as it plays, so the row comes out - but only once the
-                // router has accepted it. Dropping an item the bridge then refused to open would
-                // lose it for good, with nothing on screen to say why.
-                if (handOverSurface(source)) {
-                    dev.autobridge.bridge.AutoBridgeSessionManager.queueRemove(carContext, item.url)
-                    dev.autobridge.bridge.AutoBridgeSessionManager.open(carContext, source)
-                }
-            }
-        }
-
         HomeRegion.SCROLL_UP, HomeRegion.SCROLL_DOWN -> null
+    }
+
+    /** The card is the session the bridge is playing right now, not just the last one saved. */
+    private fun isLive(item: ContinueItem): Boolean {
+        val live = AutoBridgeSessionManager.current
+        return live.engine != EngineKind.UNSUPPORTED &&
+            live.source?.url == item.source.url &&
+            live.playback in LIVE_STATES
+    }
+
+    /** The content to draw, with the live position when the card is the session playing now. */
+    private fun liveContent(): HomeDashboardContent {
+        val item = content.continueWatching ?: return content
+        if (!isLive(item)) return content
+        val live = AutoBridgeSessionManager.current
+        return content.copy(
+            continueWatching = item.copy(
+                positionMs = live.positionMs,
+                durationMs = if (live.durationMs > 0L) live.durationMs else item.durationMs
+            )
+        )
     }
 
     private fun play(source: BridgeSource) {
@@ -330,7 +380,9 @@ class CarHomeDashboardScreen(
         val density = (if (surfaceDpi > 0) surfaceDpi else BASELINE_DPI) / BASELINE_DPI.toFloat()
         val layout = dashboardLayout ?: HomeDashboardLayout.compute(
             safeArea(), density, menuItems.map { it.title(carContext) }, content,
-            dashboardRenderer::measureLabel
+            dashboardRenderer::measureLabel,
+            recentTitle = carContext.getString(R.string.car_home_recent_from_phone),
+            queueLink = content.queueTotal.takeIf { it > 0 }?.let(dashboardRenderer::queueLink)
         ).also {
             dashboardLayout = it
             scroll = scroll.coerceIn(0f, it.maxScroll)
@@ -338,16 +390,19 @@ class CarHomeDashboardScreen(
                 TAG,
                 "layout card=${it.cards.first().width.toInt()}x${it.cards.first().height.toInt()}" +
                     " hero=${it.continueCard != null} recent=${it.recentRows.size}" +
-                    " queue=${it.queueRows.size} scroll=${it.scrollable}"
+                    " queue=${content.queueTotal} scroll=${it.scrollable}"
             )
         }
         // Not lockHardwareCanvas directly: on some devices it takes the process down a frame
         // later, uncatchably. See [dev.autobridge.display.CarSurfaceCanvas].
         dev.autobridge.display.CarSurfaceCanvas.draw(carContext, target) { canvas ->
             val focused = menuItems.indexOfFirst { it.section == focusedSection }
+            val playing = content.continueWatching?.let { isLive(it) } == true &&
+                AutoBridgeSessionManager.current.isPlaying
             dashboardRenderer.draw(
-                canvas, layout, menuItems, content,
-                HomeDashboardRenderer.State(focused, pressed, scroll), thumbnails
+                canvas, layout, menuItems, liveContent(),
+                HomeDashboardRenderer.State(focused, pressed, scroll, playing, nextEnabled = content.hasQueue),
+                thumbnails
             )
         }
     }
@@ -508,6 +563,9 @@ class CarHomeDashboardScreen(
         var resumedThisLaunch = false
         const val TAG = "CarHome"
         const val BASELINE_DPI = 160
+
+        /** Session states in which the Now Playing buttons can act on the engine directly. */
+        val LIVE_STATES = setOf(BridgePlaybackState.LOADING, BridgePlaybackState.PLAYING, BridgePlaybackState.PAUSED)
 
         /**
          * Last card the driver opened. Drawn in the focused style when Home comes back, so the

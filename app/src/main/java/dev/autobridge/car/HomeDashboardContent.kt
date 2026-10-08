@@ -11,7 +11,7 @@ import dev.autobridge.youtube.YouTubeUrls
 /**
  * What the home dashboard has to show, read once from the stores that already own it.
  *
- * Nothing here is invented: Continue Watching is the bridge's own session snapshot
+ * Nothing here is invented: Now Playing / Continue Watching is the bridge's own session snapshot
  * ([BridgeStore.lastSession]), Recently Sent is [RecentActivityStore] filtered to the entries that
  * actually arrived from the phone, and the queue is [BrowserPlayQueue]. A section with no real
  * data is absent, and [HomeDashboardLayout] then gives its space to the rest of the screen rather
@@ -34,8 +34,9 @@ internal data class HomeDashboardContent(
 
     companion object {
         /** The home shows a taste of each list; the full ones are one tap away on their screens. */
-        const val MAX_RECENTLY_SENT = 2
-        const val MAX_QUEUE_ROWS = 3
+        const val MAX_RECENTLY_SENT = 3
+        /** The queue is a link with its count on the home; only its head is kept, for the Next button. */
+        const val MAX_QUEUE_ROWS = 1
 
         fun read(context: Context): HomeDashboardContent {
             val snapshot = BridgeStore.lastSession(context)
@@ -93,7 +94,7 @@ internal data class ContinueItem(
 internal data class SentItem(
     val url: String,
     val title: String,
-    /** "YouTube · from phone · 28 min ago", already localised and joined. */
+    /** "YouTube · 28 min ago", already localised and joined; the section already says "from phone". */
     val meta: String,
     val artwork: Artwork
 ) {
@@ -102,7 +103,6 @@ internal data class SentItem(
             val url = entry.data.orEmpty()
             val parts = listOf(
                 HomeDashboardSource.label(context, url),
-                context.getString(dev.autobridge.R.string.car_home_sent_from_phone),
                 RecentActivityStore.relativeAge(context, entry.timestampMs)
             ).filter { it.isNotBlank() }
             return SentItem(
