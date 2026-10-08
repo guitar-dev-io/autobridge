@@ -513,6 +513,8 @@ class CarWebRenderer(context: Context) {
         override fun readMediaStatus(onResult: (dev.autobridge.audio.WebMediaStatus) -> Unit) =
             webAudio.readState(onResult)
 
+        override val pageUrl: String? get() = webView?.url ?: currentUrl
+
         override fun play() {
             // A page whose surface went away silent was paused; it cannot play until resumed.
             webView?.onResume()

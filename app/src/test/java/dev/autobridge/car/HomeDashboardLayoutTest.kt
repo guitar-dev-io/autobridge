@@ -49,7 +49,7 @@ class HomeDashboardLayoutTest {
     ) = HomeDashboardLayout.compute(
         MenuBox(0f, 0f, width, height), density, labels, content, measure,
         recentTitle = "Recently sent from phone",
-        queueLink = if (content.queueTotal > 0) "Queue · ${content.queueTotal} items" else null
+        queueLabel = if (content.queueTotal > 0) "Queue · ${content.queueTotal} items" else "Queue empty"
     )
 
     private fun full() = content(hero = true, sent = 3, queued = 2)
@@ -57,13 +57,37 @@ class HomeDashboardLayoutTest {
     // ------------------------------------------------------------------ sections appear and go
 
     @Test
-    fun `an empty dashboard is the six cards and nothing else`() {
+    fun `a fresh install shows the empty states, not a collapsed screen`() {
         val layout = layout(content())
         assertEquals(6, layout.cards.size)
         assertNull(layout.hero)
-        assertNull(layout.recentHeader)
+        assertNotNull("the Now Playing slot keeps its place", layout.emptyHero)
+        assertNotNull("the sent row shows a placeholder", layout.emptyRecent)
+        assertNull("nothing to open behind the title", layout.recentHeader)
         assertNull(layout.queueHeader)
+        assertNull("no queue pill on a fresh install", layout.queueEmpty)
         assertTrue(layout.recentRows.isEmpty())
+    }
+
+    @Test
+    fun `the grid does not move between nothing playing and something playing`() {
+        assertEquals(layout(content()).cards, layout(full()).cards)
+        assertEquals(layout(content()).emptyHero, layout(full()).hero!!.card)
+    }
+
+    @Test
+    fun `an empty queue next to a session shows the outline, which is not a target`() {
+        val layout = layout(content(hero = true, sent = 3))
+        val outline = layout.queueEmpty!!
+        assertNull(layout.queueHeader)
+        assertNull(layout.hit(outline.centerX, outline.centerY, 0f))
+    }
+
+    @Test
+    fun `empty states are not tap targets`() {
+        val layout = layout(content())
+        assertNull(layout.hit(layout.emptyHero!!.centerX, layout.emptyHero!!.centerY, 0f))
+        assertNull(layout.hit(layout.emptyRecent!!.centerX, layout.emptyRecent!!.centerY, 0f))
     }
 
     @Test
@@ -86,6 +110,7 @@ class HomeDashboardLayoutTest {
         assertNull(layout.recentHeader)
         assertNotNull(layout.queueHeader)
         assertTrue(layout.recentRows.isEmpty())
+        assertNotNull(layout.emptyRecent)
     }
 
     // --------------------------------------------------------------------- the reference layout
@@ -95,8 +120,8 @@ class HomeDashboardLayoutTest {
         // The design is 1280 x 720 with a 96dp host rail: 1184 x 720 is the surface it was drawn for.
         val layout = layout(full())
         val hero = layout.hero!!
-        assertEquals(HomeDashboardTheme.Dp.HERO_WIDTH, hero.card.width, 1f)
-        assertEquals(HomeDashboardTheme.Dp.CARD_HEIGHT, layout.cards.first().height, 1f)
+        assertEquals(HomeDashboardTheme.ROOMY.heroWidth, hero.card.width, 1f)
+        assertEquals(HomeDashboardTheme.ROOMY.cardHeight, layout.cards.first().height, 1f)
         assertEquals(HomeDashboardTheme.Dp.ROW_HEIGHT, layout.recentRows.first().height, 1f)
     }
 
@@ -136,6 +161,7 @@ class HomeDashboardLayoutTest {
         assertTrue(hero.play.width > hero.previous.width)
         assertTrue(hero.previous.right < hero.play.left && hero.play.right < hero.next.left)
         assertTrue("the times must clear the buttons", hero.times.bottom <= hero.play.top)
+        assertTrue("the progress sits under the art, not over it", hero.art.bottom <= hero.progress.top)
     }
 
     // ------------------------------------------------------------------------- responsiveness
@@ -151,11 +177,45 @@ class HomeDashboardLayoutTest {
 
     @Test
     fun `a short screen scrolls rather than shrinking the cards below the touch minimum`() {
-        val layout = layout(full(), width = 1184f, height = 360f)
+        val layout = layout(full(), width = 1184f, height = 300f)
         assertTrue("expected the column to scroll", layout.scrollable)
+        assertEquals("a screen this short is past even the compact design", HomeDashboardTheme.COMPACT, layout.profile)
         assertEquals(HomeDashboardTheme.MIN_SCALE, layout.unit, 0.001f)
         assertNotNull(layout.scrollUp)
         assertNotNull(layout.scrollDown)
+    }
+
+    @Test
+    fun `the DHU's real stable area keeps the roomy design without scrolling`() {
+        // 1190 x 700 surface, host chrome taking the top 88px: what the 720 DHU profile reports.
+        val layout = HomeDashboardLayout.compute(
+            MenuBox(12f, 88f, 1178f, 688f), 1f, labels, full(), measure, "Recently sent from phone", "Queue · 2 items"
+        )
+        assertEquals(HomeDashboardTheme.ROOMY, layout.profile)
+        assertTrue(!layout.scrollable)
+    }
+
+    @Test
+    fun `a short 800 x 400 unit gets the compact design and nothing scrolls`() {
+        val layout = layout(full(), width = 800f, height = 400f)
+        assertEquals(HomeDashboardTheme.COMPACT, layout.profile)
+        assertTrue("the compact column should fit", !layout.scrollable)
+        assertNotNull("the Now Playing card stays beside the grid", layout.hero)
+        assertTrue(layout.cards.first().left > layout.hero!!.card.right)
+        assertTrue("the compact header is smaller", layout.logo.height < HomeDashboardTheme.ROOMY.logo)
+    }
+
+    @Test
+    fun `the DHU small profile keeps the card beside a fully visible grid`() {
+        // 800 x 480 profile: the host takes the top 88px and a dock, leaving 776 x 300.
+        val layout = HomeDashboardLayout.compute(
+            MenuBox(12f, 88f, 788f, 388f), 1f, labels, full(), measure, "Recently sent from phone", "Queue · 2 items"
+        )
+        assertEquals(HomeDashboardTheme.COMPACT, layout.profile)
+        val hero = layout.hero!!.card
+        assertTrue("the grid must stay beside the card", layout.cards.first().left > hero.right)
+        assertTrue("every card visible without scrolling", layout.cards.last().bottom <= layout.viewport.bottom)
+        assertTrue("the header stays on screen", layout.logo.bottom <= layout.cards.first().top)
     }
 
     @Test
@@ -234,7 +294,7 @@ class HomeDashboardLayoutTest {
 
     @Test
     fun `a scrolled column hits what is drawn under the finger, not what was there`() {
-        val layout = layout(full(), width = 1184f, height = 360f)
+        val layout = layout(full(), width = 1184f, height = 300f)
         val row = layout.recentRows[0]
         val step = layout.scrollStep
         assertEquals(
@@ -245,7 +305,7 @@ class HomeDashboardLayoutTest {
 
     @Test
     fun `the scroll buttons stay put while the column moves`() {
-        val layout = layout(full(), width = 1184f, height = 360f)
+        val layout = layout(full(), width = 1184f, height = 300f)
         val up = layout.scrollUp!!
         assertEquals(HomeHit(HomeRegion.SCROLL_UP), layout.hit(up.centerX, up.centerY, 0f))
         assertEquals(HomeHit(HomeRegion.SCROLL_UP), layout.hit(up.centerX, up.centerY, layout.maxScroll))

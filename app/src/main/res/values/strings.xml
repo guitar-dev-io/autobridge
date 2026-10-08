@@ -1284,6 +1284,11 @@
     <string name="car_home_continue_watching">Continue Watching</string>
     <string name="car_home_recent_from_phone">Recently sent from phone</string>
     <string name="car_home_now_playing">Now playing</string>
+    <string name="car_home_paused">Paused</string>
+    <string name="car_home_queue_empty">Queue empty</string>
+    <string name="car_home_nothing_playing">Nothing playing yet</string>
+    <string name="car_home_nothing_playing_hint">Tap “Send to car” on your phone\nor pick from the menu</string>
+    <string name="car_home_nothing_sent">Nothing sent from your phone yet · it will show up here</string>
     <plurals name="car_home_queue_items">
         <item quantity="one">Queue · %1$d item</item>
         <item quantity="other">Queue · %1$d items</item>

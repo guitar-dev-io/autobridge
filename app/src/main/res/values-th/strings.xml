@@ -1263,6 +1263,11 @@
     <string name="car_home_continue_watching">ดูต่อ</string>
     <string name="car_home_recent_from_phone">ส่งล่าสุดจากมือถือ</string>
     <string name="car_home_now_playing">กำลังเล่น</string>
+    <string name="car_home_paused">หยุดชั่วคราว</string>
+    <string name="car_home_queue_empty">คิวว่าง</string>
+    <string name="car_home_nothing_playing">ยังไม่มีอะไรเล่น</string>
+    <string name="car_home_nothing_playing_hint">แตะ “ส่งไปที่รถ” บนมือถือ\nหรือเลือกจากเมนูด้านขวา</string>
+    <string name="car_home_nothing_sent">ยังไม่ได้ส่งอะไรจากมือถือ · สิ่งที่ส่งมาจะขึ้นตรงนี้</string>
     <plurals name="car_home_queue_items">
         <item quantity="other">คิว %1$d รายการ</item>
     </plurals>

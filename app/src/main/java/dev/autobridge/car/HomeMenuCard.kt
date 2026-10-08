@@ -95,12 +95,12 @@ internal class HomeMenuCard {
         label.textSize = layout.labelSize
         val metrics = label.fontMetrics
         val lineHeight = metrics.descent - metrics.ascent
-        val icon = layout.dp(HomeDashboardTheme.Dp.ICON)
-        val gap = layout.dp(HomeDashboardTheme.Dp.ICON_LABEL_GAP)
-        val padding = layout.dp(HomeDashboardTheme.Dp.CARD_PADDING)
+        val icon = layout.dp(layout.profile.icon)
+        val gap = layout.dp(layout.profile.iconLabelGap)
+        val padding = layout.dp(layout.profile.cardPadding)
         val blockTop = bounds.centerY - (icon + gap + lineHeight) / 2f
         val tile = MenuBox(bounds.left + padding, blockTop, bounds.left + padding + icon, blockTop + icon)
-        drawIconTile(canvas, tile, item.glyph, item.accent, layout.dp(HomeDashboardTheme.Dp.ICON_RADIUS), d)
+        drawIconTile(canvas, tile, item.glyph, item.accent, layout.dp(layout.profile.iconRadius), d)
 
         val textMaxWidth = bounds.width - padding * 2
         val text = TextUtils.ellipsize(title, label, textMaxWidth, TextUtils.TruncateAt.END)
