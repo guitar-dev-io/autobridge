@@ -123,7 +123,13 @@ fun ControlScreen(
     // this screen is opened.
     LaunchedEffect(Unit) {
         AutoBridgeSessionManager.initialize(context)
-        AutoBridgeSessionManager.refresh()
+        // The car browser's page only reports where it is when asked, so the time under the
+        // progress bar stood still at whatever it read when this screen opened. Ask once a second
+        // while the screen is up; the loop ends with the screen.
+        while (true) {
+            AutoBridgeSessionManager.refresh()
+            kotlinx.coroutines.delay(POSITION_REFRESH_MS)
+        }
     }
 
     val bridgeState by AutoBridgeSessionManager.state.collectAsState()
@@ -1354,3 +1360,6 @@ private fun Card(onClick: (() -> Unit)? = null, content: @Composable () -> Unit)
 
 private fun formatTime(ts: Long): String =
     java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(ts))
+
+/** How often the Control screen asks the car for the playback position. */
+private const val POSITION_REFRESH_MS = 1_000L
