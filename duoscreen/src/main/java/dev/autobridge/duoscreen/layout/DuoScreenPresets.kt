@@ -32,8 +32,9 @@ enum class DuoScreenPreset(
     EVEN_ROWS(R.string.duo_screen_preset_even_rows, "⊟", R.drawable.ic_duo_preset_even_rows),
 
     /**
-     * Stacked, the top pane the larger: 60% over 40% (a third pane takes the bottom 40% as two halves).
-     * The shape of a portrait head unit with a map above and the music below.
+     * Stacked, the top pane the larger: 56% over 44% (a third pane takes the bottom half as two
+     * quarters). The shape of a portrait head unit with a map above and the music below. The name
+     * is the stored key from when the split was 60/40, kept so a saved choice still reads back.
      */
     STACKED_60_40(R.string.duo_screen_preset_stacked_60_40, "⬒", R.drawable.ic_duo_preset_stacked_60_40),
 
@@ -65,7 +66,7 @@ object DuoScreenPresetGeometry {
      * an app a nearly square area, where two columns would each be too narrow to use).
      */
     fun defaultFor(bounds: Bounds): DuoScreenPreset =
-        if (bounds.width > 0 && bounds.height >= bounds.width * SQUARISH) DuoScreenPreset.EVEN_ROWS
+        if (bounds.width > 0 && bounds.height >= bounds.width * SQUARISH) DuoScreenPreset.STACKED_60_40
         else DuoScreenPreset.EVEN_COLUMNS
 
     /** Height over width from which a surface counts as "tall enough to stack". */
@@ -89,11 +90,11 @@ object DuoScreenPresetGeometry {
     private fun evenWeights(paneCount: Int): List<Float> = List(paneCount) { 1f / paneCount }
 
     /**
-     * 60/40 for two panes. Three panes cannot be 60/20/20 (20% is under the minimum height), so
-     * the top pane takes half and the other two a quarter each.
+     * 56/44 for two panes (the design's split for a portrait unit). Three panes cannot be 56/22/22
+     * (22% is under the minimum height), so the top pane takes half and the other two a quarter each.
      */
     private fun stackedWeights(paneCount: Int): List<Float> =
-        if (paneCount == 2) listOf(0.6f, 0.4f) else listOf(0.5f, 0.25f, 0.25f)
+        if (paneCount == 2) listOf(0.56f, 0.44f) else listOf(0.5f, 0.25f, 0.25f)
 
     private fun mainFirstWeights(paneCount: Int): List<Float> {
         val main = if (paneCount == 2) MAIN_FRACTION_TWO_PANES else MAIN_FRACTION_THREE_PANES
@@ -101,48 +102,59 @@ object DuoScreenPresetGeometry {
         return listOf(main) + List(paneCount - 1) { side }
     }
 
-    // The last column/row absorbs the rounding remainder so the panes tile the surface exactly
-    // instead of leaving a sliver of uncovered car surface on the far edge.
+    /**
+     * The gap after pane [index]: the control bar after the first, a thin seam after any other.
+     * The weights share what is left once the gaps are out.
+     */
+    private fun gapAfter(index: Int, bounds: Bounds): Int = if (index == 0) bounds.barPx else bounds.seamPx
+
+    private fun gapsTotal(count: Int, bounds: Bounds): Int = (0 until count - 1).sumOf { gapAfter(it, bounds) }
+
+    // The last column/row absorbs the rounding remainder so the panes reach the far edge exactly
+    // instead of leaving a sliver of uncovered car surface there.
     private fun columns(weights: List<Float>, bounds: Bounds): List<Rect> {
+        val usable = (bounds.width - gapsTotal(weights.size, bounds)).coerceAtLeast(0)
         var left = 0
         return weights.mapIndexed { index, weight ->
             val width = if (index == weights.lastIndex) {
                 bounds.width - left
             } else {
-                (bounds.width * weight).toInt()
+                (usable * weight).toInt()
             }
-            Rect(left, 0, width, bounds.height).also { left += width }
+            Rect(left, 0, width, bounds.height).also { left += width + gapAfter(index, bounds) }
         }
     }
 
     private fun rows(weights: List<Float>, bounds: Bounds): List<Rect> {
+        val usable = (bounds.height - gapsTotal(weights.size, bounds)).coerceAtLeast(0)
         var top = 0
         return weights.mapIndexed { index, weight ->
             val height = if (index == weights.lastIndex) {
                 bounds.height - top
             } else {
-                (bounds.height * weight).toInt()
+                (usable * weight).toInt()
             }
-            Rect(0, top, bounds.width, height).also { top += height }
+            Rect(0, top, bounds.width, height).also { top += height + gapAfter(index, bounds) }
         }
     }
 
     /**
-     * Pane 0 keeps the whole surface and the others sit on top of it, stacked up from the
-     * bottom-right corner. They overlap pane 0 on purpose: the pane set's z-order (last = topmost)
-     * already draws and hit-tests them above it.
+     * Pane 0 keeps the whole surface but the control bar's strip along the bottom, and the others
+     * sit on top of it, stacked up from its bottom-right corner. They overlap pane 0 on purpose:
+     * the pane set's z-order (last = topmost) already draws and hit-tests them above it.
      */
     private fun pictureInPicture(paneCount: Int, bounds: Bounds): List<Rect> {
+        val mainHeight = bounds.height - bounds.barPx
         val tileWidth = (bounds.width * PIP_TILE_FRACTION).toInt().coerceAtLeast(bounds.minPaneWidth)
-        val tileHeight = (bounds.height * PIP_TILE_FRACTION).toInt().coerceAtLeast(bounds.minPaneHeight)
+        val tileHeight = (mainHeight * PIP_TILE_FRACTION).toInt().coerceAtLeast(bounds.minPaneHeight)
         val margin = (bounds.width * PIP_MARGIN_FRACTION).toInt()
         val tiles = (0 until paneCount - 1).map { index ->
-            val top = bounds.height - margin - (index + 1) * (tileHeight + margin)
+            val top = mainHeight - margin - (index + 1) * (tileHeight + margin)
             DuoScreenLayout.clamp(
                 Rect(bounds.width - margin - tileWidth, top, tileWidth, tileHeight),
                 bounds
             )
         }
-        return listOf(Rect(0, 0, bounds.width, bounds.height)) + tiles
+        return listOf(Rect(0, 0, bounds.width, mainHeight)) + tiles
     }
 }

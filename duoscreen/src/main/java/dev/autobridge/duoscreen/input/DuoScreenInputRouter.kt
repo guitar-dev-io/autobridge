@@ -50,8 +50,14 @@ class DuoScreenInputRouter(
     var panes: DuoScreenPaneSet = initialPanes
         private set
 
-    private var lastTouchedPaneId: Int? = null
-    private var selectedPaneId: Int? = null
+    /** The pane plain taps and scrolls go to: the one marked as focused on the car screen. */
+    var lastTouchedPaneId: Int? = null
+        private set
+
+    /** The pane edit mode acts on, outlined on the car screen. */
+    var selectedPaneId: Int? = null
+        private set
+
     private var grabbedDivider: Divider? = null
 
     /** The seam the next drag moves, for callers that want to show what is grabbed. */
@@ -69,9 +75,26 @@ class DuoScreenInputRouter(
         }
     }
 
+    /**
+     * Grabs [seam] so the drags that follow slide it, in either mode: the control bar's grip is
+     * the seam's handle in normal use too, not only while arranging. A tap anywhere else lets go.
+     */
+    fun grabDivider(seam: Divider) {
+        grabbedDivider = seam
+        if (selectedPaneId != null) {
+            selectedPaneId = null
+            port.onSelectionChanged(null)
+        }
+        port.onDividerGrabbed(seam)
+    }
+
+    /** The seams of the current arrangement, as wide apart as the control bar allows. */
+    fun dividers(): List<Divider> = panes.dividers(bounds.seamTolerance)
+
     fun onClick(x: Int, y: Int) {
+        if (mode == Mode.NORMAL) releaseDivider()
         if (mode == Mode.EDIT) {
-            val seam = panes.dividerAt(x, y)
+            val seam = panes.dividerAt(x, y, tolerance = bounds.seamTolerance)
             if (seam != null) {
                 grabbedDivider = seam
                 // A grabbed seam owns the drag, so nothing stays selected underneath it.
@@ -132,6 +155,8 @@ class DuoScreenInputRouter(
      * travel the way the finger went, not the way the content would have.
      */
     fun onScroll(dx: Int, dy: Int) {
+        // A seam grabbed from the grip owns the drag whatever the mode.
+        if (grabbedDivider != null) return dragDivider(-dx, -dy)
         when (mode) {
             Mode.NORMAL -> {
                 val id = lastTouchedPaneId ?: return
@@ -149,6 +174,7 @@ class DuoScreenInputRouter(
      * as a scroll distance, exactly as MirrorCarScreen does.
      */
     fun onFling(velocityX: Int, velocityY: Int) {
+        if (grabbedDivider != null) return dragDivider(velocityX / 8, velocityY / 8)
         if (mode == Mode.NORMAL) {
             val id = lastTouchedPaneId ?: return
             port.forwardScroll(id, velocityX / 8, velocityY / 8)
@@ -189,7 +215,7 @@ class DuoScreenInputRouter(
         port.onPaneRectChanged(seam.second, movedSecond)
         // The seam moved with the panes, so the next drag — and the band drawn under it — follow it.
         grabbedDivider = DuoScreenLayout.dividerBetween(
-            seam.first, movedFirst, seam.second, movedSecond, seam.axis
+            seam.first, movedFirst, seam.second, movedSecond, seam.axis, bounds.seamTolerance
         ) ?: seam
         port.onDividerGrabbed(grabbedDivider)
     }

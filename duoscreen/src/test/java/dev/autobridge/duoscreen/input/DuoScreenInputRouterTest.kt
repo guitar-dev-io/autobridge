@@ -70,7 +70,8 @@ class DuoScreenInputRouterTest {
 
     @Test fun editModeClickSelectsAndBringsToFront() {
         router.setMode(DuoScreenInputRouter.Mode.EDIT)
-        router.onClick(500, 10) // pane 1
+        // Well clear of the seam at 450: within DIVIDER_GRAB_PX of it a tap grabs the seam instead.
+        router.onClick(700, 10) // pane 1
         assertEquals(1, port.selections.single())
         assertEquals(1, router.panes.panes.last().id) // brought to front
     }

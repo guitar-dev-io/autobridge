@@ -1,5 +1,7 @@
 package dev.autobridge.duoscreen.render
 
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.SurfaceTexture
 import android.opengl.EGL14
 import android.opengl.EGLConfig
@@ -8,6 +10,7 @@ import android.opengl.EGLDisplay
 import android.opengl.EGLSurface
 import android.opengl.GLES11Ext
 import android.opengl.GLES20
+import android.opengl.GLUtils
 import android.os.Handler
 import android.os.HandlerThread
 import android.util.Log
@@ -76,6 +79,40 @@ class DuoScreenCompositor {
                 gl_FragColor = uColor;
             }
         """
+
+        /**
+         * The app-drawn chrome (control bar, focus edge, arrange labels) as a plain 2D texture over
+         * the panes. Its own pair because the pane program samples an external texture.
+         */
+        const val OVERLAY_VERTEX_SHADER = """
+            attribute vec4 aPosition;
+            attribute vec2 aTexCoord;
+            varying vec2 vTexCoord;
+            void main() {
+                gl_Position = aPosition;
+                vTexCoord = aTexCoord;
+            }
+        """
+
+        const val OVERLAY_FRAGMENT_SHADER = """
+            precision mediump float;
+            varying vec2 vTexCoord;
+            uniform sampler2D uTexture;
+            void main() {
+                gl_FragColor = texture2D(uTexture, vTexCoord);
+            }
+        """
+
+        /** The overlay bitmap's rows run top-down, so the strip's bottom corners sample t = 1. */
+        val OVERLAY_TEX_COORDS = floatArrayOf(
+            0f, 1f,
+            1f, 1f,
+            0f, 0f,
+            1f, 0f
+        )
+
+        /** Behind and between the panes: the design's surface colour (#0B0D10), not black. */
+        val CLEAR_COLOR = floatArrayOf(0x0B / 255f, 0x0D / 255f, 0x10 / 255f, 1f)
 
         /** Tex coords for a triangle strip: bottom-left, bottom-right, top-left, top-right. */
         val TEX_COORDS = floatArrayOf(
@@ -150,6 +187,19 @@ class DuoScreenCompositor {
     private var highlightedPaneId: Int? = null
     private var dividerBand: Rect? = null
 
+    private var overlayProgram = 0
+    private var overlayPositionHandle = 0
+    private var overlayTexCoordHandle = 0
+    private var overlayTextureHandle = 0
+    private var overlayTexture = 0
+
+    /** Paints the chrome; replaced, never mutated, so it is safe to run here on the GL thread. */
+    private var overlayPainter: ((Canvas) -> Unit)? = null
+    private var overlayBitmap: Bitmap? = null
+    private var overlayDirty = false
+    private var overlayUploadedSize = 0L
+    private val overlayTexCoordBuffer: FloatBuffer = floatBuffer(OVERLAY_TEX_COORDS)
+
     private val texCoordBuffer: FloatBuffer = floatBuffer(TEX_COORDS)
     private val vertexBuffer: FloatBuffer = floatBuffer(FloatArray(8))
 
@@ -174,6 +224,7 @@ class DuoScreenCompositor {
             // Whatever was selected or grabbed belonged to a gesture the surface swap interrupted.
             highlightedPaneId = null
             dividerBand = null
+            overlayDirty = true
             // Order matters: the shaders are GL calls, so they need a context that is already
             // current on a surface. On a re-bind both already exist and only the surface changes.
             val hadContext = eglContext != EGL14.EGL_NO_CONTEXT
@@ -298,6 +349,19 @@ class DuoScreenCompositor {
         }
     }
 
+    /**
+     * Sets what the chrome overlay draws, or clears it when null. [painter] runs on the GL thread
+     * into a surface-sized transparent bitmap, so it must only read what it captured.
+     */
+    fun setOverlay(painter: ((Canvas) -> Unit)?) {
+        val threadHandler = handler ?: return
+        threadHandler.post {
+            overlayPainter = painter
+            overlayDirty = true
+            scheduleRender()
+        }
+    }
+
     /** Releases every pane, the EGL context and the GL thread. Safe to call more than once. */
     fun stopBlocking() {
         val threadHandler = handler ?: return
@@ -327,7 +391,7 @@ class DuoScreenCompositor {
             return
         }
         GLES20.glViewport(0, 0, outputWidth, outputHeight)
-        GLES20.glClearColor(0f, 0f, 0f, 1f)
+        GLES20.glClearColor(CLEAR_COLOR[0], CLEAR_COLOR[1], CLEAR_COLOR[2], CLEAR_COLOR[3])
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
         GLES20.glUseProgram(program)
 
@@ -345,10 +409,73 @@ class DuoScreenCompositor {
 
         highlightedPaneId?.let { id -> panes[id]?.let(::drawHighlight) }
         dividerBand?.let(::drawDividerBand)
+        drawOverlay()
 
         if (!EGL14.eglSwapBuffers(eglDisplay, eglSurface)) {
             Log.w(TAG, "eglSwapBuffers failed: ${EGL14.eglGetError()}")
         }
+    }
+
+    /** Repaints the chrome bitmap when it changed, then blends it over everything drawn so far. */
+    private fun drawOverlay() {
+        val painter = overlayPainter ?: return
+        if (overlayProgram == 0 || outputWidth <= 0 || outputHeight <= 0) return
+        if (overlayDirty) {
+            var bitmap = overlayBitmap
+            if (bitmap == null || bitmap.width != outputWidth || bitmap.height != outputHeight) {
+                bitmap?.recycle()
+                bitmap = Bitmap.createBitmap(outputWidth, outputHeight, Bitmap.Config.ARGB_8888)
+                overlayBitmap = bitmap
+            }
+            bitmap.eraseColor(0)
+            runCatching { painter(Canvas(bitmap)) }.onFailure { Log.w(TAG, "Overlay paint failed", it) }
+            if (overlayTexture == 0) overlayTexture = createOverlayTexture()
+            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, overlayTexture)
+            val size = (bitmap.width.toLong() shl 32) or bitmap.height.toLong()
+            // Same size as last time: replace the pixels instead of reallocating the texture.
+            if (size == overlayUploadedSize) GLUtils.texSubImage2D(GLES20.GL_TEXTURE_2D, 0, 0, 0, bitmap)
+            else GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bitmap, 0)
+            overlayUploadedSize = size
+            overlayDirty = false
+        }
+        if (overlayTexture == 0) return
+
+        GLES20.glUseProgram(overlayProgram)
+        writeVertices(Rect(0, 0, outputWidth, outputHeight))
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, overlayTexture)
+        GLES20.glUniform1i(overlayTextureHandle, 0)
+        GLES20.glEnableVertexAttribArray(overlayPositionHandle)
+        GLES20.glVertexAttribPointer(
+            overlayPositionHandle, COORDS_PER_VERTEX, GLES20.GL_FLOAT, false,
+            COORDS_PER_VERTEX * FLOAT_BYTES, vertexBuffer
+        )
+        GLES20.glEnableVertexAttribArray(overlayTexCoordHandle)
+        GLES20.glVertexAttribPointer(
+            overlayTexCoordHandle, 2, GLES20.GL_FLOAT, false, 2 * FLOAT_BYTES, overlayTexCoordBuffer
+        )
+        // The bitmap is premultiplied, which is what this blend expects.
+        GLES20.glEnable(GLES20.GL_BLEND)
+        GLES20.glBlendFunc(GLES20.GL_ONE, GLES20.GL_ONE_MINUS_SRC_ALPHA)
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
+        GLES20.glDisable(GLES20.GL_BLEND)
+        GLES20.glDisableVertexAttribArray(overlayPositionHandle)
+        GLES20.glDisableVertexAttribArray(overlayTexCoordHandle)
+        GLES20.glUseProgram(program)
+    }
+
+    private fun createOverlayTexture(): Int {
+        val textures = IntArray(1)
+        GLES20.glGenTextures(1, textures, 0)
+        val textureId = textures[0]
+        if (textureId == 0) return 0
+        overlayUploadedSize = 0L
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureId)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
+        GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
+        return textureId
     }
 
     /** Four filled bands inside the pane's edges; GL line width above 1px is not portable. */
@@ -523,6 +650,16 @@ class DuoScreenCompositor {
             // The panes still composite; only the edit-mode frame and empty-pane tint are missing.
             Log.w(TAG, "Solid-colour program unavailable")
         }
+
+        overlayProgram = linkProgram(OVERLAY_VERTEX_SHADER, OVERLAY_FRAGMENT_SHADER)
+        if (overlayProgram != 0) {
+            overlayPositionHandle = GLES20.glGetAttribLocation(overlayProgram, "aPosition")
+            overlayTexCoordHandle = GLES20.glGetAttribLocation(overlayProgram, "aTexCoord")
+            overlayTextureHandle = GLES20.glGetUniformLocation(overlayProgram, "uTexture")
+        } else {
+            // The panes still composite and take touch; only the drawn controls are missing.
+            Log.w(TAG, "Overlay program unavailable")
+        }
         return true
     }
 
@@ -590,6 +727,18 @@ class DuoScreenCompositor {
             GLES20.glDeleteProgram(solidProgram)
             solidProgram = 0
         }
+        if (overlayProgram != 0) {
+            GLES20.glDeleteProgram(overlayProgram)
+            overlayProgram = 0
+        }
+        if (overlayTexture != 0) {
+            GLES20.glDeleteTextures(1, intArrayOf(overlayTexture), 0)
+            overlayTexture = 0
+        }
+        overlayUploadedSize = 0L
+        overlayBitmap?.recycle()
+        overlayBitmap = null
+        overlayPainter = null
         if (eglDisplay != EGL14.EGL_NO_DISPLAY) {
             releaseWindowSurface()
             EGL14.eglMakeCurrent(

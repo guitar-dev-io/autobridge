@@ -28,18 +28,37 @@ class DuoScreenPresetTest {
 
     @Test fun aSquarishOrTallSurfaceStartsStacked() {
         // The 780 x 770 area a portrait Ford head unit gives an app, and a properly tall one.
-        assertEquals(DuoScreenPreset.EVEN_ROWS, DuoScreenPresetGeometry.defaultFor(Bounds(780, 770)))
-        assertEquals(DuoScreenPreset.EVEN_ROWS, DuoScreenPresetGeometry.defaultFor(Bounds(600, 1000)))
+        assertEquals(DuoScreenPreset.STACKED_60_40, DuoScreenPresetGeometry.defaultFor(Bounds(780, 770)))
+        assertEquals(DuoScreenPreset.STACKED_60_40, DuoScreenPresetGeometry.defaultFor(Bounds(600, 1000)))
     }
 
     @Test fun noSizeYetStartsSideBySide() {
         assertEquals(DuoScreenPreset.EVEN_COLUMNS, DuoScreenPresetGeometry.defaultFor(Bounds(0, 0)))
     }
 
-    @Test fun stackedSixtyFortyPutsTheLargerPaneOnTop() {
+    @Test fun stackedPutsTheLargerPaneOnTop() {
+        // 56 / 44, the design's split for a portrait unit (the enum keeps its old 60/40 name).
         val rects = DuoScreenPreset.STACKED_60_40.rects(2, bounds)
-        assertEquals(Rect(0, 0, 1000, 480), rects[0])
-        assertEquals(Rect(0, 480, 1000, 320), rects[1])
+        assertEquals(Rect(0, 0, 1000, 448), rects[0])
+        assertEquals(Rect(0, 448, 1000, 352), rects[1])
+    }
+
+    @Test fun presetsLeaveTheControlBarBetweenTheFirstTwoPanes() {
+        val withBar = Bounds(1000, 800, barPx = 72, seamPx = 14)
+        val rows = DuoScreenPreset.STACKED_60_40.rects(2, withBar)
+        assertEquals(72, rows[1].top - rows[0].bottom)
+        assertEquals(800, rows[1].bottom)
+        val columns = DuoScreenPreset.EVEN_COLUMNS.rects(3, withBar)
+        assertEquals(72, columns[1].left - columns[0].right)
+        assertEquals(14, columns[2].left - columns[1].right)
+        assertEquals(1000, columns[2].right)
+    }
+
+    @Test fun pictureInPictureLeavesTheBottomStripForTheBar() {
+        val withBar = Bounds(1000, 800, barPx = 72, seamPx = 14)
+        val rects = DuoScreenPreset.PICTURE_IN_PICTURE.rects(2, withBar)
+        assertEquals(728, rects[0].bottom)
+        assert(rects[1].bottom <= 728)
     }
 
     @Test fun stackedSixtyFortyWithThreePanesHalvesTheBottom() {

@@ -14,6 +14,14 @@ import android.view.Surface
 import dev.autobridge.car.DuoSessionState
 import dev.autobridge.logging.StructuredLog
 import dev.autobridge.power.CarScreenPower
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import dev.autobridge.duoscreen.chrome.ChromeFrame
+import dev.autobridge.duoscreen.chrome.ChromeLabels
+import dev.autobridge.duoscreen.chrome.ChromeTarget
+import dev.autobridge.duoscreen.chrome.DuoScreenChrome
+import dev.autobridge.duoscreen.chrome.DuoScreenChromeRenderer
+import dev.autobridge.duoscreen.chrome.PaneApp
 import dev.autobridge.duoscreen.input.DuoScreenInputPort
 import dev.autobridge.duoscreen.input.DuoScreenInputRouter
 import dev.autobridge.duoscreen.input.DuoScreenTouchController
@@ -54,7 +62,31 @@ class DuoScreenController(
         const val INPUT_THREAD_NAME = "AutoBridgeDuoInput"
 
         const val GESTURE_LOG_INTERVAL_MS = 1_000L
+
+        /** How long a tapped bar control shows as pressed. */
+        const val PRESS_FLASH_MS = 150L
+
+        /** Baseline dpi for dp: the car's own density decides every size on the bar. */
+        const val BASELINE_DPI = 160f
+
+        /** App icons on the Arrange cards are decoded once at this size and kept. */
+        const val ICON_PX = 128
     }
+
+    /** What the car screen has to do for the drawn controls that it alone can: toasts and screens. */
+    interface ChromeListener {
+        fun onPresetChanged(preset: DuoScreenPreset) {}
+        fun onChangeAppRequested(paneId: Int) {}
+    }
+
+    var chromeListener: ChromeListener? = null
+
+    private val chromeRenderer = DuoScreenChromeRenderer()
+
+    /** The chrome as last laid out, for hit-testing taps against what is on screen. */
+    private var chrome: DuoScreenChrome? = null
+    private var pressedChrome: ChromeTarget? = null
+    private val appInfo = HashMap<String, PaneApp>()
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private val compositor = DuoScreenCompositor()
@@ -83,6 +115,7 @@ class DuoScreenController(
      */
     private var paneDpi = 0
     private var running = false
+    private var density = 1f
     private var sessionBounds: Bounds? = null
     private var selectedPaneId: Int? = null
 
@@ -125,11 +158,17 @@ class DuoScreenController(
             return true
         }
         stop()
-        val bounds = Bounds(width, height)
         dpi = panelDpi
+        density = densityOf(panelDpi)
+        val bounds = DuoScreenChrome.boundsFor(width, height, density)
         paneDpi = storedPaneDpi(panelDpi)
         DuoScreenStore.noteSurface(context, bounds)
-        val restored = DuoScreenStore.restore(context, bounds)
+        // An arrangement saved before the control bar existed tiles the surface edge to edge; it
+        // would get the bar drawn over its panes, so it is laid out afresh from the preset instead.
+        val restored = DuoScreenStore.restore(context, bounds)?.let { saved ->
+            if (DuoScreenChrome.hasRoomForBar(saved, bounds)) saved
+            else null.also { StructuredLog.i(TAG, "Saved arrangement has no room for the bar; using the preset") }
+        }
         val preset = DuoScreenStore.presetPanes(context, bounds)
         val paneSet = when {
             restored != null -> DuoScreenPaneSet.of(restored)
@@ -153,6 +192,7 @@ class DuoScreenController(
 
         router = DuoScreenInputRouter(paneSet, bounds, this)
         paneSet.panes.forEach(::openPane)
+        refreshChrome()
         // The panes run on untrusted VirtualDisplays, which the system stops resuming once the
         // phone sleeps or locks, so the display has to be held awake for as long as the session
         // lives. Only the panel is allowed to go dark, and only if the user asked for that; see
@@ -186,6 +226,7 @@ class DuoScreenController(
             compositor.bringToFront(pane.id)
         }
         DuoScreenStore.setPreset(context, preset)
+        refreshChrome()
         StructuredLog.i(TAG, "Applied preset ${preset.name} to ${byId.size} panes")
         return true
     }
@@ -225,14 +266,16 @@ class DuoScreenController(
             return false
         }
         dpi = panelDpi
+        density = densityOf(panelDpi)
         paneDpi = storedPaneDpi(panelDpi)
         hostSurface = output
-        val bounds = Bounds(width, height)
+        val bounds = DuoScreenChrome.boundsFor(width, height, density)
         sessionBounds = bounds
         if (bounds != previous) {
             DuoScreenLayoutCodec.refit(active.panes.panes.sortedBy { it.id }, previous, bounds)
                 .forEach { pane -> active.setRect(pane.id, pane.rect) }
         }
+        refreshChrome()
         StructuredLog.i(
             TAG,
             "Session resumed on ${width}x$height" +
@@ -335,6 +378,7 @@ class DuoScreenController(
             active.panes.pane(paneId)?.let(::reopenPane)
         }
         saveLayout()
+        refreshChrome()
         StructuredLog.i(
             TAG,
             "Settings applied live: ${changed.size} pane(s) swapped, preset=${preset.name}"
@@ -436,6 +480,7 @@ class DuoScreenController(
 
     fun setMode(mode: DuoScreenInputRouter.Mode) {
         router?.setMode(mode)
+        refreshChrome()
     }
 
     /** Returns the mode now in effect, for a caller that drives this from one button. */
@@ -458,8 +503,149 @@ class DuoScreenController(
             return
         }
         StructuredLog.i(TAG, "Car tap at $x,$y (${active.mode})")
+        // The drawn controls sit over the panes and the gaps between them, so they are asked first.
+        val shown = chrome
+        val target = shown?.hit(x, y)
+        if (target != null) {
+            onChromeTap(target)
+            return
+        }
+        // The rest of the bar belongs to no pane: swallowed rather than sent to the nearest one.
+        if (shown?.onBar(x, y) == true) return
         active.onClick(x, y)
+        refreshChrome()
     }
+
+    private fun onChromeTap(target: ChromeTarget) {
+        StructuredLog.i(TAG, "Chrome tap: $target")
+        when (target) {
+            is ChromeTarget.Chip -> {
+                if (applyPreset(target.preset)) appliedPreset = target.preset
+            }
+            is ChromeTarget.ChangeApp -> chromeListener?.onChangeAppRequested(target.paneId)
+            is ChromeTarget.Control -> when (target.kind) {
+                ChromeTarget.Kind.LAYOUT -> chromeListener?.onPresetChanged(cyclePreset())
+                ChromeTarget.Kind.SWAP -> swapPanes()
+                ChromeTarget.Kind.RELOAD -> StructuredLog.i(TAG, "Reloaded ${reloadSelectedOrAll()} pane(s)")
+                ChromeTarget.Kind.ARRANGE -> setMode(DuoScreenInputRouter.Mode.EDIT)
+                ChromeTarget.Kind.DONE -> setMode(DuoScreenInputRouter.Mode.NORMAL)
+                ChromeTarget.Kind.GRIP -> chrome?.barDivider?.let { router?.grabDivider(it) }
+            }
+        }
+        // A short pressed flash, so a tap on a drawn button is seen to have landed.
+        pressedChrome = target
+        refreshChrome()
+        mainHandler.postDelayed({
+            pressedChrome = null
+            refreshChrome()
+        }, PRESS_FLASH_MS)
+    }
+
+    /**
+     * Swaps the two panes on either side of the bar — their places and sizes, each keeping its
+     * app — or the first two panes when the bar has no seam (picture-in-picture: the tile and the
+     * main pane trade places).
+     */
+    fun swapPanes(): Boolean {
+        val active = router ?: return false
+        val seam = chrome?.barDivider
+        val ids = if (seam != null) listOf(seam.first, seam.second) else active.panes.panes.map { it.id }.sorted().take(2)
+        if (ids.size < 2) return false
+        val a = active.panes.pane(ids[0]) ?: return false
+        val b = active.panes.pane(ids[1]) ?: return false
+        active.setRect(a.id, b.rect)
+        active.setRect(b.id, a.rect)
+        // Whichever is now the smaller one goes on top, so a swapped picture-in-picture stays one.
+        val smaller = listOf(a.id, b.id).minByOrNull { id -> active.panes.pane(id)?.rect?.let { it.width.toLong() * it.height } ?: 0L }
+        smaller?.let {
+            active.bringToFront(it)
+            compositor.bringToFront(it)
+        }
+        refreshChrome()
+        StructuredLog.i(TAG, "Swapped panes ${a.id} and ${b.id}")
+        return true
+    }
+
+    // --- the drawn chrome ---
+
+    private fun densityOf(panelDpi: Int): Float = (if (panelDpi > 0) panelDpi else BASELINE_DPI.toInt()) / BASELINE_DPI
+
+    /**
+     * Lays the chrome out for the panes as they are now and hands the compositor a painter for it.
+     * Everything the painter reads is captured here, because it runs later on the GL thread.
+     */
+    private fun refreshChrome() {
+        if (!running) return
+        val active = router ?: return
+        val bounds = sessionBounds ?: return
+        val labels = ChromeLabels(
+            swap = context.getString(R.string.duo_swap),
+            done = context.getString(R.string.duo_done),
+            changeApp = context.getString(R.string.duo_change_app),
+            chips = mapOf(
+                DuoScreenPreset.EVEN_COLUMNS to context.getString(R.string.duo_chip_side_by_side),
+                DuoScreenPreset.STACKED_60_40 to context.getString(R.string.duo_chip_stacked),
+                DuoScreenPreset.PICTURE_IN_PICTURE to context.getString(R.string.duo_chip_pip)
+            )
+        )
+        val panes = active.panes.panes
+        val editing = active.mode == DuoScreenInputRouter.Mode.EDIT
+        val laidOut = DuoScreenChrome.compute(panes, bounds, density, editing, labels, chromeRenderer::measure)
+        chrome = laidOut
+        val apps = if (editing) panes.associate { it.id to appFor(it.packageName) } else emptyMap()
+        val titles = if (editing) panes.associate { pane ->
+            pane.id to context.getString(R.string.duo_card_title, pane.id + 1, apps[pane.id]?.label.orEmpty())
+        } else emptyMap()
+        val shares = if (editing) laidOut.cards.associate { card ->
+            card.paneId to context.getString(
+                when (card.shareAxis) {
+                    DuoScreenChrome.ShareAxis.HEIGHT -> R.string.duo_share_height
+                    DuoScreenChrome.ShareAxis.WIDTH -> R.string.duo_share_width
+                    DuoScreenChrome.ShareAxis.AREA -> R.string.duo_share_area
+                },
+                card.sharePercent
+            )
+        } else emptyMap()
+        val frame = ChromeFrame(
+            chrome = laidOut,
+            density = density,
+            focusedPaneId = active.lastTouchedPaneId,
+            selectedPaneId = active.selectedPaneId,
+            gripGrabbed = active.divider != null,
+            pressed = pressedChrome,
+            currentPreset = DuoScreenStore.preset(context),
+            titles = titles,
+            shares = shares,
+            apps = apps,
+            labels = labels
+        )
+        val renderer = chromeRenderer
+        compositor.setOverlay { canvas: Canvas -> renderer.draw(canvas, frame) }
+    }
+
+    /** A pane app's name and icon for its Arrange card, loaded once per package. */
+    private fun appFor(packageName: String?): PaneApp {
+        if (packageName == null) return PaneApp(context.getString(R.string.duo_screen_pane_empty), null)
+        appInfo[packageName]?.let { return it }
+        val pm = context.packageManager
+        val loaded = if (DuoScreenSelfPane.isSelf(packageName, context.packageName)) {
+            PaneApp(context.getString(R.string.duo_screen_self_pane), iconBitmap { pm.getApplicationIcon(packageName) })
+        } else {
+            val label = runCatching { pm.getApplicationLabel(pm.getApplicationInfo(packageName, 0)).toString() }
+                .getOrDefault(packageName)
+            PaneApp(label, iconBitmap { pm.getApplicationIcon(packageName) })
+        }
+        appInfo[packageName] = loaded
+        return loaded
+    }
+
+    private fun iconBitmap(load: () -> android.graphics.drawable.Drawable): Bitmap? = runCatching {
+        val drawable = load()
+        Bitmap.createBitmap(ICON_PX, ICON_PX, Bitmap.Config.ARGB_8888).also { bitmap ->
+            drawable.setBounds(0, 0, ICON_PX, ICON_PX)
+            drawable.draw(Canvas(bitmap))
+        }
+    }.getOrNull()
 
     fun onScroll(dx: Int, dy: Int) {
         logGesture("scroll", "$dx,$dy")
@@ -626,7 +812,8 @@ class DuoScreenController(
     }
 
     override fun onDividerGrabbed(divider: DuoScreenLayout.Divider?) {
-        compositor.setDividerBand(divider?.let(DuoScreenLayout::band))
+        // The overlay draws the grabbed grip; the old filled band over the seam is not needed.
+        refreshChrome()
         StructuredLog.i(
             TAG,
             divider?.let { "Grabbed the ${it.axis} seam between panes ${it.first} and ${it.second}" }
@@ -636,7 +823,8 @@ class DuoScreenController(
 
     override fun onSelectionChanged(paneId: Int?) {
         selectedPaneId = paneId
-        compositor.setHighlight(paneId)
+        // The selection outline is drawn by the overlay, above its dimmed card.
+        refreshChrome()
         // Keep the compositor's draw order in step with the pane set's: the router has already
         // moved the selected pane to the front of its own z-order.
         paneId?.let(compositor::bringToFront)
@@ -650,6 +838,7 @@ class DuoScreenController(
      */
     override fun onPaneRectChanged(paneId: Int, rect: Rect) {
         compositor.setRect(paneId, rect)
+        refreshChrome()
         pendingSizes[paneId] = rect
         debouncer.onResizeActivity(paneId, SystemClock.uptimeMillis())
         mainHandler.removeCallbacks(commitPoll)

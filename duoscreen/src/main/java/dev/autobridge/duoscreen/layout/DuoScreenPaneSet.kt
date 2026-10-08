@@ -41,14 +41,14 @@ class DuoScreenPaneSet private constructor(private val panesInZOrder: List<DuoSc
     fun paneAt(x: Int, y: Int): DuoScreenPane? = panesInZOrder.lastOrNull { it.rect.contains(x, y) }
 
     /** Every seam two panes currently share, left-to-right then top-to-bottom. */
-    fun dividers(): List<Divider> {
+    fun dividers(tolerance: Int = DuoScreenLayout.SEAM_TOLERANCE_PX): List<Divider> {
         val found = mutableListOf<Divider>()
         for (i in panesInZOrder.indices) {
             for (j in i + 1 until panesInZOrder.size) {
                 val a = panesInZOrder[i]
                 val b = panesInZOrder[j]
                 Axis.entries.forEach { axis ->
-                    DuoScreenLayout.dividerBetween(a.id, a.rect, b.id, b.rect, axis)?.let(found::add)
+                    DuoScreenLayout.dividerBetween(a.id, a.rect, b.id, b.rect, axis, tolerance)?.let(found::add)
                 }
             }
         }
@@ -60,8 +60,13 @@ class DuoScreenPaneSet private constructor(private val panesInZOrder: List<DuoSc
      * middle of a pane select that pane while a tap on the join between two grabs the join. An
      * arrangement with no shared seams at all (picture-in-picture) never returns one.
      */
-    fun dividerAt(x: Int, y: Int, grabPx: Int = DuoScreenLayout.DIVIDER_GRAB_PX): Divider? =
-        dividers()
+    fun dividerAt(
+        x: Int,
+        y: Int,
+        grabPx: Int = DuoScreenLayout.DIVIDER_GRAB_PX,
+        tolerance: Int = DuoScreenLayout.SEAM_TOLERANCE_PX
+    ): Divider? =
+        dividers(tolerance)
             .mapNotNull { divider ->
                 DuoScreenLayout.distanceToDivider(divider, x, y)
                     ?.takeIf { it <= grabPx }
