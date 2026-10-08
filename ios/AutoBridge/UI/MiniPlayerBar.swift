@@ -61,6 +61,17 @@ struct MiniPlayerBar: View {
                     .background(AutoBridgeDesign.accent.opacity(0.22), in: Circle())
             }
             .buttonStyle(.plain)
+            // Stops and unloads, so a TV channel can actually be closed rather than only paused.
+            Button {
+                playback.stop()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(AutoBridgeDesign.secondaryText)
+                    .frame(width: 32, height: 32)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text(NSLocalizedString("Close", comment: "Now playing bar")))
         }
         .padding(10)
         .background(AutoBridgeDesign.surfaceRaised)

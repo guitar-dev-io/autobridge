@@ -11,6 +11,7 @@ import SwiftUI
 struct PlayerView: View {
     @EnvironmentObject private var playback: PlaybackController
     @EnvironmentObject private var historyStore: IptvHistoryStore
+    @Environment(\.dismiss) private var dismiss
 
     @State private var scrubbing = false
     @State private var scrubPosition: Double = 0
@@ -38,6 +39,18 @@ struct PlayerView: View {
         .navigationTitle(playback.current?.title ?? NSLocalizedString("Player", comment: "Player"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            // Leaving the screen keeps a station playing; this is the one that ends it.
+            ToolbarItem(placement: .topBarTrailing) {
+                if playback.current != nil {
+                    Button {
+                        playback.stop()
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                    }
+                    .accessibilityLabel(Text(NSLocalizedString("Close", comment: "Player")))
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 if let origin = playback.current?.origin {
                     Button {

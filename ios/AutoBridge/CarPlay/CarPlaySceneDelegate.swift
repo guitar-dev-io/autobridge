@@ -32,6 +32,7 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
     ) {
         self.interfaceController = interfaceController
         interfaceController.setRootTemplate(rootTemplate(), animated: true, completion: nil)
+        addCloseButton()
     }
 
     func templateApplicationScene(
@@ -288,6 +289,20 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
     }
 
     // MARK: - Playback
+
+    /// A close button on the Now Playing screen: stops and unloads the channel, then goes back to
+    /// the list it was picked from. Without it a TV channel could only be paused from the car.
+    private func addCloseButton() {
+        guard let image = UIImage(systemName: "xmark.circle") else { return }
+        let close = CPNowPlayingImageButton(image: image) { [weak self] _ in
+            guard let self else { return }
+            self.stores.playback.stop()
+            if self.interfaceController?.topTemplate === CPNowPlayingTemplate.shared {
+                self.interfaceController?.popTemplate(animated: true, completion: nil)
+            }
+        }
+        CPNowPlayingTemplate.shared.updateNowPlayingButtons([close])
+    }
 
     private func play(_ tracks: [PlaybackController.Track], index: Int) {
         guard tracks.indices.contains(index) else { return }

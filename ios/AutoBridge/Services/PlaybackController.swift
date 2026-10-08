@@ -322,6 +322,11 @@ public final class PlaybackController: NSObject, ObservableObject {
             self.previous()
             return .success
         }
+        center.stopCommand.addTarget { [weak self] _ in
+            guard let self, self.current != nil else { return .noActionableNowPlayingItem }
+            self.stop()
+            return .success
+        }
         center.changePlaybackPositionCommand.addTarget { [weak self] event in
             guard let self,
                   let positionEvent = event as? MPChangePlaybackPositionCommandEvent else {
