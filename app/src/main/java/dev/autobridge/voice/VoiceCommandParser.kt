@@ -186,7 +186,31 @@ object VoiceCommandParser {
     private val PUNCTUATION = Regex("[,，、!?！？。\"“”]")
     private val SPACES = Regex("\\s+")
 
-    fun parse(input: String): VoiceCommand {
+    /**
+     * [shortcuts] are the driver's own phrases ([VoiceShortcutStore]); one that matches wins over
+     * every built-in rule, because it is the driver saying exactly what those words mean.
+     */
+    fun parse(input: String, shortcuts: List<VoiceShortcut> = emptyList()): VoiceCommand {
+        VoiceShortcutMatcher.match(input, shortcuts)?.let { shortcut -> fromShortcut(shortcut, input)?.let { return it } }
+        return parseBuiltIn(input)
+    }
+
+    private fun fromShortcut(shortcut: VoiceShortcut, input: String): VoiceCommand? = when (shortcut.kind) {
+        VoiceShortcut.Kind.SCREEN -> VoiceScreen.entries.firstOrNull { it.name == shortcut.value }?.let {
+            VoiceCommand(VoiceAction.OPEN_SCREEN, screen = it, confidence = 0.99f, text = input)
+        }
+        VoiceShortcut.Kind.URL -> VoiceCommand(
+            VoiceAction.OPEN_URL,
+            url = shortcut.value.let { if (it.contains("://")) it else "https://$it" },
+            confidence = 0.99f,
+            text = input,
+        )
+        // The stored command is parsed as if it had been said; its own text is what an unknown
+        // command hands on to the Agent.
+        VoiceShortcut.Kind.COMMAND -> parseBuiltIn(shortcut.value)
+    }
+
+    private fun parseBuiltIn(input: String): VoiceCommand {
         // Sentence-final full stops go before the particle cleanup, which only looks at the very end
         // ("... Bodyslam ครับ."); a dot inside the text is left alone, it may be a web address.
         val text = AgentCommandParser.normalizeSpeech(input.replace(PUNCTUATION, " ").trim().trimEnd('.', ' '))

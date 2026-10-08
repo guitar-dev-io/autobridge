@@ -473,6 +473,20 @@
     <string name="browser_resumed_from_queue">เล่นต่อจากคิว</string>
 
     <!-- Phone browser: zoom readout in All Actions sheet. -->
+    <string name="voice_group_shortcuts">คำสั่งของฉัน</string>
+    <string name="voice_shortcut_add">เพิ่มคำสั่ง</string>
+    <string name="voice_shortcut_add_caption">ตั้งคำพูดของคุณเอง และให้พาไปที่ไหน</string>
+    <string name="voice_shortcut_delete">ลบ</string>
+    <string name="voice_shortcut_phrase_title">จะพูดว่าอะไร</string>
+    <string name="voice_shortcut_phrase_hint">เช่น ข่าวเช้า</string>
+    <string name="voice_shortcut_too_short">ใส่อย่างน้อยสองตัวอักษร</string>
+    <string name="voice_shortcut_kind_title">“%1$s” ให้…</string>
+    <string name="voice_shortcut_kind_screen">เปิดหน้าใน AutoBridge</string>
+    <string name="voice_shortcut_kind_url">เปิดเว็บไซต์</string>
+    <string name="voice_shortcut_kind_command">ทำคำสั่งอื่น</string>
+    <string name="voice_shortcut_url_hint">เช่น youtube.com/@channel</string>
+    <string name="voice_shortcut_command_hint">เช่น เล่น Bodyslam บน YouTube Music</string>
+    <string name="voice_shortcut_saved">บันทึก “%1$s” แล้ว</string>
     <string name="queue_started_on_car">รถว่างอยู่ เลยเริ่มเล่นบนรถให้แล้ว</string>
     <string name="browser_audio_held">ปิดเสียงไว้ขณะรถกำลังเล่นเพลง · แตะเพื่อเปิดเสียง</string>
     <string name="browser_zoom_percent">%1$d%%</string>

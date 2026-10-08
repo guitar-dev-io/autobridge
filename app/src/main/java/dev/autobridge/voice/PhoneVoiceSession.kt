@@ -130,12 +130,12 @@ class PhoneVoiceSession(private val activity: Activity, private val actions: Act
     private fun onTranscript(text: String) {
         dialog?.setTitle(R.string.voice_test_transcript)
         heard?.text = text
-        val command = VoiceCommandParser.parse(text)
+        val command = VoiceCommandParser.parse(text, VoiceShortcutStore.all(activity))
         StructuredLog.i(VoiceRuntime.TAG, "phone voice command ${command.action} ${command.target} conf=${command.confidence}")
         val run: (() -> Unit)? = when (val validation = CommandValidator.validate(command)) {
             is Validation.Valid -> ({ execute(validation.command) })
             is Validation.Rejected ->
-                if (validation.reason == Validation.Reason.UNKNOWN_COMMAND) ({ actions.runAgentCommand(text) })
+                if (validation.reason == Validation.Reason.UNKNOWN_COMMAND) ({ actions.runAgentCommand(command.text.ifBlank { text }) })
                 else null
         }
         val auto = VoiceSettings.autoExecute(activity) &&
