@@ -473,6 +473,7 @@
     <string name="browser_resumed_from_queue">เล่นต่อจากคิว</string>
 
     <!-- Phone browser: zoom readout in All Actions sheet. -->
+    <string name="browser_audio_held">ปิดเสียงไว้ขณะรถกำลังเล่นเพลง · แตะเพื่อเปิดเสียง</string>
     <string name="browser_zoom_percent">%1$d%%</string>
 
     <!-- Browser settings sheet: แถว YouTube add-ons ในส่วน Playback -->
