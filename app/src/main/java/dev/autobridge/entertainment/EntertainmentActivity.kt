@@ -336,7 +336,12 @@ YouTube · TV · Web
             message(getString(R.string.ent_need_url_for_browser))
             return
         }
-        if (!BrowserLauncher.openUrl(this, url)) {
+        // AutoBridge's own browser rather than another app; the phone's browser only if it fails.
+        val opened = runCatching {
+            startActivity(Intent(this, dev.autobridge.browser.BrowserActivity::class.java).setData(android.net.Uri.parse(url)))
+            true
+        }.getOrDefault(false)
+        if (!opened && !BrowserLauncher.openUrl(this, url)) {
             message(getString(R.string.ent_browser_failed))
         }
     }

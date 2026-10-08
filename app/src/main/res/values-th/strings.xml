@@ -439,7 +439,6 @@
     <string name="browser_cannot_open_browser">เปิดเบราว์เซอร์ไม่ได้</string>
     <string name="browser_url_copied">คัดลอก URL แล้ว</string>
     <string name="browser_clipboard_empty">คลิปบอร์ดว่าง</string>
-    <string name="browser_cannot_open_licenses">เปิดสัญญาอนุญาตไม่ได้</string>
     <string name="browser_nothing_to_bookmark">ยังไม่มีหน้าให้บันทึก</string>
     <string name="browser_bookmark_saved">บันทึกบุ๊กมาร์กแล้ว</string>
     <string name="browser_bookmark_failed">บันทึกไม่สำเร็จ</string>

@@ -455,7 +455,6 @@
     <string name="browser_cannot_open_browser">Could not open a browser</string>
     <string name="browser_url_copied">URL copied</string>
     <string name="browser_clipboard_empty">The clipboard is empty</string>
-    <string name="browser_cannot_open_licenses">Could not open the licenses</string>
     <string name="browser_nothing_to_bookmark">No page to bookmark yet</string>
     <string name="browser_bookmark_saved">Bookmark saved</string>
     <string name="browser_bookmark_failed">Could not save the bookmark</string>
