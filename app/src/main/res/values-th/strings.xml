@@ -687,6 +687,9 @@
     <string name="about_check_update_checking">กำลังตรวจหาการอัปเดต…</string>
     <string name="about_check_update_up_to_date">คุณใช้รุ่นล่าสุดอยู่แล้ว (%1$s)</string>
     <string name="about_check_update_failed">ตรวจหาการอัปเดตไม่สำเร็จ: %1$s</string>
+    <string name="home_update_title">มีเวอร์ชันใหม่ %1$s</string>
+    <string name="home_update_caption">แตะเพื่อดูว่ามีอะไรใหม่และดาวน์โหลด</string>
+    <string name="home_update_dismiss">ซ่อนการแจ้งเตือนอัปเดตนี้</string>
     <string name="about_update_title">มีอัปเดตใหม่</string>
     <string name="about_update_message">ออกรุ่น %1$s แล้ว รุ่นที่ติดตั้งอยู่คือ %2$s</string>
     <string name="about_update_downloading">กำลังดาวน์โหลดอัปเดต…</string>

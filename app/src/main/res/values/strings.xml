@@ -703,6 +703,9 @@
     <string name="about_check_update_checking">Checking for updates…</string>
     <string name="about_check_update_up_to_date">You are on the latest release (%1$s)</string>
     <string name="about_check_update_failed">Could not check for updates: %1$s</string>
+    <string name="home_update_title">Version %1$s is available</string>
+    <string name="home_update_caption">Tap to see what\'s new and download</string>
+    <string name="home_update_dismiss">Hide this update</string>
     <string name="about_update_title">Update available</string>
     <string name="about_update_message">%1$s has been released. This build is %2$s.</string>
     <string name="about_update_downloading">Downloading the update…</string>
