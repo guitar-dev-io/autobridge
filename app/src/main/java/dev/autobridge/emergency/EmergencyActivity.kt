@@ -1,14 +1,21 @@
 package dev.autobridge.emergency
 
 import android.app.Activity
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.graphics.Typeface
 import android.text.InputType
+import android.text.TextUtils
+import android.view.Gravity
+import android.view.View
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
 import dev.autobridge.R
 import dev.autobridge.i18n.AppLocale
@@ -50,20 +57,25 @@ class EmergencyActivity : Activity() {
 
     private fun render() {
         val entries = EmergencyStore.all(this)
+        val publicNumbers = SUGGESTED.map { it.second }.toSet()
+        val (lines, mine) = entries.partition { it.value.trim() in publicNumbers }
+        val missingLines = SUGGESTED.any { (_, number) -> entries.none { it.value.trim() == number } }
+
         val body = AutoBridgeDesign.body(this)
         body.stack(
             LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 addView(
                     AutoBridgeDesign.pill(this@EmergencyActivity, getString(R.string.emergency_add), primary = true, accent = accent) { showAddDialog() },
-                    LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = (8 * resources.displayMetrics.density).toInt() }
-                )
-                addView(
-                    AutoBridgeDesign.pill(this@EmergencyActivity, getString(R.string.emergency_add_suggested), accent = accent) { addSuggested() },
                     LinearLayout.LayoutParams(0, -2, 1f)
                 )
+                // Once every public line is on the card the button has nothing left to add.
+                if (missingLines) addView(
+                    AutoBridgeDesign.pill(this@EmergencyActivity, getString(R.string.emergency_add_suggested), accent = accent) { addSuggested() },
+                    LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(8) }
+                )
             },
-            gap = 20
+            gap = 12
         )
         if (entries.isEmpty()) {
             body.stack(
@@ -74,18 +86,16 @@ class EmergencyActivity : Activity() {
                     accent = accent
                 )
             )
-        } else {
-            entries.forEach { entry ->
-                body.stack(
-                    AutoBridgeDesign.contentRow(
-                        context = this,
-                        title = entry.label,
-                        subtitle = entry.value,
-                        accent = accent,
-                        badgeText = if (entry.dialable != null) "📞" else "📄",
-                    ) { showEntryActions(entry) }
-                )
-            }
+        }
+        // Your own numbers first (insurance, roadside help, family): they are what the public
+        // lines cannot do for you. The public lines follow, each in its service's colour.
+        if (mine.isNotEmpty()) {
+            body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.emergency_section_mine)), gap = 2)
+            mine.forEach { body.stack(entryRow(it, accent), gap = 10) }
+        }
+        if (lines.isNotEmpty()) {
+            body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.emergency_section_lines)), gap = 2)
+            lines.forEach { body.stack(entryRow(it, lineColor(it.value.trim())), gap = 10) }
         }
         setContentView(
             AutoBridgeDesign.page(
@@ -100,6 +110,90 @@ class EmergencyActivity : Activity() {
             )
         )
     }
+
+    /** Each public line in a colour of its own, so the right one is found at a glance. */
+    private fun lineColor(number: String): Int = when (number) {
+        "191" -> 0xFF6EA8FF.toInt()  // police
+        "1669" -> 0xFFFF7A8A.toInt() // medical
+        "1193" -> 0xFF5BD98A.toInt() // highway police
+        "199" -> 0xFFFFB35C.toInt()  // fire
+        "1155" -> 0xFFB39DFF.toInt() // tourist police
+        else -> accent
+    }
+
+    /**
+     * One line of the card: a coloured edge, the name in large type, and on the right the number
+     * itself as the call button (or Copy, for text such as a policy number). Tapping the rest of
+     * the line offers delete.
+     */
+    private fun entryRow(entry: EmergencyEntry, color: Int): View {
+        val dial = entry.dialable
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            minimumHeight = dp(76)
+            background = AutoBridgeDesign.tappable(this@EmergencyActivity, AutoBridgeDesign.SURFACE, 18, color)
+            setPadding(0, dp(10), dp(10), dp(10))
+            isClickable = true
+            setOnClickListener { showEntryActions(entry) }
+
+            addView(View(this@EmergencyActivity).apply {
+                background = AutoBridgeDesign.surface(this@EmergencyActivity, color, 3, android.graphics.Color.TRANSPARENT)
+            }, LinearLayout.LayoutParams(dp(5), dp(44)).apply { marginStart = dp(10); marginEnd = dp(14) })
+
+            addView(LinearLayout(this@EmergencyActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(TextView(this@EmergencyActivity).apply {
+                    text = entry.label
+                    textSize = 18f
+                    setTextColor(AutoBridgeDesign.TEXT)
+                    typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+                    maxLines = 2
+                    ellipsize = TextUtils.TruncateAt.END
+                })
+                // A number reads on its button; text (a policy number) is shown here in full.
+                if (dial == null) addView(TextView(this@EmergencyActivity).apply {
+                    text = entry.value
+                    textSize = 15f
+                    setTextColor(AutoBridgeDesign.TEXT_MUTED)
+                    setTextIsSelectable(true)
+                    setPadding(0, dp(2), 0, 0)
+                })
+            }, LinearLayout.LayoutParams(0, -2, 1f))
+
+            addView(TextView(this@EmergencyActivity).apply {
+                text = if (dial != null) "☎  ${entry.value.trim()}" else getString(R.string.emergency_copy)
+                textSize = if (dial != null) 20f else 15f
+                typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+                gravity = Gravity.CENTER
+                setTextColor(if (dial != null) AutoBridgeDesign.INK else color)
+                background = if (dial != null) {
+                    AutoBridgeDesign.tappable(this@EmergencyActivity, color, 14, AutoBridgeDesign.INK, android.graphics.Color.TRANSPARENT)
+                } else {
+                    AutoBridgeDesign.tappable(this@EmergencyActivity, AutoBridgeDesign.tint(color, 0.16f), 14, color, AutoBridgeDesign.tint(color, 0.4f))
+                }
+                setPadding(dp(16), 0, dp(16), 0)
+                minWidth = dp(96)
+                contentDescription = if (dial != null) "${getString(R.string.emergency_call)} ${entry.label} ${entry.value}" else getString(R.string.emergency_copy)
+                isClickable = true
+                setOnClickListener { if (dial != null) dialNumber(dial) else copy(entry) }
+            }, LinearLayout.LayoutParams(-2, dp(52)))
+        }
+    }
+
+    private fun dialNumber(number: String) {
+        // The dialer opens with the number filled in; the driver presses call.
+        val opened = runCatching { startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$number"))) }.isSuccess
+        if (!opened) Toast.makeText(this, getString(R.string.emergency_cannot_dial), Toast.LENGTH_SHORT).show()
+    }
+
+    private fun copy(entry: EmergencyEntry) {
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return
+        clipboard.setPrimaryClip(ClipData.newPlainText(entry.label, entry.value))
+        Toast.makeText(this, getString(R.string.emergency_copied), Toast.LENGTH_SHORT).show()
+    }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     /** Adds the public emergency lines that are not on the card yet. */
     private fun addSuggested() {
@@ -150,8 +244,7 @@ class EmergencyActivity : Activity() {
             .setMessage(entry.value)
             .setItems(items.toTypedArray()) { _, which ->
                 if (dial != null && which == 0) {
-                    // The dialer opens with the number filled in; the driver presses call.
-                    runCatching { startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$dial"))) }
+                    dialNumber(dial)
                 } else {
                     EmergencyStore.delete(this, entry.id)
                     render()

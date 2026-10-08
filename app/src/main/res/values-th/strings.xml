@@ -1691,6 +1691,10 @@
     <string name="emergency_invalid">กรอกชื่อ และเบอร์หรือข้อความ</string>
     <string name="emergency_call">โทร</string>
     <string name="emergency_cannot_dial">เปิดแอปโทรไม่ได้</string>
+    <string name="emergency_section_mine">เบอร์ของฉัน</string>
+    <string name="emergency_section_lines">สายด่วนฉุกเฉิน</string>
+    <string name="emergency_copy">คัดลอก</string>
+    <string name="emergency_copied">คัดลอกแล้ว</string>
     <string name="emergency_police">ตำรวจ</string>
     <string name="emergency_medical">เหตุฉุกเฉินทางการแพทย์</string>
     <string name="emergency_highway_police">ตำรวจทางหลวง</string>
