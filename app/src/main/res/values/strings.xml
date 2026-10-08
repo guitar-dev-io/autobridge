@@ -1723,6 +1723,10 @@
     <string name="emergency_invalid">Enter a label and a number or text.</string>
     <string name="emergency_call">Call</string>
     <string name="emergency_cannot_dial">Could not open the dialer.</string>
+    <string name="emergency_section_mine">Your numbers</string>
+    <string name="emergency_section_lines">Emergency lines</string>
+    <string name="emergency_copy">Copy</string>
+    <string name="emergency_copied">Copied</string>
     <string name="emergency_police">Police</string>
     <string name="emergency_medical">Medical emergency</string>
     <string name="emergency_highway_police">Highway police</string>
