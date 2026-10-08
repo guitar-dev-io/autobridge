@@ -13,6 +13,15 @@ import kotlin.math.sqrt
  * calls a frame speech when it stands well above that floor. A car cabin at speed is loud but
  * steady, which is exactly what a floor-relative threshold copes with and an absolute one does not.
  *
+ * When it decides the speaker is done is what makes listening feel quick or sluggish, so the
+ * wait is not one fixed number:
+ * - **Short commands end sooner.** "หยุด", "YouTube", "ถัดไป" are over in well under a second and
+ *   nobody pauses inside them, so after a short utterance the wait is a fraction of the setting.
+ *   A longer sentence gets the whole setting, so a breath between words does not cut it off.
+ * - **Blips do not restart the wait.** A click, a breath or the indicator tick after the speaker
+ *   stopped is a frame or two above the floor; only a run of speech frames ([ONSET_FRAMES]) counts
+ *   as talking again, so the wait is not reset by noise and the command is sent on time.
+ *
  * Pure Kotlin and frame-driven, so it is tested by feeding it synthetic frames.
  */
 class SilenceDetector(
@@ -26,6 +35,7 @@ class SilenceDetector(
     private var elapsedMs = 0.0
     private var speechMs = 0.0
     private var silenceSinceSpeechMs = 0.0
+    private var speechRun = 0
     private var noiseFloorDb = Double.NaN
 
     /** Level of the last frame, in dBFS (0 is full scale, -90 is silence). */
@@ -56,21 +66,47 @@ class SilenceDetector(
 
         if (isSpeech) {
             speechMs += frameMs
+            speechRun++
+        } else {
+            speechRun = 0
+        }
+        // Talking resumes only after a short run of speech frames; a single loud frame after the
+        // speaker stopped is a click or a breath and keeps counting towards the end.
+        if (speechRun >= ONSET_FRAMES || (isSpeech && !heardSpeech)) {
             silenceSinceSpeechMs = 0.0
         } else if (heardSpeech) {
             silenceSinceSpeechMs += frameMs
         }
 
         return when {
-            heardSpeech && silenceSinceSpeechMs >= silenceTimeoutMs -> Decision.END_OF_SPEECH
+            heardSpeech && silenceSinceSpeechMs >= currentTimeoutMs() -> Decision.END_OF_SPEECH
             elapsedMs >= maxDurationMs -> Decision.MAX_DURATION
             !heardSpeech && elapsedMs >= noSpeechTimeoutMs -> Decision.NO_SPEECH
             else -> Decision.CONTINUE
         }
     }
 
+    /**
+     * The silence that ends this utterance: a fraction of the setting after a short command, the
+     * whole setting once the speaker has said more than a few words.
+     */
+    fun currentTimeoutMs(): Int =
+        if (speechMs < SHORT_UTTERANCE_MS) {
+            (silenceTimeoutMs * SHORT_UTTERANCE_FACTOR).toInt().coerceAtLeast(MIN_TIMEOUT_MS).coerceAtMost(silenceTimeoutMs)
+        } else {
+            silenceTimeoutMs
+        }
+
     companion object {
         const val DEFAULT_NO_SPEECH_MS = 5_000
+        /** Speech shorter than this is a one- or two-word command. */
+        const val SHORT_UTTERANCE_MS = 700.0
+        /** ...and is sent after this share of the silence setting. */
+        const val SHORT_UTTERANCE_FACTOR = 0.6
+        /** Never end sooner than this after the last word. */
+        const val MIN_TIMEOUT_MS = 450
+        /** Consecutive speech frames (60 ms) that count as talking again after a pause. */
+        const val ONSET_FRAMES = 3
         const val FRAME_MS = 20
         const val SILENCE_DB = -90.0
         /** Speech has to clear the floor by this much. */
