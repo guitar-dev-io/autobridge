@@ -10,8 +10,10 @@ struct SettingsView: View {
     @EnvironmentObject private var historyStore: IptvHistoryStore
     @EnvironmentObject private var catalog: IptvCatalog
     @EnvironmentObject private var youtube: YouTubeSettings
+    @EnvironmentObject private var vehicle: VehicleStore
 
     @State private var logoBytes = 0
+    @State private var breakHours = VehicleReminders.breakHours
 
     var body: some View {
         List {
@@ -31,6 +33,50 @@ struct SettingsView: View {
                         NSLocalizedString("Radio sources", comment: "Settings"),
                         plural(sourceStore.sources(kind: .radio).count, "source")
                     )
+                }
+            }
+
+            // The driver's own paperwork on the car, the Android settings' Utilities group.
+            Section(NSLocalizedString("Utilities", comment: "Settings")) {
+                NavigationLink { FuelLogView() } label: {
+                    ValueRow(title: NSLocalizedString(vehicle.isEv ? "Charging log" : "Fuel log", comment: "Fuel"),
+                        detail: NSLocalizedString("Fill-ups, km/L and fuel spending", comment: "Settings"))
+                }
+                NavigationLink { MaintenanceView() } label: {
+                    ValueRow(title: NSLocalizedString("Maintenance", comment: "Maintenance"),
+                        detail: NSLocalizedString("Oil, tyres, road tax and what is due next", comment: "Settings"))
+                }
+                Picker(selection: $breakHours) {
+                    ForEach(VehicleReminders.breakChoices, id: \.self) { hours in
+                        Text(hours == 0
+                            ? NSLocalizedString("Off", comment: "Break reminder")
+                            : String(format: NSLocalizedString("Every %d hours", comment: "Break reminder"), hours))
+                            .tag(hours)
+                    }
+                } label: {
+                    ValueRow(title: NSLocalizedString("Break reminder", comment: "Reminder"),
+                        detail: NSLocalizedString("While CarPlay is connected; no location, only time", comment: "Settings"))
+                }
+                .pickerStyle(.navigationLink)
+                .onChange(of: breakHours) { hours in
+                    VehicleReminders.breakHours = hours
+                    if hours > 0 { VehicleReminders.requestPermission() }
+                }
+                NavigationLink { CostsView() } label: {
+                    ValueRow(title: NSLocalizedString("Car costs", comment: "Costs"),
+                        detail: NSLocalizedString("What the car costs each month", comment: "Settings"))
+                }
+                NavigationLink { ParkingView() } label: {
+                    ValueRow(title: NSLocalizedString("Parking spot", comment: "Parking"),
+                        detail: NSLocalizedString("Mark where you parked and navigate back", comment: "Settings"))
+                }
+                NavigationLink { EmergencyView() } label: {
+                    ValueRow(title: NSLocalizedString("Emergency card", comment: "Emergency"),
+                        detail: NSLocalizedString("Insurance, roadside help, emergency lines", comment: "Settings"))
+                }
+                NavigationLink { BackupView() } label: {
+                    ValueRow(title: NSLocalizedString("Backup and restore", comment: "Backup"),
+                        detail: NSLocalizedString("Fuel or charging log and maintenance in one file", comment: "Settings"))
                 }
             }
 

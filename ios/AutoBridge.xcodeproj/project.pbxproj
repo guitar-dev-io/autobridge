@@ -17,6 +17,7 @@
 		27284DF0EE3CA088E69D0A7C /* SecretStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C72312437F67EE6EC6AA0B5 /* SecretStore.swift */; };
 		276D3932E678D41111222626 /* SponsorBlockClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C7243F20A7F9072F4DA9C06 /* SponsorBlockClient.swift */; };
 		28DE6939126CA36D03A571EA /* IptvDirectory.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1558208AC33103AD18C5976 /* IptvDirectory.swift */; };
+		2B424DC7487E27227FCB6ED2 /* FuelLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C16B1D4946E069DDF5621B /* FuelLogView.swift */; };
 		2B8FC9122C04728E9CFB85BC /* XtreamCredentials.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC099702DE50FA39B449A12A /* XtreamCredentials.swift */; };
 		2D47140A7788F5333AF3ADEF /* StreamingLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53CDBF3FA436D1CF4547ABFB /* StreamingLinks.swift */; };
 		356C2ABE5EDA73A3E4E0C94F /* StreamingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDC80990B7C3DE99CDE26B0B /* StreamingView.swift */; };
@@ -25,23 +26,30 @@
 		3D751552675C15D534AE41B4 /* EntriesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8CD1B0AFCBA2049D81507C1 /* EntriesView.swift */; };
 		43E7C05C5CBB30EE986B1407 /* M3UParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = F33FD94FA9377C4C7EDDE399 /* M3UParser.swift */; };
 		562C490D509CD063D7AFF95C /* LogoImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1525E900FD0B1F7348559808 /* LogoImage.swift */; };
+		5C45A0EA45F63BA276EA455D /* VehicleStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05F4414EEEB33656468505C5 /* VehicleStore.swift */; };
 		67F1CF0911081090A777C970 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 3DA24DC46A8A91E3C84BC267 /* PrivacyInfo.xcprivacy */; };
 		687A83C4AE1EBFA574C27E19 /* IptvParsingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B5C83969DF4E421EEA46DDB /* IptvParsingTests.swift */; };
 		6B61389680755EB25DC009B5 /* YouTubeUrls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90A6641BCB55772A45E5C18E /* YouTubeUrls.swift */; };
 		6BB625D980A36018FC4FB7F8 /* LocalMediaView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B7E15B7DFC83A257CC9D761 /* LocalMediaView.swift */; };
 		6ED1D9C801A96F9E075E5782 /* AutoBridgeDesign.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A7F594C1B644B794A02CDD4 /* AutoBridgeDesign.swift */; };
 		765C373BEED8EA63BA346B43 /* HistoryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = C874A91AF4C596E5BD9F1C74 /* HistoryViews.swift */; };
+		7CD32289521F262924BCD6A4 /* VehicleReminders.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31979498A407BC207701B48 /* VehicleReminders.swift */; };
 		7DE5BCBE824FDA62EA1C63C2 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 7A51E39C7216FC43DF300102 /* Localizable.strings */; };
+		83EF866FC83574AA2FAA9086 /* WeatherStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 397ACEC692AC1E1BBB3D87AF /* WeatherStore.swift */; };
 		86EE82219E570D80F3EC3A06 /* IptvPlaylistConventions.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD8F8D3B3955D0C2E3C534F0 /* IptvPlaylistConventions.swift */; };
 		8739C17068C27DBA8F6E5D9C /* MiniPlayerBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC7D3A74BBDB6B6A996BCB89 /* MiniPlayerBar.swift */; };
+		9C43E8FCEAA45EC81859D3EF /* MaintenanceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16929C0FBE8A35B961410A09 /* MaintenanceView.swift */; };
 		9D0807C2D9550DB58A86A187 /* StreamPing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E3E75C1542D1FF913B0B4C2 /* StreamPing.swift */; };
 		9D8E13D79BE9F0D29DF951DC /* XtreamClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C83CD83EAC29DF506D9646BD /* XtreamClient.swift */; };
 		9EFD7115C935350856EB6108 /* BrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E11482FFF9C334DEDDD0347 /* BrowserView.swift */; };
 		9F9B80928F66B86254C8B812 /* SponsorBlock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72B1565EFEB58F895F170630 /* SponsorBlock.swift */; };
+		9FA6E9D669C992A6C4E78702 /* VehicleModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 979C3C4AC48B3DF9D08AB710 /* VehicleModels.swift */; };
 		A120AD1186842BC036FB410F /* YouTubeAdSkip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C3DC95AD866C8BC32B6A802 /* YouTubeAdSkip.swift */; };
 		A670CAE2DC05BAA6F595C4C4 /* SourcesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB05136D7F204040B347BE1F /* SourcesView.swift */; };
 		A7A1621C70F4C3A8DB0A1C46 /* EntryDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8574DA94B6A75256E17915DD /* EntryDestination.swift */; };
+		A7AD1C30A7568B286E4C3610 /* WeatherView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1533E783089D9FBF336131D /* WeatherView.swift */; };
 		A84C4A35DEC83E756F0C62EE /* IptvHistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 356FED14DCC1614CDDA103EB /* IptvHistoryStore.swift */; };
+		ABAEF094BF3C9AF707F630AE /* VehicleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDF3C2AFDCEB9080B1B05009 /* VehicleTests.swift */; };
 		BD24C21D55976EE1405047A2 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75668EE85C556BEE6D663DD2 /* HomeView.swift */; };
 		BFF950272C4A0E62CBCE1034 /* ImageLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A61357E5F6A066871B5B085 /* ImageLoader.swift */; };
 		C2CF7348E34F0E7FC397D1B9 /* AutoBridgeStores.swift in Sources */ = {isa = PBXBuildFile; fileRef = 223C495FD3D4E548509835FC /* AutoBridgeStores.swift */; };
@@ -57,6 +65,7 @@
 		F5AB8547D7ED937536F752CC /* IptvCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 189B3F1C31952ED59382B6D2 /* IptvCatalog.swift */; };
 		F9EB7FC677D9AA453689BDEF /* CategoriesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4EEFD36366253809E393E28 /* CategoriesView.swift */; };
 		FC4FF43AEF3C484CC2BC54C6 /* PublicPlaylistLiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48D0F34BA08E481909D56DBB /* PublicPlaylistLiveTests.swift */; };
+		FD26ACE288D1FE270741DEF9 /* ParkingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 425FA08ECC5F7E86F205BF3B /* ParkingView.swift */; };
 		FED2DE50F59594A87B2FBBF4 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1AD1AEDE1FB31939F1FF6B17 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -71,11 +80,13 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		05F4414EEEB33656468505C5 /* VehicleStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VehicleStore.swift; sourceTree = "<group>"; };
 		064AEAD4C677350DCB182E62 /* HomeSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeSection.swift; sourceTree = "<group>"; };
 		0E10783D21B5732498DB7A3B /* DirectoryPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectoryPickerView.swift; sourceTree = "<group>"; };
 		10B9EB0C4091B8889867EAC1 /* CarPlaySceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlaySceneDelegate.swift; sourceTree = "<group>"; };
 		14EC81D2CB9115E1C35443EE /* AutoBridge.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AutoBridge.entitlements; sourceTree = "<group>"; };
 		1525E900FD0B1F7348559808 /* LogoImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogoImage.swift; sourceTree = "<group>"; };
+		16929C0FBE8A35B961410A09 /* MaintenanceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaintenanceView.swift; sourceTree = "<group>"; };
 		189B3F1C31952ED59382B6D2 /* IptvCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IptvCatalog.swift; sourceTree = "<group>"; };
 		1A7F594C1B644B794A02CDD4 /* AutoBridgeDesign.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoBridgeDesign.swift; sourceTree = "<group>"; };
 		1AD1AEDE1FB31939F1FF6B17 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -89,12 +100,15 @@
 		3352016DB3BC9D15E2602E5D /* IptvLogoTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IptvLogoTests.swift; sourceTree = "<group>"; };
 		356FED14DCC1614CDDA103EB /* IptvHistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IptvHistoryStore.swift; sourceTree = "<group>"; };
 		36355638D7775958447F2B46 /* IptvSourceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IptvSourceStore.swift; sourceTree = "<group>"; };
+		397ACEC692AC1E1BBB3D87AF /* WeatherStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeatherStore.swift; sourceTree = "<group>"; };
 		39EE8F3666AF3CFEBA6F3A94 /* YouTubeAddOnTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YouTubeAddOnTests.swift; sourceTree = "<group>"; };
 		3B7E15B7DFC83A257CC9D761 /* LocalMediaView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalMediaView.swift; sourceTree = "<group>"; };
 		3DA24DC46A8A91E3C84BC267 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		425FA08ECC5F7E86F205BF3B /* ParkingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParkingView.swift; sourceTree = "<group>"; };
 		4290FBCFB77588B67364890B /* YouTubeSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YouTubeSettings.swift; sourceTree = "<group>"; };
 		44662BFD7604655B7B40F9C5 /* WebBookmarkStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebBookmarkStore.swift; sourceTree = "<group>"; };
 		48D0F34BA08E481909D56DBB /* PublicPlaylistLiveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublicPlaylistLiveTests.swift; sourceTree = "<group>"; };
+		50C16B1D4946E069DDF5621B /* FuelLogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FuelLogView.swift; sourceTree = "<group>"; };
 		53CDBF3FA436D1CF4547ABFB /* StreamingLinks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamingLinks.swift; sourceTree = "<group>"; };
 		54998D41754B36C6DF5DB40A /* th */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = th; path = th.lproj/Localizable.strings; sourceTree = "<group>"; };
 		550645EFF34BB231101D7681 /* SourceEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceEditorView.swift; sourceTree = "<group>"; };
@@ -106,9 +120,11 @@
 		8574DA94B6A75256E17915DD /* EntryDestination.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntryDestination.swift; sourceTree = "<group>"; };
 		8C72312437F67EE6EC6AA0B5 /* SecretStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecretStore.swift; sourceTree = "<group>"; };
 		90A6641BCB55772A45E5C18E /* YouTubeUrls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YouTubeUrls.swift; sourceTree = "<group>"; };
+		979C3C4AC48B3DF9D08AB710 /* VehicleModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VehicleModels.swift; sourceTree = "<group>"; };
 		9E3E75C1542D1FF913B0B4C2 /* StreamPing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamPing.swift; sourceTree = "<group>"; };
 		AF0A958A3A31506CAB9181AA /* IptvModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IptvModels.swift; sourceTree = "<group>"; };
 		B1558208AC33103AD18C5976 /* IptvDirectory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IptvDirectory.swift; sourceTree = "<group>"; };
+		B31979498A407BC207701B48 /* VehicleReminders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VehicleReminders.swift; sourceTree = "<group>"; };
 		BDCF7A15D3729726728098DC /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		BE6B47C8061C685ABA88F45D /* PlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerView.swift; sourceTree = "<group>"; };
 		C83CD83EAC29DF506D9646BD /* XtreamClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XtreamClient.swift; sourceTree = "<group>"; };
@@ -123,10 +139,12 @@
 		E4221DBC44D4F8244659B983 /* PlaybackController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackController.swift; sourceTree = "<group>"; };
 		E4EEFD36366253809E393E28 /* CategoriesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoriesView.swift; sourceTree = "<group>"; };
 		EC099702DE50FA39B449A12A /* XtreamCredentials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XtreamCredentials.swift; sourceTree = "<group>"; };
+		F1533E783089D9FBF336131D /* WeatherView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeatherView.swift; sourceTree = "<group>"; };
 		F33FD94FA9377C4C7EDDE399 /* M3UParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M3UParser.swift; sourceTree = "<group>"; };
 		F8CD1B0AFCBA2049D81507C1 /* EntriesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntriesView.swift; sourceTree = "<group>"; };
 		FB05136D7F204040B347BE1F /* SourcesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourcesView.swift; sourceTree = "<group>"; };
 		FC2DC46EF46D56B3DCAE7B87 /* AutoBridgeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoBridgeApp.swift; sourceTree = "<group>"; };
+		FDF3C2AFDCEB9080B1B05009 /* VehicleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VehicleTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -138,6 +156,16 @@
 				D372FD1C63A1C741B96835B8 /* BuildFlavor.swift */,
 			);
 			path = App;
+			sourceTree = "<group>";
+		};
+		1F815A15B85B2BFE85157340 /* Vehicle */ = {
+			isa = PBXGroup;
+			children = (
+				979C3C4AC48B3DF9D08AB710 /* VehicleModels.swift */,
+				B31979498A407BC207701B48 /* VehicleReminders.swift */,
+				05F4414EEEB33656468505C5 /* VehicleStore.swift */,
+			);
+			path = Vehicle;
 			sourceTree = "<group>";
 		};
 		3A1C37B6A0B6BC20D2D2C971 /* IPTV */ = {
@@ -156,6 +184,14 @@
 			path = IPTV;
 			sourceTree = "<group>";
 		};
+		4EA0E42845BF81B2045D42B5 /* Weather */ = {
+			isa = PBXGroup;
+			children = (
+				397ACEC692AC1E1BBB3D87AF /* WeatherStore.swift */,
+			);
+			path = Weather;
+			sourceTree = "<group>";
+		};
 		605FE106893ABBF71EED14FF /* AutoBridgeTests */ = {
 			isa = PBXGroup;
 			children = (
@@ -163,9 +199,20 @@
 				5B5C83969DF4E421EEA46DDB /* IptvParsingTests.swift */,
 				48D0F34BA08E481909D56DBB /* PublicPlaylistLiveTests.swift */,
 				2966E828D29584E0E837522E /* StreamPingTests.swift */,
+				FDF3C2AFDCEB9080B1B05009 /* VehicleTests.swift */,
 				39EE8F3666AF3CFEBA6F3A94 /* YouTubeAddOnTests.swift */,
 			);
 			path = AutoBridgeTests;
+			sourceTree = "<group>";
+		};
+		7745A001799E68674EDD0DD4 /* Vehicle */ = {
+			isa = PBXGroup;
+			children = (
+				50C16B1D4946E069DDF5621B /* FuelLogView.swift */,
+				16929C0FBE8A35B961410A09 /* MaintenanceView.swift */,
+				425FA08ECC5F7E86F205BF3B /* ParkingView.swift */,
+			);
+			path = Vehicle;
 			sourceTree = "<group>";
 		};
 		8A28828AF6B51F3C7689254C /* YouTube */ = {
@@ -216,6 +263,8 @@
 				FAB61FDDAB4E623B0D775450 /* Resources */,
 				ECF4E1A21728F1BA95AF01BE /* Services */,
 				EE4A7E584703393C3FBE9957 /* UI */,
+				1F815A15B85B2BFE85157340 /* Vehicle */,
+				4EA0E42845BF81B2045D42B5 /* Weather */,
 				8A28828AF6B51F3C7689254C /* YouTube */,
 			);
 			path = AutoBridge;
@@ -255,6 +304,8 @@
 				550645EFF34BB231101D7681 /* SourceEditorView.swift */,
 				FB05136D7F204040B347BE1F /* SourcesView.swift */,
 				DDC80990B7C3DE99CDE26B0B /* StreamingView.swift */,
+				F1533E783089D9FBF336131D /* WeatherView.swift */,
+				7745A001799E68674EDD0DD4 /* Vehicle */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -378,6 +429,7 @@
 				142704BF823BA667FE09BCF4 /* DirectoryPickerView.swift in Sources */,
 				3D751552675C15D534AE41B4 /* EntriesView.swift in Sources */,
 				A7A1621C70F4C3A8DB0A1C46 /* EntryDestination.swift in Sources */,
+				2B424DC7487E27227FCB6ED2 /* FuelLogView.swift in Sources */,
 				765C373BEED8EA63BA346B43 /* HistoryViews.swift in Sources */,
 				2362113433707AC6D3650BCD /* HomeSection.swift in Sources */,
 				BD24C21D55976EE1405047A2 /* HomeView.swift in Sources */,
@@ -392,7 +444,9 @@
 				6BB625D980A36018FC4FB7F8 /* LocalMediaView.swift in Sources */,
 				562C490D509CD063D7AFF95C /* LogoImage.swift in Sources */,
 				43E7C05C5CBB30EE986B1407 /* M3UParser.swift in Sources */,
+				9C43E8FCEAA45EC81859D3EF /* MaintenanceView.swift in Sources */,
 				8739C17068C27DBA8F6E5D9C /* MiniPlayerBar.swift in Sources */,
+				FD26ACE288D1FE270741DEF9 /* ParkingView.swift in Sources */,
 				CD47912CB25B082F58AC5C31 /* PlaybackController.swift in Sources */,
 				09220BAFC31E31E57E23974E /* PlayerView.swift in Sources */,
 				27284DF0EE3CA088E69D0A7C /* SecretStore.swift in Sources */,
@@ -404,6 +458,11 @@
 				9D0807C2D9550DB58A86A187 /* StreamPing.swift in Sources */,
 				2D47140A7788F5333AF3ADEF /* StreamingLinks.swift in Sources */,
 				356C2ABE5EDA73A3E4E0C94F /* StreamingView.swift in Sources */,
+				9FA6E9D669C992A6C4E78702 /* VehicleModels.swift in Sources */,
+				7CD32289521F262924BCD6A4 /* VehicleReminders.swift in Sources */,
+				5C45A0EA45F63BA276EA455D /* VehicleStore.swift in Sources */,
+				83EF866FC83574AA2FAA9086 /* WeatherStore.swift in Sources */,
+				A7AD1C30A7568B286E4C3610 /* WeatherView.swift in Sources */,
 				37E70AADC9E8093FFAB8BA16 /* WebBookmarkStore.swift in Sources */,
 				9D8E13D79BE9F0D29DF951DC /* XtreamClient.swift in Sources */,
 				2B8FC9122C04728E9CFB85BC /* XtreamCredentials.swift in Sources */,
@@ -422,6 +481,7 @@
 				687A83C4AE1EBFA574C27E19 /* IptvParsingTests.swift in Sources */,
 				FC4FF43AEF3C484CC2BC54C6 /* PublicPlaylistLiveTests.swift in Sources */,
 				C7790A56AF8E8B9B7623E514 /* StreamPingTests.swift in Sources */,
+				ABAEF094BF3C9AF707F630AE /* VehicleTests.swift in Sources */,
 				0580E21596378442A60AE36E /* YouTubeAddOnTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
