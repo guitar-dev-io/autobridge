@@ -1422,6 +1422,8 @@
     <string name="car_video_player_failed">Cannot connect to the media player. Return to the library and try again.</string>
     <string name="car_video_output_unavailable">Video output is unavailable on this connection.</string>
     <string name="car_video_home">Home</string>
+    <string name="car_video_close">Close channel</string>
+    <string name="player_close">Close</string>
     <string name="car_video_back_10">Back 10 seconds</string>
     <string name="car_video_forward_10">Forward 10 seconds</string>
 

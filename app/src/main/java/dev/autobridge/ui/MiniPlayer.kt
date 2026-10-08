@@ -103,6 +103,14 @@ class MiniPlayer(
             LinearLayout.LayoutParams(context.dp(38), context.dp(38))
         )
         row.addView(toggle, LinearLayout.LayoutParams(context.dp(40), context.dp(40)))
+        // Pausing leaves the channel loaded and this bar up; closing unloads it, and the bar hides.
+        row.addView(
+            AutoBridgeDesign.glyphButton(context, "✕", 15f) {
+                playback.close()
+                render()
+            }.apply { contentDescription = context.getString(dev.autobridge.R.string.player_close) },
+            LinearLayout.LayoutParams(context.dp(38), context.dp(38))
+        )
     }
 
     /** Starts the refresh tick. Callers pair this with [stop] in their lifecycle callbacks. */

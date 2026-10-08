@@ -329,14 +329,24 @@ class CarVideoScreen(
             }
             .setActionStrip(ActionStrip.Builder()
                 .addAction(Action.BACK)
-                .addAction(control(R.drawable.ic_car_home, carContext.getString(R.string.car_video_home)) { screenManager.popToRoot() })
+                // Home and Play/Pause are icons only: with titles the host had room for three of the
+                // four buttons and silently dropped the last one, which was Close.
+                .addAction(control(R.drawable.ic_car_home, carContext.getString(R.string.car_video_home), iconOnly = true) { screenManager.popToRoot() })
                 .addAction(control(if (media.isPlaying) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play,
                     carContext.getString(
                         if (media.isPlaying) R.string.car_now_pause else R.string.car_now_play
                     ),
-                    player?.isCommandAvailable(Player.COMMAND_PLAY_PAUSE) == true
+                    player?.isCommandAvailable(Player.COMMAND_PLAY_PAUSE) == true,
+                    iconOnly = true
                 ) {
                     if (media.isPlaying) media.pause() else if (allowed()) media.resume()
+                })
+                // Back and Home only leave the screen and the channel carries on paused in the
+                // media card; this is the one way to turn it off.
+                .addAction(control(R.drawable.ic_car_stop, carContext.getString(R.string.car_video_close)) {
+                    resumeWhenSurfaceReturns = false
+                    media.close()
+                    screenManager.pop()
                 })
                 .build())
             .setMapActionStrip(ActionStrip.Builder()
@@ -401,8 +411,8 @@ class CarVideoScreen(
         player.seekTo((player.currentPosition + delta).coerceIn(0L, upper))
     }
 
-    private fun control(icon: Int, description: String, enabled: Boolean = true, mapAction: Boolean = false, action: () -> Unit): Action =
+    private fun control(icon: Int, description: String, enabled: Boolean = true, mapAction: Boolean = false, iconOnly: Boolean = false, action: () -> Unit): Action =
         Action.Builder().setIcon(CarIcon.Builder(IconCompat.createWithResource(carContext, icon))
-            .build()).setEnabled(enabled).apply { if (!mapAction) setTitle(description) }
+            .build()).setEnabled(enabled).apply { if (!mapAction && !iconOnly) setTitle(description) }
             .setOnClickListener { action(); invalidate() }.build()
 }

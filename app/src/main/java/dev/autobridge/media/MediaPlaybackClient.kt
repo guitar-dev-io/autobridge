@@ -192,6 +192,36 @@ class MediaPlaybackClient(private val context: Context) {
     }
 
     /**
+     * Ends what is playing: stops it and empties the queue, so the channel is gone rather than
+     * paused. [pause] and [stop] both leave the item loaded, which keeps the media card, the
+     * notification and the mini player up with a Play button — a TV channel the driver wanted
+     * off could only ever be paused. Always allowed, like [stop].
+     *
+     * A channel sent to the car through the bridge is also the bridge's session, and the car
+     * home's "Continue" card is that session's snapshot; both are let go when they are this same
+     * item, or the card would offer back the channel that was just turned off — and a disconnect
+     * would save it again. Main thread only, like the bridge.
+     */
+    fun close() {
+        val c = controller ?: return
+        val uris = currentQueueUris().filter { it.isNotBlank() }.toSet()
+        val title = currentTitle
+        c.stop()
+        c.clearMediaItems()
+        forgetBridgeSession(uris, title)
+    }
+
+    private fun forgetBridgeSession(uris: Set<String>, title: String?) {
+        fun same(source: dev.autobridge.bridge.BridgeSource?): Boolean =
+            source != null && (source.url in uris || (title != null && source.title == title))
+        val bridge = dev.autobridge.bridge.AutoBridgeSessionManager
+        // stop() saves a snapshot first, so the stored one is cleared after it, not before.
+        if (same(bridge.current.source)) bridge.stop(context)
+        val store = dev.autobridge.bridge.BridgeStore
+        if (same(store.lastSession(context)?.source)) store.setLastSession(context, null)
+    }
+
+    /**
      * Builds a [MediaItem] from an arbitrary source string via [MediaSourceResolver], attaching an
      * explicit MIME type for HLS/DASH so the right source is used even when the URL has no
      * recognizable extension (e.g. a manifest behind a query-only endpoint).
