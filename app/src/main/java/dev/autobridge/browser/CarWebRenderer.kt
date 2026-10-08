@@ -1902,7 +1902,11 @@ class CarWebRenderer(context: Context) {
      */
     fun applyControlSettings() = runOnMain {
         val now = SystemClock.uptimeMillis()
-        val hideBar = BrowserControlsStore.hideUrlBar(appContext)
+        // While the surface is split the bar would run across both pages, over the top of each,
+        // and the menu already carries the address, Back, Forward and Reload; so a split has no
+        // bar and the floating button is the way to the menu.
+        val hideBar = BrowserControlsStore.hideUrlBar(appContext) ||
+            BrowserSplitStore.layout(appContext) != BrowserSplitLayout.SINGLE
         // "Hide the bar" wins over "pin the bar": the two are contradictory and the hide is the
         // more explicit "I never use it". A hidden bar also gets no page inset — there is no bar to
         // make room for — so the page keeps the whole surface.
@@ -1957,7 +1961,8 @@ class CarWebRenderer(context: Context) {
             if (idle < FULLSCREEN_FAB_IDLE_MS) return 1f
             return (1f - (idle - FULLSCREEN_FAB_IDLE_MS).toFloat() / FULLSCREEN_FAB_FADE_MS).coerceIn(0f, 1f)
         }
-        return if (alwaysShowFab) 1f else visibility.alphaAt(nowMs)
+        // With no bar to recall, the floating button is the only way to the menu: keep it up.
+        return if (alwaysShowFab || hideUrlBar) 1f else visibility.alphaAt(nowMs)
     }
 
     /** Uptime of the last tap/scroll/fling/pinch on the car surface; drives the fullscreen FAB. */
