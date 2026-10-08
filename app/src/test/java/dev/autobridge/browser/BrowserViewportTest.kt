@@ -629,7 +629,7 @@ class BrowserDrawerModelTest {
     @Test fun bothSheetsFitWithoutScrollingOnEveryHeadUnitWithRoomForThem() {
         tallEnough.forEach { (width, height, dpi) ->
             listOf(false, true).forEach { more ->
-                val model = modelFor(width, height, dpi, more = more)
+                val model = modelFor(width, height, dpi, more = more, state = state.copy(surface = MenuSurface.PHONE))
                 val name = if (more) "more" else "primary"
                 assertEquals(
                     "$name sheet scrolls at ${width}x$height @$dpi",
@@ -643,6 +643,22 @@ class BrowserDrawerModelTest {
                             row.bounds.bottom <= model.panel.bottom + 0.01f
                     )
                 }
+            }
+        }
+    }
+
+    /**
+     * The car sheet follows the reference menu (the same layout Bridge Web shows), which is taller
+     * than a head unit: it scrolls, its header stays put, and scrolled to the end its last row is
+     * on screen, so nothing is out of reach.
+     */
+    @Test fun theCarSheetScrollsToEveryRow() {
+        HEAD_UNITS.forEach { (width, height, dpi) ->
+            listOf(false, true).forEach { more ->
+                val top = modelFor(width, height, dpi, more = more)
+                val end = modelFor(width, height, dpi, more = more, scroll = top.maxScroll)
+                assertTrue(end.contentBottom <= end.panel.bottom + 0.01f)
+                assertTrue(end.closeButton.bottom <= end.headerBottom + 0.01f)
             }
         }
     }
@@ -731,7 +747,7 @@ class BrowserDrawerModelTest {
         tallEnough.forEach { (width, height, dpi) ->
             val sizes = AutoUiSizes.forCarSurface(dpi)
             val minimum = sizes.touchTarget * sizes.touchTarget
-            modelFor(width, height, dpi).tiles.forEach { row ->
+            modelFor(width, height, dpi).tiles.filter { it.kind == DrawerKind.TILE }.forEach { row ->
                 assertTrue(
                     "tile ${row.item.action} too small at ${width}x$height",
                     row.bounds.width * row.bounds.height >= minimum * 1.5f
@@ -774,7 +790,10 @@ class BrowserDrawerModelTest {
     @Test fun everyEntryIsTappableAtItsOwnCentre() {
         listOf(false, true).forEach { more ->
             val model = modelFor(1024, 600, 160, more = more)
-            model.rows.filter { it.item.enabled }.forEach { row ->
+            model.rows.filter {
+                it.item.enabled && (it in model.headerLinks ||
+                    (it.bounds.centerY > model.headerBottom && it.bounds.centerY < model.panel.bottom))
+            }.forEach { row ->
                 val hit = model.rowAt(row.bounds.centerX, row.bounds.centerY)
                 assertEquals(
                     "${row.item.action} is not tappable at its own centre",
@@ -887,33 +906,63 @@ class BrowserDrawerModelTest {
         assertTrue(BrowserDrawerModel.moreItems().map { it.action }.contains(DrawerAction.PASTE_AND_GO))
     }
 
+    /** The car's "More" page is the reference menu's groups as rows, and loses nothing. */
+    @Test fun theMoreListIsGroupedWithoutLosingAnEntry() {
+        val grouped = CarMenuList.plan(BrowserDrawerModel.carMenu(state)).more.flatMap { it.second }.map { it.action }
+        val more = modelFor(1024, 600, 160, more = true)
+        assertTrue(more.tiles.all { it.kind == DrawerKind.LIST })
+        assertTrue(more.sectionLabels.isNotEmpty())
+        assertEquals(grouped, more.tiles.map { it.item.action })
+    }
+
+    /** Steppers and switches leave the menu open; everything that goes somewhere closes it. */
+    @Test fun zoomAndSwitchesKeepTheMenuOpen() {
+        assertTrue(BrowserDrawerModel.keepsMenuOpen(DrawerAction.ZOOM_IN))
+        assertTrue(BrowserDrawerModel.keepsMenuOpen(DrawerAction.ZOOM_OUT))
+        assertTrue(BrowserDrawerModel.keepsMenuOpen(DrawerAction.TOGGLE_DESKTOP))
+        assertFalse(BrowserDrawerModel.keepsMenuOpen(DrawerAction.HISTORY))
+        assertFalse(BrowserDrawerModel.keepsMenuOpen(DrawerAction.NEW_TAB))
+    }
+
     /**
      * The car sheet mirrors the phone's [BrowserMenuSheet]: one accent primary button, then
      * Back / Reload / Forward and Bookmarks / Settings / Split screen / More, then the desktop
      * and fullscreen switches. Growing it is how the old menu ended up with a fold: the split
      * screen joined the second row rather than adding a third.
      */
-    @Test fun thePrimarySheetMirrorsThePhoneSheet() {
+    /**
+     * The car sheet is the reference menu (the one Bridge Web draws): two lines of four buttons,
+     * then the This page switches with the zoom stepper, the split screen, and a More row.
+     */
+    @Test fun theCarSheetFollowsTheReferenceMenu() {
         val model = modelFor(1024, 600, 160)
-        assertEquals(DrawerAction.TABS, model.primary?.item?.action)
-        assertEquals(DrawerKind.PRIMARY, model.primary?.kind)
-        assertEquals("2", model.primary?.item?.value)
+        assertNull(model.primary)
+        val grid = model.tiles.filter { it.kind == DrawerKind.TILE }
         assertEquals(
             listOf(
-                DrawerAction.NAV_BACK, DrawerAction.RELOAD, DrawerAction.NAV_FORWARD,
-                DrawerAction.BOOKMARKS, DrawerAction.SETTINGS, DrawerAction.SPLIT_LAYOUT, DrawerAction.MORE,
+                DrawerAction.NAV_BACK, DrawerAction.RELOAD, DrawerAction.NAV_FORWARD, DrawerAction.TABS,
+                DrawerAction.BOOKMARK_PAGE, DrawerAction.BOOKMARKS, DrawerAction.HISTORY, DrawerAction.NEW_TAB,
             ),
-            model.tiles.map { it.item.action }
+            grid.map { it.item.action }
         )
-        // Two rows of three, in that order: the first three share a top, below the primary button.
-        val (nav, secondary) = model.tiles.chunked(BrowserDrawerModel.PRIMARY_COLUMNS)
-        assertTrue(nav.all { it.bounds.top == nav.first().bounds.top })
-        assertTrue(secondary.first().bounds.top > nav.first().bounds.bottom)
-        assertTrue(nav.first().bounds.top > model.primary!!.bounds.bottom)
+        assertEquals("2", grid.single { it.item.action == DrawerAction.TABS }.item.value)
+        assertEquals(
+            listOf(DrawerAction.TOGGLE_DESKTOP, DrawerAction.TOGGLE_FULLSCREEN, DrawerAction.PIN_TOOLBAR, DrawerAction.SPLIT_LAYOUT),
+            model.toggles.map { it.item.action }
+        )
+        assertEquals(
+            setOf(DrawerAction.ZOOM_OUT, DrawerAction.ZOOM_IN),
+            model.tiles.filter { it.kind == DrawerKind.ROUND }.map { it.item.action }.toSet()
+        )
+        assertEquals(DrawerAction.MORE, model.tiles.last().item.action)
+        assertTrue(model.sectionLabels.isNotEmpty())
+    }
+
+    /** The phone sheet keeps its own shape: the Send to car button over two rows of three. */
+    @Test fun thePhoneSheetKeepsItsPrimaryButton() {
+        val model = modelFor(1024, 600, 160, state = state.copy(surface = MenuSurface.PHONE))
+        assertEquals(DrawerAction.SEND_TO_CAR, model.primary?.item?.action)
         assertEquals(2, model.toggles.size)
-        assertTrue(model.toggles[0].bounds.top > secondary.first().bounds.bottom)
-        assertTrue(model.toggles[1].bounds.top > model.toggles[0].bounds.bottom)
-        assertEquals(2, model.dividers.size)
     }
 
     /**
@@ -1016,11 +1065,9 @@ class CarMenuParityTest {
     @Test fun theFourTileRowSharesTheSheetWidth() {
         val sizes = AutoUiSizes.forCarSurface(160)
         val model = BrowserDrawerModel.create(sizes, BrowserViewport.create(1024, 600, sizes.density), state)
-        val second = model.tiles.filter { it.item.action in setOf(DrawerAction.BOOKMARKS, DrawerAction.MORE) }
-        val first = model.tiles.first { it.item.action == DrawerAction.NAV_BACK }
-        assertTrue(second.all { it.bounds.width < first.bounds.width })
-        val more = model.tiles.single { it.item.action == DrawerAction.MORE }
-        assertEquals(model.tiles.single { it.item.action == DrawerAction.NAV_FORWARD }.bounds.right, more.bounds.right, 0.5f)
+        val grid = model.tiles.filter { it.kind == DrawerKind.TILE }
+        assertTrue(grid.all { kotlin.math.abs(it.bounds.width - grid.first().bounds.width) < 0.5f })
+        assertEquals(grid[3].bounds.right, grid[7].bounds.right, 0.5f)
     }
 
     @Test fun swappingSidesOnlyActsWhileASplitIsUp() {

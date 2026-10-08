@@ -1094,8 +1094,10 @@ class BrowserActivity : Activity() {
             context = this,
             state = pageState,
             style = style,
+            refresh = { menuState() },
         ) { action ->
-            shell.dismiss()
+            // Zoom, switches and Save stay open so they can be pressed again; see keepsMenuOpen.
+            if (!BrowserDrawerModel.keepsMenuOpen(action)) shell.dismiss()
             runMenuAction(action)
         }.forEach(column::addView)
         shell.show(column)

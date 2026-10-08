@@ -1473,7 +1473,12 @@ class CarWebRenderer(context: Context) {
                         rebuildDrawer()
                         host?.onBrowserStateChanged()
                     }
-                    else -> {
+                    // Zoom, pin toolbar and Save are pressed again or show their new state: act,
+                    // keep the sheet up and redraw it.
+                    else -> if (BrowserDrawerModel.keepsMenuOpen(row.item.action)) {
+                        performDrawerAction(row.item.action)
+                        rebuildDrawer()
+                    } else {
                         closeDrawer()
                         performDrawerAction(row.item.action)
                     }
@@ -2011,7 +2016,8 @@ class CarWebRenderer(context: Context) {
         drawer = BrowserDrawerModel.create(
             sizes, viewport, menuState(),
             more = overlay == Overlay.DRAWER_MORE,
-            scrollOffset = drawerScroll
+            scrollOffset = drawerScroll,
+            moreTitle = appContext.getString(R.string.drawer_more),
         )
     }
 
@@ -3216,7 +3222,15 @@ class CarWebRenderer(context: Context) {
         model.dividers.forEach { y ->
             canvas.drawRect(model.header.left, y, model.header.right, y + sizes.dp(1f), toolbarPaint)
         }
-        model.tiles.forEach { drawSheetTile(canvas, it) }
+        model.sectionLabels.forEach { (labelRes, box) -> drawSheetSectionLabel(canvas, labelRes, box) }
+        model.plates.forEach { (labelRes, box) -> drawSheetPlate(canvas, labelRes, box) }
+        model.tiles.forEach {
+            when (it.kind) {
+                DrawerKind.LIST -> drawSheetListRow(canvas, it)
+                DrawerKind.ROUND -> drawSheetStepButton(canvas, it)
+                else -> drawSheetTile(canvas, it)
+            }
+        }
         model.toggles.forEach { drawSheetToggle(canvas, it) }
         canvas.restore()
 
@@ -3383,6 +3397,82 @@ class CarWebRenderer(context: Context) {
             canvas, BrowserIcon.SEARCH, address.go.centerX, address.go.centerY,
             goSize, BrowserTheme.dark.onPrimary
         )
+    }
+
+    /** A "More" group heading: small, muted, left-aligned at the bottom of its band. */
+    private fun drawSheetSectionLabel(canvas: Canvas, labelRes: Int, box: Box) {
+        detailPaint.color = BrowserTheme.dark.textSecondary
+        detailPaint.textSize = (sizes.iconSmall * 0.72f).coerceAtMost(box.height * 0.6f)
+        detailPaint.textAlign = Paint.Align.LEFT
+        canvas.drawText(
+            fit(appContext.getString(labelRes), detailPaint, box.width),
+            box.left + sizes.contentGap * 0.5f, box.bottom - box.height * 0.28f, detailPaint
+        )
+    }
+
+    /** A row that only holds buttons (zoom): the card, a search glyph and its label. */
+    private fun drawSheetPlate(canvas: Canvas, labelRes: Int, box: Box) {
+        toolbarPaint.color = BrowserTheme.dark.sheetCardBackground
+        canvas.drawRoundRect(box.left, box.top, box.right, box.bottom, sizes.cornerRadius, sizes.cornerRadius, toolbarPaint)
+        val iconSize = sizes.iconMedium.coerceAtMost(box.height * 0.5f)
+        val glyphX = box.left + sizes.horizontalPadding + iconSize / 2f
+        drawIcon(canvas, BrowserIcon.SEARCH, glyphX, box.centerY, iconSize, BrowserTheme.dark.textSecondary)
+        titlePaint.color = BrowserTheme.dark.textPrimary
+        titlePaint.textSize = (sizes.iconSmall * 0.9f).coerceAtMost(box.height * 0.42f)
+        canvas.drawText(
+            appContext.getString(labelRes), glyphX + iconSize / 2f + sizes.horizontalPadding,
+            box.centerY + titlePaint.textSize * 0.34f, titlePaint
+        )
+    }
+
+    /** The zoom stepper's − / + buttons: a tonal rounded square with the glyph. */
+    private fun drawSheetStepButton(canvas: Canvas, row: DrawerRow) {
+        val box = row.bounds
+        toolbarPaint.color = BrowserTheme.dark.tileBackground
+        val radius = box.height * 0.3f
+        canvas.drawRoundRect(box.left, box.top, box.right, box.bottom, radius, radius, toolbarPaint)
+        val iconSize = sizes.iconMedium.coerceAtMost(box.height * 0.55f)
+        drawIcon(
+            canvas, row.item.icon, box.centerX, box.centerY, iconSize,
+            if (row.item.enabled) BrowserTheme.dark.iconEnabled else BrowserTheme.dark.iconDisabled
+        )
+    }
+
+    /** A "More" row: tonal rounded bar, icon on the left, the label beside it. */
+    private fun drawSheetListRow(canvas: Canvas, row: DrawerRow) {
+        val box = row.bounds
+        val enabled = row.item.enabled
+        val on = enabled && row.item.on
+        val radius = sizes.dp(AutoUiSizes.SHEET_CORNER_RADIUS_DP).coerceAtMost(box.height * 0.3f)
+        toolbarPaint.color = if (enabled) BrowserTheme.dark.tileBackground else BrowserTheme.dark.tileDisabledBackground
+        canvas.drawRoundRect(box.left, box.top, box.right, box.bottom, radius, radius, toolbarPaint)
+
+        val iconSize = sizes.dp(AutoUiSizes.SHEET_ICON_DP).coerceAtMost(box.height * 0.5f)
+        val iconCx = box.left + sizes.contentGap + iconSize / 2f
+        val iconColor = when {
+            on -> BrowserTheme.dark.accent
+            enabled -> BrowserTheme.dark.iconEnabled
+            else -> BrowserTheme.dark.iconDisabled
+        }
+        drawIcon(canvas, row.item.icon, iconCx, box.centerY, iconSize, iconColor)
+
+        detailPaint.color = if (enabled) BrowserTheme.dark.textPrimary else BrowserTheme.dark.iconDisabled
+        detailPaint.textSize = (sizes.iconSmall * 0.8f).coerceAtMost(box.height * 0.36f)
+        detailPaint.textAlign = Paint.Align.LEFT
+        val textLeft = iconCx + iconSize / 2f + sizes.contentGap
+        val valueText = row.item.value
+        val valueWidth = if (valueText.isNotBlank()) detailPaint.measureText(valueText) + sizes.contentGap else 0f
+        canvas.drawText(
+            fit(row.item.label(appContext), detailPaint, box.right - sizes.contentGap - valueWidth - textLeft),
+            textLeft, box.centerY + detailPaint.textSize * 0.35f, detailPaint
+        )
+        if (valueText.isNotBlank()) {
+            detailPaint.color = BrowserTheme.dark.accent
+            canvas.drawText(
+                valueText, box.right - sizes.contentGap - detailPaint.measureText(valueText),
+                box.centerY + detailPaint.textSize * 0.35f, detailPaint
+            )
+        }
     }
 
     private fun drawSheetTile(canvas: Canvas, row: DrawerRow) {

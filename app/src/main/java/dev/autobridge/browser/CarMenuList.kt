@@ -52,20 +52,36 @@ object CarMenuList {
         context: Context,
         state: BrowserMenuState,
         style: Style,
+        /**
+         * Reads the browser's state again. When given, an action that keeps the menu open (see
+         * [BrowserDrawerModel.keepsMenuOpen]) redraws the page it was tapped on with the new
+         * state, so a switch flips and Save's star fills in place.
+         */
+        refresh: (() -> BrowserMenuState)? = null,
         onAction: (DrawerAction) -> Unit,
     ): List<View> {
-        val items = BrowserDrawerModel.carMenu(state)
-        if (items.isEmpty()) return emptyList()
-        val plan = plan(items)
+        var current = state
+        if (BrowserDrawerModel.carMenu(current).isEmpty()) return emptyList()
         val pages = android.widget.FrameLayout(context)
         lateinit var showMain: () -> Unit
-        val showMore: () -> Unit = {
+        lateinit var showMore: () -> Unit
+        var onMorePage = false
+        val dispatch: (DrawerAction) -> Unit = { action ->
+            onAction(action)
+            if (refresh != null && BrowserDrawerModel.keepsMenuOpen(action)) {
+                current = refresh()
+                if (onMorePage) showMore() else showMain()
+            }
+        }
+        showMore = {
+            onMorePage = true
             pages.removeAllViews()
-            pages.addView(morePage(context, plan, style, onAction) { showMain() })
+            pages.addView(morePage(context, plan(BrowserDrawerModel.carMenu(current)), style, dispatch) { showMain() })
         }
         showMain = {
+            onMorePage = false
             pages.removeAllViews()
-            pages.addView(mainPage(context, plan, state, style, onAction, showMore))
+            pages.addView(mainPage(context, plan(BrowserDrawerModel.carMenu(current)), current, style, dispatch, showMore))
         }
         showMain()
         pages.layoutParams = LinearLayout.LayoutParams(
