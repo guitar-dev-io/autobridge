@@ -736,6 +736,7 @@
     <string name="about_update_title">Update available</string>
     <string name="about_update_message">%1$s has been released. This build is %2$s.</string>
     <string name="about_update_downloading">Downloading the update…</string>
+    <string name="about_update_download_progress">%1$d%% · %2$s of %3$s</string>
     <string name="about_update_install_with">Install with</string>
     <string name="about_update_download_failed">Download failed (%1$s). Opening it in the browser instead.</string>
     <string name="about_update_download">Download APK</string>

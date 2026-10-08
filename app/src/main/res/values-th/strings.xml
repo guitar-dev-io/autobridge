@@ -720,6 +720,7 @@
     <string name="about_update_title">มีอัปเดตใหม่</string>
     <string name="about_update_message">ออกรุ่น %1$s แล้ว รุ่นที่ติดตั้งอยู่คือ %2$s</string>
     <string name="about_update_downloading">กำลังดาวน์โหลดอัปเดต…</string>
+    <string name="about_update_download_progress">%1$d%% · %2$s จาก %3$s</string>
     <string name="about_update_install_with">ติดตั้งด้วย</string>
     <string name="about_update_download_failed">ดาวน์โหลดไม่สำเร็จ (%1$s) จะเปิดในเบราว์เซอร์แทน</string>
     <string name="about_update_download">ดาวน์โหลด APK</string>
