@@ -16,101 +16,101 @@ internal data class MenuBox(val left: Float, val top: Float, val right: Float, v
 
 /** Everything on the dashboard a tap can land on. */
 internal enum class HomeRegion {
-    CONTINUE, QUICK_ACCESS, RECENT_HEADER, RECENT_ITEM, QUEUE_HEADER, QUEUE_ITEM, SCROLL_UP, SCROLL_DOWN
+    CONTINUE, CONTROL_PREVIOUS, CONTROL_PLAY, CONTROL_NEXT, QUICK_ACCESS,
+    RECENT_HEADER, RECENT_ITEM, QUEUE_HEADER, SCROLL_UP, SCROLL_DOWN
 }
 
-/** A resolved tap: which region, and which row of it when the region is a list. */
+/** A resolved tap: which region, and which item of it when the region is a list. */
 internal data class HomeHit(val region: HomeRegion, val index: Int = -1)
 
+/** Where the parts of the Now Playing card sit. Every box is in surface pixels, at scroll 0. */
+internal data class HeroBoxes(
+    val card: MenuBox,
+    val art: MenuBox,
+    /** Caption and title, to the right of [art]. */
+    val text: MenuBox,
+    val progress: MenuBox,
+    /** Elapsed time on the left, duration on the right, under [progress]. */
+    val times: MenuBox,
+    val previous: MenuBox,
+    val play: MenuBox,
+    val next: MenuBox
+)
+
 /**
- * Responsive geometry for the whole home dashboard, computed from the area the host leaves free.
+ * Responsive geometry for the car home, computed from the area the host leaves free.
  *
- * The screen is one vertical column — header, Continue Watching, Quick Access, then Recently Sent
- * and Queue — and its heights come from [HomeDashboardTheme.Budget]: a share of the free height per
- * section, clamped into a dp range. That ordering matters. Sizing each piece by what it measures
- * and giving the remainder to the cards, which is the obvious way round, lets a long title or an
- * extra queue row quietly eat the thing the driver actually aims at; a budget cannot, because the
- * grid's ~46% is taken out first and nothing above it can spend it.
+ * The design is drawn at one size (1280 × 720): the AutoBridge header, then a row holding the Now
+ * Playing card on the left and the 3 × 2 quick-access grid on the right, both 274dp tall, then
+ * "Recently sent from phone" with its queue link and up to three sent items side by side. Rather
+ * than re-deciding each piece per head unit, the whole column is laid out at that design size and
+ * scaled by one factor so it fills the free height, which keeps every proportion the design fixes.
  *
- * A section with no content drops out and its share is scaled across the rest, so a head unit with
- * no queue gets bigger cards rather than a hole. The Recently Sent / Queue blocks are budgeted for
- * their *header* only: their rows are laid out in full below it and reached by scrolling, which is
- * what keeps a list that happens to be long from pushing the grid off the screen.
+ * The factor is clamped ([HomeDashboardTheme.MIN_SCALE]..[HomeDashboardTheme.MAX_SCALE]): a large
+ * screen gets breathing room instead of giant cards, and a small one keeps its touch targets and
+ * scrolls the column with the [scrollUp] / [scrollDown] buttons rather than shrinking past them.
  *
- * When the dp floors no longer fit the free height — the smallest head units — the column scrolls
- * as a whole with the [scrollUp] / [scrollDown] buttons, exactly as the six-card menu did before
- * it, rather than honouring the percentages down to untouchable cards.
- *
- * Widths follow the card grid: the cards are clamped so an ultra-wide head unit does not get
- * 600dp-wide tiles, and every other section is aligned to the grid's edges so the column reads as
- * one component. Recently Sent and Queue sit side by side when that column is wide enough for two
- * readable blocks, and stack when it is not.
+ * Widths follow what is there. A unit too narrow for the card grid beside the Now Playing card
+ * stacks the card above the grid; one too narrow for three sent items across stacks those too;
+ * an ultra-wide one centres the column at [Dp.MAX_CONTENT_WIDTH]. A section with no content is
+ * absent and its space is simply not drawn: no empty frames.
  */
 internal class HomeDashboardLayout private constructor(
     val density: Float,
+    /** dp → px on this layout: the head unit's density times the fit scale. */
+    val unit: Float,
     val logo: MenuBox,
     /** Title start; it is centred on [logo] vertically by the renderer, which owns the font metrics. */
     val titleX: Float,
     val titleSize: Float,
     /** Clip region of the scrolling column; equal to the content bounds unless scrolling is needed. */
     val viewport: MenuBox,
-    val continueTitle: MenuBox?,
-    val continueCard: MenuBox?,
-    val quickTitle: MenuBox,
+    val hero: HeroBoxes?,
     /** Card bounds at scroll offset 0, row-major. */
     val cards: List<MenuBox>,
-    val recentBlock: MenuBox?,
+    /** "Recently sent from phone": the label, sized to its text so the rest of the line is not a target. */
     val recentHeader: MenuBox?,
-    val recentRows: List<MenuBox>,
-    val queueBlock: MenuBox?,
+    /** "Queue N items", right-aligned on the same line. */
     val queueHeader: MenuBox?,
-    val queueRows: List<MenuBox>,
-    val cornerRadius: Float,
-    val blockRadius: Float,
-    val rowRadius: Float,
-    val thumbRadius: Float,
-    val iconSize: Float,
-    val iconLabelGap: Float,
-    val labelSize: Float,
-    val labelMaxWidth: Float,
-    val sectionTitleSize: Float,
-    val blockHeaderSize: Float,
-    val heroTitleSize: Float,
-    val heroMetaSize: Float,
-    val rowTitleSize: Float,
-    val rowMetaSize: Float,
+    val recentRows: List<MenuBox>,
     val maxScroll: Float,
     val scrollUp: MenuBox?,
-    val scrollDown: MenuBox?
+    val scrollDown: MenuBox?,
+    val labelSize: Float
 ) {
     val scrollable: Boolean get() = maxScroll > 0f
 
-    fun dp(value: Float) = value * density
+    /** The Now Playing card, which the hit test and the log talk about on their own. */
+    val continueCard: MenuBox? get() = hero?.card
+
+    /** [value] dp on this layout, scale included. */
+    fun dp(value: Float) = value * unit
 
     /**
      * What a tap at ([x], [y]) hits with the column at [scroll], or null for empty space.
      *
-     * The order is the one the dashboard spec fixes: Continue Watching, the quick-access cards,
-     * then each block's header before its rows. Regions never overlap, so the order only decides
-     * which of two adjacent edges wins a tap exactly between them.
+     * The Now Playing card's buttons sit inside the card, so they are tried first; everything
+     * else is disjoint.
      */
     fun hit(x: Float, y: Float, scroll: Float): HomeHit? {
-        // The scroll buttons sit in their own column outside the viewport and never move with it.
+        // The scroll buttons sit in their own lane outside the viewport and never move with it.
         if (scrollUp?.contains(x, y) == true) return HomeHit(HomeRegion.SCROLL_UP)
         if (scrollDown?.contains(x, y) == true) return HomeHit(HomeRegion.SCROLL_DOWN)
         if (!viewport.contains(x, y)) return null
 
-        continueCard?.offset(-scroll)?.let { if (it.contains(x, y)) return HomeHit(HomeRegion.CONTINUE) }
+        hero?.let {
+            if (it.previous.offset(-scroll).contains(x, y)) return HomeHit(HomeRegion.CONTROL_PREVIOUS)
+            if (it.play.offset(-scroll).contains(x, y)) return HomeHit(HomeRegion.CONTROL_PLAY)
+            if (it.next.offset(-scroll).contains(x, y)) return HomeHit(HomeRegion.CONTROL_NEXT)
+            if (it.card.offset(-scroll).contains(x, y)) return HomeHit(HomeRegion.CONTINUE)
+        }
         cards.forEachIndexed { index, box ->
             if (box.offset(-scroll).contains(x, y)) return HomeHit(HomeRegion.QUICK_ACCESS, index)
         }
         recentHeader?.offset(-scroll)?.let { if (it.contains(x, y)) return HomeHit(HomeRegion.RECENT_HEADER) }
+        queueHeader?.offset(-scroll)?.let { if (it.contains(x, y)) return HomeHit(HomeRegion.QUEUE_HEADER) }
         recentRows.forEachIndexed { index, box ->
             if (box.offset(-scroll).contains(x, y)) return HomeHit(HomeRegion.RECENT_ITEM, index)
-        }
-        queueHeader?.offset(-scroll)?.let { if (it.contains(x, y)) return HomeHit(HomeRegion.QUEUE_HEADER) }
-        queueRows.forEachIndexed { index, box ->
-            if (box.offset(-scroll).contains(x, y)) return HomeHit(HomeRegion.QUEUE_ITEM, index)
         }
         return null
     }
@@ -122,267 +122,246 @@ internal class HomeDashboardLayout private constructor(
     companion object {
         const val COLUMNS = 3
 
-        /** Where one section sits and how tall its budget band is. */
-        private data class Band(val top: Float, val height: Float) {
-            val bottom get() = top + height
-        }
+        /** Most sent items the row shows; the rest are on the Recently Sent screen. */
+        const val MAX_RECENT = 3
+
+        /** Line box of a text run as a multiple of its size; roughly ascent+descent for this family. */
+        const val LINE_RATIO = 1.3f
+
+        /** Hero and grid share one height: two cards and the gap between them. */
+        private const val TOP_ROW = Dp.CARD_HEIGHT * 2 + Dp.GAP
 
         /**
          * @param safe area not covered by host chrome (visible/stable area), in surface pixels.
-         * @param measure width of a label at a text size in pixels, from the real paint.
+         * @param labels the quick-access card labels, in order.
+         * @param recentTitle the Recently Sent label, so its tap target is the text and not the line.
+         * @param queueLink the queue link's text, or null when the queue is empty.
+         * @param measure width of a text at a size in pixels, from the real paint.
          */
         fun compute(
             safe: MenuBox,
             density: Float,
             labels: List<String>,
             content: HomeDashboardContent,
-            measure: (String, Float) -> Float
+            measure: (String, Float) -> Float,
+            recentTitle: String = "",
+            queueLink: String? = null
         ): HomeDashboardLayout {
             val d = density
-            val budget = HomeDashboardTheme.Budget
+            val hasHero = content.hasContinueWatching
+            val recentCount = min(content.recentlySent.size, MAX_RECENT)
+            val hasQueueLink = !queueLink.isNullOrBlank() && content.queueTotal > 0
+            val hasSection = recentCount > 0 || hasQueueLink
+            val gridRows = (labels.size + COLUMNS - 1) / COLUMNS
+            val gridHeight = gridRows * Dp.CARD_HEIGHT + (gridRows - 1) * Dp.GAP
+
+            val usable = max(1f, safe.height - (Dp.TOP_PADDING + Dp.BOTTOM_PADDING) * d)
+
+            /** Arrangement decided for one scale; the column's height in dp follows from it. */
+            data class Arrangement(val heroBeside: Boolean, val rowsAcross: Boolean)
+
+            fun heightDp(a: Arrangement): Float {
+                var h = Dp.HEADER + Dp.GAP
+                h += when {
+                    !hasHero -> gridHeight
+                    a.heroBeside -> max(TOP_ROW, gridHeight)
+                    else -> TOP_ROW + Dp.GAP + gridHeight
+                }
+                if (hasSection) {
+                    h += Dp.GAP + Dp.SECTION_TITLE * LINE_RATIO
+                    if (recentCount > 0) {
+                        h += Dp.SECTION_TITLE_GAP +
+                            if (a.rowsAcross) Dp.ROW_HEIGHT
+                            else recentCount * Dp.ROW_HEIGHT + (recentCount - 1) * Dp.GAP
+                    }
+                }
+                return h
+            }
+
+            fun columnWidth(unit: Float, scrolling: Boolean): Float {
+                val lane = if (scrolling) (Dp.SCROLL_BUTTON + Dp.SCROLL_COLUMN_GAP) * d else 0f
+                return min(safe.width - Dp.MARGIN * unit * 2 - lane, Dp.MAX_CONTENT_WIDTH * unit)
+            }
+
+            fun arrangementAt(unit: Float, scrolling: Boolean): Arrangement {
+                val width = columnWidth(unit, scrolling)
+                val gridBeside = width - (Dp.HERO_WIDTH + Dp.GAP) * unit
+                val heroBeside = !hasHero ||
+                    (gridBeside - Dp.GAP * unit * (COLUMNS - 1)) / COLUMNS >= Dp.CARD_MIN_WIDTH * unit
+                val rowsAcross = recentCount <= 1 ||
+                    (width - Dp.GAP * unit * (recentCount - 1)) / recentCount >= Dp.ROW_MIN_WIDTH * unit
+                return Arrangement(heroBeside, rowsAcross)
+            }
+
+            /** What the column needs across at scale 1: the design's card width, not the minimum. */
+            fun widthDp(a: Arrangement): Float =
+                Dp.MARGIN * 2 + (if (hasHero && a.heroBeside) Dp.HERO_WIDTH + Dp.GAP else 0f) +
+                    COLUMNS * Dp.CARD_WIDTH + (COLUMNS - 1) * Dp.GAP
+
+            // One scale for the whole column: whichever of the free height and width is tighter,
+            // so a 1280 x 720 unit gets the design as drawn and a bigger one grows it evenly.
+            fun fit(a: Arrangement, scrolling: Boolean): Float {
+                val lane = if (scrolling) (Dp.SCROLL_BUTTON + Dp.SCROLL_COLUMN_GAP) * d else 0f
+                val byHeight = usable / (heightDp(a) * d)
+                val byWidth = (safe.width - lane) / (widthDp(a) * d)
+                return min(byHeight, byWidth).coerceIn(HomeDashboardTheme.MIN_SCALE, HomeDashboardTheme.MAX_SCALE)
+            }
+
+            // The arrangement depends on the scale and the scale on the arrangement (stacking makes
+            // the column taller and narrower); one correction pass settles it.
+            var scale = fit(Arrangement(heroBeside = true, rowsAcross = true), scrolling = false)
+            var arrangement = arrangementAt(scale * d, scrolling = false)
+            scale = fit(arrangement, scrolling = false)
+            arrangement = arrangementAt(scale * d, scrolling = false)
+            val scrolling = heightDp(arrangement) * scale * d > usable + 0.5f
+            if (scrolling) {
+                scale = fit(arrangement, scrolling = true)
+                arrangement = arrangementAt(scale * d, scrolling = true)
+            }
+
+            val u = scale * d
+            val gap = Dp.GAP * u
             val top = safe.top + Dp.TOP_PADDING * d
             val bottom = safe.bottom - Dp.BOTTOM_PADDING * d
-            val usable = max(1f, bottom - top)
-            val margin = (safe.width * 0.035f).coerceIn(Dp.MARGIN_MIN * d, Dp.MARGIN_MAX * d)
-            val gap = (usable * 0.045f).coerceIn(Dp.GAP_COMPACT * d, Dp.GAP * d)
-            val buttonSize = Dp.SCROLL_BUTTON * d
+            val margin = Dp.MARGIN * u
+            val lane = if (scrolling) (Dp.SCROLL_BUTTON + Dp.SCROLL_COLUMN_GAP) * d else 0f
+            val width = columnWidth(u, scrolling)
+            val areaLeft = safe.left + margin + lane
+            val areaRight = safe.right - margin
+            val left = areaLeft + (areaRight - areaLeft - width) / 2f
+            val right = left + width
 
-            val hasHero = content.hasContinueWatching
-            val hasBlocks = content.hasRecentlySent || content.hasQueue
+            // --- header ---------------------------------------------------------------------
+            val logoSize = Dp.LOGO * u
+            val headerTop = top + (Dp.HEADER * u - logoSize) / 2f
+            val logo = MenuBox(left, headerTop, left + logoSize, headerTop + logoSize)
+            var cursor = top + Dp.HEADER * u + gap
 
-            // --- the budget -----------------------------------------------------------------
-            // Absent sections hand their share back; the rest are scaled to fill the same total,
-            // so the proportions between what *is* on screen stay the ones the design fixes.
-            val claimed = budget.HEADER + budget.QUICK_ACCESS_TITLE + budget.QUICK_ACCESS_GRID +
-                (if (hasHero) budget.CONTINUE_WATCHING else 0f) +
-                (if (hasBlocks) budget.BLOCK_HEADER else 0f)
-            val scale = budget.SPENDABLE / claimed
+            // --- Now Playing + grid ---------------------------------------------------------
+            var hero: HeroBoxes? = null
+            val gridLeft: Float
+            val gridTop: Float
+            if (hasHero && arrangement.heroBeside) {
+                hero = heroBoxes(MenuBox(left, cursor, left + Dp.HERO_WIDTH * u, cursor + TOP_ROW * u), u)
+                gridLeft = hero.card.right + gap
+                gridTop = cursor
+                cursor += max(TOP_ROW, gridHeight) * u
+            } else if (hasHero) {
+                hero = heroBoxes(MenuBox(left, cursor, right, cursor + TOP_ROW * u), u)
+                cursor = hero.card.bottom + gap
+                gridLeft = left
+                gridTop = cursor
+                cursor += gridHeight * u
+            } else {
+                gridLeft = left
+                gridTop = cursor
+                cursor += gridHeight * u
+            }
+            val cardWidth = (right - gridLeft - gap * (COLUMNS - 1)) / COLUMNS
+            val cardHeight = Dp.CARD_HEIGHT * u
+            val cards = labels.indices.map { index ->
+                val cardLeft = gridLeft + (index % COLUMNS) * (cardWidth + gap)
+                val cardTop = gridTop + (index / COLUMNS) * (cardHeight + gap)
+                MenuBox(cardLeft, cardTop, cardLeft + cardWidth, cardTop + cardHeight)
+            }
 
-            fun band(share: Float, minDp: Float, maxDp: Float) =
-                (usable * share * scale).coerceIn(minDp * d, maxDp * d)
+            // One label size for every card, so "TV" and "YouTube Music" read as one component.
+            val labelMaxWidth = cardWidth - Dp.CARD_PADDING * u * 2
+            val labelFloor = Dp.LABEL_MIN * u
+            var labelSize = Dp.LABEL * u
+            while (labelSize > labelFloor && labels.any { measure(it, labelSize) > labelMaxWidth }) {
+                labelSize -= 0.5f * d
+            }
+            labelSize = max(labelSize, labelFloor)
 
-            val headerBand = band(budget.HEADER, Dp.HEADER_BAND_MIN, Dp.HEADER_BAND_MAX)
-            val heroBand =
-                if (hasHero) band(budget.CONTINUE_WATCHING, Dp.HERO_BAND_MIN, Dp.HERO_BAND_MAX) else 0f
-            val quickTitleBand =
-                band(budget.QUICK_ACCESS_TITLE, Dp.QUICK_TITLE_BAND_MIN, Dp.QUICK_TITLE_BAND_MAX)
-            val gridBand = band(budget.QUICK_ACCESS_GRID, Dp.GRID_BAND_MIN, Dp.GRID_BAND_MAX)
-            val peekBand = if (hasBlocks) band(budget.BLOCK_HEADER, Dp.BLOCK_PEEK_MIN, Dp.BLOCK_PEEK_MAX) else 0f
-
-            // --- what each band spends its height on ----------------------------------------
-            val sectionTitleGap = Dp.SECTION_TITLE_GAP * d
-            val sectionTitleSize = ((quickTitleBand - sectionTitleGap) / LINE_RATIO)
-                .coerceIn(Dp.SECTION_TITLE_MIN * d, Dp.SECTION_TITLE * d)
-            val sectionTitleLine = sectionTitleSize * LINE_RATIO
-
-            val logoSize = (headerBand - gap).coerceIn(Dp.LOGO_COMPACT * d, Dp.LOGO_MAX * d)
-            val wordmarkSize = logoSize * HomeDashboardTheme.WORDMARK_RATIO
-
-            val heroHeight = (heroBand - sectionTitleLine - sectionTitleGap - gap)
-                .coerceIn(Dp.HERO_MIN_HEIGHT * d, Dp.HERO_MAX_HEIGHT * d)
-
-            val blockPadding = Dp.BLOCK_PADDING * d
-            val blockHeaderSize = ((peekBand - blockPadding) / LINE_RATIO)
-                .coerceIn(Dp.BLOCK_HEADER_MIN * d, Dp.BLOCK_HEADER * d)
-            val blockHeaderLine = blockHeaderSize * LINE_RATIO
-            // Rows are not budgeted: they fill what the bands left and then run past the fold.
-            val rowHeight = (usable * 0.105f).coerceIn(Dp.ROW_MIN_HEIGHT * d, Dp.ROW_MAX_HEIGHT * d)
-
-            val gridRows = (labels.size + COLUMNS - 1) / COLUMNS
-            val bandCardHeight = ((gridBand - gap * gridRows) / gridRows).coerceAtLeast(Dp.CARD_MIN_HEIGHT * d)
-
-            // Side by side is decided on the column's real width, which is only known once the
-            // cards are sized; the area width is an upper bound on it and settles the common case
-            // in one go, with a single correction below for the rest.
-            var sideBySide = (safe.width - margin * 2) >= HomeDashboardTheme.SIDE_BY_SIDE_MIN_WIDTH * d
-
-            fun blockHeight(rows: Int): Float =
-                if (rows <= 0) 0f
-                else blockPadding * 2 + blockHeaderLine + Dp.BLOCK_HEADER_GAP * d +
-                    rows * rowHeight + (rows - 1) * Dp.ROW_GAP * d
-
-            /** One full pass at the geometry; [scrolling] is what reserves the button column. */
-            fun place(scrolling: Boolean): HomeDashboardLayout {
-                val areaLeft = safe.left + margin + if (scrolling) buttonSize + Dp.SCROLL_COLUMN_GAP * d else 0f
-                val areaRight = safe.right - margin
-                var cardWidth = (areaRight - areaLeft - gap * (COLUMNS - 1)) / COLUMNS
-                cardWidth = min(cardWidth, bandCardHeight * HomeDashboardTheme.CARD_MAX_ASPECT)
-                // Very narrow units: never let a card be taller than it is wide-ish.
-                val cardHeight = min(bandCardHeight, max(cardWidth * 1.1f, Dp.CARD_MIN_HEIGHT * d))
-                val gridWidth = cardWidth * COLUMNS + gap * (COLUMNS - 1)
-                val left = areaLeft + (areaRight - areaLeft - gridWidth) / 2f
-                val right = left + gridWidth
-
-                // A band is at least its budget and at most what it actually has to hold, so a
-                // floored card or a long title overflows into the scroll rather than overlapping.
-                fun advance(band: Float, content: Float) = max(band, content + gap)
-
-                val header = Band(top, advance(headerBand, logoSize))
-                val headerLeft = if (scrolling) safe.left + margin else left
-                val logo = MenuBox(headerLeft, header.top, headerLeft + logoSize, header.top + logoSize)
-
-                var continueTitle: MenuBox? = null
-                var continueCard: MenuBox? = null
-                var cursor = header.bottom
-                if (hasHero) {
-                    val hero = Band(cursor, advance(heroBand, sectionTitleLine + sectionTitleGap + heroHeight))
-                    continueTitle = MenuBox(left, hero.top, right, hero.top + sectionTitleLine)
-                    val cardTop = hero.top + sectionTitleLine + sectionTitleGap
-                    continueCard = MenuBox(left, cardTop, right, cardTop + heroHeight)
-                    cursor = hero.bottom
+            // --- Recently sent from phone ----------------------------------------------------
+            var recentHeader: MenuBox? = null
+            var queueHeader: MenuBox? = null
+            var recentRows: List<MenuBox> = emptyList()
+            if (hasSection) {
+                cursor += gap
+                val line = Dp.SECTION_TITLE * LINE_RATIO * u
+                // Generous vertical slop on the two header targets: the text is small, the finger is not.
+                val slop = (line * 0.5f).coerceAtMost(gap / 2f)
+                if (recentCount > 0) {
+                    val textWidth = measure(recentTitle, Dp.SECTION_TITLE * u)
+                    recentHeader = MenuBox(left, cursor - slop, left + textWidth, cursor + line + slop)
                 }
-
-                val titleBandHeight = max(quickTitleBand, sectionTitleLine + sectionTitleGap)
-                val quickTitle = MenuBox(left, cursor, right, cursor + sectionTitleLine)
-                cursor += titleBandHeight
-
-                val gridTop = cursor
-                val cards = labels.indices.map { index ->
-                    val column = index % COLUMNS
-                    val row = index / COLUMNS
-                    val cardLeft = left + column * (cardWidth + gap)
-                    val cardTop = gridTop + row * (cardHeight + gap)
-                    MenuBox(cardLeft, cardTop, cardLeft + cardWidth, cardTop + cardHeight)
+                if (hasQueueLink) {
+                    val linkWidth = measure(queueLink!!, Dp.SECTION_LINK * u)
+                    queueHeader = MenuBox(right - linkWidth, cursor - slop, right, cursor + line + slop)
                 }
-                cursor += advance(gridBand, cardHeight * gridRows + gap * (gridRows - 1))
-
-                // --- Recently Sent / Queue, laid out in full below the budgeted peek ---------
-                var recentBlock: MenuBox? = null
-                var recentHeader: MenuBox? = null
-                var recentRows: List<MenuBox> = emptyList()
-                var queueBlock: MenuBox? = null
-                var queueHeader: MenuBox? = null
-                var queueRows: List<MenuBox> = emptyList()
-
-                fun rowsOf(block: MenuBox, count: Int): Pair<MenuBox, List<MenuBox>> {
-                    val headerBox = MenuBox(
-                        block.left + blockPadding, block.top + blockPadding,
-                        block.right - blockPadding, block.top + blockPadding + blockHeaderLine
-                    )
-                    var rowTop = headerBox.bottom + Dp.BLOCK_HEADER_GAP * d
-                    val rows = (0 until count).map {
-                        val box = MenuBox(block.left + blockPadding, rowTop, block.right - blockPadding, rowTop + rowHeight)
-                        rowTop = box.bottom + Dp.ROW_GAP * d
-                        box
-                    }
-                    return headerBox to rows
-                }
-
-                if (hasBlocks) {
-                    val recentHeight = blockHeight(content.recentlySent.size)
-                    val queueHeight = blockHeight(content.queue.size)
-                    if (recentHeight > 0f && queueHeight > 0f && sideBySide) {
-                        val half = (gridWidth - gap) / 2f
-                        recentBlock = MenuBox(left, cursor, left + half, cursor + recentHeight)
-                        queueBlock = MenuBox(right - half, cursor, right, cursor + queueHeight)
-                        cursor += max(recentHeight, queueHeight)
+                cursor += line
+                if (recentCount > 0) {
+                    cursor += Dp.SECTION_TITLE_GAP * u
+                    val rowHeight = Dp.ROW_HEIGHT * u
+                    recentRows = if (arrangement.rowsAcross) {
+                        val rowWidth = (width - gap * (recentCount - 1)) / recentCount
+                        (0 until recentCount).map { i ->
+                            val rowLeft = left + i * (rowWidth + gap)
+                            MenuBox(rowLeft, cursor, rowLeft + rowWidth, cursor + rowHeight)
+                        }.also { cursor += rowHeight }
                     } else {
-                        if (recentHeight > 0f) {
-                            recentBlock = MenuBox(left, cursor, right, cursor + recentHeight)
-                            cursor += recentHeight
-                        }
-                        if (recentHeight > 0f && queueHeight > 0f) cursor += gap
-                        if (queueHeight > 0f) {
-                            queueBlock = MenuBox(left, cursor, right, cursor + queueHeight)
-                            cursor += queueHeight
-                        }
-                    }
-                    recentBlock?.let {
-                        val (header2, rows) = rowsOf(it, content.recentlySent.size)
-                        recentHeader = header2
-                        recentRows = rows
-                    }
-                    queueBlock?.let {
-                        val (header2, rows) = rowsOf(it, content.queue.size)
-                        queueHeader = header2
-                        queueRows = rows
+                        (0 until recentCount).map { i ->
+                            val rowTop = cursor + i * (rowHeight + gap)
+                            MenuBox(left, rowTop, right, rowTop + rowHeight)
+                        }.also { cursor = it.last().bottom }
                     }
                 }
-
-                val contentBottom = cursor
-                // The column overflows when its content runs past the free height, which is what
-                // decides whether the scrolling pass is needed. That is always measured against
-                // the available bottom; the non-scrolling viewport then wraps the content exactly,
-                // and the scrolling one clips to the free height with the buttons in their lane.
-                val maxScroll = max(0f, contentBottom - bottom)
-                val viewport = MenuBox(left, header.bottom, right, if (scrolling) bottom else contentBottom)
-
-                // --- quick-access card internals ---------------------------------------------
-                val cardPadding = Dp.CARD_PADDING * d
-                val labelFloor = Dp.LABEL_MIN * d
-                val iconLabelGap = (cardHeight * 0.08f).coerceIn(Dp.ICON_LABEL_GAP_MIN * d, Dp.ICON_LABEL_GAP_MAX * d)
-                // The icon tile's room still assumes the largest candidate label; the fit loop only
-                // ever shrinks the label from here, so this stays a conservative (not undersized) tile.
-                val iconRoom = cardHeight - cardPadding * 2 - iconLabelGap - (Dp.LABEL_MAX * d) * 1.2f
-                val iconSize = min(min(cardHeight * 0.52f, cardWidth * 0.45f), iconRoom)
-                    .coerceIn(Dp.ICON_MIN * d, Dp.ICON_MAX * d)
-                // The horizontal card paints the label in the column to the right of the icon tile,
-                // not across the whole card, so fit it to that real column (card minus padding, the
-                // icon tile and the icon→label gap) or it ellipsizes early on narrow profiles.
-                val labelMaxWidth = cardWidth - cardPadding * 2 - iconSize - Dp.CARD_ICON_LABEL_GAP * d
-                var labelSize = min(Dp.LABEL_MAX * d, cardHeight * 0.18f).coerceAtLeast(labelFloor)
-                // One size for every card, so "TV" and "YouTube Music" read as the same component.
-                while (labelSize > labelFloor && labels.any { measure(it, labelSize) > labelMaxWidth }) {
-                    labelSize -= 0.5f * d
-                }
-                labelSize = max(labelSize, labelFloor)
-
-                val scrollUp = if (scrolling) MenuBox(
-                    safe.left + margin, viewport.top, safe.left + margin + buttonSize, viewport.top + buttonSize
-                ) else null
-                val scrollDown = if (scrolling) MenuBox(
-                    safe.left + margin, viewport.bottom - buttonSize, safe.left + margin + buttonSize, viewport.bottom
-                ) else null
-
-                return HomeDashboardLayout(
-                    density = d,
-                    logo = logo,
-                    titleX = logo.right + Dp.LOGO_TO_TITLE * d,
-                    titleSize = wordmarkSize,
-                    viewport = viewport,
-                    continueTitle = continueTitle,
-                    continueCard = continueCard,
-                    quickTitle = quickTitle,
-                    cards = cards,
-                    recentBlock = recentBlock,
-                    recentHeader = recentHeader,
-                    recentRows = recentRows,
-                    queueBlock = queueBlock,
-                    queueHeader = queueHeader,
-                    queueRows = queueRows,
-                    cornerRadius = min(Dp.CARD_RADIUS * d, cardHeight * 0.18f),
-                    blockRadius = min(Dp.BLOCK_RADIUS * d, rowHeight * 0.4f),
-                    rowRadius = min(Dp.ROW_RADIUS * d, rowHeight * 0.3f),
-                    thumbRadius = Dp.THUMB_RADIUS * d,
-                    iconSize = iconSize,
-                    iconLabelGap = iconLabelGap,
-                    labelSize = labelSize,
-                    labelMaxWidth = labelMaxWidth,
-                    sectionTitleSize = sectionTitleSize,
-                    blockHeaderSize = blockHeaderSize,
-                    heroTitleSize = (heroHeight * 0.20f).coerceIn(Dp.HERO_TITLE_MIN * d, Dp.HERO_TITLE_MAX * d),
-                    heroMetaSize = (heroHeight * 0.145f).coerceIn(Dp.HERO_META_MIN * d, Dp.HERO_META * d),
-                    rowTitleSize = (rowHeight * 0.30f).coerceIn(Dp.ROW_TITLE_MIN * d, Dp.ROW_TITLE * d),
-                    rowMetaSize = (rowHeight * 0.23f).coerceIn(Dp.ROW_META_MIN * d, Dp.ROW_META * d),
-                    maxScroll = maxScroll,
-                    scrollUp = scrollUp,
-                    scrollDown = scrollDown
-                )
             }
 
-            // First pass without the button column; if the column does not fit the free height,
-            // the second pass is the one that gets drawn, with the buttons given their own lane.
-            var placed = place(scrolling = false)
-            if (placed.maxScroll > 0f) placed = place(scrolling = true)
-            if (sideBySide && placed.cards.first().width * COLUMNS < HomeDashboardTheme.SIDE_BY_SIDE_MIN_WIDTH * d) {
-                sideBySide = false
-                placed = place(scrolling = placed.scrollable)
-                if (placed.maxScroll > 0f && placed.scrollUp == null) placed = place(scrolling = true)
-            }
-            return placed
+            val contentTop = logo.bottom.coerceAtLeast(top + Dp.HEADER * u)
+            val contentBottom = cursor
+            val maxScroll = if (scrolling) max(0f, contentBottom - bottom) else 0f
+            // Everything under the header scrolls; the header itself stays put.
+            val viewport = MenuBox(left, contentTop, right, if (scrolling) bottom else contentBottom)
+
+            val buttonSize = Dp.SCROLL_BUTTON * d
+            val buttonLeft = safe.left + margin
+            val scrollUp = if (maxScroll > 0f) {
+                MenuBox(buttonLeft, viewport.top + gap, buttonLeft + buttonSize, viewport.top + gap + buttonSize)
+            } else null
+            val scrollDown = if (maxScroll > 0f) {
+                MenuBox(buttonLeft, viewport.bottom - buttonSize, buttonLeft + buttonSize, viewport.bottom)
+            } else null
+
+            return HomeDashboardLayout(
+                density = d,
+                unit = u,
+                logo = logo,
+                titleX = logo.right + Dp.LOGO_TO_TITLE * u,
+                titleSize = Dp.TITLE * u,
+                viewport = viewport,
+                hero = hero,
+                cards = cards,
+                recentHeader = recentHeader,
+                queueHeader = queueHeader,
+                recentRows = recentRows,
+                maxScroll = maxScroll,
+                scrollUp = scrollUp,
+                scrollDown = scrollDown,
+                labelSize = labelSize
+            )
         }
 
-        /** Line box of a text run as a multiple of its size; roughly ascent+descent for this family. */
-        private const val LINE_RATIO = 1.3f
+        /** The card's insides: art and text on top, progress and times, then the three controls. */
+        private fun heroBoxes(card: MenuBox, u: Float): HeroBoxes {
+            val pad = Dp.HERO_PADDING * u
+            val inner = Dp.HERO_INNER_GAP * u
+            val art = MenuBox(card.left + pad, card.top + pad, card.left + pad + Dp.HERO_ART * u, card.top + pad + Dp.HERO_ART * u)
+            val text = MenuBox(art.right + inner, art.top, card.right - pad, art.bottom)
+            val progressTop = art.bottom + inner
+            val progress = MenuBox(card.left + pad, progressTop, card.right - pad, progressTop + Dp.HERO_PROGRESS * u)
+            val timesTop = progress.bottom + Dp.HERO_PROGRESS * u
+            val times = MenuBox(progress.left, timesTop, progress.right, timesTop + Dp.HERO_TIME * LINE_RATIO * u)
+
+            val primary = Dp.CONTROL_PRIMARY * u
+            val side = Dp.CONTROL * u
+            val centerY = card.bottom - pad - primary / 2f
+            val play = MenuBox(card.centerX - primary / 2f, centerY - primary / 2f, card.centerX + primary / 2f, centerY + primary / 2f)
+            val previous = MenuBox(card.left + pad, centerY - side / 2f, card.left + pad + side, centerY + side / 2f)
+            val next = MenuBox(card.right - pad - side, centerY - side / 2f, card.right - pad, centerY + side / 2f)
+            return HeroBoxes(card, art, text, progress, times, previous, play, next)
+        }
     }
 }

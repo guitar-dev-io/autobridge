@@ -1257,10 +1257,11 @@
     <string name="car_home_speed_permission_denied">ไม่ได้รับสิทธิ์อ่านความเร็ว</string>
     <!-- Home dashboard sections, drawn by the app on the Android Auto surface. -->
     <string name="car_home_continue_watching">ดูต่อ</string>
-    <string name="car_home_quick_access">เข้าถึงด่วน</string>
-    <string name="car_home_recently_sent">ส่งมาล่าสุด</string>
-    <string name="car_home_queue">คิวเล่น</string>
-    <string name="car_home_sent_from_phone">จากมือถือ</string>
+    <string name="car_home_recent_from_phone">ส่งล่าสุดจากมือถือ</string>
+    <string name="car_home_now_playing">กำลังเล่น</string>
+    <plurals name="car_home_queue_items">
+        <item quantity="other">คิว %1$d รายการ</item>
+    </plurals>
     <string name="car_queue_title">คิวเล่น</string>
     <string name="car_queue_empty">ยังไม่มีรายการในคิว</string>
     <string name="car_time_just_now">เมื่อสักครู่</string>

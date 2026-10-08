@@ -1278,10 +1278,12 @@
     <string name="car_home_speed_permission_denied">Speed permission denied</string>
     <!-- Home dashboard sections, drawn by the app on the Android Auto surface. -->
     <string name="car_home_continue_watching">Continue Watching</string>
-    <string name="car_home_quick_access">Quick Access</string>
-    <string name="car_home_recently_sent">Recently Sent</string>
-    <string name="car_home_queue">Queue</string>
-    <string name="car_home_sent_from_phone">from phone</string>
+    <string name="car_home_recent_from_phone">Recently sent from phone</string>
+    <string name="car_home_now_playing">Now playing</string>
+    <plurals name="car_home_queue_items">
+        <item quantity="one">Queue · %1$d item</item>
+        <item quantity="other">Queue · %1$d items</item>
+    </plurals>
     <string name="car_queue_title">Queue</string>
     <string name="car_queue_empty">Nothing is queued yet</string>
     <string name="car_time_just_now">just now</string>
