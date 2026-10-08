@@ -234,7 +234,11 @@ class CarWebRenderer(context: Context) {
     }
 
     /** Which full-surface overlay is currently composited over the page. */
-    private enum class Overlay { NONE, DRAWER, DRAWER_MORE, TABS }
+    private enum class Overlay { NONE, DRAWER, DRAWER_MORE, DRAWER_SPLIT, TABS }
+
+    /** Any page of the menu sheet: the main list, More, or the split page. */
+    private val drawerOpen: Boolean
+        get() = overlay == Overlay.DRAWER || overlay == Overlay.DRAWER_MORE || overlay == Overlay.DRAWER_SPLIT
 
     /**
      * Exposes the scroll extents so page scrolling can be bounded.
@@ -1450,7 +1454,7 @@ class CarWebRenderer(context: Context) {
             handleTabOverlayClick(x, y)
             return@runOnMain
         }
-        if (overlay == Overlay.DRAWER || overlay == Overlay.DRAWER_MORE) {
+        if (drawerOpen) {
             val model = drawer
             if (model == null) {
                 closeDrawer()
@@ -1462,12 +1466,28 @@ class CarWebRenderer(context: Context) {
                 return@runOnMain
             }
             val row = model.rowAt(x, y)
+            // A layout picture on the split page: apply it and stay, so the choice shows at once.
+            row?.layout?.let { layout ->
+                pickSplitLayout(layout)
+                rebuildDrawer()
+                return@runOnMain
+            }
+            // On the split page the switch and the side swap show their result there.
+            if (row != null && overlay == Overlay.DRAWER_SPLIT &&
+                (row.item.action == DrawerAction.SPLIT_LAYOUT || row.item.action == DrawerAction.SWAP_SPLIT_SIDES)
+            ) {
+                performDrawerAction(row.item.action)
+                rebuildDrawer()
+                return@runOnMain
+            }
             if (row != null) {
                 when (row.item.action) {
                     // These two switch which list is drawn instead of closing the sheet, so it
                     // stays open across the "More" round trip.
                     DrawerAction.MORE -> openDrawerMore()
                     DrawerAction.BACK_TO_MENU -> openDrawer()
+                    // Split screen is one row on the main list; it opens the split page.
+                    DrawerAction.SPLIT_CHOOSE -> openDrawerSplit()
                     // A switch reports state, so the sheet stays open and redraws it. Closing on
                     // the way out would hide the one thing the tap was for.
                     DrawerAction.TOGGLE_DESKTOP -> {
@@ -1817,7 +1837,7 @@ class CarWebRenderer(context: Context) {
         val now = SystemClock.uptimeMillis()
         lastInputMs = now
         visibility.onInteraction(now)
-        if (overlay == Overlay.DRAWER || overlay == Overlay.DRAWER_MORE) {
+        if (drawerOpen) {
             val model = drawer ?: return@runOnMain
             drawerScroll = (drawerScroll + distanceY).coerceIn(0f, model.maxScroll)
             rebuildDrawer()
@@ -1983,6 +2003,29 @@ class CarWebRenderer(context: Context) {
         trace(ViewportDebug.Event.DRAWER, "open=true more=true")
     }
 
+    /** Switches the open drawer to the split page: the switch and the layouts as pictures. */
+    private fun openDrawerSplit() {
+        drawerScroll = 0f
+        overlay = Overlay.DRAWER_SPLIT
+        rebuildDrawer()
+        trace(ViewportDebug.Event.DRAWER, "open=true split=true")
+    }
+
+    /** A layout picked on the split page: the same path as cycling to it, without the cycle. */
+    private fun pickSplitLayout(layout: BrowserSplitLayout) {
+        dividerGrabbed = false
+        BrowserSplitStore.setLayout(appContext, layout)
+        applyControlSettings()
+        val label = layout.label(appContext)
+        host?.showMessage(
+            when {
+                isSplit -> label
+                !hardwareMode -> appContext.getString(R.string.car_split_unavailable_legacy, label)
+                else -> appContext.getString(R.string.car_split_too_narrow, label)
+            }
+        )
+    }
+
     fun closeDrawer() = runOnMain {
         if (overlay == Overlay.NONE) return@runOnMain
         overlay = Overlay.NONE
@@ -2013,6 +2056,8 @@ class CarWebRenderer(context: Context) {
         pinnedToolbar = alwaysShowUrlBar,
         splitActive = isSplit,
         zoomPercent = PageZoom.percent(focusedView),
+        splitLayout = splitLayout,
+        splitSideOnRight = splitSideOnRight,
     )
 
     private fun rebuildDrawer() {
@@ -2021,6 +2066,9 @@ class CarWebRenderer(context: Context) {
             more = overlay == Overlay.DRAWER_MORE,
             scrollOffset = drawerScroll,
             moreTitle = appContext.getString(R.string.drawer_more),
+            split = overlay == Overlay.DRAWER_SPLIT,
+            splitTitle = appContext.getString(R.string.drawer_split),
+            layoutLabels = BrowserSplitLayout.entries.associateWith { it.label(appContext) },
         )
     }
 
@@ -2466,7 +2514,7 @@ class CarWebRenderer(context: Context) {
             else -> null
         }
         chrome = BrowserChromeLayout.create(sizes, viewport, showToolbarMenuButton(), chromeBounds, fabOnLeft)
-        if (overlay == Overlay.DRAWER || overlay == Overlay.DRAWER_MORE) rebuildDrawer()
+        if (drawerOpen) rebuildDrawer()
         if (geometryUnchanged) {
             trace(event, "reflow=skipped")
             return
@@ -3038,7 +3086,7 @@ class CarWebRenderer(context: Context) {
         // — inactive until the sheet is dismissed.
         if (overlayOpen && alpha > 0.01f) drawToolbar(canvas, alpha)
         when (overlay) {
-            Overlay.DRAWER, Overlay.DRAWER_MORE -> drawDrawer(canvas)
+            Overlay.DRAWER, Overlay.DRAWER_MORE, Overlay.DRAWER_SPLIT -> drawDrawer(canvas)
             Overlay.TABS -> drawTabSwitcher(canvas)
             Overlay.NONE -> Unit
         }
@@ -3234,6 +3282,7 @@ class CarWebRenderer(context: Context) {
             when (it.kind) {
                 DrawerKind.LIST -> drawSheetListRow(canvas, it)
                 DrawerKind.ROUND -> drawSheetStepButton(canvas, it)
+                DrawerKind.LAYOUT -> drawSheetLayoutCard(canvas, it)
                 else -> drawSheetTile(canvas, it)
             }
         }
@@ -3489,6 +3538,69 @@ class CarWebRenderer(context: Context) {
                 box.centerY + detailPaint.textSize * 0.35f, detailPaint
             )
         }
+    }
+
+    /**
+     * A split layout on the split page: a small picture of the screen with the two panes at that
+     * layout's shares (the side pane on the side it is set to), the name below, and an accent
+     * outline on the one in use.
+     */
+    private fun drawSheetLayoutCard(canvas: Canvas, row: DrawerRow) {
+        val card = row.bounds
+        val layout = row.layout ?: return
+        val radius = sizes.dp(AutoUiSizes.SHEET_CORNER_RADIUS_DP).coerceAtMost(card.height * 0.2f)
+        toolbarPaint.color = BrowserTheme.dark.tileBackground
+        canvas.drawRoundRect(card.left, card.top, card.right, card.bottom, radius, radius, toolbarPaint)
+        if (row.item.on) {
+            val stroke = sizes.dp(3f)
+            val outline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE
+                strokeWidth = stroke
+                color = BrowserTheme.dark.accent
+            }
+            canvas.drawRoundRect(
+                card.left + stroke / 2f, card.top + stroke / 2f, card.right - stroke / 2f, card.bottom - stroke / 2f,
+                radius, radius, outline
+            )
+        }
+
+        val pad = sizes.contentGap * 0.8f
+        val labelSize = (sizes.iconSmall * 0.72f).coerceAtMost(card.height * 0.16f)
+        val picBottom = card.bottom - pad - labelSize * 1.6f
+        val picHeight = (picBottom - card.top - pad).coerceAtLeast(1f)
+        val picWidth = (picHeight * 16f / 9f).coerceAtMost(card.width - pad * 2f)
+        val picLeft = card.centerX - picWidth / 2f
+        val picTop = card.top + pad
+        val gap = sizes.dp(3f)
+        val sideWidth = picWidth * layoutSideShare(layout)
+        val mainWidth = picWidth - sideWidth - gap
+        val sideRight = menuSideOnRight
+        val mainLeft = if (sideRight) picLeft else picLeft + sideWidth + gap
+        val sideLeft = if (sideRight) picLeft + mainWidth + gap else picLeft
+        val corner = sizes.dp(4f)
+        toolbarPaint.color = if (row.item.on) BrowserTheme.dark.accent else BrowserTheme.dark.iconEnabled
+        canvas.drawRoundRect(mainLeft, picTop, mainLeft + mainWidth, picTop + picHeight, corner, corner, toolbarPaint)
+        toolbarPaint.color = BrowserTheme.dark.iconDisabled
+        canvas.drawRoundRect(sideLeft, picTop, sideLeft + sideWidth, picTop + picHeight, corner, corner, toolbarPaint)
+
+        detailPaint.color = BrowserTheme.dark.textPrimary
+        detailPaint.textSize = labelSize
+        val align = detailPaint.textAlign
+        detailPaint.textAlign = Paint.Align.CENTER
+        canvas.drawText(fit(row.item.value, detailPaint, card.width - pad), card.centerX, card.bottom - pad, detailPaint)
+        detailPaint.textAlign = align
+    }
+
+    /** Which side the second page is on, as the split page pictures it. */
+    private val menuSideOnRight: Boolean get() = splitSideOnRight
+
+    /** The side page's share of the width in each layout's picture; matches [CarMenuList]. */
+    private fun layoutSideShare(layout: BrowserSplitLayout): Float = when (layout) {
+        BrowserSplitLayout.SINGLE -> 0f
+        BrowserSplitLayout.HALF -> 0.5f
+        BrowserSplitLayout.FORTY_SIXTY -> 0.4f
+        BrowserSplitLayout.SIXTY_FIVE_THIRTY_FIVE -> 0.35f
+        BrowserSplitLayout.PORTRAIT_LANDSCAPE -> 0.3f
     }
 
     private fun drawSheetTile(canvas: Canvas, row: DrawerRow) {
