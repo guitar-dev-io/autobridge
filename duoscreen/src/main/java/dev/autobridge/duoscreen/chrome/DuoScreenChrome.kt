@@ -9,10 +9,11 @@ import dev.autobridge.duoscreen.layout.DuoScreenPane
 import dev.autobridge.duoscreen.layout.DuoScreenPreset
 
 /**
- * Sizes of the app-drawn controls, in dp. [REGULAR] is the Duo screen design ("Duo screen · ใหม่"
- * and its Arrange board on the design canvas), drawn for a large portrait head unit. A small or
- * short surface gets [COMPACT]: on an 800 x 400 unit the design's 72dp bar took a tenth of the
- * width and three panes were left 238px each, so everything there is about two thirds the size.
+ * Sizes of the app-drawn controls, in dp. [REGULAR] is for a large portrait head unit, a step
+ * below the Duo screen design's 72dp bar and 56dp buttons, which read as far too big on the car
+ * display. A small or short surface gets [COMPACT]: on an 800 x 400 unit even that took a tenth of
+ * the width, so there the bar is 40dp with 32dp buttons. The touch area is still the bar's full
+ * thickness and half the gap either side, larger than what is drawn.
  */
 @Suppress("PropertyName")
 data class DuoScreenChromeSpec(
@@ -62,22 +63,22 @@ data class DuoScreenChromeSpec(
         const val COMPACT_BELOW_DP = 720f
 
         val REGULAR = DuoScreenChromeSpec(
-        BAR = 72f,
-        SEAM = 14f,
-        BUTTON = 56f,
-        BUTTON_RADIUS = 16f,
-        BUTTON_GAP = 10f,
-        BUTTON_ICON = 26f,
+        BAR = 56f,
+        SEAM = 12f,
+        BUTTON = 44f,
+        BUTTON_RADIUS = 14f,
+        BUTTON_GAP = 8f,
+        BUTTON_ICON = 22f,
         BAR_PADDING = 6f,
-        GRIP_LENGTH = 120f,
-        GRIP_THICKNESS = 8f,
-        PILL = 56f,
-        GRIP_PILL_LENGTH = 150f,
-        PILL_PADDING = 24f,
-        PILL_ICON = 26f,
-        PILL_ICON_GAP = 10f,
-        PILL_TEXT = 20f,
-        PILL_GROUP_GAP = 16f,
+        GRIP_LENGTH = 100f,
+        GRIP_THICKNESS = 6f,
+        PILL = 44f,
+        GRIP_PILL_LENGTH = 120f,
+        PILL_PADDING = 18f,
+        PILL_ICON = 22f,
+        PILL_ICON_GAP = 8f,
+        PILL_TEXT = 18f,
+        PILL_GROUP_GAP = 12f,
         CHIP = 64f,
         CHIP_RADIUS = 22f,
         CHIP_PADDING = 20f,
@@ -102,22 +103,22 @@ data class DuoScreenChromeSpec(
         )
 
         val COMPACT = DuoScreenChromeSpec(
-        BAR = 48f,
-        SEAM = 10f,
-        BUTTON = 40f,
-        BUTTON_RADIUS = 12f,
-        BUTTON_GAP = 8f,
-        BUTTON_ICON = 20f,
+        BAR = 40f,
+        SEAM = 8f,
+        BUTTON = 32f,
+        BUTTON_RADIUS = 10f,
+        BUTTON_GAP = 6f,
+        BUTTON_ICON = 18f,
         BAR_PADDING = 4f,
-        GRIP_LENGTH = 80f,
-        GRIP_THICKNESS = 6f,
-        PILL = 40f,
-        GRIP_PILL_LENGTH = 100f,
-        PILL_PADDING = 16f,
-        PILL_ICON = 20f,
-        PILL_ICON_GAP = 8f,
-        PILL_TEXT = 16f,
-        PILL_GROUP_GAP = 12f,
+        GRIP_LENGTH = 64f,
+        GRIP_THICKNESS = 5f,
+        PILL = 32f,
+        GRIP_PILL_LENGTH = 80f,
+        PILL_PADDING = 12f,
+        PILL_ICON = 16f,
+        PILL_ICON_GAP = 6f,
+        PILL_TEXT = 14f,
+        PILL_GROUP_GAP = 10f,
         CHIP = 44f,
         CHIP_RADIUS = 16f,
         CHIP_PADDING = 14f,
