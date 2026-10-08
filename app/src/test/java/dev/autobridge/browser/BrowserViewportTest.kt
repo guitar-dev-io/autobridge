@@ -887,6 +887,27 @@ class BrowserDrawerModelTest {
         assertTrue(BrowserDrawerModel.moreItems().map { it.action }.contains(DrawerAction.PASTE_AND_GO))
     }
 
+    /** The car's "More" list is labelled groups of rows, and grouping loses or repeats nothing. */
+    @Test fun theMoreListIsGroupedWithoutLosingAnEntry() {
+        val listed = BrowserDrawerModel.moreItems(state).map { it.action }
+        val grouped = BrowserDrawerModel.moreSections(state).flatMap { it.second }.map { it.action }
+        assertEquals(listed.size, grouped.size)
+        assertEquals(listed.toSet(), grouped.toSet())
+        val more = modelFor(1024, 600, 160, more = true)
+        assertTrue(more.tiles.all { it.kind == DrawerKind.LIST })
+        assertTrue(more.sectionLabels.isNotEmpty())
+        assertEquals(grouped.toSet(), more.tiles.map { it.item.action }.toSet())
+    }
+
+    /** Steppers and switches leave the menu open; everything that goes somewhere closes it. */
+    @Test fun zoomAndSwitchesKeepTheMenuOpen() {
+        assertTrue(BrowserDrawerModel.keepsMenuOpen(DrawerAction.ZOOM_IN))
+        assertTrue(BrowserDrawerModel.keepsMenuOpen(DrawerAction.ZOOM_OUT))
+        assertTrue(BrowserDrawerModel.keepsMenuOpen(DrawerAction.TOGGLE_DESKTOP))
+        assertFalse(BrowserDrawerModel.keepsMenuOpen(DrawerAction.HISTORY))
+        assertFalse(BrowserDrawerModel.keepsMenuOpen(DrawerAction.NEW_TAB))
+    }
+
     /**
      * The car sheet mirrors the phone's [BrowserMenuSheet]: one accent primary button, then
      * Back / Reload / Forward and Bookmarks / Settings / Split screen / More, then the desktop

@@ -45,6 +45,7 @@ import dev.autobridge.browser.BrowserAdBlock
 import dev.autobridge.browser.BrowserDownloads
 import dev.autobridge.browser.BrowserMenuState
 import dev.autobridge.browser.CarBrowserAbout
+import dev.autobridge.browser.BrowserDrawerModel
 import dev.autobridge.browser.CarMenuList
 import dev.autobridge.browser.DrawerAction
 import dev.autobridge.browser.MenuSurface
@@ -1177,8 +1178,9 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
     private fun openMenu() {
         noteInteraction()
         if (!allowed()) return enforcePolicy()
-        val rows = CarMenuList.build(this, menuState(), menuStyle()) { action ->
-            dismissOverlay()
+        val rows = CarMenuList.build(this, menuState(), menuStyle(), refresh = ::menuState) { action ->
+            // Zoom, switches and Save stay open so they can be pressed again; see keepsMenuOpen.
+            if (!BrowserDrawerModel.keepsMenuOpen(action)) dismissOverlay()
             runMenuAction(action)
         }
         // The page's own name and host, so the menu says which page it acts on.

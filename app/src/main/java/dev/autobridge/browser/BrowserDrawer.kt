@@ -128,6 +128,9 @@ enum class DrawerKind {
 
     /** The address row itself: tapping anywhere that is not one of its buttons edits the URL. */
     ADDRESS,
+
+    /** A row in the "More" list: the icon on the left, the label beside it. */
+    LIST,
 }
 
 /** A tappable entry, before it has been given a place on screen. */
@@ -266,6 +269,8 @@ class BrowserDrawerModel private constructor(
     val contentHeight: Float,
     val visibleHeight: Float,
     val scrollOffset: Float,
+    /** The "More" list's group headings (string id, box); scrolls with the rows. */
+    val sectionLabels: List<Pair<Int, Box>> = emptyList(),
 ) {
     companion object {
         /**
@@ -414,6 +419,55 @@ class BrowserDrawerModel private constructor(
             DrawerItem(DrawerAction.DIAGNOSTICS, R.string.drawer_about, BrowserIcon.INFO),
         )
 
+        /**
+         * The "More" list as labelled groups, in the order the sheet draws them. The car's list is
+         * split by what an entry is for; anything not named below (added later) joins the last
+         * group, so nothing can fall off the sheet. The phone's list stays one unlabelled group.
+         */
+        fun moreSections(state: BrowserMenuState): List<Pair<Int, List<DrawerItem>>> {
+            val items = moreItems(state)
+            if (state.surface == MenuSurface.PHONE) return listOf(0 to items)
+            val byAction = items.associateBy { it.action }
+            val used = HashSet<DrawerAction>()
+            fun group(vararg actions: DrawerAction): List<DrawerItem> =
+                actions.mapNotNull { action -> byAction[action]?.takeIf { used.add(action) } }
+            val goTo = group(
+                DrawerAction.NEW_TAB, DrawerAction.HOME, DrawerAction.HISTORY, DrawerAction.DOWNLOADS,
+                DrawerAction.MEDIA_CENTER, DrawerAction.NOW_PLAYING, DrawerAction.MEDIA_LIBRARY, DrawerAction.AGENT,
+            )
+            val page = group(
+                DrawerAction.BOOKMARK_PAGE, DrawerAction.FIND_IN_PAGE, DrawerAction.COPY_URL,
+                DrawerAction.PASTE_AND_GO, DrawerAction.OPEN_EXTERNAL, DrawerAction.ZOOM_OUT,
+                DrawerAction.ZOOM_IN, DrawerAction.PIN_TOOLBAR,
+            )
+            val split = group(DrawerAction.SPLIT_CHOOSE, DrawerAction.SIDE_SHOW_PAGE, DrawerAction.SWAP_SPLIT_SIDES)
+            val app = group(
+                DrawerAction.NAVIGATE_MAPS, DrawerAction.MIRROR_PHONE, DrawerAction.CLEAR_DATA, DrawerAction.DIAGNOSTICS,
+            ) + items.filter { used.add(it.action) }
+            return listOf(
+                R.string.drawer_section_goto to goTo,
+                R.string.drawer_section_page to page,
+                R.string.drawer_section_split to split,
+                R.string.drawer_section_app to app,
+            ).filter { it.second.isNotEmpty() }
+        }
+
+        /**
+         * Whether tapping [action] leaves the menu open. Steppers and switches are pressed more
+         * than once or report a state the menu shows (zoom, desktop site, pinned toolbar, the
+         * ad-block switch, Save's star), so closing after each tap would make the driver reopen the
+         * menu to press again. Everything else goes somewhere or acts on the page, and closes it.
+         */
+        fun keepsMenuOpen(action: DrawerAction): Boolean = action in KEEP_MENU_OPEN
+
+        private val KEEP_MENU_OPEN = setOf(
+            DrawerAction.ZOOM_IN, DrawerAction.ZOOM_OUT, DrawerAction.TOGGLE_DESKTOP,
+            DrawerAction.PIN_TOOLBAR, DrawerAction.TOGGLE_AD_BLOCK, DrawerAction.BOOKMARK_PAGE,
+        )
+
+        /** Panel width from which the "More" list's rows sit two to a line. */
+        private const val MORE_TWO_COLUMNS_MIN_DP = 480f
+
         /** The phone's secondary list, in the order [MoreActionsSheet] draws it. */
         private fun phoneMoreItems(): List<DrawerItem> = listOf(
             DrawerItem(DrawerAction.RECEIVE_FROM_CAR, R.string.drawer_get_from_car, BrowserIcon.RECEIVE),
@@ -444,6 +498,8 @@ class BrowserDrawerModel private constructor(
             state: BrowserMenuState,
             more: Boolean = false,
             scrollOffset: Float = 0f,
+            /** The "More" list's title, resolved by the caller in the language in force. */
+            moreTitle: String = "More actions",
         ): BrowserDrawerModel {
             val gap = sizes.contentGap
             val tileGap = sizes.menuTileGap
@@ -501,6 +557,65 @@ class BrowserDrawerModel private constructor(
             val contentTop = headerBottom + gap
             val contentBottom = panel.bottom - gap
             val visibleHeight = (contentBottom - contentTop).coerceAtLeast(1f)
+
+            if (more) {
+                // Grouped rows instead of one uniform grid: four short labelled lists (Go to, This
+                // page, Split screen, AutoBridge), two columns where the panel is wide enough. A
+                // driver scans a heading and a few rows; a 22-tile grid gave no place to start.
+                val sections = moreSections(state)
+                val columns = if (innerWidth >= sizes.dp(MORE_TWO_COLUMNS_MIN_DP)) 2 else 1
+                val rowHeight = sizes.touchTarget
+                val labelHeight = sizes.iconSmall * 1.6f
+                fun sectionHeight(labelRes: Int, items: List<DrawerItem>): Float {
+                    val lines = (items.size + columns - 1) / columns
+                    return (if (labelRes != 0) labelHeight else 0f) + lines * rowHeight + (lines - 1).coerceAtLeast(0) * tileGap
+                }
+                val contentHeight = sections.sumOf { (labelRes, items) -> sectionHeight(labelRes, items).toDouble() }.toFloat() +
+                    gap * (sections.size - 1).coerceAtLeast(0)
+                val maxScroll = (contentHeight - visibleHeight).coerceAtLeast(0f)
+                val offset = scrollOffset.coerceIn(0f, maxScroll)
+                val columnWidth = (innerWidth - tileGap * (columns - 1)) / columns
+                val rows = ArrayList<DrawerRow>()
+                val labels = ArrayList<Pair<Int, Box>>()
+                var cursor = contentTop - offset
+                sections.forEachIndexed { index, (labelRes, items) ->
+                    if (index > 0) cursor += gap
+                    if (labelRes != 0) {
+                        labels += labelRes to Box(innerLeft, cursor, innerRight, cursor + labelHeight)
+                        cursor += labelHeight
+                    }
+                    val lines = items.chunked(columns)
+                    lines.forEachIndexed { lineIndex, line ->
+                        line.forEachIndexed { column, item ->
+                            val left = innerLeft + column * (columnWidth + tileGap)
+                            rows += DrawerRow(item, Box(left, cursor, left + columnWidth, cursor + rowHeight), DrawerKind.LIST)
+                        }
+                        cursor += rowHeight
+                        if (lineIndex < lines.lastIndex) cursor += tileGap
+                    }
+                }
+                return BrowserDrawerModel(
+                    sizes = sizes,
+                    panel = panel,
+                    title = moreTitle,
+                    subtitle = "",
+                    grip = grip,
+                    header = header,
+                    titleLeft = titleLeft,
+                    closeButton = closeButton,
+                    headerLinks = headerLinks,
+                    address = null,
+                    primary = null,
+                    tiles = rows,
+                    dividers = emptyList(),
+                    toggles = emptyList(),
+                    headerBottom = headerBottom,
+                    contentHeight = contentHeight,
+                    visibleHeight = visibleHeight,
+                    scrollOffset = offset,
+                    sectionLabels = labels,
+                )
+            }
 
             val tileWant = sizes.dp(AutoUiSizes.MENU_TILE_HEIGHT_DP)
             val tileFloor = sizes.dp(AutoUiSizes.MIN_TILE_HEIGHT_DP)
