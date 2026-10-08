@@ -112,6 +112,17 @@ class MainActivity : androidx.activity.ComponentActivity() {
         const val GITHUB_URL = "https://github.com/guitar-dev-io/autobridge"
         const val FACEBOOK_URL = "https://www.facebook.com/share/19mw1X5Lou/"
 
+        /** Home checks for a newer release once per app process; see [maybeCheckUpdateFromHome]. */
+        var homeUpdateChecked = false
+
+        /** A newer release found by that check, shown as Home's update card until dismissed. */
+        var homeUpdate: dev.autobridge.update.UpdateChecker.Result.Available? = null
+
+        /** A Home check is skipped when the last answer was "up to date" and is this fresh. */
+        const val HOME_UPDATE_RECHECK_MS = 3 * 60 * 60 * 1000L
+        const val PREFS_HOME_UPDATE = "home_update"
+        const val KEY_DISMISSED_VERSION = "dismissed_version"
+
         const val STATE_SCREEN = "phone_screen"
         const val STATE_BACK_STACK = "phone_back_stack"
         const val STATE_APPS_FAVORITES = "apps_favorites_only"
@@ -420,6 +431,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
      * behind More. The car's own grid is unchanged.
      */
     private fun buildHomeScreen(): View {
+        maybeCheckUpdateFromHome()
         val layout = dev.autobridge.ui.PhoneHomeLayout
         val design = dev.autobridge.ui.AutoBridgeDesign
         val tiles = dev.autobridge.ui.PhoneHomeLayout.Tile.entries.map { tile ->
@@ -474,7 +486,10 @@ class MainActivity : androidx.activity.ComponentActivity() {
                         onEditQuickLaunch = { appsFavoritesOnly = true; showPhoneScreen(PhoneScreen.APPS) },
                         onOpenController = { showPhoneScreen(PhoneScreen.CONTROL) },
                         onMirror = { requestScreenCapture() },
-                        onBridgeDuo = duoScreenIntent()?.let { intent -> { startActivity(intent) } }
+                        onBridgeDuo = duoScreenIntent()?.let { intent -> { startActivity(intent) } },
+                        updateVersion = homeUpdate?.release?.versionName,
+                        onOpenUpdate = { homeUpdate?.let(::showUpdateDialog) },
+                        onDismissUpdate = ::dismissHomeUpdate
                     )
                 }
             }
@@ -1310,6 +1325,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
      * there is nothing to report beyond the version itself.
      */
     private fun updateCheckCaption(): String {
+        if (updateCheckRunning) return getString(R.string.about_check_update_checking)
         val current = BuildConfig.VERSION_NAME
         val last = UpdateChecker.lastCheck(this)
             ?: return getString(R.string.about_check_update_caption, current)
@@ -1325,11 +1341,22 @@ class MainActivity : androidx.activity.ComponentActivity() {
         }
     }
 
+    /** True while About's "Check for updates" is waiting on GitHub, so a second tap does not stack. */
+    private var updateCheckRunning = false
+
     private fun checkForUpdates() {
-        Toast.makeText(this, getString(R.string.about_check_update_checking), Toast.LENGTH_SHORT).show()
+        if (updateCheckRunning) return
+        updateCheckRunning = true
+        // A visible "loading" while GitHub answers: the check can take a few seconds on a slow
+        // connection, and a single toast left no sign that anything was still happening.
+        val progress = updateProgressDialog()
+        if (currentScreen == PhoneScreen.ABOUT) showPhoneScreen(PhoneScreen.ABOUT, force = true)
         UpdateChecker.checkAsync(this) { result ->
+            updateCheckRunning = false
             // The check outlives a back press or a rotation, so the activity may be gone by now.
             if (isFinishing || isDestroyed) return@checkAsync
+            runCatching { progress.dismiss() }
+            if (result is UpdateChecker.Result.Available) homeUpdate = result
             when (result) {
                 is UpdateChecker.Result.Available -> showUpdateDialog(result)
                 is UpdateChecker.Result.UpToDate -> Toast.makeText(
@@ -1346,6 +1373,54 @@ class MainActivity : androidx.activity.ComponentActivity() {
             // Redraw so the row caption carries what was just learned.
             if (currentScreen == PhoneScreen.ABOUT) showPhoneScreen(PhoneScreen.ABOUT, force = true)
         }
+    }
+
+    /** A small non-blocking dialog with a spinner and "Checking for updates…". */
+    private fun updateProgressDialog(): android.app.AlertDialog {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setPadding(dp(24), dp(20), dp(24), dp(20))
+            addView(android.widget.ProgressBar(this@MainActivity).apply { isIndeterminate = true }, LinearLayout.LayoutParams(dp(36), dp(36)))
+            addView(TextView(this@MainActivity).apply {
+                text = getString(R.string.about_check_update_checking)
+                textSize = 16f
+                setPadding(dp(16), 0, 0, 0)
+            })
+        }
+        return android.app.AlertDialog.Builder(this).setView(row).setCancelable(true).show()
+    }
+
+    /**
+     * Home's own update check: once per app process, sideload builds only (the Play build is
+     * updated by the store), and skipped when the last answer was "up to date" and recent. A newer
+     * release becomes the card at the top of Home rather than a dialog over it.
+     */
+    private fun maybeCheckUpdateFromHome() {
+        if (BuildConfig.AUTOBRIDGE_MODE == "SAFE" || homeUpdateChecked) return
+        homeUpdateChecked = true
+        val last = UpdateChecker.lastCheck(this)
+        if (last != null && !last.updateAvailable &&
+            System.currentTimeMillis() - last.checkedAtEpochMillis < HOME_UPDATE_RECHECK_MS
+        ) return
+        UpdateChecker.checkAsync(this) { result ->
+            if (isFinishing || isDestroyed) return@checkAsync
+            if (result !is UpdateChecker.Result.Available) return@checkAsync
+            val dismissed = getSharedPreferences(PREFS_HOME_UPDATE, MODE_PRIVATE).getString(KEY_DISMISSED_VERSION, null)
+            if (dismissed == result.release.versionName) return@checkAsync
+            homeUpdate = result
+            if (currentScreen == PhoneScreen.HOME) showPhoneScreen(PhoneScreen.HOME, force = true)
+        }
+    }
+
+    /** Hides Home's update card for this release; a later release shows it again. */
+    private fun dismissHomeUpdate() {
+        homeUpdate?.let { update ->
+            getSharedPreferences(PREFS_HOME_UPDATE, MODE_PRIVATE).edit()
+                .putString(KEY_DISMISSED_VERSION, update.release.versionName).apply()
+        }
+        homeUpdate = null
+        if (currentScreen == PhoneScreen.HOME) showPhoneScreen(PhoneScreen.HOME, force = true)
     }
 
     /**

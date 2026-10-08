@@ -62,7 +62,11 @@ fun HomeDashboard(
     onEditQuickLaunch: () -> Unit,
     onOpenController: () -> Unit,
     onMirror: () -> Unit,
-    onBridgeDuo: (() -> Unit)?
+    onBridgeDuo: (() -> Unit)?,
+    /** A newer release's version name when one was found; null hides the update card. */
+    updateVersion: String? = null,
+    onOpenUpdate: () -> Unit = {},
+    onDismissUpdate: () -> Unit = {}
 ) {
     val history by CommandHistoryStore.entries.collectAsState()
     val lastResult = rememberLastCommandResult()
@@ -73,6 +77,8 @@ fun HomeDashboard(
         Modifier.fillMaxWidth().background(ComposeTokens.Ink).padding(bottom = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
+        if (updateVersion != null) UpdateCard(updateVersion, onOpenUpdate, onDismissUpdate)
+
         AndroidAutoStatusCard(
             title = stringResource(R.string.control_android_auto),
             onClick = onOpenConnection,
@@ -144,6 +150,37 @@ fun HomeDashboard(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 row.forEach { tile -> QuickLaunchTile(tile, Modifier.weight(1f)) }
                 repeat(3 - row.size) { Box(Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
+/** "Version X is available": opens the update dialog; ✕ hides it for that release. */
+@Composable
+private fun UpdateCard(version: String, onOpen: () -> Unit, onDismiss: () -> Unit) {
+    val dismissDescription = stringResource(R.string.home_update_dismiss)
+    Surface(
+        onClick = onOpen,
+        shape = RoundedCornerShape(18.dp),
+        color = ComposeTokens.Accent.copy(alpha = 0.14f),
+        modifier = Modifier.fillMaxWidth().border(1.dp, ComposeTokens.Accent.copy(alpha = 0.4f), RoundedCornerShape(18.dp))
+    ) {
+        Row(Modifier.padding(start = 14.dp, top = 10.dp, bottom = 10.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(36.dp).background(ComposeTokens.Accent, RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center
+            ) { Text("⬇", color = ComposeTokens.Ink, fontSize = 18.sp, fontWeight = FontWeight.Bold) }
+            Column(Modifier.padding(start = 12.dp).weight(1f)) {
+                Text(
+                    stringResource(R.string.home_update_title, version),
+                    color = ComposeTokens.Text,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(stringResource(R.string.home_update_caption), color = ComposeTokens.TextMuted, fontSize = 12.5.sp)
+            }
+            TextButton(onClick = onDismiss, modifier = Modifier.semantics { contentDescription = dismissDescription }) {
+                Text("✕", color = ComposeTokens.TextMuted, fontSize = 16.sp)
             }
         }
     }
