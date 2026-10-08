@@ -605,10 +605,11 @@ class BrowserDrawerModelTest {
         scroll: Float = 0f,
         more: Boolean = false,
         state: BrowserMenuState = this.state,
+        split: Boolean = false,
     ): BrowserDrawerModel {
         val sizes = AutoUiSizes.forCarSurface(dpi)
         val viewport = BrowserViewport.create(width, height, sizes.density)
-        return BrowserDrawerModel.create(sizes, viewport, state, more, scroll)
+        return BrowserDrawerModel.create(sizes, viewport, state, more, scroll, split = split)
     }
 
     /**
@@ -947,15 +948,39 @@ class BrowserDrawerModelTest {
         )
         assertEquals("2", grid.single { it.item.action == DrawerAction.TABS }.item.value)
         assertEquals(
-            listOf(DrawerAction.TOGGLE_DESKTOP, DrawerAction.TOGGLE_FULLSCREEN, DrawerAction.PIN_TOOLBAR, DrawerAction.SPLIT_LAYOUT),
+            listOf(DrawerAction.TOGGLE_DESKTOP, DrawerAction.TOGGLE_FULLSCREEN, DrawerAction.PIN_TOOLBAR),
             model.toggles.map { it.item.action }
         )
+        // Split screen is one row, which opens the split page.
+        val splitRows = model.rows.filter {
+            it.item.action in setOf(DrawerAction.SPLIT_LAYOUT, DrawerAction.SPLIT_CHOOSE, DrawerAction.SIDE_SHOW_PAGE, DrawerAction.SWAP_SPLIT_SIDES)
+        }
+        assertEquals(listOf(DrawerAction.SPLIT_CHOOSE), splitRows.map { it.item.action })
         assertEquals(
             setOf(DrawerAction.ZOOM_OUT, DrawerAction.ZOOM_IN),
             model.tiles.filter { it.kind == DrawerKind.ROUND }.map { it.item.action }.toSet()
         )
         assertEquals(DrawerAction.MORE, model.tiles.last().item.action)
         assertTrue(model.sectionLabels.isNotEmpty())
+    }
+
+    /**
+     * The split page: the switch, every layout but "single" as a picture to pick (the one in use
+     * marked), then the side-page actions. Nothing overlaps and everything takes its own tap.
+     */
+    @Test fun theSplitPageShowsTheLayoutsAsPictures() {
+        val up = state.copy(splitActive = true, splitLayout = BrowserSplitLayout.HALF)
+        val model = modelFor(1024, 600, 160, state = up, split = true)
+        assertEquals(listOf(DrawerAction.SPLIT_LAYOUT), model.toggles.map { it.item.action })
+        val cards = model.rows.filter { it.kind == DrawerKind.LAYOUT }
+        assertEquals(BrowserSplitLayout.entries - BrowserSplitLayout.SINGLE, cards.map { it.layout })
+        assertEquals(listOf(BrowserSplitLayout.HALF), cards.filter { it.item.on }.map { it.layout })
+        assertTrue(DrawerAction.SIDE_SHOW_PAGE in model.rows.map { it.item.action })
+        assertTrue(model.headerLinks.any { it.item.action == DrawerAction.BACK_TO_MENU })
+        val visible = model.rows.filter { it !in model.headerLinks && it.bounds.centerY < model.panel.bottom }
+        visible.forEach { row -> assertEquals(row, model.rowAt(row.bounds.centerX, row.bounds.centerY)) }
+        val end = modelFor(1024, 600, 160, state = up, split = true, scroll = model.maxScroll)
+        assertTrue(end.contentBottom <= end.panel.bottom + 0.01f)
     }
 
     /** The zoom stepper shows the zoom it changes, between its − and + buttons. */
@@ -1017,6 +1042,11 @@ class BrowserDrawerModelTest {
             val primary = modelFor(1024, 600, 160, state = state.copy(surface = surface))
             val more = modelFor(1024, 600, 160, more = true, state = state.copy(surface = surface))
             covered += (primary.rows + more.rows).map { it.item.action }
+            // The car's split page holds the split switch and the side-page actions.
+            if (surface == MenuSurface.CAR) {
+                covered += modelFor(1024, 600, 160, split = true, state = state.copy(surface = surface))
+                    .rows.map { it.item.action }
+            }
             listOf(primary, more).forEach { model ->
                 val actions = model.rows.map { it.item.action }
                     // ADDRESS_KEYBOARD is deliberately both the row and its ⌕ button.

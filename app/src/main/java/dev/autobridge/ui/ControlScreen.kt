@@ -123,7 +123,13 @@ fun ControlScreen(
     // this screen is opened.
     LaunchedEffect(Unit) {
         AutoBridgeSessionManager.initialize(context)
-        AutoBridgeSessionManager.refresh()
+        // The car browser's page only reports where it is when asked, so the time under the
+        // progress bar stood still at whatever it read when this screen opened. Ask once a second
+        // while the screen is up; the loop ends with the screen.
+        while (true) {
+            AutoBridgeSessionManager.refresh()
+            kotlinx.coroutines.delay(POSITION_REFRESH_MS)
+        }
     }
 
     val bridgeState by AutoBridgeSessionManager.state.collectAsState()
@@ -185,10 +191,14 @@ fun ControlScreen(
 
     fun addToQueue(url: String, title: String = "") {
         val size = AutoBridgeSessionManager.queueAdd(context, BridgeSource(url, title))
+        val started = size != null && AutoBridgeSessionManager.startQueueIfIdle(context)
         Toast.makeText(
             context,
-            if (size == null) context.getString(R.string.browser_already_queued)
-            else context.getString(R.string.bridge_controller_queued),
+            when {
+                size == null -> context.getString(R.string.browser_already_queued)
+                started -> context.getString(R.string.queue_started_on_car)
+                else -> context.getString(R.string.bridge_controller_queued)
+            },
             Toast.LENGTH_SHORT
         ).show()
         revision++
@@ -1354,3 +1364,6 @@ private fun Card(onClick: (() -> Unit)? = null, content: @Composable () -> Unit)
 
 private fun formatTime(ts: Long): String =
     java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(ts))
+
+/** How often the Control screen asks the car for the playback position. */
+private const val POSITION_REFRESH_MS = 1_000L
