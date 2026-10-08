@@ -1222,6 +1222,12 @@
     <string name="car_browser_no_external">No external browser available</string>
 
     <!-- Car Browser search ([CarBrowserSearchScreen]). -->
+    <string name="car_field_fill">Fill in</string>
+    <string name="car_field_hint_text">Type into the field on the page</string>
+    <string name="car_field_hint_tel">Phone number</string>
+    <string name="car_field_hint_email">Email</string>
+    <string name="car_field_hint_number">Number</string>
+    <string name="car_field_note_title">Fills the field on the page</string>
     <string name="car_browser_search_go">Go</string>
     <string name="car_browser_search_hint">Type a URL or search</string>
 

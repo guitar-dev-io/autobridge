@@ -226,8 +226,9 @@ class CarBrowserScreen(carContext: CarContext) :
     }
 
     /** A page field took focus: type into it with the car's own keyboard, then fill it in and submit. */
-    override fun openFieldInput(current: String) {
-        screenManager.pushForResult(CarBrowserSearchScreen(carContext, current)) { result ->
+    override fun openFieldInput(current: String, label: String, type: String) {
+        val field = CarBrowserSearchScreen.Field(label = label, type = type)
+        screenManager.pushForResult(CarBrowserSearchScreen(carContext, current, field)) { result ->
             val text = result as? String ?: return@pushForResult
             if (text.isNotBlank()) renderer.submitText(text, autoSubmit = true)
         }

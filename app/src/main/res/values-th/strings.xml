@@ -1201,6 +1201,12 @@
     <string name="car_browser_no_external">ไม่มีเบราว์เซอร์ภายนอก</string>
 
     <!-- Car Browser search -->
+    <string name="car_field_fill">กรอก</string>
+    <string name="car_field_hint_text">พิมพ์ลงช่องในหน้าเว็บ</string>
+    <string name="car_field_hint_tel">เบอร์โทรศัพท์</string>
+    <string name="car_field_hint_email">อีเมล</string>
+    <string name="car_field_hint_number">ตัวเลข</string>
+    <string name="car_field_note_title">กรอกลงช่องในหน้าเว็บ</string>
     <string name="car_browser_search_go">ไป</string>
     <string name="car_browser_search_hint">พิมพ์ URL หรือคำค้นหา</string>
 

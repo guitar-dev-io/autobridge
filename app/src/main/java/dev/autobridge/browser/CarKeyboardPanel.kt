@@ -242,6 +242,33 @@ class CarKeyboardPanel(
         """
 
         /**
+         * Like [FOCUSED_FIELD_SCRIPT], but a JSON object `{value, label, type}`, or null when no
+         * typeable field has focus. [label] is what the page calls the field (placeholder,
+         * aria-label, its <label>, or its name), so the car's input screen can say which field it
+         * fills instead of looking like the address bar.
+         */
+        const val FOCUSED_FIELD_INFO_SCRIPT = """
+            (function(){
+              var el = document.activeElement;
+              if (!el) return null;
+              function labelOf(e){
+                var t = e.getAttribute('placeholder') || e.getAttribute('aria-label') || '';
+                if (!t && e.id) { var l = document.querySelector('label[for="' + e.id + '"]'); if (l) t = l.textContent; }
+                if (!t && e.closest) { var p = e.closest('label'); if (p) t = p.textContent; }
+                if (!t) t = e.getAttribute('title') || e.getAttribute('name') || '';
+                return (t || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+              }
+              if (el.isContentEditable) return JSON.stringify({value: el.textContent || '', label: labelOf(el), type: 'text'});
+              if (el.readOnly || el.disabled) return null;
+              if (el.tagName === 'TEXTAREA') return JSON.stringify({value: el.value || '', label: labelOf(el), type: 'text'});
+              if (el.tagName !== 'INPUT') return null;
+              var t = (el.type || 'text').toLowerCase();
+              if (['text', 'search', 'url', 'email', 'tel', 'number'].indexOf(t) < 0) return null;
+              return JSON.stringify({value: el.value || '', label: labelOf(el), type: t});
+            })();
+        """
+
+        /**
          * The script that puts [value] (already a quoted JS string literal) into the page's
          * focused field, and with [submit] submits its form or presses Enter. Returns 'OK', or
          * 'NO_FOCUS' when nothing editable has focus.
