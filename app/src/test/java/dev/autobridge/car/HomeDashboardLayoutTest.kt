@@ -202,7 +202,7 @@ class HomeDashboardLayoutTest {
         assertTrue("the compact column should fit", !layout.scrollable)
         assertNotNull("the Now Playing card stays beside the grid", layout.hero)
         assertTrue(layout.cards.first().left > layout.hero!!.card.right)
-        assertTrue("no header in compact", layout.hero!!.card.top < 40f)
+        assertTrue("the compact header is smaller", layout.logo.height < HomeDashboardTheme.ROOMY.logo)
     }
 
     @Test
@@ -215,7 +215,7 @@ class HomeDashboardLayoutTest {
         val hero = layout.hero!!.card
         assertTrue("the grid must stay beside the card", layout.cards.first().left > hero.right)
         assertTrue("every card visible without scrolling", layout.cards.last().bottom <= layout.viewport.bottom)
-        assertTrue("the section line peeks above the fold", layout.queueHeader!!.bottom <= layout.viewport.bottom)
+        assertTrue("the header stays on screen", layout.logo.bottom <= layout.cards.first().top)
     }
 
     @Test

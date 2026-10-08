@@ -74,9 +74,6 @@ internal object HomeDashboardTheme {
         const val MARGIN = 28f
 
         // Header
-        const val LOGO = 54f
-        const val HEADER = 56f
-        const val TITLE = 28f
         const val LOGO_TO_TITLE = 14f
 
         /** Between every section, and between the cards of the grid. */
@@ -152,14 +149,18 @@ internal object HomeDashboardTheme {
      * [ROOMY] is the design as drawn for a 1280 × 720 unit (canvas "Home v2 · ทาง A"): a 420dp top
      * row, big cards and controls, the AutoBridge header. A short head unit cannot hold that without
      * scrolling, so it gets [COMPACT] instead: the earlier CarHomeNew proportions (274dp top row,
-     * 128dp cards), a narrower Now Playing card, tighter edges and no header. On an 800 × 400 unit
-     * that fits whole; where the host also takes a top band and a dock (the DHU's 800 × 480 profile
-     * leaves 776 × 300) the card and the whole grid still fit and only the sent row sits below the
-     * fold. The host already names the app, so the wordmark is the first thing to go, and a narrower
-     * card is what keeps the grid beside it rather than stacking under it.
+     * 128dp cards), a narrower Now Playing card, tighter edges and a smaller header (32dp logo,
+     * 20dp wordmark). On an 800 × 400 unit that fits whole; where the host also takes a top band
+     * and a dock (the DHU's 800 × 480 profile leaves 776 × 300) the header, the card and the whole
+     * grid still fit and the sent section sits below the fold. A narrower card is what keeps the
+     * grid beside it rather than stacking under it.
      */
     data class Profile(
-        val showHeader: Boolean,
+        /** The AutoBridge header row: its height, the logo in it, the wordmark, and the gap below. */
+        val header: Float,
+        val logo: Float,
+        val title: Float,
+        val headerGap: Float,
         val topPadding: Float,
         val bottomPadding: Float,
         val heroWidth: Float,
@@ -180,14 +181,14 @@ internal object HomeDashboardTheme {
     )
 
     val ROOMY = Profile(
-        showHeader = true, topPadding = 20f, bottomPadding = 16f, heroWidth = 400f,
+        header = 56f, logo = 54f, title = 28f, headerGap = 18f, topPadding = 20f, bottomPadding = 16f, heroWidth = 400f,
         cardHeight = 201f, cardPadding = 22f, icon = 64f, iconRadius = 18f,
         iconLabelGap = 14f, label = 22f, heroStackedHeight = 310f, heroPadding = 20f, heroArt = 108f,
         heroTitle = 23f, heroInnerGap = 16f, control = 80f, controlPrimary = 96f
     )
 
     val COMPACT = Profile(
-        showHeader = false, topPadding = 8f, bottomPadding = 8f, heroWidth = 300f,
+        header = 36f, logo = 32f, title = 20f, headerGap = 10f, topPadding = 8f, bottomPadding = 8f, heroWidth = 300f,
         cardHeight = 128f, cardPadding = 20f, icon = 56f, iconRadius = 16f,
         iconLabelGap = 12f, label = 21f, heroStackedHeight = 274f, heroPadding = 18f, heroArt = 84f,
         heroTitle = 21f, heroInnerGap = 14f, control = 72f, controlPrimary = 84f

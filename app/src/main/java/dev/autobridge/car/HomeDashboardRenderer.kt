@@ -128,7 +128,7 @@ internal class HomeDashboardRenderer(private val context: Context) {
         thumbnails: Thumbnails
     ) {
         canvas.drawColor(HomeDashboardTheme.BACKGROUND)
-        if (layout.profile.showHeader) drawHeader(canvas, layout)
+        drawHeader(canvas, layout)
 
         canvas.save()
         val viewport = layout.viewport

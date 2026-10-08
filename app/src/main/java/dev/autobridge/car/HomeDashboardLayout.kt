@@ -178,7 +178,7 @@ internal class HomeDashboardLayout private constructor(
             queueLabel: String
         ): HomeDashboardLayout {
             val d = density
-            val headerBand = if (profile.showHeader) Dp.HEADER + Dp.GAP else 0f
+            val headerBand = profile.header + profile.headerGap
             val hasHero = content.hasContinueWatching
             val recentCount = min(content.recentlySent.size, MAX_RECENT)
             // The placeholder row stands in for the sent items; it is one row however wide.
@@ -255,8 +255,8 @@ internal class HomeDashboardLayout private constructor(
             val right = left + width
 
             // --- header ---------------------------------------------------------------------
-            val logoSize = Dp.LOGO * u
-            val headerTop = top + (Dp.HEADER * u - logoSize) / 2f
+            val logoSize = profile.logo * u
+            val headerTop = top + (profile.header * u - logoSize) / 2f
             val logo = MenuBox(left, headerTop, left + logoSize, headerTop + logoSize)
             var cursor = top + headerBand * u
 
@@ -341,7 +341,7 @@ internal class HomeDashboardLayout private constructor(
                 cursor += rowHeight
             }
 
-            val contentTop = if (profile.showHeader) top + Dp.HEADER * u else top
+            val contentTop = top + profile.header * u
             val contentBottom = cursor
             val maxScroll = if (scrolling) max(0f, contentBottom - bottom) else 0f
             // Everything under the header scrolls; the header itself stays put.
@@ -362,7 +362,7 @@ internal class HomeDashboardLayout private constructor(
                 unit = u,
                 logo = logo,
                 titleX = logo.right + Dp.LOGO_TO_TITLE * u,
-                titleSize = Dp.TITLE * u,
+                titleSize = profile.title * u,
                 viewport = viewport,
                 hero = hero,
                 emptyHero = emptyHero,
