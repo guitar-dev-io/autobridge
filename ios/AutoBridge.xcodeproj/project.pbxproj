@@ -12,6 +12,7 @@
 		09220BAFC31E31E57E23974E /* PlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE6B47C8061C685ABA88F45D /* PlayerView.swift */; };
 		142704BF823BA667FE09BCF4 /* DirectoryPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E10783D21B5732498DB7A3B /* DirectoryPickerView.swift */; };
 		1D55504141FDB9933DC4A58B /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D782EA9E716E03CD2E3A8460 /* SettingsView.swift */; };
+		1D777DAB259AC48816F23E0F /* BuildFlavor.swift in Sources */ = {isa = PBXBuildFile; fileRef = D372FD1C63A1C741B96835B8 /* BuildFlavor.swift */; };
 		2362113433707AC6D3650BCD /* HomeSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 064AEAD4C677350DCB182E62 /* HomeSection.swift */; };
 		27284DF0EE3CA088E69D0A7C /* SecretStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C72312437F67EE6EC6AA0B5 /* SecretStore.swift */; };
 		276D3932E678D41111222626 /* SponsorBlockClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C7243F20A7F9072F4DA9C06 /* SponsorBlockClient.swift */; };
@@ -24,6 +25,7 @@
 		3D751552675C15D534AE41B4 /* EntriesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8CD1B0AFCBA2049D81507C1 /* EntriesView.swift */; };
 		43E7C05C5CBB30EE986B1407 /* M3UParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = F33FD94FA9377C4C7EDDE399 /* M3UParser.swift */; };
 		562C490D509CD063D7AFF95C /* LogoImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1525E900FD0B1F7348559808 /* LogoImage.swift */; };
+		67F1CF0911081090A777C970 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 3DA24DC46A8A91E3C84BC267 /* PrivacyInfo.xcprivacy */; };
 		687A83C4AE1EBFA574C27E19 /* IptvParsingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B5C83969DF4E421EEA46DDB /* IptvParsingTests.swift */; };
 		6B61389680755EB25DC009B5 /* YouTubeUrls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90A6641BCB55772A45E5C18E /* YouTubeUrls.swift */; };
 		6BB625D980A36018FC4FB7F8 /* LocalMediaView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B7E15B7DFC83A257CC9D761 /* LocalMediaView.swift */; };
@@ -55,6 +57,7 @@
 		F5AB8547D7ED937536F752CC /* IptvCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 189B3F1C31952ED59382B6D2 /* IptvCatalog.swift */; };
 		F9EB7FC677D9AA453689BDEF /* CategoriesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4EEFD36366253809E393E28 /* CategoriesView.swift */; };
 		FC4FF43AEF3C484CC2BC54C6 /* PublicPlaylistLiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48D0F34BA08E481909D56DBB /* PublicPlaylistLiveTests.swift */; };
+		FED2DE50F59594A87B2FBBF4 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1AD1AEDE1FB31939F1FF6B17 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -75,6 +78,7 @@
 		1525E900FD0B1F7348559808 /* LogoImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogoImage.swift; sourceTree = "<group>"; };
 		189B3F1C31952ED59382B6D2 /* IptvCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IptvCatalog.swift; sourceTree = "<group>"; };
 		1A7F594C1B644B794A02CDD4 /* AutoBridgeDesign.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoBridgeDesign.swift; sourceTree = "<group>"; };
+		1AD1AEDE1FB31939F1FF6B17 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		1C3DC95AD866C8BC32B6A802 /* YouTubeAdSkip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YouTubeAdSkip.swift; sourceTree = "<group>"; };
 		1C7243F20A7F9072F4DA9C06 /* SponsorBlockClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SponsorBlockClient.swift; sourceTree = "<group>"; };
 		1D5801B5316F3325CAE7139E /* AutoBridgeTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = AutoBridgeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -87,6 +91,7 @@
 		36355638D7775958447F2B46 /* IptvSourceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IptvSourceStore.swift; sourceTree = "<group>"; };
 		39EE8F3666AF3CFEBA6F3A94 /* YouTubeAddOnTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YouTubeAddOnTests.swift; sourceTree = "<group>"; };
 		3B7E15B7DFC83A257CC9D761 /* LocalMediaView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalMediaView.swift; sourceTree = "<group>"; };
+		3DA24DC46A8A91E3C84BC267 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		4290FBCFB77588B67364890B /* YouTubeSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YouTubeSettings.swift; sourceTree = "<group>"; };
 		44662BFD7604655B7B40F9C5 /* WebBookmarkStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebBookmarkStore.swift; sourceTree = "<group>"; };
 		48D0F34BA08E481909D56DBB /* PublicPlaylistLiveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublicPlaylistLiveTests.swift; sourceTree = "<group>"; };
@@ -109,6 +114,7 @@
 		C83CD83EAC29DF506D9646BD /* XtreamClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XtreamClient.swift; sourceTree = "<group>"; };
 		C874A91AF4C596E5BD9F1C74 /* HistoryViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryViews.swift; sourceTree = "<group>"; };
 		CC7D3A74BBDB6B6A996BCB89 /* MiniPlayerBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniPlayerBar.swift; sourceTree = "<group>"; };
+		D372FD1C63A1C741B96835B8 /* BuildFlavor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuildFlavor.swift; sourceTree = "<group>"; };
 		D782EA9E716E03CD2E3A8460 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		DA7132E64D602881AB4642B1 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
 		DC27C741D4CDE73F36C0CF16 /* IptvLogos.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IptvLogos.swift; sourceTree = "<group>"; };
@@ -129,6 +135,7 @@
 			children = (
 				FC2DC46EF46D56B3DCAE7B87 /* AutoBridgeApp.swift */,
 				223C495FD3D4E548509835FC /* AutoBridgeStores.swift */,
+				D372FD1C63A1C741B96835B8 /* BuildFlavor.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -255,8 +262,10 @@
 		FAB61FDDAB4E623B0D775450 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				1AD1AEDE1FB31939F1FF6B17 /* Assets.xcassets */,
 				14EC81D2CB9115E1C35443EE /* AutoBridge.entitlements */,
 				BDCF7A15D3729726728098DC /* Info.plist */,
+				3DA24DC46A8A91E3C84BC267 /* PrivacyInfo.xcprivacy */,
 				7A51E39C7216FC43DF300102 /* Localizable.strings */,
 			);
 			path = Resources;
@@ -346,7 +355,9 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				FED2DE50F59594A87B2FBBF4 /* Assets.xcassets in Resources */,
 				7DE5BCBE824FDA62EA1C63C2 /* Localizable.strings in Resources */,
+				67F1CF0911081090A777C970 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -361,6 +372,7 @@
 				6ED1D9C801A96F9E075E5782 /* AutoBridgeDesign.swift in Sources */,
 				C2CF7348E34F0E7FC397D1B9 /* AutoBridgeStores.swift in Sources */,
 				9EFD7115C935350856EB6108 /* BrowserView.swift in Sources */,
+				1D777DAB259AC48816F23E0F /* BuildFlavor.swift in Sources */,
 				D4C36BDB3E1FD10DFFEAA6A1 /* CarPlaySceneDelegate.swift in Sources */,
 				F9EB7FC677D9AA453689BDEF /* CategoriesView.swift in Sources */,
 				142704BF823BA667FE09BCF4 /* DirectoryPickerView.swift in Sources */,
@@ -547,6 +559,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = dev.autobridge.ios;
 				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = AUTOBRIDGE_STORE;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;

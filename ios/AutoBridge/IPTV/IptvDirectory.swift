@@ -5,7 +5,7 @@ import Foundation
 ///
 /// These are addresses only. AutoBridge does not host, mirror, bundle or redistribute any playlist
 /// or stream; each entry is fetched live from the project that publishes it, under that project's
-/// own terms. Nothing here is added automatically — adding a source stays an explicit action.
+/// own terms. The `seeded` entries are added on a fresh install; anything else stays an explicit action.
 public enum IptvDirectory {
     /// One offer in the picker. `note` is what the row says about the list. `seeded` marks the ones
     /// a fresh install starts with, so TV and Radio have something to show before anything is set.
@@ -63,13 +63,20 @@ public enum IptvDirectory {
         )
     ]
 
+    /// The lists this build offers. The store build offers radio only: a TV app that arrives with
+    /// channel lists reads to App Review as pointing at unlicensed streams, so there the user adds
+    /// their own TV playlist or Xtream account instead.
+    static func offered(store: Bool = BuildFlavor.isStore) -> [Entry] {
+        store ? entries.filter { $0.kind != .tv } : entries
+    }
+
     public static func list(kind: IptvKind) -> [Entry] {
-        entries.filter { $0.kind == kind }
+        offered().filter { $0.kind == kind }
     }
 
     /// The lists a fresh install starts with.
     public static func defaults() -> [Entry] {
-        entries.filter { $0.seeded }
+        offered().filter { $0.seeded }
     }
 
     /// Which defaults still have to be created, given the URLs already seeded once and the URLs

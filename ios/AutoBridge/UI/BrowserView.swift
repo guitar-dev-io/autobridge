@@ -107,10 +107,12 @@ struct BrowserView: View {
                             NSLocalizedString("Highest quality", comment: "YouTube add-on"),
                             isOn: $youtube.autoHighestQuality
                         )
-                        Toggle(
-                            NSLocalizedString("Skip ads", comment: "YouTube add-on"),
-                            isOn: $youtube.adSkipEnabled
-                        )
+                        if YouTubeSettings.adSkipAvailable {
+                            Toggle(
+                                NSLocalizedString("Skip ads", comment: "YouTube add-on"),
+                                isOn: $youtube.adSkipEnabled
+                            )
+                        }
                     }
                 }
             } label: {

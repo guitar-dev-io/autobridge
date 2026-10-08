@@ -1,0 +1,120 @@
+# แจกจ่ายแอป iOS: TestFlight, App Store และ CarPlay
+
+บันทึกนี้รวบรวมสิ่งที่ต้องทำก่อนให้เครื่องอื่นโหลดแอป AutoBridge iOS ไปใช้, ฟีเจอร์ที่เสี่ยงโดน App Review ปฏิเสธ และการขอสิทธิ์ CarPlay
+
+> **สถานะ (2026-10-08):** ตัดฟีเจอร์ 🔴 ออกจาก build สำหรับ store แล้ว ส่วน 🟡 ยังอยู่ครบ
+>
+> **Build แยกเป็น 2 แบบ:**
+> - **Debug:** ตอนกด Run จาก Xcode ได้ทุกฟีเจอร์
+> - **Release:** ตอน Archive เพื่อส่ง TestFlight หรือ App Store ตั้งค่า `AUTOBRIDGE_STORE` (ใน `project.yml`) จึงตัดฟีเจอร์ 🔴 ออก
+>
+> โค้ดอ่านค่านี้ผ่าน `AutoBridge/App/BuildFlavor.swift`
+
+## 1. วิธีแจกจ่าย
+
+ทุกวิธี ยกเว้นติดตั้งตรงจาก Xcode ด้วยบัญชีฟรี ต้องใช้ **Apple Developer Program แบบเสียเงิน ($99/ปี)**
+
+| วิธี | ใครใช้ได้ | ต้องผ่าน review ไหม | ข้อจำกัด |
+|---|---|---|---|
+| Xcode ติดตั้งตรง (บัญชีฟรี) | เครื่องตัวเองเท่านั้น | ไม่ | หมดอายุใน 7 วัน, ใช้ CarPlay ไม่ได้ |
+| TestFlight แบบคนในทีม | สมาชิกในบัญชีนักพัฒนา สูงสุด 100 คน | ไม่ | build หมดอายุใน 90 วัน |
+| TestFlight แบบลิงก์สาธารณะ | ใครก็ได้ที่มีลิงก์ สูงสุด 10,000 คน | Beta App Review (ผ่อนกว่า App Store) | build หมดอายุใน 90 วัน |
+| Ad Hoc | เครื่องที่ลงทะเบียน UDID สูงสุด 100 เครื่องต่อปี | ไม่ | ต้องเก็บ UDID ของแต่ละเครื่อง |
+| App Store | ทุกคน | App Review เต็มรูปแบบ | ดูหัวข้อ 3 |
+
+**แนะนำ:** เริ่มจาก TestFlight แบบคนในทีม ไม่ต้องผ่าน review จึงใช้ build เต็มที่มีทุกฟีเจอร์ได้
+
+ค่าที่ตั้งไว้ใน `project.yml`:
+- `DEVELOPMENT_TEAM`: `V9Q6ZN9L53` ต้องเป็นทีมที่จ่ายเงินแล้ว
+- `PRODUCT_BUNDLE_IDENTIFIER`: `dev.autobridge.ios`
+
+## 2. สิ่งที่ยังขาดก่อนอัปโหลด
+
+- [x] **ไอคอนแอป:** ✅ เพิ่มแล้วใน `Resources/Assets.xcassets/AppIcon.appiconset` วาดใหม่จาก `assets/AutoBridge.svg` ของ Android เป็นสี่เหลี่ยมเต็ม 1024px ให้ iOS ตัดมุมเอง เดิม: โปรเจกต์ยังไม่มี `Assets.xcassets` / `AppIcon` ถ้าไม่มี การอัปโหลดขึ้น App Store Connect จะไม่ผ่าน
+- [x] **Privacy manifest (`PrivacyInfo.xcprivacy`):** ✅ เพิ่มแล้วใน `Resources/PrivacyInfo.xcprivacy` เดิม: แอปใช้ `UserDefaults` ซึ่งเป็น required-reason API จึงต้องประกาศเหตุผล (`CA92.1`) ถ้าไม่มี จะได้คำเตือน ITMS-91053 หรือถูกตีกลับ
+- [x] **`ITSAppUsesNonExemptEncryption = NO` ใน `Info.plist`:** ✅ เพิ่มแล้ว เดิม: แอปใช้แค่ HTTPS ของระบบ ถ้าไม่ใส่ ต้องตอบคำถามเรื่องการเข้ารหัสทุกครั้งที่อัปโหลด
+- [ ] **ข้อมูลหน้าร้าน:** URL ของนโยบายความเป็นส่วนตัว, ภาพหน้าจอ, คำอธิบาย และ App Privacy (แอปไม่เก็บข้อมูลผู้ใช้)
+- [ ] **บัญชีทดสอบสำหรับ reviewer:** ใส่ใน App Review notes เช่น playlist วิทยุที่ถูกกฎหมาย เพื่อให้ reviewer เห็นว่าแอปเล่นอะไรได้
+
+## 3. ฟีเจอร์ที่เสี่ยงโดนปฏิเสธใน App Store
+
+ฟีเจอร์ 🔴 ถูกตัดออกจาก build Release แล้ว แต่ยังอยู่ใน build Debug ส่วน 🟡 ยังอยู่ทั้งสองแบบ ถ้าอยากตัดเพิ่ม ใช้ `BuildFlavor.isStore` ได้เลย
+
+### 🔴 เสี่ยงสูง
+
+| ฟีเจอร์ | อยู่ที่ไหน | เหตุผล |
+|---|---|---|
+| ข้ามและซ่อนโฆษณา YouTube | `AutoBridge/YouTube/YouTubeAdSkip.swift`, สวิตช์ `youtube.adSkip` ใน `YouTubeSettings.swift` | ขัดเงื่อนไขการใช้งานของ YouTube ซึ่งผิดกฎ 5.2.2 (บริการของบุคคลที่สาม) และ 5.2.3 (การเข้าถึงสื่อ) เป็นเหตุผลที่ถูกปฏิเสธบ่อยที่สุด **✅ ตัดออกจาก Release แล้ว:** ซ่อนสวิตช์ และไม่ฉีดสคริปต์ (`YouTubeSettings.adSkipAvailable`) |
+| รายการ TV สาธารณะที่ติดมากับแอป | `AutoBridge/IPTV/IptvDirectory.swift`: Free-TV และ Thai (dearbulut) ถูกเพิ่มให้อัตโนมัติ (`seeded: true`), iptv-org อยู่ในตัวเลือก | Apple มองว่าแอปพาไปหาสตรีมที่อาจไม่มีลิขสิทธิ์ (5.2.3) แอป IPTV ที่ผ่าน review มักไม่มีเนื้อหาติดมาเลย และให้ผู้ใช้ใส่ playlist เอง **✅ ตัดออกจาก Release แล้ว:** ไม่เพิ่มรายการ TV ให้อัตโนมัติ และไม่มีให้เลือก ปุ่ม Public lists ของ TV ถูกซ่อน ผู้ใช้ยังกด + M3U หรือ + Xtream เพื่อใส่เองได้ ส่วนวิทยุยังมีเหมือนเดิม (`IptvDirectory.offered`) |
+
+### 🟡 เสี่ยงกลาง
+
+| ฟีเจอร์ | อยู่ที่ไหน | เหตุผล |
+|---|---|---|
+| SponsorBlock (ข้ามช่วงสปอนเซอร์ใน YouTube) | `AutoBridge/YouTube/SponsorBlock.swift`, `SponsorBlockClient.swift` | แก้การเล่นของ YouTube ผ่านการฉีด JavaScript ขึ้นกับว่าใครรีวิว |
+| บังคับคุณภาพสูงสุดของ YouTube | `YouTubeEnhancer.swift`, สวิตช์ `youtube.autoHighestQuality` | เหตุผลเดียวกับ SponsorBlock แต่เบากว่า |
+| รายการเว็บสตรีมมิง | `AutoBridge/IPTV/StreamingLinks.swift` | เป็นแค่ลิงก์ไปเว็บ แต่ต้องไม่มีเว็บที่ปล่อยเนื้อหาผิดลิขสิทธิ์ |
+| เปิด ATS ทั้งหมด | `Info.plist`: `NSAllowsArbitraryLoads` และ `NSAllowsArbitraryLoadsInWebContent` | ต้องเขียนเหตุผลใน review notes ว่าสตรีม IPTV และวิทยุจำนวนมากยังเป็น `http://` ถ้าอธิบายชัดก็ผ่านได้ |
+
+### 🟢 ผ่านได้ตามปกติ
+
+- เครื่องเล่น IPTV ที่ผู้ใช้ใส่ M3U หรือ Xtream ของตัวเอง
+- วิทยุจาก radio-browser
+- เล่นเสียงในพื้นหลัง (`UIBackgroundModes: audio`) เพราะแอปเล่นเสียงจริง
+- เบราว์เซอร์ในแอป, รายการโปรด และประวัติการเล่น
+- Picture-in-picture และ AirPlay ผ่าน `VideoPlayer`
+
+### ถ้าจะส่ง App Store
+
+1. ~~ตัดการข้ามโฆษณา YouTube~~ ✅ ทำแล้วใน build Release
+2. ~~ไม่เพิ่มรายการ TV สาธารณะให้อัตโนมัติ~~ ✅ ทำแล้วใน build Release
+3. ใส่ข้อความในแอปและหน้าร้านว่า "แอปไม่มีเนื้อหาในตัว ผู้ใช้ต้องใช้ playlist ที่ตนมีสิทธิ์"
+4. วางตำแหน่งแอปเป็นเครื่องเล่นสื่อหรือวิทยุ ไม่ใช่แอปดูทีวีฟรี
+
+ถ้าทำครบ ประเมินว่าโอกาสผ่านปานกลางถึงดี ถ้าส่งแบบที่เป็นอยู่ตอนนี้ โอกาสผ่านต่ำ
+
+## 4. CarPlay
+
+**ต้องขอสิทธิ์จาก Apple:** สิทธิ์ `com.apple.developer.carplay-audio` เป็น managed entitlement ที่ Apple ต้องอนุมัติให้ App ID นี้ก่อน
+
+- [ ] **ส่งคำขอ:** ที่ https://developer.apple.com/contact/carplay/ ด้วยบัญชีที่จ่ายเงินแล้ว
+- [ ] **เลือกหมวด:** Audio โดยอธิบายว่าเป็นแอปวิทยุและเสียง เพราะ CarPlay ไม่อนุญาตให้เล่นวิดีโอ ฝั่ง CarPlay ของแอปเล่นแค่เสียงอยู่แล้ว (`CarPlay/CarPlaySceneDelegate.swift`)
+- [ ] **ระยะเวลา:** ไม่แน่นอน ตั้งแต่ไม่กี่วันถึงหลายสัปดาห์
+- [ ] **เมื่อได้รับอนุมัติ:** ใส่ key กลับใน `AutoBridge/Resources/AutoBridge.entitlements` ตามคอมเมนต์ในไฟล์ แล้วสร้าง provisioning profile ใหม่
+
+**ระหว่างรอ:**
+- ทดสอบบน CarPlay Simulator ใน Xcode ได้ (I/O → External Displays → CarPlay)
+- ใช้กับจอ CarPlay จริงหรือรถจริงไม่ได้ จนกว่าจะได้สิทธิ์
+- ตัวแอปบนมือถือทำงานได้ปกติโดยไม่มีสิทธิ์นี้
+
+**ดูวิดีโอบน CarPlay ขณะรถวิ่ง:** บน Android เรามีสวิตช์ที่ปิดไว้เป็นค่าเริ่มต้น และผู้ใช้เปิดเองได้ แต่บน iOS ทำแบบเดียวกันไม่ได้:
+- **ไม่มี API:** CarPlay ให้แอปบุคคลที่สามใช้แค่ template จึงไม่มีพื้นที่ให้แอปวาดวิดีโอเอง
+- **ระบบล็อกตอนรถวิ่ง:** การเล่นวิดีโอใน iOS 26.4 เล่นได้ตอนจอดเท่านั้น iOS หยุดให้เอง แอปไม่มีทางเปลี่ยน
+- **ที่เห็นคนดูได้ตอนรถวิ่ง:** มักมาจาก 3 ทาง ซึ่งไม่ได้ทำผ่านแอปใน App Store เลย
+  - กล่อง CarPlay AI ที่ข้างในเป็น Android เช่น Ottocast หรือ Carlinkit
+  - เครื่องที่ jailbreak แล้วลง tweak เช่น CarBridge
+  - จอหลังตลาดที่เปิด AirPlay mirroring ได้
+
+**สิ่งที่ยังไม่เคยทดสอบบน CarPlay:** ปุ่มปิดในหน้า Now Playing จาก PR #25
+
+## 5. เทียบกับ APTV (https://aptv.app/)
+
+APTV เป็นเครื่องเล่น M3U บน App Store ตามหน้าเว็บของเขา (อ่านเมื่อ 2026-10-08):
+- **CarPlay:** เล่นวิดีโอบนจอรถได้เฉพาะ iOS 26.4 ขึ้นไป
+- **เนื้อหา:** ไม่มีช่องหรือ playlist ติดมากับแอป ผู้ใช้ต้องเพิ่ม source เอง
+
+**ทำไมผ่าน review และนิยม:**
+- **ไม่มีเนื้อหาติดมาเลย:** หน้าที่ของแอปคือเครื่องเล่น ไม่ใช่แหล่งช่อง จึงไม่โดนกฎ 5.2.3 ต่างจากเราที่เพิ่ม Free-TV, dearbulut และ iptv-org ให้อัตโนมัติ
+- **ไม่ยุ่งกับบริการอื่น:** ไม่มีการข้ามโฆษณา YouTube
+- **ได้วิดีโอบน CarPlay ก่อนแอปอื่น:** iOS 26.4 เพิ่มการเล่นวิดีโอบน CarPlay ตอนจอดรถ ผ่านกลไกแบบ AirPlay video
+- **ครบทุกอุปกรณ์ Apple:** iPhone, iPad, Apple TV, Mac, Vision Pro และ sync การตั้งค่าผ่าน iCloud
+
+**เงื่อนไขของวิดีโอบน CarPlay (ตามข่าว ยังไม่ได้ยืนยันจากเอกสาร Apple):**
+- เล่นได้เฉพาะตอนรถจอด และหยุดเองเมื่อรถเริ่มวิ่ง
+- รถต้องรองรับ "CarPlay with AirPlay video" ด้วย รถรุ่นเก่าส่วนใหญ่ไม่รองรับ
+- ยังไม่พบชื่อ entitlement สำหรับแอปบุคคลที่สามโดยเฉพาะ ต้องเช็กจาก Apple Developer documentation ก่อนทำ
+
+**ถ้าจะทำแบบเดียวกัน (ยังไม่ได้ทำ):**
+1. ทำตามหัวข้อ 3 ก่อน: ตัดรายการ TV สาธารณะและการข้ามโฆษณา YouTube ออก
+2. ศึกษา API วิดีโอบน CarPlay ของ iOS 26.4
+3. ทดสอบกับรถหรือจอที่รองรับ AirPlay video

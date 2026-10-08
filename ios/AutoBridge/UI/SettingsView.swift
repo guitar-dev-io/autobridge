@@ -201,15 +201,17 @@ struct YouTubeAddOnsView: View {
                 )
             }
 
-            Section {
-                Toggle(
-                    NSLocalizedString("Skip ads", comment: "YouTube add-on"),
-                    isOn: $youtube.adSkipEnabled
-                )
-            } footer: {
-                Text(
-                    "Presses Skip when YouTube offers it, and otherwise seeks an unskippable ad to its end. The ad is still fetched and may flash up for a frame. Every selector is YouTube's own internal class name, so this stops working without notice when they change it, and YouTube may answer with its \"ad blockers are not allowed\" interstitial — nothing here tries to defeat that check."
-                )
+            if YouTubeSettings.adSkipAvailable {
+                Section {
+                    Toggle(
+                        NSLocalizedString("Skip ads", comment: "YouTube add-on"),
+                        isOn: $youtube.adSkipEnabled
+                    )
+                } footer: {
+                    Text(
+                        "Presses Skip when YouTube offers it, and otherwise seeks an unskippable ad to its end. The ad is still fetched and may flash up for a frame. Every selector is YouTube's own internal class name, so this stops working without notice when they change it, and YouTube may answer with its \"ad blockers are not allowed\" interstitial — nothing here tries to defeat that check."
+                    )
+                }
             }
         }
         .listStyle(.insetGrouped)
