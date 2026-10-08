@@ -1223,7 +1223,7 @@
 
     <!-- Car Browser search ([CarBrowserSearchScreen]). -->
     <string name="car_field_fill">Fill in</string>
-    <string name="car_field_hint_text">Type into the page's field</string>
+    <string name="car_field_hint_text">Type into the field on the page</string>
     <string name="car_field_hint_tel">Phone number</string>
     <string name="car_field_hint_email">Email</string>
     <string name="car_field_hint_number">Number</string>
