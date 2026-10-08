@@ -244,4 +244,11 @@ final class IptvParsingTests: XCTestCase {
         )
         XCTAssertTrue(pending.isEmpty)
     }
+
+    func testStoreBuildOffersNoTvLists() {
+        let store = IptvDirectory.offered(store: true)
+        XCTAssertFalse(store.contains { $0.kind == .tv })
+        XCTAssertTrue(store.contains { $0.kind == .radio })
+        XCTAssertTrue(IptvDirectory.offered(store: false).contains { $0.kind == .tv })
+    }
 }

@@ -33,6 +33,7 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
         self.interfaceController = interfaceController
         interfaceController.setRootTemplate(rootTemplate(), animated: true, completion: nil)
         addCloseButton()
+        VehicleReminders.carConnected()
     }
 
     func templateApplicationScene(
@@ -40,6 +41,7 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
         didDisconnectInterfaceController interfaceController: CPInterfaceController
     ) {
         self.interfaceController = nil
+        VehicleReminders.carDisconnected()
     }
 
     // MARK: - Root
