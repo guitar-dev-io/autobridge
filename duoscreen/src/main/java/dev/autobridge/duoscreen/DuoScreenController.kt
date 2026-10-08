@@ -66,6 +66,9 @@ class DuoScreenController(
         /** How long a tapped bar control shows as pressed. */
         const val PRESS_FLASH_MS = 150L
 
+        /** The seam's toolbar closes itself after this long without a tap on it or a seam drag. */
+        const val TOOLBAR_HIDE_MS = 4_000L
+
         /** Baseline dpi for dp: the car's own density decides every size on the bar. */
         const val BASELINE_DPI = 160f
 
@@ -86,6 +89,10 @@ class DuoScreenController(
     /** The chrome as last laid out, for hit-testing taps against what is on screen. */
     private var chrome: DuoScreenChrome? = null
     private var pressedChrome: ChromeTarget? = null
+
+    /** The seam's toolbar is open (normal mode only); see [DuoScreenChrome]. */
+    private var toolbarOpen = false
+    private val hideToolbar = Runnable { closeToolbar() }
     private val appInfo = HashMap<String, PaneApp>()
 
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -479,6 +486,10 @@ class DuoScreenController(
         get() = router?.mode ?: DuoScreenInputRouter.Mode.NORMAL
 
     fun setMode(mode: DuoScreenInputRouter.Mode) {
+        if (mode == DuoScreenInputRouter.Mode.EDIT && toolbarOpen) {
+            toolbarOpen = false
+            mainHandler.removeCallbacks(hideToolbar)
+        }
         router?.setMode(mode)
         refreshChrome()
     }
@@ -510,6 +521,12 @@ class DuoScreenController(
             onChromeTap(target)
             return
         }
+        // An open toolbar closes on a tap anywhere else, and that tap goes no further: it was
+        // meant for the toolbar, not for whatever pane is under the finger.
+        if (toolbarOpen) {
+            closeToolbar()
+            return
+        }
         // The rest of the bar belongs to no pane: swallowed rather than sent to the nearest one.
         if (shown?.onBar(x, y) == true) return
         active.onClick(x, y)
@@ -529,8 +546,14 @@ class DuoScreenController(
                 ChromeTarget.Kind.RELOAD -> StructuredLog.i(TAG, "Reloaded ${reloadSelectedOrAll()} pane(s)")
                 ChromeTarget.Kind.ARRANGE -> setMode(DuoScreenInputRouter.Mode.EDIT)
                 ChromeTarget.Kind.DONE -> setMode(DuoScreenInputRouter.Mode.NORMAL)
-                ChromeTarget.Kind.GRIP -> chrome?.barDivider?.let { router?.grabDivider(it) }
+                ChromeTarget.Kind.GRIP ->
+                    if (mode == DuoScreenInputRouter.Mode.EDIT) chrome?.barDivider?.let { router?.grabDivider(it) }
+                    else if (toolbarOpen) closeToolbar() else openToolbar()
             }
+        }
+        // Using the toolbar keeps it up; Arrange replaces it with the arrange controls.
+        if (toolbarOpen && target is ChromeTarget.Control && target.kind != ChromeTarget.Kind.GRIP) {
+            if (mode == DuoScreenInputRouter.Mode.EDIT) closeToolbar() else scheduleToolbarHide()
         }
         // A short pressed flash, so a tap on a drawn button is seen to have landed.
         pressedChrome = target
@@ -539,6 +562,29 @@ class DuoScreenController(
             pressedChrome = null
             refreshChrome()
         }, PRESS_FLASH_MS)
+    }
+
+    /**
+     * Opens the seam's toolbar and grabs the seam, so a drag straight after the tap on the handle
+     * resizes the panes: the handle is both the way to the buttons and the seam's own grip.
+     */
+    private fun openToolbar() {
+        toolbarOpen = true
+        chrome?.barDivider?.let { router?.grabDivider(it) }
+        scheduleToolbarHide()
+    }
+
+    private fun closeToolbar() {
+        mainHandler.removeCallbacks(hideToolbar)
+        if (!toolbarOpen) return
+        toolbarOpen = false
+        router?.releaseGrab()
+        refreshChrome()
+    }
+
+    private fun scheduleToolbarHide() {
+        mainHandler.removeCallbacks(hideToolbar)
+        mainHandler.postDelayed(hideToolbar, TOOLBAR_HIDE_MS)
     }
 
     /**
@@ -590,7 +636,10 @@ class DuoScreenController(
         )
         val panes = active.panes.panes
         val editing = active.mode == DuoScreenInputRouter.Mode.EDIT
-        val laidOut = DuoScreenChrome.compute(panes, bounds, density, editing, labels, chromeRenderer::measure)
+        val laidOut = DuoScreenChrome.compute(
+            panes, bounds, density, editing, labels, chromeRenderer::measure,
+            toolbarOpen = toolbarOpen && !editing
+        )
         chrome = laidOut
         val apps = if (editing) panes.associate { it.id to appFor(it.packageName) } else emptyMap()
         val titles = if (editing) panes.associate { pane ->
@@ -692,6 +741,7 @@ class DuoScreenController(
         saveLayout()
         running = false
         selectedPaneId = null
+        toolbarOpen = false
         mainHandler.removeCallbacksAndMessages(null)
         debouncer.cancelAll()
         pendingSizes.clear()
@@ -838,6 +888,8 @@ class DuoScreenController(
      */
     override fun onPaneRectChanged(paneId: Int, rect: Rect) {
         compositor.setRect(paneId, rect)
+        // Dragging the seam from the toolbar's handle is using it: keep it up until the drag ends.
+        if (toolbarOpen) scheduleToolbarHide()
         refreshChrome()
         pendingSizes[paneId] = rect
         debouncer.onResizeActivity(paneId, SystemClock.uptimeMillis())

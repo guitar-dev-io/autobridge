@@ -39,8 +39,12 @@ class DuoScreenChromeTest {
     private fun panes(preset: DuoScreenPreset, bounds: DuoScreenLayout.Bounds, count: Int = 2) =
         preset.rects(count, bounds).mapIndexed { i, r -> DuoScreenPane(i, "app$i", r) }
 
-    private fun chrome(panes: List<DuoScreenPane>, bounds: DuoScreenLayout.Bounds, editing: Boolean = false) =
-        DuoScreenChrome.compute(panes, bounds, 1f, editing, labels, measure)
+    private fun chrome(
+        panes: List<DuoScreenPane>,
+        bounds: DuoScreenLayout.Bounds,
+        editing: Boolean = false,
+        toolbarOpen: Boolean = false
+    ) = DuoScreenChrome.compute(panes, bounds, 1f, editing, labels, measure, toolbarOpen)
 
     private fun Rect.center() = (left + width / 2) to (top + height / 2)
 
@@ -84,63 +88,80 @@ class DuoScreenChromeTest {
 
     // ------------------------------------------------------------------------------ the bar
 
-    @Test fun aSmallSurfaceGetsTheCompactBar() {
-        // The DHU's small profile: 800 x 400 at 160dpi, where the design's 72dp bar was a tenth
-        // of the width.
-        val small = DuoScreenChrome.boundsFor(800, 400, 1f)
-        assertEquals(DuoScreenChromeSpec.COMPACT.BAR.toInt(), small.barPx)
-        val panes = panes(DuoScreenPreset.EVEN_COLUMNS, small, count = 3)
-        val c = chrome(panes, small)
-        assertEquals(DuoScreenChromeSpec.COMPACT, c.spec)
-        assertTrue("the bar is under 7% of the width", c.bar.width * 100 / small.width < 7)
-        assertEquals(4, c.buttons.size)
-        c.buttons.forEach { (_, box) -> assertTrue(DuoScreenLayout.overlaps(box, c.bar)) }
+    @Test fun theSeamIsThinAndShowsOnlyItsHandleUntilOpened() {
+        val panes = panes(DuoScreenPreset.STACKED_60_40, portrait)
+        val c = chrome(panes, portrait)
+        assertEquals(DuoScreenChromeSpec.REGULAR.BAR.toInt(), c.bar.height)
+        assertTrue(c.buttons.isEmpty())
+        assertNull(c.toolbar)
+        val handle = c.handle!!
+        assertTrue(kotlin.math.abs((c.bar.left + c.bar.width / 2) - (handle.left + handle.width / 2)) <= 1)
+        val (hx, hy) = handle.center()
+        assertEquals(ChromeTarget.Control(ChromeTarget.Kind.GRIP), c.hit(hx, hy))
     }
 
-    @Test fun aLayoutSavedWithTheBiggerBarIsLaidOutAgainOnASmallSurface() {
-        val small = DuoScreenChrome.boundsFor(800, 400, 1f)
-        val savedAt72 = listOf(
-            DuoScreenPane(0, "a", Rect(0, 0, 364, 400)),
-            DuoScreenPane(1, "b", Rect(436, 0, 364, 400))
-        )
-        assertFalse(DuoScreenChrome.hasRoomForBar(savedAt72, small))
-        assertTrue(DuoScreenChrome.hasRoomForBar(panes(DuoScreenPreset.EVEN_COLUMNS, small), small))
-    }
-
-    @Test fun aLargePortraitUnitKeepsTheDesignsSizes() {
-        assertEquals(DuoScreenChromeSpec.REGULAR, chrome(panes(DuoScreenPreset.STACKED_60_40, portrait), portrait).spec)
-        assertEquals(DuoScreenChromeSpec.REGULAR.BAR.toInt(), portrait.barPx)
-    }
-
-    @Test fun theBarHoldsFourButtonsAndTheGripInsideIt() {
+    @Test fun theHandleTakesAFingerSizedSquareThoughItIsThin() {
         val c = chrome(panes(DuoScreenPreset.STACKED_60_40, portrait), portrait)
+        val (hx, hy) = c.handle!!.center()
+        val reach = DuoScreenChromeSpec.REGULAR.HANDLE_TOUCH.toInt() / 2 - 2
+        assertEquals(ChromeTarget.Control(ChromeTarget.Kind.GRIP), c.hit(hx, hy - reach))
+        assertEquals(ChromeTarget.Control(ChromeTarget.Kind.GRIP), c.hit(hx, hy + reach))
+    }
+
+    @Test fun anOpenToolbarHoldsTheFourButtonsOverTheSeam() {
+        val panes = panes(DuoScreenPreset.STACKED_60_40, portrait)
+        val c = chrome(panes, portrait, toolbarOpen = true)
+        val toolbar = c.toolbar!!
         assertEquals(
             listOf(ChromeTarget.Kind.LAYOUT, ChromeTarget.Kind.SWAP, ChromeTarget.Kind.RELOAD, ChromeTarget.Kind.ARRANGE),
             c.buttons.map { it.first }
         )
-        c.buttons.forEach { (_, box) -> assertTrue("$box inside ${c.bar}", DuoScreenLayout.overlaps(box, c.bar)) }
-        val grip = c.grip!!
-        assertTrue(c.buttons[1].second.right < grip.left && grip.right < c.buttons[2].second.left)
-    }
-
-    @Test fun eachButtonAnswersForItsOwnSpotAndThePanesKeepTheirs() {
-        val panes = panes(DuoScreenPreset.STACKED_60_40, portrait)
-        val c = chrome(panes, portrait)
+        assertTrue("the toolbar is centred on the seam", toolbar.top < c.bar.top && toolbar.bottom > c.bar.bottom)
         c.buttons.forEach { (kind, box) ->
+            assertTrue(toolbar.left <= box.left && box.right <= toolbar.right)
             val (x, y) = box.center()
             assertEquals(ChromeTarget.Control(kind), c.hit(x, y))
         }
-        val (gx, gy) = c.grip!!.center()
-        assertEquals(ChromeTarget.Control(ChromeTarget.Kind.GRIP), c.hit(gx, gy))
         val (px, py) = panes[0].rect.center()
-        assertNull("a tap in a pane is the pane's", c.hit(px, py))
+        assertNull("a tap in a pane is not the toolbar's", c.hit(px, py))
+        assertTrue("the toolbar between its buttons belongs to no pane", c.onBar(toolbar.left + 1, toolbar.top + toolbar.height / 2))
     }
 
-    @Test fun aButtonTakesTheBarsFullThickness() {
-        val c = chrome(panes(DuoScreenPreset.STACKED_60_40, portrait), portrait)
-        val layout = c.buttons.first().second
-        assertEquals(ChromeTarget.Control(ChromeTarget.Kind.LAYOUT), c.hit(layout.left + 4, c.bar.top + 1))
-        assertEquals(ChromeTarget.Control(ChromeTarget.Kind.LAYOUT), c.hit(layout.left + 4, c.bar.bottom - 1))
+    @Test fun aSideBySideToolbarRunsDownTheSeam() {
+        val c = chrome(panes(DuoScreenPreset.EVEN_COLUMNS, landscape), landscape, toolbarOpen = true)
+        val toolbar = c.toolbar!!
+        assertTrue(toolbar.height > toolbar.width)
+        assertTrue(c.buttons.zipWithNext().all { (a, b) -> a.second.bottom <= b.second.top })
+    }
+
+    @Test fun aToolbarNearTheEdgeStaysOnTheSurface() {
+        val bottomBar = chrome(panes(DuoScreenPreset.PICTURE_IN_PICTURE, portrait), portrait, toolbarOpen = true)
+        assertTrue(bottomBar.toolbar!!.bottom <= portrait.height)
+    }
+
+    @Test fun aSmallSurfaceGetsTheCompactSeam() {
+        // The DHU's small profile: 800 x 400 at 160dpi, where even a 40dp bar of buttons read as big.
+        val small = DuoScreenChrome.boundsFor(800, 400, 1f)
+        assertEquals(DuoScreenChromeSpec.COMPACT.BAR.toInt(), small.barPx)
+        val c = chrome(panes(DuoScreenPreset.EVEN_COLUMNS, small, count = 3), small, toolbarOpen = true)
+        assertEquals(DuoScreenChromeSpec.COMPACT, c.spec)
+        assertTrue("the seam is under 2% of the width", c.bar.width * 100 / small.width < 2)
+        assertEquals(4, c.buttons.size)
+    }
+
+    @Test fun aLayoutSavedWithTheBiggerBarIsLaidOutAgainOnASmallSurface() {
+        val small = DuoScreenChrome.boundsFor(800, 400, 1f)
+        val savedAt40 = listOf(
+            DuoScreenPane(0, "a", Rect(0, 0, 380, 400)),
+            DuoScreenPane(1, "b", Rect(420, 0, 380, 400))
+        )
+        assertFalse(DuoScreenChrome.hasRoomForBar(savedAt40, small))
+        assertTrue(DuoScreenChrome.hasRoomForBar(panes(DuoScreenPreset.EVEN_COLUMNS, small), small))
+    }
+
+    @Test fun aLargePortraitUnitGetsTheRegularSizes() {
+        assertEquals(DuoScreenChromeSpec.REGULAR, chrome(panes(DuoScreenPreset.STACKED_60_40, portrait), portrait).spec)
+        assertEquals(DuoScreenChromeSpec.REGULAR.BAR.toInt(), portrait.barPx)
     }
 
     // --------------------------------------------------------------------------- arranging
