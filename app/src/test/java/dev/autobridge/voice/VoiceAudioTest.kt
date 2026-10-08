@@ -38,6 +38,37 @@ class VoiceAudioTest {
         assertEquals(framesFor(1_000), silentFrames)
     }
 
+    @Test fun `a short command is sent sooner than a sentence`() {
+        val detector = SilenceDetector(silenceTimeoutMs = 1_200, maxDurationMs = 10_000)
+        repeat(framesFor(300)) { detector.accept(frame(0.0, seed = it)) }
+        repeat(framesFor(500)) { detector.accept(frame(0.3, seed = it)) }
+        var silentFrames = 0
+        var decision = SilenceDetector.Decision.CONTINUE
+        while (decision == SilenceDetector.Decision.CONTINUE && silentFrames < 200) {
+            decision = detector.accept(frame(0.0, seed = silentFrames))
+            silentFrames++
+        }
+        assertEquals(SilenceDetector.Decision.END_OF_SPEECH, decision)
+        assertEquals(framesFor(720), silentFrames)
+    }
+
+    @Test fun `a click after the speaker stopped does not restart the wait`() {
+        val detector = SilenceDetector(silenceTimeoutMs = 1_000, maxDurationMs = 10_000)
+        repeat(framesFor(300)) { detector.accept(frame(0.0, seed = it)) }
+        repeat(framesFor(1_200)) { detector.accept(frame(0.3, seed = it)) }
+        repeat(framesFor(500)) { detector.accept(frame(0.0, seed = it)) }
+        detector.accept(frame(0.8, seed = 1)) // one loud frame: a click
+        var silentFrames = 0
+        var decision = SilenceDetector.Decision.CONTINUE
+        while (decision == SilenceDetector.Decision.CONTINUE && silentFrames < 200) {
+            decision = detector.accept(frame(0.0, seed = silentFrames))
+            silentFrames++
+        }
+        assertEquals(SilenceDetector.Decision.END_OF_SPEECH, decision)
+        // 500 ms before the click, 20 ms of click, so 480 ms more ends it.
+        assertEquals(framesFor(480), silentFrames)
+    }
+
     @Test fun `steady cabin noise is not speech, speech above it is`() {
         val detector = SilenceDetector(silenceTimeoutMs = 800, maxDurationMs = 10_000)
         // Loud, steady road noise...
@@ -107,7 +138,8 @@ class VoiceAudioTest {
         )
         assertEquals(VoiceRecording.Ending.END_OF_SPEECH, recording.ending)
         assertTrue(recording.heardSpeech)
-        assertEquals(1_800L, recording.durationMs)
+        // 600 ms of speech is a short command: it ends after 60% of the 1 s setting.
+        assertEquals(1_400L, recording.durationMs)
         assertEquals(1, source.released)
     }
 
