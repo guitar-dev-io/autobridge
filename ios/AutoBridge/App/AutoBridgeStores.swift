@@ -16,6 +16,8 @@ final class AutoBridgeStores {
     let youtube = YouTubeSettings()
     let playback = PlaybackController()
     let catalog = IptvCatalog.shared
+    let vehicle = VehicleStore()
+    let weather = WeatherStore()
 
     private init() {}
 }

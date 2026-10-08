@@ -50,4 +50,10 @@ class DuoScreenResizeDebouncerTest {
         debouncer.cancelAll()
         assertTrue(debouncer.pollReadyToCommit(nowMs = 1_300L).isEmpty())
     }
+
+    @Test fun aSeamDragWaitsForItsLongerQuietPeriod() {
+        debouncer.onResizeActivity(paneId = 0, nowMs = 1_000L, quietMs = 700L)
+        assertTrue(debouncer.pollReadyToCommit(nowMs = 1_400L).isEmpty()) // a pause, not the end
+        assertEquals(listOf(0), debouncer.pollReadyToCommit(nowMs = 1_700L))
+    }
 }

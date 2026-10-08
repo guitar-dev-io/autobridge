@@ -7,7 +7,7 @@ import SwiftUI
 /// Android has that iOS cannot do are absent rather than stubbed: `MIRROR`, `APPS` and `REMOTE`
 /// need full-device capture and input injection, which the App Sandbox forbids outright, and
 /// `PLAYLISTS` would need the user's Apple Music library, whose tracks expose no playable asset URL
-/// when they are DRM-protected. `WEATHER` is simply not ported yet.
+/// when they are DRM-protected.
 ///
 /// `webUrl` is set for the sections that are simply a website; everything else is handled by the
 /// screen for that section.
@@ -21,6 +21,7 @@ enum HomeSection: String, CaseIterable, Identifiable {
     case folders
     case favorites
     case gallery
+    case weather
 
     var id: String { rawValue }
 
@@ -35,6 +36,7 @@ enum HomeSection: String, CaseIterable, Identifiable {
         case .folders: return "Folders"
         case .favorites: return "Favorites"
         case .gallery: return "Gallery"
+        case .weather: return "Weather"
         }
     }
 
@@ -50,6 +52,7 @@ enum HomeSection: String, CaseIterable, Identifiable {
         case .folders: return NSLocalizedString("Folders", comment: "Home section")
         case .favorites: return NSLocalizedString("Favorites", comment: "Home section")
         case .gallery: return NSLocalizedString("Gallery", comment: "Home section")
+        case .weather: return NSLocalizedString("Weather", comment: "Home section")
         }
     }
 
@@ -65,6 +68,7 @@ enum HomeSection: String, CaseIterable, Identifiable {
         case .folders: return "On-device media"
         case .favorites: return "Saved channels & pages"
         case .gallery: return "Photos & clips"
+        case .weather: return "Current conditions"
         }
     }
 
@@ -77,6 +81,7 @@ enum HomeSection: String, CaseIterable, Identifiable {
         case .folders: return AutoBridgeDesign.accentFiles
         case .favorites: return AutoBridgeDesign.accentFavorite
         case .gallery: return AutoBridgeDesign.accentWeb
+        case .weather: return AutoBridgeDesign.accentWeather
         }
     }
 
@@ -91,6 +96,7 @@ enum HomeSection: String, CaseIterable, Identifiable {
         case .folders: return "folder"
         case .favorites: return "star"
         case .gallery: return "photo.on.rectangle"
+        case .weather: return "cloud.sun"
         }
     }
 

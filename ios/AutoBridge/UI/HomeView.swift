@@ -8,6 +8,7 @@ import SwiftUI
 struct HomeView: View {
     @EnvironmentObject private var sourceStore: IptvSourceStore
     @EnvironmentObject private var historyStore: IptvHistoryStore
+    @EnvironmentObject private var weather: WeatherStore
 
     private let columns = [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)]
 
@@ -27,6 +28,7 @@ struct HomeView: View {
                 .padding(.top, 2)
             }
             .safeAreaInset(edge: .bottom) { MiniPlayerBar() }
+            .task { await weather.refresh() }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     NavigationLink {
@@ -77,6 +79,9 @@ struct HomeView: View {
             let count = historyStore.favorites.count
             return count == 0 ? section.caption : "\(count) saved"
         }
+        if section == .weather, let snapshot = weather.snapshot {
+            return "\(Int(snapshot.temperatureC.rounded()))°C · \(snapshot.condition)"
+        }
         return section.caption
     }
 }
@@ -102,6 +107,8 @@ struct SectionDestination: View {
             LocalMediaView(mode: .gallery)
         case .favorites:
             FavoritesView()
+        case .weather:
+            WeatherView()
         }
     }
 }

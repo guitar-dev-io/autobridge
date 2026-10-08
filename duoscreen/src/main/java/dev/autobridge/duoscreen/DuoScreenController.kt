@@ -55,6 +55,12 @@ class DuoScreenController(
     private companion object {
         const val TAG = "AutoBridgeDuoCtl"
         const val QUIET_PERIOD_MS = 300L
+        /**
+         * How long a seam drag must rest before the panes' displays are resized. Longer than
+         * [QUIET_PERIOD_MS] because the car host sends no finger-up: a short pause mid-drag would
+         * otherwise resize both displays, and relayout both apps, while the seam is still moving.
+         */
+        const val DIVIDER_QUIET_PERIOD_MS = 700L
 
         /** A scroll is replayed into the pane as a short drag with this many interpolated moves. */
         const val SCROLL_STEPS = 4
@@ -743,6 +749,8 @@ class DuoScreenController(
         selectedPaneId = null
         toolbarOpen = false
         mainHandler.removeCallbacksAndMessages(null)
+        chromeRefreshPosted = false
+        loggedSeam = null
         debouncer.cancelAll()
         pendingSizes.clear()
         releaseInputThread()
@@ -863,7 +871,13 @@ class DuoScreenController(
 
     override fun onDividerGrabbed(divider: DuoScreenLayout.Divider?) {
         // The overlay draws the grabbed grip; the old filled band over the seam is not needed.
-        refreshChrome()
+        scheduleChromeRefresh()
+        // This is called again on every step of a seam drag, to move the grip with it. Only a grab
+        // or a release is worth a line: the log is mirrored to a file, and a write per drag event
+        // was part of what made the seam lag behind the finger.
+        val seam = divider?.let { Triple(it.first, it.second, it.axis) }
+        if (seam == loggedSeam) return
+        loggedSeam = seam
         StructuredLog.i(
             TAG,
             divider?.let { "Grabbed the ${it.axis} seam between panes ${it.first} and ${it.second}" }
@@ -890,11 +904,30 @@ class DuoScreenController(
         compositor.setRect(paneId, rect)
         // Dragging the seam from the toolbar's handle is using it: keep it up until the drag ends.
         if (toolbarOpen) scheduleToolbarHide()
-        refreshChrome()
+        scheduleChromeRefresh()
         pendingSizes[paneId] = rect
-        debouncer.onResizeActivity(paneId, SystemClock.uptimeMillis())
+        val quiet = if (router?.divider != null) DIVIDER_QUIET_PERIOD_MS else QUIET_PERIOD_MS
+        debouncer.onResizeActivity(paneId, SystemClock.uptimeMillis(), quiet)
         mainHandler.removeCallbacks(commitPoll)
-        mainHandler.postDelayed(commitPoll, QUIET_PERIOD_MS)
+        mainHandler.postDelayed(commitPoll, quiet)
+    }
+
+    private var loggedSeam: Triple<Int, Int, DuoScreenLayout.Axis>? = null
+    private var chromeRefreshPosted = false
+    private val chromeRefresh = Runnable {
+        chromeRefreshPosted = false
+        refreshChrome()
+    }
+
+    /**
+     * One seam step reports both panes' new rects and the moved grip - three calls that each
+     * used to lay the chrome out and repaint the whole overlay. They now ask for one refresh,
+     * run once the step is done.
+     */
+    private fun scheduleChromeRefresh() {
+        if (chromeRefreshPosted) return
+        chromeRefreshPosted = true
+        mainHandler.post(chromeRefresh)
     }
 
     // Explicit type: the lambda reschedules itself, which inference cannot resolve on its own.
@@ -910,6 +943,8 @@ class DuoScreenController(
             StructuredLog.i(TAG, "Pane $paneId committed ${rect.width}x${rect.height}")
         }
         saveLayout()
-        if (pendingSizes.isNotEmpty()) mainHandler.postDelayed(commitPoll, QUIET_PERIOD_MS)
+        if (pendingSizes.isNotEmpty()) {
+            mainHandler.postDelayed(commitPoll, if (router?.divider != null) DIVIDER_QUIET_PERIOD_MS else QUIET_PERIOD_MS)
+        }
     }
 }

@@ -300,6 +300,7 @@ object AutoBridgeSessionManager {
     }
 
     private fun onEngineState(engineState: EngineState) = post {
+        val wasEnded = current.playback == BridgePlaybackState.ENDED
         update {
             it.copy(
                 engine = engineState.kind,
@@ -310,6 +311,41 @@ object AutoBridgeSessionManager {
                 error = engineState.error
             )
         }
+        advanceQueueIfFinished(engineState, wasEnded)
+    }
+
+    /**
+     * Plays the next queued item when the native or remote player reaches the end of its own.
+     *
+     * Acts on the *transition* into ENDED, so one finished item moves the queue on once. A page in
+     * the car browser is left to [dev.autobridge.media.MediaPlaybackService], whose one-second
+     * poll already advances the queue when a page finishes; doing it here as well would skip one.
+     */
+    private fun advanceQueueIfFinished(engineState: EngineState, wasEnded: Boolean) {
+        if (engineState.playback != BridgePlaybackState.ENDED || wasEnded) return
+        if (engine is BrowserPlaybackEngine) return
+        val context = appContext ?: return
+        if (BrowserPlayQueue.size(context) == 0) return
+        BridgeLog.i("queue.auto_next", "engine" to engineState.kind)
+        next(context)
+    }
+
+    /**
+     * Starts the queue on the car when nothing is playing there, so adding the first item of a
+     * listening session plays it rather than leaving it to wait for a Next nobody will press.
+     *
+     * "Nothing is playing" is the phone's own music output being quiet, which covers every app
+     * that could be sending sound to the car, not only this one's players. Returns whether it
+     * started something.
+     */
+    fun startQueueIfIdle(context: Context): Boolean {
+        if (!isConnected()) return false
+        if (current.playback == BridgePlaybackState.PLAYING || current.playback == BridgePlaybackState.LOADING) return false
+        val audio = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
+        if (audio?.isMusicActive == true) return false
+        val started = next(context)
+        if (started) BridgeLog.i("queue.start_idle")
+        return started
     }
 
     // ------------------------------------------------------------------------- the surface

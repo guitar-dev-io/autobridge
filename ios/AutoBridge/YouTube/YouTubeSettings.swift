@@ -33,7 +33,7 @@ public final class YouTubeSettings: ObservableObject {
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         self.sponsorBlockEnabled = defaults.bool(forKey: Keys.sponsorBlock)
-        self.adSkipEnabled = defaults.bool(forKey: Keys.adSkip)
+        self.adSkipEnabled = Self.adSkipAvailable && defaults.bool(forKey: Keys.adSkip)
         self.autoHighestQuality = defaults.bool(forKey: Keys.highestQuality)
     }
 
@@ -53,6 +53,10 @@ public final class YouTubeSettings: ObservableObject {
         guard sponsorBlockEnabled else { return [] }
         return Set(SponsorCategory.allCases.filter(isEnabled))
     }
+
+    /// The ad skipper is left out of the store build: skipping YouTube's ads breaks YouTube's terms,
+    /// which App Review rejects under guideline 5.2.
+    public static let adSkipAvailable = !BuildFlavor.isStore
 
     /// Whether any add-on is armed, for the row that summarises them.
     public var anyEnabled: Bool {

@@ -28,6 +28,12 @@ targets:
         CODE_SIGN_ENTITLEMENTS: AutoBridge/Resources/AutoBridge.entitlements
         GENERATE_INFOPLIST_FILE: NO
         TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+      configs:
+        # The store build (Archive -> TestFlight / App Store) leaves out the features App Review is
+        # likely to reject; Debug, what Xcode runs, keeps them. See BuildFlavor.swift.
+        Release:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: AUTOBRIDGE_STORE
     # No `info:` block on purpose: XcodeGen *generates* the plist at `info.path` and would
     # overwrite the hand-written one, which carries the CarPlay scene manifest, the audio
     # background mode and the ATS exception. INFOPLIST_FILE above is what points at it.

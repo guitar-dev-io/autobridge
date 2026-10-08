@@ -487,6 +487,8 @@
     <string name="voice_shortcut_url_hint">เช่น youtube.com/@channel</string>
     <string name="voice_shortcut_command_hint">เช่น เล่น Bodyslam บน YouTube Music</string>
     <string name="voice_shortcut_saved">บันทึก “%1$s” แล้ว</string>
+    <string name="queue_started_on_car">รถว่างอยู่ เลยเริ่มเล่นบนรถให้แล้ว</string>
+    <string name="browser_audio_held">ปิดเสียงไว้ขณะรถกำลังเล่นเพลง · แตะเพื่อเปิดเสียง</string>
     <string name="browser_zoom_percent">%1$d%%</string>
 
     <!-- Browser settings sheet: แถว YouTube add-ons ในส่วน Playback -->
@@ -1705,6 +1707,10 @@
     <string name="emergency_invalid">กรอกชื่อ และเบอร์หรือข้อความ</string>
     <string name="emergency_call">โทร</string>
     <string name="emergency_cannot_dial">เปิดแอปโทรไม่ได้</string>
+    <string name="emergency_section_mine">เบอร์ของฉัน</string>
+    <string name="emergency_section_lines">สายด่วนฉุกเฉิน</string>
+    <string name="emergency_copy">คัดลอก</string>
+    <string name="emergency_copied">คัดลอกแล้ว</string>
     <string name="emergency_police">ตำรวจ</string>
     <string name="emergency_medical">เหตุฉุกเฉินทางการแพทย์</string>
     <string name="emergency_highway_police">ตำรวจทางหลวง</string>

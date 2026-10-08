@@ -12,10 +12,17 @@ package dev.autobridge.duoscreen.render
  */
 class DuoScreenResizeDebouncer(private val quietPeriodMs: Long = 300L) {
     private val lastActivityMs = HashMap<Int, Long>()
+    private val quietFor = HashMap<Int, Long>()
     private val pending = HashSet<Int>()
 
-    fun onResizeActivity(paneId: Int, nowMs: Long) {
+    /**
+     * [quietMs] overrides the quiet period for this activity: a seam drag waits longer, because
+     * the car host gives no finger-up and a short pause mid-drag would otherwise resize both
+     * panes' displays (and relayout both apps) while the seam is still moving.
+     */
+    fun onResizeActivity(paneId: Int, nowMs: Long, quietMs: Long = quietPeriodMs) {
         lastActivityMs[paneId] = nowMs
+        quietFor[paneId] = quietMs
         pending.add(paneId)
     }
 
@@ -28,7 +35,7 @@ class DuoScreenResizeDebouncer(private val quietPeriodMs: Long = 300L) {
         if (pending.isEmpty()) return emptyList()
         val ready = pending.filter { id ->
             val last = lastActivityMs[id] ?: return@filter false
-            nowMs - last >= quietPeriodMs
+            nowMs - last >= (quietFor[id] ?: quietPeriodMs)
         }
         pending.removeAll(ready)
         return ready
@@ -37,10 +44,12 @@ class DuoScreenResizeDebouncer(private val quietPeriodMs: Long = 300L) {
     fun cancel(paneId: Int) {
         pending.remove(paneId)
         lastActivityMs.remove(paneId)
+        quietFor.remove(paneId)
     }
 
     fun cancelAll() {
         pending.clear()
         lastActivityMs.clear()
+        quietFor.clear()
     }
 }
