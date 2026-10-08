@@ -3223,7 +3223,14 @@ class CarWebRenderer(context: Context) {
             canvas.drawRect(model.header.left, y, model.header.right, y + sizes.dp(1f), toolbarPaint)
         }
         model.sectionLabels.forEach { (labelRes, box) -> drawSheetSectionLabel(canvas, labelRes, box) }
-        model.tiles.forEach { if (it.kind == DrawerKind.LIST) drawSheetListRow(canvas, it) else drawSheetTile(canvas, it) }
+        model.plates.forEach { (labelRes, box) -> drawSheetPlate(canvas, labelRes, box) }
+        model.tiles.forEach {
+            when (it.kind) {
+                DrawerKind.LIST -> drawSheetListRow(canvas, it)
+                DrawerKind.ROUND -> drawSheetStepButton(canvas, it)
+                else -> drawSheetTile(canvas, it)
+            }
+        }
         model.toggles.forEach { drawSheetToggle(canvas, it) }
         canvas.restore()
 
@@ -3400,6 +3407,34 @@ class CarWebRenderer(context: Context) {
         canvas.drawText(
             fit(appContext.getString(labelRes), detailPaint, box.width),
             box.left + sizes.contentGap * 0.5f, box.bottom - box.height * 0.28f, detailPaint
+        )
+    }
+
+    /** A row that only holds buttons (zoom): the card, a search glyph and its label. */
+    private fun drawSheetPlate(canvas: Canvas, labelRes: Int, box: Box) {
+        toolbarPaint.color = BrowserTheme.dark.sheetCardBackground
+        canvas.drawRoundRect(box.left, box.top, box.right, box.bottom, sizes.cornerRadius, sizes.cornerRadius, toolbarPaint)
+        val iconSize = sizes.iconMedium.coerceAtMost(box.height * 0.5f)
+        val glyphX = box.left + sizes.horizontalPadding + iconSize / 2f
+        drawIcon(canvas, BrowserIcon.SEARCH, glyphX, box.centerY, iconSize, BrowserTheme.dark.textSecondary)
+        titlePaint.color = BrowserTheme.dark.textPrimary
+        titlePaint.textSize = (sizes.iconSmall * 0.9f).coerceAtMost(box.height * 0.42f)
+        canvas.drawText(
+            appContext.getString(labelRes), glyphX + iconSize / 2f + sizes.horizontalPadding,
+            box.centerY + titlePaint.textSize * 0.34f, titlePaint
+        )
+    }
+
+    /** The zoom stepper's − / + buttons: a tonal rounded square with the glyph. */
+    private fun drawSheetStepButton(canvas: Canvas, row: DrawerRow) {
+        val box = row.bounds
+        toolbarPaint.color = BrowserTheme.dark.tileBackground
+        val radius = box.height * 0.3f
+        canvas.drawRoundRect(box.left, box.top, box.right, box.bottom, radius, radius, toolbarPaint)
+        val iconSize = sizes.iconMedium.coerceAtMost(box.height * 0.55f)
+        drawIcon(
+            canvas, row.item.icon, box.centerX, box.centerY, iconSize,
+            if (row.item.enabled) BrowserTheme.dark.iconEnabled else BrowserTheme.dark.iconDisabled
         )
     }
 

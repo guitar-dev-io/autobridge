@@ -269,8 +269,10 @@ class BrowserDrawerModel private constructor(
     val contentHeight: Float,
     val visibleHeight: Float,
     val scrollOffset: Float,
-    /** The "More" list's group headings (string id, box); scrolls with the rows. */
+    /** Group headings (string id, box); scroll with the rows. */
     val sectionLabels: List<Pair<Int, Box>> = emptyList(),
+    /** Labelled rows that do nothing themselves but hold buttons (the zoom stepper). */
+    val plates: List<Pair<Int, Box>> = emptyList(),
 ) {
     companion object {
         /**
@@ -420,39 +422,6 @@ class BrowserDrawerModel private constructor(
         )
 
         /**
-         * The "More" list as labelled groups, in the order the sheet draws them. The car's list is
-         * split by what an entry is for; anything not named below (added later) joins the last
-         * group, so nothing can fall off the sheet. The phone's list stays one unlabelled group.
-         */
-        fun moreSections(state: BrowserMenuState): List<Pair<Int, List<DrawerItem>>> {
-            val items = moreItems(state)
-            if (state.surface == MenuSurface.PHONE) return listOf(0 to items)
-            val byAction = items.associateBy { it.action }
-            val used = HashSet<DrawerAction>()
-            fun group(vararg actions: DrawerAction): List<DrawerItem> =
-                actions.mapNotNull { action -> byAction[action]?.takeIf { used.add(action) } }
-            val goTo = group(
-                DrawerAction.NEW_TAB, DrawerAction.HOME, DrawerAction.HISTORY, DrawerAction.DOWNLOADS,
-                DrawerAction.MEDIA_CENTER, DrawerAction.NOW_PLAYING, DrawerAction.MEDIA_LIBRARY, DrawerAction.AGENT,
-            )
-            val page = group(
-                DrawerAction.BOOKMARK_PAGE, DrawerAction.FIND_IN_PAGE, DrawerAction.COPY_URL,
-                DrawerAction.PASTE_AND_GO, DrawerAction.OPEN_EXTERNAL, DrawerAction.ZOOM_OUT,
-                DrawerAction.ZOOM_IN, DrawerAction.PIN_TOOLBAR,
-            )
-            val split = group(DrawerAction.SPLIT_CHOOSE, DrawerAction.SIDE_SHOW_PAGE, DrawerAction.SWAP_SPLIT_SIDES)
-            val app = group(
-                DrawerAction.NAVIGATE_MAPS, DrawerAction.MIRROR_PHONE, DrawerAction.CLEAR_DATA, DrawerAction.DIAGNOSTICS,
-            ) + items.filter { used.add(it.action) }
-            return listOf(
-                R.string.drawer_section_goto to goTo,
-                R.string.drawer_section_page to page,
-                R.string.drawer_section_split to split,
-                R.string.drawer_section_app to app,
-            ).filter { it.second.isNotEmpty() }
-        }
-
-        /**
          * Whether tapping [action] leaves the menu open. Steppers and switches are pressed more
          * than once or report a state the menu shows (zoom, desktop site, pinned toolbar, the
          * ad-block switch, Save's star), so closing after each tap would make the driver reopen the
@@ -467,6 +436,157 @@ class BrowserDrawerModel private constructor(
 
         /** Panel width from which the "More" list's rows sit two to a line. */
         private const val MORE_TWO_COLUMNS_MIN_DP = 480f
+
+        /**
+         * The car sheet, laid out like Bridge Web's menu (docs/design 18/19): the address row, two
+         * lines of four buttons, "This page" switches and the zoom stepper, the split screen, and a
+         * "More" row; the More page is [CarMenuList.plan]'s groups as rows. Taller than most head
+         * units, so it scrolls, as the view-based menu does; the header never moves.
+         */
+        private fun carSheet(
+            sizes: AutoUiSizes,
+            state: BrowserMenuState,
+            more: Boolean,
+            scrollOffset: Float,
+            moreTitle: String,
+            panel: Box,
+            grip: Box,
+            header: Box,
+            titleLeft: Float,
+            closeButton: Box,
+            headerLinks: List<DrawerRow>,
+            headerBottom: Float,
+            contentTop: Float,
+            visibleHeight: Float,
+            innerLeft: Float,
+            innerRight: Float,
+        ): BrowserDrawerModel {
+            val plan = CarMenuList.plan(carMenu(state))
+            val gap = sizes.contentGap
+            val tileGap = sizes.menuTileGap
+            val innerWidth = (innerRight - innerLeft).coerceAtLeast(1f)
+            val tileHeight = sizes.dp(CAR_TILE_HEIGHT_DP)
+            val rowHeight = sizes.touchTarget * 1.15f
+            val listHeight = sizes.touchTarget
+            val labelHeight = sizes.iconSmall * 1.7f
+
+            val rows = ArrayList<DrawerRow>()
+            val toggles = ArrayList<DrawerRow>()
+            val labels = ArrayList<Pair<Int, Box>>()
+            val plates = ArrayList<Pair<Int, Box>>()
+            var address: DrawerAddress? = null
+
+            fun layout(start: Float): Float {
+                rows.clear(); toggles.clear(); labels.clear(); plates.clear(); address = null
+                var y = start
+                fun label(res: Int) {
+                    labels += res to Box(innerLeft, y, innerRight, y + labelHeight)
+                    y += labelHeight
+                }
+                fun line(items: List<DrawerItem>, columns: Int, height: Float, kind: DrawerKind) {
+                    val width = (innerWidth - tileGap * (columns - 1)) / columns
+                    items.forEachIndexed { column, item ->
+                        val left = innerLeft + column * (width + tileGap)
+                        rows += DrawerRow(item, Box(left, y, left + width, y + height), kind)
+                    }
+                    y += height
+                }
+                fun full(item: DrawerItem, kind: DrawerKind, height: Float) {
+                    val row = DrawerRow(item, Box(innerLeft, y, innerRight, y + height), kind)
+                    if (kind == DrawerKind.TOGGLE) toggles += row else rows += row
+                    y += height
+                }
+                if (more) {
+                    val columns = if (innerWidth >= sizes.dp(MORE_TWO_COLUMNS_MIN_DP)) 2 else 1
+                    plan.more.forEachIndexed { index, (labelRes, items) ->
+                        if (index > 0) y += gap
+                        label(labelRes)
+                        items.chunked(columns).forEachIndexed { lineIndex, chunk ->
+                            if (lineIndex > 0) y += tileGap * 0.6f
+                            line(chunk, columns, listHeight, DrawerKind.LIST)
+                        }
+                    }
+                    return y
+                }
+
+                // The address row: which page the menu acts on, and the way to type a new one.
+                val addressBox = Box(innerLeft, y, innerRight, y + sizes.touchTarget)
+                val side = (addressBox.height - gap * 0.5f).coerceAtMost(sizes.touchTarget)
+                val goBox = Box(addressBox.right - gap * 0.5f - side, addressBox.centerY - side / 2f, addressBox.right - gap * 0.5f, addressBox.centerY + side / 2f)
+                val clearBox = Box(goBox.left - gap * 0.5f - side, addressBox.centerY - side / 2f, goBox.left - gap * 0.5f, addressBox.centerY + side / 2f)
+                address = DrawerAddress(addressBox, BrowserDisplayUrl.compact(state.url), state.secure, clearBox, goBox)
+                y = addressBox.bottom + gap
+
+                plan.grid.forEachIndexed { index, items ->
+                    if (index > 0) y += tileGap
+                    line(items, 4, tileHeight, DrawerKind.TILE)
+                }
+
+                if (plan.switches.isNotEmpty() || plan.zoom != null) {
+                    y += gap
+                    label(R.string.drawer_section_page)
+                    plan.switches.forEach { full(it, DrawerKind.TOGGLE, rowHeight); y += 2f }
+                    plan.zoom?.let { (out, zoomIn) ->
+                        val plate = Box(innerLeft, y, innerRight, y + rowHeight)
+                        plates += R.string.drawer_zoom to plate
+                        val buttonHeight = (rowHeight - gap).coerceAtLeast(sizes.touchTarget * 0.8f)
+                        val buttonWidth = buttonHeight * 1.2f
+                        val inRight = plate.right - gap
+                        val outRight = inRight - buttonWidth - gap
+                        val top = plate.centerY - buttonHeight / 2f
+                        rows += DrawerRow(out, Box(outRight - buttonWidth, top, outRight, top + buttonHeight), DrawerKind.ROUND)
+                        rows += DrawerRow(zoomIn, Box(inRight - buttonWidth, top, inRight, top + buttonHeight), DrawerKind.ROUND)
+                        y += rowHeight
+                    }
+                }
+
+                val swap = carMenu(state).firstOrNull { it.action == DrawerAction.SWAP_SPLIT_SIDES }
+                val splitRows = listOfNotNull(plan.splitChoose, plan.sideShow, swap)
+                if (plan.split != null || splitRows.isNotEmpty()) {
+                    y += gap
+                    label(R.string.drawer_section_split)
+                    plan.split?.let { full(it, DrawerKind.TOGGLE, rowHeight); y += 2f }
+                    splitRows.forEach { full(it, DrawerKind.LIST, listHeight); y += tileGap * 0.6f }
+                }
+
+                if (plan.more.isNotEmpty()) {
+                    y += gap
+                    full(DrawerItem(DrawerAction.MORE, R.string.drawer_more, BrowserIcon.MORE, value = "›"), DrawerKind.LIST, listHeight)
+                }
+                return y
+            }
+
+            val contentHeight = layout(contentTop) - contentTop
+            val maxScroll = (contentHeight - visibleHeight).coerceAtLeast(0f)
+            val offset = scrollOffset.coerceIn(0f, maxScroll)
+            layout(contentTop - offset)
+
+            val host = runCatching { java.net.URI(state.url).host }.getOrNull()?.removePrefix("www.").orEmpty()
+            return BrowserDrawerModel(
+                sizes = sizes,
+                panel = panel,
+                title = if (more) moreTitle else state.pageTitle.ifBlank { state.appName },
+                subtitle = if (more) "" else host,
+                grip = grip,
+                header = header,
+                titleLeft = titleLeft,
+                closeButton = closeButton,
+                headerLinks = headerLinks,
+                address = address,
+                primary = null,
+                tiles = rows.toList(),
+                dividers = emptyList(),
+                toggles = toggles.toList(),
+                headerBottom = headerBottom,
+                contentHeight = contentHeight,
+                visibleHeight = visibleHeight,
+                scrollOffset = offset,
+                sectionLabels = labels.toList(),
+                plates = plates.toList(),
+            )
+        }
+
+        private const val CAR_TILE_HEIGHT_DP = 72f
 
         /** The phone's secondary list, in the order [MoreActionsSheet] draws it. */
         private fun phoneMoreItems(): List<DrawerItem> = listOf(
@@ -558,62 +678,12 @@ class BrowserDrawerModel private constructor(
             val contentBottom = panel.bottom - gap
             val visibleHeight = (contentBottom - contentTop).coerceAtLeast(1f)
 
-            if (more) {
-                // Grouped rows instead of one uniform grid: four short labelled lists (Go to, This
-                // page, Split screen, AutoBridge), two columns where the panel is wide enough. A
-                // driver scans a heading and a few rows; a 22-tile grid gave no place to start.
-                val sections = moreSections(state)
-                val columns = if (innerWidth >= sizes.dp(MORE_TWO_COLUMNS_MIN_DP)) 2 else 1
-                val rowHeight = sizes.touchTarget
-                val labelHeight = sizes.iconSmall * 1.6f
-                fun sectionHeight(labelRes: Int, items: List<DrawerItem>): Float {
-                    val lines = (items.size + columns - 1) / columns
-                    return (if (labelRes != 0) labelHeight else 0f) + lines * rowHeight + (lines - 1).coerceAtLeast(0) * tileGap
-                }
-                val contentHeight = sections.sumOf { (labelRes, items) -> sectionHeight(labelRes, items).toDouble() }.toFloat() +
-                    gap * (sections.size - 1).coerceAtLeast(0)
-                val maxScroll = (contentHeight - visibleHeight).coerceAtLeast(0f)
-                val offset = scrollOffset.coerceIn(0f, maxScroll)
-                val columnWidth = (innerWidth - tileGap * (columns - 1)) / columns
-                val rows = ArrayList<DrawerRow>()
-                val labels = ArrayList<Pair<Int, Box>>()
-                var cursor = contentTop - offset
-                sections.forEachIndexed { index, (labelRes, items) ->
-                    if (index > 0) cursor += gap
-                    if (labelRes != 0) {
-                        labels += labelRes to Box(innerLeft, cursor, innerRight, cursor + labelHeight)
-                        cursor += labelHeight
-                    }
-                    val lines = items.chunked(columns)
-                    lines.forEachIndexed { lineIndex, line ->
-                        line.forEachIndexed { column, item ->
-                            val left = innerLeft + column * (columnWidth + tileGap)
-                            rows += DrawerRow(item, Box(left, cursor, left + columnWidth, cursor + rowHeight), DrawerKind.LIST)
-                        }
-                        cursor += rowHeight
-                        if (lineIndex < lines.lastIndex) cursor += tileGap
-                    }
-                }
-                return BrowserDrawerModel(
-                    sizes = sizes,
-                    panel = panel,
-                    title = moreTitle,
-                    subtitle = "",
-                    grip = grip,
-                    header = header,
-                    titleLeft = titleLeft,
-                    closeButton = closeButton,
-                    headerLinks = headerLinks,
-                    address = null,
-                    primary = null,
-                    tiles = rows,
-                    dividers = emptyList(),
-                    toggles = emptyList(),
-                    headerBottom = headerBottom,
-                    contentHeight = contentHeight,
-                    visibleHeight = visibleHeight,
-                    scrollOffset = offset,
-                    sectionLabels = labels,
+            // The car's three browsers share one menu layout ([CarMenuList.plan]); this is the
+            // Android Auto template browser's Canvas copy of it. The phone keeps the sheet below.
+            if (state.surface == MenuSurface.CAR) {
+                return carSheet(
+                    sizes, state, more, scrollOffset, moreTitle, panel, grip, header, titleLeft,
+                    closeButton, headerLinks, headerBottom, contentTop, visibleHeight, innerLeft, innerRight,
                 )
             }
 
@@ -768,7 +838,8 @@ class BrowserDrawerModel private constructor(
 
     /** The last thing on the sheet, for "scrolled to the end" checks. */
     val contentBottom: Float get() =
-        (toggles.lastOrNull() ?: tiles.lastOrNull() ?: primary)?.bounds?.bottom ?: headerBottom
+        (tiles + toggles + listOfNotNull(primary)).maxOfOrNull { it.bounds.bottom }
+            ?: address?.bounds?.bottom ?: headerBottom
 
     /** Everything that can be tapped, in the order hit testing resolves them. */
     val rows: List<DrawerRow>
