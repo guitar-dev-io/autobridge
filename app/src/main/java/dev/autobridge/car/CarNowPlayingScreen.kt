@@ -90,17 +90,29 @@ class CarNowPlayingScreen(carContext: CarContext) : Screen(carContext) {
                     }
                     .build()
             )
-            // PaneTemplate allows at most 2 actions. Keep Play/Pause and Next here; Prev and the
-            // rest of the transport live on the Full controls (CarMediaScreen) screen.
+            // PaneTemplate allows at most 2 actions. Play/Pause is always the first; the second is
+            // Next while something plays and Close once it is paused, which is when a driver turns
+            // a channel off. Prev and the rest of the transport live on Full controls (CarMediaScreen).
             .addAction(
-                Action.Builder()
-                    .setTitle(carContext.getString(R.string.car_now_next))
-                    .setEnabled(connected)
-                    .setOnClickListener {
-                        mediaPlayback.next()
-                        invalidate()
-                    }
-                    .build()
+                if (playing || mediaPlayback.currentTitle == null) {
+                    Action.Builder()
+                        .setTitle(carContext.getString(R.string.car_now_next))
+                        .setEnabled(connected)
+                        .setOnClickListener {
+                            mediaPlayback.next()
+                            invalidate()
+                        }
+                        .build()
+                } else {
+                    Action.Builder()
+                        .setTitle(carContext.getString(R.string.player_close))
+                        .setEnabled(connected)
+                        .setOnClickListener {
+                            mediaPlayback.close()
+                            invalidate()
+                        }
+                        .build()
+                }
             )
             .build()
 

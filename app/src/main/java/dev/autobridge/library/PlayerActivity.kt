@@ -319,6 +319,9 @@ class PlayerActivity : Activity() {
                     add(AutoBridgeDesign.HeaderAction("💬", { startActivity(SubtitleSettingsActivity.intent(this@PlayerActivity)) }))
                 }
                 add(AutoBridgeDesign.HeaderAction("⚙", { startActivity(VideoSettingsActivity.intent(this@PlayerActivity)) }))
+                // Back keeps audio, and anything the car is showing, playing on purpose; this is
+                // how a channel is actually turned off.
+                add(AutoBridgeDesign.HeaderAction("✕", { closePlayback() }))
             }
         )
         chrome += header
@@ -1222,6 +1225,13 @@ class PlayerActivity : Activity() {
             playback.pause()
             detachSurface()
         }
+    }
+
+    /** Stops and unloads what is playing, on the phone and the car alike, then leaves. */
+    private fun closePlayback() {
+        playback.close()
+        detachSurface()
+        finish()
     }
 
     /**

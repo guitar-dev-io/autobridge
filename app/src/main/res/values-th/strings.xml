@@ -1395,6 +1395,8 @@
     <string name="car_video_player_failed">เชื่อมต่อเครื่องเล่นสื่อไม่ได้ กลับไปที่คลังแล้วลองอีกครั้ง</string>
     <string name="car_video_output_unavailable">การเชื่อมต่อนี้ไม่รองรับการแสดงวิดีโอ</string>
     <string name="car_video_home">หน้าหลัก</string>
+    <string name="car_video_close">ปิดช่อง</string>
+    <string name="player_close">ปิด</string>
     <string name="car_video_back_10">ถอยหลัง 10 วินาที</string>
     <string name="car_video_forward_10">เดินหน้า 10 วินาที</string>
 
