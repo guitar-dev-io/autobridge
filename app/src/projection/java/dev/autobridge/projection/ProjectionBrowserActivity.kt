@@ -49,6 +49,7 @@ import dev.autobridge.browser.BrowserDrawerModel
 import dev.autobridge.browser.CarMenuList
 import dev.autobridge.browser.DrawerAction
 import dev.autobridge.browser.MenuSurface
+import dev.autobridge.browser.PageZoom
 import dev.autobridge.entertainment.BrowserLauncher
 import dev.autobridge.entertainment.WebBookmarkStore
 import dev.autobridge.entertainment.WebHistoryStore
@@ -500,6 +501,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
                 }
 
                 override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
+                    PageZoom.reset(view)
                     BrowserDefaults.applyIdentity(this@ProjectionBrowserActivity, view, url)
                     // The page the keyboard was typing into is going away — usually because the
                     // search it typed was just submitted. The keyboard goes with it.
@@ -1227,6 +1229,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         unsupported = UNSUPPORTED_ACTIONS,
         bookmarked = WebBookmarkStore.contains(this, currentUrl),
         splitLayout = BrowserSplitStore.projection.layout(this),
+        zoomPercent = PageZoom.percent(webView),
     )
 
     /** What each menu entry does here. Entries in [UNSUPPORTED_ACTIONS] are never offered. */
@@ -1286,8 +1289,8 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
             }
             DrawerAction.OPEN_EXTERNAL ->
                 if (!BrowserLauncher.openUrl(this, currentUrl)) notice(getString(R.string.car_browser_no_external))
-            DrawerAction.ZOOM_IN -> page?.zoomBy(1.25f)
-            DrawerAction.ZOOM_OUT -> page?.zoomBy(0.8f)
+            DrawerAction.ZOOM_IN -> page?.let { PageZoom.zoomBy(it, 1.25f) }
+            DrawerAction.ZOOM_OUT -> page?.let { PageZoom.zoomBy(it, 0.8f) }
             DrawerAction.CLEAR_DATA -> {
                 clearBrowsingData()
                 notice(getString(R.string.car_browsing_data_cleared))
@@ -2033,6 +2036,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
                 }
 
                 override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
+                    PageZoom.reset(view)
                     BrowserDefaults.applyIdentity(this@ProjectionBrowserActivity, view, url)
                     if (keyboardTarget === view) closeKeyboard()
                 }

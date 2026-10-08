@@ -671,6 +671,7 @@ class BrowserActivity : Activity() {
             }
 
             override fun onPageStarted(view: WebView, url: String, favicon: android.graphics.Bitmap?) {
+                PageZoom.reset(view)
                 loadError.visibility = View.GONE
                 // Sign-in origins always get the clean mobile UA (see resolveForUrl): a desktop UA
                 // contradicts the WebView's Android client hints and Google refuses it. This fires
@@ -1023,6 +1024,7 @@ class BrowserActivity : Activity() {
         surface = if (onCarDisplay) MenuSurface.CAR else MenuSurface.PHONE,
         unsupported = if (onCarDisplay) CAR_DISPLAY_UNSUPPORTED else emptySet(),
         bookmarked = !showingStartPage && WebBookmarkStore.contains(this, web.url.orEmpty()),
+        zoomPercent = PageZoom.percent(web),
     )
 
     /** How long after a tap the focused field and the system keyboard are checked. */
@@ -1394,8 +1396,8 @@ class BrowserActivity : Activity() {
                 toast(getString(R.string.browser_url_copied))
             }
             DrawerAction.PASTE_AND_GO -> clipboardText()?.let { navigate(it) } ?: toast(getString(R.string.browser_clipboard_empty))
-            DrawerAction.ZOOM_IN -> web.zoomBy(1.25f)
-            DrawerAction.ZOOM_OUT -> web.zoomBy(0.8f)
+            DrawerAction.ZOOM_IN -> PageZoom.zoomBy(web, 1.25f)
+            DrawerAction.ZOOM_OUT -> PageZoom.zoomBy(web, 0.8f)
             DrawerAction.CLEAR_DATA -> confirmClearBrowsingData()
             // Opens the dedicated "Send to car" sheet rather than firing immediately: the sheet
             // lets the user send the current page, a different URL, or a search query, and pick

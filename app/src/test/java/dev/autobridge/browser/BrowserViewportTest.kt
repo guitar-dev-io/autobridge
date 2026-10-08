@@ -958,6 +958,24 @@ class BrowserDrawerModelTest {
         assertTrue(model.sectionLabels.isNotEmpty())
     }
 
+    /** The zoom stepper shows the zoom it changes, between its − and + buttons. */
+    @Test fun theZoomStepperShowsThePercentBetweenItsButtons() {
+        val model = modelFor(1024, 600, 160, state = state.copy(zoomPercent = 125))
+        val (text, box) = model.zoomReadout ?: error("no zoom readout")
+        assertEquals("125%", text)
+        val out = model.tiles.single { it.item.action == DrawerAction.ZOOM_OUT }.bounds
+        val zoomIn = model.tiles.single { it.item.action == DrawerAction.ZOOM_IN }.bounds
+        assertTrue(out.right <= box.left && box.right <= zoomIn.left)
+        assertEquals(out.centerY, box.centerY, 0.5f)
+    }
+
+    /** Opposite steps cancel out exactly, rather than leaving the readout at 99% or 101%. */
+    @Test fun zoomStepsRoundToWholePercent() {
+        assertEquals(100, PageZoom.percentOf(1.25f * 0.8f))
+        assertEquals(156, PageZoom.percentOf(1.25f * 1.25f))
+        assertEquals(64, PageZoom.percentOf(0.8f * 0.8f))
+    }
+
     /** The phone sheet keeps its own shape: the Send to car button over two rows of three. */
     @Test fun thePhoneSheetKeepsItsPrimaryButton() {
         val model = modelFor(1024, 600, 160, state = state.copy(surface = MenuSurface.PHONE))
