@@ -91,7 +91,7 @@ class DuoScreenChromeRenderer {
     fun draw(canvas: Canvas, frame: ChromeFrame) {
         val c = frame.chrome
         val d = frame.density
-        val s = DuoScreenChromeSpec
+        val s = c.spec
 
         // Gaps in the surface colour, and every pane's corners rounded off by the same paint.
         path.reset()
@@ -128,7 +128,7 @@ class DuoScreenChromeRenderer {
     private fun drawBar(canvas: Canvas, frame: ChromeFrame) {
         val c = frame.chrome
         val d = frame.density
-        val s = DuoScreenChromeSpec
+        val s = frame.chrome.spec
         if (c.barOverlapsPanes) {
             fill.color = SURFACE
             canvas.drawRect(c.bar.toRectF(), fill)
@@ -190,7 +190,7 @@ class DuoScreenChromeRenderer {
         kind: ChromeTarget.Kind
     ) {
         val d = frame.density
-        val s = DuoScreenChromeSpec
+        val s = frame.chrome.spec
         val pressed = frame.pressed == ChromeTarget.Control(kind)
         fill.color = if (pressed) mix(background, 0xFFFFFFFF.toInt(), 0.2f) else background
         rect.set(box.toRectF())
@@ -212,7 +212,7 @@ class DuoScreenChromeRenderer {
 
     private fun drawChips(canvas: Canvas, frame: ChromeFrame) {
         val d = frame.density
-        val s = DuoScreenChromeSpec
+        val s = frame.chrome.spec
         frame.chrome.chips.forEach { (preset, box) ->
             val selected = preset == frame.currentPreset ||
                 (preset == DuoScreenPreset.STACKED_60_40 && frame.currentPreset == DuoScreenPreset.EVEN_ROWS)
@@ -280,7 +280,7 @@ class DuoScreenChromeRenderer {
 
     private fun drawCards(canvas: Canvas, frame: ChromeFrame) {
         val d = frame.density
-        val s = DuoScreenChromeSpec
+        val s = frame.chrome.spec
         val radius = s.PANE_RADIUS * d
         frame.chrome.cards.forEach { card ->
             rect.set(card.pane.toRectF())

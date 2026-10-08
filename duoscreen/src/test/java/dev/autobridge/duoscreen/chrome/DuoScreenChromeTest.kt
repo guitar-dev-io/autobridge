@@ -84,6 +84,34 @@ class DuoScreenChromeTest {
 
     // ------------------------------------------------------------------------------ the bar
 
+    @Test fun aSmallSurfaceGetsTheCompactBar() {
+        // The DHU's small profile: 800 x 400 at 160dpi, where the design's 72dp bar was a tenth
+        // of the width.
+        val small = DuoScreenChrome.boundsFor(800, 400, 1f)
+        assertEquals(DuoScreenChromeSpec.COMPACT.BAR.toInt(), small.barPx)
+        val panes = panes(DuoScreenPreset.EVEN_COLUMNS, small, count = 3)
+        val c = chrome(panes, small)
+        assertEquals(DuoScreenChromeSpec.COMPACT, c.spec)
+        assertTrue("the bar is under 7% of the width", c.bar.width * 100 / small.width < 7)
+        assertEquals(4, c.buttons.size)
+        c.buttons.forEach { (_, box) -> assertTrue(DuoScreenLayout.overlaps(box, c.bar)) }
+    }
+
+    @Test fun aLayoutSavedWithTheBiggerBarIsLaidOutAgainOnASmallSurface() {
+        val small = DuoScreenChrome.boundsFor(800, 400, 1f)
+        val savedAt72 = listOf(
+            DuoScreenPane(0, "a", Rect(0, 0, 364, 400)),
+            DuoScreenPane(1, "b", Rect(436, 0, 364, 400))
+        )
+        assertFalse(DuoScreenChrome.hasRoomForBar(savedAt72, small))
+        assertTrue(DuoScreenChrome.hasRoomForBar(panes(DuoScreenPreset.EVEN_COLUMNS, small), small))
+    }
+
+    @Test fun aLargePortraitUnitKeepsTheDesignsSizes() {
+        assertEquals(DuoScreenChromeSpec.REGULAR, chrome(panes(DuoScreenPreset.STACKED_60_40, portrait), portrait).spec)
+        assertEquals(DuoScreenChromeSpec.REGULAR.BAR.toInt(), portrait.barPx)
+    }
+
     @Test fun theBarHoldsFourButtonsAndTheGripInsideIt() {
         val c = chrome(panes(DuoScreenPreset.STACKED_60_40, portrait), portrait)
         assertEquals(
@@ -142,7 +170,7 @@ class DuoScreenChromeTest {
         val narrow = DuoScreenChrome.boundsFor(560, 900, 1f)
         val c = chrome(panes(DuoScreenPreset.STACKED_60_40, narrow), narrow, editing = true)
         assertTrue(c.chipsIconOnly)
-        assertTrue(c.chips.last().second.right <= narrow.width - DuoScreenChromeSpec.EXIT_RESERVE.toInt())
+        assertTrue(c.chips.last().second.right <= narrow.width - c.spec.EXIT_RESERVE.toInt())
     }
 
     // --------------------------------------------------------------- the grip moves the seam
