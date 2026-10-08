@@ -23,6 +23,7 @@ object UpdateDownloader {
     private const val MAX_BYTES = 200L * 1024 * 1024
     private const val TIMEOUT_MS = 20_000
     private const val APK_MIME = "application/vnd.android.package-archive"
+    private const val PROGRESS_INTERVAL_MS = 150L
 
     /** Hosts a release APK is served from: the release link and the storage it redirects to. */
     private val ALLOWED_HOSTS = setOf(
@@ -34,13 +35,23 @@ object UpdateDownloader {
     sealed interface Result {
         data class Ready(val apk: File) : Result
         data class Failed(val reason: String) : Result
+        /** The user stopped it; nothing to report and no browser fallback. */
+        object Cancelled : Result
     }
 
     /**
      * Downloads [url] into the app's cache and checks that it is an APK of this app before it is
      * offered to anything. Blocking: call off the main thread.
+     *
+     * [onProgress] gets the bytes so far and the total (-1 when the server does not say), on this
+     * thread, at most every [PROGRESS_INTERVAL_MS]. [cancelled] is polled between reads.
      */
-    fun download(context: Context, url: String): Result {
+    fun download(
+        context: Context,
+        url: String,
+        onProgress: (copied: Long, total: Long) -> Unit = { _, _ -> },
+        cancelled: () -> Boolean = { false },
+    ): Result {
         val dir = File(context.cacheDir, DIR).apply { mkdirs() }
         val target = File(dir, FILE)
         target.delete()
@@ -67,20 +78,33 @@ object UpdateDownloader {
                     return@repeat
                 }
                 if (code != HttpURLConnection.HTTP_OK) return Result.Failed("HTTP $code")
-                if (opened.contentLengthLong > MAX_BYTES) return Result.Failed("file too large")
+                val total = opened.contentLengthLong
+                if (total > MAX_BYTES) return Result.Failed("file too large")
                 var copied = 0L
+                var reportedAt = 0L
+                onProgress(0L, total)
                 opened.inputStream.use { input ->
                     target.outputStream().use { output ->
                         val buffer = ByteArray(64 * 1024)
                         while (true) {
+                            if (cancelled()) {
+                                target.delete()
+                                return Result.Cancelled
+                            }
                             val read = input.read(buffer)
                             if (read < 0) break
                             copied += read
                             if (copied > MAX_BYTES) return Result.Failed("file too large")
                             output.write(buffer, 0, read)
+                            val now = System.currentTimeMillis()
+                            if (now - reportedAt >= PROGRESS_INTERVAL_MS) {
+                                reportedAt = now
+                                onProgress(copied, total)
+                            }
                         }
                     }
                 }
+                onProgress(copied, total)
                 return verify(context, target)
             }
             return Result.Failed("too many redirects")
