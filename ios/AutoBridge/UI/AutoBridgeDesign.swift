@@ -27,6 +27,7 @@ enum AutoBridgeDesign {
     static let accentFiles = Color(hex: 0x9BE08A)
     static let accentFavorite = Color(hex: 0xFF8FB1)
     static let accentSystem = Color(hex: 0xB39DFF)
+    static let accentWeather = Color(hex: 0x7CC4FF)
 
     static func color(for tone: StreamPing.Tone) -> Color {
         switch tone {
