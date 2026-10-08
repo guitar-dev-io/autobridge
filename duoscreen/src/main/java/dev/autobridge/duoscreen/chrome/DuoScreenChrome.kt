@@ -9,11 +9,11 @@ import dev.autobridge.duoscreen.layout.DuoScreenPane
 import dev.autobridge.duoscreen.layout.DuoScreenPreset
 
 /**
- * Sizes of the app-drawn controls, in dp. [REGULAR] is for a large portrait head unit, a step
- * below the Duo screen design's 72dp bar and 56dp buttons, which read as far too big on the car
- * display. A small or short surface gets [COMPACT]: on an 800 x 400 unit even that took a tenth of
- * the width, so there the bar is 40dp with 32dp buttons. The touch area is still the bar's full
- * thickness and half the gap either side, larger than what is drawn.
+ * Sizes of the app-drawn controls, in dp. The seam between the panes is thin ([BAR]) with a small
+ * handle in the middle ([GRIP_LENGTH] x [GRIP_THICKNESS], touched over [HANDLE_TOUCH]); tapping it
+ * brings up a floating toolbar of [BUTTON]-sized buttons padded by [BAR_PADDING]. A permanent bar of
+ * buttons, even shrunk, read as too big on the car display, so the panes get nearly all of it.
+ * [REGULAR] is for a large portrait unit and [COMPACT] for a small or short surface.
  */
 @Suppress("PropertyName")
 data class DuoScreenChromeSpec(
@@ -26,6 +26,7 @@ data class DuoScreenChromeSpec(
     val BAR_PADDING: Float,
     val GRIP_LENGTH: Float,
     val GRIP_THICKNESS: Float,
+    val HANDLE_TOUCH: Float,
     val PILL: Float,
     val GRIP_PILL_LENGTH: Float,
     val PILL_PADDING: Float,
@@ -63,19 +64,20 @@ data class DuoScreenChromeSpec(
         const val COMPACT_BELOW_DP = 720f
 
         val REGULAR = DuoScreenChromeSpec(
-        BAR = 56f,
-        SEAM = 12f,
+        BAR = 12f,
+        SEAM = 6f,
         BUTTON = 44f,
-        BUTTON_RADIUS = 14f,
-        BUTTON_GAP = 8f,
+        BUTTON_RADIUS = 12f,
+        BUTTON_GAP = 6f,
         BUTTON_ICON = 22f,
         BAR_PADDING = 6f,
-        GRIP_LENGTH = 100f,
+        GRIP_LENGTH = 44f,
+        HANDLE_TOUCH = 56f,
         GRIP_THICKNESS = 6f,
         PILL = 44f,
-        GRIP_PILL_LENGTH = 120f,
-        PILL_PADDING = 18f,
-        PILL_ICON = 22f,
+        GRIP_PILL_LENGTH = 100f,
+        PILL_PADDING = 16f,
+        PILL_ICON = 20f,
         PILL_ICON_GAP = 8f,
         PILL_TEXT = 18f,
         PILL_GROUP_GAP = 12f,
@@ -103,17 +105,18 @@ data class DuoScreenChromeSpec(
         )
 
         val COMPACT = DuoScreenChromeSpec(
-        BAR = 40f,
-        SEAM = 8f,
-        BUTTON = 32f,
+        BAR = 10f,
+        SEAM = 6f,
+        BUTTON = 36f,
         BUTTON_RADIUS = 10f,
-        BUTTON_GAP = 6f,
+        BUTTON_GAP = 4f,
         BUTTON_ICON = 18f,
         BAR_PADDING = 4f,
-        GRIP_LENGTH = 64f,
+        GRIP_LENGTH = 36f,
+        HANDLE_TOUCH = 48f,
         GRIP_THICKNESS = 5f,
-        PILL = 32f,
-        GRIP_PILL_LENGTH = 80f,
+        PILL = 36f,
+        GRIP_PILL_LENGTH = 72f,
         PILL_PADDING = 12f,
         PILL_ICON = 16f,
         PILL_ICON_GAP = 6f,
@@ -169,10 +172,11 @@ data class ChromeLabels(
  * renderer paints from it and the controller hit-tests against it, so the two can never disagree
  * about where a button is.
  *
- * The control bar lives in the widest gap between two panes — which the presets leave exactly
+ * The seam lives in the widest gap between two panes — which the presets leave exactly
  * [DuoScreenChromeSpec.BAR] wide — and runs along it, so on a stacked layout it is a horizontal
  * strip between the two panes and on a side-by-side one a vertical strip. With no such gap
- * (picture-in-picture, or panes moved by hand) it takes the strip along the bottom.
+ * (picture-in-picture, or panes moved by hand) it takes the strip along the bottom. In normal use
+ * it shows only its handle; the toolbar ([toolbar]) floats over the seam while it is open.
  */
 class DuoScreenChrome private constructor(
     /** The size set this was laid out with; the renderer draws to the same one. */
@@ -189,9 +193,13 @@ class DuoScreenChrome private constructor(
     /** True when no gap was free and the bar is drawn over the panes' bottom edge. */
     val barOverlapsPanes: Boolean,
     val editing: Boolean,
-    /** Normal mode's bar buttons, by kind; empty while arranging. */
+    /** The handle in the middle of the seam, which opens the toolbar. Normal mode only. */
+    val handle: Rect?,
+    /** The toolbar floating over the seam while open, in normal mode; null when closed. */
+    val toolbar: Rect?,
+    /** The toolbar's buttons, by kind; empty while it is closed and while arranging. */
     val buttons: List<Pair<ChromeTarget.Kind, Rect>>,
-    /** The grip: a thin handle in normal mode, a pill while arranging. Null when it did not fit. */
+    /** Arrange mode's grip pill on the seam; null when there is no seam to grab. */
     val grip: Rect?,
     /** Arrange mode's Swap and Done on the bar. */
     val swapPill: Rect?,
@@ -201,9 +209,9 @@ class DuoScreenChrome private constructor(
     val chipsIconOnly: Boolean,
     /** Arrange mode's card in each pane, in z-order. */
     val cards: List<Card>,
-    /** The gap between bar buttons, and the pills' thickness, in px; for the touch areas. */
+    /** The gap between toolbar buttons, and the handle's touch square, in px. */
     private val gapPx: Int,
-    private val pillPx: Int
+    private val handleTouchPx: Int
 ) {
     /**
      * One pane's card while arranging. [tile] and [share] are null when the pane is too small to
@@ -230,16 +238,15 @@ class DuoScreenChrome private constructor(
     fun hit(x: Int, y: Int): ChromeTarget? {
         if (editing) {
             chips.firstOrNull { (_, rect) -> rect.contains(x, y) }?.let { return ChromeTarget.Chip(it.first) }
-            donePill?.let { if (it.inflate(slop()).contains(x, y)) return ChromeTarget.Control(ChromeTarget.Kind.DONE) }
-            swapPill?.let { if (it.inflate(slop()).contains(x, y)) return ChromeTarget.Control(ChromeTarget.Kind.SWAP) }
-            grip?.let { if (it.inflate(slop()).contains(x, y)) return ChromeTarget.Control(ChromeTarget.Kind.GRIP) }
+            donePill?.let { if (it.inflate(gapPx).contains(x, y)) return ChromeTarget.Control(ChromeTarget.Kind.DONE) }
+            swapPill?.let { if (it.inflate(gapPx).contains(x, y)) return ChromeTarget.Control(ChromeTarget.Kind.SWAP) }
+            grip?.let { if (it.inflate(gapPx).contains(x, y)) return ChromeTarget.Control(ChromeTarget.Kind.GRIP) }
             cards.lastOrNull { it.button.contains(x, y) }?.let { return ChromeTarget.ChangeApp(it.paneId) }
             return null
         }
-        buttons.firstOrNull { (_, rect) -> buttonHitArea(rect).contains(x, y) }
+        buttons.firstOrNull { (_, rect) -> rect.inflate(gapPx / 2).contains(x, y) }
             ?.let { return ChromeTarget.Control(it.first) }
-        grip?.let { if (gripHitArea(it).contains(x, y)) return ChromeTarget.Control(ChromeTarget.Kind.GRIP) }
-        // The rest of the bar is not a pane: a tap there is swallowed rather than sent to one.
+        if (toolbar == null) handle?.let { if (handleTouchArea(it).contains(x, y)) return ChromeTarget.Control(ChromeTarget.Kind.GRIP) }
         return null
     }
 
@@ -247,24 +254,17 @@ class DuoScreenChrome private constructor(
 
     fun paneRectOf(id: Int): Rect? = panes.firstOrNull { it.first == id }?.second
 
-    /** Whether a tap at ([x], [y]) is on the bar at all, hit or not. */
-    fun onBar(x: Int, y: Int): Boolean = bar.contains(x, y)
+    /**
+     * Whether a tap at ([x], [y]) lands on the chrome at all, hit or not: the seam belongs to no
+     * pane, and neither does the open toolbar between its buttons.
+     */
+    fun onBar(x: Int, y: Int): Boolean = bar.contains(x, y) || toolbar?.contains(x, y) == true
 
-    /** Grows a pill to the bar's thickness. */
-    private fun slop(): Int = ((if (barHorizontal) bar.height else bar.width) - pillPx).coerceAtLeast(0) / 2
-
-    /** A button's touch area: the bar's full thickness, and half the gap on each side along it. */
-    private fun buttonHitArea(button: Rect): Rect {
-        val half = gapPx / 2
-        return if (barHorizontal) Rect(button.left - half, bar.top, button.width + half * 2, bar.height)
-        else Rect(bar.left, button.top - half, bar.width, button.height + half * 2)
-    }
-
-    /** The grip is thin to look at but takes the bar's thickness and its own length plus a margin. */
-    private fun gripHitArea(grip: Rect): Rect {
-        val margin = gapPx * 2
-        return if (barHorizontal) Rect(grip.left - margin, bar.top, grip.width + margin * 2, bar.height)
-        else Rect(bar.left, grip.top - margin, bar.width, grip.height + margin * 2)
+    /** The handle is a few dp to look at but takes a finger-sized square around its centre. */
+    private fun handleTouchArea(handle: Rect): Rect {
+        val cx = handle.left + handle.width / 2
+        val cy = handle.top + handle.height / 2
+        return Rect(cx - handleTouchPx / 2, cy - handleTouchPx / 2, handleTouchPx, handleTouchPx)
     }
 
     companion object {
@@ -304,7 +304,8 @@ class DuoScreenChrome private constructor(
             density: Float,
             editing: Boolean,
             labels: ChromeLabels,
-            measure: (String, Float) -> Float
+            measure: (String, Float) -> Float,
+            toolbarOpen: Boolean = false
         ): DuoScreenChrome {
             val s = DuoScreenChromeSpec.forSurface(bounds.width, bounds.height, density)
             fun px(dp: Float) = (dp * density).toInt()
@@ -339,29 +340,35 @@ class DuoScreenChrome private constructor(
                 else Rect(acrossCenter - thickness / 2, alongStart + offset, thickness, length)
 
             val buttons = mutableListOf<Pair<ChromeTarget.Kind, Rect>>()
+            var handle: Rect? = null
+            var toolbar: Rect? = null
             var grip: Rect? = null
             var swapPill: Rect? = null
             var donePill: Rect? = null
             if (!editing) {
-                // Layout and Swap from the start, Reload and Arrange from the end, the grip between.
-                val lead = listOf(ChromeTarget.Kind.LAYOUT, ChromeTarget.Kind.SWAP)
-                val tail = listOf(ChromeTarget.Kind.RELOAD, ChromeTarget.Kind.ARRANGE)
-                val needed = pad * 2 + button * 4 + buttonGap * 3
-                if (along >= needed) {
-                    lead.forEachIndexed { i, kind -> buttons += kind to boxAlong(pad + i * (button + buttonGap), button, button) }
-                    tail.forEachIndexed { i, kind ->
-                        val fromEnd = pad + (tail.size - i) * button + (tail.size - 1 - i) * buttonGap
-                        buttons += kind to boxAlong(along - fromEnd, button, button)
+                val handleLength = px(s.GRIP_LENGTH)
+                handle = boxAlong((along - handleLength) / 2, handleLength, px(s.GRIP_THICKNESS))
+                if (toolbarOpen) {
+                    // Layout, Swap, Reload, Arrange on a pill centred on the seam, along it, kept
+                    // on the surface when the seam runs close to an edge.
+                    val kinds = listOf(
+                        ChromeTarget.Kind.LAYOUT, ChromeTarget.Kind.SWAP,
+                        ChromeTarget.Kind.RELOAD, ChromeTarget.Kind.ARRANGE
+                    )
+                    val length = pad * 2 + button * kinds.size + buttonGap * (kinds.size - 1)
+                    val thickness = button + pad * 2
+                    val cx = bar.left + bar.width / 2
+                    val cy = bar.top + bar.height / 2
+                    val w = if (horizontal) length else thickness
+                    val h = if (horizontal) thickness else length
+                    val left = (cx - w / 2).coerceIn(0, (bounds.width - w).coerceAtLeast(0))
+                    val top = (cy - h / 2).coerceIn(0, (bounds.height - h).coerceAtLeast(0))
+                    toolbar = Rect(left, top, w, h)
+                    kinds.forEachIndexed { index, kind ->
+                        val offset = pad + index * (button + buttonGap)
+                        buttons += kind to if (horizontal) Rect(left + offset, top + pad, button, button)
+                        else Rect(left + pad, top + offset, button, button)
                     }
-                    val gripLength = px(s.GRIP_LENGTH)
-                    val free = along - needed - buttonGap * 2
-                    if (free >= gripLength && divider != null) {
-                        grip = boxAlong((along - gripLength) / 2, gripLength, px(s.GRIP_THICKNESS))
-                    }
-                } else {
-                    // Too short for all four: keep Layout and Arrange, the two that lead somewhere.
-                    buttons += ChromeTarget.Kind.LAYOUT to boxAlong(pad, button, button)
-                    buttons += ChromeTarget.Kind.ARRANGE to boxAlong(along - pad - button, button, button)
                 }
             } else {
                 val pill = px(s.PILL)
@@ -458,8 +465,9 @@ class DuoScreenChrome private constructor(
             }
 
             return DuoScreenChrome(
-                s, bounds, panes.map { it.id to it.rect }, bar, horizontal, divider, overlaps, editing, buttons, grip,
-                swapPill, donePill, chips, iconOnly, cards, buttonGap, px(s.PILL)
+                s, bounds, panes.map { it.id to it.rect }, bar, horizontal, divider, overlaps, editing,
+                handle, toolbar, buttons, grip, swapPill, donePill, chips, iconOnly, cards, buttonGap,
+                px(s.HANDLE_TOUCH)
             )
         }
 

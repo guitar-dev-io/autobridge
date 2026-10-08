@@ -3,6 +3,7 @@ package dev.autobridge.duoscreen.render
 import android.content.Context
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
+import android.os.Build
 import android.view.Surface
 import dev.autobridge.duoscreen.DuoLog
 import dev.autobridge.duoscreen.system.DuoScreenPrivilegedOps
@@ -35,6 +36,7 @@ object DuoScreenDisplays {
     private const val FLAG_DESTROY_CONTENT_ON_REMOVAL = 1 shl 8
     private const val FLAG_TRUSTED = 1 shl 10
     private const val FLAG_OWN_DISPLAY_GROUP = 1 shl 11
+    private const val FLAG_ALWAYS_UNLOCKED = 1 shl 12
 
     /**
      * The untrusted fallback flags — what an app may set with no permission.
@@ -53,6 +55,15 @@ object DuoScreenDisplays {
      * trusted display behaves like the untrusted one in every other respect.
      */
     const val TRUSTED_FLAGS = FLAGS or FLAG_TRUSTED or FLAG_OWN_DISPLAY_GROUP
+
+    /**
+     * [TRUSTED_FLAGS] plus [FLAG_ALWAYS_UNLOCKED] (API 33+, `ADD_ALWAYS_UNLOCKED_DISPLAY`, which the
+     * shell UID holds). The own group keeps the display on after the power button, but the
+     * keyguard still puts a sleep token on every display that is not always-unlocked, and that
+     * stops the pane's app within a second. Android Auto's own display carries this flag for the
+     * same reason.
+     */
+    const val UNLOCKED_FLAGS = TRUSTED_FLAGS or FLAG_ALWAYS_UNLOCKED
 
     /**
      * A pane's display and the size it is actually running at, which is not always its rect's.
@@ -94,7 +105,11 @@ object DuoScreenDisplays {
 
         // Prefer the trusted, own-display-group path so the pane survives the phone's power button.
         if (ops.isAvailable) {
-            val trustedId = ops.createTrustedVirtualDisplay(name, width, height, dpi, surface, TRUSTED_FLAGS)
+            // Always-unlocked first; a ROM that refuses it still gets the plain trusted display.
+            val trustedId = (if (Build.VERSION.SDK_INT >= 33) {
+                ops.createTrustedVirtualDisplay(name, width, height, dpi, surface, UNLOCKED_FLAGS)
+            } else -1).takeIf { it >= 0 }
+                ?: ops.createTrustedVirtualDisplay(name, width, height, dpi, surface, TRUSTED_FLAGS)
             if (trustedId >= 0) {
                 displays[paneId] = PaneDisplay(null, width, height, dpi, trustedDisplayId = trustedId, ops = ops)
                 DuoLog.i(TAG, "Pane $paneId -> trusted display $trustedId (${width}x$height @ ${dpi}dpi)")

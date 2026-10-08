@@ -63,6 +63,9 @@ class DuoScreenChromeRenderer {
         const val CARD_BUTTON = 0xFFF1F3F5.toInt()
         const val CARD_BUTTON_TEXT = 0xFF0F1114.toInt()
         const val TILE = 0xFF1C2330.toInt()
+        /** The floating toolbar over the seam: nearly opaque, with a soft drop below it. */
+        const val TOOLBAR = 0xF21C1F25.toInt()
+        const val TOOLBAR_SHADOW = 0x66000000
     }
 
     private enum class Glyph { LAYOUT_STACKED, LAYOUT_COLUMNS, SWAP, RELOAD, ARRANGE, DONE }
@@ -134,6 +137,25 @@ class DuoScreenChromeRenderer {
             canvas.drawRect(c.bar.toRectF(), fill)
         }
         if (!c.editing) {
+            // Closed: only the handle in the middle of the seam. Open: the toolbar over the seam.
+            val toolbar = c.toolbar
+            if (toolbar == null) {
+                c.handle?.let { handle ->
+                    fill.color = if (frame.gripGrabbed) ACCENT else GRIP
+                    rect.set(handle.toRectF())
+                    val r = minOf(handle.width, handle.height) / 2f
+                    canvas.drawRoundRect(rect, r, r, fill)
+                }
+                return
+            }
+            rect.set(toolbar.toRectF())
+            val tr = minOf(toolbar.width, toolbar.height) / 2f
+            fill.color = TOOLBAR_SHADOW
+            rect.offset(0f, 2f * d)
+            canvas.drawRoundRect(rect, tr, tr, fill)
+            rect.set(toolbar.toRectF())
+            fill.color = TOOLBAR
+            canvas.drawRoundRect(rect, tr, tr, fill)
             c.buttons.forEach { (kind, box) ->
                 val pressed = frame.pressed == ChromeTarget.Control(kind)
                 fill.color = if (pressed) BUTTON_PRESSED else BUTTON
@@ -150,12 +172,6 @@ class DuoScreenChromeRenderer {
                     else -> Glyph.ARRANGE
                 }
                 glyph(canvas, glyph, box.centerX(), box.centerY(), s.BUTTON_ICON * d, ICON)
-            }
-            c.grip?.let { grip ->
-                fill.color = if (frame.gripGrabbed) ACCENT else GRIP
-                rect.set(grip.toRectF())
-                val r = minOf(grip.width, grip.height) / 2f
-                canvas.drawRoundRect(rect, r, r, fill)
             }
             return
         }

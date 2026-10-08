@@ -55,6 +55,31 @@ object DuoScreenShizukuOps : DuoScreenPrivilegedOps {
      */
     private const val SHELL_PACKAGE = "com.android.shell"
 
+    /**
+     * A wake lock held for one trusted pane display, so that display's own group stays awake.
+     *
+     * The pane displays are created in their own display group (FLAG_OWN_DISPLAY_GROUP), which
+     * is what keeps them out of the phone's power state: pressing the power button turns display
+     * 0 off and the panes carry on. But a display group has its own idle timeout too, and with the
+     * phone's screen off nothing counts as activity on it, so about ten seconds later the system
+     * put the group to sleep ("going to sleep ... groupId=100 why=OFF_BECAUSE_OF_TIMEOUT") and the
+     * car panes went black. A SCREEN_BRIGHT wake lock bound to the pane's display id (the
+     * displayId argument PowerManagerService has taken since Android 12) holds that group awake
+     * and nothing else; acquired as the shell UID, which holds WAKE_LOCK, over the same binder
+     * wrapper as everything here.
+     */
+    private const val SCREEN_BRIGHT_WAKE_LOCK = 0x0000000a
+    private const val ACQUIRE_CAUSES_WAKEUP = 0x10000000
+    private const val WAKE_LOCK_TAG = "AutoBridge:DuoPane"
+
+    private data class PowerApi(val service: Any, val acquire: Method, val release: Method)
+
+    @Volatile
+    private var powerApi: PowerApi? = null
+
+    /** The token of the wake lock held for each trusted display, by display id. */
+    private val wakeLocks = ConcurrentHashMap<Int, IBinder>()
+
     private data class ActivityApi(val service: Any, val start: Method)
     private data class InputApi(val service: Any, val inject: Method)
 
@@ -188,6 +213,7 @@ object DuoScreenShizukuOps : DuoScreenPrivilegedOps {
                 // Keep the token so release/resize can match it later.
                 displayTokens[displayId] = token
                 DuoLog.i(TAG, "Trusted display created: $name -> $displayId (${width}x$height @ ${dpi}dpi)")
+                keepDisplayAwake(displayId)
             }
             displayId
         }.onFailure { error ->
@@ -223,6 +249,7 @@ object DuoScreenShizukuOps : DuoScreenPrivilegedOps {
     }
 
     override fun releaseTrustedVirtualDisplay(displayId: Int) {
+        releaseDisplayAwake(displayId)
         val token = displayTokens.remove(displayId) ?: return
         val api = resolveDisplayApi() ?: return
         val release = api.release ?: run {
@@ -377,6 +404,71 @@ object DuoScreenShizukuOps : DuoScreenPrivilegedOps {
                 ?: error("No injectInputEvent method on ${service.javaClass.name}")
             InputApi(service, inject).also { inputApi = it }
         }.onFailure { DuoLog.w(TAG, "Could not reach the input manager over Shizuku", it) }.getOrNull()
+    }
+
+    /** Holds [displayId]'s display group awake for as long as the pane lives; see [SCREEN_BRIGHT_WAKE_LOCK]. */
+    private fun keepDisplayAwake(displayId: Int) {
+        val api = resolvePowerApi() ?: return
+        val token = Binder()
+        runCatching {
+            var ints = 0
+            var strings = 0
+            val args = api.acquire.parameterTypes.map { type ->
+                when {
+                    type == IBinder::class.java -> token
+                    // acquireWakeLock(lock, flags, tag, packageName, workSource, historyTag,
+                    // displayId, callback): the first int is the level and flags, the second
+                    // the display; the strings are the tag, then the shell package, then none.
+                    type == Int::class.javaPrimitiveType -> when (ints++) {
+                        0 -> SCREEN_BRIGHT_WAKE_LOCK or ACQUIRE_CAUSES_WAKEUP
+                        else -> displayId
+                    }
+                    type == String::class.java -> when (strings++) {
+                        0 -> WAKE_LOCK_TAG
+                        1 -> SHELL_PACKAGE
+                        else -> null
+                    }
+                    else -> null
+                }
+            }.toTypedArray()
+            if (ints < 2) error("acquireWakeLock has no displayId parameter (${api.acquire})")
+            api.acquire.invoke(api.service, *args)
+            wakeLocks[displayId] = token
+            DuoLog.i(TAG, "Display $displayId held awake (its own group survives the power button)")
+        }.onFailure { error ->
+            powerApi = null
+            DuoLog.w(TAG, "Could not hold display $displayId awake; it will sleep with the phone", error)
+        }
+    }
+
+    private fun releaseDisplayAwake(displayId: Int) {
+        val token = wakeLocks.remove(displayId) ?: return
+        val api = resolvePowerApi() ?: return
+        runCatching {
+            val args = api.release.parameterTypes.map { type ->
+                when (type) {
+                    IBinder::class.java -> token
+                    Int::class.javaPrimitiveType -> 0
+                    else -> null
+                }
+            }.toTypedArray()
+            api.release.invoke(api.service, *args)
+        }.onFailure { DuoLog.w(TAG, "Releasing the wake lock for display $displayId failed", it) }
+    }
+
+    private fun resolvePowerApi(): PowerApi? {
+        powerApi?.let { return it }
+        return runCatching {
+            val service = asShellInterface("power", "android.os.IPowerManager")
+                ?: error("IPowerManager could not be wrapped")
+            val methods = service.javaClass.methods
+            // The longest acquireWakeLock is the one that carries a displayId.
+            val acquire = methods.filter { it.name == "acquireWakeLock" }.maxByOrNull { it.parameterCount }
+                ?: error("acquireWakeLock not found on ${service.javaClass.name}")
+            val release = methods.firstOrNull { it.name == "releaseWakeLock" }
+                ?: error("releaseWakeLock not found on ${service.javaClass.name}")
+            PowerApi(service, acquire, release).also { powerApi = it }
+        }.onFailure { DuoLog.w(TAG, "Could not reach the power manager over Shizuku", it) }.getOrNull()
     }
 
     /** Wraps a system service binder so its transactions run as the shell UID, then asInterface()s it. */

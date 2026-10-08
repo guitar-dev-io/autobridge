@@ -88,6 +88,9 @@ class DuoScreenInputRouter(
         port.onDividerGrabbed(seam)
     }
 
+    /** Lets go of a seam grabbed with [grabDivider], when the toolbar that grabbed it closes. */
+    fun releaseGrab() = releaseDivider()
+
     /** The seams of the current arrangement, as wide apart as the control bar allows. */
     fun dividers(): List<Divider> = panes.dividers(bounds.seamTolerance)
 
