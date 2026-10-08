@@ -24,8 +24,8 @@
     <string name="duo_screen_preset_wide_left">ซ้ายกว้าง</string>
     <string name="duo_screen_preset_wide_right">ขวากว้าง</string>
     <string name="duo_screen_preset_even_rows">แบ่งบน-ล่าง</string>
-    <string name="duo_screen_preset_stacked_60_40">บน 60 / ล่าง 40</string>
-    <string name="duo_screen_shortcut_title">ปุ่มลัด: Maps บน เพลงล่าง (60/40)</string>
+    <string name="duo_screen_preset_stacked_60_40">บน 56 / ล่าง 44</string>
+    <string name="duo_screen_shortcut_title">ปุ่มลัด: Maps บน เพลงล่าง (56/44)</string>
     <string name="duo_screen_shortcut_caption">แบ่งบน-ล่าง: Google Maps ด้านบน แอปเพลงด้านล่าง แตะเพื่อตั้งค่าให้</string>
     <string name="duo_screen_maps_missing">ไม่ได้ติดตั้ง Google Maps ในโทรศัพท์เครื่องนี้</string>
     <string name="duo_screen_pick_music">เลือกแอปเพลงสำหรับช่องด้านล่าง</string>
@@ -50,4 +50,16 @@
     <string name="duo_screen_end_none">ยังไม่มีเซสชันที่รันอยู่</string>
 
     <string name="duo_screen_pick_app_why">AutoBridge อ่านรายชื่อแอปที่ติดตั้งในเครื่องนี้ เพื่อให้เลือกแอปไปแสดงในแต่ละแพนได้ รายชื่อนี้ใช้สำหรับหน้าเลือกแอปนี้เท่านั้น และไม่ถูกส่งออกจากเครื่อง</string>
+    <string name="duo_chip_side_by_side">ซ้าย/ขวา</string>
+    <string name="duo_chip_stacked">บน/ล่าง</string>
+    <string name="duo_chip_pip">ภาพซ้อนภาพ</string>
+    <string name="duo_swap">สลับ</string>
+    <string name="duo_done">เสร็จ</string>
+    <string name="duo_change_app">เปลี่ยนแอป</string>
+    <string name="duo_card_title">ช่อง %1$d · %2$s</string>
+    <string name="duo_share_height">%1$d%% ของความสูง</string>
+    <string name="duo_share_width">%1$d%% ของความกว้าง</string>
+    <string name="duo_share_area">%1$d%% ของจอ</string>
+    <string name="duo_pick_title">แอปสำหรับช่อง %1$d</string>
+    <string name="duo_pick_empty">ไม่มีแอปให้เลือก</string>
 </resources>

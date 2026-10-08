@@ -32,9 +32,20 @@ object DuoScreenLayout {
         fun contains(x: Int, y: Int): Boolean = x in left until right && y in top until bottom
     }
 
-    data class Bounds(val width: Int, val height: Int) {
-        val minPaneWidth: Int get() = (width * MIN_WIDTH_FRACTION).toInt().coerceAtMost(width)
-        val minPaneHeight: Int get() = (height * MIN_HEIGHT_FRACTION).toInt().coerceAtMost(height)
+    /**
+     * The surface the panes share. [barPx] is the control bar the app draws on the main seam (or
+     * along the bottom when there is no seam), [seamPx] the thin gap left at any other seam; the
+     * presets leave both empty between panes, and the minimum pane size is taken from what is left
+     * once they are out, or a three-pane split could never satisfy it.
+     */
+    data class Bounds(val width: Int, val height: Int, val barPx: Int = 0, val seamPx: Int = 0) {
+        val minPaneWidth: Int get() =
+            ((width - barPx - seamPx).coerceAtLeast(0) * MIN_WIDTH_FRACTION).toInt().coerceAtMost(width)
+        val minPaneHeight: Int get() =
+            ((height - barPx - seamPx).coerceAtLeast(0) * MIN_HEIGHT_FRACTION).toInt().coerceAtMost(height)
+
+        /** How far apart two pane edges may be and still be one seam: across the bar, at most. */
+        val seamTolerance: Int get() = maxOf(barPx, seamPx) + SEAM_TOLERANCE_PX
     }
 
     /** Clamps size to the pane minimum/[bounds], then clamps position so the pane stays inside. */
@@ -160,11 +171,18 @@ object DuoScreenLayout {
 
     /**
      * The seam between the pane [aId]/[a] and the pane [bId]/[b], or null when they are not
-     * neighbours on this [axis] — their facing edges are more than [SEAM_TOLERANCE_PX] apart, or
+     * neighbours on this [axis] — their facing edges are more than [tolerance] apart, or
      * they share no stretch of it. The two panes may be given in either order; the returned
      * divider always names the left (or upper) one first.
      */
-    fun dividerBetween(aId: Int, a: Rect, bId: Int, b: Rect, axis: Axis): Divider? {
+    fun dividerBetween(
+        aId: Int,
+        a: Rect,
+        bId: Int,
+        b: Rect,
+        axis: Axis,
+        tolerance: Int = SEAM_TOLERANCE_PX
+    ): Divider? {
         val aIsFirst = when (axis) {
             Axis.VERTICAL -> a.left <= b.left
             Axis.HORIZONTAL -> a.top <= b.top
@@ -175,7 +193,7 @@ object DuoScreenLayout {
             Axis.VERTICAL -> (second.left - first.right) to ((first.right + second.left) / 2)
             Axis.HORIZONTAL -> (second.top - first.bottom) to ((first.bottom + second.top) / 2)
         }
-        if (kotlin.math.abs(gap) > SEAM_TOLERANCE_PX) return null
+        if (kotlin.math.abs(gap) > tolerance) return null
         val from = when (axis) {
             Axis.VERTICAL -> maxOf(first.top, second.top)
             Axis.HORIZONTAL -> maxOf(first.left, second.left)

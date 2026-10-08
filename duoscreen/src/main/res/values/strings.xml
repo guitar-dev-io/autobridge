@@ -24,8 +24,8 @@
     <string name="duo_screen_preset_wide_left">Wide left</string>
     <string name="duo_screen_preset_wide_right">Wide right</string>
     <string name="duo_screen_preset_even_rows">Stacked rows</string>
-    <string name="duo_screen_preset_stacked_60_40">Top 60 / 40</string>
-    <string name="duo_screen_shortcut_title">Shortcut: Maps on top, music below (60/40)</string>
+    <string name="duo_screen_preset_stacked_60_40">Top 56 / 44</string>
+    <string name="duo_screen_shortcut_title">Shortcut: Maps on top, music below (56/44)</string>
     <string name="duo_screen_shortcut_caption">Stacked: Google Maps on top, a music app below. Tap to set it up.</string>
     <string name="duo_screen_maps_missing">Google Maps is not installed on this phone.</string>
     <string name="duo_screen_pick_music">Pick the music app for the bottom pane.</string>
@@ -53,4 +53,17 @@
          sideload-only build declares. Shown in the picker so the user is told rather than left
          to notice. -->
     <string name="duo_screen_pick_app_why">AutoBridge reads the list of installed apps on this phone so a pane can run one of them. The list is used for this picker only and never leaves the device.</string>
+    <!-- The control bar and Arrange mode drawn on the car display -->
+    <string name="duo_chip_side_by_side">Left / right</string>
+    <string name="duo_chip_stacked">Top / bottom</string>
+    <string name="duo_chip_pip">Picture in picture</string>
+    <string name="duo_swap">Swap</string>
+    <string name="duo_done">Done</string>
+    <string name="duo_change_app">Change app</string>
+    <string name="duo_card_title">Pane %1$d · %2$s</string>
+    <string name="duo_share_height">%1$d%% of the height</string>
+    <string name="duo_share_width">%1$d%% of the width</string>
+    <string name="duo_share_area">%1$d%% of the screen</string>
+    <string name="duo_pick_title">App for pane %1$d</string>
+    <string name="duo_pick_empty">No apps to show</string>
 </resources>

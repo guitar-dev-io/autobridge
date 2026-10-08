@@ -18,9 +18,9 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import dev.autobridge.duoscreen.R
 import dev.autobridge.logging.StructuredLog
+import dev.autobridge.duoscreen.DuoScreenController
 import dev.autobridge.duoscreen.DuoScreenHost
-import dev.autobridge.duoscreen.input.DuoScreenInputRouter
-import dev.autobridge.duoscreen.layout.DuoScreenStore
+import dev.autobridge.duoscreen.layout.DuoScreenPreset
 import dev.autobridge.duoscreen.system.DuoScreenShizukuOps
 
 /**
@@ -51,51 +51,34 @@ class DuoScreenScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
 
             override fun onDestroy(owner: LifecycleOwner) {
                 carContext.getCarService(AppManager::class.java).setSurfaceCallback(null)
+                // The controller outlives this screen; it must not keep a dead one to call back.
+                controller.chromeListener = null
                 DuoScreenHost.onScreenGone()
             }
         })
     }
 
+    init {
+        // The drawn controls handle themselves; these two need a CarContext or a ScreenManager.
+        controller.chromeListener = object : DuoScreenController.ChromeListener {
+            override fun onPresetChanged(preset: DuoScreenPreset) {
+                CarToast.makeText(carContext, preset.label(carContext), CarToast.LENGTH_SHORT).show()
+            }
+
+            override fun onChangeAppRequested(paneId: Int) {
+                screenManager.push(DuoScreenAppPickerScreen(carContext, paneId))
+            }
+        }
+    }
+
     /**
-     * The controls sit in two places because the template allows no other shape. Preset, reload and
-     * arrange go in the *map* action strip, which the host draws as one compact group of small icon
-     * buttons, like a map's zoom controls; as titled pills in the main strip they covered the top of
-     * a pane on a real head unit. Exit stays alone in the main strip: [NavigationTemplate] refuses
-     * to build without one, an empty strip is invalid, and it keeps the way out apart from the
-     * buttons a driver taps by the dozen.
-     *
-     * One button toggles edit mode, because the host only reports scroll/fling/scale — there is no
-     * separate gesture left to mean "arrange" (see [DuoScreenInputRouter]).
+     * Only Exit is left to the host. The layout, swap, reload and arrange controls are drawn by the
+     * app on the bar between the panes ([dev.autobridge.duoscreen.chrome.DuoScreenChrome]): the host
+     * draws its own buttons at a fixed, large size over the top of the panes, which is what covered
+     * the map on a real head unit. [NavigationTemplate] refuses to build without an action strip,
+     * and Exit is the one control worth keeping apart from the ones a driver taps by the dozen.
      */
     override fun onGetTemplate(): Template {
-        val editing = controller.mode == DuoScreenInputRouter.Mode.EDIT
-        // Presets are a button rather than a sub-screen: it is one tap per layout from the driver's
-        // seat, and the result is visible behind the strip while they cycle.
-        val preset = Action.Builder()
-            .setIcon(icon(DuoScreenStore.preset(carContext).iconRes))
-            .setOnClickListener {
-                val applied = controller.cyclePreset()
-                CarToast.makeText(carContext, applied.label(carContext), CarToast.LENGTH_SHORT).show()
-                invalidate()
-            }
-            .build()
-        val toggle = Action.Builder()
-            .setIcon(icon(if (editing) R.drawable.ic_duo_done else R.drawable.ic_duo_arrange))
-            .setOnClickListener {
-                controller.toggleMode()
-                invalidate()
-            }
-            .build()
-        // A pane whose app was killed in the background comes back as a black rectangle; this
-        // re-launches it rather than making the driver restart the whole session.
-        val reload = Action.Builder()
-            .setIcon(icon(R.drawable.ic_duo_reload))
-            .setOnClickListener {
-                val reloaded = controller.reloadSelectedOrAll()
-                StructuredLog.i(TAG, "Reloaded $reloaded pane(s)")
-            }
-            .build()
-
         // Leaving the screen only detaches (DuoScreenHost.KEEP_ALIVE_MS), by design, so
         // without this there is no way to get the panes off the car display short of waiting the
         // keep-alive out: every pane app keeps running on its own display behind whatever the driver
@@ -123,14 +106,6 @@ class DuoScreenScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
         }
         return builder
             .setActionStrip(ActionStrip.Builder().addAction(exit).build())
-            // ACTIONS_CONSTRAINTS_MAP: at most four actions, none with a custom title.
-            .setMapActionStrip(
-                ActionStrip.Builder()
-                    .addAction(preset)
-                    .addAction(reload)
-                    .addAction(toggle)
-                    .build()
-            )
             .build()
     }
 
@@ -150,6 +125,8 @@ class DuoScreenScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
             StructuredLog.e(TAG, "Could not start the Duo Screen session on the car surface")
             return
         }
+        // An app chosen in the picker (or on the phone) while the surface was away goes in now.
+        controller.applyStoredSettings()
         // The template shows the banner while the grant is missing; redraw it for this state.
         invalidate()
         if (!DuoScreenShizukuOps.isAvailable) {
