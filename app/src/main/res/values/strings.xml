@@ -490,6 +490,7 @@
 
     <!-- Phone browser: zoom readout in All Actions sheet. -->
     <string name="queue_started_on_car">Nothing was playing on the car, so it is playing now</string>
+    <string name="browser_audio_held">Sound is off while the car plays music · Tap to turn it on</string>
     <string name="browser_zoom_percent">%1$d%%</string>
 
     <!-- Browser settings sheet ([BrowserSettingsSheet]): the Playback section's YouTube add-ons row. -->
@@ -1723,6 +1724,10 @@
     <string name="emergency_invalid">Enter a label and a number or text.</string>
     <string name="emergency_call">Call</string>
     <string name="emergency_cannot_dial">Could not open the dialer.</string>
+    <string name="emergency_section_mine">Your numbers</string>
+    <string name="emergency_section_lines">Emergency lines</string>
+    <string name="emergency_copy">Copy</string>
+    <string name="emergency_copied">Copied</string>
     <string name="emergency_police">Police</string>
     <string name="emergency_medical">Medical emergency</string>
     <string name="emergency_highway_police">Highway police</string>

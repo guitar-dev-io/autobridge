@@ -90,7 +90,7 @@ public final class YouTubeEnhancer {
     /// search results carry ad slots of their own — so it runs before the `videoId` check rather
     /// than after it.
     private func applyAdSkip(_ webView: WKWebView, url: String) {
-        if settings.adSkipEnabled && YouTubeUrls.isYouTube(url) {
+        if YouTubeSettings.adSkipAvailable && settings.adSkipEnabled && YouTubeUrls.isYouTube(url) {
             adSkipArmed = true
             Task { await Self.evaluate(webView, YouTubeAdSkip.script()) }
         } else if adSkipArmed {

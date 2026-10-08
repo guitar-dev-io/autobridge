@@ -44,7 +44,10 @@ APIs — and it now carries essentially all of it.
 | Thai + English UI | ✅ | |
 | Car surface | ⚠️ | CarPlay **audio**: sections, sources, categories, paged channel lists, logos, check results, now-playing |
 | Playlists (music library) | ❌ | A DRM-protected Apple Music track exposes no playable asset URL |
-| Weather section | ❌ | Not ported |
+| Weather section | ✅ | Open-Meteo, one place picked by name; the temperature shows on the home card |
+| Utilities: fuel/charging log, maintenance, car costs, emergency card, parking spot, backup | ✅ | Settings → Utilities. Same JSON as Android, so a backup file moves between the two apps |
+| Maintenance reminder, break reminder | ✅ | Local notifications: maintenance on opening the app (once a day), break every N hours while CarPlay is connected |
+| Odometer from the car, voice fill-up (Agent), trips | ❌ | CarPlay gives an audio app no vehicle data; no voice agent on iOS yet. Trips in a backup are kept untouched |
 | Mirror / Apps / Remote, Smart Mode, LAB, parked gate | ❌ | Platform boundary, see above |
 
 ## Requirements

@@ -32,10 +32,13 @@ struct SourcesView: View {
                 ? NSLocalizedString("No source configured", comment: "Sources page")
                 : plural(sources.count, "source"),
             accent: accent,
-            actions: [
+            // The store build offers no public TV lists, so the button is left out where it would
+            // open an empty picker.
+            actions: (IptvDirectory.list(kind: kind).isEmpty ? [] : [
                 PageAction(title: NSLocalizedString("Public lists", comment: "Action")) {
                     showingDirectory = true
-                },
+                }
+            ]) + [
                 PageAction(title: NSLocalizedString("+ Xtream", comment: "Action")) {
                     editing = .init(type: .xtream, existing: nil)
                 },

@@ -298,6 +298,9 @@ class BrowserActivity : Activity() {
         }
 
         fullscreenController = FullscreenVideoController(this, content)
+        if (!onCarDisplay) root.addView(audioHoldBanner(), FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply {
+            bottomMargin = 96.dp()
+        })
         setContentView(root)
         if (onCarDisplay) applyCarDisplayWindow()
 
@@ -672,6 +675,7 @@ class BrowserActivity : Activity() {
 
             override fun onPageStarted(view: WebView, url: String, favicon: android.graphics.Bitmap?) {
                 PageZoom.reset(view)
+                refreshAudioHold()
                 loadError.visibility = View.GONE
                 // Sign-in origins always get the clean mobile UA (see resolveForUrl): a desktop UA
                 // contradicts the WebView's Android client hints and Google refuses it. This fires
@@ -1998,7 +2002,45 @@ class BrowserActivity : Activity() {
         BrowserDefaults.configure(this, web)
         enforcePolicy()
         if (allowed() && previousAgent != web.settings.userAgentString) web.reload()
+        refreshAudioHold()
     }
+
+    /** Set once the user lets this browser's sound through over the car's music. */
+    private var audioReleased = false
+    private var audioBanner: View? = null
+
+    /**
+     * While the car plays music, the phone browser's pages stay silent so a search for the next
+     * song does not cut into the one playing (see [PhoneAudioHold]). The banner says so and is the
+     * way to let the sound through. The car display's browser is the car's own and is left alone.
+     */
+    private fun refreshAudioHold() {
+        if (onCarDisplay) return
+        val hold = !audioReleased && PhoneAudioHold.carIsPlaying(this)
+        PhoneAudioHold.apply(web, hold)
+        audioBanner?.visibility = if (hold) View.VISIBLE else View.GONE
+    }
+
+    private fun audioHoldBanner(): View = TextView(this).apply {
+        text = getString(R.string.browser_audio_held)
+        setTextColor(BrowserTheme.textPrimary)
+        textSize = 14f
+        gravity = Gravity.CENTER
+        setPadding(18.dp(), 12.dp(), 18.dp(), 12.dp())
+        background = android.graphics.drawable.GradientDrawable().apply {
+            cornerRadius = 24.dp().toFloat()
+            setColor(BrowserTheme.toolbarBackground)
+            setStroke(1.dp(), BrowserTheme.accent)
+        }
+        elevation = 8.dp().toFloat()
+        visibility = View.GONE
+        isClickable = true
+        setOnClickListener {
+            audioReleased = true
+            PhoneAudioHold.apply(web, false)
+            visibility = View.GONE
+        }
+    }.also { audioBanner = it }
 
     override fun onPause() {
         resumed = false

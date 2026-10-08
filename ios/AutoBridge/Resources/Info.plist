@@ -28,6 +28,13 @@
 
 	<!-- Radio has to keep playing with the screen locked and the phone in a pocket, which is the
 	     whole point of the section in a car. -->
+	<!-- Only the system's HTTPS; no encryption of our own to declare on each upload. -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Your location is read only when you tap Mark here, to save where you parked. It stays on this phone.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>A photo of the floor sign or pillar number helps you find the parked car. It stays on this phone.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>
