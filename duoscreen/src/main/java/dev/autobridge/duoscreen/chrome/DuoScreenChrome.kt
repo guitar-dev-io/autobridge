@@ -9,62 +9,142 @@ import dev.autobridge.duoscreen.layout.DuoScreenPane
 import dev.autobridge.duoscreen.layout.DuoScreenPreset
 
 /**
- * Sizes of the app-drawn controls, in dp, from the Duo screen design ("Duo screen · ใหม่" and its
- * Arrange board on the design canvas).
+ * Sizes of the app-drawn controls, in dp. [REGULAR] is for a large portrait head unit, a step
+ * below the Duo screen design's 72dp bar and 56dp buttons, which read as far too big on the car
+ * display. A small or short surface gets [COMPACT]: on an 800 x 400 unit even that took a tenth of
+ * the width, so there the bar is 40dp with 32dp buttons. The touch area is still the bar's full
+ * thickness and half the gap either side, larger than what is drawn.
  */
-object DuoScreenChromeSpec {
-    /** The control bar on the main seam. Thick enough for a 56dp button with room around it. */
-    const val BAR = 72f
+@Suppress("PropertyName")
+data class DuoScreenChromeSpec(
+    val BAR: Float,
+    val SEAM: Float,
+    val BUTTON: Float,
+    val BUTTON_RADIUS: Float,
+    val BUTTON_GAP: Float,
+    val BUTTON_ICON: Float,
+    val BAR_PADDING: Float,
+    val GRIP_LENGTH: Float,
+    val GRIP_THICKNESS: Float,
+    val PILL: Float,
+    val GRIP_PILL_LENGTH: Float,
+    val PILL_PADDING: Float,
+    val PILL_ICON: Float,
+    val PILL_ICON_GAP: Float,
+    val PILL_TEXT: Float,
+    val PILL_GROUP_GAP: Float,
+    val CHIP: Float,
+    val CHIP_RADIUS: Float,
+    val CHIP_PADDING: Float,
+    val CHIP_GLYPH_WIDTH: Float,
+    val CHIP_GLYPH_HEIGHT: Float,
+    val CHIP_GLYPH_GAP: Float,
+    val CHIP_TEXT: Float,
+    val CHIP_GAP: Float,
+    val CHIP_MARGIN: Float,
+    val EXIT_RESERVE: Float,
+    val PANE_RADIUS: Float,
+    val FOCUS_EDGE: Float,
+    val SELECT_OUTLINE: Float,
+    val CARD_TILE: Float,
+    val CARD_TILE_RADIUS: Float,
+    val CARD_TITLE: Float,
+    val CARD_SHARE: Float,
+    val CARD_GAP: Float,
+    val CARD_BUTTON: Float,
+    val CARD_BUTTON_PADDING: Float,
+    val CARD_BUTTON_TEXT: Float
+) {
+    companion object {
+        /** Text line box as a multiple of its size. */
+        const val LINE = 1.3f
 
-    /** Any other seam: a thin gap that still reads as a join and can be grabbed while arranging. */
-    const val SEAM = 14f
+        /** Below this short side, in dp, the surface gets [COMPACT]. */
+        const val COMPACT_BELOW_DP = 720f
 
-    const val BUTTON = 56f
-    const val BUTTON_RADIUS = 16f
-    const val BUTTON_GAP = 10f
-    const val BUTTON_ICON = 26f
-    const val BAR_PADDING = 6f
+        val REGULAR = DuoScreenChromeSpec(
+        BAR = 56f,
+        SEAM = 12f,
+        BUTTON = 44f,
+        BUTTON_RADIUS = 14f,
+        BUTTON_GAP = 8f,
+        BUTTON_ICON = 22f,
+        BAR_PADDING = 6f,
+        GRIP_LENGTH = 100f,
+        GRIP_THICKNESS = 6f,
+        PILL = 44f,
+        GRIP_PILL_LENGTH = 120f,
+        PILL_PADDING = 18f,
+        PILL_ICON = 22f,
+        PILL_ICON_GAP = 8f,
+        PILL_TEXT = 18f,
+        PILL_GROUP_GAP = 12f,
+        CHIP = 64f,
+        CHIP_RADIUS = 22f,
+        CHIP_PADDING = 20f,
+        CHIP_GLYPH_WIDTH = 34f,
+        CHIP_GLYPH_HEIGHT = 26f,
+        CHIP_GLYPH_GAP = 12f,
+        CHIP_TEXT = 20f,
+        CHIP_GAP = 10f,
+        CHIP_MARGIN = 12f,
+        EXIT_RESERVE = 132f,
+        PANE_RADIUS = 20f,
+        FOCUS_EDGE = 5f,
+        SELECT_OUTLINE = 3f,
+        CARD_TILE = 80f,
+        CARD_TILE_RADIUS = 24f,
+        CARD_TITLE = 26f,
+        CARD_SHARE = 20f,
+        CARD_GAP = 14f,
+        CARD_BUTTON = 60f,
+        CARD_BUTTON_PADDING = 28f,
+        CARD_BUTTON_TEXT = 20f
+        )
 
-    const val GRIP_LENGTH = 120f
-    const val GRIP_THICKNESS = 8f
+        val COMPACT = DuoScreenChromeSpec(
+        BAR = 40f,
+        SEAM = 8f,
+        BUTTON = 32f,
+        BUTTON_RADIUS = 10f,
+        BUTTON_GAP = 6f,
+        BUTTON_ICON = 18f,
+        BAR_PADDING = 4f,
+        GRIP_LENGTH = 64f,
+        GRIP_THICKNESS = 5f,
+        PILL = 32f,
+        GRIP_PILL_LENGTH = 80f,
+        PILL_PADDING = 12f,
+        PILL_ICON = 16f,
+        PILL_ICON_GAP = 6f,
+        PILL_TEXT = 14f,
+        PILL_GROUP_GAP = 10f,
+        CHIP = 44f,
+        CHIP_RADIUS = 16f,
+        CHIP_PADDING = 14f,
+        CHIP_GLYPH_WIDTH = 26f,
+        CHIP_GLYPH_HEIGHT = 20f,
+        CHIP_GLYPH_GAP = 8f,
+        CHIP_TEXT = 16f,
+        CHIP_GAP = 8f,
+        CHIP_MARGIN = 8f,
+        EXIT_RESERVE = 96f,
+        PANE_RADIUS = 14f,
+        FOCUS_EDGE = 4f,
+        SELECT_OUTLINE = 3f,
+        CARD_TILE = 52f,
+        CARD_TILE_RADIUS = 16f,
+        CARD_TITLE = 18f,
+        CARD_SHARE = 15f,
+        CARD_GAP = 8f,
+        CARD_BUTTON = 44f,
+        CARD_BUTTON_PADDING = 18f,
+        CARD_BUTTON_TEXT = 16f
+        )
 
-    /** Arrange mode's seam controls: the grip pill and the Swap / Done pills beside it. */
-    const val PILL = 56f
-    const val GRIP_PILL_LENGTH = 150f
-    const val PILL_PADDING = 24f
-    const val PILL_ICON = 26f
-    const val PILL_ICON_GAP = 10f
-    const val PILL_TEXT = 20f
-    const val PILL_GROUP_GAP = 16f
-
-    /** Arrange mode's preset chips, top-left; the host's Exit button keeps the top-right corner. */
-    const val CHIP = 64f
-    const val CHIP_RADIUS = 22f
-    const val CHIP_PADDING = 20f
-    const val CHIP_GLYPH_WIDTH = 34f
-    const val CHIP_GLYPH_HEIGHT = 26f
-    const val CHIP_GLYPH_GAP = 12f
-    const val CHIP_TEXT = 20f
-    const val CHIP_GAP = 10f
-    const val CHIP_MARGIN = 12f
-    const val EXIT_RESERVE = 132f
-
-    const val PANE_RADIUS = 20f
-    const val FOCUS_EDGE = 5f
-    const val SELECT_OUTLINE = 3f
-
-    /** Arrange mode's card in each pane: app tile, "Pane N · App", its share, Change app. */
-    const val CARD_TILE = 80f
-    const val CARD_TILE_RADIUS = 24f
-    const val CARD_TITLE = 26f
-    const val CARD_SHARE = 20f
-    const val CARD_GAP = 14f
-    const val CARD_BUTTON = 60f
-    const val CARD_BUTTON_PADDING = 28f
-    const val CARD_BUTTON_TEXT = 20f
-
-    /** Text line box as a multiple of its size. */
-    const val LINE = 1.3f
+        fun forSurface(width: Int, height: Int, density: Float): DuoScreenChromeSpec =
+            if (minOf(width, height) / density.coerceAtLeast(0.1f) < COMPACT_BELOW_DP) COMPACT else REGULAR
+    }
 }
 
 /** Something on the drawn chrome a tap can hit. */
@@ -95,6 +175,8 @@ data class ChromeLabels(
  * (picture-in-picture, or panes moved by hand) it takes the strip along the bottom.
  */
 class DuoScreenChrome private constructor(
+    /** The size set this was laid out with; the renderer draws to the same one. */
+    val spec: DuoScreenChromeSpec,
     val bounds: Bounds,
     /** Every pane's id and rect, in z-order, as laid out when this was computed. */
     private val panes: List<Pair<Int, Rect>>,
@@ -194,21 +276,23 @@ class DuoScreenChrome private constructor(
         )
 
         /** The [Bounds] for a surface, with the bar and seam gaps at this [density]. */
-        fun boundsFor(width: Int, height: Int, density: Float): Bounds =
-            Bounds(
-                width,
-                height,
-                barPx = (DuoScreenChromeSpec.BAR * density).toInt(),
-                seamPx = (DuoScreenChromeSpec.SEAM * density).toInt()
-            )
+        fun boundsFor(width: Int, height: Int, density: Float): Bounds {
+            val spec = DuoScreenChromeSpec.forSurface(width, height, density)
+            return Bounds(width, height, barPx = (spec.BAR * density).toInt(), seamPx = (spec.SEAM * density).toInt())
+        }
 
         /**
-         * True when [panes] leave room for the bar between two of them, or along the bottom. A
-         * saved arrangement from before the bar existed tiles the surface edge to edge and would
-         * get the bar drawn over its panes; the caller lays such a layout out afresh instead.
+         * True when [panes] leave a gap the bar fits — between two of them, or along the bottom.
+         * The caller lays out afresh a saved arrangement that fails this: one from before the bar
+         * existed tiles edge to edge and would get the bar drawn over its panes, and one saved at
+         * a larger bar size would keep that size, since the bar fills the gap it is given.
          */
-        fun hasRoomForBar(panes: List<DuoScreenPane>, bounds: Bounds): Boolean =
-            widestGap(panes, bounds) != null || bottomStripFree(panes, bounds)
+        fun hasRoomForBar(panes: List<DuoScreenPane>, bounds: Bounds): Boolean {
+            val gap = widestGap(panes, bounds)
+                ?: return bottomStripFree(panes, bounds)
+            val thickness = if (gap.first.axis == Axis.HORIZONTAL) gap.second.height else gap.second.width
+            return thickness <= bounds.barPx * 3 / 2
+        }
 
         /**
          * @param panes in z-order (last on top), as the pane set holds them.
@@ -222,7 +306,7 @@ class DuoScreenChrome private constructor(
             labels: ChromeLabels,
             measure: (String, Float) -> Float
         ): DuoScreenChrome {
-            val s = DuoScreenChromeSpec
+            val s = DuoScreenChromeSpec.forSurface(bounds.width, bounds.height, density)
             fun px(dp: Float) = (dp * density).toInt()
             val barPx = bounds.barPx.coerceAtLeast(px(s.BAR))
 
@@ -338,8 +422,8 @@ class DuoScreenChrome private constructor(
                 panes.forEach { pane ->
                     val r = pane.rect
                     val tile = px(s.CARD_TILE)
-                    val title = (s.CARD_TITLE * s.LINE * density).toInt()
-                    val share = (s.CARD_SHARE * s.LINE * density).toInt()
+                    val title = (s.CARD_TITLE * DuoScreenChromeSpec.LINE * density).toInt()
+                    val share = (s.CARD_SHARE * DuoScreenChromeSpec.LINE * density).toInt()
                     val cardGap = px(s.CARD_GAP)
                     val buttonHeight = px(s.CARD_BUTTON)
                     // Drop the tile first, then the share line, until the card fits the pane.
@@ -374,7 +458,7 @@ class DuoScreenChrome private constructor(
             }
 
             return DuoScreenChrome(
-                bounds, panes.map { it.id to it.rect }, bar, horizontal, divider, overlaps, editing, buttons, grip,
+                s, bounds, panes.map { it.id to it.rect }, bar, horizontal, divider, overlaps, editing, buttons, grip,
                 swapPill, donePill, chips, iconOnly, cards, buttonGap, px(s.PILL)
             )
         }
