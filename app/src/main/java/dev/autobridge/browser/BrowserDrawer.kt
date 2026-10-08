@@ -131,6 +131,9 @@ enum class DrawerKind {
 
     /** A row in the "More" list: the icon on the left, the label beside it. */
     LIST,
+
+    /** A split-screen layout drawn as a small picture of the two panes, with its name below. */
+    LAYOUT,
 }
 
 /** A tappable entry, before it has been given a place on screen. */
@@ -166,7 +169,13 @@ data class DrawerItem(
 }
 
 /** A laid-out entry with the box it occupies in surface coordinates. */
-data class DrawerRow(val item: DrawerItem, val bounds: Box, val kind: DrawerKind)
+data class DrawerRow(
+    val item: DrawerItem,
+    val bounds: Box,
+    val kind: DrawerKind,
+    /** The layout a [DrawerKind.LAYOUT] card picks; null on every other row. */
+    val layout: BrowserSplitLayout? = null,
+)
 
 /** The address row: a pill carrying the page's identity and two controls. */
 data class DrawerAddress(
@@ -207,6 +216,8 @@ data class BrowserMenuState(
     val bookmarked: Boolean = false,
     /** The split's current layout, named beside the split switch while it is on. */
     val splitLayout: BrowserSplitLayout? = null,
+    /** Which side the second page sits on, for the layout pictures on the split page. */
+    val splitSideOnRight: Boolean = true,
     /** The page zoom, in percent of the page as loaded, shown between the zoom − and + buttons. */
     val zoomPercent: Int = 100,
 ) {
@@ -464,6 +475,9 @@ class BrowserDrawerModel private constructor(
             visibleHeight: Float,
             innerLeft: Float,
             innerRight: Float,
+            split: Boolean,
+            splitTitle: String,
+            layoutLabels: Map<BrowserSplitLayout, String>,
         ): BrowserDrawerModel {
             val plan = CarMenuList.plan(carMenu(state))
             val gap = sizes.contentGap
@@ -513,6 +527,33 @@ class BrowserDrawerModel private constructor(
                     }
                     return y
                 }
+                if (split) {
+                    // The split page: the switch, the layouts as pictures to pick from, then what
+                    // goes in the second pane. The way Bridge Web's split chooser reads.
+                    plan.split?.let { full(it, DrawerKind.TOGGLE, rowHeight); y += gap }
+                    label(R.string.split_layouts_heading)
+                    val chosen = state.splitLayout?.takeIf { state.splitActive }
+                    val cardHeight = tileHeight * 1.45f
+                    BrowserSplitLayout.entries.filter { it != BrowserSplitLayout.SINGLE }
+                        .chunked(2).forEachIndexed { index, pair ->
+                            if (index > 0) y += tileGap
+                            val width = (innerWidth - tileGap) / 2f
+                            pair.forEachIndexed { column, layout ->
+                                val left = innerLeft + column * (width + tileGap)
+                                val item = DrawerItem(
+                                    DrawerAction.SPLIT_CHOOSE, layout.labelRes, BrowserIcon.SPLIT_LAYOUT,
+                                    value = layoutLabels[layout].orEmpty(), on = layout == chosen,
+                                )
+                                rows += DrawerRow(item, Box(left, y, left + width, y + cardHeight), DrawerKind.LAYOUT, layout)
+                            }
+                            y += cardHeight
+                        }
+                    val swap = carMenu(state).firstOrNull { it.action == DrawerAction.SWAP_SPLIT_SIDES }
+                    val after = listOfNotNull(plan.sideShow, swap)
+                    if (after.isNotEmpty()) y += gap
+                    after.forEach { full(it, DrawerKind.LIST, listHeight); y += tileGap * 0.6f }
+                    return y
+                }
 
                 // The address row: which page the menu acts on, and the way to type a new one.
                 val addressBox = Box(innerLeft, y, innerRight, y + sizes.touchTarget)
@@ -548,13 +589,16 @@ class BrowserDrawerModel private constructor(
                     }
                 }
 
-                val swap = carMenu(state).firstOrNull { it.action == DrawerAction.SWAP_SPLIT_SIDES }
-                val splitRows = listOfNotNull(plan.splitChoose, plan.sideShow, swap)
-                if (plan.split != null || splitRows.isNotEmpty()) {
+                // Split screen is one row: it opens the split page, which carries the switch, the
+                // layouts as pictures, and the side-page actions that used to be listed here.
+                (plan.split ?: plan.splitChoose)?.let { base ->
                     y += gap
-                    label(R.string.drawer_section_split)
-                    plan.split?.let { full(it, DrawerKind.TOGGLE, rowHeight); y += 2f }
-                    splitRows.forEach { full(it, DrawerKind.LIST, listHeight); y += tileGap * 0.6f }
+                    val current = state.splitLayout?.takeIf { state.splitActive }?.let { layoutLabels[it] }
+                    val value = if (current.isNullOrBlank()) "›" else "$current  ›"
+                    full(
+                        DrawerItem(DrawerAction.SPLIT_CHOOSE, base.labelRes, base.icon, value = value, on = state.splitActive),
+                        DrawerKind.LIST, listHeight,
+                    )
                 }
 
                 if (plan.more.isNotEmpty()) {
@@ -573,8 +617,12 @@ class BrowserDrawerModel private constructor(
             return BrowserDrawerModel(
                 sizes = sizes,
                 panel = panel,
-                title = if (more) moreTitle else state.pageTitle.ifBlank { state.appName },
-                subtitle = if (more) "" else host,
+                title = when {
+                    more -> moreTitle
+                    split -> splitTitle
+                    else -> state.pageTitle.ifBlank { state.appName }
+                },
+                subtitle = if (more || split) "" else host,
                 grip = grip,
                 header = header,
                 titleLeft = titleLeft,
@@ -629,6 +677,11 @@ class BrowserDrawerModel private constructor(
             scrollOffset: Float = 0f,
             /** The "More" list's title, resolved by the caller in the language in force. */
             moreTitle: String = "More actions",
+            /** The car's split page instead of the main list (car surface only). */
+            split: Boolean = false,
+            /** The split page's title and each layout's name, resolved by the caller. */
+            splitTitle: String = "Split screen",
+            layoutLabels: Map<BrowserSplitLayout, String> = emptyMap(),
         ): BrowserDrawerModel {
             val gap = sizes.contentGap
             val tileGap = sizes.menuTileGap
@@ -676,7 +729,8 @@ class BrowserDrawerModel private constructor(
             )
             headerLinks += DrawerRow(DrawerItem(DrawerAction.APP_HOME, R.string.drawer_exit, BrowserIcon.APP_HOME), exitBox, DrawerKind.PILL)
             var titleLeft = header.left
-            if (more) {
+            val subPage = more || (split && state.surface == MenuSurface.CAR)
+            if (subPage) {
                 // The phone's "More actions" sheet opens with a circular back arrow; so does this.
                 val back = Box(header.left, closeButton.top, header.left + roundSide, closeButton.bottom)
                 headerLinks.add(0, DrawerRow(DrawerItem(DrawerAction.BACK_TO_MENU, R.string.drawer_back, BrowserIcon.BACK), back, DrawerKind.ROUND))
@@ -693,6 +747,7 @@ class BrowserDrawerModel private constructor(
                 return carSheet(
                     sizes, state, more, scrollOffset, moreTitle, panel, grip, header, titleLeft,
                     closeButton, headerLinks, headerBottom, contentTop, visibleHeight, innerLeft, innerRight,
+                    split = split && !more, splitTitle = splitTitle, layoutLabels = layoutLabels,
                 )
             }
 
