@@ -91,6 +91,9 @@ class MediaPlaybackService : MediaLibraryService() {
                     // The answer is asynchronous; the service may have been torn down meanwhile.
                     if (carPlayer !== composite) return@readMediaStatus
                     webPlayer?.update(status)
+                    // Republish so the home dashboard can read this reading instead of polling the
+                    // same WebView a second time. One probe per second, done here.
+                    WebMediaHub.publishStatus(status)
                     composite.select(
                         SessionSourceArbiter.choose(composite.source, exoActive, true, status.playing)
                     )

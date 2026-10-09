@@ -101,12 +101,12 @@ class CarHomeDashboardScreen(
 
     private data class WebNow(val source: dev.autobridge.media.WebMediaSource, val url: String, val status: WebMediaStatus)
 
-    private val webPoll = object : Runnable {
-        override fun run() {
-            if (!active) return
-            readWeb()
-            handler.postDelayed(this, WEB_POLL_MS)
-        }
+    /**
+     * Repaints the Now Playing card from the status the media service republishes each second,
+     * so the WebView is probed once (by the service) rather than twice.
+     */
+    private val webStatusListener: () -> Unit = {
+        if (active) readWeb()
     }
 
     /** Repaints the Now Playing card as the live session plays, pauses and moves on. */
@@ -139,7 +139,8 @@ class CarHomeDashboardScreen(
                 MirrorSurfaceOwnership.claim(this@CarHomeDashboardScreen)
                 appManager.setSurfaceCallback(this@CarHomeDashboardScreen)
                 sessionWatch = scope.launch { AutoBridgeSessionManager.state.collect { renderMenu() } }
-                handler.post(webPoll)
+                WebMediaHub.addStatusListener(webStatusListener)
+                readWeb()
                 // The surface may have survived the screen above (both are surface templates).
                 renderMenu()
             }
@@ -149,6 +150,7 @@ class CarHomeDashboardScreen(
                 active = false
                 sessionWatch?.cancel()
                 sessionWatch = null
+                WebMediaHub.removeStatusListener(webStatusListener)
                 handler.removeCallbacksAndMessages(null)
                 releaseSurface()
                 if (MirrorSurfaceOwnership.release(this@CarHomeDashboardScreen)) appManager.setSurfaceCallback(null)
@@ -363,17 +365,16 @@ class CarHomeDashboardScreen(
             live.playback in LIVE_STATES
     }
 
-    /** Reads the car browser's page audio, if a browser is alive, and repaints on what changed. */
+    /**
+     * Repaints the Now Playing card from the car browser's page audio, read from the status the
+     * media service already republishes to [WebMediaHub] every second. No WebView probe here: the
+     * service owns the single poll, so the page is evaluated once, not twice.
+     */
     private fun readWeb() {
         val source = WebMediaHub.source
-        if (source == null) {
-            updateWeb(null)
-            return
-        }
-        source.readMediaStatus { status ->
-            if (!active) return@readMediaStatus
-            updateWeb(source.pageUrl?.takeIf { it.isNotBlank() }?.let { WebNow(source, it, status) })
-        }
+        val status = WebMediaHub.lastStatus
+        val url = source?.pageUrl?.takeIf { it.isNotBlank() }
+        updateWeb(if (source != null && status != null && url != null) WebNow(source, url, status) else null)
     }
 
     private fun updateWeb(next: WebNow?) {
@@ -682,9 +683,6 @@ class CarHomeDashboardScreen(
         var resumedThisLaunch = false
         const val TAG = "CarHome"
         const val BASELINE_DPI = 160
-
-        /** How often the browser's page audio is read: the media service polls it at the same pace. */
-        const val WEB_POLL_MS = 1000L
 
         /** Session states in which the Now Playing buttons can act on the engine directly. */
         val LIVE_STATES = setOf(BridgePlaybackState.LOADING, BridgePlaybackState.PLAYING, BridgePlaybackState.PAUSED)

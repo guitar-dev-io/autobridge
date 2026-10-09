@@ -27,6 +27,13 @@ object SpeedManager {
     private var sources: List<SpeedSource> = emptyList()
     private var refCount = 0
 
+    /**
+     * Coalesces emissions so a fast stream of samples (which is what a moving vehicle produces)
+     * does not churn [speed] on the main thread on every sample. Only touched under [lock]. The
+     * PARKED⇄MOVING transition always emits; see [SpeedConflator].
+     */
+    private val conflator = SpeedConflator()
+
     private val _speed = MutableStateFlow(SpeedSample.NONE)
     val speed: StateFlow<SpeedSample> = _speed.asStateFlow()
 
@@ -67,7 +74,10 @@ object SpeedManager {
                 // Drop a stale invalid reading for this origin so it stops winning selection.
                 latestByOrigin.remove(sample.origin)
             }
-            _speed.value = selectBest()
+            // selectBest() still runs every sample, so freshness/expiry is unchanged; only the
+            // StateFlow write is gated, dropping high-frequency same-state updates.
+            val best = selectBest()
+            if (conflator.shouldEmit(best)) _speed.value = best
         }
     }
 
@@ -84,6 +94,7 @@ object SpeedManager {
             sources.forEach { runCatching { it.stop() } }
             sources = emptyList()
             latestByOrigin.clear()
+            conflator.reset()
             _speed.value = SpeedSample.NONE
         }
     }
