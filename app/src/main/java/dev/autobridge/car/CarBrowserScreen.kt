@@ -211,7 +211,19 @@ class CarBrowserScreen(carContext: CarContext) :
                     )
                     .build()
             )
-            .setMapActionStrip(ActionStrip.Builder().addAction(Action.PAN).build())
+            // The map action strip floats over the page on the host's side of the screen, so the
+            // keyboard sits there: one tap to type, without opening the menu first.
+            .setMapActionStrip(
+                ActionStrip.Builder()
+                    .addAction(
+                        Action.Builder()
+                            .setIcon(CarIcons.of(carContext, R.drawable.ic_car_keyboard))
+                            .setOnClickListener { renderer.openKeyboard() }
+                            .build()
+                    )
+                    .addAction(Action.PAN)
+                    .build()
+            )
             .build()
     }
 
