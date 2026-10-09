@@ -1787,6 +1787,30 @@ class CarWebRenderer(context: Context) {
         mainHandler.postDelayed({ offerFieldInput(view) }, FIELD_FOCUS_DELAY_MS)
     }
 
+    /**
+     * The car's floating keyboard button: types into the page's focused text field when there is
+     * one, otherwise into the address bar. The tap lands on the host's button, not the page, so the
+     * field the user picked earlier still holds focus.
+     */
+    fun openKeyboard() = runOnMain {
+        closeDrawer()
+        val page = focusedView
+        if (page == null) {
+            host?.openAddressInput()
+            return@runOnMain
+        }
+        page.evaluateJavascript(CarKeyboardPanel.FOCUSED_FIELD_INFO_SCRIPT.trimIndent()) { raw ->
+            val parsed = runCatching { org.json.JSONArray("[${raw ?: "null"}]") }.getOrNull()
+            val json = if (parsed == null || parsed.isNull(0)) null else parsed.optString(0)
+            val info = json?.let { runCatching { org.json.JSONObject(it) }.getOrNull() }
+            if (info != null) {
+                host?.openFieldInput(info.optString("value"), info.optString("label"), info.optString("type", "text"))
+            } else {
+                host?.openAddressInput()
+            }
+        }
+    }
+
     /** When [page] has a text field focused, hands its text to [Host.openFieldInput]. */
     private fun offerFieldInput(page: WebView) {
         if (page !== webView && page !== sideView) return
