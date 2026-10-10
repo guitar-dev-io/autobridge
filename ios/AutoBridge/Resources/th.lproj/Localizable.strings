@@ -386,3 +386,10 @@
 "Open it on your phone. Starred and recent TV channels play here." = "เปิดบนมือถือของคุณ ช่องทีวีที่กดดาวหรือเล่นล่าสุดเล่นในรถได้ที่นี่";
 "Open it on your phone. Starred and recent radio stations play here." = "เปิดบนมือถือของคุณ สถานีวิทยุที่กดดาวหรือเล่นล่าสุดเล่นในรถได้ที่นี่";
 "Open it on your phone. Starred and recent channels play here." = "เปิดบนมือถือของคุณ ช่องที่กดดาวหรือเล่นล่าสุดเล่นในรถได้ที่นี่";
+
+/* Web pages on a car screen. */
+"Web pages on a car screen (AirPlay)" = "หน้าเว็บบนจอรถ (AirPlay)";
+"An AirPlay car screen gets its own browser instead of a mirror of the phone. Send a page from the browser with the car button; reconnect the screen after changing this." = "จอรถที่รับ AirPlay จะได้เบราว์เซอร์ของตัวเองแทนการสะท้อนจอมือถือ ส่งหน้าเว็บจากเบราว์เซอร์ด้วยปุ่มรูปรถ และต่อจอใหม่หลังเปลี่ยนค่านี้";
+"The car screen will show web pages, video included, whether the car is parked or moving; nothing here checks. Do not watch while driving." = "จอรถจะแสดงหน้าเว็บรวมถึงวิดีโอ ไม่ว่ารถจอดหรือวิ่งอยู่ แอปไม่ได้ตรวจ ห้ามดูขณะขับรถ";
+"Open a page in AutoBridge on your phone and send it to the car screen." = "เปิดหน้าเว็บใน AutoBridge บนมือถือ แล้วส่งมาที่จอรถ";
+"Send to car" = "ส่งไปจอรถ";

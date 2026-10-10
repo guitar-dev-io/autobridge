@@ -142,6 +142,7 @@ struct SettingsView: View {
             }
 
             CarScreenVideoSection()
+            CarScreenWebSection()
 
             Section(NSLocalizedString("Not on iOS", comment: "Settings")) {
                 Text(

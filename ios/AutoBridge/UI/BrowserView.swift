@@ -16,6 +16,7 @@ struct BrowserView: View {
     @EnvironmentObject private var bookmarkStore: WebBookmarkStore
     @EnvironmentObject private var youtube: YouTubeSettings
     @StateObject private var model = WebViewModel()
+    @ObservedObject private var carScreen = CarWebScreen.shared
 
     @State private var address = ""
     @State private var editingAddress = false
@@ -37,6 +38,9 @@ struct BrowserView: View {
                         .frame(maxHeight: .infinity, alignment: .top)
                 }
             }
+            if carScreen.isConnected {
+                CarWebRemote(screen: carScreen, phoneURL: model.currentURL)
+            }
             controlBar
         }
         .background(AutoBridgeDesign.ink.ignoresSafeArea())
@@ -51,6 +55,7 @@ struct BrowserView: View {
         }
         .onChange(of: model.currentURL) { url in
             if !editingAddress { address = url }
+            carScreen.phoneNavigated(to: url)
         }
         .onDisappear { model.suspend() }
     }
@@ -264,20 +269,24 @@ final class WebViewModel: NSObject, ObservableObject {
     /// Loads what the address bar holds, treating anything that is not an address as a web search —
     /// the behaviour of every browser's single field.
     func go(to text: String) {
+        if let url = Self.resolve(text) { load(url) }
+    }
+
+    /// What the address bar's text opens: the address itself, or a web search for anything else.
+    /// Shared with the CarPlay address search, so both answer the same way.
+    static func resolve(_ text: String) -> URL? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
+        guard !trimmed.isEmpty else { return nil }
         let lower = trimmed.lowercased()
         if lower.hasPrefix("http://") || lower.hasPrefix("https://") {
-            if let url = URL(string: trimmed) { load(url) }
-            return
+            return URL(string: trimmed)
         }
         if !trimmed.contains(" "), trimmed.contains("."), let url = URL(string: "https://\(trimmed)") {
-            load(url)
-            return
+            return url
         }
         var components = URLComponents(string: "https://duckduckgo.com/")
         components?.queryItems = [URLQueryItem(name: "q", value: trimmed)]
-        if let url = components?.url { load(url) }
+        return components?.url
     }
 
     func goBack() { webView.goBack() }
