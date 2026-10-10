@@ -131,6 +131,17 @@ class BrowserKeyboardTest {
         assertEquals(3, clamped.selectionEnd)
     }
 
+    @Test
+    fun `ios style colours each kind of key`() {
+        val style = BrowserKeyboardStyle
+        assertEquals(style.GO_CAP to style.INK, style.colours(BrowserKey.Go, ShiftState.OFF))
+        assertEquals(style.LETTER_CAP, style.colours(BrowserKey.Text("q", "Q"), ShiftState.OFF).first)
+        assertEquals(style.FUNCTION_CAP, style.colours(BrowserKey.Text(".com"), ShiftState.OFF).first)
+        assertEquals(style.FUNCTION_CAP, style.colours(BrowserKey.Shift, ShiftState.OFF).first)
+        assertEquals(style.SHIFT_ON_CAP, style.colours(BrowserKey.Shift, ShiftState.LOCKED).first)
+        assertEquals("Go ›", style.goLabel("Go"))
+    }
+
     // ---------------------------------------------------------------- go
 
     @Test
