@@ -332,6 +332,10 @@
     <string name="split_closed">ปิดการแบ่งจอแล้ว</string>
     <string name="split_close_side">ปิดหน้าด้านข้าง</string>
     <string name="car_keyboard_hint">ค้นหาหรือพิมพ์ URL</string>
+    <string name="car_keyboard_space">เว้นวรรค</string>
+    <string name="car_keyboard_go">ไป</string>
+    <string name="car_keyboard_search">ค้นหา</string>
+    <string name="car_keyboard_hide">ซ่อนแป้นพิมพ์</string>
     <string name="split_layouts_heading">รูปแบบ</string>
     <string name="split_drag_seam">ลากเพื่อปรับขนาดจอแบ่ง</string>
     <string name="browser_about_version">เวอร์ชัน</string>
