@@ -39,6 +39,9 @@ ALLOW_THAI_IN_CODE=(
   "dev/autobridge/browser/CarKeyboardLayout.kt"
   # The layer keys name the layout they switch to in its own script ("ไทย", "กขค"), like the caps.
   "dev/autobridge/browser/CarKeyboardPanel.kt"
+  # The browser keyboard's own language key, drawn on the car surface and in the Duo pane.
+  "dev/autobridge/browser/CarSurfaceKeyboard.kt"
+  "dev/autobridge/browser/BrowserKeyboardView.kt"
 )
 
 status=0

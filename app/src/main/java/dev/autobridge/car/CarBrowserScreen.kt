@@ -2,6 +2,7 @@ package dev.autobridge.car
 
 import android.graphics.Rect
 import android.util.Log
+import androidx.activity.OnBackPressedCallback
 import androidx.car.app.AppManager
 import androidx.car.app.CarContext
 import androidx.car.app.CarToast
@@ -71,6 +72,16 @@ class CarBrowserScreen(carContext: CarContext) :
     private var visibleArea: Rect? = null
 
     private var active = false
+
+    /**
+     * Enabled only while the browser keyboard is up: the car's Back closes the keyboard first.
+     * Disabled, Back does what it always did on this screen.
+     */
+    private val keyboardBack = object : OnBackPressedCallback(false) {
+        override fun handleOnBackPressed() {
+            renderer.closeKeyboard()
+        }
+    }
     private fun allowed() =
         SafetyEnforcement.gateParked(ParkingStateStore.isParked) && FeaturePolicy.app.isAvailable(Feature.BROWSER)
     private val parkingListener: (ParkingStateStore.State) -> Unit = {
@@ -83,6 +94,7 @@ class CarBrowserScreen(carContext: CarContext) :
     }
 
     init {
+        carContext.onBackPressedDispatcher.addCallback(this, keyboardBack)
         lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) {
                 active = true
@@ -91,6 +103,7 @@ class CarBrowserScreen(carContext: CarContext) :
                 MirrorSurfaceOwnership.claim(this@CarBrowserScreen)
                 appManager.setSurfaceCallback(this@CarBrowserScreen)
                 renderer.host = this@CarBrowserScreen
+                renderer.onKeyboardChanged = { open -> keyboardBack.isEnabled = open }
                 renderer.onPageChanged = { url, title ->
                     carContext.mainExecutor.execute {
                         // Publish live browser state so the Mobile Remote reflects the car in real time.
@@ -118,9 +131,11 @@ class CarBrowserScreen(carContext: CarContext) :
             override fun onStop(owner: LifecycleOwner) {
                 active = false
                 ParkingStateStore.removeListener(parkingListener)
+                renderer.closeKeyboard()
                 renderer.stop()
                 if (renderer.host === this@CarBrowserScreen) {
                     renderer.host = null
+                    renderer.onKeyboardChanged = null
                     // These lambdas capture this screen and call invalidate() on it. The renderer
                     // outlives the screen, so leaving them attached would let a popped screen be
                     // invalidated by a page event that belongs to its replacement.
@@ -218,7 +233,7 @@ class CarBrowserScreen(carContext: CarContext) :
                     .addAction(
                         Action.Builder()
                             .setIcon(CarIcons.of(carContext, R.drawable.ic_car_keyboard))
-                            .setOnClickListener { renderer.openKeyboard() }
+                            .setOnClickListener { if (renderer.keyboardOpen) renderer.closeKeyboard() else renderer.openKeyboard() }
                             .build()
                     )
                     .addAction(Action.PAN)
@@ -228,23 +243,6 @@ class CarBrowserScreen(carContext: CarContext) :
     }
 
     // --- CarWebRenderer.Host: navigation performed via the existing ScreenManager ---
-
-    /** Pushes a [CarBrowserSearchScreen] so the user can type a URL / query on the car display. */
-    override fun openAddressInput() {
-        screenManager.pushForResult(CarBrowserSearchScreen(carContext, renderer.url)) { result ->
-            val query = result as? String ?: return@pushForResult
-            if (query.isNotBlank()) openUrl(query)
-        }
-    }
-
-    /** A page field took focus: type into it with the car's own keyboard, then fill it in and submit. */
-    override fun openFieldInput(current: String, label: String, type: String) {
-        val field = CarBrowserSearchScreen.Field(label = label, type = type)
-        screenManager.pushForResult(CarBrowserSearchScreen(carContext, current, field)) { result ->
-            val text = result as? String ?: return@pushForResult
-            if (text.isNotBlank()) renderer.submitText(text, autoSubmit = true)
-        }
-    }
 
     override fun openFindInPage() {
         // Ask for the term first, then open the find controls screen (prev/next + counter).

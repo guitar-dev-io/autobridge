@@ -18,6 +18,7 @@ import android.os.Bundle
 import android.view.Display
 import android.view.Gravity
 import android.view.View
+import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.os.Message
@@ -163,6 +164,12 @@ class BrowserActivity : Activity() {
      * The phone window is left exactly as it was — this runs only when [onCarDisplay].
      */
     private fun applyCarDisplayWindow() {
+        // The address bar types with the app's own keyboard here; the window never asks for the
+        // system one. Only the state bits change, so how the window adjusts is left as it was.
+        window.setSoftInputMode(
+            (window.attributes.softInputMode and WindowManager.LayoutParams.SOFT_INPUT_MASK_STATE.inv()) or
+                WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
+        )
         WindowCompat.setDecorFitsSystemWindows(window, false)
         WindowInsetsControllerCompat(window, root).apply {
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
@@ -423,6 +430,9 @@ class BrowserActivity : Activity() {
         gravity = Gravity.CENTER_VERTICAL
         inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
         imeOptions = EditorInfo.IME_ACTION_GO
+        // On the car display the app's own keyboard types here ([BrowserKeyboardView]); the field
+        // still takes focus and shows its cursor, but never raises the system keyboard.
+        if (onCarDisplay) showSoftInputOnFocus = false
         setPadding(
             sizes.dpInt(AutoUiSizes.HORIZONTAL_PADDING_DP),
             0,
@@ -445,10 +455,16 @@ class BrowserActivity : Activity() {
                 setText(if (showingStartPage) "" else web.url.orEmpty())
                 setSelection(0, text.length)
                 updateAddressDecorations()
-                (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager)
-                    .showSoftInput(this, InputMethodManager.SHOW_IMPLICIT)
-                if (onCarDisplay) postDelayed({ offerCarKeyboardForAddress() }, CAR_KEYBOARD_DELAY_MS)
+                if (onCarDisplay) {
+                    hideSystemKeyboard()
+                    openAddressKeyboard()
+                } else {
+                    (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager)
+                        .showSoftInput(this, InputMethodManager.SHOW_IMPLICIT)
+                }
             } else {
+                // The address keyboard belongs to the field; it goes when the field lets go.
+                if (onCarDisplay) closeCarKeyboard()
                 // Leaving edit mode collapses back to the compact hostname with no clear button.
                 setHint(HINT_IDLE)
                 setText(if (showingStartPage) "" else displayUrl(web.url.orEmpty()))
@@ -983,8 +999,10 @@ class BrowserActivity : Activity() {
     private fun focusAddressBar() {
         if (fullscreen) setFullscreen(false)
         address.requestFocus()
-        (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager)
-            .showSoftInput(address, InputMethodManager.SHOW_IMPLICIT)
+        if (!onCarDisplay) {
+            (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager)
+                .showSoftInput(address, InputMethodManager.SHOW_IMPLICIT)
+        }
     }
 
     /** Keeps the button inside the content area, whatever the offset was before. */
@@ -1141,16 +1159,43 @@ class BrowserActivity : Activity() {
         }
     }
 
-    /** The address bar took focus on the car display and no system keyboard came up for it. */
-    private fun offerCarKeyboardForAddress() {
-        if (!onCarDisplay || isFinishing || !address.hasFocus() || systemKeyboardShown()) return
-        openCarKeyboard(
-            seed = "",
-            onChange = { address.setText(it); address.setSelection(it.length) },
-            onCommit = { value ->
-                address.clearFocus()
-                if (value.isNotBlank()) navigate(value)
+    /** The system keyboard, if anything raised it in this window, is put away. */
+    private fun hideSystemKeyboard() {
+        (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager)
+            .hideSoftInputFromWindow(root.windowToken, 0)
+    }
+
+    /**
+     * The address bar took focus on the car display: the app's keyboard types straight into it.
+     * Go loads the address or searches, hides the keyboard and lets the field go; the hide key
+     * and Back cancel the edit, as Back in the field always has.
+     */
+    private fun openAddressKeyboard() {
+        closeCarKeyboard()
+        val panel = BrowserKeyboardView(
+            context = this,
+            field = address,
+            mode = BrowserKeyboardMode.URL,
+            areaWidth = root.width.takeIf { it > 0 } ?: resources.displayMetrics.widthPixels,
+            areaHeight = root.height.takeIf { it > 0 } ?: resources.displayMetrics.heightPixels,
+            onGo = { value ->
+                closeCarKeyboard()
+                collapseAddressEditing(hideKeyboard = true)
+                if (value.isNotBlank()) {
+                    navigate(
+                        if (WebVideoDiagnostics.isSentinel(value)) value
+                        else BrowserInputResolver.resolveTyped(value, SearchEngineStore.engine(this))
+                    )
+                }
             },
+            onHide = { cancelAddressEditing() },
+        ).view
+        carKeyboard = panel
+        root.addView(
+            panel,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM
+            )
         )
     }
 

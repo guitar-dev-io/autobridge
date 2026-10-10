@@ -345,6 +345,10 @@
     <string name="split_closed">Split screen off</string>
     <string name="split_close_side">Close side page</string>
     <string name="car_keyboard_hint">Search or type a URL</string>
+    <string name="car_keyboard_space">space</string>
+    <string name="car_keyboard_go">Go</string>
+    <string name="car_keyboard_search">Search</string>
+    <string name="car_keyboard_hide">Hide keyboard</string>
     <string name="split_layouts_heading">Layout</string>
     <string name="split_drag_seam">Drag to resize the split</string>
     <string name="browser_about_version">Version</string>

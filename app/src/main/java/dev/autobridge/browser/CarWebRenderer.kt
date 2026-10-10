@@ -194,13 +194,6 @@ class CarWebRenderer(context: Context) {
      * `ScreenManager` the car UI already uses, and no navigation logic is duplicated here.
      */
     interface Host {
-        fun openAddressInput()
-
-        /**
-         * A text field on the page took focus. The host offers a way to type into it, seeded with
-         * [current], and sends the result back through [submitText].
-         */
-        fun openFieldInput(current: String, label: String = "", type: String = "text")
         fun openFindInPage()
         fun openAgent()
         fun openBookmarks()
@@ -401,6 +394,13 @@ class CarWebRenderer(context: Context) {
     // not stomp on a choice the user already made during the session).
     private val visibility = ChromeVisibility().apply { setFullscreen(0L, true) }
     private var overlay: Overlay = Overlay.NONE
+
+    /** The browser keyboard while it is up; see [CarSurfaceKeyboard]. */
+    private var keyboard: CarSurfaceKeyboard? = null
+
+    /** Told whenever the keyboard opens or closes, so the screen can route the car's Back to it. */
+    var onKeyboardChanged: ((open: Boolean) -> Unit)? = null
+    val keyboardOpen: Boolean get() = keyboard != null
     private var drawer: BrowserDrawerModel? = null
     private var drawerScroll = 0f
 
@@ -1450,6 +1450,11 @@ class CarWebRenderer(context: Context) {
     fun onSurfaceClick(x: Float, y: Float) = runOnMain {
         val now = SystemClock.uptimeMillis()
         stopFling()
+        keyboard?.let { board ->
+            lastInputMs = now
+            handleKeyboardTap(board, x, y)
+            return@runOnMain
+        }
         if (overlay == Overlay.TABS) {
             handleTabOverlayClick(x, y)
             return@runOnMain
@@ -1540,7 +1545,7 @@ class CarWebRenderer(context: Context) {
                 visibility.onInteraction(now)
                 if (isLoading) stopLoading() else reload()
             }
-            ChromeZone.ADDRESS -> { visibility.onInteraction(now); host?.openAddressInput() }
+            ChromeZone.ADDRESS -> { visibility.onInteraction(now); openAddressKeyboard() }
             ChromeZone.FULLSCREEN -> toggleFullscreen()
             ChromeZone.MENU -> openDrawer()
             ChromeZone.FAB -> { visibility.onInteraction(now); performFloatingAction() }
@@ -1796,34 +1801,131 @@ class CarWebRenderer(context: Context) {
         closeDrawer()
         val page = focusedView
         if (page == null) {
-            host?.openAddressInput()
+            openAddressKeyboard()
             return@runOnMain
         }
-        page.evaluateJavascript(CarKeyboardPanel.FOCUSED_FIELD_INFO_SCRIPT.trimIndent()) { raw ->
-            val parsed = runCatching { org.json.JSONArray("[${raw ?: "null"}]") }.getOrNull()
-            val json = if (parsed == null || parsed.isNull(0)) null else parsed.optString(0)
-            val info = json?.let { runCatching { org.json.JSONObject(it) }.getOrNull() }
-            if (info != null) {
-                host?.openFieldInput(info.optString("value"), info.optString("label"), info.optString("type", "text"))
-            } else {
-                host?.openAddressInput()
-            }
+        readFocusedField(page) { info ->
+            if (info != null) openFieldKeyboard(info) else openAddressKeyboard()
         }
     }
 
-    /** When [page] has a text field focused, hands its text to [Host.openFieldInput]. */
+    /** When [page] has a text field focused, opens the keyboard on it. */
     private fun offerFieldInput(page: WebView) {
         if (page !== webView && page !== sideView) return
-        if (overlay != Overlay.NONE) return
+        if (overlay != Overlay.NONE || keyboard != null) return
+        readFocusedField(page) { info ->
+            if (info != null && overlay == Overlay.NONE && keyboard == null) openFieldKeyboard(info)
+        }
+    }
+
+    /** The focused field's `{value, label, type}`, or null when nothing typeable has focus. */
+    private fun readFocusedField(page: WebView, onResult: (org.json.JSONObject?) -> Unit) {
         page.evaluateJavascript(CarKeyboardPanel.FOCUSED_FIELD_INFO_SCRIPT.trimIndent()) { raw ->
             // evaluateJavascript hands back the JSON string as a JS string literal: unwrap, then parse.
             val parsed = runCatching { org.json.JSONArray("[${raw ?: "null"}]") }.getOrNull()
             val json = if (parsed == null || parsed.isNull(0)) null else parsed.optString(0)
-            val info = json?.let { runCatching { org.json.JSONObject(it) }.getOrNull() }
-            if (info != null && overlay == Overlay.NONE) {
-                host?.openFieldInput(info.optString("value"), info.optString("label"), info.optString("type", "text"))
-            }
+            onResult(json?.let { runCatching { org.json.JSONObject(it) }.getOrNull() })
         }
+    }
+
+    // ------------------------------------------------------------------ keyboard
+
+    /** The surface the keyboard lays itself out in: the part of the car screen the browser owns. */
+    private fun keyboardArea(): Box = Box(
+        viewport.left.toFloat(), viewport.top.toFloat(),
+        (viewport.left + viewport.width).toFloat(), (viewport.top + viewport.height).toFloat()
+    )
+
+    /** Opens the keyboard on the address bar, the current address selected so typing replaces it. */
+    fun openAddressKeyboard(clear: Boolean = false) = runOnMain {
+        if (drawerOpen || overlay == Overlay.TABS) closeDrawer()
+        showKeyboard(
+            CarSurfaceKeyboard(
+                appContext, CarSurfaceKeyboard.Target.ADDRESS,
+                seed = if (clear) "" else livePageUrl.orEmpty(),
+                mode = BrowserKeyboardMode.URL,
+                hint = appContext.getString(R.string.car_keyboard_hint),
+            )
+        )
+    }
+
+    private fun openFieldKeyboard(info: org.json.JSONObject) {
+        val type = info.optString("type", "text")
+        val label = info.optString("label").ifBlank { appContext.getString(R.string.car_field_hint_text) }
+        showKeyboard(
+            CarSurfaceKeyboard(
+                appContext, CarSurfaceKeyboard.Target.FIELD,
+                seed = info.optString("value"),
+                mode = if (type == "url") BrowserKeyboardMode.URL else BrowserKeyboardMode.SEARCH,
+                hint = label,
+            )
+        )
+        keepFocusedFieldAboveKeyboard()
+    }
+
+    private fun showKeyboard(board: CarSurfaceKeyboard) {
+        keyboard = board
+        visibility.onInteraction(SystemClock.uptimeMillis())
+        requestFullRate()
+        onKeyboardChanged?.invoke(true)
+    }
+
+    /** Closes the keyboard without doing anything with what was typed (hide, Back, a tap outside). */
+    fun closeKeyboard() = runOnMain {
+        if (keyboard == null) return@runOnMain
+        keyboard = null
+        onKeyboardChanged?.invoke(false)
+    }
+
+    private fun handleKeyboardTap(board: CarSurfaceKeyboard, x: Float, y: Float) {
+        when (val result = board.onTap(x, y, keyboardArea(), sizes.dp(1f))) {
+            is CarSurfaceKeyboard.Result.Close -> closeKeyboard()
+            is CarSurfaceKeyboard.Result.Commit -> commitKeyboard(board, result.text)
+            else -> Unit
+        }
+    }
+
+    /**
+     * Go. The address bar opens an address directly and searches anything else, on the engine the
+     * user picked; a page field gets the text and its form is submitted. Either way the keyboard
+     * goes, and the page below loads in the pane that has focus.
+     */
+    private fun commitKeyboard(board: CarSurfaceKeyboard, text: String) {
+        closeKeyboard()
+        when (board.target) {
+            CarSurfaceKeyboard.Target.ADDRESS -> {
+                if (text.isEmpty()) return
+                load(
+                    if (WebVideoDiagnostics.isSentinel(text)) text
+                    else BrowserInputResolver.resolveTyped(text, SearchEngineStore.engine(appContext))
+                )
+            }
+            CarSurfaceKeyboard.Target.FIELD -> submitText(text, autoSubmit = true)
+        }
+    }
+
+    /**
+     * The keyboard covers the bottom of the page, and the field being typed into may be under it.
+     * Scrolls the page (never re-lays it out) until the field sits above the tray.
+     */
+    private fun keepFocusedFieldAboveKeyboard() {
+        val board = keyboard ?: return
+        val page = focusedView ?: return
+        val pane = (if (sideActive) sideViewport else mainViewport) ?: return
+        val trayTop = board.geometry(keyboardArea(), sizes.dp(1f)).tray.top
+        val visible = ((trayTop - pane.top) / pane.height.toFloat()).coerceIn(0.2f, 1f)
+        page.evaluateJavascript(
+            """
+            (function(){
+              var el = document.activeElement;
+              if (!el || !el.getBoundingClientRect) return;
+              var r = el.getBoundingClientRect();
+              var limit = window.innerHeight * $visible;
+              if (r.bottom > limit) window.scrollBy(0, r.bottom - limit + 16);
+              else if (r.top < 0) window.scrollBy(0, r.top - 16);
+            })();
+            """.trimIndent(), null
+        )
     }
 
     /**
@@ -1975,7 +2077,7 @@ class CarWebRenderer(context: Context) {
 
     /** Whether the floating button is drawn right now; hit testing asks the same question. */
     private fun fabVisible(nowMs: Long): Boolean =
-        overlay == Overlay.NONE && fabAlpha(nowMs) > 0.01f
+        overlay == Overlay.NONE && keyboard == null && fabAlpha(nowMs) > 0.01f
 
     /**
      * The floating button's opacity. Outside fullscreen it is always lit (the default) or follows
@@ -2015,7 +2117,7 @@ class CarWebRenderer(context: Context) {
             FloatingButtonAction.TABS -> openTabSwitcher()
             FloatingButtonAction.NEW_TAB -> openNewTab()
             FloatingButtonAction.HOME -> goHome()
-            FloatingButtonAction.ADDRESS -> host?.openAddressInput()
+            FloatingButtonAction.ADDRESS -> openAddressKeyboard()
             FloatingButtonAction.FULLSCREEN -> toggleFullscreen()
         }
     }
@@ -2121,7 +2223,8 @@ class CarWebRenderer(context: Context) {
             DrawerAction.NAV_FORWARD -> goForward()
             // Both routes land on the same editor; "clear" is the one that starts it empty, which
             // the car's address screen does by ignoring the current URL it was not given.
-            DrawerAction.ADDRESS_KEYBOARD, DrawerAction.ADDRESS_CLEAR -> target?.openAddressInput()
+            DrawerAction.ADDRESS_KEYBOARD -> openAddressKeyboard()
+            DrawerAction.ADDRESS_CLEAR -> openAddressKeyboard(clear = true)
             DrawerAction.FIND_IN_PAGE -> target?.openFindInPage()
             DrawerAction.AGENT -> target?.openAgent()
             DrawerAction.COPY_URL ->
@@ -3132,6 +3235,9 @@ class CarWebRenderer(context: Context) {
         // toolbar's fade only when the user has asked for that
         // ([BrowserControlsStore.alwaysShowFloatingButton]).
         if (fabVisible(nowMs)) drawFab(canvas, fabAlpha(nowMs))
+        keyboard?.draw(canvas, keyboardArea(), sizes.dp(1f)) { c, icon, cx, cy, size, color ->
+            drawIcon(c, icon, cx, cy, size, color)
+        }
     }
 
     /** The floating control button: one large, always-present target that opens the menu. */

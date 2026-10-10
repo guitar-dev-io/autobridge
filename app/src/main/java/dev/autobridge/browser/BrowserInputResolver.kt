@@ -54,6 +54,30 @@ object BrowserInputResolver {
 
     /** True when [input] is (or normalises to) a real address rather than a search query. */
     fun looksLikeUrl(input: String): Boolean = ContentAddress.https(input.trim()) != null
+
+    /**
+     * The car keyboard's Go: an address opens directly, anything else searches on [engine].
+     *
+     * Stricter than [resolveBrowserInput] about what counts as an address, because on a keyboard
+     * a single word is far more often a search than a host: `weather` searches, `weather.com`
+     * opens. An address is one word with a scheme, a dot in its host, or `localhost`. A typed
+     * `http://` is upgraded to https, the only scheme this browser loads.
+     */
+    fun resolveTyped(input: String, engine: SearchEngine): String {
+        val trimmed = input.trim()
+        return addressOf(trimmed) ?: engine.searchUrl(trimmed)
+    }
+
+    /** The https URL [input] names, or null when it reads as a search. */
+    fun addressOf(input: String): String? {
+        val trimmed = input.trim()
+        if (trimmed.isEmpty() || trimmed.any { it.isWhitespace() }) return null
+        val upgraded = if (trimmed.startsWith("http://", ignoreCase = true)) "https://" + trimmed.substring(7) else trimmed
+        val url = ContentAddress.https(upgraded) ?: return null
+        if (upgraded.contains("://")) return url
+        val host = runCatching { java.net.URI(url).host }.getOrNull().orEmpty()
+        return url.takeIf { host.contains('.') || host.equals("localhost", ignoreCase = true) }
+    }
 }
 
 /**
