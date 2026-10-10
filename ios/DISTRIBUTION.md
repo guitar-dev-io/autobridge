@@ -26,7 +26,7 @@
 
 ค่าที่ตั้งไว้ใน `project.yml`:
 - `DEVELOPMENT_TEAM`: `V9Q6ZN9L53` ต้องเป็นทีมที่จ่ายเงินแล้ว
-- `PRODUCT_BUNDLE_IDENTIFIER`: `dev.autobridge.ios`
+- `PRODUCT_BUNDLE_IDENTIFIER`: `dev.autobridge`
 
 ## 2. สิ่งที่ยังขาดก่อนอัปโหลด
 

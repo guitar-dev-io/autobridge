@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+      Simulator-only. Simulator builds are signed ad hoc without a provisioning profile,
+      so the managed CarPlay entitlement can be declared here before Apple grants it.
+      That lets the app show up on the Simulator's CarPlay display
+      (I/O > External Displays > CarPlay). Device builds keep using
+      AutoBridge.entitlements, which leaves it out until the grant is approved.
+    -->
+    <key>com.apple.developer.carplay-audio</key>
+    <true/>
+</dict>
+</plist>
