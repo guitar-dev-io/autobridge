@@ -11,6 +11,11 @@ class StreamingLinksTest {
         assertTrue(titles.containsAll(listOf("Tencent Video", "iQIYI", "Youku", "Mango TV", "CCTV", "Douyin", "Xiaohongshu")))
     }
 
+    @Test fun theGlobalSitesAreThere() {
+        val titles = StreamingLinks.all.map { it.title }
+        assertTrue(titles.containsAll(listOf("Facebook Watch", "Dailymotion", "Vimeo", "SoundCloud", "Radio Garden", "Kick")))
+    }
+
     @Test fun aptvIsNotListed() {
         assertFalse(StreamingLinks.all.any { it.title.contains("APTV", ignoreCase = true) || it.url.contains("aptv", ignoreCase = true) })
     }
