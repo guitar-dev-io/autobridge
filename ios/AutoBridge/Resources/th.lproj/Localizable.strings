@@ -374,3 +374,15 @@
 "Turning this on lifts a protection; you take the risk and the responsibility. Watching video the driver can see while the car moves is dangerous and against Thai traffic law." = "เปิดแล้วคือการยกเลิกการป้องกัน ผู้ใช้รับความเสี่ยงและความรับผิดชอบเอง การดูวิดีโอบนจอที่คนขับมองเห็นขณะรถวิ่งเป็นอันตรายและผิดกฎหมายจราจร";
 "Turn on" = "เปิด";
 "The car screen will show video whether the car is parked or moving; nothing here checks. Do not watch while driving. Turn it on only for passengers, or for when you are parked." = "จอรถจะแสดงวิดีโอทั้งตอนจอดและตอนรถวิ่ง แอปไม่ได้ตรวจสถานะรถ ห้ามดูขณะขับ เปิดใช้เพื่อผู้โดยสาร หรือตอนจอดรถเท่านั้น";
+
+/* MARK: - CarPlay home */
+"Home" = "หน้าหลัก";
+"Play in the car" = "เล่นในรถ";
+"Now playing: %@" = "กำลังเล่น: %@";
+"Web pages open on your phone" = "หน้าเว็บเปิดบนมือถือ";
+"YouTube plays on your phone" = "YouTube เล่นบนมือถือ";
+"YouTube Music plays on your phone" = "YouTube Music เล่นบนมือถือ";
+"Streaming sites open on your phone" = "เว็บสตรีมมิงเปิดบนมือถือ";
+"Open it on your phone. Starred and recent TV channels play here." = "เปิดบนมือถือของคุณ ช่องทีวีที่กดดาวหรือเล่นล่าสุดเล่นในรถได้ที่นี่";
+"Open it on your phone. Starred and recent radio stations play here." = "เปิดบนมือถือของคุณ สถานีวิทยุที่กดดาวหรือเล่นล่าสุดเล่นในรถได้ที่นี่";
+"Open it on your phone. Starred and recent channels play here." = "เปิดบนมือถือของคุณ ช่องที่กดดาวหรือเล่นล่าสุดเล่นในรถได้ที่นี่";

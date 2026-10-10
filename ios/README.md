@@ -42,7 +42,7 @@ APIs — and it now carries essentially all of it.
 | Streaming sites list | ✅ | Same catalog, DRM-free sites only |
 | Folders / Gallery (on-device media) | ⚠️ | Through the system pickers — iOS has no `MediaStore` to walk |
 | Thai + English UI | ✅ | |
-| Car surface | ⚠️ | CarPlay **audio**: sections, sources, categories, paged channel lists, logos, check results, now-playing |
+| Car surface | ⚠️ | CarPlay **audio**: Home grid (TV, Radio, Web browser, YouTube, YouTube Music, Streaming in the Android order) plus Favorites and Recently-played tabs; sources, categories, paged channel lists, logos, check results, now-playing. The web tiles list remembered channels that play in the car and say the site itself opens on the phone |
 | Playlists (music library) | ❌ | A DRM-protected Apple Music track exposes no playable asset URL |
 | Weather section | ✅ | Open-Meteo, one place picked by name; the temperature shows on the home card |
 | Utilities: fuel/charging log, maintenance, car costs, emergency card, parking spot, backup | ✅ | Settings → Utilities. Same JSON as Android, so a backup file moves between the two apps |

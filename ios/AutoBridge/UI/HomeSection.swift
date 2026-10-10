@@ -117,7 +117,8 @@ enum HomeSection: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Sections the CarPlay dashboard offers. CarPlay is audio-only and template-based, so the
-    /// browser-backed sections and the photo picker have nothing to show there.
-    static let carSections: [HomeSection] = [.radio, .tv, .favorites]
+    /// The CarPlay home grid, in the Android car-home quick-access order. The browser-backed tiles
+    /// cannot show a web page on the car, so CarPlay opens a list of remembered channels that do
+    /// play there for them.
+    static let carQuickAccess: [HomeSection] = [.tv, .radio, .web, .youtube, .youtubeMusic, .streaming]
 }
