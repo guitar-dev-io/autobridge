@@ -36,6 +36,9 @@ object StreamingLinks {
     val all: List<StreamingLink> = listOf(
         StreamingLink("YouTube", StreamingGroup.VIDEO, "https://m.youtube.com"),
         StreamingLink("TikTok", StreamingGroup.VIDEO, "https://www.tiktok.com"),
+        StreamingLink("Facebook Watch", StreamingGroup.VIDEO, "https://m.facebook.com/watch"),
+        StreamingLink("Dailymotion", StreamingGroup.VIDEO, "https://www.dailymotion.com"),
+        StreamingLink("Vimeo", StreamingGroup.VIDEO, "https://vimeo.com"),
         StreamingLink("Tencent Video", StreamingGroup.CHINESE, "https://v.qq.com"),
         StreamingLink("WeTV", StreamingGroup.CHINESE, "https://wetv.vip"),
         StreamingLink("iQIYI", StreamingGroup.CHINESE, "https://www.iq.com"),
@@ -46,9 +49,18 @@ object StreamingLinks {
         StreamingLink("Xiaohongshu", StreamingGroup.CHINESE, "https://www.xiaohongshu.com"),
         StreamingLink("Internet Archive: Feature Films", StreamingGroup.MOVIES, "https://archive.org/details/feature_films"),
         StreamingLink("YouTube Music", StreamingGroup.MUSIC, "https://music.youtube.com"),
+        StreamingLink("SoundCloud", StreamingGroup.MUSIC, "https://m.soundcloud.com"),
+        StreamingLink("Mixcloud", StreamingGroup.MUSIC, "https://www.mixcloud.com"),
+        // Live radio from around the world, Thai stations included, on a globe.
+        StreamingLink("Radio Garden", StreamingGroup.MUSIC, "https://radio.garden"),
+        StreamingLink("YouTube Live", StreamingGroup.LIVE, "https://m.youtube.com/live"),
         StreamingLink("Twitch", StreamingGroup.LIVE, "https://www.twitch.tv"),
+        StreamingLink("Kick", StreamingGroup.LIVE, "https://kick.com"),
         // The international site; bilibili.com is the mainland-China front end.
-        StreamingLink("Bilibili", StreamingGroup.ANIME, "https://www.bilibili.tv")
+        StreamingLink("Bilibili", StreamingGroup.ANIME, "https://www.bilibili.tv"),
+        // Licensed anime, free on YouTube with Thai subtitles on much of it.
+        StreamingLink("Muse Asia", StreamingGroup.ANIME, "https://m.youtube.com/@MuseAsia"),
+        StreamingLink("Ani-One Asia", StreamingGroup.ANIME, "https://m.youtube.com/@AniOneAsia")
     )
 
     /** True for the group whose sites may not play here (protected video, or limited by region). */

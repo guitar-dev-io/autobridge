@@ -18,6 +18,9 @@ object StreamingIcons {
     private val CATALOG: Map<String, Style> = mapOf(
         "YouTube" to Style("▶", 0xFFE62117.toInt()),
         "TikTok" to Style("♪", 0xFF111111.toInt()),
+        "Facebook Watch" to Style("f", 0xFF1877F2.toInt()),
+        "Dailymotion" to Style("d", 0xFF0066DC.toInt()),
+        "Vimeo" to Style("v", 0xFF1AB7EA.toInt()),
         "Tencent Video" to Style("腾", 0xFF1E88E5.toInt()),
         "WeTV" to Style("WE", 0xFF0EA5E9.toInt()),
         "iQIYI" to Style("iQ", 0xFF00A806.toInt()),
@@ -28,8 +31,15 @@ object StreamingIcons {
         "Xiaohongshu" to Style("小红书", 0xFFFF2442.toInt()),
         "Internet Archive: Feature Films" to Style("IA", 0xFF4B5563.toInt()),
         "YouTube Music" to Style("♫", 0xFFD93025.toInt()),
+        "SoundCloud" to Style("☁", 0xFFFF5500.toInt()),
+        "Mixcloud" to Style("M", 0xFF5000FF.toInt()),
+        "Radio Garden" to Style("◉", 0xFF2E7D32.toInt()),
+        "YouTube Live" to Style("●", 0xFFCC0000.toInt()),
         "Twitch" to Style("T", 0xFF9146FF.toInt()),
+        "Kick" to Style("K", 0xFF1B8F0A.toInt()),
         "Bilibili" to Style("bili", 0xFFFB7299.toInt()),
+        "Muse Asia" to Style("M", 0xFFE4007F.toInt()),
+        "Ani-One Asia" to Style("A1", 0xFFF39800.toInt()),
     )
 
     private val PALETTE = intArrayOf(
