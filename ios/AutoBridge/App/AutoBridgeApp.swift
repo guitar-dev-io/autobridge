@@ -4,6 +4,8 @@ import SwiftUI
 /// `AutoBridgeStores`, the CarPlay scene — reads the same sources, favourites, history and player.
 @main
 struct AutoBridgeApp: App {
+    /// Offers an AirPlay car screen its own browser scene; see `AutoBridgeAppDelegate`.
+    @UIApplicationDelegateAdaptor(AutoBridgeAppDelegate.self) private var appDelegate
     @StateObject private var sourceStore = AutoBridgeStores.shared.sources
     @StateObject private var historyStore = AutoBridgeStores.shared.history
     @StateObject private var bookmarkStore = AutoBridgeStores.shared.bookmarks

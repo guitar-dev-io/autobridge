@@ -20,6 +20,10 @@ import UIKit
 @objc(CarPlaySceneDelegate)
 final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     private var interfaceController: CPInterfaceController?
+    /// The CarPlay window, when the app holds the navigation entitlement; see the web section below.
+    private var carWebWindow: CPWindow?
+    /// Where the last pan update left off, so each update scrolls by the change since then.
+    private var lastPan: CGPoint = .zero
     /// Keeps the Favorites and Recently-played tabs in step with the phone while connected.
     private var subscriptions = Set<AnyCancellable>()
 
@@ -521,5 +525,158 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
             guard let image = await ImageLoader.shared.load(url) else { return }
             item.setImage(image)
         }
+    }
+}
+
+// MARK: - Web pages on the CarPlay screen
+
+/// A real web page on the CarPlay screen. CarPlay hands an app a window it can draw in only when
+/// the app holds the navigation entitlement (`com.apple.developer.carplay-maps`), and then calls the
+/// `to window:` variant below instead of the audio one above. Apple grants that entitlement to
+/// navigation apps only, so only the Simulator's entitlements declare it: on a device the app stays
+/// the audio surface and none of this runs.
+///
+/// The window takes no touches, so the page is driven the way a map is: pan to scroll, map buttons
+/// for up/down/back/reload, a search button for the address (CarPlay's own keyboard), and the
+/// phone browser's car controls. The audio home is one button away.
+extension CarPlaySceneDelegate: CPMapTemplateDelegate, CPSearchTemplateDelegate {
+    func templateApplicationScene(
+        _ templateApplicationScene: CPTemplateApplicationScene,
+        didConnect interfaceController: CPInterfaceController,
+        to window: CPWindow
+    ) {
+        self.interfaceController = interfaceController
+        subscriptions.removeAll()
+        let controller = CarWebViewController()
+        window.rootViewController = controller
+        carWebWindow = window
+        let screen = CarWebScreen.shared
+        screen.attach(controller, as: .carPlay)
+        if screen.currentURL.isEmpty, let start = URL(string: "https://www.google.com") {
+            screen.show(start)
+        }
+        interfaceController.setRootTemplate(webMapTemplate(), animated: true, completion: nil)
+        addCloseButton()
+        VehicleReminders.carConnected()
+    }
+
+    func templateApplicationScene(
+        _ templateApplicationScene: CPTemplateApplicationScene,
+        didDisconnect interfaceController: CPInterfaceController,
+        from window: CPWindow
+    ) {
+        CarWebScreen.shared.detach(.carPlay)
+        carWebWindow = nil
+        self.interfaceController = nil
+        subscriptions.removeAll()
+        VehicleReminders.carDisconnected()
+    }
+
+    private func webMapTemplate() -> CPMapTemplate {
+        let map = CPMapTemplate()
+        map.mapDelegate = self
+        map.automaticallyHidesNavigationBar = false
+        let screen = CarWebScreen.shared
+        map.mapButtons = [
+            mapButton("chevron.up") { screen.scroll(pages: -0.8) },
+            mapButton("chevron.down") { screen.scroll(pages: 0.8) },
+            mapButton("arrow.uturn.backward") { screen.goBack() },
+            mapButton("arrow.clockwise") { screen.reload() },
+        ]
+        let home = CPBarButton(image: UIImage(systemName: "square.grid.2x2") ?? UIImage()) { [weak self] _ in
+            guard let self else { return }
+            self.interfaceController?.pushTemplate(self.homeTemplate(), animated: true, completion: nil)
+        }
+        let address = CPBarButton(image: UIImage(systemName: "magnifyingglass") ?? UIImage()) { [weak self] _ in
+            self?.openAddressSearch()
+        }
+        map.leadingNavigationBarButtons = [home]
+        map.trailingNavigationBarButtons = [address]
+        return map
+    }
+
+    private func mapButton(_ symbol: String, action: @escaping () -> Void) -> CPMapButton {
+        let button = CPMapButton { _ in action() }
+        button.image = UIImage(systemName: symbol)
+        return button
+    }
+
+    private func openAddressSearch() {
+        let search = CPSearchTemplate()
+        search.delegate = self
+        interfaceController?.pushTemplate(search, animated: true, completion: nil)
+    }
+
+    // MARK: Pan to scroll
+
+    func mapTemplateDidBeginPanGesture(_ mapTemplate: CPMapTemplate) {
+        lastPan = .zero
+    }
+
+    func mapTemplate(_ mapTemplate: CPMapTemplate, didUpdatePanGestureWithTranslation translation: CGPoint, velocity: CGPoint) {
+        // A finger moving down drags the page down, which moves the view up the page.
+        let delta = CGPoint(x: lastPan.x - translation.x, y: lastPan.y - translation.y)
+        lastPan = translation
+        CarWebScreen.shared.scroll(by: delta)
+    }
+
+    func mapTemplate(_ mapTemplate: CPMapTemplate, didEndPanGestureWithVelocity velocity: CGPoint) {
+        lastPan = .zero
+    }
+
+    /// The pan buttons a car without a touch screen shows.
+    func mapTemplate(_ mapTemplate: CPMapTemplate, panWith direction: CPMapTemplate.PanDirection) {
+        let step: CGFloat = 240
+        var delta = CGPoint.zero
+        if direction.contains(.up) { delta.y -= step }
+        if direction.contains(.down) { delta.y += step }
+        if direction.contains(.left) { delta.x -= step }
+        if direction.contains(.right) { delta.x += step }
+        CarWebScreen.shared.scroll(by: delta)
+    }
+
+    // MARK: Address search
+
+    func searchTemplate(
+        _ searchTemplate: CPSearchTemplate,
+        updatedSearchText searchText: String,
+        completionHandler: @escaping ([CPListItem]) -> Void
+    ) {
+        completionHandler(webSuggestions(for: searchText))
+    }
+
+    func searchTemplate(
+        _ searchTemplate: CPSearchTemplate,
+        selectedResult item: CPListItem,
+        completionHandler: @escaping () -> Void
+    ) {
+        if let address = item.userInfo as? String, let url = URL(string: address) {
+            CarWebScreen.shared.show(url)
+        }
+        interfaceController?.popToRootTemplate(animated: true, completion: nil)
+        completionHandler()
+    }
+
+    /// What was typed (as an address or a search), then the saved pages that match it.
+    private func webSuggestions(for text: String) -> [CPListItem] {
+        var items: [CPListItem] = []
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let url = WebViewModel.resolve(trimmed) {
+            let item = CPListItem(text: trimmed, detailText: url.host ?? url.absoluteString)
+            item.userInfo = url.absoluteString
+            items.append(item)
+        }
+        let needle = trimmed.lowercased()
+        let saved = stores.bookmarks.bookmarks.filter { bookmark in
+            needle.isEmpty
+                || bookmark.title.lowercased().contains(needle)
+                || bookmark.url.lowercased().contains(needle)
+        }
+        for bookmark in saved.prefix(12) {
+            let item = CPListItem(text: bookmark.title, detailText: URL(string: bookmark.url)?.host ?? bookmark.url)
+            item.userInfo = bookmark.url
+            items.append(item)
+        }
+        return items
     }
 }
