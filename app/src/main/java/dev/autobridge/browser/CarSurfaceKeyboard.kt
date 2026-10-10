@@ -106,21 +106,19 @@ internal class CarSurfaceKeyboard(
 
     fun draw(canvas: Canvas, area: Box, density: Float, drawIcon: (Canvas, BrowserIcon, Float, Float, Float, Int) -> Unit) {
         val g = geometry(area, density)
-        val theme = BrowserTheme.dark
-        val radius = 8f * density
+        val style = BrowserKeyboardStyle
+        val radius = style.KEY_RADIUS_DP * density
 
-        fill.color = theme.surfaceContainer
+        fill.color = style.TRAY
         canvas.drawRect(g.tray.left, g.tray.top, g.tray.right, g.tray.bottom, fill)
-        fill.color = theme.outlineVariant
+        fill.color = style.TRAY_EDGE
         canvas.drawRect(g.tray.left, g.tray.top, g.tray.right, g.tray.top + density, fill)
 
         drawField(canvas, g, density, drawIcon)
 
-        // Hide: a key-shaped button with a chevron pointing down.
-        fill.color = theme.surfaceContainerHigh
-        rect.set(g.hide.left, g.hide.top, g.hide.right, g.hide.bottom)
-        canvas.drawRoundRect(rect, radius, radius, fill)
-        stroke.color = theme.textPrimary
+        // Hide: a raised function key with a chevron pointing down.
+        drawCap(canvas, g.hide, style.FUNCTION_CAP, radius, density)
+        stroke.color = style.INK
         stroke.strokeWidth = 2.5f * density
         val half = g.hide.width * 0.16f
         path.rewind()
@@ -130,10 +128,8 @@ internal class CarSurfaceKeyboard(
         canvas.drawPath(path, stroke)
 
         g.keys.forEach { (key, box) ->
-            val (cap, ink) = colours(key)
-            fill.color = cap
-            rect.set(box.left, box.top, box.right, box.bottom)
-            canvas.drawRoundRect(rect, radius, radius, fill)
+            val (cap, ink) = style.colours(key, shift)
+            drawCap(canvas, box, cap, radius, density)
             val text = keyLabel(key)
             label.color = ink
             label.textSize = g.keyHeight * (if (key is BrowserKey.Text && text.length <= 2) LETTER_TEXT else WORD_TEXT)
@@ -148,6 +144,17 @@ internal class CarSurfaceKeyboard(
         }
     }
 
+    /** A raised key: a dark shadow just below, then the cap over it. */
+    private fun drawCap(canvas: Canvas, box: Box, cap: Int, radius: Float, density: Float) {
+        val drop = BrowserKeyboardStyle.SHADOW_DP * density
+        fill.color = BrowserKeyboardStyle.CAP_SHADOW
+        rect.set(box.left, box.top + drop, box.right, box.bottom + drop)
+        canvas.drawRoundRect(rect, radius, radius, fill)
+        fill.color = cap
+        rect.set(box.left, box.top, box.right, box.bottom)
+        canvas.drawRoundRect(rect, radius, radius, fill)
+    }
+
     private fun textLeft(g: BrowserKeyboardGeometry): Float = g.field.left + g.keyHeight * 0.9f
 
     private fun drawField(
@@ -156,16 +163,20 @@ internal class CarSurfaceKeyboard(
         density: Float,
         drawIcon: (Canvas, BrowserIcon, Float, Float, Float, Int) -> Unit,
     ) {
-        val theme = BrowserTheme.dark
+        val style = BrowserKeyboardStyle
         val field = g.field
-        fill.color = theme.addressPillBackground
+        val corner = style.KEY_RADIUS_DP * density
+        fill.color = style.FIELD
         rect.set(field.left, field.top, field.right, field.bottom)
-        canvas.drawRoundRect(rect, field.height / 2f, field.height / 2f, fill)
-        drawIcon(canvas, BrowserIcon.SEARCH, field.left + g.keyHeight * 0.45f, field.centerY, g.keyHeight * 0.42f, theme.textSecondary)
+        canvas.drawRoundRect(rect, corner, corner, fill)
+        stroke.color = style.FIELD_EDGE
+        stroke.strokeWidth = density
+        canvas.drawRoundRect(rect, corner, corner, stroke)
+        drawIcon(canvas, BrowserIcon.SEARCH, field.left + g.keyHeight * 0.45f, field.centerY, g.keyHeight * 0.42f, style.INK_SECONDARY)
 
         val text = buffer.text
         if (text.isNotEmpty()) {
-            drawIcon(canvas, BrowserIcon.CLOSE, g.clear.centerX, g.clear.centerY, g.keyHeight * 0.38f, theme.iconEnabled)
+            drawIcon(canvas, BrowserIcon.CLOSE, g.clear.centerX, g.clear.centerY, g.keyHeight * 0.38f, style.INK_SECONDARY)
         }
         fieldText.textSize = g.keyHeight * FIELD_TEXT
         val start = textLeft(g)
@@ -174,7 +185,7 @@ internal class CarSurfaceKeyboard(
         val baseline = field.centerY - (fieldText.descent() + fieldText.ascent()) / 2f
 
         if (text.isEmpty()) {
-            fieldText.color = theme.textSecondary
+            fieldText.color = style.INK_SECONDARY
             canvas.drawText(fitHint(hint, width), start, baseline, fieldText)
             drawCursor(canvas, start, field, density)
             return
@@ -190,42 +201,31 @@ internal class CarSurfaceKeyboard(
         if (buffer.hasSelection) {
             val a = fieldText.measureText(text, 0, minOf(buffer.selectionStart, buffer.selectionEnd))
             val b = fieldText.measureText(text, 0, maxOf(buffer.selectionStart, buffer.selectionEnd))
-            fill.color = theme.accent
-            fill.alpha = 90
+            fill.color = style.SELECTION
             canvas.drawRect(start + a - textScroll, field.top + field.height * 0.18f, start + b - textScroll, field.bottom - field.height * 0.18f, fill)
-            fill.alpha = 255
         }
-        fieldText.color = theme.textPrimary
+        fieldText.color = style.INK
         canvas.drawText(text, start - textScroll, baseline, fieldText)
         if (!buffer.hasSelection) drawCursor(canvas, start + cursorX - textScroll, field, density)
         canvas.restore()
     }
 
     private fun drawCursor(canvas: Canvas, x: Float, field: Box, density: Float) {
-        fill.color = BrowserTheme.dark.accent
+        fill.color = BrowserKeyboardStyle.CURSOR
         canvas.drawRect(x, field.top + field.height * 0.2f, x + 2f * density, field.bottom - field.height * 0.2f, fill)
     }
 
     private fun fitHint(text: String, width: Float): String =
         android.text.TextUtils.ellipsize(text, android.text.TextPaint(fieldText), width, android.text.TextUtils.TruncateAt.END).toString()
 
-    private fun colours(key: BrowserKey): Pair<Int, Int> {
-        val theme = BrowserTheme.dark
-        return when {
-            key is BrowserKey.Go -> theme.primary to theme.onPrimary
-            key is BrowserKey.Shift && shift.active -> theme.primaryContainer to theme.onPrimaryContainer
-            key is BrowserKey.Text && key.lower.length <= 1 -> theme.surfaceContainerHighest to theme.textPrimary
-            key is BrowserKey.Space -> theme.surfaceContainerHighest to theme.textSecondary
-            else -> theme.surfaceContainerHigh to theme.textPrimary
-        }
-    }
-
     private fun keyLabel(key: BrowserKey): String = when (key) {
         is BrowserKey.Text -> BrowserKeyboardLayouts.typed(key, shift)
         is BrowserKey.Shift -> "⇧"
         is BrowserKey.Backspace -> "⌫"
         is BrowserKey.Space -> context.getString(R.string.car_keyboard_space)
-        is BrowserKey.Go -> context.getString(if (mode == BrowserKeyboardMode.URL) R.string.car_keyboard_go else R.string.car_keyboard_search)
+        is BrowserKey.Go -> BrowserKeyboardStyle.goLabel(
+            context.getString(if (mode == BrowserKeyboardMode.URL) R.string.car_keyboard_go else R.string.car_keyboard_search)
+        )
         is BrowserKey.Language -> if (language == CarKeyboardLanguage.THAI) "EN" else "ไทย"
         is BrowserKey.CursorLeft -> "◀"
         is BrowserKey.CursorRight -> "▶"
