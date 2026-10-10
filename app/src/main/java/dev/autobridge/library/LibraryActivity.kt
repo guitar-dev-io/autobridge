@@ -1794,22 +1794,14 @@ class LibraryActivity : Activity() {
                 onLongClick = {}
             )
         )
-        rows += TextView(this).apply {
-            text = getString(R.string.streaming_long_press_hint)
-            textSize = 12f
-            setTextColor(AutoBridgeDesign.TEXT_MUTED)
-            setPadding(0, (6 * resources.displayMetrics.density).toInt(), 0, 0)
-        }
+        rows += streamingNote(getString(R.string.streaming_long_press_hint))
         StreamingLinks.grouped().forEach { (group, links) ->
-            rows += AutoBridgeDesign.sectionLabel(this, group.title)
-            rows += streamingGrid(
-                links.map { link ->
-                    tile(
-                        link.title, link.url, starred = link.url in favoriteUrls,
-                        caption = getString(R.string.streaming_may_not_play).takeIf { StreamingLinks.mayNotPlay(link) }
-                    )
-                }
-            )
+            rows += AutoBridgeDesign.sectionLabel(this, getString(groupLabel(group)))
+            // Said once for the group, not under every icon: eight identical captions read as noise.
+            if (links.any { StreamingLinks.mayNotPlay(it) }) {
+                rows += streamingNote(getString(R.string.streaming_group_may_not_play))
+            }
+            rows += streamingGrid(links.map { link -> tile(link.title, link.url, starred = link.url in favoriteUrls) })
         }
         render(
             title = getString(R.string.section_streaming),
@@ -1817,6 +1809,24 @@ class LibraryActivity : Activity() {
             rows = rows,
             extraPinned = listOf(chipsRow())
         )
+    }
+
+    /** A group's name in the UI language; [StreamingGroup.title] is the English one. */
+    private fun groupLabel(group: StreamingGroup): Int = when (group) {
+        StreamingGroup.VIDEO -> R.string.streaming_group_video
+        StreamingGroup.CHINESE -> R.string.streaming_group_chinese
+        StreamingGroup.MOVIES -> R.string.streaming_group_movies
+        StreamingGroup.MUSIC -> R.string.streaming_group_music
+        StreamingGroup.LIVE -> R.string.streaming_group_live
+        StreamingGroup.ANIME -> R.string.streaming_group_anime
+    }
+
+    /** A short muted line under a Streaming heading. */
+    private fun streamingNote(text: String) = TextView(this).apply {
+        this.text = text
+        textSize = 12f
+        setTextColor(AutoBridgeDesign.TEXT_MUTED)
+        setPadding(0, (2 * resources.displayMetrics.density).toInt(), 0, (4 * resources.displayMetrics.density).toInt())
     }
 
     /** One icon in the Streaming grid. */
@@ -1827,6 +1837,11 @@ class LibraryActivity : Activity() {
         val onClick: () -> Unit,
         val onLongClick: () -> Unit,
     )
+
+    private fun streamingCellParams() = android.widget.GridLayout.LayoutParams(
+        android.widget.GridLayout.spec(android.widget.GridLayout.UNDEFINED),
+        android.widget.GridLayout.spec(android.widget.GridLayout.UNDEFINED, 1f)
+    ).apply { width = 0 }
 
     /** [tiles] as rows of icons with their names under them, [STREAM_COLUMNS] to a row. */
     private fun streamingGrid(tiles: List<StreamingTile>): View {
@@ -1865,13 +1880,13 @@ class LibraryActivity : Activity() {
                     })
                 }
             }
-            grid.addView(
-                cell,
-                android.widget.GridLayout.LayoutParams(
-                    android.widget.GridLayout.spec(android.widget.GridLayout.UNDEFINED),
-                    android.widget.GridLayout.spec(android.widget.GridLayout.UNDEFINED, 1f)
-                ).apply { width = 0 }
-            )
+            grid.addView(cell, streamingCellParams())
+        }
+        // Fill the last row with empty cells, so a short group keeps the same column width as the
+        // rest: two icons alone otherwise spread across the whole width, half a screen apart.
+        val remainder = tiles.size % STREAM_COLUMNS
+        if (remainder != 0) {
+            repeat(STREAM_COLUMNS - remainder) { grid.addView(View(this), streamingCellParams()) }
         }
         return grid
     }
