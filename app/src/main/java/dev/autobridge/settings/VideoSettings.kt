@@ -2,7 +2,22 @@ package dev.autobridge.settings
 
 import android.content.Context
 import androidx.core.content.edit
+import dev.autobridge.BuildConfig
 import java.util.concurrent.CopyOnWriteArrayList
+
+/**
+ * Which engine actually decodes and renders the picture — the built-in Media3/ExoPlayer path, or
+ * the embedded libVLC engine, the Fermata-style "pick which engine plays your media" choice.
+ *
+ * Orthogonal to [PreferredPlayer]: that one chooses a decoder *within* ExoPlayer (hardware vs
+ * software), while this one chooses the decode engine entirely. The VLC option exists, and is
+ * selectable, only in a build compiled with `-Pautobridge.vlc=true`; see
+ * [VideoSettings.videoEngine] for how a stored `VLC` falls back to [MEDIA3] when the flag is off.
+ */
+enum class VideoEngine(val label: String, val caption: String) {
+    MEDIA3("Media3", "The built-in player"),
+    VLC("VLC", "libVLC plays your media")
+}
 
 /**
  * Which decoder the shared player reaches for first.
@@ -74,6 +89,7 @@ enum class PlayerDpi(val label: String, val caption: String, val scale: Float) {
 object VideoSettings {
     private const val PREFS_NAME = "autobridge_video"
 
+    private const val KEY_VIDEO_ENGINE = "video_engine"
     private const val KEY_PREFERRED_PLAYER = "preferred_player"
     private const val KEY_PLAY_IN_BACKGROUND = "play_in_background"
     private const val KEY_AUTO_PIP = "auto_picture_in_picture"
@@ -101,6 +117,30 @@ object VideoSettings {
     fun removeListener(listener: () -> Unit) {
         listeners.remove(listener)
     }
+
+    /**
+     * Which engine the playback service builds its player on.
+     *
+     * The build flag comes first and is not overridable from the app, the same contract as
+     * [dev.autobridge.subtitles.SubtitleSettings.enabled]: a build made without `autobridge.vlc`
+     * has no VLC engine compiled in, and the stored preference outlives that change — someone who
+     * had picked VLC, then installed a build without it, would otherwise have the service try to
+     * build an engine that is not there. ANDing the flag first makes a stale `VLC` resolve to
+     * [VideoEngine.MEDIA3], so the VLC branch in the service is unreachable and `src/novlc`'s
+     * throwing factory is never called.
+     */
+    fun videoEngine(context: Context): VideoEngine =
+        if (BuildConfig.VLC_ENGINE) {
+            VideoSettingsCodec.videoEngine(prefs(context).getString(KEY_VIDEO_ENGINE, null))
+        } else {
+            VideoEngine.MEDIA3
+        }
+
+    /** True when this build has the libVLC engine in it; see [videoEngine]. */
+    val isVlcSupported: Boolean get() = BuildConfig.VLC_ENGINE
+
+    fun setVideoEngine(context: Context, value: VideoEngine) =
+        putString(context, KEY_VIDEO_ENGINE, value.name)
 
     fun preferredPlayer(context: Context): PreferredPlayer =
         VideoSettingsCodec.preferredPlayer(prefs(context).getString(KEY_PREFERRED_PLAYER, null))
@@ -248,6 +288,9 @@ data class VideoEnhancement(
  * from [VideoSettings] for the same reason: it is testable without a [Context].
  */
 object VideoSettingsCodec {
+    fun videoEngine(name: String?): VideoEngine =
+        VideoEngine.entries.firstOrNull { it.name == name } ?: VideoEngine.MEDIA3
+
     fun preferredPlayer(name: String?): PreferredPlayer =
         PreferredPlayer.entries.firstOrNull { it.name == name } ?: PreferredPlayer.AUTO
 

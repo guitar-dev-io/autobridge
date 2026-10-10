@@ -62,6 +62,28 @@ val subtitleTranslationEnabled: Boolean = run {
         )
 }
 
+// The embedded libVLC playback engine, offered beside Media3 the way Fermata lets a user pick
+// which engine plays their media. Its whole cost is the native payload: org.videolan.android:
+// libvlc-all ships an uncompressed .so set per ABI, larger than the translation engines. A build
+// that does not want it leaves the whole engine off, which drops the Maven artifact (so no VLC
+// .so is packaged), the one source set that imports org.videolan.libvlc, and the Settings choice.
+// It is off by default, so compiling the engine in is the opt-in:
+//
+//   ./gradlew assembleSafeRelease -Pautobridge.vlc=true
+//   AUTOBRIDGE_VLC=true ./gradlew assembleSafeRelease
+//
+// The default lives in gradle.properties; precedence matches the flag above - Gradle property,
+// then environment variable, then the file.
+val vlcEngineEnabled: Boolean = run {
+    val raw = (providers.gradleProperty("autobridge.vlc").orNull
+        ?: System.getenv("AUTOBRIDGE_VLC")
+        ?: "false").trim()
+    raw.toBooleanStrictOrNull()
+        ?: throw GradleException(
+            "autobridge.vlc must be true or false, not \"$raw\"."
+        )
+}
+
 // `./gradlew -q :app:printVersion` -> "0.4.12 26". The release workflow and scripts ask Gradle
 // rather than re-parsing the properties file, so there is one definition of what the build used.
 tasks.register("printVersion") {
@@ -109,6 +131,9 @@ android {
         // Read by SubtitleSettings.enabled() so a pref left on by an earlier build cannot ask an
         // engine that is not here, and by the screens that offer the feature.
         buildConfigField("boolean", "SUBTITLE_TRANSLATION", subtitleTranslationEnabled.toString())
+        // Read by VideoSettings.videoEngine() so a pref left on "VLC" by an earlier build cannot
+        // ask for an engine that is not here, and by the Settings screen that offers the choice.
+        buildConfigField("boolean", "VLC_ENGINE", vlcEngineEnabled.toString())
         // Arm only. Nothing this app runs on is x86: a phone driving a head unit is arm64, and
         // armeabi-v7a is kept for the older 32-bit ones. The weight is in the translation engines
         // (ML Kit Translate + ONNX Runtime, behind autobridge.subtitleTranslation above), which
@@ -258,9 +283,23 @@ kotlin {
 // that names them, src/notranslate holds a factory that passes every line through. Exactly one of
 // the two is compiled, so the libraries can leave the build without a single `if` in the subtitle
 // stack above them.
+//
+// The VLC engine is split the same way, on the autobridge.vlc flag: src/vlc holds the one class
+// that imports org.videolan.libvlc (the VlcMediaPlayer facade) and the factory that names it,
+// src/novlc holds a factory of the same symbol whose create() throws (never reached, because the
+// runtime guard never routes to it when the flag is off). Exactly one of the two is compiled, so
+// libvlc-all can leave the build without a single `if` in the service above it. Its JVM unit
+// tests live in src/testVlc and are added to the debug unit-test source set only when the flag is
+// on, so they compile against src/vlc without dragging it into a flag-off test run.
 android.sourceSets {
     getByName("main") {
         java.srcDir(if (subtitleTranslationEnabled) "src/translate/java" else "src/notranslate/java")
+        java.srcDir(if (vlcEngineEnabled) "src/vlc/java" else "src/novlc/java")
+    }
+    if (vlcEngineEnabled) {
+        getByName("test") {
+            java.srcDir("src/testVlc/java")
+        }
     }
     listOf("personal", "lab").forEach { flavor ->
         getByName(flavor) {
@@ -343,6 +382,14 @@ dependencies {
     if (subtitleTranslationEnabled) {
         implementation("com.google.mlkit:translate:17.0.3")
         implementation("com.microsoft.onnxruntime:onnxruntime-android:1.20.0")
+    }
+    // The embedded libVLC playback engine, behind -Pautobridge.vlc. VideoLAN's official LibVLC
+    // Android AAR (org.videolan.libvlc.* bindings). 3.7.7 is the latest stable 3.x on Maven
+    // Central (4.0.0 is EAP only); pinned exact, like every other coordinate here. Declared only
+    // inside this block, so a flag-off build resolves no org.videolan artifact and packages no VLC
+    // .so. abiFilters above drops the x86/x86_64 variants it ships, same as ML Kit / ONNX.
+    if (vlcEngineEnabled) {
+        implementation("org.videolan.android:libvlc-all:3.7.7")
     }
     // Renders the generated third-party license list in OssLicensesMenuActivity, which the
     // Settings "Open-source licenses" row opens. The oss-licenses-plugin collects the notices from

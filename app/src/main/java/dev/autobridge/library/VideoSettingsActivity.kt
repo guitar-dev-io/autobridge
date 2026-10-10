@@ -18,6 +18,7 @@ import dev.autobridge.settings.ChannelGesture
 import dev.autobridge.settings.PlayerDpi
 import dev.autobridge.settings.PreferredPlayer
 import dev.autobridge.settings.SplitLayout
+import dev.autobridge.settings.VideoEngine
 import dev.autobridge.settings.VideoSettings
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.dp
@@ -62,9 +63,31 @@ class VideoSettingsActivity : Activity() {
 
         body.stack(AutoBridgeDesign.sectionLabel(this, "Video"), gap = 2)
 
+        // The engine choice only exists in a build compiled with -Pautobridge.vlc=true; with the
+        // flag off the row is absent and nothing on this screen or in the player exposes VLC.
+        if (VideoSettings.isVlcSupported) {
+            val engine = VideoSettings.videoEngine(this)
+            body.stack(
+                choiceRow("Playback engine", engine.label, engine.caption) {
+                    choose("Playback engine", VideoEngine.entries, engine, { it.label }) {
+                        VideoSettings.setVideoEngine(this, it)
+                    }
+                }
+            )
+        }
+
         val player = VideoSettings.preferredPlayer(this)
+        // Decoder selection is an ExoPlayer concept; under the VLC engine it is inert. The row
+        // stays enabled (so it is ready the moment the user switches back to Media3) and swaps its
+        // caption, the way the PiP row explains itself rather than vanishing.
+        val engineIsVlc = VideoSettings.isVlcSupported &&
+            VideoSettings.videoEngine(this) == VideoEngine.VLC
         body.stack(
-            choiceRow("Preferred player", player.label, player.caption) {
+            choiceRow(
+                "Preferred player",
+                player.label,
+                if (engineIsVlc) "Applies to the Media3 engine only" else player.caption
+            ) {
                 choose("Preferred player", PreferredPlayer.entries, player, { it.label }) {
                     VideoSettings.setPreferredPlayer(this, it)
                 }

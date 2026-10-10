@@ -151,6 +151,33 @@ the feature is left off, `SubtitleSettings.enabled()` is false regardless of the
 so a phone that had translation on before does not route cues at an engine that is no longer there,
 and the player hides the button that opens the translation settings.
 
+### Building with the VLC engine (off by default)
+
+The video player can optionally decode through an embedded **libVLC** engine instead of the
+built-in Media3/ExoPlayer path — the Fermata-style "pick which engine plays your media" choice,
+surfaced as a *Playback engine* row in Settings → Video. Its whole cost is the native payload:
+`org.videolan.android:libvlc-all` ships an uncompressed `.so` set per ABI (about 39 MB for
+`armeabi-v7a` and 53 MB for `arm64-v8a` in the artifact, stored uncompressed in the APK because the
+module uses `useLegacyPackaging`). For that reason `autobridge.vlc` in `gradle.properties` is
+**`false` by default**, so a standard build leaves libVLC out entirely — no `org.videolan`
+dependency resolved, no VLC `.so` packaged, the VLC engine class not compiled, and the engine
+choice hidden in Settings. The measured increase of the packaged `assembleSafeRelease` APK across
+the two shipped ABIs is **about +43 MB** (the `safe` release APK grew from roughly 10 MB to 51 MB
+with `arm64-v8a` + `armeabi-v7a` combined). Opt in with the flag set to `true`:
+
+```bash
+./gradlew assembleSafeRelease -Pautobridge.vlc=true
+AUTOBRIDGE_VLC=true ./gradlew assembleSafeRelease
+```
+
+Precedence matches the version and translation flags — Gradle property, then environment variable,
+then `gradle.properties`. When the engine is left off, `VideoSettings.videoEngine()` returns
+`MEDIA3` regardless of the stored preference, so a phone that had picked VLC before falls back to
+Media3 rather than reaching for an engine that is no longer there, and the Media3 path is byte-for-
+byte the build it is today. libVLC enters the build the normal way — a dynamically-linked,
+unmodified AAR resolved from Maven Central, satisfying its LGPL-2.1 dynamic-linking terms by
+construction; no VLC, libVLC or Fermata source is vendored into this tree.
+
 ### Setting the version
 
 `version.properties` at the repo root is the only place the version is written; `app/build.gradle.kts`
@@ -374,7 +401,7 @@ _Entertainment & IPTV_
 - Weather by city (Open-Meteo, no API key) that the car Weather screen reads.
 
 _Media player & subtitles_
-- Built-in Media3/ExoPlayer with a scrubber, LIVE indicator, previous/next, and a 10-second skip; it keeps playing when the screen is left (background playback) and supports picture-in-picture.
+- Built-in Media3/ExoPlayer with a scrubber, LIVE indicator, previous/next, and a 10-second skip; it keeps playing when the screen is left (background playback) and supports picture-in-picture. An embedded libVLC engine is an _optional, off-by-default_ alternative, compiled in only with `-Pautobridge.vlc=true`.
 - Player options: preferred decoder (Auto/Hardware/Software), aspect ratio (Auto/Fill/Stretch/16:9/4:3), split layout, channel-change gesture, player-control density, show-delay, and picture enhancement (brightness/contrast/saturation).
 - Plays on-device files and MP4/HLS/DASH stream links; MediaStore Folders, Playlists, and a photo/clip Gallery.
 - On-device subtitle translation (_optional, off by default_): when compiled in, it translates a subtitle track entirely on the phone with ML Kit or Opus-MT (ONNX Runtime), with source/target language, show-original, and Wi-Fi-only model downloads. The translation stack is left out of a standard build and is only compiled in when `-Pautobridge.subtitleTranslation=true` is set; otherwise subtitles still render untranslated.
@@ -425,7 +452,7 @@ _ความบันเทิงและ IPTV_
 - สภาพอากาศตามเมือง (Open-Meteo ไม่ต้องใช้ API key) ซึ่งหน้า Weather บนจอรถดึงไปแสดง
 
 _เครื่องเล่นสื่อและซับไตเติล_
-- เครื่องเล่นในตัวด้วย Media3/ExoPlayer มีแถบเลื่อน (scrubber), ตัวบอก LIVE, ก่อนหน้า/ถัดไป และข้าม 10 วินาที เล่นต่อได้แม้ออกจากหน้าจอ (เล่นเบื้องหลัง) และรองรับ picture-in-picture
+- เครื่องเล่นในตัวด้วย Media3/ExoPlayer มีแถบเลื่อน (scrubber), ตัวบอก LIVE, ก่อนหน้า/ถัดไป และข้าม 10 วินาที เล่นต่อได้แม้ออกจากหน้าจอ (เล่นเบื้องหลัง) และรองรับ picture-in-picture มีเอนจิน libVLC ฝังในตัวเป็นทางเลือก (_ทางเลือก, ปิดเป็นค่าเริ่มต้น_) ซึ่ง build รวมเข้ามาเฉพาะเมื่อตั้ง `-Pautobridge.vlc=true`
 - ตัวเลือกเครื่องเล่น: ตัวถอดรหัสที่เลือก (Auto/Hardware/Software), อัตราส่วนภาพ (Auto/Fill/Stretch/16:9/4:3), เลย์เอาต์แบบแบ่งจอ, ท่าทางเปลี่ยนช่อง, ความหนาแน่นของปุ่มควบคุม, การแสดง delay และการปรับภาพ (ความสว่าง/คอนทราสต์/ความอิ่มสี)
 - เล่นไฟล์บนเครื่อง และลิงก์สตรีม MP4/HLS/DASH รวมถึง โฟลเดอร์, เพลย์ลิสต์ และแกลเลอรีรูป/คลิป จาก MediaStore
 - การแปลซับไตเติลบนเครื่อง (_ทางเลือก, ปิดเป็นค่าเริ่มต้น_): เมื่อ build รวมเข้ามา จะแปลแทร็กซับไตเติลบนมือถือล้วน ๆ ด้วย ML Kit หรือ Opus-MT (ONNX Runtime) เลือกภาษาต้นทาง/ปลายทาง, แสดงต้นฉบับ และดาวน์โหลดโมเดลเฉพาะตอนต่อ Wi-Fi โดยค่าเริ่มต้นชุดการแปลจะไม่ถูก build เข้ามา และจะรวมเข้าเฉพาะเมื่อตั้ง `-Pautobridge.subtitleTranslation=true` เท่านั้น มิฉะนั้นซับไตเติลจะยังแสดงแบบไม่แปล

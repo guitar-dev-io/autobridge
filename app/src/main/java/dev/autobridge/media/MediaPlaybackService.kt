@@ -47,7 +47,9 @@ import dev.autobridge.safety.ParkingStateStore
 import dev.autobridge.settings.PreferredPlayer
 import dev.autobridge.subtitles.SubtitleController
 import dev.autobridge.settings.VideoEnhancement
+import dev.autobridge.settings.VideoEngine
 import dev.autobridge.settings.VideoSettings
+import dev.autobridge.media.vlc.VlcEngineFactory
 
 /**
  * Hosts the long-lived Media3 player and MediaSession used by Android Auto and steering controls.
@@ -67,7 +69,20 @@ class MediaPlaybackService : MediaLibraryService() {
         const val WEB_POLL_MS = 1_000L
     }
 
-    private var player: ExoPlayer? = null
+    /**
+     * What the session, the car card, the parking gate and the settings listeners operate on. It
+     * is the Media3 [Player] interface, so it holds either the ExoPlayer (the default engine) or
+     * the libVLC facade ([dev.autobridge.media.vlc.VlcMediaPlayer]) interchangeably.
+     */
+    private var player: Player? = null
+
+    /**
+     * The concrete ExoPlayer, set non-null only on the Media3 branch. The ExoPlayer-only paths —
+     * output geometry / GL effects, the video renderer, and the BEHIND_LIVE_WINDOW recovery — read
+     * this and no-op when it is null (i.e. under VLC).
+     */
+    private var exoPlayer: ExoPlayer? = null
+    private var facadeListener: Player.Listener? = null
     private var webPlayer: WebMediaPlayer? = null
     private var carPlayer: CarMediaPlayer? = null
     private var session: MediaLibrarySession? = null
@@ -80,10 +95,13 @@ class MediaPlaybackService : MediaLibraryService() {
     private val webPoll = object : Runnable {
         override fun run() {
             val composite = carPlayer ?: return
-            val exo = player ?: return
+            if (player == null) return
             val source = WebMediaHub.source
-            val exoActive = exo.isPlaying ||
-                (exo.playWhenReady && exo.playbackState == Player.STATE_BUFFERING)
+            // Only the Media3 branch competes with the web page for the card; under VLC there is
+            // no ExoPlayer handle, so treat the engine as the non-web (EXO) source either way.
+            val exo = exoPlayer
+            val exoActive = exo != null && (exo.isPlaying ||
+                (exo.playWhenReady && exo.playbackState == Player.STATE_BUFFERING))
             if (source == null) {
                 composite.select(SessionSourceArbiter.choose(composite.source, exoActive, false, false))
             } else {
@@ -337,7 +355,7 @@ class MediaPlaybackService : MediaLibraryService() {
      * playing channel down to rebuild its renderer is worse than waiting for the next one.
      */
     private val videoSettingsListener: () -> Unit = {
-        mainHandler.post { applyOutputGeometry(VideoOutputGeometry.current) }
+        mainHandler.post { exoPlayer?.let { applyOutputGeometry(VideoOutputGeometry.current) } }
     }
 
     /**
@@ -351,7 +369,9 @@ class MediaPlaybackService : MediaLibraryService() {
      */
     @OptIn(UnstableApi::class)
     private fun applyOutputGeometry(output: VideoOutputGeometry.Output?) {
-        val currentPlayer = player ?: return
+        // GL effects + output-resolution messaging are ExoPlayer-renderer features. Under VLC
+        // exoPlayer is null and this whole path no-ops (libVLC does its own aspect handling).
+        val currentPlayer = exoPlayer ?: return
         runCatching {
             // Colour first, letterbox last: Presentation pads the frame to the surface's shape,
             // and padding that has been through a brightness or saturation shader is no longer
@@ -438,13 +458,16 @@ class MediaPlaybackService : MediaLibraryService() {
             .build()
     }
 
+    /**
+     * Builds the Media3 ExoPlayer exactly as before — the default engine. Extracted from
+     * [onCreate] so the engine branch there reads as one decision; the body is unchanged.
+     */
     @OptIn(UnstableApi::class)
-    override fun onCreate() {
-        super.onCreate()
+    private fun buildExoPlayer(): ExoPlayer {
         // DefaultMediaSourceFactory auto-selects progressive, HLS, and DASH sources. Audio remains
         // available through Feature.MEDIA even when Feature.VIDEO is denied while moving.
         val mediaSourceFactory = DefaultMediaSourceFactory(DefaultDataSource.Factory(this))
-        val exoPlayer = ExoPlayer.Builder(this)
+        val exo = ExoPlayer.Builder(this)
             .setMediaSourceFactory(mediaSourceFactory)
             // Decoder choice is a setting ("Preferred player"), and fallback is on so a decoder
             // that initialises and then refuses the stream hands over instead of ending playback.
@@ -474,14 +497,51 @@ class MediaPlaybackService : MediaLibraryService() {
         // greys those buttons out because hasNext/hasPreviousMediaItem() report false there. For a
         // channel/track list this is the expected behaviour - Next past the end returns to the
         // start. A single-item queue still has nowhere to go, which is correct.
-        exoPlayer.repeatMode = Player.REPEAT_MODE_ALL
-        player = exoPlayer
-        subtitles = SubtitleController(this).also { it.start() }
-        exoPlayer.addListener(playerListener)
+        exo.repeatMode = Player.REPEAT_MODE_ALL
+        exo.addListener(playerListener)
         // Arms the effect pipeline. The renderer only builds it when a video-effects list has been
         // set before the first prepare(), so this empty call has to happen at construction even
         // though the real letterbox ratio is not known until a screen attaches a surface.
-        exoPlayer.setVideoEffects(emptyList())
+        exo.setVideoEffects(emptyList())
+        return exo
+    }
+
+    @OptIn(UnstableApi::class)
+    override fun onCreate() {
+        super.onCreate()
+        // The decode engine is read once, when the service builds its player, exactly as the
+        // decoder choice is read when the next item is prepared. VideoSettings.videoEngine() ANDs
+        // BuildConfig.VLC_ENGINE first, so the VLC branch is unreachable in a flag-off build and
+        // src/novlc's throwing factory is never called.
+        when (VideoSettings.videoEngine(this)) {
+            VideoEngine.MEDIA3 -> {
+                val exo = buildExoPlayer()
+                exoPlayer = exo
+                player = exo
+            }
+            VideoEngine.VLC -> {
+                // No ExoPlayer handle: every ExoPlayer-only path (output geometry, GL effects,
+                // the video renderer, BEHIND_LIVE_WINDOW recovery) no-ops. The facade owns its own
+                // audio focus and parked-gate behaviour.
+                exoPlayer = null
+                val facade = VlcEngineFactory.create(this)
+                player = facade
+                // The one load-bearing member of playerListener under VLC: the browse-tree refresh.
+                // invalidateState() drives the session's view of the facade but does not invoke
+                // this service's playerListener (never attached to the facade), so register a
+                // minimal listener that refreshes the car card's queue when the playlist changes.
+                val listener = object : Player.Listener {
+                    override fun onTimelineChanged(timeline: Timeline, reason: Int) {
+                        if (reason != Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED) return
+                        session?.notifyChildrenChanged(ROOT_ID, player?.mediaItemCount ?: 0, null)
+                    }
+                }
+                facade.addListener(listener)
+                facadeListener = listener
+            }
+        }
+        val base: Player = player!!
+        subtitles = SubtitleController(this).also { it.start() }
         ParkingStateStore.addListener(parkingListener)
         VideoOutputGeometry.addListener(geometryListener)
         VideoSettings.addListener(videoSettingsListener)
@@ -495,10 +555,11 @@ class MediaPlaybackService : MediaLibraryService() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        // The session sits on the composite, not on ExoPlayer directly, so the car media card can
-        // follow browser audio too. Everything else here keeps talking to ExoPlayer itself.
-        val web = WebMediaPlayer(exoPlayer.applicationLooper)
-        val composite = CarMediaPlayer(exoPlayer, web)
+        // The session sits on the composite, not on the engine directly, so the car media card can
+        // follow browser audio too. CarMediaPlayer forwards to whichever source the arbiter picks;
+        // its ExoPlayer slot is the active decode engine, VLC or Media3.
+        val web = WebMediaPlayer(base.applicationLooper)
+        val composite = CarMediaPlayer(base, web)
         webPlayer = web
         carPlayer = composite
 
@@ -535,7 +596,10 @@ class MediaPlaybackService : MediaLibraryService() {
         VideoOutputGeometry.removeListener(geometryListener)
         VideoSettings.removeListener(videoSettingsListener)
         mainHandler.removeCallbacksAndMessages(null)
-        player?.removeListener(playerListener)
+        // playerListener is attached only on the Media3 branch; facadeListener only under VLC.
+        exoPlayer?.removeListener(playerListener)
+        facadeListener?.let { player?.removeListener(it) }
+        facadeListener = null
         subtitles?.release()
         subtitles = null
         session?.release()
@@ -545,6 +609,7 @@ class MediaPlaybackService : MediaLibraryService() {
         webPlayer = null
         player?.release()
         player = null
+        exoPlayer = null
         super.onDestroy()
     }
 }

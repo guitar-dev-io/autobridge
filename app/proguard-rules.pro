@@ -34,6 +34,14 @@
 # Compiled out entirely by -Pautobridge.subtitleTranslation=false; harmless then.
 -keep class ai.onnxruntime.** { *; }
 
+# -- libVLC (optional embedded playback engine) -------------------------------------------------
+# org.videolan.libvlc resolves these classes, their native-method bindings and the constructors
+# the JNI layer instantiates (MediaPlayer, LibVLC, Media, IVLCVout callbacks) from native code —
+# edges no shrinker can follow. Renaming or stripping any of them fails at the first LibVLC() call,
+# i.e. only once a user picks the VLC engine, which is exactly the kind of fault that would ship.
+# Compiled out entirely by -Pautobridge.vlc=false; harmless then (the classes are absent).
+-keep class org.videolan.libvlc.** { *; }
+
 # -- Shizuku user service -----------------------------------------------------------------------
 # ShizukuInputBackend hands Shizuku a ComponentName built from ShizukuTouchService's class name,
 # and Shizuku loads and constructs that class inside its own shell-UID process. The class name in

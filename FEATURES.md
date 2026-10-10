@@ -42,6 +42,8 @@
 - ควบคุมด้วยปุ่มบนพวงมาลัยและ MediaSession ของรถได้
 - ซับไตเติล: แสดงซับที่มากับไฟล์ได้ ส่วนการแปลซับในเครื่องเป็นความสามารถที่**ปิดอยู่ตอน build ปกติ**
   (ต้อง build แบบเปิดเอง)
+- การถอดรหัสวิดีโอใช้เอนจิน VLC ฝังในตัวเป็นทางเลือกได้ โดย build รวมเข้ามาเฉพาะเวอร์ชันที่เปิดใช้เท่านั้น
+  (ปิดเป็นค่าเริ่มต้น)
 
 ## 4. Bridge Web: เว็บเบราว์เซอร์บนจอรถ
 
@@ -150,7 +152,7 @@
 ## English summary
 
 AutoBridge lets you, from the phone and from the Android Auto screen: watch IPTV (M3U / Xtream) and
-listen to radio; play local audio and video; browse the web beside Google Maps and hand a place to the
+listen to radio; play local audio and video (optionally through an embedded VLC engine in builds compiled with it); browse the web beside Google Maps and hand a place to the
 Google Maps app for real turn-by-turn navigation (web Maps cannot navigate by itself); split the car
 screen between several apps (Duo Screen, needs Shizuku); mirror the phone screen; keep a fuel or
 charging log (by voice too), give voice commands transcribed offline on the phone by Whisper (Thai,
