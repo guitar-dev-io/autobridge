@@ -81,6 +81,13 @@ interface DuoScreenPrivilegedOps {
         allowSecondInstance: Boolean = false,
     ): Boolean
 
+    /**
+     * Whether any task is on [displayId], or null when that cannot be told. A pane display loses
+     * its task when the same app is opened on the phone: Android moves the existing task to the
+     * phone instead of starting a second one, and the pane is left empty. Null by default.
+     */
+    fun hasTaskOnDisplay(displayId: Int): Boolean? = null
+
     /** Injects [event] into [displayId]; the event is recycled by the caller, not here. */
     fun injectMotion(event: MotionEvent, displayId: Int): Boolean
 }
