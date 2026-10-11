@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.LayerDrawable
 import android.graphics.drawable.RippleDrawable
 import android.os.Handler
 import android.os.Looper
@@ -55,7 +56,7 @@ class BrowserKeyboardView(
 
     val view: View = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
-        setBackgroundColor(BrowserTheme.surfaceContainer)
+        setBackgroundColor(BrowserKeyboardStyle.TRAY)
         val pad = dp(8f).toInt()
         setPadding(pad, dp(4f).toInt(), pad, pad)
         // Taps between keys stay here instead of reaching the page underneath.
@@ -67,8 +68,8 @@ class BrowserKeyboardView(
             contentDescription = context.getString(R.string.car_keyboard_hide)
             textSize = 22f
             gravity = Gravity.CENTER
-            setTextColor(BrowserTheme.textPrimary)
-            background = keyCap(BrowserTheme.surfaceContainerHigh)
+            setTextColor(BrowserKeyboardStyle.INK)
+            background = keyCap(BrowserKeyboardStyle.FUNCTION_CAP)
             isFocusable = false
             setOnClickListener { onHide() }
         }, LinearLayout.LayoutParams(dp(64f).toInt(), dp(36f).toInt()).apply { gravity = Gravity.END })
@@ -118,7 +119,7 @@ class BrowserKeyboardView(
         contentDescription = description(key)
         gravity = Gravity.CENTER
         isFocusable = false
-        val (cap, ink) = colours(key)
+        val (cap, ink) = BrowserKeyboardStyle.colours(key, shift)
         setTextColor(ink)
         background = keyCap(cap)
         textSize = if (key is BrowserKey.Text && text.length <= 2) 20f else 15f
@@ -144,21 +145,23 @@ class BrowserKeyboardView(
         }
     }
 
-    private fun keyCap(fill: Int) = RippleDrawable(
-        ColorStateList.valueOf(BrowserTheme.textSecondary),
-        GradientDrawable().apply {
-            cornerRadius = dp(8f)
+    /** A raised key, as on the car surface: a shadow just below the cap, and a ripple on press. */
+    private fun keyCap(fill: Int): RippleDrawable {
+        val radius = dp(BrowserKeyboardStyle.KEY_RADIUS_DP)
+        val shadow = GradientDrawable().apply {
+            cornerRadius = radius
+            setColor(BrowserKeyboardStyle.CAP_SHADOW)
+        }
+        val cap = GradientDrawable().apply {
+            cornerRadius = radius
             setColor(fill)
-        },
-        null,
-    )
-
-    private fun colours(key: BrowserKey): Pair<Int, Int> = when {
-        key is BrowserKey.Go -> BrowserTheme.primary to BrowserTheme.onPrimary
-        key is BrowserKey.Shift && shift.active -> BrowserTheme.primaryContainer to BrowserTheme.onPrimaryContainer
-        key is BrowserKey.Text && key.lower.length <= 1 -> BrowserTheme.surfaceContainerHighest to BrowserTheme.textPrimary
-        key is BrowserKey.Space -> BrowserTheme.surfaceContainerHighest to BrowserTheme.textSecondary
-        else -> BrowserTheme.surfaceContainerHigh to BrowserTheme.textPrimary
+        }
+        val layers = LayerDrawable(arrayOf(shadow, cap)).apply {
+            val drop = dp(BrowserKeyboardStyle.SHADOW_DP).toInt().coerceAtLeast(1)
+            setLayerInset(0, 0, drop, 0, 0)
+            setLayerInset(1, 0, 0, 0, drop)
+        }
+        return RippleDrawable(ColorStateList.valueOf(BrowserKeyboardStyle.INK_SECONDARY), layers, null)
     }
 
     private fun label(key: BrowserKey): String = when (key) {
@@ -166,7 +169,9 @@ class BrowserKeyboardView(
         is BrowserKey.Shift -> if (shift == ShiftState.LOCKED) "⇪" else "⇧"
         is BrowserKey.Backspace -> "⌫"
         is BrowserKey.Space -> context.getString(R.string.car_keyboard_space)
-        is BrowserKey.Go -> context.getString(if (mode == BrowserKeyboardMode.URL) R.string.car_keyboard_go else R.string.car_keyboard_search)
+        is BrowserKey.Go -> BrowserKeyboardStyle.goLabel(
+            context.getString(if (mode == BrowserKeyboardMode.URL) R.string.car_keyboard_go else R.string.car_keyboard_search)
+        )
         is BrowserKey.Language -> if (language == CarKeyboardLanguage.THAI) "EN" else "ไทย"
         is BrowserKey.CursorLeft -> "◀"
         is BrowserKey.CursorRight -> "▶"
