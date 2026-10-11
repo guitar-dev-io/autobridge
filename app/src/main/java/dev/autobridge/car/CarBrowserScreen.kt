@@ -414,7 +414,7 @@ class CarBrowserScreen(carContext: CarContext) :
         // The host's own dpi is the only correct density for car chrome; the connected phone's
         // density describes a different screen and would mis-size every icon.
         surfaceDpi = surfaceContainer.dpi
-        CarDisplayInfo.record(surfaceWidth, surfaceHeight, surfaceDpi)
+        CarDisplayInfo.record(surfaceWidth, surfaceHeight, surfaceDpi, source = "browser")
         Log.i(TAG, "Browser surface ${surfaceWidth}x$surfaceHeight dpi=$surfaceDpi")
         val permitted = allowed()
         dev.autobridge.logging.StructuredLog.i(
@@ -438,6 +438,7 @@ class CarBrowserScreen(carContext: CarContext) :
 
     override fun onStableAreaChanged(stableArea: Rect) {
         if (!active || !MirrorSurfaceOwnership.isOwner(this)) return
+        CarDisplayInfo.recordStableArea(stableArea.left, stableArea.top, stableArea.right, stableArea.bottom, source = "browser")
         this.stableArea = Rect(stableArea)
         applyContentArea()
     }
@@ -449,6 +450,7 @@ class CarBrowserScreen(carContext: CarContext) :
      */
     override fun onVisibleAreaChanged(visibleArea: Rect) {
         if (!active || !MirrorSurfaceOwnership.isOwner(this)) return
+        CarDisplayInfo.recordVisibleArea(visibleArea.left, visibleArea.top, visibleArea.right, visibleArea.bottom, source = "browser")
         this.visibleArea = Rect(visibleArea)
         applyContentArea()
     }

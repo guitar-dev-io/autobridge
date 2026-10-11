@@ -25,6 +25,9 @@ class AutoBridgeSession : Session(), CarScreenController.Host {
                 // Register this session so the Mobile Remote's command router can drive the car app
                 // (navigation) through the SAME ScreenManager the car UI already uses.
                 RemoteRuntime.ensureStarted(carContext)
+                // A new connection may be a different head unit; its screens report their own
+                // geometry as they attach, so nothing from the previous car is carried over.
+                CarDisplayInfo.reset()
                 CarScreenController.register(this@AutoBridgeSession)
                 // A live Session IS the Android Auto connection; nothing else observes the host
                 // handshake. Without this the runtime context stayed false for the whole drive, so

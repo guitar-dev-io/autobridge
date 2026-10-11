@@ -198,6 +198,7 @@ class CarHomeDashboardScreen(
         surfaceDpi = surfaceContainer.dpi
         dashboardLayout = null
         StructuredLog.i(TAG, "surface ${surfaceWidth}x$surfaceHeight dpi=$surfaceDpi")
+        CarDisplayInfo.record(surfaceWidth, surfaceHeight, surfaceDpi, source = "home")
         renderMenu()
     }
 
@@ -209,6 +210,7 @@ class CarHomeDashboardScreen(
     override fun onStableAreaChanged(stableArea: Rect) {
         if (!active || !MirrorSurfaceOwnership.isOwner(this)) return
         StructuredLog.i(TAG, "stable area $stableArea")
+        CarDisplayInfo.recordStableArea(stableArea.left, stableArea.top, stableArea.right, stableArea.bottom, source = "home")
         this.stableArea = Rect(stableArea)
         dashboardLayout = null
         renderMenu()
@@ -217,6 +219,7 @@ class CarHomeDashboardScreen(
     override fun onVisibleAreaChanged(visibleArea: Rect) {
         if (!active || !MirrorSurfaceOwnership.isOwner(this)) return
         StructuredLog.i(TAG, "visible area $visibleArea")
+        CarDisplayInfo.recordVisibleArea(visibleArea.left, visibleArea.top, visibleArea.right, visibleArea.bottom, source = "home")
         this.visibleArea = Rect(visibleArea)
         dashboardLayout = null
         renderMenu()

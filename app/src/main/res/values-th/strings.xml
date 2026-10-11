@@ -1043,6 +1043,8 @@
     <string name="car_diag_title">การวินิจฉัย</string>
     <string name="car_diag_lowest_resolution">%1$s • ความละเอียดต่ำสุดของ Android Auto ถ้ารถรองรับ ให้ไปที่ Android Auto ▸ การตั้งค่านักพัฒนา ▸ ความละเอียดวิดีโอ ▸ 720p แล้วเชื่อมต่อใหม่</string>
     <string name="car_diag_car_display">จอรถ</string>
+    <string name="car_diag_car_area">พื้นที่แสดงผลบนจอรถ</string>
+    <string name="car_diag_car_area_value">คงที่ %1$s · มองเห็น %2$s</string>
     <string name="car_diag_pipeline">ไปป์ไลน์</string>
     <string name="car_diag_mirror">มิเรอร์</string>
     <string name="car_diag_active">ทำงานอยู่</string>
@@ -1350,7 +1352,7 @@
     <string name="car_streaming_title">สตรีมมิง</string>
 
     <!-- Car display info -->
-    <string name="car_display_none">— (เปิด Browser หรือ Mirror ก่อน)</string>
+    <string name="car_display_none">— (รถยังไม่ได้ส่งข้อมูลจอมา)</string>
 
     <!-- Car audio diagnostics -->
     <string name="car_audio_title">เสียง</string>

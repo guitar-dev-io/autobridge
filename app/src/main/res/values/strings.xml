@@ -1062,6 +1062,8 @@
     <string name="car_diag_title">Diagnostics</string>
     <string name="car_diag_lowest_resolution">%1$s • Lowest Android Auto resolution. If the car supports it: Android Auto ▸ Developer settings ▸ Video resolution ▸ 720p, then reconnect</string>
     <string name="car_diag_car_display">Car display</string>
+    <string name="car_diag_car_area">Car content area</string>
+    <string name="car_diag_car_area_value">stable %1$s · visible %2$s</string>
     <string name="car_diag_pipeline">Pipeline</string>
     <string name="car_diag_mirror">Mirror</string>
     <string name="car_diag_active">Active</string>
@@ -1372,7 +1374,7 @@
     <string name="car_streaming_title">Streaming</string>
 
     <!-- Car display info ([CarDisplayInfo]). -->
-    <string name="car_display_none">— (open Browser or Mirror first)</string>
+    <string name="car_display_none">— (the car has not reported a screen yet)</string>
 
     <!-- Car audio diagnostics ([CarAudioDiagnosticsScreen]). -->
     <string name="car_audio_title">Audio</string>

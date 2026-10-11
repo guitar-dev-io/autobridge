@@ -38,6 +38,7 @@ class CarDiagnosticsScreen(carContext: CarContext) : Screen(carContext) {
 
         val list = ItemList.Builder()
             .addItem(statusRow(carContext.getString(R.string.car_diag_car_display), carDisplayText))
+            .addItem(statusRow(carContext.getString(R.string.car_diag_car_area), carAreaLabel()))
             .addItem(statusRow(carContext.getString(R.string.car_diag_pipeline), MirrorCoordinator.activePipelineMode.name))
             .addItem(
                 statusRow(
@@ -134,6 +135,16 @@ class CarDiagnosticsScreen(carContext: CarContext) : Screen(carContext) {
     private fun fpsLabel(stats: MirrorDiagnostics.FrameStats): String =
         if (stats.rendered > 0) "%.1f FPS".format(stats.measuredFps)
         else carContext.getString(R.string.car_diag_measuring)
+
+    /** Where content and touches can land, as the host reported it; "—" for an area not reported yet. */
+    private fun carAreaLabel(): String {
+        val print = CarDisplayInfo.fingerprint
+        return carContext.getString(
+            R.string.car_diag_car_area_value,
+            print.stable?.toString() ?: "—",
+            print.visible?.toString() ?: "—"
+        )
+    }
 
     private fun uptimeLabel(): String {
         val ms = MirrorDiagnostics.currentMirroringUptimeMs() ?: return "—"
