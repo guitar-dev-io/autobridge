@@ -168,6 +168,7 @@ class DuoScreenController(
         if (resume(output, width, height, panelDpi)) {
             CarScreenPower.sessionStarted(context)
             DuoSessionState.sessionStarted()
+            recallVacatedPanes()
             return true
         }
         stop()
@@ -425,6 +426,32 @@ class DuoScreenController(
         debouncer.cancel(pane.id)
         pendingSizes.remove(pane.id)
         openPane(pane)
+    }
+
+    /**
+     * Brings back the app of every pane whose display has lost its task. That happens when the
+     * driver opens the same app on the phone: Android moves the app's existing task to the phone
+     * instead of starting a second one, and the pane is left black until the session is ended and
+     * started again. Coming back to Duo Screen is the driver asking for the car layout, so the app
+     * is launched onto its pane again, which moves it back from the phone.
+     *
+     * Only panes known to be empty are touched. When the system cannot say (the query is missing
+     * on this Android version), a third-party pane is relaunched anyway, which only brings an app
+     * already on its display to the front; our own app is not, because its pane launch always
+     * makes a new instance and would stack a second browser on the first.
+     */
+    private fun recallVacatedPanes() {
+        if (!ops.isAvailable) return
+        panes.forEach { pane ->
+            val packageName = pane.packageName ?: return@forEach
+            val displayId = DuoScreenDisplays.displayId(pane.id)
+            if (displayId < 0) return@forEach
+            val occupied = ops.hasTaskOnDisplay(displayId)
+            val isSelf = DuoScreenSelfPane.isSelf(packageName, context.packageName)
+            if (occupied == true || (occupied == null && isSelf)) return@forEach
+            val relaunched = reload(pane.id)
+            StructuredLog.i(TAG, "Pane ${pane.id}: $packageName ${if (occupied == false) "had left its display" else "state unknown"}; relaunched=$relaunched")
+        }
     }
 
     /** Re-launches a pane's app, for the "pane went black" reload action. */
@@ -822,6 +849,13 @@ class DuoScreenController(
         // Geometry is read here, on the caller's thread, where the pane set and the displays are
         // written; only the injection itself goes to the input thread.
         onInputThread {
+            // A tap on a pane whose app was taken to the phone has nothing to land on: bring the
+            // app back to the pane instead, which is what the driver tapping a black pane wants.
+            if (pane.packageName != null && ops.hasTaskOnDisplay(displayId) == false) {
+                val relaunched = reload(paneId)
+                StructuredLog.i(TAG, "Tap on empty pane $paneId (${pane.packageName}); relaunched=$relaunched")
+                return@onInputThread
+            }
             val injected = touch.tap(displayId, x, y)
             // A refused injection is silent otherwise: it is what an unavailable Shizuku looks
             // like from the car, a screen that simply does not react.
