@@ -8,6 +8,9 @@
 พฤติกรรมของโปรเจกต์นี้ ส่วนขั้นตอน KingInstaller อ้างจาก
 [KingInstaller](https://github.com/fcaronte/KingInstaller)
 
+> **ตั้งเครื่องครั้งแรก?** ขั้นตอนทีละขั้นของ Shizuku-Next และ KingInstaller ตั้งแต่โหลดจนใช้งานครั้งแรก อยู่ที่
+> [setup-kinginstaller-shizuku-next.md](setup-kinginstaller-shizuku-next.md)
+
 > **ต้องมีหัวเครื่องที่รองรับ Android Auto** ถ้ารถต่อมือถือได้แค่ Bluetooth (เช่น Honda BR-V เจน 1)
 > ขั้นที่ 2–4 ด้านล่างไม่มีผลอะไร ลง APK แล้วใช้งานบนจอมือถือ เสียงออกลำโพงรถทาง A2DP ได้เลย
 
