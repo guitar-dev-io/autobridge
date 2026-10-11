@@ -112,6 +112,9 @@ object DuoScreenDisplays {
                 ?: ops.createTrustedVirtualDisplay(name, width, height, dpi, surface, TRUSTED_FLAGS)
             if (trustedId >= 0) {
                 displays[paneId] = PaneDisplay(null, width, height, dpi, trustedDisplayId = trustedId, ops = ops)
+                // Without this a pane app's keyboard opens on the phone, out of the driver's sight.
+                val imeHere = ops.showImeOnDisplay(trustedId)
+                DuoLog.i(TAG, "Pane $paneId keyboard on its own display: $imeHere")
                 DuoLog.i(TAG, "Pane $paneId -> trusted display $trustedId (${width}x$height @ ${dpi}dpi)")
                 return trustedId
             }

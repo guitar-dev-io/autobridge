@@ -88,6 +88,14 @@ interface DuoScreenPrivilegedOps {
      */
     fun hasTaskOnDisplay(displayId: Int): Boolean? = null
 
+    /**
+     * Makes the system keyboard open on [displayId] itself rather than on the phone. A virtual
+     * display hands its keyboard to the phone's screen by default, so a pane's search box (Maps,
+     * YouTube) took focus and nothing appeared on the car to type with. Returns whether the
+     * system took the setting; false by default.
+     */
+    fun showImeOnDisplay(displayId: Int): Boolean = false
+
     /** Injects [event] into [displayId]; the event is recycled by the caller, not here. */
     fun injectMotion(event: MotionEvent, displayId: Int): Boolean
 }
