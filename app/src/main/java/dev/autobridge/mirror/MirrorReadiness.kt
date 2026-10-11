@@ -14,7 +14,7 @@ package dev.autobridge.mirror
  */
 object MirrorReadiness {
 
-    enum class Step { NOTIFICATIONS, TOUCH, CAPTURE, BATTERY }
+    enum class Step { NOTIFICATIONS, TOUCH, CAPTURE, BATTERY, SPEED }
 
     enum class State {
         /** Nothing to do. */
@@ -24,7 +24,10 @@ object MirrorReadiness {
         BLOCKING,
 
         /** Works without it, but something will be worse. Never blocks the next step. */
-        OPTIONAL
+        OPTIONAL,
+
+        /** Cannot be checked yet (the car is not connected). Nothing to do, nothing wrong. */
+        WAITING
     }
 
     /** A step as the screen renders it. */
@@ -43,6 +46,10 @@ object MirrorReadiness {
      * @param notificationsRequired false below API 33, where the permission does not exist.
      * @param batteryOptimizationExempt whether the OS has already agreed not to restrict this app
      *        in the background — see [android.os.PowerManager.isIgnoringBatteryOptimizations].
+     * @param carConnected whether an Android Auto host is connected right now.
+     * @param speedPermissionGranted whether the car speed permission (`CAR_SPEED`) is granted.
+     * @param speedReported whether the car has reported a speed this connection (the parked status
+     *        is PARKED or MOVING rather than UNKNOWN).
      */
     data class Status(
         val notificationsRequired: Boolean,
@@ -52,14 +59,18 @@ object MirrorReadiness {
         val realTouchAvailable: Boolean,
         val accessibilityEnabled: Boolean,
         val projecting: Boolean,
-        val batteryOptimizationExempt: Boolean = true
+        val batteryOptimizationExempt: Boolean = true,
+        val carConnected: Boolean = false,
+        val speedPermissionGranted: Boolean = false,
+        val speedReported: Boolean = false
     )
 
     fun steps(status: Status): List<Item> = listOf(
         notifications(status),
         touch(status),
         capture(status),
-        battery(status)
+        battery(status),
+        speed(status)
     )
 
     /** The step the user should act on next, or null when mirroring is ready to start. */
@@ -136,6 +147,31 @@ object MirrorReadiness {
             Step.BATTERY, "Background use",
             "Some phones stop AutoBridge in the background unless this is allowed",
             State.OPTIONAL, "Allow"
+        )
+    }
+
+    /**
+     * Whether the car reports its speed, which is what the parked status is read from. It never
+     * blocks mirroring: the parked gate in this build only reports. A head unit that never sends a
+     * speed leaves the status at Unknown, and this step is where that becomes visible before a drive.
+     * The permission can only be granted from the car screen, so there is no phone action.
+     */
+    private fun speed(status: Status): Item = when {
+        !status.carConnected -> Item(
+            Step.SPEED, "Car speed", "Checked when the car connects", State.WAITING, null
+        )
+        status.speedReported -> Item(
+            Step.SPEED, "Car speed", "The car reports its speed", State.DONE, null
+        )
+        !status.speedPermissionGranted -> Item(
+            Step.SPEED, "Car speed",
+            "Allow speed access when AutoBridge asks on the car screen",
+            State.OPTIONAL, null
+        )
+        else -> Item(
+            Step.SPEED, "Car speed",
+            "Allowed, but the car has not reported a speed; parked status stays Unknown",
+            State.OPTIONAL, null
         )
     }
 }

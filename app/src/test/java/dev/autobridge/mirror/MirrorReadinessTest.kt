@@ -20,15 +20,58 @@ class MirrorReadinessTest {
         realTouchAvailable, accessibilityEnabled, projecting, batteryOptimizationExempt
     )
 
+    private fun battery(status: MirrorReadiness.Status) =
+        MirrorReadiness.steps(status).single { it.step == MirrorReadiness.Step.BATTERY }
+
+    private fun speed(status: MirrorReadiness.Status) =
+        MirrorReadiness.steps(status).single { it.step == MirrorReadiness.Step.SPEED }
+
     @Test
-    fun `the steps are always the same four, in order`() {
+    fun `car speed waits for a car and is never something to do before one connects`() {
+        val item = speed(status())
+        assertEquals(MirrorReadiness.State.WAITING, item.state)
+        assertNull(item.actionLabel)
+    }
+
+    @Test
+    fun `car speed is done once the car reports one`() {
+        val item = speed(status().copy(carConnected = true, speedPermissionGranted = true, speedReported = true))
+        assertEquals(MirrorReadiness.State.DONE, item.state)
+    }
+
+    @Test
+    fun `car speed separates a missing permission from a car that sends nothing`() {
+        val noPermission = speed(status().copy(carConnected = true))
+        val silentCar = speed(status().copy(carConnected = true, speedPermissionGranted = true))
+        assertEquals(MirrorReadiness.State.OPTIONAL, noPermission.state)
+        assertEquals(MirrorReadiness.State.OPTIONAL, silentCar.state)
+        assertEquals(true, noPermission.caption != silentCar.caption)
+        // The permission is granted on the car screen; the phone has nothing to press.
+        assertNull(noPermission.actionLabel)
+        assertNull(silentCar.actionLabel)
+    }
+
+    @Test
+    fun `car speed never becomes the next action, whatever the car reports`() {
+        val ready = status(accessibilityEnabled = true, projecting = true)
+        listOf(
+            ready,
+            ready.copy(carConnected = true),
+            ready.copy(carConnected = true, speedPermissionGranted = true),
+            ready.copy(carConnected = true, speedPermissionGranted = true, speedReported = true)
+        ).forEach { assertNull(MirrorReadiness.nextAction(it)) }
+    }
+
+    @Test
+    fun `the steps are always the same five, in order`() {
         val steps = MirrorReadiness.steps(status())
         assertEquals(
             listOf(
                 MirrorReadiness.Step.NOTIFICATIONS,
                 MirrorReadiness.Step.TOUCH,
                 MirrorReadiness.Step.CAPTURE,
-                MirrorReadiness.Step.BATTERY
+                MirrorReadiness.Step.BATTERY,
+                MirrorReadiness.Step.SPEED
             ),
             steps.map { it.step }
         )
@@ -36,11 +79,11 @@ class MirrorReadinessTest {
 
     @Test
     fun `background use never blocks, and asks only when not already exempt`() {
-        val exempt = MirrorReadiness.steps(status()).last()
+        val exempt = battery(status())
         assertEquals(MirrorReadiness.State.DONE, exempt.state)
         assertNull(exempt.actionLabel)
 
-        val notExempt = MirrorReadiness.steps(status(batteryOptimizationExempt = false)).last()
+        val notExempt = battery(status(batteryOptimizationExempt = false))
         assertEquals(MirrorReadiness.State.OPTIONAL, notExempt.state)
         assertEquals("Allow", notExempt.actionLabel)
         // Everything else already satisfied: an OPTIONAL battery step must not become "next".

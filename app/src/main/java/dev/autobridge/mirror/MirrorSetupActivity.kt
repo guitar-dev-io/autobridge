@@ -14,11 +14,13 @@ import android.provider.Settings
 import android.view.View
 import android.widget.Toast
 import dev.autobridge.R
+import dev.autobridge.core.state.RuntimeContextStore
 import dev.autobridge.core.consent.PermissionDisclosure
 import dev.autobridge.i18n.AppLocale
 import dev.autobridge.input.AccessibilityInputBackend
 import dev.autobridge.input.ShizukuInputBackend
 import dev.autobridge.media.MediaAutoStart
+import dev.autobridge.safety.ParkingStateStore
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.stack
 
@@ -38,6 +40,7 @@ class MirrorSetupActivity : Activity() {
     companion object {
         private const val REQUEST_NOTIFICATIONS = 5101
         private const val REQUEST_CAPTURE = 5102
+        private const val CAR_SPEED_PERMISSION = "com.google.android.gms.permission.CAR_SPEED"
         private const val REQUEST_BLUETOOTH = 5103
 
         fun intent(context: Context): Intent = Intent(context, MirrorSetupActivity::class.java)
@@ -104,7 +107,11 @@ class MirrorSetupActivity : Activity() {
                 ProjectionService.sessionState == ProjectionService.SessionState.STARTING,
             batteryOptimizationExempt = runCatching {
                 getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(packageName)
-            }.getOrDefault(true)
+            }.getOrDefault(true),
+            carConnected = RuntimeContextStore.context.value.connected,
+            speedPermissionGranted = checkSelfPermission(CAR_SPEED_PERMISSION) == PackageManager.PERMISSION_GRANTED,
+            // Read only: the setup screen shows the reading, it never sets or overrides it.
+            speedReported = ParkingStateStore.state != ParkingStateStore.State.UNKNOWN
         )
     }
 
@@ -159,11 +166,13 @@ class MirrorSetupActivity : Activity() {
             MirrorReadiness.State.DONE -> "✓"
             MirrorReadiness.State.BLOCKING -> "$number"
             MirrorReadiness.State.OPTIONAL -> "!"
+            MirrorReadiness.State.WAITING -> "…"
         }
         val rowAccent = when (item.state) {
             MirrorReadiness.State.DONE -> AutoBridgeDesign.ACCENT_FILES
             MirrorReadiness.State.BLOCKING -> accent
             MirrorReadiness.State.OPTIONAL -> AutoBridgeDesign.ACCENT_RADIO
+            MirrorReadiness.State.WAITING -> AutoBridgeDesign.TEXT_MUTED
         }
         return AutoBridgeDesign.contentRow(
             context = this,
@@ -183,6 +192,8 @@ class MirrorSetupActivity : Activity() {
             MirrorReadiness.Step.TOUCH -> openTouchSetup()
             MirrorReadiness.Step.CAPTURE -> toggleProjection()
             MirrorReadiness.Step.BATTERY -> requestBatteryExemption()
+            // Granted from the car screen only; the row is information.
+            MirrorReadiness.Step.SPEED -> Unit
         }
     }
 
