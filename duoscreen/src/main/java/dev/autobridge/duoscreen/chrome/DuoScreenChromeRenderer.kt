@@ -68,7 +68,7 @@ class DuoScreenChromeRenderer {
         const val TOOLBAR_SHADOW = 0x66000000
     }
 
-    private enum class Glyph { LAYOUT_STACKED, LAYOUT_COLUMNS, SWAP, RELOAD, ARRANGE, DONE }
+    private enum class Glyph { LAYOUT_STACKED, LAYOUT_COLUMNS, SWAP, RELOAD, ARRANGE, DONE, KEYBOARD }
 
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
     private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -225,9 +225,12 @@ class DuoScreenChromeRenderer {
                             ) Glyph.LAYOUT_COLUMNS else Glyph.LAYOUT_STACKED
                         ChromeTarget.Kind.SWAP -> Glyph.SWAP
                         ChromeTarget.Kind.RELOAD -> Glyph.RELOAD
+                        ChromeTarget.Kind.KEYBOARD -> Glyph.KEYBOARD
                         else -> Glyph.ARRANGE
                     }
-                    glyph(canvas, glyph, box.centerX(), box.centerY(), s.BUTTON_ICON * d, ICON)
+                    // The rail's buttons are larger than the toolbar's; the icon grows with them.
+                    val iconSize = s.BUTTON_ICON * d * box.width / (s.BUTTON * d)
+                    glyph(canvas, glyph, box.centerX(), box.centerY(), iconSize, ICON)
                 }
             }
         }
@@ -494,6 +497,17 @@ class DuoScreenChromeRenderer {
                 path.moveTo(x(20f), y(9f)); path.lineTo(x(20f), y(4f)); path.lineTo(x(15f), y(4f))
                 path.moveTo(x(4f), y(15f)); path.lineTo(x(4f), y(20f)); path.lineTo(x(9f), y(20f))
                 path.moveTo(x(20f), y(15f)); path.lineTo(x(20f), y(20f)); path.lineTo(x(15f), y(20f))
+                canvas.drawPath(path, stroke)
+            }
+            Glyph.KEYBOARD -> {
+                rect.set(x(2.5f), y(5.5f), x(21.5f), y(18.5f)); canvas.drawRoundRect(rect, 2f * k, 2f * k, stroke)
+                fill.color = color
+                for (row in 0..1) for (col in 0..4) {
+                    val kx = x(5.5f + col * 3.25f)
+                    val ky = y(8.8f + row * 3f)
+                    canvas.drawCircle(kx, ky, 0.95f * k, fill)
+                }
+                path.moveTo(x(8f), y(15.3f)); path.lineTo(x(16f), y(15.3f))
                 canvas.drawPath(path, stroke)
             }
             Glyph.DONE -> {

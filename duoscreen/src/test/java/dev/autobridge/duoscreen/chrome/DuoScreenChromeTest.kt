@@ -76,9 +76,15 @@ class DuoScreenChromeTest {
             assertTrue(panel.left >= 0 && panel.right <= bounds.width && panel.top >= 0)
             assertEquals(listOf(0, 1, 2), rail.apps.map { it.first })
             assertEquals(
-                listOf(ChromeTarget.Kind.SWAP, ChromeTarget.Kind.LAYOUT, ChromeTarget.Kind.RELOAD, ChromeTarget.Kind.RAIL_MOVE),
+                listOf(
+                    ChromeTarget.Kind.KEYBOARD, ChromeTarget.Kind.SWAP, ChromeTarget.Kind.LAYOUT,
+                    ChromeTarget.Kind.RELOAD, ChromeTarget.Kind.RAIL_MOVE
+                ),
                 rail.buttons.map { it.first }
             )
+            assertTrue(panel.bottom <= bounds.height)
+            val (kx, ky) = rail.buttons.first().second.center()
+            assertEquals(ChromeTarget.Control(ChromeTarget.Kind.KEYBOARD), c.hit(kx, ky))
             rail.apps.forEach { (id, box) ->
                 val (x, y) = box.center()
                 assertEquals(ChromeTarget.RailApp(id), c.hit(x, y))
@@ -86,6 +92,19 @@ class DuoScreenChromeTest {
             val (mx, my) = rail.buttons.last().second.center()
             assertEquals(ChromeTarget.Control(ChromeTarget.Kind.RAIL_MOVE), c.hit(mx, my))
         }
+    }
+
+    @Test fun theOpenRailsButtonsAreLargerThanTheToolbarsButStillFit() {
+        for (bounds in listOf(portrait, landscape)) {
+            val panes = panes(DuoScreenPreset.STACKED_60_40, bounds)
+            val c = railChrome(panes, bounds, RailSide.RIGHT, open = true)
+            val button = (c.spec.BUTTON).toInt()
+            c.rail!!.buttons.forEach { (_, box) -> assertTrue(box.width > button) }
+        }
+        // A short surface shrinks them back toward the toolbar size so the panel stays on it.
+        val short = DuoScreenChrome.boundsFor(800, 360, 1f)
+        val c = railChrome(panes(DuoScreenPreset.EVEN_COLUMNS, short), short, RailSide.LEFT, open = true)
+        assertTrue(c.rail!!.panel!!.bottom <= short.height)
     }
 
     @Test fun noRailWhileArranging() {

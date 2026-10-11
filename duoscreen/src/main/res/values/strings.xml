@@ -66,4 +66,5 @@
     <string name="duo_share_area">%1$d%% of the screen</string>
     <string name="duo_pick_title">App for pane %1$d</string>
     <string name="duo_pick_empty">No apps to show</string>
+    <string name="duo_keyboard_hint">Type into pane %1$d</string>
 </resources>

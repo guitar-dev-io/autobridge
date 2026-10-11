@@ -2,6 +2,7 @@ package dev.autobridge.duoscreen.system
 
 import android.content.ComponentName
 import android.view.Surface
+import android.view.KeyEvent
 import android.view.MotionEvent
 
 /**
@@ -98,4 +99,10 @@ interface DuoScreenPrivilegedOps {
 
     /** Injects [event] into [displayId]; the event is recycled by the caller, not here. */
     fun injectMotion(event: MotionEvent, displayId: Int): Boolean
+
+    /**
+     * Injects a key [event] into [displayId], where the focused window of that display takes it:
+     * how text typed on the car's keyboard reaches a pane's text field. False by default.
+     */
+    fun injectKey(event: KeyEvent, displayId: Int): Boolean = false
 }
