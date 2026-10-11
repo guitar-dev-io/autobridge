@@ -11,6 +11,8 @@ import androidx.car.app.model.Row
 import androidx.car.app.model.Template
 import dev.autobridge.R
 import dev.autobridge.display.MirrorDiagnostics
+import dev.autobridge.display.PerformanceMode
+import dev.autobridge.display.PerformancePolicy
 import dev.autobridge.mirror.MirrorCoordinator
 
 /**
@@ -56,6 +58,7 @@ class CarDiagnosticsScreen(carContext: CarContext) : Screen(carContext) {
                     connectionLabel()
                 )
             )
+            .addItem(statusRow(carContext.getString(R.string.car_diag_performance), performanceLabel()))
             .addItem(
                 statusRow(
                     carContext.getString(R.string.car_diag_frame_rate),
@@ -156,6 +159,19 @@ class CarDiagnosticsScreen(carContext: CarContext) : Screen(carContext) {
             summary.projectionStops,
             lastRecovery
         )
+    }
+
+    /** The current [PerformanceMode] level and why, e.g. "Reduced (thermal 2)". */
+    private fun performanceLabel(): String {
+        if (!PerformanceMode.enabled) return carContext.getString(R.string.car_diag_performance_off)
+        val level = carContext.getString(
+            when (PerformanceMode.level) {
+                PerformancePolicy.Level.NORMAL -> R.string.performance_level_normal
+                PerformancePolicy.Level.REDUCED -> R.string.performance_level_reduced
+                PerformancePolicy.Level.LOW -> R.string.performance_level_low
+            }
+        )
+        return carContext.getString(R.string.car_diag_performance_value, level, PerformanceMode.reason)
     }
 
     private fun uptimeLabel(): String {

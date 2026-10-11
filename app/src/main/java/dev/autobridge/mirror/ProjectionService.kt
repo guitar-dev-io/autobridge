@@ -22,6 +22,7 @@ import dev.autobridge.apps.QuickAppLauncher
 import dev.autobridge.car.CarConnectionMonitor
 import dev.autobridge.car.ConnectionTimeline
 import dev.autobridge.display.MirrorDiagnostics
+import dev.autobridge.display.PerformanceMode
 import dev.autobridge.display.MirrorOrientationController
 import dev.autobridge.display.OrientationMonitor
 import dev.autobridge.display.ScreenPowerController
@@ -232,6 +233,7 @@ class ProjectionService : Service() {
                 StructuredLog.i(TAG, "MediaProjection stopped by system/user")
                 // The release below sees no projection and records nothing, so this is the one record.
                 ConnectionTimeline.record(ConnectionTimeline.Kind.PROJECTION_STOPPED, "reason=system")
+                PerformanceMode.release("projection")
                 projection = null
                 MirrorSettings.preferredFps = null
                 ScreenPowerController.stop()
@@ -261,6 +263,7 @@ class ProjectionService : Service() {
         )
         markReady()
         ConnectionTimeline.record(ConnectionTimeline.Kind.PROJECTION_STARTED)
+        PerformanceMode.acquire(this, "projection")
         if (MirrorCoordinator.isMirroring) {
             QuickAppLauncher.autoLaunchLastSession(this)
         }
@@ -320,6 +323,7 @@ class ProjectionService : Service() {
         nextStopReason = null
         if (old != null) {
             ConnectionTimeline.record(ConnectionTimeline.Kind.PROJECTION_STOPPED, "reason=${reason ?: "service_stopped"}")
+            PerformanceMode.release("projection")
         }
         ScreenPowerController.stop()
         // Restore privileged state before dropping the Shizuku binder. This is deliberately

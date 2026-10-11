@@ -38,6 +38,7 @@ import android.webkit.WebStorage
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import dev.autobridge.R
+import dev.autobridge.display.PerformanceMode
 import dev.autobridge.entertainment.ContentAddress
 import dev.autobridge.entertainment.WebHistoryStore
 import kotlin.math.abs
@@ -105,7 +106,8 @@ class CarWebRenderer(context: Context) {
 
         /** How soon after a page play a permanent focus loss counts as the WebView's own request. */
         const val SELF_FOCUS_WINDOW_MS = 1_500L
-        const val FRAME_INTERVAL_MS = 33L // ~30fps repaint pump while something is moving
+        // The repaint pump while something is moving is PerformanceMode.level.browserFrameMs:
+        // ~30fps normally, lower when the phone is hot.
 
         /**
          * Pump interval while nothing is known to be moving (~4fps). Still ticking, so auto-hide
@@ -601,7 +603,7 @@ class CarWebRenderer(context: Context) {
             pollLegacyMedia(now)
             val busy = flinging || needsFullRate(now)
             pumpIdle = !busy
-            mainHandler.postDelayed(this, if (busy) FRAME_INTERVAL_MS else IDLE_FRAME_INTERVAL_MS)
+            mainHandler.postDelayed(this, if (busy) PerformanceMode.level.browserFrameMs else IDLE_FRAME_INTERVAL_MS)
         }
     }
 

@@ -2028,4 +2028,12 @@
     <string name="setup_autostart_title">Start the media service on Bluetooth</string>
     <string name="setup_autostart_on">The session is ready as soon as the car pairs</string>
     <string name="setup_autostart_off">The session starts when you first play something</string>
+    <string name="performance_mode">Performance mode</string>
+    <string name="performance_mode_caption">Lowers the self-drawn mirror frame rate, car browser redraws and video resolution when the phone is hot or dropping frames. Now: %1$s</string>
+    <string name="performance_level_normal">Normal</string>
+    <string name="performance_level_reduced">Reduced</string>
+    <string name="performance_level_low">Low</string>
+    <string name="car_diag_performance">Performance</string>
+    <string name="car_diag_performance_value">%1$s (%2$s)</string>
+    <string name="car_diag_performance_off">Off</string>
 </resources>

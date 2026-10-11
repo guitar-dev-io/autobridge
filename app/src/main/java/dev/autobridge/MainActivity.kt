@@ -1906,6 +1906,19 @@ class MainActivity : androidx.activity.ComponentActivity() {
         )
         addCard(
             content,
+            settingSwitchRow(
+                getString(R.string.performance_mode),
+                getString(R.string.performance_mode_caption, performanceLevelLabel()),
+                checked = dev.autobridge.display.PerformanceMode.enabled,
+                enabled = true
+            ) { on ->
+                dev.autobridge.display.PerformanceMode.setEnabled(this, on)
+                showPhoneScreen(PhoneScreen.MIRROR_SETTINGS, force = true)
+            },
+            top = 8
+        )
+        addCard(
+            content,
             settingRow(
                 getString(R.string.mirror_renderer),
                 getString(R.string.mirror_renderer_caption),
@@ -2552,6 +2565,14 @@ class MainActivity : androidx.activity.ComponentActivity() {
         PerAppProfileStore.save(this, next(PerAppProfileStore.profile(this, pkg, id)))
         showPhoneScreen(PhoneScreen.PROFILE)
     }
+    private fun performanceLevelLabel(): String = getString(
+        when (dev.autobridge.display.PerformanceMode.level) {
+            dev.autobridge.display.PerformancePolicy.Level.NORMAL -> R.string.performance_level_normal
+            dev.autobridge.display.PerformancePolicy.Level.REDUCED -> R.string.performance_level_reduced
+            dev.autobridge.display.PerformancePolicy.Level.LOW -> R.string.performance_level_low
+        }
+    )
+
     private fun frameRateSubtitle(): String = getString(
         if (ScreenOffController.pipelineMode == ScreenOffController.PipelineMode.SELF_DRAWN) {
             R.string.mirror_frame_rate_self_drawn

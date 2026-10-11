@@ -1996,4 +1996,12 @@
     <string name="setup_autostart_title">เริ่มบริการสื่อเมื่อเชื่อม Bluetooth</string>
     <string name="setup_autostart_on">พร้อมใช้ทันทีที่รถจับคู่</string>
     <string name="setup_autostart_off">เริ่มเมื่อเล่นสื่อครั้งแรก</string>
+    <string name="performance_mode">โหมดประหยัดภาระเครื่อง</string>
+    <string name="performance_mode_caption">ลดเฟรมเรตของ mirror แบบวาดเอง รอบวาดของเบราว์เซอร์บนรถ และความละเอียดวิดีโอ เมื่อมือถือร้อนหรือเฟรมตก ตอนนี้: %1$s</string>
+    <string name="performance_level_normal">ปกติ</string>
+    <string name="performance_level_reduced">ลดภาระ</string>
+    <string name="performance_level_low">ประหยัด</string>
+    <string name="car_diag_performance">ภาระเครื่อง</string>
+    <string name="car_diag_performance_value">%1$s (%2$s)</string>
+    <string name="car_diag_performance_off">ปิด</string>
 </resources>
