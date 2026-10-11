@@ -18,6 +18,7 @@ import dev.autobridge.display.ScreenPowerController
 import dev.autobridge.logging.StructuredLog
 import dev.autobridge.display.SurfaceProfile
 import dev.autobridge.input.DisplayTransform
+import dev.autobridge.safety.BypassPolicyStore
 import dev.autobridge.safety.ParkingStateStore
 import dev.autobridge.safety.SafetyEnforcement
 
@@ -42,18 +43,30 @@ object MirrorCoordinator {
     private var rotationMode: RotationMode = RotationMode.AUTO
 
     private val parkingListener: (ParkingStateStore.State) -> Unit = { state ->
-        if (state != ParkingStateStore.State.PARKED) {
+        if (MirrorParkedTeardown.shouldTearDown(state, BypassPolicyStore.overridesParked)) {
             // Safety teardown is intentionally stronger than merely hiding the output. It also
             // releases the WakeLock and projection so UNKNOWN cannot leave a live capture session.
-            ScreenPowerController.stop()
-            stopProjection()
+            tearDownForVehicleState()
         } else {
             runLocked { reconcileLocked() }
         }
     }
 
+    /** Turning the driver's bypass off while not parked applies the teardown it was holding back. */
+    private val bypassListener: (BypassPolicyStore.State) -> Unit = {
+        if (MirrorParkedTeardown.shouldTearDown(ParkingStateStore.state, BypassPolicyStore.overridesParked)) {
+            tearDownForVehicleState()
+        }
+    }
+
+    private fun tearDownForVehicleState() {
+        ScreenPowerController.stop()
+        stopProjection()
+    }
+
     init {
         ParkingStateStore.addListener(parkingListener)
+        BypassPolicyStore.addListener(bypassListener)
     }
 
     val isProjectionReady: Boolean

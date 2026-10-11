@@ -9,7 +9,7 @@ This roadmap describes the current shared implementation. `DONE` means the code 
 - Single `:app` module with shared `src/main` code.
 - `safe`, `personal`, and `lab` product flavors with `BuildConfig.AUTOBRIDGE_MODE`.
 - Runtime models, `RuntimeContextStore` StateFlow/SharedFlow, structured logs, vehicle profiles, and reference-counted vehicle-state leases.
-- Central `FeaturePolicy` for mode, environment, and `PARKED` decisions. The mode gate is enforced; the parked gate ships reporting rather than blocking (`SafetyEnforcement.isBlocking = false`), with the enforcing branch kept and unit-tested. Mirroring is separate: `MirrorCoordinator` stops the projection whenever the reading leaves `PARKED` (including a three-second stale `UNKNOWN`), in every flavor and regardless of the runtime bypass. `scripts/check-protected.sh` guards the safety files and the personal-flavor bypass against incidental edits.
+- Central `FeaturePolicy` for mode, environment, and `PARKED` decisions. The mode gate is enforced; the parked gate ships reporting rather than blocking (`SafetyEnforcement.isBlocking = false`), with the enforcing branch kept and unit-tested. Mirroring is separate: `MirrorCoordinator` stops the projection whenever the reading leaves `PARKED` (including a three-second stale `UNKNOWN`), in every flavor unless the driver's runtime bypass is on (`MirrorParkedTeardown`). `scripts/check-protected.sh` guards the safety files and the personal-flavor bypass against incidental edits.
 
 ### Mirror and Android Auto — DONE locally / PARTIAL on hardware
 
