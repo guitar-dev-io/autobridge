@@ -34,6 +34,7 @@ import android.widget.Toast
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import dev.autobridge.apps.AppListFilter
+import dev.autobridge.apps.AppProfileCycle
 import dev.autobridge.apps.InstalledApp
 import dev.autobridge.apps.InstalledAppRepository
 import dev.autobridge.apps.MirrorContentPolicy
@@ -43,6 +44,7 @@ import dev.autobridge.apps.QuickAppsStore
 import dev.autobridge.apps.SmartModeResolver
 import dev.autobridge.core.consent.PermissionDisclosure
 import dev.autobridge.core.datastore.SessionRestoreStore
+import dev.autobridge.core.model.AppProfile
 import dev.autobridge.core.model.AudioMode
 import dev.autobridge.core.model.AutoBridgeMode
 import dev.autobridge.core.model.Environment
@@ -2540,10 +2542,16 @@ class MainActivity : androidx.activity.ComponentActivity() {
         }
     }
 
-    private fun cycleProfileScale(pkg: String, id: String) {}
-    private fun cycleProfileResolution(pkg: String, id: String) {}
-    private fun cycleProfileFps(pkg: String, id: String) {}
-    private fun cycleProfileAudio(pkg: String, id: String) {}
+    private fun cycleProfileScale(pkg: String, id: String) = cycleProfile(pkg, id, AppProfileCycle::nextScale)
+    private fun cycleProfileResolution(pkg: String, id: String) = cycleProfile(pkg, id, AppProfileCycle::nextResolution)
+    private fun cycleProfileFps(pkg: String, id: String) = cycleProfile(pkg, id, AppProfileCycle::nextFps)
+    private fun cycleProfileAudio(pkg: String, id: String) = cycleProfile(pkg, id, AppProfileCycle::nextAudio)
+
+    /** Saves the next value and redraws, so the row shows what was stored. */
+    private fun cycleProfile(pkg: String, id: String, next: (AppProfile) -> AppProfile) {
+        PerAppProfileStore.save(this, next(PerAppProfileStore.profile(this, pkg, id)))
+        showPhoneScreen(PhoneScreen.PROFILE)
+    }
     private fun frameRateSubtitle() = "Target frame rate"
     private fun frameRateValue() = "60 FPS"
 
