@@ -12,11 +12,10 @@ import androidx.car.app.model.Template
 import dev.autobridge.R
 import dev.autobridge.display.MirrorDiagnostics
 import dev.autobridge.mirror.MirrorCoordinator
-import dev.autobridge.mirror.ReconnectTracker
 
 /**
  * Car-native live diagnostics for the mirror pipeline. All values are read from the same
- * [MirrorDiagnostics]/[MirrorCoordinator]/[ReconnectTracker] state used by the phone developer
+ * [MirrorDiagnostics]/[MirrorCoordinator]/[ConnectionTimeline] state used by the phone developer
  * view, so the two surfaces never disagree. Frame counters are meaningful only for the SELF_DRAWN
  * renderer; AUTO_MIRROR is a zero-copy OS path with no app-observable frames.
  */
@@ -54,7 +53,7 @@ class CarDiagnosticsScreen(carContext: CarContext) : Screen(carContext) {
             .addItem(
                 statusRow(
                     carContext.getString(R.string.car_diag_reconnects),
-                    ReconnectTracker.reconnectCount.toString()
+                    connectionLabel()
                 )
             )
             .addItem(
@@ -143,6 +142,19 @@ class CarDiagnosticsScreen(carContext: CarContext) : Screen(carContext) {
             R.string.car_diag_car_area_value,
             print.stable?.toString() ?: "—",
             print.visible?.toString() ?: "—"
+        )
+    }
+
+    /** The whole drive so far, from [ConnectionTimeline]; the per-projection count resets too often to judge stability. */
+    private fun connectionLabel(): String {
+        val summary = ConnectionTimeline.summary()
+        val lastRecovery = summary.lastRecoveryMs?.let { "%.1f s".format(it / 1000f) } ?: "—"
+        return carContext.getString(
+            R.string.car_diag_reconnects_value,
+            summary.surfaceResumes,
+            summary.hostDrops,
+            summary.projectionStops,
+            lastRecovery
         )
     }
 

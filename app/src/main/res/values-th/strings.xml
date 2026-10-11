@@ -1052,6 +1052,7 @@
     <string name="car_diag_uptime">เวลาทำงาน</string>
     <string name="car_diag_source_size">ขนาดภาพต้นทาง</string>
     <string name="car_diag_reconnects">จำนวนการเชื่อมต่อใหม่</string>
+    <string name="car_diag_reconnects_value">กู้คืน %1$d ครั้ง · รถหลุด %2$d ครั้ง · หยุดฉาย %3$d ครั้ง · กู้ล่าสุด %4$s</string>
     <string name="car_diag_frame_rate">อัตราเฟรม</string>
     <string name="car_diag_os_owned">ไม่มีข้อมูล • AUTO_MIRROR ระบบปฏิบัติการควบคุมเอง</string>
     <string name="car_diag_frames">เฟรม (เรนเดอร์/ตก/จับ)</string>

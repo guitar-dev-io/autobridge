@@ -42,6 +42,7 @@ class AutoBridgeSession : Session(), CarScreenController.Host {
                 // "Time for a break" every N hours of this connection, when the driver turned it on.
                 runCatching { dev.autobridge.breakreminder.BreakReminder.start(carContext) }
                 dev.autobridge.logging.StructuredLog.i(TAG, "car session connected")
+                ConnectionTimeline.record(ConnectionTimeline.Kind.SESSION_STARTED)
                 // The bridge learns about the connection here rather than polling for it, and
                 // this is where a Send-to-Car that arrived while nothing was plugged in gets
                 // replayed onto the head unit.
@@ -59,6 +60,7 @@ class AutoBridgeSession : Session(), CarScreenController.Host {
                 CarConnectionMonitor.publish()
                 val stillConnected = RuntimeContextStore.context.value.connected
                 dev.autobridge.logging.StructuredLog.i(TAG, "car session destroyed connected=$stillConnected")
+                ConnectionTimeline.record(ConnectionTimeline.Kind.SESSION_ENDED, "hostConnected=$stillConnected")
                 dev.autobridge.bridge.AutoBridgeSessionManager.onCarDisconnected(carContext)
                 // The browser renderer outlives individual screens on purpose, so the session is
                 // the only correct place to tear its WebView down.

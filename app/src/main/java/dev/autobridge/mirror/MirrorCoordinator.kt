@@ -6,6 +6,7 @@ import android.hardware.display.VirtualDisplay
 import android.media.projection.MediaProjection
 import android.util.Log
 import android.view.Surface
+import dev.autobridge.car.ConnectionTimeline
 import dev.autobridge.core.model.Feature
 import dev.autobridge.core.model.RotationMode
 import dev.autobridge.core.model.ScaleMode
@@ -204,10 +205,17 @@ object MirrorCoordinator {
     fun attachCarSurface(surface: Surface, width: Int, height: Int, dpi: Int): Boolean = runLockedResult {
         val oldSurface = carSurface
         if (oldSurface == null || oldSurface !== surface) {
-            if (oldSurface != null) ReconnectTracker.onSurfaceDetached()
+            if (oldSurface != null) {
+                ReconnectTracker.onSurfaceDetached()
+                ConnectionTimeline.record(ConnectionTimeline.Kind.SURFACE_DETACHED, "replaced")
+            }
             when (ReconnectTracker.onSurfaceArrived(projectionAlive = projection != null)) {
-                ReconnectTracker.Outcome.RESUMED -> MirrorDiagnostics.record("car_session_reconnected")
-                ReconnectTracker.Outcome.FRESH_START,
+                ReconnectTracker.Outcome.RESUMED -> {
+                    MirrorDiagnostics.record("car_session_reconnected")
+                    ConnectionTimeline.record(ConnectionTimeline.Kind.SURFACE_RESUMED, "${width}x$height")
+                }
+                ReconnectTracker.Outcome.FRESH_START ->
+                    ConnectionTimeline.record(ConnectionTimeline.Kind.SURFACE_ATTACHED, "${width}x$height")
                 ReconnectTracker.Outcome.UNCHANGED -> Unit
             }
         }
@@ -231,6 +239,7 @@ object MirrorCoordinator {
             carSurface = null
             ReconnectTracker.onSurfaceDetached()
             MirrorDiagnostics.record("car_surface_detached")
+            ConnectionTimeline.record(ConnectionTimeline.Kind.SURFACE_DETACHED)
         }
     }
 

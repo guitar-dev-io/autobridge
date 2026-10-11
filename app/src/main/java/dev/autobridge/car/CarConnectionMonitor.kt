@@ -35,6 +35,11 @@ object CarConnectionMonitor {
             CarConnection(context.applicationContext).type.observeForever { type ->
                 hostConnected = type != null && type != CarConnection.CONNECTION_TYPE_NOT_CONNECTED
                 StructuredLog.i(TAG, "host connection type=$type")
+                ConnectionTimeline.record(
+                    if (hostConnected) ConnectionTimeline.Kind.HOST_CONNECTED
+                    else ConnectionTimeline.Kind.HOST_DISCONNECTED,
+                    "type=$type"
+                )
                 publish()
             }
         }.onFailure { StructuredLog.w(TAG, "car connection signal unavailable: ${it.message}") }

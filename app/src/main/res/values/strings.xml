@@ -1071,6 +1071,7 @@
     <string name="car_diag_uptime">Uptime</string>
     <string name="car_diag_source_size">Source size</string>
     <string name="car_diag_reconnects">Reconnects</string>
+    <string name="car_diag_reconnects_value">%1$d resumed · %2$d host drops · %3$d stops · last recovery %4$s</string>
     <string name="car_diag_frame_rate">Frame rate</string>
     <string name="car_diag_os_owned">n/a • AUTO_MIRROR is OS-owned</string>
     <string name="car_diag_frames">Frames (r/d/c)</string>
