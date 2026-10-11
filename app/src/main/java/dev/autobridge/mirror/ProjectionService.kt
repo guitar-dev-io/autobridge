@@ -19,6 +19,7 @@ import dev.autobridge.MainActivity
 import dev.autobridge.R
 import dev.autobridge.apps.AppRotationController
 import dev.autobridge.apps.QuickAppLauncher
+import dev.autobridge.car.CarConnectionMonitor
 import dev.autobridge.car.ConnectionTimeline
 import dev.autobridge.display.MirrorDiagnostics
 import dev.autobridge.display.MirrorOrientationController
@@ -61,7 +62,23 @@ class ProjectionService : Service() {
             pendingDisconnectStop = null
         }
 
-        fun onCarSurfaceDisconnected(context: Context) {
+        /** The car surface went away; on its own that may only be the driver switching apps. */
+        fun onCarSurfaceDisconnected(context: Context) = scheduleDisconnectCheck(context)
+
+        /** The Android Auto host reports the car connection is gone. */
+        fun onCarHostDisconnected(context: Context) = scheduleDisconnectCheck(context)
+
+        /** The car is back before the grace period ran out; nothing to stop. */
+        fun onCarHostConnected() {
+            pendingDisconnectStop?.let(mainHandler::removeCallbacks)
+            pendingDisconnectStop = null
+        }
+
+        /**
+         * Re-checks after [SURFACE_DISCONNECT_GRACE_MS] so a brief flap does not end the session;
+         * [DisconnectStopPolicy] decides from the state at that moment.
+         */
+        private fun scheduleDisconnectCheck(context: Context) {
             pendingDisconnectStop?.let(mainHandler::removeCallbacks)
             pendingDisconnectStop = null
             if (!MirrorSettings.stopOnDisconnect) return
@@ -69,13 +86,15 @@ class ProjectionService : Service() {
             val appContext = context.applicationContext
             val stopRunnable = Runnable {
                 pendingDisconnectStop = null
-                if (MirrorSettings.stopOnDisconnect &&
-                    !MirrorCoordinator.isCarSurfaceReady &&
-                    sessionState != SessionState.IDLE
-                ) {
-                    StructuredLog.i(TAG, "Android Auto surface disconnected; stopping projection")
-                    stop(appContext, reason = "surface_disconnect")
-                }
+                val reason = DisconnectStopPolicy.decide(
+                    stopOnDisconnect = MirrorSettings.stopOnDisconnect,
+                    sessionIdle = sessionState == SessionState.IDLE,
+                    hostSignalKnown = CarConnectionMonitor.hostSignalKnown,
+                    hostConnected = CarConnectionMonitor.isHostConnected,
+                    surfaceReady = MirrorCoordinator.isCarSurfaceReady
+                ) ?: return@Runnable
+                StructuredLog.i(TAG, "Android Auto disconnected (${reason.label}); stopping projection")
+                stop(appContext, reason = reason.label)
             }
             pendingDisconnectStop = stopRunnable
             mainHandler.postDelayed(stopRunnable, SURFACE_DISCONNECT_GRACE_MS)

@@ -890,7 +890,7 @@
     <string name="mirror_auto_dim">Auto dim</string>
     <string name="mirror_auto_dim_caption">Dim after inactivity; car touch starts the timer again</string>
     <string name="mirror_stop_on_disconnect">Stop on disconnect</string>
-    <string name="mirror_stop_on_disconnect_caption">Stop projection after Android Auto stays disconnected for 2 seconds</string>
+    <string name="mirror_stop_on_disconnect_caption">Stop projection after Android Auto stays disconnected for 2 seconds; switching apps on the car screen does not count</string>
     <string name="mirror_scale_mode">Scale mode</string>
     <string name="mirror_started">Mirroring Started</string>
     <string name="mirror_capture_denied">Screen capture permission denied</string>

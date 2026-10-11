@@ -874,7 +874,7 @@
     <string name="mirror_auto_dim">หรี่จออัตโนมัติ</string>
     <string name="mirror_auto_dim_caption">หรี่จอเมื่อไม่มีการใช้งาน การแตะจอรถจะเริ่มจับเวลาใหม่</string>
     <string name="mirror_stop_on_disconnect">หยุดเมื่อตัดการเชื่อมต่อ</string>
-    <string name="mirror_stop_on_disconnect_caption">หยุดแชร์หน้าจอเมื่อ Android Auto หลุดการเชื่อมต่อเกิน 2 วินาที</string>
+    <string name="mirror_stop_on_disconnect_caption">หยุดแชร์หน้าจอเมื่อ Android Auto หลุดการเชื่อมต่อเกิน 2 วินาที การสลับแอปบนจอรถไม่นับ</string>
     <string name="mirror_scale_mode">โหมดการย่อขยาย</string>
     <string name="mirror_started">เริ่มมิเรอร์แล้ว</string>
     <string name="mirror_capture_denied">ไม่ได้รับสิทธิ์บันทึกหน้าจอ</string>
