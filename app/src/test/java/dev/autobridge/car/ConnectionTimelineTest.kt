@@ -95,6 +95,27 @@ class ConnectionTimelineTest {
         )
     }
 
+    @Test fun aKnownSpeedTurningUnknownIsCountedAsALoss() {
+        record(Kind.VEHICLE_STATE, 0, "UNKNOWN")      // start of a session: nothing was known, not a loss
+        record(Kind.VEHICLE_STATE, 100, "PARKED")
+        record(Kind.VEHICLE_STATE, 3_100, "UNKNOWN")  // stale reading
+        record(Kind.VEHICLE_STATE, 4_000, "PARKED")
+        record(Kind.VEHICLE_STATE, 5_000, "MOVING")
+        record(Kind.VEHICLE_STATE, 9_000, "UNKNOWN")
+        assertEquals(2, ConnectionTimeline.summary().speedLosses)
+    }
+
+    @Test fun aSpeedLossThenATeardownReadsInOrder() {
+        record(Kind.PROJECTION_STARTED, 0)
+        record(Kind.VEHICLE_STATE, 10, "PARKED")
+        record(Kind.VEHICLE_STATE, 3_010, "UNKNOWN")
+        record(Kind.PROJECTION_STOPPED, 3_011, "reason=system")
+        assertEquals(
+            listOf("PROJECTION_STARTED", "VEHICLE_STATE PARKED", "VEHICLE_STATE UNKNOWN", "PROJECTION_STOPPED reason=system"),
+            StructuredLog.recent().filter { it.tag == "CONN" }.map { it.message }
+        )
+    }
+
     @Test fun theRingKeepsTheNewestHundred() {
         repeat(130) { record(Kind.SESSION_STARTED, it.toLong()) }
         val events = ConnectionTimeline.recent()

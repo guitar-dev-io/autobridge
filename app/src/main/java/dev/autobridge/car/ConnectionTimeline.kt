@@ -9,7 +9,9 @@ import dev.autobridge.logging.StructuredLog
  *
  * A drop can happen at four layers that recover independently: the Android Auto host connection,
  * this app's car session, the car surface a screen draws on, and the MediaProjection behind
- * mirroring. [ReconnectTracker][dev.autobridge.mirror.ReconnectTracker] only counts surface
+ * mirroring. The vehicle state is recorded alongside them because mirroring is torn down whenever
+ * it leaves PARKED, including when a speed reading goes stale and turns UNKNOWN, so a mirror that
+ * "drops" may really be a speed signal that went quiet. [ReconnectTracker][dev.autobridge.mirror.ReconnectTracker] only counts surface
  * resumes and is reset with every projection, so it can say neither how long an outage lasted
  * nor which layer it was. Each layer reports here, every event is also one `CONN` line in the
  * structured log (and so in Send log), and [summary] turns the events into the numbers stability
@@ -20,6 +22,7 @@ import dev.autobridge.logging.StructuredLog
 object ConnectionTimeline {
     private const val TAG = "CONN"
     private const val CAPACITY = 100
+    private const val UNKNOWN = "UNKNOWN"
 
     enum class Kind {
         HOST_CONNECTED,
@@ -30,7 +33,9 @@ object ConnectionTimeline {
         SURFACE_DETACHED,
         SURFACE_RESUMED,
         PROJECTION_STARTED,
-        PROJECTION_STOPPED
+        PROJECTION_STOPPED,
+        /** The parked status changed; detail is the new state (PARKED, MOVING or UNKNOWN). */
+        VEHICLE_STATE
     }
 
     data class Event(val atMs: Long, val kind: Kind, val detail: String)
@@ -46,7 +51,9 @@ object ConnectionTimeline {
         val lastRecoveryMs: Long?,
         val longestOutageMs: Long?,
         /** True while the host or the surface is down and has not come back yet. */
-        val outageOpen: Boolean
+        val outageOpen: Boolean,
+        /** Times a known speed reading (PARKED or MOVING) turned UNKNOWN. */
+        val speedLosses: Int = 0
     )
 
     private val events = ArrayDeque<Event>()
@@ -73,6 +80,8 @@ object ConnectionTimeline {
         var hostDrops = 0
         var surfaceResumes = 0
         var projectionStops = 0
+        var speedLosses = 0
+        var lastVehicleState: String? = null
         var hostDownAt: Long? = null
         var surfaceDownAt: Long? = null
         var lastRecovery: Long? = null
@@ -95,6 +104,10 @@ object ConnectionTimeline {
             // A fresh attach is a new start, not a recovery, but it does close an open detach.
             Kind.SURFACE_ATTACHED -> surfaceDownAt = null
             Kind.PROJECTION_STOPPED -> { projectionStops++; surfaceDownAt = null }
+            Kind.VEHICLE_STATE -> {
+                if (event.detail == UNKNOWN && lastVehicleState != null && lastVehicleState != UNKNOWN) speedLosses++
+                lastVehicleState = event.detail
+            }
             else -> Unit
         }
         return Summary(
@@ -103,7 +116,8 @@ object ConnectionTimeline {
             projectionStops = projectionStops,
             lastRecoveryMs = lastRecovery,
             longestOutageMs = longest,
-            outageOpen = hostDownAt != null || surfaceDownAt != null
+            outageOpen = hostDownAt != null || surfaceDownAt != null,
+            speedLosses = speedLosses
         )
     }
 

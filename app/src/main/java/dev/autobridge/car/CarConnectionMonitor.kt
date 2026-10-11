@@ -5,6 +5,7 @@ import androidx.car.app.connection.CarConnection
 import dev.autobridge.core.state.RuntimeContextStore
 import dev.autobridge.logging.StructuredLog
 import dev.autobridge.remote.CarScreenController
+import dev.autobridge.safety.ParkingStateStore
 
 /**
  * Decides whether the phone is connected to the car, for every phone screen that says so.
@@ -31,6 +32,11 @@ object CarConnectionMonitor {
     fun install(context: Context) {
         if (installed) return
         installed = true
+        // Observation only: the store is read, never written. Registered at startup, so it runs
+        // before the mirror's own listener and the log shows the state change before any teardown.
+        ParkingStateStore.addListener { state ->
+            ConnectionTimeline.record(ConnectionTimeline.Kind.VEHICLE_STATE, state.name)
+        }
         runCatching {
             CarConnection(context.applicationContext).type.observeForever { type ->
                 hostConnected = type != null && type != CarConnection.CONNECTION_TYPE_NOT_CONNECTED
