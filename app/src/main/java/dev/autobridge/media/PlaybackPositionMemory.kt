@@ -142,6 +142,8 @@ class PlaybackPositionMemory(
         onItemStarted(mediaItem)
     }
 
+    // PositionInfo.mediaItem is still marked unstable in Media3.
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
     override fun onPositionDiscontinuity(
         oldPosition: Player.PositionInfo,
         newPosition: Player.PositionInfo,
