@@ -113,6 +113,7 @@ object DuoScreenStore {
      */
     private const val KEY_ARRANGED = "arranged"
     private const val KEY_CONTENT_SCALE = "content_scale"
+    private const val KEY_RAIL_SIDE = "rail_side"
     private const val DEFAULT_PANE_COUNT = 2
 
     const val MIN_PANES = 2
@@ -174,6 +175,16 @@ object DuoScreenStore {
     }
 
     /** Choosing a preset drops the hand-made arrangement; the chosen apps are kept. */
+    /** The edge the quick rail floats on; the right by default, where a right-hand driver reaches. */
+    fun railSide(context: Context): dev.autobridge.duoscreen.chrome.RailSide =
+        prefs(context).getString(KEY_RAIL_SIDE, null)
+            ?.let { name -> dev.autobridge.duoscreen.chrome.RailSide.entries.firstOrNull { it.name == name } }
+            ?: dev.autobridge.duoscreen.chrome.RailSide.RIGHT
+
+    fun setRailSide(context: Context, side: dev.autobridge.duoscreen.chrome.RailSide) {
+        prefs(context).edit { putString(KEY_RAIL_SIDE, side.name) }
+    }
+
     fun setPreset(context: Context, preset: DuoScreenPreset) {
         prefs(context).edit {
             putString(KEY_PRESET, preset.name)

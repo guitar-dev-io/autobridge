@@ -48,6 +48,52 @@ class DuoScreenChromeTest {
 
     private fun Rect.center() = (left + width / 2) to (top + height / 2)
 
+    // --------------------------------------------------------------------------- quick rail
+
+    private fun railChrome(panes: List<DuoScreenPane>, bounds: DuoScreenLayout.Bounds, side: RailSide, open: Boolean) =
+        DuoScreenChrome.compute(panes, bounds, 1f, false, labels, measure, railSide = side, railOpen = open)
+
+    @Test fun theClosedRailIsATabOnItsEdgeThatOpensIt() {
+        val panes = panes(DuoScreenPreset.STACKED_60_40, portrait)
+        val right = railChrome(panes, portrait, RailSide.RIGHT, open = false).rail!!
+        assertEquals(portrait.width, right.tab!!.right)
+        assertNull(right.panel)
+        val left = railChrome(panes, portrait, RailSide.LEFT, open = false).rail!!
+        assertEquals(0, left.tab!!.left)
+        val (x, y) = right.tab!!.center()
+        assertEquals(
+            ChromeTarget.Control(ChromeTarget.Kind.RAIL),
+            railChrome(panes, portrait, RailSide.RIGHT, open = false).hit(x, y)
+        )
+    }
+
+    @Test fun theOpenRailHoldsEachPanesAppAndTheQuickActions() {
+        for (bounds in listOf(portrait, landscape)) {
+            val panes = panes(DuoScreenPreset.EVEN_COLUMNS, bounds, count = 3)
+            val c = railChrome(panes, bounds, RailSide.RIGHT, open = true)
+            val rail = c.rail!!
+            val panel = rail.panel!!
+            assertTrue(panel.left >= 0 && panel.right <= bounds.width && panel.top >= 0)
+            assertEquals(listOf(0, 1, 2), rail.apps.map { it.first })
+            assertEquals(
+                listOf(ChromeTarget.Kind.SWAP, ChromeTarget.Kind.LAYOUT, ChromeTarget.Kind.RELOAD, ChromeTarget.Kind.RAIL_MOVE),
+                rail.buttons.map { it.first }
+            )
+            rail.apps.forEach { (id, box) ->
+                val (x, y) = box.center()
+                assertEquals(ChromeTarget.RailApp(id), c.hit(x, y))
+            }
+            val (mx, my) = rail.buttons.last().second.center()
+            assertEquals(ChromeTarget.Control(ChromeTarget.Kind.RAIL_MOVE), c.hit(mx, my))
+        }
+    }
+
+    @Test fun noRailWhileArranging() {
+        val panes = panes(DuoScreenPreset.STACKED_60_40, portrait)
+        val c = DuoScreenChrome.compute(panes, portrait, 1f, true, labels, measure, railSide = RailSide.RIGHT, railOpen = true)
+        assertNull(c.rail)
+    }
+
     // --------------------------------------------------------------------- where the bar goes
 
     @Test fun aStackedLayoutGetsAHorizontalBarBetweenThePanes() {
