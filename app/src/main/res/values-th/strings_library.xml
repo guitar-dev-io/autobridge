@@ -62,6 +62,9 @@
     <string name="library_no_matches_category">ไม่มีรายการในหมวดนี้ที่ตรงกับคำค้นหา</string>
     <string name="library_online_count">ออนไลน์ %1$d</string>
     <string name="library_offline_count">ออฟไลน์ %1$d</string>
+    <string name="library_status_online">ออนไลน์ · %1$s</string>
+    <string name="library_status_slow">ช้า · %1$s</string>
+    <string name="library_status_offline">ออฟไลน์</string>
     <string name="library_show_all">แสดงทั้งหมด</string>
     <string name="library_hide_offline">ซ่อนช่องออฟไลน์</string>
     <string name="library_on_car">บนรถ</string>

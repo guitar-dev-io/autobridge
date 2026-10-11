@@ -98,14 +98,14 @@ object CarKeyboardLayouts {
     }
 
     // Kedmanee, the layout every Thai keyboard uses, minus the rows a car has no room for.
-    private val THAI = listOf(
+    internal val THAI = listOf(
         listOf("ๆ", "ไ", "ำ", "พ", "ะ", "ั", "ี", "ร", "น", "ย", "บ", "ล"),
         listOf("ฟ", "ห", "ก", "ด", "เ", "้", "่", "า", "ส", "ว", "ง"),
         listOf("ผ", "ป", "แ", "อ", "ิ", "ื", "ท", "ม", "ใ", "ฝ"),
         listOf("ภ", "ถ", "ุ", "ึ", "ค", "ต", "จ", "ข", "ช"),
     )
 
-    private val THAI_SHIFTED = listOf(
+    internal val THAI_SHIFTED = listOf(
         listOf("๐", "ฎ", "ฑ", "ธ", "ํ", "๊", "ณ", "ฯ", "ญ", "ฐ"),
         listOf("ฤ", "ฆ", "ฏ", "โ", "ฌ", "็", "๋", "ษ", "ศ", "ซ"),
         listOf("ฉ", "ฮ", "ฺ", "์", "?", "ฒ", "ฬ", "ฦ"),

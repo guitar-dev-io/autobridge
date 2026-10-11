@@ -6,6 +6,7 @@ import dev.autobridge.settings.ChannelGesture
 import dev.autobridge.settings.PlayerDpi
 import dev.autobridge.settings.PreferredPlayer
 import dev.autobridge.settings.SplitLayout
+import dev.autobridge.settings.VideoEngine
 import dev.autobridge.settings.VideoEnhancement
 import dev.autobridge.settings.VideoSettings
 import dev.autobridge.settings.VideoSettingsCodec
@@ -23,8 +24,14 @@ class VideoSettingsTest {
     @Test
     fun `a missing or renamed stored value falls back instead of throwing`() {
         assertEquals(PreferredPlayer.AUTO, VideoSettingsCodec.preferredPlayer(null))
+        // "VLC" is a VideoEngine, not a PreferredPlayer: engine selection is a separate axis, so a
+        // stray "VLC" on the decoder key must still fall back rather than resolve to a player.
         assertEquals(PreferredPlayer.AUTO, VideoSettingsCodec.preferredPlayer("VLC"))
         assertEquals(PreferredPlayer.SOFTWARE, VideoSettingsCodec.preferredPlayer("SOFTWARE"))
+
+        assertEquals(VideoEngine.MEDIA3, VideoSettingsCodec.videoEngine(null))
+        assertEquals(VideoEngine.VLC, VideoSettingsCodec.videoEngine("VLC"))
+        assertEquals(VideoEngine.MEDIA3, VideoSettingsCodec.videoEngine("bogus"))
 
         assertEquals(ChannelGesture.SWIPE_VERTICAL, VideoSettingsCodec.channelGesture(null))
         assertEquals(ChannelGesture.OFF, VideoSettingsCodec.channelGesture("OFF"))

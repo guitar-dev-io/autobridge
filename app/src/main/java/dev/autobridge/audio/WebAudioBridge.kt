@@ -314,10 +314,10 @@ class WebAudioBridge(private val webViewProvider: () -> WebView?) {
      * Session API, which is what a site fills in for the system's own media controls.
      */
     fun readState(onResult: (WebMediaStatus) -> Unit) {
-        // The tracking hook rides along, so a page loaded before it existed still gets it on the
-        // next read. The state object below stays the script's last value, which is what returns.
+        // The tracking hook is installed on every page-finished via installPlayTracking() (and is
+        // idempotent), so it no longer rides along on every read — this script is just the reader.
+        // __abLastPlayAt feeds msSinceLastPlay, not readState, so the returned JSON is unchanged.
         evaluate(
-            PLAY_TRACKING_SCRIPT.trimIndent() + "\n" +
             """
             (function(){
               var playing = false, dur = 0, pos = 0, held = null, finished = null;

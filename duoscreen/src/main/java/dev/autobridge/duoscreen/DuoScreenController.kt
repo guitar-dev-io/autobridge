@@ -63,7 +63,15 @@ class DuoScreenController(
         const val DIVIDER_QUIET_PERIOD_MS = 700L
 
         /** A scroll is replayed into the pane as a short drag with this many interpolated moves. */
-        const val SCROLL_STEPS = 4
+        /**
+         * A drag built from the host's scrolls is let go this long after the last one. Long enough
+         * to bridge the gap between two scroll callbacks of one swipe; long enough too that the
+         * app's velocity tracker sees the finger at rest, so letting go does not throw a fling.
+         */
+        const val DRAG_IDLE_MS = 150L
+
+        /** How close to a display edge a drag may get before it is lifted and started again. */
+        const val DRAG_EDGE_MARGIN = 8
 
         const val INPUT_THREAD_NAME = "AutoBridgeDuoInput"
 
@@ -74,6 +82,9 @@ class DuoScreenController(
 
         /** The seam's toolbar closes itself after this long without a tap on it or a seam drag. */
         const val TOOLBAR_HIDE_MS = 4_000L
+
+        /** The quick rail stays open this long after the last tap on it. */
+        const val RAIL_HIDE_MS = 6_000L
 
         /** Baseline dpi for dp: the car's own density decides every size on the bar. */
         const val BASELINE_DPI = 160f
@@ -99,6 +110,10 @@ class DuoScreenController(
     /** The seam's toolbar is open (normal mode only); see [DuoScreenChrome]. */
     private var toolbarOpen = false
     private val hideToolbar = Runnable { closeToolbar() }
+
+    /** The quick rail on the side of the surface is open; it closes itself after [RAIL_HIDE_MS]. */
+    private var railOpen = false
+    private val collapseRail = Runnable { closeRail() }
     private val appInfo = HashMap<String, PaneApp>()
 
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -168,6 +183,7 @@ class DuoScreenController(
         if (resume(output, width, height, panelDpi)) {
             CarScreenPower.sessionStarted(context)
             DuoSessionState.sessionStarted()
+            recallVacatedPanes()
             return true
         }
         stop()
@@ -307,7 +323,11 @@ class DuoScreenController(
         saveLayout()
         mainHandler.removeCallbacks(commitPoll)
         // Kept alive, unlike in stop(): the session is only detached and resume() carries on with it.
-        onInputThread { touch.cancelAll() }
+        onInputThread {
+            inputHandler?.removeCallbacks(dragIdle)
+            drag = null
+            touch.cancelAll()
+        }
         compositor.detachBlocking()
         StructuredLog.i(TAG, "Surface detached; ${panes.size} pane(s) kept alive")
     }
@@ -427,6 +447,32 @@ class DuoScreenController(
         openPane(pane)
     }
 
+    /**
+     * Brings back the app of every pane whose display has lost its task. That happens when the
+     * driver opens the same app on the phone: Android moves the app's existing task to the phone
+     * instead of starting a second one, and the pane is left black until the session is ended and
+     * started again. Coming back to Duo Screen is the driver asking for the car layout, so the app
+     * is launched onto its pane again, which moves it back from the phone.
+     *
+     * Only panes known to be empty are touched. When the system cannot say (the query is missing
+     * on this Android version), a third-party pane is relaunched anyway, which only brings an app
+     * already on its display to the front; our own app is not, because its pane launch always
+     * makes a new instance and would stack a second browser on the first.
+     */
+    private fun recallVacatedPanes() {
+        if (!ops.isAvailable) return
+        panes.forEach { pane ->
+            val packageName = pane.packageName ?: return@forEach
+            val displayId = DuoScreenDisplays.displayId(pane.id)
+            if (displayId < 0) return@forEach
+            val occupied = ops.hasTaskOnDisplay(displayId)
+            val isSelf = DuoScreenSelfPane.isSelf(packageName, context.packageName)
+            if (occupied == true || (occupied == null && isSelf)) return@forEach
+            val relaunched = reload(pane.id)
+            StructuredLog.i(TAG, "Pane ${pane.id}: $packageName ${if (occupied == false) "had left its display" else "state unknown"}; relaunched=$relaunched")
+        }
+    }
+
     /** Re-launches a pane's app, for the "pane went black" reload action. */
     fun reload(paneId: Int): Boolean {
         val pane = router?.panes?.pane(paneId) ?: return false
@@ -527,6 +573,11 @@ class DuoScreenController(
             onChromeTap(target)
             return
         }
+        // Likewise the open rail: a tap off it closes it and reaches nothing else.
+        if (railOpen) {
+            closeRail()
+            return
+        }
         // An open toolbar closes on a tap anywhere else, and that tap goes no further: it was
         // meant for the toolbar, not for whatever pane is under the finger.
         if (toolbarOpen) {
@@ -546,12 +597,22 @@ class DuoScreenController(
                 if (applyPreset(target.preset)) appliedPreset = target.preset
             }
             is ChromeTarget.ChangeApp -> chromeListener?.onChangeAppRequested(target.paneId)
+            is ChromeTarget.RailApp -> {
+                closeRail()
+                chromeListener?.onChangeAppRequested(target.paneId)
+            }
             is ChromeTarget.Control -> when (target.kind) {
                 ChromeTarget.Kind.LAYOUT -> chromeListener?.onPresetChanged(cyclePreset())
                 ChromeTarget.Kind.SWAP -> swapPanes()
                 ChromeTarget.Kind.RELOAD -> StructuredLog.i(TAG, "Reloaded ${reloadSelectedOrAll()} pane(s)")
                 ChromeTarget.Kind.ARRANGE -> setMode(DuoScreenInputRouter.Mode.EDIT)
                 ChromeTarget.Kind.DONE -> setMode(DuoScreenInputRouter.Mode.NORMAL)
+                ChromeTarget.Kind.RAIL -> if (railOpen) closeRail() else openRail()
+                ChromeTarget.Kind.RAIL_MOVE -> {
+                    val side = DuoScreenStore.railSide(context).other()
+                    DuoScreenStore.setRailSide(context, side)
+                    StructuredLog.i(TAG, "Quick rail moved to the ${side.name.lowercase()} edge")
+                }
                 ChromeTarget.Kind.GRIP ->
                     if (mode == DuoScreenInputRouter.Mode.EDIT) chrome?.barDivider?.let { router?.grabDivider(it) }
                     else if (toolbarOpen) closeToolbar() else openToolbar()
@@ -561,6 +622,8 @@ class DuoScreenController(
         if (toolbarOpen && target is ChromeTarget.Control && target.kind != ChromeTarget.Kind.GRIP) {
             if (mode == DuoScreenInputRouter.Mode.EDIT) closeToolbar() else scheduleToolbarHide()
         }
+        // Using the rail keeps it up for another while.
+        if (railOpen) scheduleRailHide()
         // A short pressed flash, so a tap on a drawn button is seen to have landed.
         pressedChrome = target
         refreshChrome()
@@ -586,6 +649,24 @@ class DuoScreenController(
         toolbarOpen = false
         router?.releaseGrab()
         refreshChrome()
+    }
+
+    private fun openRail() {
+        closeToolbar()
+        railOpen = true
+        scheduleRailHide()
+    }
+
+    private fun closeRail() {
+        mainHandler.removeCallbacks(collapseRail)
+        if (!railOpen) return
+        railOpen = false
+        refreshChrome()
+    }
+
+    private fun scheduleRailHide() {
+        mainHandler.removeCallbacks(collapseRail)
+        mainHandler.postDelayed(collapseRail, RAIL_HIDE_MS)
     }
 
     private fun scheduleToolbarHide() {
@@ -644,10 +725,14 @@ class DuoScreenController(
         val editing = active.mode == DuoScreenInputRouter.Mode.EDIT
         val laidOut = DuoScreenChrome.compute(
             panes, bounds, density, editing, labels, chromeRenderer::measure,
-            toolbarOpen = toolbarOpen && !editing
+            toolbarOpen = toolbarOpen && !editing,
+            railSide = DuoScreenStore.railSide(context),
+            railOpen = railOpen && !editing
         )
         chrome = laidOut
-        val apps = if (editing) panes.associate { it.id to appFor(it.packageName) } else emptyMap()
+        val apps = if (editing || (railOpen && laidOut.rail?.panel != null)) {
+            panes.associate { it.id to appFor(it.packageName) }
+        } else emptyMap()
         val titles = if (editing) panes.associate { pane ->
             pane.id to context.getString(R.string.duo_card_title, pane.id + 1, apps[pane.id]?.label.orEmpty())
         } else emptyMap()
@@ -798,7 +883,11 @@ class DuoScreenController(
         if (handler == null) {
             touch.cancelAll()
         } else {
-            handler.post { touch.cancelAll() }
+            handler.removeCallbacks(dragIdle)
+            handler.post {
+                drag = null
+                touch.cancelAll()
+            }
             inputThread?.quitSafely()
         }
         inputHandler = null
@@ -822,6 +911,14 @@ class DuoScreenController(
         // Geometry is read here, on the caller's thread, where the pane set and the displays are
         // written; only the injection itself goes to the input thread.
         onInputThread {
+            finishDrag()
+            // A tap on a pane whose app was taken to the phone has nothing to land on: bring the
+            // app back to the pane instead, which is what the driver tapping a black pane wants.
+            if (pane.packageName != null && ops.hasTaskOnDisplay(displayId) == false) {
+                val relaunched = reload(paneId)
+                StructuredLog.i(TAG, "Tap on empty pane $paneId (${pane.packageName}); relaunched=$relaunched")
+                return@onInputThread
+            }
             val injected = touch.tap(displayId, x, y)
             // A refused injection is silent otherwise: it is what an unavailable Shizuku looks
             // like from the car, a screen that simply does not react.
@@ -838,6 +935,28 @@ class DuoScreenController(
      * is replayed as a drag starting at the pane's centre — the only point guaranteed to be inside
      * the pane — moving by the opposite of the scrolled distance, the direction content travels.
      */
+    /**
+     * One finger held down across a whole swipe. The host reports a swipe as a run of scroll
+     * distances with no position; each used to be replayed as a drag of its own from the pane's
+     * centre (down, a few moves, up). A map then saw dozens of tiny separate drags: the short ones
+     * fell inside its touch slop and were dropped, and each lift could start a small fling, so the
+     * map lagged behind the finger and then overshot. Now the first scroll puts a finger down,
+     * every later one moves it, and it is lifted once the scrolls stop ([DRAG_IDLE_MS]) or the
+     * host reports the fling that ends the swipe. Only ever touched on the input thread.
+     */
+    private class Drag(val paneId: Int, val displayId: Int, var x: Int, var y: Int)
+
+    private var drag: Drag? = null
+    private val dragIdle = Runnable { finishDrag() }
+
+    /** Lifts the finger of the drag in progress, if any. Input thread only. */
+    private fun finishDrag() {
+        inputHandler?.removeCallbacks(dragIdle)
+        val active = drag ?: return
+        drag = null
+        touch.touchUp(active.displayId, DuoScreenTouchController.POINTER_ID, active.x, active.y)
+    }
+
     override fun forwardScroll(paneId: Int, dx: Int, dy: Int) {
         CarScreenPower.carInput()
         val displayId = DuoScreenDisplays.displayId(paneId)
@@ -850,22 +969,54 @@ class DuoScreenController(
         val centreY = size.height / 2
         val (scrollX, scrollY) =
             DuoScreenLayout.scaleDeltaToDisplay(dx, dy, pane.rect, size.width, size.height)
-        // The whole drag is one unit of work on the input thread, so its down, moves and up stay
-        // in order and none of the six injections it costs lands on the caller's thread.
         onInputThread {
-            if (!touch.touchDown(
-                    displayId, DuoScreenTouchController.POINTER_ID, centreX, centreY
-                )
-            ) return@onInputThread
-            val ids = intArrayOf(DuoScreenTouchController.POINTER_ID)
-            for (step in 1..SCROLL_STEPS) {
-                val x = centreX - scrollX * step / SCROLL_STEPS
-                val y = centreY - scrollY * step / SCROLL_STEPS
-                touch.touchMove(displayId, ids, intArrayOf(x), intArrayOf(y))
+            var active = drag
+            // A swipe that moved to the other pane ends the one before it.
+            if (active != null && (active.paneId != paneId || active.displayId != displayId)) {
+                finishDrag()
+                active = null
             }
-            touch.touchUp(
-                displayId, DuoScreenTouchController.POINTER_ID, centreX - scrollX, centreY - scrollY
-            )
+            if (active == null) {
+                if (!touch.touchDown(displayId, DuoScreenTouchController.POINTER_ID, centreX, centreY)) {
+                    return@onInputThread
+                }
+                active = Drag(paneId, displayId, centreX, centreY).also { drag = it }
+            }
+            var x = active.x - scrollX
+            var y = active.y - scrollY
+            // Run out of display: lift where the finger is and put it down again at the centre,
+            // the way a person re-grips a long scroll, instead of clamping and losing distance.
+            val margin = DRAG_EDGE_MARGIN
+            if (x !in margin..size.width - margin || y !in margin..size.height - margin) {
+                finishDrag()
+                if (!touch.touchDown(displayId, DuoScreenTouchController.POINTER_ID, centreX, centreY)) {
+                    return@onInputThread
+                }
+                active = Drag(paneId, displayId, centreX, centreY).also { drag = it }
+                x = (centreX - scrollX).coerceIn(margin, size.width - margin)
+                y = (centreY - scrollY).coerceIn(margin, size.height - margin)
+            }
+            if (touch.touchMove(displayId, intArrayOf(DuoScreenTouchController.POINTER_ID), intArrayOf(x), intArrayOf(y))) {
+                active.x = x
+                active.y = y
+            }
+            inputHandler?.let { handler ->
+                handler.removeCallbacks(dragIdle)
+                handler.postDelayed(dragIdle, DRAG_IDLE_MS)
+            }
+        }
+    }
+
+    /**
+     * The end of a swipe. With a drag in progress the finger is simply lifted now, so the app
+     * measures the speed from the real moves just sent and flings as far as the driver meant.
+     * Without one (a fling the host reported on its own) it falls back to the damped scroll.
+     */
+    override fun forwardFling(paneId: Int, velocityX: Int, velocityY: Int) {
+        CarScreenPower.carInput()
+        onInputThread {
+            if (drag?.paneId == paneId) finishDrag()
+            else mainHandler.post { forwardScroll(paneId, velocityX / 8, velocityY / 8) }
         }
     }
 

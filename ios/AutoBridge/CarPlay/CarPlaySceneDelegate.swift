@@ -1,5 +1,6 @@
 import AVFoundation
 import CarPlay
+import Combine
 import Foundation
 import UIKit
 
@@ -19,6 +20,12 @@ import UIKit
 @objc(CarPlaySceneDelegate)
 final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     private var interfaceController: CPInterfaceController?
+    /// The CarPlay window, when the app holds the navigation entitlement; see the web section below.
+    private var carWebWindow: CPWindow?
+    /// Where the last pan update left off, so each update scrolls by the change since then.
+    private var lastPan: CGPoint = .zero
+    /// Keeps the Favorites and Recently-played tabs in step with the phone while connected.
+    private var subscriptions = Set<AnyCancellable>()
 
     private var stores: AutoBridgeStores { AutoBridgeStores.shared }
 
@@ -31,6 +38,7 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
         didConnect interfaceController: CPInterfaceController
     ) {
         self.interfaceController = interfaceController
+        subscriptions.removeAll()
         interfaceController.setRootTemplate(rootTemplate(), animated: true, completion: nil)
         addCloseButton()
         VehicleReminders.carConnected()
@@ -41,25 +49,47 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
         didDisconnectInterfaceController interfaceController: CPInterfaceController
     ) {
         self.interfaceController = nil
+        subscriptions.removeAll()
         VehicleReminders.carDisconnected()
     }
 
     // MARK: - Root
 
-    /// The dashboard: the sections CarPlay can serve, in the shared `HomeSection` order.
+    /// The dashboard, laid out like the Android car home: a Home grid with the quick-access tiles in
+    /// the same order, then the Favorites and Recently-played lists. Every tab carries both a title
+    /// and an image; a tab without an image is what CarPlay draws as an unlabelled "More".
     private func rootTemplate() -> CPTemplate {
-        let tabs: [CPListTemplate] = HomeSection.carSections.map { section in
-            switch section {
-            case .radio:
-                return sourcesTemplate(kind: .radio, title: section.plainTitle)
-            case .tv:
-                return sourcesTemplate(kind: .tv, title: section.plainTitle)
-            default:
-                return favoritesTemplate(title: section.plainTitle)
+        let tabs: [CPTemplate] = [homeTemplate(), favoritesTemplate(), recentTemplate()]
+        return CPTabBarTemplate(templates: Array(tabs.prefix(CPTabBarTemplate.maximumTabCount)))
+    }
+
+    private func homeTemplate() -> CPGridTemplate {
+        let scale = interfaceController?.carTraitCollection.displayScale ?? 2
+        let buttons = HomeSection.carQuickAccess.prefix(8).map { section in
+            CPGridButton(
+                titleVariants: [section.plainTitle],
+                image: CarPlayHome.tileImage(for: section, scale: scale)
+            ) { [weak self] _ in
+                self?.open(section)
             }
-        } + [recentTemplate()]
-        let bar = CPTabBarTemplate(templates: tabs)
-        return bar
+        }
+        let template = CPGridTemplate(title: "AutoBridge", gridButtons: Array(buttons))
+        template.tabTitle = NSLocalizedString("Home", comment: "CarPlay tab")
+        template.tabImage = UIImage(systemName: "square.grid.2x2.fill")
+        return template
+    }
+
+    /// A home tile. TV and Radio drill into their sources; the browser-backed tiles open a list of
+    /// what can play in the car, since a web page cannot be shown there.
+    private func open(_ section: HomeSection) {
+        let template: CPListTemplate
+        switch section {
+        case .tv, .radio:
+            template = sourcesTemplate(kind: section.iptvKind ?? .tv, title: section.plainTitle)
+        default:
+            template = hubTemplate(section)
+        }
+        interfaceController?.pushTemplate(template, animated: true, completion: nil)
     }
 
     private func sourcesTemplate(kind: IptvKind, title: String) -> CPListTemplate {
@@ -82,7 +112,6 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
             title: title,
             sections: [CPListSection(items: items)]
         )
-        template.tabTitle = title
         template.emptyViewTitleVariants = [
             NSLocalizedString("No sources", comment: "CarPlay")
         ]
@@ -95,33 +124,38 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
         return template
     }
 
-    private func favoritesTemplate(title: String) -> CPListTemplate {
-        let favorites = stores.history.favorites
-        let tracks = favorites.map(PlaybackController.Track.init(item:))
-        let items = favorites.enumerated().map { index, favorite -> CPListItem in
-            let item = CPListItem(text: favorite.title, detailText: kindLabel(favorite.kind))
-            item.handler = { [weak self] _, completion in
-                self?.play(tracks, index: index)
+    /// YouTube, YouTube Music, the browser and the streaming sites are web pages, which the car
+    /// cannot show. Their tile still plays: a now-playing row, the remembered channels that are real
+    /// streams, and a note saying the site itself opens on the phone.
+    private func hubTemplate(_ section: HomeSection) -> CPListTemplate {
+        var sections: [CPListSection] = []
+
+        if let current = stores.playback.current {
+            let row = CPListItem(
+                text: String(
+                    format: NSLocalizedString("Now playing: %@", comment: "CarPlay"),
+                    current.title
+                ),
+                detailText: nil,
+                image: UIImage(systemName: "speaker.wave.2.fill"),
+                accessoryImage: nil,
+                accessoryType: .disclosureIndicator
+            )
+            row.handler = { [weak self] _, completion in
+                self?.showNowPlaying()
                 completion()
             }
-            load(favorite.logo, into: item)
-            return item
+            sections.append(CPListSection(items: [row]))
         }
-        let template = CPListTemplate(title: title, sections: [CPListSection(items: items)])
-        template.tabTitle = title
-        template.emptyViewTitleVariants = [
-            NSLocalizedString("Nothing saved yet", comment: "CarPlay")
-        ]
-        template.emptyViewSubtitleVariants = [
-            NSLocalizedString("Star a channel on your phone.", comment: "CarPlay")
-        ]
-        return template
-    }
 
-    private func recentTemplate() -> CPListTemplate {
-        let recent = stores.history.recent.filter { $0.playback == .stream }
-        let tracks = recent.map(PlaybackController.Track.init(item:))
-        let items = recent.enumerated().map { index, entry -> CPListItem in
+        let playable = CarPlayHome.playable(
+            for: section,
+            favorites: stores.history.favorites,
+            recent: stores.history.recent
+        )
+        let limit = max(CPListTemplate.maximumItemCount - 2, 1)
+        let tracks = playable.map(PlaybackController.Track.init(item:))
+        let rows = playable.prefix(limit).enumerated().map { index, entry -> CPListItem in
             let item = CPListItem(text: entry.title, detailText: kindLabel(entry.kind))
             item.handler = { [weak self] _, completion in
                 self?.play(tracks, index: index)
@@ -130,16 +164,133 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
             load(entry.logo, into: item)
             return item
         }
-        let title = NSLocalizedString("Recently played", comment: "Row")
-        let template = CPListTemplate(title: title, sections: [CPListSection(items: items)])
+        if !rows.isEmpty {
+            sections.append(CPListSection(
+                items: rows,
+                header: NSLocalizedString("Play in the car", comment: "CarPlay"),
+                sectionIndexTitle: nil
+            ))
+        }
+
+        let note = CarPlayHome.phoneNote(for: section)
+        if let note {
+            let row = CPListItem(
+                text: note.title,
+                detailText: note.subtitle,
+                image: UIImage(systemName: "iphone"),
+                accessoryImage: nil,
+                accessoryType: .none
+            )
+            row.handler = { [weak self] _, completion in
+                self?.presentNote(note.title, note.subtitle)
+                completion()
+            }
+            sections.append(CPListSection(items: [row]))
+        }
+
+        let template = CPListTemplate(title: section.plainTitle, sections: sections)
+        if let note {
+            template.emptyViewTitleVariants = [note.title]
+            template.emptyViewSubtitleVariants = [note.subtitle]
+        }
+        return template
+    }
+
+    private func presentNote(_ title: String, _ subtitle: String) {
+        let ok = CPAlertAction(
+            title: NSLocalizedString("OK", comment: "Button"),
+            style: .default
+        ) { [weak self] _ in
+            self?.interfaceController?.dismissTemplate(animated: true, completion: nil)
+        }
+        let alert = CPAlertTemplate(titleVariants: [title + "\n" + subtitle, title], actions: [ok])
+        interfaceController?.presentTemplate(alert, animated: true, completion: nil)
+    }
+
+    private func favoritesTemplate() -> CPListTemplate {
+        let title = HomeSection.favorites.plainTitle
+        let template = CPListTemplate(
+            title: title,
+            sections: favoritesSections(stores.history.favorites)
+        )
         template.tabTitle = title
+        template.tabImage = UIImage(systemName: "star.fill")
+        template.emptyViewTitleVariants = [
+            NSLocalizedString("Nothing saved yet", comment: "CarPlay")
+        ]
+        template.emptyViewSubtitleVariants = [
+            NSLocalizedString("Star a channel on your phone.", comment: "CarPlay")
+        ]
+        // Stays live: a channel starred on the phone (or from Now Playing) shows up without a reconnect.
+        stores.history.$favorites
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self, weak template] favorites in
+                Task { @MainActor in
+                    guard let self, let template else { return }
+                    template.updateSections(self.favoritesSections(favorites))
+                }
+            }
+            .store(in: &subscriptions)
+        return template
+    }
+
+    private func favoritesSections(_ favorites: [IptvHistoryItem]) -> [CPListSection] {
+        let shown = Array(favorites.prefix(CPListTemplate.maximumItemCount))
+        let tracks = favorites.map(PlaybackController.Track.init(item:))
+        let items = shown.enumerated().map { index, favorite -> CPListItem in
+            let item = CPListItem(text: favorite.title, detailText: kindLabel(favorite.kind))
+            item.handler = { [weak self] _, completion in
+                self?.play(tracks, index: index)
+                completion()
+            }
+            load(favorite.logo, into: item)
+            return item
+        }
+        return [CPListSection(items: items)]
+    }
+
+    private func recentTemplate() -> CPListTemplate {
+        let title = NSLocalizedString("Recently played", comment: "Row")
+        let template = CPListTemplate(
+            title: title,
+            sections: recentSections(stores.history.recent)
+        )
+        template.tabTitle = title
+        template.tabImage = UIImage(systemName: "clock.fill")
         template.emptyViewTitleVariants = [
             NSLocalizedString("Nothing yet", comment: "CarPlay")
         ]
         template.emptyViewSubtitleVariants = [
             NSLocalizedString("Channels you play show up here.", comment: "CarPlay")
         ]
+        stores.history.$recent
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self, weak template] recent in
+                Task { @MainActor in
+                    guard let self, let template else { return }
+                    template.updateSections(self.recentSections(recent))
+                }
+            }
+            .store(in: &subscriptions)
         return template
+    }
+
+    private func recentSections(_ all: [IptvHistoryItem]) -> [CPListSection] {
+        let recent = all.filter { $0.playback == .stream }
+        let shown = Array(recent.prefix(CPListTemplate.maximumItemCount))
+        let tracks = recent.map(PlaybackController.Track.init(item:))
+        let items = shown.enumerated().map { index, entry -> CPListItem in
+            let item = CPListItem(text: entry.title, detailText: kindLabel(entry.kind))
+            item.handler = { [weak self] _, completion in
+                self?.play(tracks, index: index)
+                completion()
+            }
+            load(entry.logo, into: item)
+            return item
+        }
+        return [CPListSection(items: items)]
     }
 
     // MARK: - Drill-down
@@ -259,7 +410,14 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
                 comment: "CarPlay"
             )
         ]
-        interfaceController?.pushTemplate(template, animated: true, completion: nil)
+        // Later pages replace the current one rather than stacking on it: CarPlay allows five levels,
+        // and Home → sources → categories → entries → Now Playing already uses them all. Back still
+        // returns to the category list.
+        if page > 0 {
+            replaceTop(with: template)
+        } else {
+            interfaceController?.pushTemplate(template, animated: true, completion: nil)
+        }
 
         // The same automatic check the phone page runs, so a dead channel reads as dead here too.
         let urls = slice.map(\.url)
@@ -313,11 +471,21 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
         if let origin = track.origin {
             stores.history.recordPlayback(origin)
         }
-        interfaceController?.pushTemplate(
-            CPNowPlayingTemplate.shared,
-            animated: true,
-            completion: nil
-        )
+        showNowPlaying()
+    }
+
+    /// Pushes Now Playing unless it is already on the stack; CarPlay throws on a second push of the
+    /// same template.
+    private func showNowPlaying() {
+        guard let controller = interfaceController else { return }
+        let shared = CPNowPlayingTemplate.shared
+        if controller.templates.contains(where: { $0 === shared }) {
+            if controller.topTemplate !== shared {
+                controller.pop(to: shared, animated: true, completion: nil)
+            }
+            return
+        }
+        controller.pushTemplate(shared, animated: true, completion: nil)
     }
 
     // MARK: - Row text and artwork
@@ -357,5 +525,158 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
             guard let image = await ImageLoader.shared.load(url) else { return }
             item.setImage(image)
         }
+    }
+}
+
+// MARK: - Web pages on the CarPlay screen
+
+/// A real web page on the CarPlay screen. CarPlay hands an app a window it can draw in only when
+/// the app holds the navigation entitlement (`com.apple.developer.carplay-maps`), and then calls the
+/// `to window:` variant below instead of the audio one above. Apple grants that entitlement to
+/// navigation apps only, so only the Simulator's entitlements declare it: on a device the app stays
+/// the audio surface and none of this runs.
+///
+/// The window takes no touches, so the page is driven the way a map is: pan to scroll, map buttons
+/// for up/down/back/reload, a search button for the address (CarPlay's own keyboard), and the
+/// phone browser's car controls. The audio home is one button away.
+extension CarPlaySceneDelegate: CPMapTemplateDelegate, CPSearchTemplateDelegate {
+    func templateApplicationScene(
+        _ templateApplicationScene: CPTemplateApplicationScene,
+        didConnect interfaceController: CPInterfaceController,
+        to window: CPWindow
+    ) {
+        self.interfaceController = interfaceController
+        subscriptions.removeAll()
+        let controller = CarWebViewController()
+        window.rootViewController = controller
+        carWebWindow = window
+        let screen = CarWebScreen.shared
+        screen.attach(controller, as: .carPlay)
+        if screen.currentURL.isEmpty, let start = URL(string: "https://www.google.com") {
+            screen.show(start)
+        }
+        interfaceController.setRootTemplate(webMapTemplate(), animated: true, completion: nil)
+        addCloseButton()
+        VehicleReminders.carConnected()
+    }
+
+    func templateApplicationScene(
+        _ templateApplicationScene: CPTemplateApplicationScene,
+        didDisconnect interfaceController: CPInterfaceController,
+        from window: CPWindow
+    ) {
+        CarWebScreen.shared.detach(.carPlay)
+        carWebWindow = nil
+        self.interfaceController = nil
+        subscriptions.removeAll()
+        VehicleReminders.carDisconnected()
+    }
+
+    private func webMapTemplate() -> CPMapTemplate {
+        let map = CPMapTemplate()
+        map.mapDelegate = self
+        map.automaticallyHidesNavigationBar = false
+        let screen = CarWebScreen.shared
+        map.mapButtons = [
+            mapButton("chevron.up") { screen.scroll(pages: -0.8) },
+            mapButton("chevron.down") { screen.scroll(pages: 0.8) },
+            mapButton("arrow.uturn.backward") { screen.goBack() },
+            mapButton("arrow.clockwise") { screen.reload() },
+        ]
+        let home = CPBarButton(image: UIImage(systemName: "square.grid.2x2") ?? UIImage()) { [weak self] _ in
+            guard let self else { return }
+            self.interfaceController?.pushTemplate(self.homeTemplate(), animated: true, completion: nil)
+        }
+        let address = CPBarButton(image: UIImage(systemName: "magnifyingglass") ?? UIImage()) { [weak self] _ in
+            self?.openAddressSearch()
+        }
+        map.leadingNavigationBarButtons = [home]
+        map.trailingNavigationBarButtons = [address]
+        return map
+    }
+
+    private func mapButton(_ symbol: String, action: @escaping () -> Void) -> CPMapButton {
+        let button = CPMapButton { _ in action() }
+        button.image = UIImage(systemName: symbol)
+        return button
+    }
+
+    private func openAddressSearch() {
+        let search = CPSearchTemplate()
+        search.delegate = self
+        interfaceController?.pushTemplate(search, animated: true, completion: nil)
+    }
+
+    // MARK: Pan to scroll
+
+    func mapTemplateDidBeginPanGesture(_ mapTemplate: CPMapTemplate) {
+        lastPan = .zero
+    }
+
+    func mapTemplate(_ mapTemplate: CPMapTemplate, didUpdatePanGestureWithTranslation translation: CGPoint, velocity: CGPoint) {
+        // A finger moving down drags the page down, which moves the view up the page.
+        let delta = CGPoint(x: lastPan.x - translation.x, y: lastPan.y - translation.y)
+        lastPan = translation
+        CarWebScreen.shared.scroll(by: delta)
+    }
+
+    func mapTemplate(_ mapTemplate: CPMapTemplate, didEndPanGestureWithVelocity velocity: CGPoint) {
+        lastPan = .zero
+    }
+
+    /// The pan buttons a car without a touch screen shows.
+    func mapTemplate(_ mapTemplate: CPMapTemplate, panWith direction: CPMapTemplate.PanDirection) {
+        let step: CGFloat = 240
+        var delta = CGPoint.zero
+        if direction.contains(.up) { delta.y -= step }
+        if direction.contains(.down) { delta.y += step }
+        if direction.contains(.left) { delta.x -= step }
+        if direction.contains(.right) { delta.x += step }
+        CarWebScreen.shared.scroll(by: delta)
+    }
+
+    // MARK: Address search
+
+    func searchTemplate(
+        _ searchTemplate: CPSearchTemplate,
+        updatedSearchText searchText: String,
+        completionHandler: @escaping ([CPListItem]) -> Void
+    ) {
+        completionHandler(webSuggestions(for: searchText))
+    }
+
+    func searchTemplate(
+        _ searchTemplate: CPSearchTemplate,
+        selectedResult item: CPListItem,
+        completionHandler: @escaping () -> Void
+    ) {
+        if let address = item.userInfo as? String, let url = URL(string: address) {
+            CarWebScreen.shared.show(url)
+        }
+        interfaceController?.popToRootTemplate(animated: true, completion: nil)
+        completionHandler()
+    }
+
+    /// What was typed (as an address or a search), then the saved pages that match it.
+    private func webSuggestions(for text: String) -> [CPListItem] {
+        var items: [CPListItem] = []
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let url = WebViewModel.resolve(trimmed) {
+            let item = CPListItem(text: trimmed, detailText: url.host ?? url.absoluteString)
+            item.userInfo = url.absoluteString
+            items.append(item)
+        }
+        let needle = trimmed.lowercased()
+        let saved = stores.bookmarks.bookmarks.filter { bookmark in
+            needle.isEmpty
+                || bookmark.title.lowercased().contains(needle)
+                || bookmark.url.lowercased().contains(needle)
+        }
+        for bookmark in saved.prefix(12) {
+            let item = CPListItem(text: bookmark.title, detailText: URL(string: bookmark.url)?.host ?? bookmark.url)
+            item.userInfo = bookmark.url
+            items.append(item)
+        }
+        return items
     }
 }

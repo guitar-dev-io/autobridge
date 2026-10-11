@@ -40,10 +40,20 @@ enum StreamingLinks {
     static let all: [StreamingLink] = [
         StreamingLink(title: "YouTube", group: .video, url: URL(string: "https://m.youtube.com")!),
         StreamingLink(title: "TikTok", group: .video, url: URL(string: "https://www.tiktok.com")!),
+        StreamingLink(title: "Facebook Watch", group: .video, url: URL(string: "https://m.facebook.com/watch")!),
+        StreamingLink(title: "Dailymotion", group: .video, url: URL(string: "https://www.dailymotion.com")!),
+        StreamingLink(title: "Vimeo", group: .video, url: URL(string: "https://vimeo.com")!),
         StreamingLink(title: "YouTube Music", group: .music, url: URL(string: "https://music.youtube.com")!),
+        StreamingLink(title: "SoundCloud", group: .music, url: URL(string: "https://m.soundcloud.com")!),
+        StreamingLink(title: "Mixcloud", group: .music, url: URL(string: "https://www.mixcloud.com")!),
+        StreamingLink(title: "Radio Garden", group: .music, url: URL(string: "https://radio.garden")!),
+        StreamingLink(title: "YouTube Live", group: .live, url: URL(string: "https://m.youtube.com/live")!),
         StreamingLink(title: "Twitch", group: .live, url: URL(string: "https://www.twitch.tv")!),
+        StreamingLink(title: "Kick", group: .live, url: URL(string: "https://kick.com")!),
         // The international site; bilibili.com is the mainland-China front end.
-        StreamingLink(title: "Bilibili", group: .anime, url: URL(string: "https://www.bilibili.tv")!)
+        StreamingLink(title: "Bilibili", group: .anime, url: URL(string: "https://www.bilibili.tv")!),
+        StreamingLink(title: "Muse Asia", group: .anime, url: URL(string: "https://m.youtube.com/@MuseAsia")!),
+        StreamingLink(title: "Ani-One Asia", group: .anime, url: URL(string: "https://m.youtube.com/@AniOneAsia")!)
     ]
 
     /// [all] split by group, in `StreamingGroup` order, skipping empty groups.

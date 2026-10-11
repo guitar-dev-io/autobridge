@@ -47,7 +47,35 @@ object WebMediaHub {
     var source: WebMediaSource? = null
         private set
 
+    /**
+     * The most recent reading the service's one-second poll took of [source], republished here so
+     * the home dashboard can show it without probing the WebView a second time. Null until the
+     * first poll and whenever no source is registered. Written and read on the main thread (see the
+     * class doc); @Volatile is belt-and-suspenders, not a cross-thread contract change.
+     */
+    @Volatile
+    var lastStatus: WebMediaStatus? = null
+        private set
+
+    private val statusListeners = mutableListOf<() -> Unit>()
+
     private var keepAlive: ListenableFuture<MediaController>? = null
+
+    /** Republishes the latest poll reading and wakes anything watching for it. Main thread. */
+    fun publishStatus(status: WebMediaStatus) {
+        runOnMain {
+            lastStatus = status
+            statusListeners.toList().forEach { it() }
+        }
+    }
+
+    fun addStatusListener(listener: () -> Unit) {
+        runOnMain { statusListeners.add(listener) }
+    }
+
+    fun removeStatusListener(listener: () -> Unit) {
+        runOnMain { statusListeners.remove(listener) }
+    }
 
     fun register(context: Context, newSource: WebMediaSource) {
         runOnMain {
@@ -66,6 +94,7 @@ object WebMediaHub {
         runOnMain {
             if (source !== oldSource) return@runOnMain
             source = null
+            lastStatus = null
             keepAlive?.let { MediaController.releaseFuture(it) }
             keepAlive = null
             StructuredLog.i("MEDIA", "web media source unregistered")

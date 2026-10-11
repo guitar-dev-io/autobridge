@@ -5,13 +5,24 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      all_flavors:
+        description: 'Also build the personal AAB and the lab APK'
+        type: boolean
+        default: false
 
 permissions:
   contents: write  # needed to create a GitHub Release and attach the artifacts
 
+# Only the personal APK is built and published by default: it is the one file anyone installs.
+# The personal AAB and the lab APK are still wired up below; tick "all_flavors" on a manual run,
+# or change the 'false' here to 'true', to build and publish them again.
+env:
+  ALL_FLAVORS: ${{ github.event.inputs.all_flavors == 'true' && 'true' || 'false' }}
+
 jobs:
   release:
-    name: Build + publish personal release AAB + APK
+    name: Build + publish personal release APK
     runs-on: ubuntu-latest
 
     steps:
@@ -96,12 +107,15 @@ jobs:
       # One build pass; every variant shares the same signing config.
       #   AAB -> app/build/outputs/bundle/<flavor>Release/*.aab
       #   APK -> app/build/outputs/apk/<flavor>/release/*.apk
-      - name: Build release (all flavors)
-        run: >-
-          ./gradlew --no-daemon
-          bundlePersonalRelease
-          assemblePersonalRelease
-          assembleLabRelease
+      - name: Build release
+        run: |
+          set -euo pipefail
+          tasks="assemblePersonalRelease"
+          if [ "$ALL_FLAVORS" = "true" ]; then
+            tasks="bundlePersonalRelease $tasks assembleLabRelease"
+          fi
+          echo "Building: $tasks"
+          ./gradlew --no-daemon $tasks
 
       # Scrub decoded signing material. The runner is ephemeral, but do not depend on that, and
       # keep it out of any later step's artifact upload.
@@ -138,13 +152,26 @@ jobs:
           if-no-files-found: error
 
       # Only publish a GitHub Release for an actual tag push, not for manual dispatch on a branch.
-      - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
+      # A version with a suffix (0.4.58-rc2) is published as a pre-release: the in-app update check
+      # reads /releases/latest, which skips pre-releases, so only people who go looking get it.
+      - name: Publish GitHub Release (personal APK)
+        if: startsWith(github.ref, 'refs/tags/') && env.ALL_FLAVORS != 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            app/build/outputs/apk/personal/release/*.apk
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+
+      - name: Publish GitHub Release (all flavors)
+        if: startsWith(github.ref, 'refs/tags/') && env.ALL_FLAVORS == 'true'
         uses: softprops/action-gh-release@v2
         with:
           files: |
             app/build/outputs/bundle/personalRelease/*.aab
             app/build/outputs/apk/personal/release/*.apk
             app/build/outputs/apk/lab/release/*.apk
+          prerelease: ${{ contains(github.ref_name, '-') }}
           generate_release_notes: true
           fail_on_unmatched_files: true

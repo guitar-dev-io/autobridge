@@ -23,6 +23,7 @@
 		356C2ABE5EDA73A3E4E0C94F /* StreamingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDC80990B7C3DE99CDE26B0B /* StreamingView.swift */; };
 		37E70AADC9E8093FFAB8BA16 /* WebBookmarkStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44662BFD7604655B7B40F9C5 /* WebBookmarkStore.swift */; };
 		3B83354A1BAD95DDB68F1BEB /* IptvLogoTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3352016DB3BC9D15E2602E5D /* IptvLogoTests.swift */; };
+		3C99792AFF819A599744B542 /* CarPlayHomeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C864FE45BCA84340EB36A71D /* CarPlayHomeTests.swift */; };
 		3D751552675C15D534AE41B4 /* EntriesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8CD1B0AFCBA2049D81507C1 /* EntriesView.swift */; };
 		43E7C05C5CBB30EE986B1407 /* M3UParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = F33FD94FA9377C4C7EDDE399 /* M3UParser.swift */; };
 		562C490D509CD063D7AFF95C /* LogoImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1525E900FD0B1F7348559808 /* LogoImage.swift */; };
@@ -63,6 +64,7 @@
 		DA92F3A20D463D1D2CBEF204 /* AutoBridgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC2DC46EF46D56B3DCAE7B87 /* AutoBridgeApp.swift */; };
 		E8F5F6FB291459300CAFC018 /* SourceEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 550645EFF34BB231101D7681 /* SourceEditorView.swift */; };
 		EB3CBBECAD4B21AF24AC2742 /* YouTubeSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4290FBCFB77588B67364890B /* YouTubeSettings.swift */; };
+		F35A92DFF1BA5FFDA1D03A00 /* CarPlayHome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 898E261272F950E65063F7BB /* CarPlayHome.swift */; };
 		F5AB8547D7ED937536F752CC /* IptvCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 189B3F1C31952ED59382B6D2 /* IptvCatalog.swift */; };
 		F9EB7FC677D9AA453689BDEF /* CategoriesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4EEFD36366253809E393E28 /* CategoriesView.swift */; };
 		FC4FF43AEF3C484CC2BC54C6 /* PublicPlaylistLiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48D0F34BA08E481909D56DBB /* PublicPlaylistLiveTests.swift */; };
@@ -117,9 +119,11 @@
 		5A61357E5F6A066871B5B085 /* ImageLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageLoader.swift; sourceTree = "<group>"; };
 		5B5C83969DF4E421EEA46DDB /* IptvParsingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IptvParsingTests.swift; sourceTree = "<group>"; };
 		6104955E5574E28E0409343E /* YouTubeEnhancer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YouTubeEnhancer.swift; sourceTree = "<group>"; };
+		64ECB917D5EC736D916E503D /* AutoBridge-Simulator.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "AutoBridge-Simulator.entitlements"; sourceTree = "<group>"; };
 		72B1565EFEB58F895F170630 /* SponsorBlock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SponsorBlock.swift; sourceTree = "<group>"; };
 		75668EE85C556BEE6D663DD2 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		8574DA94B6A75256E17915DD /* EntryDestination.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntryDestination.swift; sourceTree = "<group>"; };
+		898E261272F950E65063F7BB /* CarPlayHome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlayHome.swift; sourceTree = "<group>"; };
 		8C72312437F67EE6EC6AA0B5 /* SecretStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecretStore.swift; sourceTree = "<group>"; };
 		90A6641BCB55772A45E5C18E /* YouTubeUrls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YouTubeUrls.swift; sourceTree = "<group>"; };
 		979C3C4AC48B3DF9D08AB710 /* VehicleModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VehicleModels.swift; sourceTree = "<group>"; };
@@ -130,6 +134,7 @@
 		BDCF7A15D3729726728098DC /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		BE6B47C8061C685ABA88F45D /* PlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerView.swift; sourceTree = "<group>"; };
 		C83CD83EAC29DF506D9646BD /* XtreamClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XtreamClient.swift; sourceTree = "<group>"; };
+		C864FE45BCA84340EB36A71D /* CarPlayHomeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlayHomeTests.swift; sourceTree = "<group>"; };
 		C874A91AF4C596E5BD9F1C74 /* HistoryViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryViews.swift; sourceTree = "<group>"; };
 		CC7D3A74BBDB6B6A996BCB89 /* MiniPlayerBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniPlayerBar.swift; sourceTree = "<group>"; };
 		D372FD1C63A1C741B96835B8 /* BuildFlavor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuildFlavor.swift; sourceTree = "<group>"; };
@@ -197,6 +202,7 @@
 		605FE106893ABBF71EED14FF /* AutoBridgeTests */ = {
 			isa = PBXGroup;
 			children = (
+				C864FE45BCA84340EB36A71D /* CarPlayHomeTests.swift */,
 				3352016DB3BC9D15E2602E5D /* IptvLogoTests.swift */,
 				5B5C83969DF4E421EEA46DDB /* IptvParsingTests.swift */,
 				48D0F34BA08E481909D56DBB /* PublicPlaylistLiveTests.swift */,
@@ -251,6 +257,7 @@
 		B5D90F1B0DF130AD369B550E /* CarPlay */ = {
 			isa = PBXGroup;
 			children = (
+				898E261272F950E65063F7BB /* CarPlayHome.swift */,
 				10B9EB0C4091B8889867EAC1 /* CarPlaySceneDelegate.swift */,
 			);
 			path = CarPlay;
@@ -317,6 +324,7 @@
 			isa = PBXGroup;
 			children = (
 				1AD1AEDE1FB31939F1FF6B17 /* Assets.xcassets */,
+				64ECB917D5EC736D916E503D /* AutoBridge-Simulator.entitlements */,
 				14EC81D2CB9115E1C35443EE /* AutoBridge.entitlements */,
 				BDCF7A15D3729726728098DC /* Info.plist */,
 				3DA24DC46A8A91E3C84BC267 /* PrivacyInfo.xcprivacy */,
@@ -428,6 +436,7 @@
 				C2CF7348E34F0E7FC397D1B9 /* AutoBridgeStores.swift in Sources */,
 				9EFD7115C935350856EB6108 /* BrowserView.swift in Sources */,
 				1D777DAB259AC48816F23E0F /* BuildFlavor.swift in Sources */,
+				F35A92DFF1BA5FFDA1D03A00 /* CarPlayHome.swift in Sources */,
 				D4C36BDB3E1FD10DFFEAA6A1 /* CarPlaySceneDelegate.swift in Sources */,
 				F9EB7FC677D9AA453689BDEF /* CategoriesView.swift in Sources */,
 				142704BF823BA667FE09BCF4 /* DirectoryPickerView.swift in Sources */,
@@ -481,6 +490,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3C99792AFF819A599744B542 /* CarPlayHomeTests.swift in Sources */,
 				3B83354A1BAD95DDB68F1BEB /* IptvLogoTests.swift in Sources */,
 				687A83C4AE1EBFA574C27E19 /* IptvParsingTests.swift in Sources */,
 				FC4FF43AEF3C484CC2BC54C6 /* PublicPlaylistLiveTests.swift in Sources */,
@@ -524,7 +534,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = dev.autobridge.ios.tests;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.autobridge.tests;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AutoBridge.app/AutoBridge";
@@ -542,7 +552,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = dev.autobridge.ios.tests;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.autobridge.tests;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AutoBridge.app/AutoBridge";
@@ -614,14 +624,16 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = AutoBridge/Resources/AutoBridge.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "AutoBridge/Resources/AutoBridge-Simulator.entitlements";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AutoBridge/Resources/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = dev.autobridge.ios;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.autobridge;
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = AUTOBRIDGE_STORE;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -633,14 +645,16 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = AutoBridge/Resources/AutoBridge.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "AutoBridge/Resources/AutoBridge-Simulator.entitlements";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AutoBridge/Resources/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = dev.autobridge.ios;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.autobridge;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};

@@ -23,9 +23,16 @@ targets:
       - path: AutoBridge
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: dev.autobridge.ios
+        # Matches the App ID the CarPlay audio entitlement was requested for.
+        PRODUCT_BUNDLE_IDENTIFIER: dev.autobridge
+        # Pinned at target level: Xcode 27 otherwise fills it with
+        # $(RECOMMENDED_IPHONEOS_DEPLOYMENT_TARGET) = 17.0, overriding the project-wide 16.0
+        # and locking out iOS 16 devices (e.g. iPhone 8 / 8 Plus / X).
+        IPHONEOS_DEPLOYMENT_TARGET: "16.0"
         INFOPLIST_FILE: AutoBridge/Resources/Info.plist
         CODE_SIGN_ENTITLEMENTS: AutoBridge/Resources/AutoBridge.entitlements
+        # Simulator only: declares carplay-audio so the CarPlay display in the Simulator shows the app.
+        "CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]": AutoBridge/Resources/AutoBridge-Simulator.entitlements
         GENERATE_INFOPLIST_FILE: NO
         TARGETED_DEVICE_FAMILY: "1,2"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
@@ -47,7 +54,7 @@ targets:
       - target: AutoBridge
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: dev.autobridge.ios.tests
+        PRODUCT_BUNDLE_IDENTIFIER: dev.autobridge.tests
         GENERATE_INFOPLIST_FILE: YES
         # The app ships to iOS 16; XCTest.framework in current Xcode is built for 17, and only the
         # test bundle links it. Raising it here keeps the link warning-free without moving the app.

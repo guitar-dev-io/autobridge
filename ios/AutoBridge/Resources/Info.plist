@@ -12,6 +12,11 @@
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+		<string>th</string>
+	</array>
 	<key>CFBundleName</key>
 	<string>$(PRODUCT_NAME)</string>
 	<key>CFBundlePackageType</key>
@@ -20,32 +25,8 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
-	<key>CFBundleLocalizations</key>
-	<array>
-		<string>en</string>
-		<string>th</string>
-	</array>
-
-	<!-- Radio has to keep playing with the screen locked and the phone in a pocket, which is the
-	     whole point of the section in a car. -->
-	<!-- Only the system's HTTPS; no encryption of our own to declare on each upload. -->
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Your location is read only when you tap Mark here, to save where you parked. It stays on this phone.</string>
-	<key>NSCameraUsageDescription</key>
-	<string>A photo of the floor sign or pillar number helps you find the parked car. It stays on this phone.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>audio</string>
-	</array>
-
-	<!-- IPTV is an http world. A large share of every public playlist, and most Xtream portals,
-	     serve `http://` stream and logo addresses; with App Transport Security at its default
-	     those requests fail before they are made and the app looks broken rather than honest.
-	     Arbitrary loads are therefore allowed, which is a real reduction in transport security
-	     and the reason it is stated here rather than buried: AutoBridge connects to whatever
-	     address a playlist the user chose happens to carry. -->
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
@@ -53,25 +34,10 @@
 		<key>NSAllowsArbitraryLoadsInWebContent</key>
 		<true/>
 	</dict>
-
-	<key>UILaunchScreen</key>
-	<dict/>
-	<key>UISupportedInterfaceOrientations</key>
-	<array>
-		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
-	</array>
-	<key>UISupportedInterfaceOrientations~ipad</key>
-	<array>
-		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationPortraitUpsideDown</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
-	</array>
-
-	<!-- The window role is left to SwiftUI; only the CarPlay role names a delegate. Without this
-	     manifest the CarPlay scene is never created at all, whatever the entitlement says. -->
+	<key>NSCameraUsageDescription</key>
+	<string>A photo of the floor sign or pillar number helps you find the parked car. It stays on this phone.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Your location is read only when you tap Mark here, to save where you parked. It stays on this phone.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -91,5 +57,24 @@
 			</array>
 		</dict>
 	</dict>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
+	<key>UILaunchScreen</key>
+	<dict/>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
 </dict>
 </plist>

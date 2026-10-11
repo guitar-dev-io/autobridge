@@ -46,7 +46,8 @@ class CarStreamingScreen(carContext: CarContext) : Screen(carContext) {
             grid.addItem(item(favorite.title, favorite.url, starred = true, note = null))
             room--
         }
-        StreamingLinks.all.filterNot { it.url in favoriteUrls }.forEach { link ->
+        // Sites that may not play go last, so a small car grid fills with ones that do.
+        StreamingLinks.all.filterNot { it.url in favoriteUrls }.sortedBy { StreamingLinks.mayNotPlay(it) }.forEach { link ->
             if (room <= 0) return@forEach
             val note = if (StreamingLinks.mayNotPlay(link)) carContext.getString(R.string.car_streaming_maybe) else null
             grid.addItem(item(link.title, link.url, starred = false, note = note))
