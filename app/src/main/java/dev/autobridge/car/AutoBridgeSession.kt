@@ -43,6 +43,7 @@ class AutoBridgeSession : Session(), CarScreenController.Host {
                 runCatching { dev.autobridge.breakreminder.BreakReminder.start(carContext) }
                 dev.autobridge.logging.StructuredLog.i(TAG, "car session connected")
                 ConnectionTimeline.record(ConnectionTimeline.Kind.SESSION_STARTED)
+                CarSessionHistory.markStarted(carContext)
                 // The bridge learns about the connection here rather than polling for it, and
                 // this is where a Send-to-Car that arrived while nothing was plugged in gets
                 // replayed onto the head unit.
