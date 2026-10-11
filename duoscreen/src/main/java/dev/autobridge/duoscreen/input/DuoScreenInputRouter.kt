@@ -17,6 +17,13 @@ interface DuoScreenInputPort {
     /** Coordinates are pane-local (already offset by the pane's rect), matching what a VirtualDisplay-hosted app expects. */
     fun forwardTap(paneId: Int, localX: Int, localY: Int)
     fun forwardScroll(paneId: Int, dx: Int, dy: Int)
+
+    /**
+     * The host's fling, the end of a swipe. By default a damped scroll, as before; the controller
+     * instead lets go of the drag the scrolls built, so the app sees a real release with the
+     * finger's own speed.
+     */
+    fun forwardFling(paneId: Int, velocityX: Int, velocityY: Int) = forwardScroll(paneId, velocityX / 8, velocityY / 8)
     fun onSelectionChanged(paneId: Int?)
     fun onPaneRectChanged(paneId: Int, rect: Rect)
 
@@ -180,7 +187,7 @@ class DuoScreenInputRouter(
         if (grabbedDivider != null) return dragDivider(velocityX / 8, velocityY / 8)
         if (mode == Mode.NORMAL) {
             val id = lastTouchedPaneId ?: return
-            port.forwardScroll(id, velocityX / 8, velocityY / 8)
+            port.forwardFling(id, velocityX, velocityY)
         } else {
             dragOrMove(velocityX / 8, velocityY / 8)
         }
