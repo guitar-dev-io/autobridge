@@ -83,6 +83,7 @@ class MediaPlaybackService : MediaLibraryService() {
      */
     private var exoPlayer: ExoPlayer? = null
     private var facadeListener: Player.Listener? = null
+    private var positionMemory: PlaybackPositionMemory? = null
     private var webPlayer: WebMediaPlayer? = null
     private var carPlayer: CarMediaPlayer? = null
     private var session: MediaLibrarySession? = null
@@ -542,6 +543,7 @@ class MediaPlaybackService : MediaLibraryService() {
         }
         val base: Player = player!!
         subtitles = SubtitleController(this).also { it.start() }
+        positionMemory = PlaybackPositionMemory(this, base).also { it.start() }
         ParkingStateStore.addListener(parkingListener)
         VideoOutputGeometry.addListener(geometryListener)
         VideoSettings.addListener(videoSettingsListener)
@@ -600,6 +602,9 @@ class MediaPlaybackService : MediaLibraryService() {
         exoPlayer?.removeListener(playerListener)
         facadeListener?.let { player?.removeListener(it) }
         facadeListener = null
+        // Before the player goes: this takes the final reading of where the item was left.
+        positionMemory?.release()
+        positionMemory = null
         subtitles?.release()
         subtitles = null
         session?.release()
