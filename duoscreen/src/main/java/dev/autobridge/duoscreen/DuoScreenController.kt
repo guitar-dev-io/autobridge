@@ -63,7 +63,15 @@ class DuoScreenController(
         const val DIVIDER_QUIET_PERIOD_MS = 700L
 
         /** A scroll is replayed into the pane as a short drag with this many interpolated moves. */
-        const val SCROLL_STEPS = 4
+        /**
+         * A drag built from the host's scrolls is let go this long after the last one. Long enough
+         * to bridge the gap between two scroll callbacks of one swipe; long enough too that the
+         * app's velocity tracker sees the finger at rest, so letting go does not throw a fling.
+         */
+        const val DRAG_IDLE_MS = 150L
+
+        /** How close to a display edge a drag may get before it is lifted and started again. */
+        const val DRAG_EDGE_MARGIN = 8
 
         const val INPUT_THREAD_NAME = "AutoBridgeDuoInput"
 
@@ -307,7 +315,11 @@ class DuoScreenController(
         saveLayout()
         mainHandler.removeCallbacks(commitPoll)
         // Kept alive, unlike in stop(): the session is only detached and resume() carries on with it.
-        onInputThread { touch.cancelAll() }
+        onInputThread {
+            inputHandler?.removeCallbacks(dragIdle)
+            drag = null
+            touch.cancelAll()
+        }
         compositor.detachBlocking()
         StructuredLog.i(TAG, "Surface detached; ${panes.size} pane(s) kept alive")
     }
@@ -798,7 +810,11 @@ class DuoScreenController(
         if (handler == null) {
             touch.cancelAll()
         } else {
-            handler.post { touch.cancelAll() }
+            handler.removeCallbacks(dragIdle)
+            handler.post {
+                drag = null
+                touch.cancelAll()
+            }
             inputThread?.quitSafely()
         }
         inputHandler = null
@@ -822,6 +838,7 @@ class DuoScreenController(
         // Geometry is read here, on the caller's thread, where the pane set and the displays are
         // written; only the injection itself goes to the input thread.
         onInputThread {
+            finishDrag()
             val injected = touch.tap(displayId, x, y)
             // A refused injection is silent otherwise: it is what an unavailable Shizuku looks
             // like from the car, a screen that simply does not react.
@@ -838,6 +855,28 @@ class DuoScreenController(
      * is replayed as a drag starting at the pane's centre — the only point guaranteed to be inside
      * the pane — moving by the opposite of the scrolled distance, the direction content travels.
      */
+    /**
+     * One finger held down across a whole swipe. The host reports a swipe as a run of scroll
+     * distances with no position; each used to be replayed as a drag of its own from the pane's
+     * centre (down, a few moves, up). A map then saw dozens of tiny separate drags: the short ones
+     * fell inside its touch slop and were dropped, and each lift could start a small fling, so the
+     * map lagged behind the finger and then overshot. Now the first scroll puts a finger down,
+     * every later one moves it, and it is lifted once the scrolls stop ([DRAG_IDLE_MS]) or the
+     * host reports the fling that ends the swipe. Only ever touched on the input thread.
+     */
+    private class Drag(val paneId: Int, val displayId: Int, var x: Int, var y: Int)
+
+    private var drag: Drag? = null
+    private val dragIdle = Runnable { finishDrag() }
+
+    /** Lifts the finger of the drag in progress, if any. Input thread only. */
+    private fun finishDrag() {
+        inputHandler?.removeCallbacks(dragIdle)
+        val active = drag ?: return
+        drag = null
+        touch.touchUp(active.displayId, DuoScreenTouchController.POINTER_ID, active.x, active.y)
+    }
+
     override fun forwardScroll(paneId: Int, dx: Int, dy: Int) {
         CarScreenPower.carInput()
         val displayId = DuoScreenDisplays.displayId(paneId)
@@ -850,22 +889,54 @@ class DuoScreenController(
         val centreY = size.height / 2
         val (scrollX, scrollY) =
             DuoScreenLayout.scaleDeltaToDisplay(dx, dy, pane.rect, size.width, size.height)
-        // The whole drag is one unit of work on the input thread, so its down, moves and up stay
-        // in order and none of the six injections it costs lands on the caller's thread.
         onInputThread {
-            if (!touch.touchDown(
-                    displayId, DuoScreenTouchController.POINTER_ID, centreX, centreY
-                )
-            ) return@onInputThread
-            val ids = intArrayOf(DuoScreenTouchController.POINTER_ID)
-            for (step in 1..SCROLL_STEPS) {
-                val x = centreX - scrollX * step / SCROLL_STEPS
-                val y = centreY - scrollY * step / SCROLL_STEPS
-                touch.touchMove(displayId, ids, intArrayOf(x), intArrayOf(y))
+            var active = drag
+            // A swipe that moved to the other pane ends the one before it.
+            if (active != null && (active.paneId != paneId || active.displayId != displayId)) {
+                finishDrag()
+                active = null
             }
-            touch.touchUp(
-                displayId, DuoScreenTouchController.POINTER_ID, centreX - scrollX, centreY - scrollY
-            )
+            if (active == null) {
+                if (!touch.touchDown(displayId, DuoScreenTouchController.POINTER_ID, centreX, centreY)) {
+                    return@onInputThread
+                }
+                active = Drag(paneId, displayId, centreX, centreY).also { drag = it }
+            }
+            var x = active.x - scrollX
+            var y = active.y - scrollY
+            // Run out of display: lift where the finger is and put it down again at the centre,
+            // the way a person re-grips a long scroll, instead of clamping and losing distance.
+            val margin = DRAG_EDGE_MARGIN
+            if (x !in margin..size.width - margin || y !in margin..size.height - margin) {
+                finishDrag()
+                if (!touch.touchDown(displayId, DuoScreenTouchController.POINTER_ID, centreX, centreY)) {
+                    return@onInputThread
+                }
+                active = Drag(paneId, displayId, centreX, centreY).also { drag = it }
+                x = (centreX - scrollX).coerceIn(margin, size.width - margin)
+                y = (centreY - scrollY).coerceIn(margin, size.height - margin)
+            }
+            if (touch.touchMove(displayId, intArrayOf(DuoScreenTouchController.POINTER_ID), intArrayOf(x), intArrayOf(y))) {
+                active.x = x
+                active.y = y
+            }
+            inputHandler?.let { handler ->
+                handler.removeCallbacks(dragIdle)
+                handler.postDelayed(dragIdle, DRAG_IDLE_MS)
+            }
+        }
+    }
+
+    /**
+     * The end of a swipe. With a drag in progress the finger is simply lifted now, so the app
+     * measures the speed from the real moves just sent and flings as far as the driver meant.
+     * Without one (a fling the host reported on its own) it falls back to the damped scroll.
+     */
+    override fun forwardFling(paneId: Int, velocityX: Int, velocityY: Int) {
+        CarScreenPower.carInput()
+        onInputThread {
+            if (drag?.paneId == paneId) finishDrag()
+            else mainHandler.post { forwardScroll(paneId, velocityX / 8, velocityY / 8) }
         }
     }
 
