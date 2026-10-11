@@ -197,3 +197,10 @@
 "Open it on your phone. Starred and recent TV channels play here." = "Open it on your phone. Starred and recent TV channels play here.";
 "Open it on your phone. Starred and recent radio stations play here." = "Open it on your phone. Starred and recent radio stations play here.";
 "Open it on your phone. Starred and recent channels play here." = "Open it on your phone. Starred and recent channels play here.";
+
+/* Web pages on a car screen. */
+"Web pages on a car screen (AirPlay)" = "Web pages on a car screen (AirPlay)";
+"An AirPlay car screen gets its own browser instead of a mirror of the phone. Send a page from the browser with the car button; reconnect the screen after changing this." = "An AirPlay car screen gets its own browser instead of a mirror of the phone. Send a page from the browser with the car button; reconnect the screen after changing this.";
+"The car screen will show web pages, video included, whether the car is parked or moving; nothing here checks. Do not watch while driving." = "The car screen will show web pages, video included, whether the car is parked or moving; nothing here checks. Do not watch while driving.";
+"Open a page in AutoBridge on your phone and send it to the car screen." = "Open a page in AutoBridge on your phone and send it to the car screen.";
+"Send to car" = "Send to car";

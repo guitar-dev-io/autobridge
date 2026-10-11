@@ -177,6 +177,25 @@ object DuoScreenShizukuOps : DuoScreenPrivilegedOps {
         }.getOrDefault(false)
     }
 
+    /**
+     * Asks the activity task manager for the root tasks on [displayId]:
+     * `getAllRootTaskInfosOnDisplay(int)` since Android 12, `getAllStackInfosOnDisplay(int)` on 10
+     * and 11. Null when neither exists or the call fails, so the caller can tell "empty" from
+     * "unknown".
+     */
+    override fun hasTaskOnDisplay(displayId: Int): Boolean? {
+        if (!isAvailable) return null
+        val api = resolveActivityApi() ?: return null
+        val method = api.service.javaClass.methods.firstOrNull {
+            (it.name == "getAllRootTaskInfosOnDisplay" || it.name == "getAllStackInfosOnDisplay") &&
+                it.parameterTypes.size == 1 && it.parameterTypes[0] == Int::class.javaPrimitiveType
+        } ?: return null
+        return runCatching {
+            val tasks = method.invoke(api.service, displayId) as? List<*> ?: return@runCatching null
+            tasks.isNotEmpty()
+        }.onFailure { DuoLog.w(TAG, "${method.name}($displayId) failed", it) }.getOrNull()
+    }
+
     override fun injectMotion(event: MotionEvent, displayId: Int): Boolean {
         if (!isAvailable) return false
         val api = resolveInputApi() ?: return false

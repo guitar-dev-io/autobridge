@@ -11,5 +11,14 @@
     -->
     <key>com.apple.developer.carplay-audio</key>
     <true/>
+    <!--
+      Also Simulator-only: the navigation entitlement is what makes CarPlay hand the app a window
+      it can draw in, which is how a real web page shows on the CarPlay screen
+      (CarPlaySceneDelegate, "Web pages on the CarPlay screen"). With it the Simulator runs the
+      app as a navigation app; the audio home is the grid button on the map screen. Apple grants
+      carplay-maps to navigation apps only, so device builds never carry it.
+    -->
+    <key>com.apple.developer.carplay-maps</key>
+    <true/>
 </dict>
 </plist>
