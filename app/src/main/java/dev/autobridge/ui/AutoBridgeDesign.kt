@@ -440,76 +440,69 @@ object AutoBridgeDesign {
                 image.visibility = View.VISIBLE
             }
         }
-        if (corner != null) artwork.addView(
-            glyphButton(context, corner.first, 15f, onClick = corner.second),
-            FrameLayout.LayoutParams(context.dp(32), context.dp(32), Gravity.TOP or Gravity.END)
-        )
-        // A small coloured dot in the artwork's bottom-end corner carries the check result at a
-        // glance; the old text label (below) is kept GONE only so setStatus() stays compatible.
-        artwork.addView(View(context).apply {
-            id = R.id.autobridge_status_dot
-            background = GradientDrawable().apply { shape = GradientDrawable.OVAL }
-            status?.let { (_, color) ->
-                (background as GradientDrawable).setColor(color)
-            }
-            visibility = if (status == null) View.GONE else View.VISIBLE
-        }, FrameLayout.LayoutParams(context.dp(8), context.dp(8), Gravity.BOTTOM or Gravity.END).apply {
-            marginEnd = context.dp(4)
-            bottomMargin = context.dp(4)
-        })
-        addView(artwork, LinearLayout.LayoutParams(-1, context.dp(88)))
+        addView(artwork, LinearLayout.LayoutParams(-1, context.dp(104)))
 
-        addView(TextView(context).apply {
+        // The star (or ›) sits beside the title rather than over the artwork, so it never covers
+        // the logo the user is looking for.
+        val titleRow = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, context.dp(10), 0, 0)
+        }
+        titleRow.addView(TextView(context).apply {
             this.text = title
-            textSize = 14f
+            textSize = 15f
             setTextColor(TEXT)
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             maxLines = 2
             ellipsize = TextUtils.TruncateAt.END
-            setPadding(0, context.dp(8), 0, 0)
-        }, LinearLayout.LayoutParams(-1, -2))
+        }, LinearLayout.LayoutParams(0, -2, 1f))
+        if (corner != null) titleRow.addView(
+            glyphButton(context, corner.first, 16f, tint = if (corner.first == "★") ACCENT_FAVORITE else null, onClick = corner.second),
+            LinearLayout.LayoutParams(context.dp(36), context.dp(36)).apply {
+                marginStart = context.dp(4)
+                topMargin = -context.dp(6)
+            }
+        )
+        addView(titleRow, LinearLayout.LayoutParams(-1, -2))
 
         if (subtitle.isNotBlank()) addView(TextView(context).apply {
             this.text = subtitle
-            textSize = 11f
+            textSize = 12f
             setTextColor(TEXT_MUTED)
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
             setPadding(0, context.dp(2), 0, 0)
         }, LinearLayout.LayoutParams(-1, -2))
 
-        // Built even when there is nothing to show yet: a result that lands later is written into
-        // this view, and a page that is already scrolled must not be rebuilt under the user.
-        // The label is kept GONE; the visible indicator is the dot on the artwork corner above.
+        // The check result in words, led by its coloured dot. Built even when there is nothing to
+        // show yet: a result that lands later is written into this view, and a page that is
+        // already scrolled must not be rebuilt under the user.
         addView(TextView(context).apply {
             id = R.id.autobridge_status_label
             textSize = 12f
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
-            setPadding(0, context.dp(3), 0, 0)
+            setPadding(0, context.dp(4), 0, 0)
             status?.let { (text, color) ->
-                this.text = text
+                this.text = statusText(text)
                 setTextColor(color)
             }
-            visibility = View.GONE
+            visibility = if (status == null || status.first.isBlank()) View.GONE else View.VISIBLE
         }, LinearLayout.LayoutParams(-1, -2))
     }
+
+    private fun statusText(text: String) = "●  $text"
 
     /** The status line inside a [contentTile], for writing a result into a page already drawn. */
     fun statusLabel(tile: View): TextView? = tile.findViewById(R.id.autobridge_status_label)
 
-    /** Writes [text] in [color] into a tile's status line, or hides it when [text] is blank.
-     *  Also updates the coloured dot on the artwork corner so the tile reads at a glance. */
+    /** Writes [text] in [color] into a tile's status line, or hides it when [text] is blank. */
     fun setStatus(tile: View, text: String, color: Int) {
         val label = statusLabel(tile) ?: return
-        label.text = text
+        label.text = statusText(text)
         label.setTextColor(color)
-        // The label stays GONE; the visible indicator is the dot.
-        val dot = tile.findViewById<View>(R.id.autobridge_status_dot)
-        if (dot != null) {
-            (dot.background as? GradientDrawable)?.setColor(color)
-            dot.visibility = if (text.isBlank()) View.GONE else View.VISIBLE
-        }
+        label.visibility = if (text.isBlank()) View.GONE else View.VISIBLE
     }
 
     /**
