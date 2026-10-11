@@ -48,6 +48,9 @@ object DuoScreenShizukuOps : DuoScreenPrivilegedOps {
      */
     private const val INJECT_INPUT_EVENT_MODE_ASYNC = 0
 
+    /** WindowManager.DISPLAY_IME_POLICY_LOCAL: the keyboard opens on the display that asked for it. */
+    private const val DISPLAY_IME_POLICY_LOCAL = 0
+
     /**
      * The launch is attributed to the shell package, not ours: the transaction arrives from uid
      * 2000, and the system rejects a calling package that does not belong to the calling uid. This
@@ -194,6 +197,34 @@ object DuoScreenShizukuOps : DuoScreenPrivilegedOps {
             val tasks = method.invoke(api.service, displayId) as? List<*> ?: return@runCatching null
             tasks.isNotEmpty()
         }.onFailure { DuoLog.w(TAG, "${method.name}($displayId) failed", it) }.getOrNull()
+    }
+
+    /**
+     * `IWindowManager.setDisplayImePolicy(displayId, DISPLAY_IME_POLICY_LOCAL)` since Android 12,
+     * `setShouldShowIme(displayId, true)` on 10 and 11. Both need INTERNAL_SYSTEM_WINDOW, which
+     * the shell UID holds, and only take effect on a trusted display, which the panes are.
+     */
+    override fun showImeOnDisplay(displayId: Int): Boolean {
+        if (!isAvailable) return false
+        val service = asShellInterface("window", "android.view.IWindowManager") ?: return false
+        val methods = service.javaClass.methods
+        val int = Int::class.javaPrimitiveType
+        val policy = methods.firstOrNull {
+            it.name == "setDisplayImePolicy" && it.parameterTypes.contentEquals(arrayOf(int, int))
+        }
+        val legacy = methods.firstOrNull {
+            it.name == "setShouldShowIme" &&
+                it.parameterTypes.contentEquals(arrayOf(int, Boolean::class.javaPrimitiveType))
+        }
+        return runCatching {
+            when {
+                policy != null -> policy.invoke(service, displayId, DISPLAY_IME_POLICY_LOCAL)
+                legacy != null -> legacy.invoke(service, displayId, true)
+                else -> error("neither setDisplayImePolicy nor setShouldShowIme exists")
+            }
+            true
+        }.onFailure { DuoLog.w(TAG, "Could not put the keyboard on display $displayId", it) }
+            .getOrDefault(false)
     }
 
     override fun injectMotion(event: MotionEvent, displayId: Int): Boolean {
