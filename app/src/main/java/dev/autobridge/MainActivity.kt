@@ -1512,7 +1512,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
             appendLine("Environment:   ${runtime.environment.name}")
             appendLine("Connected:     ${runtime.connected}")
             appendLine("Vehicle state: ${runtime.vehicleState.name}")
-            appendLine("Vehicle:       ${runtime.vehicleProfile?.name ?: "—"}")
+            appendLine("Car profile:   ${SurfaceProfile.active.name}")
             appendLine("Feature:       ${runtime.currentFeature?.name ?: "—"}")
             appendLine("Pipeline:      ${ScreenOffController.pipelineMode.name}")
             appendLine("Mirroring:     ${MirrorCoordinator.isMirroring}")
@@ -2552,8 +2552,24 @@ class MainActivity : androidx.activity.ComponentActivity() {
         PerAppProfileStore.save(this, next(PerAppProfileStore.profile(this, pkg, id)))
         showPhoneScreen(PhoneScreen.PROFILE)
     }
-    private fun frameRateSubtitle() = "Target frame rate"
-    private fun frameRateValue() = "60 FPS"
+    private fun frameRateSubtitle(): String = getString(
+        if (ScreenOffController.pipelineMode == ScreenOffController.PipelineMode.SELF_DRAWN) {
+            R.string.mirror_frame_rate_self_drawn
+        } else {
+            R.string.mirror_frame_rate_auto_mirror
+        }
+    )
+
+    /** The measured rate when the self-drawn renderer has frames; AUTO_MIRROR has no app-observable FPS. */
+    private fun frameRateValue(): String {
+        val stats = MirrorDiagnostics.frameStats()
+        val selfDrawn = ScreenOffController.pipelineMode == ScreenOffController.PipelineMode.SELF_DRAWN
+        return if (selfDrawn && stats.rendered > 0) {
+            "%.1f FPS".format(stats.measuredFps)
+        } else {
+            getString(R.string.profiles_fps_system)
+        }
+    }
 
     /**
      * Switches between the OS zero-copy AUTO_MIRROR renderer and the app-owned SELF_DRAWN renderer.
@@ -2725,10 +2741,44 @@ class MainActivity : androidx.activity.ComponentActivity() {
         }
         showPhoneScreen(PhoneScreen.MIRROR_SETTINGS)
     }
-    private fun headUnitProfileSubtitle() = "Display profile"
-    private fun toggleSurfaceProfile() {}
-    private fun screenOffBehaviorValue() = "Auto"
-    private fun onPanelOffToggled(enabled: Boolean) {}
+    private fun headUnitProfileSubtitle(): String = getString(
+        if (SurfaceProfile.active.hardwareValidated) R.string.mirror_head_unit_profile_measured
+        else R.string.mirror_head_unit_profile_placeholder
+    )
+
+    /** Same two-way switch as the car settings row, so the phone and the car agree on the profile. */
+    private fun toggleSurfaceProfile() {
+        SurfaceProfile.active = if (SurfaceProfile.active == SurfaceProfile.DEFAULT) {
+            SurfaceProfile.FORD_NEXT_GEN
+        } else {
+            SurfaceProfile.DEFAULT
+        }
+        SettingsStore.persistSurfaceProfile(this, SurfaceProfile.active)
+        showPhoneScreen(PhoneScreen.MIRROR_SETTINGS, force = true)
+    }
+
+    private fun screenOffBehaviorValue(): String = getString(
+        when {
+            ScreenOffController.pipelineMode == ScreenOffController.PipelineMode.OWN_CONTENT ->
+                R.string.mirror_screen_off_unavailable
+            MirrorSettings.screenOffOnAutoDim && ScreenOffController.panelOffAvailable() ->
+                R.string.mirror_screen_off_panel_off
+            ScreenOffController.survivesScreenOff() -> R.string.mirror_screen_off_continues
+            else -> R.string.mirror_screen_off_not_guaranteed
+        }
+    )
+
+    /** Turning it off always goes through, so a setting stored while Shizuku was up can be cleared later. */
+    private fun onPanelOffToggled(enabled: Boolean) {
+        if (enabled && !ScreenOffController.panelOffAvailable()) {
+            Toast.makeText(this, getString(R.string.mirror_panel_off_not_available), Toast.LENGTH_LONG).show()
+            showPhoneScreen(PhoneScreen.MIRROR_SETTINGS, force = true)
+            return
+        }
+        SettingsStore.persistScreenOffOnAutoDim(this, enabled)
+        ProjectionService.refreshScreenPowerPolicy(this)
+        showPhoneScreen(PhoneScreen.MIRROR_SETTINGS, force = true)
+    }
     /**
      * Turns the privileged pointer sink on or off, and says why when it cannot be turned on.
      *
@@ -2764,5 +2814,9 @@ class MainActivity : androidx.activity.ComponentActivity() {
         }
     }
     private fun shizukuTouchCard(): View? = null
-    private fun cycleAutoDimDelay() {}
+    private fun cycleAutoDimDelay() {
+        SettingsStore.persistAutoDimDelay(this, MirrorSettings.autoDimDelay.next())
+        ProjectionService.refreshScreenPowerPolicy(this)
+        showPhoneScreen(PhoneScreen.MIRROR_SETTINGS, force = true)
+    }
 }

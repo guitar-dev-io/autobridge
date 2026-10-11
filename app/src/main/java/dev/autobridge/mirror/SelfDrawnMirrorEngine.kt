@@ -25,7 +25,7 @@ import dev.autobridge.core.model.Insets
 import dev.autobridge.core.model.RotationMode
 import dev.autobridge.core.model.ScaleMode
 import dev.autobridge.core.model.Size
-import dev.autobridge.core.state.RuntimeContextStore
+import dev.autobridge.display.SurfaceProfile
 import dev.autobridge.display.MirrorDiagnostics
 import dev.autobridge.input.DisplayTransform
 import dev.autobridge.settings.MirrorSettings
@@ -63,7 +63,7 @@ class SelfDrawnMirrorEngine(
     private val appContext = context.applicationContext
     private val targetFpsProvider: () -> Int = {
         MirrorSettings.preferredFps?.coerceIn(1, 60)
-            ?: RuntimeContextStore.context.value.vehicleProfile?.preferredFps?.coerceIn(1, 60)
+            ?: SurfaceProfile.active.preferredFps?.coerceIn(1, 60)
             ?: 60
     }
     private val stateLock = Any()

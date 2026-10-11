@@ -850,6 +850,15 @@
     <string name="mirror_section_advanced">ขั้นสูง</string>
     <string name="mirror_head_unit_profile">โปรไฟล์จอรถ</string>
     <string name="mirror_screen_off">พฤติกรรมเมื่อปิดหน้าจอ</string>
+    <string name="mirror_frame_rate_self_drawn">เป้าหมายของ renderer แบบวาดเอง วัดได้เมื่อเริ่มมีเฟรม</string>
+    <string name="mirror_frame_rate_auto_mirror">AUTO_MIRROR ไม่มีตัวปรับ FPS แบบตายตัว</string>
+    <string name="mirror_head_unit_profile_measured">โปรไฟล์ที่วัดแล้ว</string>
+    <string name="mirror_head_unit_profile_placeholder">ค่าตั้งเอง ยังไม่ได้ยืนยันกับเครื่องจริง</string>
+    <string name="mirror_screen_off_unavailable">ใช้ไม่ได้</string>
+    <string name="mirror_screen_off_panel_off">ดับพาเนลเมื่อหรี่จออัตโนมัติ</string>
+    <string name="mirror_screen_off_continues">ทำงานต่อ</string>
+    <string name="mirror_screen_off_not_guaranteed">ไม่รับประกัน</string>
+    <string name="mirror_panel_off_not_available">การดับพาเนลต้องเชื่อม Shizuku และเครื่องต้องรองรับการคุมไฟจอ</string>
     <string name="mirror_panel_off">ปิดแผงจอเมื่อหน้าจอหรี่อัตโนมัติ</string>
     <string name="mirror_panel_off_caption">ปิดเฉพาะแผงจอแบบ ScreenOnAuto ต้องมี Shizuku หรือ root ถ้าไม่มีจะใช้การหรี่จอแทน</string>
     <string name="mirror_dim_now">หรี่จอโทรศัพท์เดี๋ยวนี้</string>

@@ -866,6 +866,15 @@
     <string name="mirror_section_advanced">ADVANCED</string>
     <string name="mirror_head_unit_profile">Head-unit profile</string>
     <string name="mirror_screen_off">Screen-off behavior</string>
+    <string name="mirror_frame_rate_self_drawn">Self-drawn renderer target; measured after frames arrive</string>
+    <string name="mirror_frame_rate_auto_mirror">AUTO_MIRROR does not expose a fixed FPS control</string>
+    <string name="mirror_head_unit_profile_measured">Measured profile</string>
+    <string name="mirror_head_unit_profile_placeholder">Manual placeholder; not hardware validated</string>
+    <string name="mirror_screen_off_unavailable">Unavailable</string>
+    <string name="mirror_screen_off_panel_off">Panel off on auto-dim</string>
+    <string name="mirror_screen_off_continues">Continues</string>
+    <string name="mirror_screen_off_not_guaranteed">Not guaranteed</string>
+    <string name="mirror_panel_off_not_available">Panel-off needs Shizuku connected with display power available</string>
     <string name="mirror_panel_off">Panel off on auto-dim</string>
     <string name="mirror_panel_off_caption">ScreenOnAuto-style panel-only power-off; requires Shizuku/root and falls back to dim</string>
     <string name="mirror_dim_now">Dim phone now</string>

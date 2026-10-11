@@ -4,7 +4,7 @@ import android.graphics.Rect
 import android.util.Log
 import androidx.car.app.SurfaceContainer
 import dev.autobridge.core.model.Insets
-import dev.autobridge.core.state.RuntimeContextStore
+import dev.autobridge.display.SurfaceProfile
 import dev.autobridge.input.ContentBounds
 import dev.autobridge.input.DisplayTransform
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,11 +17,10 @@ import kotlinx.coroutines.flow.asStateFlow
  */
 class MirrorSurfaceController(
     private val insetsProvider: () -> Insets = {
-        RuntimeContextStore.context.value.vehicleProfile?.safeInsets ?: Insets.ZERO
+        SurfaceProfile.active.safeInsets
     },
     private val touchOffsetProvider: () -> Pair<Float, Float> = {
-        val profile = RuntimeContextStore.context.value.vehicleProfile
-        (profile?.touchOffsetX ?: 0f) to (profile?.touchOffsetY ?: 0f)
+        SurfaceProfile.active.let { it.touchOffsetX to it.touchOffsetY }
     }
 ) {
     private companion object {
@@ -129,11 +128,10 @@ class MirrorSurfaceController(
 /** Backward-compatible name for callers that think in terms of car-surface ownership. */
 class CarSurfaceManager(
     insetsProvider: () -> Insets = {
-        RuntimeContextStore.context.value.vehicleProfile?.safeInsets ?: Insets.ZERO
+        SurfaceProfile.active.safeInsets
     },
     touchOffsetProvider: () -> Pair<Float, Float> = {
-        val profile = RuntimeContextStore.context.value.vehicleProfile
-        (profile?.touchOffsetX ?: 0f) to (profile?.touchOffsetY ?: 0f)
+        SurfaceProfile.active.let { it.touchOffsetX to it.touchOffsetY }
     }
 ) {
     private val controller = MirrorSurfaceController(insetsProvider, touchOffsetProvider)
