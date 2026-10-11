@@ -234,15 +234,19 @@ final class CarWebViewController: UIViewController {
     }
 }
 
-/// The AirPlay car screen's scene. iOS creates it only when `AutoBridgeAppDelegate` offers it,
-/// which it does only with `CarScreenWeb` on; otherwise the screen mirrors the phone as before.
+/// The AirPlay car screen's scene, declared in Info.plist for the external-display role. It builds
+/// a window only with `CarScreenWeb` on; with no window the screen keeps mirroring the phone.
+///
+/// This is deliberately not chosen in an app delegate's `configurationForConnecting`: SwiftUI asks
+/// that method for the phone's own scene too, and the configuration it hands back there has no
+/// scene delegate, so the phone window never appeared (a blank white screen at launch).
 @MainActor
 @objc(ExternalDisplaySceneDelegate)
 final class ExternalDisplaySceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
-        guard let windowScene = scene as? UIWindowScene else { return }
+        guard CarScreenWeb.enabled, let windowScene = scene as? UIWindowScene else { return }
         let controller = CarWebViewController()
         let window = UIWindow(windowScene: windowScene)
         window.rootViewController = controller
@@ -254,24 +258,6 @@ final class ExternalDisplaySceneDelegate: UIResponder, UIWindowSceneDelegate {
     func sceneDidDisconnect(_ scene: UIScene) {
         CarWebScreen.shared.detach(.airPlay)
         window = nil
-    }
-}
-
-/// Offers the AirPlay car screen its own scene when `CarScreenWeb` is on. Every other scene keeps
-/// the configuration it would have had: SwiftUI's phone window, and CarPlay from Info.plist.
-final class AutoBridgeAppDelegate: NSObject, UIApplicationDelegate {
-    func application(
-        _ application: UIApplication,
-        configurationForConnecting connectingSceneSession: UISceneSession,
-        options: UIScene.ConnectionOptions
-    ) -> UISceneConfiguration {
-        let role = connectingSceneSession.role
-        if role == .windowExternalDisplayNonInteractive, CarScreenWeb.enabled {
-            let configuration = UISceneConfiguration(name: "AutoBridge car screen", sessionRole: role)
-            configuration.delegateClass = ExternalDisplaySceneDelegate.self
-            return configuration
-        }
-        return connectingSceneSession.configuration
     }
 }
 
