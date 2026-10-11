@@ -94,6 +94,7 @@ object VideoSettings {
     private const val KEY_PLAY_IN_BACKGROUND = "play_in_background"
     private const val KEY_AUTO_PIP = "auto_picture_in_picture"
     private const val KEY_AUTO_NEXT_CHANNEL = "auto_next_channel"
+    private const val KEY_REMEMBER_POSITION = "remember_playback_position"
     private const val KEY_CHANNEL_GESTURE = "change_channel_gesture"
     private const val KEY_SPLIT_LAYOUT = "split_screen_layout"
     private const val KEY_ASPECT_RATIO = "default_aspect_ratio"
@@ -165,6 +166,16 @@ object VideoSettings {
 
     fun setAutoNextChannel(context: Context, value: Boolean) =
         putBoolean(context, KEY_AUTO_NEXT_CHANNEL, value)
+
+    /**
+     * Whether a file or on-demand video picks up where it was left. Live channels never do,
+     * whatever this says; see [dev.autobridge.media.PlaybackPositionPolicy].
+     */
+    fun rememberPosition(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_REMEMBER_POSITION, true)
+
+    fun setRememberPosition(context: Context, value: Boolean) =
+        putBoolean(context, KEY_REMEMBER_POSITION, value)
 
     fun channelGesture(context: Context): ChannelGesture =
         VideoSettingsCodec.channelGesture(prefs(context).getString(KEY_CHANNEL_GESTURE, null))

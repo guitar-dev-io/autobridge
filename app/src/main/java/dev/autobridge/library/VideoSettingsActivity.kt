@@ -13,6 +13,7 @@ import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
 import dev.autobridge.i18n.AppLocale
+import dev.autobridge.media.PlaybackPositionStore
 import dev.autobridge.settings.AspectRatio
 import dev.autobridge.settings.ChannelGesture
 import dev.autobridge.settings.PlayerDpi
@@ -130,6 +131,20 @@ class VideoSettingsActivity : Activity() {
                 offCaption = "A dead channel waits for you"
             ) {
                 VideoSettings.setAutoNextChannel(this, !VideoSettings.autoNextChannel(this))
+            }
+        )
+
+        body.stack(
+            toggleRow(
+                title = "Remember playback position",
+                on = VideoSettings.rememberPosition(this),
+                onCaption = "Videos and files resume where you left off",
+                offCaption = "Always start from the beginning"
+            ) {
+                val on = !VideoSettings.rememberPosition(this)
+                VideoSettings.setRememberPosition(this, on)
+                // Off means nothing is kept, not just that nothing is used.
+                if (!on) PlaybackPositionStore.clear(this)
             }
         )
 
