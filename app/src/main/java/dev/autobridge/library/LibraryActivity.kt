@@ -777,7 +777,7 @@ class LibraryActivity : Activity() {
             rows += if (gridView) {
                 // Channels and films carry a logo worth seeing, so the grid is the default; two
                 // columns is what fits a phone at a glance. List trades the logo for density.
-                AutoBridgeDesign.grid(this, shown.map { entryTile(source, it, shown) }, columns = 3)
+                AutoBridgeDesign.grid(this, shown.map { entryTile(source, it, shown) }, columns = 2, gap = 10)
             } else {
                 shown.map { entryRow(source, it, shown) }
             }
@@ -955,12 +955,14 @@ class LibraryActivity : Activity() {
     }
 
     /** A check result as text and the colour it reads in. */
-    private fun pingStatus(result: StreamPing.Result): Pair<String, Int> =
-        StreamPing.describe(result) to when (StreamPing.tone(result)) {
-            StreamPing.Tone.GOOD -> AutoBridgeDesign.SIGNAL_GOOD
-            StreamPing.Tone.SLOW -> AutoBridgeDesign.SIGNAL_SLOW
-            StreamPing.Tone.BAD -> AutoBridgeDesign.DANGER
-        }
+    private fun pingStatus(result: StreamPing.Result): Pair<String, Int> = if (result == StreamPing.Result.Unsupported) {
+        StreamPing.describe(result) to AutoBridgeDesign.SIGNAL_SLOW
+    } else when (StreamPing.tone(result)) {
+        // A word first, the measurement after it: "Online · 230 ms" reads at a glance, "230 ms" does not.
+        StreamPing.Tone.GOOD -> getString(R.string.library_status_online, StreamPing.describe(result)) to AutoBridgeDesign.SIGNAL_GOOD
+        StreamPing.Tone.SLOW -> getString(R.string.library_status_slow, StreamPing.describe(result)) to AutoBridgeDesign.SIGNAL_SLOW
+        StreamPing.Tone.BAD -> getString(R.string.library_status_offline) to AutoBridgeDesign.DANGER
+    }
 
     /**
      * Writes the results that have landed into the tiles already on screen.

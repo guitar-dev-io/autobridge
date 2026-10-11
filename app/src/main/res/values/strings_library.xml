@@ -67,6 +67,9 @@
     <string name="library_no_matches_category">Nothing in this category matches that search.</string>
     <string name="library_online_count">%1$d online</string>
     <string name="library_offline_count">%1$d offline</string>
+    <string name="library_status_online">Online · %1$s</string>
+    <string name="library_status_slow">Slow · %1$s</string>
+    <string name="library_status_offline">Offline</string>
     <string name="library_show_all">Show all</string>
     <string name="library_hide_offline">Hide offline</string>
     <string name="library_on_car">ON CAR</string>
