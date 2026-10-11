@@ -67,17 +67,16 @@ val subtitleTranslationEnabled: Boolean = run {
 // libvlc-all ships an uncompressed .so set per ABI, larger than the translation engines. A build
 // that does not want it leaves the whole engine off, which drops the Maven artifact (so no VLC
 // .so is packaged), the one source set that imports org.videolan.libvlc, and the Settings choice.
-// It is off by default, so compiling the engine in is the opt-in:
+// It is on by default, so leaving the engine out is the opt-out:
 //
-//   ./gradlew assembleSafeRelease -Pautobridge.vlc=true
-//   AUTOBRIDGE_VLC=true ./gradlew assembleSafeRelease
+//   ./gradlew assembleSafeRelease -Pautobridge.vlc=false
 //
 // The default lives in gradle.properties; precedence matches the flag above - Gradle property,
 // then environment variable, then the file.
 val vlcEngineEnabled: Boolean = run {
     val raw = (providers.gradleProperty("autobridge.vlc").orNull
         ?: System.getenv("AUTOBRIDGE_VLC")
-        ?: "false").trim()
+        ?: "true").trim()
     raw.toBooleanStrictOrNull()
         ?: throw GradleException(
             "autobridge.vlc must be true or false, not \"$raw\"."

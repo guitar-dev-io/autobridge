@@ -152,7 +152,7 @@ data class DuoScreenChromeSpec(
 
 /** Something on the drawn chrome a tap can hit. */
 sealed interface ChromeTarget {
-    enum class Kind { LAYOUT, SWAP, RELOAD, ARRANGE, DONE, GRIP, RAIL, RAIL_MOVE }
+    enum class Kind { LAYOUT, SWAP, RELOAD, ARRANGE, DONE, GRIP, RAIL, RAIL_MOVE, KEYBOARD }
 
     data class Control(val kind: Kind) : ChromeTarget
     data class Chip(val preset: DuoScreenPreset) : ChromeTarget
@@ -305,6 +305,19 @@ class DuoScreenChrome private constructor(
         /** The closed rail's tab on the edge, in dp: a thin, tall handle a finger finds by feel. */
         const val RAIL_TAB_WIDTH = 22f
         const val RAIL_TAB_LENGTH = 88f
+
+        /**
+         * The open rail's buttons as a multiple of the toolbar's [DuoScreenChromeSpec.BUTTON]:
+         * a little larger, since the rail is opened on purpose and is tapped while driving. Shrunk
+         * back toward the toolbar size when the surface is too short to hold them.
+         */
+        const val RAIL_BUTTON_SCALE = 1.3f
+
+        /** The open rail's quick actions, top to bottom, below the panes' apps. */
+        val RAIL_KINDS = listOf(
+            ChromeTarget.Kind.KEYBOARD, ChromeTarget.Kind.SWAP, ChromeTarget.Kind.LAYOUT,
+            ChromeTarget.Kind.RELOAD, ChromeTarget.Kind.RAIL_MOVE
+        )
 
         /** The presets offered as chips while arranging, as in the design: side by side, stacked, overlay. */
         val CHIP_PRESETS = listOf(
@@ -513,25 +526,25 @@ class DuoScreenChrome private constructor(
                     val left = if (railSide == RailSide.RIGHT) bounds.width - w else 0
                     Rail(railSide, Rect(left, (bounds.height - h) / 2, w, h), null, emptyList(), emptyList(), 0)
                 } else {
-                    val kinds = listOf(
-                        ChromeTarget.Kind.SWAP, ChromeTarget.Kind.LAYOUT,
-                        ChromeTarget.Kind.RELOAD, ChromeTarget.Kind.RAIL_MOVE
-                    )
+                    val kinds = RAIL_KINDS
                     val ordered = panes.sortedBy { it.id }
                     val items = ordered.size + kinds.size
                     val separator = buttonGap * 2
-                    val w = button + pad * 2
-                    val h = pad * 2 + items * button + (items - 1) * buttonGap + separator
+                    val fixed = pad * 2 + (items - 1) * buttonGap + separator
+                    val fits = (bounds.height - margin * 2 - fixed) / items
+                    val railButton = (button * RAIL_BUTTON_SCALE).toInt().coerceAtMost(fits).coerceAtLeast(button)
+                    val w = railButton + pad * 2
+                    val h = fixed + items * railButton
                     val left = if (railSide == RailSide.RIGHT) bounds.width - margin - w else margin
                     val top = ((bounds.height - h) / 2).coerceAtLeast(0)
                     var cursor = top + pad
                     val apps = ordered.map { pane ->
-                        (pane.id to Rect(left + pad, cursor, button, button)).also { cursor += button + buttonGap }
+                        (pane.id to Rect(left + pad, cursor, railButton, railButton)).also { cursor += railButton + buttonGap }
                     }
                     val separatorAt = cursor + separator / 2 - buttonGap / 2
                     cursor += separator
                     val railButtons = kinds.map { kind ->
-                        (kind to Rect(left + pad, cursor, button, button)).also { cursor += button + buttonGap }
+                        (kind to Rect(left + pad, cursor, railButton, railButton)).also { cursor += railButton + buttonGap }
                     }
                     Rail(railSide, null, Rect(left, top, w, h), apps, railButtons, separatorAt)
                 }

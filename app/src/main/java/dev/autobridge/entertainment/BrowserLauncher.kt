@@ -56,6 +56,24 @@ object BrowserLauncher {
         return openUrl(context, input)
     }
 
+    /**
+     * Opens [input] in an in-app browser tab (a Custom Tab from the phone's browser, shown over
+     * the caller) for links about the app itself: GitHub, support, licenses, release notes. Not
+     * AutoBridge's own browser, and not a switch to the browser app. Without a Custom
+     * Tabs-capable browser the same intent opens the page in whatever browser handles it.
+     * Not gated on [FeaturePolicy]: these are the app's own pages, opened from the phone.
+     */
+    fun openTab(context: Context, input: String): Boolean {
+        val url = ContentAddress.https(input) ?: return false
+        return runCatching {
+            CustomTabsIntent.Builder().setShowTitle(true).build().launchUrl(context, Uri.parse(url))
+            MirrorDiagnostics.record("custom_tab_opened")
+            true
+        }.onFailure { error ->
+            Log.w(TAG, "Unable to start Custom Tab", error)
+        }.getOrDefault(false)
+    }
+
     /** Opens the device browser app without forcing a particular website. */
     fun launch(context: Context): Boolean {
         if (!allowBrowserLaunch()) return false

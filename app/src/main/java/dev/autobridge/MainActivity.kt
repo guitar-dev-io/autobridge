@@ -1308,17 +1308,12 @@ class MainActivity : androidx.activity.ComponentActivity() {
     }
 
     /**
-     * Opens [url] in AutoBridge's own browser, so a link from the app (About, support, the
-     * release page) does not throw the user out to another app. Falls back to the phone's
-     * browser only when it is not a web page this browser loads.
+     * Opens [url] in an in-app browser tab (a Custom Tab over this screen), so a link from the app
+     * (About, support, GitHub, the release page) neither throws the user out to another app nor
+     * lands in AutoBridge's own browser. Falls back to the phone's browser when no tab opens.
      */
     private fun openInAppUrl(url: String) {
-        val page = dev.autobridge.entertainment.ContentAddress.https(url) ?: return openExternalUrl(url)
-        val opened = runCatching {
-            startActivity(browserScreenIntent().setData(android.net.Uri.parse(page)))
-            true
-        }.getOrDefault(false)
-        if (!opened) openExternalUrl(url)
+        if (!dev.autobridge.entertainment.BrowserLauncher.openTab(this, url)) openExternalUrl(url)
     }
 
     /** The phone's own browser: for what this app's browser should not handle (an APK download). */

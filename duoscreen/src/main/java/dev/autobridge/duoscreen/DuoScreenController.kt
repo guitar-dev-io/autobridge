@@ -10,6 +10,8 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
 import android.os.SystemClock
+import android.view.KeyCharacterMap
+import android.view.KeyEvent
 import android.view.Surface
 import dev.autobridge.car.DuoSessionState
 import dev.autobridge.logging.StructuredLog
@@ -97,6 +99,9 @@ class DuoScreenController(
     interface ChromeListener {
         fun onPresetChanged(preset: DuoScreenPreset) {}
         fun onChangeAppRequested(paneId: Int) {}
+
+        /** The rail's keyboard: the car screen opens a keyboard and hands the text to [typeText]. */
+        fun onKeyboardRequested(paneId: Int) {}
     }
 
     var chromeListener: ChromeListener? = null
@@ -608,6 +613,12 @@ class DuoScreenController(
                 ChromeTarget.Kind.ARRANGE -> setMode(DuoScreenInputRouter.Mode.EDIT)
                 ChromeTarget.Kind.DONE -> setMode(DuoScreenInputRouter.Mode.NORMAL)
                 ChromeTarget.Kind.RAIL -> if (railOpen) closeRail() else openRail()
+                ChromeTarget.Kind.KEYBOARD -> {
+                    closeRail()
+                    // The pane last tapped holds the field the driver means; else the first one.
+                    val paneId = router?.lastTouchedPaneId ?: panes.minOfOrNull { it.id }
+                    if (paneId != null) chromeListener?.onKeyboardRequested(paneId)
+                }
                 ChromeTarget.Kind.RAIL_MOVE -> {
                     val side = DuoScreenStore.railSide(context).other()
                     DuoScreenStore.setRailSide(context, side)
@@ -672,6 +683,63 @@ class DuoScreenController(
     private fun scheduleToolbarHide() {
         mainHandler.removeCallbacks(hideToolbar)
         mainHandler.postDelayed(hideToolbar, TOOLBAR_HIDE_MS)
+    }
+
+    /**
+     * Types [text] into the focused field of [paneId]'s app, then Enter when [submit]: what the
+     * rail's keyboard sends once the driver is done typing on the car's keyboard. Text a key map
+     * can spell (ASCII) is typed key by key, which every field takes; anything else (Thai) goes
+     * through the clipboard and a Ctrl+V, which text fields and web pages both paste on.
+     */
+    fun typeText(paneId: Int, text: String, submit: Boolean = true): Boolean {
+        val displayId = DuoScreenDisplays.displayId(paneId)
+        if (displayId < 0 || text.isEmpty() && !submit) return false
+        val keys = if (text.isEmpty()) emptyArray()
+        else runCatching { KeyCharacterMap.load(KeyCharacterMap.VIRTUAL_KEYBOARD).getEvents(text.toCharArray()) }.getOrNull()
+        if (keys == null) {
+            runCatching {
+                val clipboard = context.getSystemService(android.content.ClipboardManager::class.java)
+                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("AutoBridge", text))
+            }.onFailure {
+                StructuredLog.w(TAG, "Could not put typed text on the clipboard: $it")
+                return false
+            }
+        }
+        onInputThread {
+            CarScreenPower.carInput()
+            var injected = true
+            if (keys != null) {
+                keys.forEach { injected = ops.injectKey(it, displayId) && injected }
+            } else {
+                injected = pasteShortcut().all { ops.injectKey(it, displayId) }
+            }
+            if (submit) {
+                injected = keyPress(KeyEvent.KEYCODE_ENTER).all { ops.injectKey(it, displayId) } && injected
+            }
+            StructuredLog.i(
+                TAG,
+                "Typed ${text.length} char(s) into pane $paneId (display $displayId," +
+                    " ${if (keys != null) "keys" else "paste"}) injected=$injected"
+            )
+        }
+        return true
+    }
+
+    private fun keyPress(code: Int, meta: Int = 0): List<KeyEvent> {
+        val now = SystemClock.uptimeMillis()
+        return listOf(
+            KeyEvent(now, now, KeyEvent.ACTION_DOWN, code, 0, meta),
+            KeyEvent(now, now, KeyEvent.ACTION_UP, code, 0, meta)
+        )
+    }
+
+    /** Ctrl down, V with Ctrl held, Ctrl up: the paste shortcut. */
+    private fun pasteShortcut(): List<KeyEvent> {
+        val now = SystemClock.uptimeMillis()
+        val ctrl = KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON
+        return listOf(KeyEvent(now, now, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_CTRL_LEFT, 0, ctrl)) +
+            keyPress(KeyEvent.KEYCODE_V, ctrl) +
+            KeyEvent(now, now, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_CTRL_LEFT, 0, 0)
     }
 
     /**

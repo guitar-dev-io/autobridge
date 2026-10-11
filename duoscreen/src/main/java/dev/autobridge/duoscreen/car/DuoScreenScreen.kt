@@ -68,6 +68,12 @@ class DuoScreenScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
             override fun onChangeAppRequested(paneId: Int) {
                 screenManager.push(DuoScreenAppPickerScreen(carContext, paneId))
             }
+
+            override fun onKeyboardRequested(paneId: Int) {
+                screenManager.push(DuoScreenKeyboardScreen(carContext, paneId) { text ->
+                    controller.typeText(paneId, text)
+                })
+            }
         }
     }
 

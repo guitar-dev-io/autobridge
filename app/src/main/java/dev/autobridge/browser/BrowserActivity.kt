@@ -1477,10 +1477,10 @@ class BrowserActivity : Activity() {
                 startActivity(dev.autobridge.MainActivityScreens.intent(this, dev.autobridge.ui.PhoneNav.Route.CONTROL))
             DrawerAction.AGENT ->
                 startActivity(dev.autobridge.MainActivityScreens.intent(this, dev.autobridge.ui.PhoneNav.Route.AGENT_COMMANDS))
-            // Opened here, in this browser, rather than handed to another one.
-            DrawerAction.SUPPORT -> navigate("https://buymeacoffee.com/guitar.story")
+            // An in-app browser tab over this one, so the page on screen is kept.
+            DrawerAction.SUPPORT -> openTab("https://buymeacoffee.com/guitar.story")
             DrawerAction.LICENSES -> showOpenSourceLicenses()
-            DrawerAction.GITHUB -> navigate("https://github.com/guitar-dev-io/autobridge")
+            DrawerAction.GITHUB -> openTab("https://github.com/guitar-dev-io/autobridge")
             // The sheet's own footer pair: leaving the browser is this activity finishing.
             DrawerAction.APP_HOME -> finish()
             DrawerAction.TOGGLE_FULLSCREEN -> setFullscreen(!fullscreen)
@@ -1514,7 +1514,12 @@ class BrowserActivity : Activity() {
             startActivity(Intent(this, clazz))
             true
         }.getOrDefault(false)
-        if (!opened) navigate("https://github.com/guitar-dev-io/autobridge/blob/main/LICENSE")
+        if (!opened) openTab("https://github.com/guitar-dev-io/autobridge/blob/main/LICENSE")
+    }
+
+    /** An in-app browser tab (Custom Tab) for the app's own pages; loads here only if none opens. */
+    private fun openTab(url: String) {
+        if (!BrowserLauncher.openTab(this, url)) navigate(url)
     }
 
     /** Saves the page on screen, the one action the phone menu could list bookmarks but not add to. */

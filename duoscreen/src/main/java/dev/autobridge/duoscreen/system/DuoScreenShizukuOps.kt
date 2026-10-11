@@ -6,6 +6,8 @@ import android.content.Intent
 import android.os.Binder
 import android.os.Bundle
 import android.os.IBinder
+import android.view.InputEvent
+import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.Surface
 import dev.autobridge.duoscreen.DuoLog
@@ -227,7 +229,11 @@ object DuoScreenShizukuOps : DuoScreenPrivilegedOps {
             .getOrDefault(false)
     }
 
-    override fun injectMotion(event: MotionEvent, displayId: Int): Boolean {
+    override fun injectMotion(event: MotionEvent, displayId: Int): Boolean = inject(event, displayId)
+
+    override fun injectKey(event: KeyEvent, displayId: Int): Boolean = inject(event, displayId)
+
+    private fun inject(event: InputEvent, displayId: Int): Boolean {
         if (!isAvailable) return false
         val api = resolveInputApi() ?: return false
         if (!setDisplayId(event, displayId)) return false
@@ -408,7 +414,7 @@ object DuoScreenShizukuOps : DuoScreenPrivilegedOps {
         }.toTypedArray()
     }
 
-    private fun buildInjectArgs(method: Method, event: MotionEvent): Array<Any?> {
+    private fun buildInjectArgs(method: Method, event: InputEvent): Array<Any?> {
         var seenInt = false
         return method.parameterTypes.map { type ->
             when {
@@ -423,12 +429,13 @@ object DuoScreenShizukuOps : DuoScreenPrivilegedOps {
         }.toTypedArray()
     }
 
-    private fun setDisplayId(event: MotionEvent, displayId: Int): Boolean = runCatching {
-        MotionEvent::class.java
+    private fun setDisplayId(event: InputEvent, displayId: Int): Boolean = runCatching {
+        // Hidden on both MotionEvent and KeyEvent (declared abstract on InputEvent).
+        event.javaClass
             .getMethod("setDisplayId", Int::class.javaPrimitiveType)
             .invoke(event, displayId)
         true
-    }.onFailure { DuoLog.w(TAG, "MotionEvent.setDisplayId is unavailable; cannot target a display", it) }
+    }.onFailure { DuoLog.w(TAG, "${event.javaClass.simpleName}.setDisplayId is unavailable; cannot target a display", it) }
         .getOrDefault(false)
 
     private fun resolveActivityApi(): ActivityApi? {
