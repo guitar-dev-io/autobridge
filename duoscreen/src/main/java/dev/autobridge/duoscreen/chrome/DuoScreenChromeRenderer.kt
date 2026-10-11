@@ -123,7 +123,114 @@ class DuoScreenChromeRenderer {
         }
 
         drawBar(canvas, frame)
-        if (c.editing) drawChips(canvas, frame)
+        if (c.editing) drawChips(canvas, frame) else drawRail(canvas, frame)
+    }
+
+    // --------------------------------------------------------------------------------- rail
+
+    /**
+     * The quick rail: closed, a slim tab on the edge with a chevron pointing into the screen;
+     * open, a floating panel of each pane's app icon (the focused pane's ringed) above the quick
+     * actions.
+     */
+    private fun drawRail(canvas: Canvas, frame: ChromeFrame) {
+        val rail = frame.chrome.rail ?: return
+        val d = frame.density
+        val s = frame.chrome.spec
+        rail.tab?.let { tab ->
+            rect.set(tab.toRectF())
+            val r = tab.width.toFloat()
+            fill.color = TOOLBAR
+            // Rounded on the inner side only: the outer corners run off the edge.
+            if (rail.side == RailSide.RIGHT) rect.right += r else rect.left -= r
+            canvas.drawRoundRect(rect, r, r, fill)
+            stroke.color = ICON
+            stroke.strokeWidth = 2.5f * d
+            val cx = tab.centerX()
+            val cy = tab.centerY()
+            val arm = tab.width * 0.22f
+            val dir = if (rail.side == RailSide.RIGHT) 1f else -1f
+            path.reset()
+            path.moveTo(cx + dir * arm / 2, cy - arm)
+            path.lineTo(cx - dir * arm / 2, cy)
+            path.lineTo(cx + dir * arm / 2, cy + arm)
+            canvas.drawPath(path, stroke)
+            return
+        }
+        val panel = rail.panel ?: return
+        val pr = panel.width / 2f
+        rect.set(panel.toRectF())
+        rect.offset(0f, 2f * d)
+        fill.color = TOOLBAR_SHADOW
+        canvas.drawRoundRect(rect, pr, pr, fill)
+        rect.set(panel.toRectF())
+        fill.color = TOOLBAR
+        canvas.drawRoundRect(rect, pr, pr, fill)
+
+        val corner = s.BUTTON_RADIUS * d
+        rail.apps.forEach { (paneId, box) ->
+            val pressed = frame.pressed == ChromeTarget.RailApp(paneId)
+            fill.color = if (pressed) BUTTON_PRESSED else BUTTON
+            rect.set(box.toRectF())
+            canvas.drawRoundRect(rect, corner, corner, fill)
+            val icon = frame.apps[paneId]?.icon
+            if (icon != null) {
+                val inset = box.width * 0.14f
+                rect.set(box.left + inset, box.top + inset, box.right - inset, box.bottom - inset)
+                canvas.drawBitmap(icon, null, rect, image)
+            } else {
+                text.color = ICON
+                text.textSize = box.height * 0.42f
+                drawCentred(canvas, (paneId + 1).toString(), box, box.width.toFloat())
+            }
+            if (paneId == frame.focusedPaneId) {
+                stroke.color = ACCENT
+                stroke.strokeWidth = 2.5f * d
+                rect.set(box.toRectF())
+                rect.inset(-2f * d, -2f * d)
+                canvas.drawRoundRect(rect, corner + 2f * d, corner + 2f * d, stroke)
+            }
+        }
+        fill.color = GRIP
+        val inset = panel.width * 0.25f
+        canvas.drawRect(panel.left + inset, rail.separatorAt - d / 2, panel.right - inset, rail.separatorAt + d / 2, fill)
+        rail.buttons.forEach { (kind, box) ->
+            val pressed = frame.pressed == ChromeTarget.Control(kind)
+            fill.color = if (pressed) BUTTON_PRESSED else BUTTON
+            rect.set(box.toRectF())
+            canvas.drawRoundRect(rect, corner, corner, fill)
+            when (kind) {
+                ChromeTarget.Kind.RAIL_MOVE -> {
+                    // Two chevrons pointing at the other edge: "move me there".
+                    stroke.color = ICON
+                    stroke.strokeWidth = 2.5f * d
+                    val cx = box.centerX()
+                    val cy = box.centerY()
+                    val arm = box.width * 0.13f
+                    val dir = if (rail.side == RailSide.RIGHT) -1f else 1f
+                    for (offset in listOf(-arm * 0.9f, arm * 0.9f)) {
+                        path.reset()
+                        path.moveTo(cx + offset - dir * arm / 2, cy - arm)
+                        path.lineTo(cx + offset + dir * arm / 2, cy)
+                        path.lineTo(cx + offset - dir * arm / 2, cy + arm)
+                        canvas.drawPath(path, stroke)
+                    }
+                }
+                else -> {
+                    val glyph = when (kind) {
+                        ChromeTarget.Kind.LAYOUT ->
+                            if (frame.currentPreset == DuoScreenPreset.EVEN_COLUMNS ||
+                                frame.currentPreset == DuoScreenPreset.WIDE_LEFT ||
+                                frame.currentPreset == DuoScreenPreset.WIDE_RIGHT
+                            ) Glyph.LAYOUT_COLUMNS else Glyph.LAYOUT_STACKED
+                        ChromeTarget.Kind.SWAP -> Glyph.SWAP
+                        ChromeTarget.Kind.RELOAD -> Glyph.RELOAD
+                        else -> Glyph.ARRANGE
+                    }
+                    glyph(canvas, glyph, box.centerX(), box.centerY(), s.BUTTON_ICON * d, ICON)
+                }
+            }
+        }
     }
 
     // ---------------------------------------------------------------------------------- bar

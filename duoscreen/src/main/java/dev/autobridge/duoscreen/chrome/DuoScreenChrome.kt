@@ -152,11 +152,21 @@ data class DuoScreenChromeSpec(
 
 /** Something on the drawn chrome a tap can hit. */
 sealed interface ChromeTarget {
-    enum class Kind { LAYOUT, SWAP, RELOAD, ARRANGE, DONE, GRIP }
+    enum class Kind { LAYOUT, SWAP, RELOAD, ARRANGE, DONE, GRIP, RAIL, RAIL_MOVE }
 
     data class Control(val kind: Kind) : ChromeTarget
     data class Chip(val preset: DuoScreenPreset) : ChromeTarget
     data class ChangeApp(val paneId: Int) : ChromeTarget
+
+    /** A pane's app on the side rail: tapping it picks another app for that pane. */
+    data class RailApp(val paneId: Int) : ChromeTarget
+}
+
+/** Which edge of the surface the quick rail floats on. */
+enum class RailSide {
+    RIGHT, LEFT;
+
+    fun other(): RailSide = if (this == RIGHT) LEFT else RIGHT
 }
 
 /** The labels the geometry has to measure; the renderer draws the same strings. */
@@ -211,8 +221,24 @@ class DuoScreenChrome private constructor(
     val cards: List<Card>,
     /** The gap between toolbar buttons, and the handle's touch square, in px. */
     private val gapPx: Int,
-    private val handleTouchPx: Int
+    private val handleTouchPx: Int,
+    /** The quick rail on the side of the surface; null while arranging or when it is off. */
+    val rail: Rail? = null
 ) {
+    /**
+     * The quick rail: a small [tab] on one edge while closed; open, a [panel] holding each pane's
+     * app ([apps], in pane order) and the quick actions ([buttons]). It floats over the panes, so
+     * it needs no gap between them and is the same in every layout.
+     */
+    data class Rail(
+        val side: RailSide,
+        val tab: Rect?,
+        val panel: Rect?,
+        val apps: List<Pair<Int, Rect>>,
+        val buttons: List<Pair<ChromeTarget.Kind, Rect>>,
+        val separatorAt: Int
+    )
+
     /**
      * One pane's card while arranging. [tile] and [share] are null when the pane is too small to
      * hold them; the title and the Change app button always stay.
@@ -244,6 +270,13 @@ class DuoScreenChrome private constructor(
             cards.lastOrNull { it.button.contains(x, y) }?.let { return ChromeTarget.ChangeApp(it.paneId) }
             return null
         }
+        rail?.let { r ->
+            r.apps.firstOrNull { (_, rect) -> rect.inflate(gapPx / 2).contains(x, y) }
+                ?.let { return ChromeTarget.RailApp(it.first) }
+            r.buttons.firstOrNull { (_, rect) -> rect.inflate(gapPx / 2).contains(x, y) }
+                ?.let { return ChromeTarget.Control(it.first) }
+            r.tab?.let { tab -> if (tab.inflate(handleTouchPx / 3).contains(x, y)) return ChromeTarget.Control(ChromeTarget.Kind.RAIL) }
+        }
         buttons.firstOrNull { (_, rect) -> rect.inflate(gapPx / 2).contains(x, y) }
             ?.let { return ChromeTarget.Control(it.first) }
         if (toolbar == null) handle?.let { if (handleTouchArea(it).contains(x, y)) return ChromeTarget.Control(ChromeTarget.Kind.GRIP) }
@@ -258,7 +291,8 @@ class DuoScreenChrome private constructor(
      * Whether a tap at ([x], [y]) lands on the chrome at all, hit or not: the seam belongs to no
      * pane, and neither does the open toolbar between its buttons.
      */
-    fun onBar(x: Int, y: Int): Boolean = bar.contains(x, y) || toolbar?.contains(x, y) == true
+    fun onBar(x: Int, y: Int): Boolean =
+        bar.contains(x, y) || toolbar?.contains(x, y) == true || rail?.panel?.contains(x, y) == true
 
     /** The handle is a few dp to look at but takes a finger-sized square around its centre. */
     private fun handleTouchArea(handle: Rect): Rect {
@@ -268,6 +302,10 @@ class DuoScreenChrome private constructor(
     }
 
     companion object {
+        /** The closed rail's tab on the edge, in dp: a thin, tall handle a finger finds by feel. */
+        const val RAIL_TAB_WIDTH = 22f
+        const val RAIL_TAB_LENGTH = 88f
+
         /** The presets offered as chips while arranging, as in the design: side by side, stacked, overlay. */
         val CHIP_PRESETS = listOf(
             DuoScreenPreset.EVEN_COLUMNS,
@@ -305,7 +343,9 @@ class DuoScreenChrome private constructor(
             editing: Boolean,
             labels: ChromeLabels,
             measure: (String, Float) -> Float,
-            toolbarOpen: Boolean = false
+            toolbarOpen: Boolean = false,
+            railSide: RailSide? = null,
+            railOpen: Boolean = false
         ): DuoScreenChrome {
             val s = DuoScreenChromeSpec.forSurface(bounds.width, bounds.height, density)
             fun px(dp: Float) = (dp * density).toInt()
@@ -464,10 +504,43 @@ class DuoScreenChrome private constructor(
                 }
             }
 
+            // --- the quick rail ------------------------------------------------------------------
+            val rail = if (editing || railSide == null || panes.isEmpty()) null else {
+                val margin = px(s.CHIP_MARGIN)
+                if (!railOpen) {
+                    val w = px(RAIL_TAB_WIDTH)
+                    val h = px(RAIL_TAB_LENGTH)
+                    val left = if (railSide == RailSide.RIGHT) bounds.width - w else 0
+                    Rail(railSide, Rect(left, (bounds.height - h) / 2, w, h), null, emptyList(), emptyList(), 0)
+                } else {
+                    val kinds = listOf(
+                        ChromeTarget.Kind.SWAP, ChromeTarget.Kind.LAYOUT,
+                        ChromeTarget.Kind.RELOAD, ChromeTarget.Kind.RAIL_MOVE
+                    )
+                    val ordered = panes.sortedBy { it.id }
+                    val items = ordered.size + kinds.size
+                    val separator = buttonGap * 2
+                    val w = button + pad * 2
+                    val h = pad * 2 + items * button + (items - 1) * buttonGap + separator
+                    val left = if (railSide == RailSide.RIGHT) bounds.width - margin - w else margin
+                    val top = ((bounds.height - h) / 2).coerceAtLeast(0)
+                    var cursor = top + pad
+                    val apps = ordered.map { pane ->
+                        (pane.id to Rect(left + pad, cursor, button, button)).also { cursor += button + buttonGap }
+                    }
+                    val separatorAt = cursor + separator / 2 - buttonGap / 2
+                    cursor += separator
+                    val railButtons = kinds.map { kind ->
+                        (kind to Rect(left + pad, cursor, button, button)).also { cursor += button + buttonGap }
+                    }
+                    Rail(railSide, null, Rect(left, top, w, h), apps, railButtons, separatorAt)
+                }
+            }
+
             return DuoScreenChrome(
                 s, bounds, panes.map { it.id to it.rect }, bar, horizontal, divider, overlaps, editing,
                 handle, toolbar, buttons, grip, swapPill, donePill, chips, iconOnly, cards, buttonGap,
-                px(s.HANDLE_TOUCH)
+                px(s.HANDLE_TOUCH), rail
             )
         }
 

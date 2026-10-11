@@ -83,6 +83,9 @@ class DuoScreenController(
         /** The seam's toolbar closes itself after this long without a tap on it or a seam drag. */
         const val TOOLBAR_HIDE_MS = 4_000L
 
+        /** The quick rail stays open this long after the last tap on it. */
+        const val RAIL_HIDE_MS = 6_000L
+
         /** Baseline dpi for dp: the car's own density decides every size on the bar. */
         const val BASELINE_DPI = 160f
 
@@ -107,6 +110,10 @@ class DuoScreenController(
     /** The seam's toolbar is open (normal mode only); see [DuoScreenChrome]. */
     private var toolbarOpen = false
     private val hideToolbar = Runnable { closeToolbar() }
+
+    /** The quick rail on the side of the surface is open; it closes itself after [RAIL_HIDE_MS]. */
+    private var railOpen = false
+    private val collapseRail = Runnable { closeRail() }
     private val appInfo = HashMap<String, PaneApp>()
 
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -566,6 +573,11 @@ class DuoScreenController(
             onChromeTap(target)
             return
         }
+        // Likewise the open rail: a tap off it closes it and reaches nothing else.
+        if (railOpen) {
+            closeRail()
+            return
+        }
         // An open toolbar closes on a tap anywhere else, and that tap goes no further: it was
         // meant for the toolbar, not for whatever pane is under the finger.
         if (toolbarOpen) {
@@ -585,12 +597,22 @@ class DuoScreenController(
                 if (applyPreset(target.preset)) appliedPreset = target.preset
             }
             is ChromeTarget.ChangeApp -> chromeListener?.onChangeAppRequested(target.paneId)
+            is ChromeTarget.RailApp -> {
+                closeRail()
+                chromeListener?.onChangeAppRequested(target.paneId)
+            }
             is ChromeTarget.Control -> when (target.kind) {
                 ChromeTarget.Kind.LAYOUT -> chromeListener?.onPresetChanged(cyclePreset())
                 ChromeTarget.Kind.SWAP -> swapPanes()
                 ChromeTarget.Kind.RELOAD -> StructuredLog.i(TAG, "Reloaded ${reloadSelectedOrAll()} pane(s)")
                 ChromeTarget.Kind.ARRANGE -> setMode(DuoScreenInputRouter.Mode.EDIT)
                 ChromeTarget.Kind.DONE -> setMode(DuoScreenInputRouter.Mode.NORMAL)
+                ChromeTarget.Kind.RAIL -> if (railOpen) closeRail() else openRail()
+                ChromeTarget.Kind.RAIL_MOVE -> {
+                    val side = DuoScreenStore.railSide(context).other()
+                    DuoScreenStore.setRailSide(context, side)
+                    StructuredLog.i(TAG, "Quick rail moved to the ${side.name.lowercase()} edge")
+                }
                 ChromeTarget.Kind.GRIP ->
                     if (mode == DuoScreenInputRouter.Mode.EDIT) chrome?.barDivider?.let { router?.grabDivider(it) }
                     else if (toolbarOpen) closeToolbar() else openToolbar()
@@ -600,6 +622,8 @@ class DuoScreenController(
         if (toolbarOpen && target is ChromeTarget.Control && target.kind != ChromeTarget.Kind.GRIP) {
             if (mode == DuoScreenInputRouter.Mode.EDIT) closeToolbar() else scheduleToolbarHide()
         }
+        // Using the rail keeps it up for another while.
+        if (railOpen) scheduleRailHide()
         // A short pressed flash, so a tap on a drawn button is seen to have landed.
         pressedChrome = target
         refreshChrome()
@@ -625,6 +649,24 @@ class DuoScreenController(
         toolbarOpen = false
         router?.releaseGrab()
         refreshChrome()
+    }
+
+    private fun openRail() {
+        closeToolbar()
+        railOpen = true
+        scheduleRailHide()
+    }
+
+    private fun closeRail() {
+        mainHandler.removeCallbacks(collapseRail)
+        if (!railOpen) return
+        railOpen = false
+        refreshChrome()
+    }
+
+    private fun scheduleRailHide() {
+        mainHandler.removeCallbacks(collapseRail)
+        mainHandler.postDelayed(collapseRail, RAIL_HIDE_MS)
     }
 
     private fun scheduleToolbarHide() {
@@ -683,10 +725,14 @@ class DuoScreenController(
         val editing = active.mode == DuoScreenInputRouter.Mode.EDIT
         val laidOut = DuoScreenChrome.compute(
             panes, bounds, density, editing, labels, chromeRenderer::measure,
-            toolbarOpen = toolbarOpen && !editing
+            toolbarOpen = toolbarOpen && !editing,
+            railSide = DuoScreenStore.railSide(context),
+            railOpen = railOpen && !editing
         )
         chrome = laidOut
-        val apps = if (editing) panes.associate { it.id to appFor(it.packageName) } else emptyMap()
+        val apps = if (editing || (railOpen && laidOut.rail?.panel != null)) {
+            panes.associate { it.id to appFor(it.packageName) }
+        } else emptyMap()
         val titles = if (editing) panes.associate { pane ->
             pane.id to context.getString(R.string.duo_card_title, pane.id + 1, apps[pane.id]?.label.orEmpty())
         } else emptyMap()
