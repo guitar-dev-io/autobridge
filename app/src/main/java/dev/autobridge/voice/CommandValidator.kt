@@ -43,7 +43,7 @@ object CommandValidator {
 
     private val AUTO_EXECUTABLE = setOf(
         VoiceAction.OPEN_APP, VoiceAction.SEARCH, VoiceAction.PLAY, VoiceAction.GO_HOME, VoiceAction.GO_BACK,
-        VoiceAction.OPEN_SCREEN
+        VoiceAction.OPEN_SCREEN, VoiceAction.MEDIA_NEXT, VoiceAction.MEDIA_PREVIOUS, VoiceAction.MEDIA_PAUSE
     )
 
     /** Schemes a spoken address may not use; everything but https is refused anyway, these are named for the log. */
@@ -56,7 +56,15 @@ object CommandValidator {
         val auto = command.action in AUTO_EXECUTABLE
         return when (command.action) {
             VoiceAction.UNKNOWN -> Validation.Rejected(Validation.Reason.UNKNOWN_COMMAND)
-            VoiceAction.GO_HOME, VoiceAction.GO_BACK -> valid(command, null, auto)
+            VoiceAction.GO_HOME, VoiceAction.GO_BACK,
+            VoiceAction.MEDIA_NEXT, VoiceAction.MEDIA_PREVIOUS, VoiceAction.MEDIA_PAUSE -> valid(command, null, auto)
+            // A misheard place starts a route somewhere else, so on the phone it waits for a tap like
+            // an arbitrary site does. The destination only ever becomes a navigation query.
+            VoiceAction.NAVIGATE -> {
+                val destination = cleanQuery(command.query) ?: return Validation.Rejected(Validation.Reason.EMPTY_QUERY)
+                if (destination.length > MAX_QUERY_LENGTH) return Validation.Rejected(Validation.Reason.QUERY_TOO_LONG)
+                valid(command.copy(query = destination), null, auto)
+            }
             VoiceAction.OPEN_SCREEN ->
                 if (command.screen == null) Validation.Rejected(Validation.Reason.MISSING_TARGET)
                 else valid(command, null, auto)

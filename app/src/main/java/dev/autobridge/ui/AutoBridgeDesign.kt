@@ -297,6 +297,10 @@ object AutoBridgeDesign {
     /**
      * A content row: optional square artwork (or an accent-tinted initial when there is no image),
      * title, subtitle, and an optional trailing glyph with its own tap target.
+     *
+     * [trailing] is a glyph in a fixed 40dp square. For a word, use [actionLabel] instead: a pill as
+     * wide as its text, so a label like "Grant in Shizuku" or a Thai one is never broken mid-word.
+     * [subtitleMaxLines] lets a row whose subtitle is the point (a reason, an instruction) wrap.
      */
     fun contentRow(
         context: Context,
@@ -309,6 +313,8 @@ object AutoBridgeDesign {
         trailing: String? = null,
         onTrailing: (() -> Unit)? = null,
         guide: String? = null,
+        subtitleMaxLines: Int = 1,
+        actionLabel: String? = null,
         onClick: () -> Unit
     ): View = LinearLayout(context).apply {
         gravity = Gravity.CENTER_VERTICAL
@@ -369,12 +375,19 @@ object AutoBridgeDesign {
             this.text = subtitle
             textSize = 12f
             setTextColor(TEXT_MUTED)
-            maxLines = 1
+            maxLines = subtitleMaxLines
             ellipsize = TextUtils.TruncateAt.END
             setPadding(0, context.dp(3), 0, 0)
         })
         text.addView(guideLabel(context, guide))
         addView(text, LinearLayout.LayoutParams(0, -2, 1f))
+
+        if (!actionLabel.isNullOrBlank()) addView(
+            pill(context, actionLabel, accent = accent) { (onTrailing ?: onClick)() }.apply {
+                (this as TextView).maxLines = 1
+            },
+            LinearLayout.LayoutParams(-2, -2)
+        )
 
         if (!trailing.isNullOrBlank()) addView(
             glyphButton(context, trailing, 17f) { (onTrailing ?: onClick)() },

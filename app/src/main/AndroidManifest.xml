@@ -57,6 +57,10 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <queries>
+        <!-- Car setup checks whether Android Auto and Shizuku are installed, to say which one is
+             missing; without these Android 11+ reports both as absent even when installed. -->
+        <package android:name="com.google.android.projection.gearhead" />
+        <package android:name="moe.shizuku.privileged.api" />
         <!-- Package visibility for SpeechRecognizer.isRecognitionAvailable and TextToSpeech on
              Android 11+; without these both report no service even when one is installed. -->
         <intent>
@@ -218,6 +222,7 @@
 
         <!-- Step-by-step permissions and car-connection options. -->
         <activity android:name=".mirror.MirrorSetupActivity" android:exported="false" />
+        <activity android:name=".profile.CarProfilesActivity" android:exported="false" />
 
         <!-- Brings the media session up when a car connects; inert unless the option is on. -->
         <receiver android:name=".media.MediaAutoStart$BluetoothReceiver" android:exported="true"

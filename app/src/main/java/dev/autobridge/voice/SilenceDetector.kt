@@ -17,7 +17,10 @@ import kotlin.math.sqrt
  * wait is not one fixed number:
  * - **Short commands end sooner.** "หยุด", "YouTube", "ถัดไป" are over in well under a second and
  *   nobody pauses inside them, so after a short utterance the wait is a fraction of the setting.
- *   A longer sentence gets the whole setting, so a breath between words does not cut it off.
+ *   A typical command ("เปิดยูทูบมิวสิค", "เล่นเพลงบอดี้สแลม", one to two seconds of speech) gets
+ *   most of it, and only a longer sentence gets the whole setting, so a breath between words does
+ *   not cut it off. No tier goes below [MIN_TIMEOUT_MS] or [MIN_MEDIUM_TIMEOUT_MS], which stay above
+ *   the pauses Thai speakers leave between words, so a sentence-final "ครับ"/"ค่ะ" is not cut.
  * - **Blips do not restart the wait.** A click, a breath or the indicator tick after the speaker
  *   stopped is a frame or two above the floor; only a run of speech frames ([ONSET_FRAMES]) counts
  *   as talking again, so the wait is not reset by noise and the command is sent on time.
@@ -28,7 +31,9 @@ class SilenceDetector(
     private val silenceTimeoutMs: Int,
     private val maxDurationMs: Int,
     private val noSpeechTimeoutMs: Int = DEFAULT_NO_SPEECH_MS,
-    private val sampleRate: Int = WhisperEngine.SAMPLE_RATE
+    private val sampleRate: Int = WhisperEngine.SAMPLE_RATE,
+    /** Share of the setting a typical command waits; 1.0 is the rule before the command tier. */
+    private val mediumFactor: Double = MEDIUM_UTTERANCE_FACTOR
 ) {
     enum class Decision { CONTINUE, END_OF_SPEECH, NO_SPEECH, MAX_DURATION }
 
@@ -37,12 +42,19 @@ class SilenceDetector(
     private var silenceSinceSpeechMs = 0.0
     private var speechRun = 0
     private var noiseFloorDb = Double.NaN
+    private var speechStartedAtMs = -1.0
 
     /** Level of the last frame, in dBFS (0 is full scale, -90 is silence). */
     var lastLevelDb: Double = SILENCE_DB
         private set
 
     val heardSpeech: Boolean get() = speechMs >= MIN_SPEECH_MS
+
+    /** Audio time at which the first speech frame began, or -1 before any speech. For latency traces. */
+    val speechStartMs: Long get() = speechStartedAtMs.toLong()
+
+    /** Silence counted since the speaker last talked; at an endpoint, how long the wait was. */
+    val silenceMs: Long get() = silenceSinceSpeechMs.toLong()
 
     /** Feeds [count] 16-bit samples from [frame] and says whether to keep recording. */
     fun accept(frame: ShortArray, count: Int = frame.size): Decision {
@@ -65,6 +77,7 @@ class SilenceDetector(
         }
 
         if (isSpeech) {
+            if (speechStartedAtMs < 0) speechStartedAtMs = elapsedMs - frameMs
             speechMs += frameMs
             speechRun++
         } else {
@@ -87,15 +100,17 @@ class SilenceDetector(
     }
 
     /**
-     * The silence that ends this utterance: a fraction of the setting after a short command, the
-     * whole setting once the speaker has said more than a few words.
+     * The silence that ends this utterance: a fraction of the setting after a short or typical
+     * command, the whole setting once the speaker has said more than a sentence's worth.
      */
-    fun currentTimeoutMs(): Int =
-        if (speechMs < SHORT_UTTERANCE_MS) {
-            (silenceTimeoutMs * SHORT_UTTERANCE_FACTOR).toInt().coerceAtLeast(MIN_TIMEOUT_MS).coerceAtMost(silenceTimeoutMs)
-        } else {
-            silenceTimeoutMs
-        }
+    fun currentTimeoutMs(): Int = when {
+        speechMs < SHORT_UTTERANCE_MS -> scaled(SHORT_UTTERANCE_FACTOR, MIN_TIMEOUT_MS)
+        speechMs < MEDIUM_UTTERANCE_MS -> scaled(mediumFactor, MIN_MEDIUM_TIMEOUT_MS)
+        else -> silenceTimeoutMs
+    }
+
+    private fun scaled(factor: Double, floor: Int): Int =
+        (silenceTimeoutMs * factor).toInt().coerceAtLeast(floor).coerceAtMost(silenceTimeoutMs)
 
     companion object {
         const val DEFAULT_NO_SPEECH_MS = 5_000
@@ -105,6 +120,12 @@ class SilenceDetector(
         const val SHORT_UTTERANCE_FACTOR = 0.6
         /** Never end sooner than this after the last word. */
         const val MIN_TIMEOUT_MS = 450
+        /** Speech shorter than this is a command, not a sentence: one to two seconds of words. */
+        const val MEDIUM_UTTERANCE_MS = 2_000.0
+        /** ...sent after this share of the setting (1.2 s -> 0.96 s by default). */
+        const val MEDIUM_UTTERANCE_FACTOR = 0.8
+        /** ...and never sooner than this, above the longest pause between Thai words in a command. */
+        const val MIN_MEDIUM_TIMEOUT_MS = 600
         /** Consecutive speech frames (60 ms) that count as talking again after a pause. */
         const val ONSET_FRAMES = 3
         const val FRAME_MS = 20

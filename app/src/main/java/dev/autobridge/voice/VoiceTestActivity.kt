@@ -30,6 +30,11 @@ import kotlinx.coroutines.launch
  * result of this visit stays in a table at the bottom, so switching model here (tiny-q8_0,
  * base-q8_0, small-q5_1...) and saying the same sentence again compares them on this phone.
  *
+ * Below that, the latency of recent voice commands from every surface (car Agent, Home microphone,
+ * this screen) as P50/P95/P99 from [VoiceLatencyLog], and a replay of the last recording through
+ * 2, 4 and 6 threads and through each fallback bound, so the settings can be compared on the same
+ * audio on this phone.
+ *
  * Nothing is executed from this screen: it is for measuring.
  */
 class VoiceTestActivity : Activity() {
@@ -37,6 +42,7 @@ class VoiceTestActivity : Activity() {
     companion object {
         fun intent(context: Context): Intent = Intent(context, VoiceTestActivity::class.java)
         private const val REQUEST_MIC = 4201
+        private const val REPLAY_RUNS = 3
     }
 
     private val accent = AutoBridgeDesign.ACCENT_SYSTEM
@@ -50,6 +56,10 @@ class VoiceTestActivity : Activity() {
     private lateinit var parsed: TextView
     private lateinit var benchmark: LinearLayout
     private lateinit var historyTable: LinearLayout
+    private lateinit var latency: TextView
+    private lateinit var replayOut: TextView
+    private lateinit var replayButton: View
+    private var replaying = false
     private lateinit var button: TextView
 
     override fun attachBaseContext(newBase: Context) {
@@ -58,7 +68,7 @@ class VoiceTestActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        recognizer = VoiceRecognizer(this, scope)
+        recognizer = VoiceRecognizer(this, scope, keepAudio = true)
         build()
         scope.launch { recognizer.state.collect(::show) }
     }
@@ -130,6 +140,17 @@ class VoiceTestActivity : Activity() {
         body.stack(historyTable, gap = 12)
         renderHistory()
 
+        body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.voice_test_latency)), gap = 2)
+        latency = monospace()
+        body.stack(latency, gap = 12)
+        renderLatency()
+        replayButton = AutoBridgeDesign.pill(this, getString(R.string.voice_test_replay), primary = false, accent = accent) {
+            replay()
+        }
+        body.stack(replayButton, gap = 8)
+        replayOut = monospace()
+        body.stack(replayOut, gap = 12)
+
         setContentView(
             AutoBridgeDesign.page(
                 context = this,
@@ -197,8 +218,13 @@ class VoiceTestActivity : Activity() {
                 button.text = getString(R.string.voice_test_start)
                 status.text = ""
                 transcript.text = state.text
-                parsed.text = describe(VoiceCommandParser.parse(state.text, VoiceShortcutStore.all(this@VoiceTestActivity)))
+                val command = VoiceCommandParser.parse(state.text, VoiceShortcutStore.all(this@VoiceTestActivity))
+                state.trace.mark(VoiceLatencyTrace.Mark.INTENT_RESOLVED)
+                state.trace.outcome = "test"
+                state.trace.finish()
+                parsed.text = describe(command)
                 showBenchmark(state.transcription)
+                renderLatency()
                 history.add(0, state.transcription)
                 renderHistory()
             }
@@ -206,8 +232,85 @@ class VoiceTestActivity : Activity() {
                 button.text = getString(R.string.voice_test_start)
                 status.text = VoiceMessages.error(this, state.error)
                 level.scaleX = 0f
+                renderLatency()
             }
         }
+    }
+
+    /** The last command's stages and the percentiles over every command timed this run. */
+    private fun renderLatency() {
+        latency.text = VoiceLatencyReport.render(VoiceLatencyLog.recent())
+            ?: getString(R.string.voice_test_latency_empty)
+    }
+
+    /**
+     * Runs the last recording again with 2, 4 and 6 threads, then with fallback bounds 0, 1 and 5
+     * (greedy only, this app's default, whisper's default), three times each on the warm model, and
+     * prints the median and spread. The transcripts of the fallback runs are shown so a faster
+     * setting that hears worse is visible next to its time.
+     */
+    private fun replay() {
+        if (replaying || recognizer.isActive) return
+        val audio = recognizer.lastAudio ?: run {
+            replayOut.text = getString(R.string.voice_test_replay_none)
+            return
+        }
+        val store = VoiceRuntime.modelStore(this)
+        val model = store.getSelectedModel() ?: return
+        val file = store.getModelPath(model.id) ?: return
+        val engine = VoiceRuntime.engine(this)
+        val language = VoiceSettings.language(this)
+        replaying = true
+        replayButton.isEnabled = false
+        replayOut.text = getString(R.string.voice_test_replay_running)
+        val thermal = { describeThermal() }
+        scope.launch {
+            val lines = mutableListOf("model=${model.id} audio=${audio.size * 1000L / WhisperEngine.SAMPLE_RATE}ms lang=${language.code} thermal=${thermal()}")
+            val lease = engine.lease()
+            try {
+                suspend fun runs(threads: Int, fallbacks: Int): Pair<List<Long>, String> {
+                    val times = mutableListOf<Long>()
+                    var text = ""
+                    repeat(REPLAY_RUNS) {
+                        val result = engine.transcribe(
+                            model, file, audio, language, translate = false, threads = threads,
+                            prompt = VoiceCommandParser.RECOGNITION_PROMPT, maxFallbacks = fallbacks
+                        )
+                        times += result.processingMs
+                        text = TranscriptCleaner.clean(result.text, VoiceCommandParser.RECOGNITION_PROMPT)
+                    }
+                    return times to text
+                }
+                for (threads in listOf(2, 4, 6)) {
+                    val (times, _) = runs(threads, WhisperEngine.DEFAULT_MAX_FALLBACKS)
+                    lines += "threads=$threads  ${Percentiles.of(times)}"
+                }
+                val threads = VoiceSettings.effectiveThreads(this@VoiceTestActivity)
+                for (fallbacks in listOf(0, 1, 5)) {
+                    val (times, text) = runs(threads, fallbacks)
+                    lines += "fallback<=$fallbacks threads=$threads  ${Percentiles.of(times)}\n    \"$text\""
+                }
+                lines += "thermal after=${thermal()}"
+            } catch (error: WhisperException) {
+                lines += "failed: ${error.reason}"
+            } finally {
+                lease.close()
+                replaying = false
+                replayButton.isEnabled = true
+            }
+            replayOut.text = lines.joinToString("\n")
+        }
+    }
+
+    private fun describeThermal(): Int = runCatching {
+        getSystemService(android.os.PowerManager::class.java)?.currentThermalStatus ?: -1
+    }.getOrDefault(-1)
+
+    private fun monospace() = text("—", 12f, AutoBridgeDesign.TEXT_MUTED).apply {
+        typeface = Typeface.MONOSPACE
+        background = AutoBridgeDesign.surface(this@VoiceTestActivity, AutoBridgeDesign.SURFACE, 16)
+        setPadding(dp(14), dp(12), dp(14), dp(12))
+        setTextIsSelectable(true)
     }
 
     private fun showBenchmark(result: Transcription) {

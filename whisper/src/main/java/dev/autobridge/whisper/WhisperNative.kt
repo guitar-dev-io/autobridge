@@ -59,13 +59,24 @@ object WhisperNative {
     /** Raises the abort flag a running [transcribe] checks; callable from any thread. */
     @JvmStatic external fun abort(handle: Long)
 
+    /** Clears the abort flag; call before [transcribe], which no longer clears it itself. */
+    @JvmStatic external fun resetAbort(handle: Long)
+
+    /**
+     * One throwaway pass over a second of silence, right after [initContext], so the first real
+     * request after a load runs at the speed of every later one. False when whisper failed.
+     */
+    @JvmStatic external fun warmUp(handle: Long, threads: Int): Boolean
+
     @JvmStatic external fun isMultilingual(handle: Long): Boolean
     @JvmStatic external fun modelType(handle: Long): String
     @JvmStatic external fun modelFtype(handle: Long): Int
 
     /**
      * Transcribes 16 kHz mono PCM in [-1, 1]. [language] is an ISO 639-1 code or "auto".
-     * Returns null when whisper failed or [abort] was called.
+     * [maxFallbacks] bounds the temperature fallback (0 = greedy only, 5 = whisper's default).
+     * Returns null when whisper failed or [abort] was called (also before the call, since the last
+     * [resetAbort]).
      */
     @JvmStatic external fun transcribe(
         handle: Long,
@@ -73,11 +84,12 @@ object WhisperNative {
         language: String,
         translate: Boolean,
         threads: Int,
-        prompt: String?
+        prompt: String?,
+        maxFallbacks: Int
     ): String?
 
     @JvmStatic external fun lastLanguage(handle: Long): String
 
-    /** encode, decode, sample, prompt - milliseconds, from the last [transcribe]. */
+    /** encode, decode, sample, prompt, batched decode - ms per run, from the last [transcribe]. */
     @JvmStatic external fun lastTimings(handle: Long): FloatArray
 }

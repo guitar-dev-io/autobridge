@@ -26,6 +26,7 @@ import dev.autobridge.logging.StructuredLog
 import dev.autobridge.voice.CarMicSource
 import dev.autobridge.voice.PhoneMicSource
 import dev.autobridge.voice.VoiceError
+import dev.autobridge.voice.VoiceLatencyTrace
 import dev.autobridge.voice.VoiceMessages
 import dev.autobridge.voice.VoiceRecognizer
 import dev.autobridge.voice.VoiceRuntime
@@ -63,7 +64,8 @@ class CarVoiceInput(
 ) {
     interface Listener {
         fun onListening(source: Source)
-        fun onResult(text: String)
+        /** [trace] is the offline (Whisper) session's latency trace, for the owner to finish. */
+        fun onResult(text: String, trace: VoiceLatencyTrace? = null)
         fun onError(message: String)
     }
 
@@ -183,7 +185,7 @@ class CarVoiceInput(
                         announced = true
                         listener.onListening(source)
                     }
-                    is VoiceRecognizer.State.Done -> finishWhisper { listener.onResult(state.text) }
+                    is VoiceRecognizer.State.Done -> finishWhisper { listener.onResult(state.text, state.trace) }
                     is VoiceRecognizer.State.Failed -> {
                         if (state.error == VoiceError.RECORDER_FAILED && source == Source.CAR_MIC) {
                             finishWhisper { startWhisper(Source.PHONE_MIC) }

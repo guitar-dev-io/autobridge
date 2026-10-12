@@ -1,5 +1,7 @@
 package dev.autobridge.remote
 
+import dev.autobridge.browser.SearchEngineStore
+
 import android.content.Context
 import dev.autobridge.R
 import dev.autobridge.core.model.Feature
@@ -76,8 +78,8 @@ object AutoBridgeCommandRouter {
             CommandType.OPEN_URL, CommandType.SEARCH_WEB -> {
                 if (!FeaturePolicy.app.isAvailable(Feature.BROWSER)) return denied(id, Feature.BROWSER)
                 val url = when (command.type) {
-                    CommandType.SEARCH_WEB -> CommandParser.normalizeUrl(command.payload.orEmpty())
-                    else -> command.payload?.let { CommandParser.normalizeUrl(it) }
+                    CommandType.SEARCH_WEB -> CommandParser.normalizeUrl(command.payload.orEmpty(), SearchEngineStore.engine(context))
+                    else -> command.payload?.let { CommandParser.normalizeUrl(it, SearchEngineStore.engine(context)) }
                 }
                 if (url.isNullOrBlank()) {
                     return CommandResult.failure(

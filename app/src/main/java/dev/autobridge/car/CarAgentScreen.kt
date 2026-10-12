@@ -20,6 +20,9 @@ import dev.autobridge.voice.CommandValidator
 import dev.autobridge.voice.Validation
 import dev.autobridge.voice.VoiceAction
 import dev.autobridge.voice.VoiceCommandParser
+import dev.autobridge.voice.VoiceLatencyTrace
+import dev.autobridge.voice.VoiceMediaControl
+import dev.autobridge.voice.VoiceRuntime
 
 /**
  * Agent surface: "Ask, search, and control". The user speaks/types a phrase; [AgentCommandRouter]
@@ -47,10 +50,10 @@ class CarAgentScreen(carContext: CarContext) : Screen(carContext) {
             invalidate()
         }
 
-        override fun onResult(text: String) {
+        override fun onResult(text: String, trace: VoiceLatencyTrace?) {
             listening = false
             invalidate()
-            run(text, fromVoice = true)
+            run(text, fromVoice = true, trace = trace)
         }
 
         override fun onError(message: String) {
@@ -64,6 +67,8 @@ class CarAgentScreen(carContext: CarContext) : Screen(carContext) {
     init {
         lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) {
+                // Load the offline model now, not after the driver's first command ends.
+                VoiceRuntime.prewarm(carContext)
                 // Only when the permission is already held: "prefer voice" is a convenience
                 // setting, not consent to be asked for the microphone the moment a screen opens.
                 if (!autoListenDone && AppPreferences.preferVoice(carContext) &&
@@ -165,21 +170,23 @@ class CarAgentScreen(carContext: CarContext) : Screen(carContext) {
     private fun chip(title: String, onClick: () -> Unit): Action =
         Action.Builder().setTitle(title).setOnClickListener { onClick() }.build()
 
-    private fun run(input: String, fromVoice: Boolean) {
-        if (runVoiceCommand(input, fromVoice)) return
+    private fun run(input: String, fromVoice: Boolean, trace: VoiceLatencyTrace? = null) {
+        if (runVoiceCommand(input, fromVoice, trace)) return
         val command = AgentCommandRouter.parse(input)
+        trace?.mark(VoiceLatencyTrace.Mark.INTENT_RESOLVED)
         if (command == null) {
             // Same prompt the phone shows for unparseable input; see AgentCommandRouter.
             val prompt = carContext.getString(R.string.agent_prompt_say_command)
             CarToast.makeText(carContext, prompt, CarToast.LENGTH_SHORT).show()
             if (fromVoice) feedback.speak(prompt)
+            trace?.let { it.outcome = "unknown"; it.finish() }
             return
         }
         RecentActivityStore.record(
             carContext,
             RecentActivityStore.Entry(RecentActivityStore.Kind.AGENT, input.trim())
         )
-        runCommand(command, fromVoice)
+        runCommand(command, fromVoice, trace)
     }
 
     /**
@@ -191,22 +198,31 @@ class CarAgentScreen(carContext: CarContext) : Screen(carContext) {
      * Validated commands run at once on the car, as every Agent command always has: there is no
      * confirmation step to show a driver. A rejected address (not HTTPS, a private host) is refused.
      */
-    private fun runVoiceCommand(input: String, fromVoice: Boolean): Boolean {
+    private fun runVoiceCommand(input: String, fromVoice: Boolean, trace: VoiceLatencyTrace?): Boolean {
         val command = VoiceCommandParser.parse(input, dev.autobridge.voice.VoiceShortcutStore.all(carContext))
         val validated = when (val validation = CommandValidator.validate(command)) {
             is Validation.Valid -> validation.command
             is Validation.Rejected -> {
                 if (validation.reason == Validation.Reason.UNKNOWN_COMMAND) return false
+                trace?.mark(VoiceLatencyTrace.Mark.INTENT_RESOLVED)
                 val message = carContext.getString(R.string.agent_toast_invalid_website)
                 CarToast.makeText(carContext, message, CarToast.LENGTH_SHORT).show()
                 if (fromVoice) feedback.speak(carContext.getString(R.string.agent_spoken_invalid_website))
+                trace?.let { it.outcome = "refused"; it.finish() }
                 return true
             }
         }
+        trace?.mark(VoiceLatencyTrace.Mark.INTENT_RESOLVED)
         RecentActivityStore.record(
             carContext,
             RecentActivityStore.Entry(RecentActivityStore.Kind.AGENT, input.trim())
         )
+        // Screen changes start here; browser actions go through runCommand, which marks its own.
+        val direct = validated.command.action == VoiceAction.GO_BACK ||
+            validated.command.action == VoiceAction.GO_HOME ||
+            validated.command.action == VoiceAction.OPEN_SCREEN ||
+            validated.command.action in DRIVE_ACTIONS
+        if (direct) trace?.mark(VoiceLatencyTrace.Mark.ACTION_DISPATCHED)
         when (validated.command.action) {
             VoiceAction.GO_BACK -> screenManager.pop()
             VoiceAction.GO_HOME -> screenManager.popToRoot()
@@ -221,21 +237,69 @@ class CarAgentScreen(carContext: CarContext) : Screen(carContext) {
                     ).show()
                 }
             }
+            VoiceAction.MEDIA_NEXT, VoiceAction.MEDIA_PREVIOUS, VoiceAction.MEDIA_PAUSE -> {
+                val action = validated.command.action
+                VoiceMediaControl.run(carContext, action) { ok ->
+                    val text = carContext.getString(if (ok) VoiceMediaControl.doneText(action) else R.string.voice_media_unavailable)
+                    CarToast.makeText(carContext, text, CarToast.LENGTH_SHORT).show()
+                    if (fromVoice) feedback.speak(text)
+                }
+            }
+            VoiceAction.NAVIGATE -> validated.command.query?.let { navigate(it, fromVoice) }
             else -> {
                 val url = validated.url
                 runCommand(
                     if (url == null) AgentCommandRouter.Command(AgentCommandRouter.AgentAction.OPEN_BROWSER)
                     else AgentCommandRouter.Command(AgentCommandRouter.AgentAction.OPEN_URL, url),
-                    fromVoice
+                    fromVoice,
+                    trace
                 )
             }
+        }
+        if (direct) trace?.let {
+            it.mark(VoiceLatencyTrace.Mark.ACTION_STARTED)
+            it.outcome = "action"
+            it.finish()
         }
         return true
     }
 
-    private fun runCommand(command: AgentCommandRouter.Command, fromVoice: Boolean) {
+    /**
+     * The car's own navigation intent: Android Auto hands it to the navigation app, which starts
+     * turn-by-turn guidance on the head unit — the same hand-off the car browser's Maps uses.
+     */
+    private fun navigate(destination: String, fromVoice: Boolean) {
+        val uri = android.net.Uri.parse("geo:0,0?q=" + android.net.Uri.encode(destination))
+        val started = runCatching {
+            carContext.startCarApp(android.content.Intent(androidx.car.app.CarContext.ACTION_NAVIGATE, uri))
+            true
+        }.getOrDefault(false)
+        val text = if (started) carContext.getString(R.string.voice_navigating, destination)
+        else carContext.getString(R.string.voice_no_navigation_app)
+        CarToast.makeText(carContext, text, CarToast.LENGTH_SHORT).show()
+        if (fromVoice) feedback.speak(text)
+    }
+
+    private fun runCommand(
+        command: AgentCommandRouter.Command,
+        fromVoice: Boolean,
+        trace: VoiceLatencyTrace? = null
+    ) {
+        trace?.mark(VoiceLatencyTrace.Mark.ACTION_DISPATCHED)
         val result = AgentCommandRouter.execute(this, carContext, command)
+        trace?.let {
+            it.mark(VoiceLatencyTrace.Mark.ACTION_STARTED)
+            it.outcome = if (result.handled) "action" else "refused"
+            it.finish()
+        }
         CarToast.makeText(carContext, result.message, CarToast.LENGTH_SHORT).show()
         if (fromVoice) feedback.speak(result.spoken)
+    }
+
+    private companion object {
+        /** Voice commands that act directly, not through the Agent's browser path. */
+        val DRIVE_ACTIONS = setOf(
+            VoiceAction.MEDIA_NEXT, VoiceAction.MEDIA_PREVIOUS, VoiceAction.MEDIA_PAUSE, VoiceAction.NAVIGATE
+        )
     }
 }

@@ -2,26 +2,24 @@ package dev.autobridge.fuel
 
 import android.app.Activity
 import android.app.AlertDialog
-import android.app.DatePickerDialog
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.text.InputType
 import android.view.View
-import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
-import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.FileProvider
 import dev.autobridge.R
 import dev.autobridge.i18n.AppLocale
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.stack
+import dev.autobridge.ui.CarToolForm
+import dev.autobridge.ui.CarToolViews
+import androidx.core.widget.doAfterTextChanged
 import java.io.File
 import java.text.DateFormat
 import java.text.NumberFormat
-import java.util.Calendar
 import java.util.Date
 import kotlin.math.roundToLong
 
@@ -67,29 +65,18 @@ class FuelLogActivity : Activity() {
         render()
     }
 
+    /**
+     * As the design: the three figures, then each fill-up as a dated line with its amount on the
+     * right, then Add + Export. Fuel or EV changes rarely, so the current one is the header's
+     * subtitle and the other a small pill beside it.
+     */
     private fun render() {
         ev = FuelLogStore.isEv(this)
         val entries = FuelLogStore.all(this)
         val summary = FuelStats.summarize(entries)
         val body = AutoBridgeDesign.body(this)
 
-        body.stack(vehicleToggle(), gap = 12)
-        body.stack(summaryCard(summary), gap = 12)
-        body.stack(
-            LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                addView(
-                    AutoBridgeDesign.pill(this@FuelLogActivity, unit(R.string.fuel_add, R.string.fuel_add_ev), primary = true, accent = accent) { showAddDialog() },
-                    LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(8) }
-                )
-                addView(
-                    AutoBridgeDesign.pill(this@FuelLogActivity, getString(R.string.fuel_export), accent = accent) { exportCsv(entries) },
-                    LinearLayout.LayoutParams(0, -2, 1f)
-                )
-            },
-            gap = 20
-        )
-
+        // With nothing logged the figures would all be zeros; the empty state says it better.
         if (entries.isEmpty()) {
             body.stack(
                 AutoBridgeDesign.emptyState(
@@ -97,54 +84,58 @@ class FuelLogActivity : Activity() {
                     title = unit(R.string.fuel_empty_title, R.string.fuel_empty_title_ev),
                     message = unit(R.string.fuel_empty_message, R.string.fuel_empty_message_ev),
                     accent = accent
-                )
+                ),
+                gap = 12
             )
         } else {
-            body.stack(AutoBridgeDesign.sectionLabel(this, unit(R.string.fuel_history, R.string.fuel_history_ev)), gap = 8)
+            body.stack(summaryCard(summary), gap = 12)
             entries.forEach { entry ->
                 val kmPerL = FuelStats.kmPerLiterOf(entry, entries)
                 body.stack(
-                    AutoBridgeDesign.contentRow(
-                        context = this,
-                        title = getString(rowTitleRes(), decimal(entry.liters), money(entry.totalBaht)),
-                        subtitle = listOfNotNull(
+                    CarToolViews.row(
+                        this,
+                        title = getString(
+                            if (ev) R.string.fuel_row_line_ev else R.string.fuel_row_line,
                             DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(entry.timeMs)),
-                            entry.odometerKm?.let { getString(R.string.fuel_row_odometer, whole(it)) },
+                            decimal(entry.liters)
+                        ),
+                        subtitle = listOfNotNull(
+                            entry.odometerKm?.let { getString(R.string.fuel_row_odometer_line, whole(it)) },
                             kmPerL?.let { getString(kmPerUnitRes(), decimal(it)) },
                             entry.fuelType.takeIf { it.isNotBlank() },
                             entry.station.takeIf { it.isNotBlank() },
                         ).joinToString(" · "),
-                        accent = accent,
-                        badgeText = "⛽",
+                        amount = getString(R.string.money_baht, money(entry.totalBaht)),
+                        accent = accent
                     ) { showEntryActions(entry) }
                 )
             }
         }
+        body.stack(
+            CarToolViews.pillRow(this, listOfNotNull(
+                AutoBridgeDesign.pill(this, unit(R.string.fuel_add, R.string.fuel_add_ev), primary = true, accent = accent) { showAddDialog() },
+                if (entries.isNotEmpty()) AutoBridgeDesign.pill(this, getString(R.string.fuel_export), accent = accent) { exportCsv(entries) } else null
+            )),
+            gap = 12
+        )
+        body.stack(CarToolViews.footnote(this, unit(R.string.fuel_subtitle, R.string.fuel_subtitle_ev)))
 
         setContentView(
             AutoBridgeDesign.page(
                 context = this,
-                header = AutoBridgeDesign.header(
-                    context = this,
-                    title = unit(R.string.fuel_title, R.string.fuel_title_ev),
-                    subtitle = unit(R.string.fuel_subtitle, R.string.fuel_subtitle_ev),
-                    onBack = { finish() }
-                ),
+                header = CarToolViews.headerChip(
+                    this,
+                    AutoBridgeDesign.header(
+                        context = this,
+                        title = unit(R.string.fuel_title, R.string.fuel_title_ev),
+                        subtitle = unit(R.string.fuel_mode_fuel, R.string.fuel_mode_ev),
+                        onBack = { finish() }
+                    ),
+                    unit(R.string.fuel_mode_ev_short, R.string.fuel_mode_fuel_short),
+                    accent
+                ) { setVehicle(!ev) },
                 body = body
             )
-        )
-    }
-
-    /** Fuel or EV, kept on the phone; switching only changes the unit the log is read in. */
-    private fun vehicleToggle(): View = LinearLayout(this).apply {
-        orientation = LinearLayout.HORIZONTAL
-        addView(
-            AutoBridgeDesign.pill(this@FuelLogActivity, getString(R.string.fuel_vehicle_fuel), primary = !ev, accent = accent) { setVehicle(false) },
-            LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(8) }
-        )
-        addView(
-            AutoBridgeDesign.pill(this@FuelLogActivity, getString(R.string.fuel_vehicle_ev), primary = ev, accent = accent) { setVehicle(true) },
-            LinearLayout.LayoutParams(0, -2, 1f)
         )
     }
 
@@ -158,25 +149,21 @@ class FuelLogActivity : Activity() {
 
     private fun kmPerUnitRes() = if (ev) R.string.fuel_km_per_kwh_value else R.string.fuel_km_per_liter_value
 
-    private fun summaryCard(summary: FuelSummary): View = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
-        background = AutoBridgeDesign.surface(this@FuelLogActivity, AutoBridgeDesign.SURFACE, 20)
-        setPadding(dp(16), dp(16), dp(16), dp(16))
-        addView(TextView(this@FuelLogActivity).apply {
-            text = summary.averageKmPerLiter?.let { getString(kmPerUnitRes(), decimal(it)) }
-                ?: unit(R.string.fuel_average_pending, R.string.fuel_average_pending_ev)
-            textSize = 28f
-            setTextColor(AutoBridgeDesign.TEXT)
-        })
-        addView(TextView(this@FuelLogActivity).apply {
-            text = getString(R.string.fuel_average_label)
-            textSize = 13f
-            setTextColor(AutoBridgeDesign.TEXT_MUTED)
-        })
+    /** Three figures that are used day to day, then the rest as quiet lines; "—" until there is data for one. */
+    private fun summaryCard(summary: FuelSummary): View = CarToolViews.card(this) {
+        val none = getString(R.string.my_car_no_reading)
+        addView(CarToolViews.stats(context, listOf(
+            CarToolViews.Stat(
+                getString(R.string.fuel_stat_average),
+                summary.averageKmPerLiter?.let(::decimal) ?: none,
+                summary.averageKmPerLiter?.let { unit(R.string.fuel_stat_km_per_liter, R.string.fuel_stat_km_per_kwh) }
+            ),
+            CarToolViews.Stat(getString(R.string.fuel_stat_per_km), summary.bahtPerKm?.let { getString(R.string.money_baht, decimal(it)) } ?: none),
+            CarToolViews.Stat(getString(R.string.fuel_stat_this_month), getString(R.string.money_baht, money(summary.thisMonthBaht)))
+        )))
         val lines = listOfNotNull(
+            if (summary.averageKmPerLiter == null) unit(R.string.fuel_average_pending, R.string.fuel_average_pending_ev) else null,
             summary.lastKmPerLiter?.let { getString(if (ev) R.string.fuel_last_interval_ev else R.string.fuel_last_interval, decimal(it)) },
-            summary.bahtPerKm?.let { getString(R.string.fuel_baht_per_km, decimal(it)) },
-            getString(R.string.fuel_this_month, money(summary.thisMonthBaht)),
             getString(if (ev) R.string.fuel_totals_ev else R.string.fuel_totals, summary.fillUps, decimal(summary.totalLiters), money(summary.totalBaht)),
             if (ev) {
                 CarVehicleData.batteryPercent?.let { getString(R.string.fuel_car_battery, it.roundToLong()) }
@@ -184,138 +171,94 @@ class FuelLogActivity : Activity() {
                 CarVehicleData.fuelPercent?.let { getString(R.string.fuel_car_level, it.roundToLong()) }
             },
         )
-        lines.forEach { line ->
-            addView(TextView(this@FuelLogActivity).apply {
-                text = line
-                textSize = 14f
-                setTextColor(AutoBridgeDesign.TEXT)
-                setPadding(0, dp(6), 0, 0)
-            })
+        lines.forEachIndexed { index, line ->
+            addView(CarToolViews.text(context, line, 13f, AutoBridgeDesign.TEXT_MUTED, top = if (index == 0) 12 else 4))
         }
     }
 
-    /** Adds a fill-up or charge, or edits [existing] (any date, so a missed one can be entered later). */
+    /**
+     * Adds a fill-up or charge, or edits [existing] (any date, so a missed one can be entered
+     * later). The grade is a row of chips, the last one used already picked; the price per litre is
+     * worked out as the amounts are typed, so a typo shows before it is saved.
+     */
     private fun showAddDialog(existing: FuelEntry? = null) {
         val carOdometer = CarVehicleData.lastOdometer(this)
             ?.takeIf { System.currentTimeMillis() - it.second < ODOMETER_FRESH_MS }?.first
-        fun field(hint: Int, decimal: Boolean, initial: String = "") = EditText(this).apply {
-            this.hint = getString(hint)
-            inputType = if (decimal) {
-                InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
-            } else {
-                InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
-            }
-            setText(initial)
-        }
-        val liters = field(
-            if (ev) R.string.fuel_field_kwh else R.string.fuel_field_liters, decimal = true,
-            initial = existing?.liters?.let { plain(it) }.orEmpty()
+        val form = CarToolForm(
+            this,
+            if (existing != null) unit(R.string.fuel_edit_title, R.string.fuel_edit_title_ev)
+            else unit(R.string.fuel_add_title, R.string.fuel_add_title_ev),
+            accent = accent
         )
-        val baht = field(R.string.fuel_field_baht, decimal = true, initial = existing?.totalBaht?.let { plain(it) }.orEmpty())
-        val odometer = field(
-            R.string.fuel_field_odometer, decimal = true,
+        var timeMs = existing?.timeMs ?: System.currentTimeMillis()
+        form.date(getString(R.string.form_label_date), timeMs, allowFuture = false) { timeMs = it }
+
+        // Petrol and diesel cars name the grade; the last one used is offered again.
+        var fuelType = existing?.fuelType ?: if (ev) "" else FuelLogStore.lastFuelType(this)
+        var otherType: EditText? = null
+        if (!ev) {
+            val grades = FUEL_TYPES.map { getString(it) }
+            val other = getString(R.string.fuel_type_other)
+            val known = fuelType.isBlank() || fuelType in grades
+            form.chips(getString(R.string.fuel_type_title), grades + other, if (known) fuelType else other) { picked ->
+                fuelType = if (picked == other) otherType?.text?.toString().orEmpty().trim() else picked
+                otherType?.let { form.setVisible(it, picked == other) }
+                if (picked == other) otherType?.requestFocus()
+            }
+            otherType = form.field(getString(R.string.fuel_type_other_hint), CarToolForm.Kind.NAME, initial = if (known) "" else fuelType)
+            form.setVisible(otherType, !known)
+        }
+        val amount = form.field(
+            getString(R.string.fuel_form_amount), CarToolForm.Kind.DECIMAL,
+            initial = existing?.liters?.let { plain(it) }.orEmpty(),
+            unit = unit(R.string.unit_liters, R.string.unit_kwh)
+        )
+        val paid = form.field(
+            getString(R.string.fuel_form_paid), CarToolForm.Kind.DECIMAL,
+            initial = existing?.totalBaht?.let { plain(it) }.orEmpty(),
+            unit = getString(R.string.unit_baht)
+        )
+        val price = form.liveHelper()
+        fun refreshPrice() {
+            val l = number(amount)
+            val b = number(paid)
+            price.text = if (l != null && l > 0 && b != null && b > 0) {
+                getString(if (ev) R.string.fuel_form_price_per_kwh else R.string.fuel_form_price_per_liter, decimal(b / l))
+            } else ""
+        }
+        listOf(amount, paid).forEach { it.doAfterTextChanged { refreshPrice() } }
+        refreshPrice()
+        val odometer = form.field(
+            getString(R.string.fuel_form_odometer), CarToolForm.Kind.DECIMAL,
             initial = if (existing != null) {
                 existing.odometerKm?.let { whole(it).replace(",", "") }.orEmpty()
             } else {
                 carOdometer?.let { whole(it).replace(",", "") }.orEmpty()
-            }
+            },
+            unit = getString(R.string.unit_km),
+            helper = getString(if (existing == null && carOdometer != null) R.string.fuel_odometer_from_car else R.string.fuel_odometer_type_it)
         )
-        val station = field(R.string.fuel_field_station, decimal = false, initial = existing?.station.orEmpty())
-        // The day of the fill-up: today unless changed. Only the day is picked; the time of day stays
-        // as it was (now for a new one), which keeps same-day entries in the order they were made.
-        var timeMs = existing?.timeMs ?: System.currentTimeMillis()
-        val dateButton = Button(this).apply {
-            isAllCaps = false
-            fun refresh() {
-                text = getString(R.string.fuel_date_button, DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(timeMs)))
-            }
-            refresh()
-            setOnClickListener {
-                val shown = Calendar.getInstance().apply { timeInMillis = timeMs }
-                DatePickerDialog(
-                    this@FuelLogActivity,
-                    { _, year, month, day ->
-                        timeMs = Calendar.getInstance().apply {
-                            timeInMillis = timeMs
-                            set(year, month, day)
-                        }.timeInMillis
-                        refresh()
-                    },
-                    shown.get(Calendar.YEAR), shown.get(Calendar.MONTH), shown.get(Calendar.DAY_OF_MONTH)
-                ).apply { datePicker.maxDate = System.currentTimeMillis() }.show()
-            }
-        }
-        // Petrol and diesel cars name the grade; the last one used is offered again.
-        var fuelType = existing?.fuelType ?: if (ev) "" else FuelLogStore.lastFuelType(this)
-        val typeButton = Button(this).apply {
-            isAllCaps = false
-            visibility = if (ev) View.GONE else View.VISIBLE
-            fun refresh() {
-                text = getString(R.string.fuel_type_button, fuelType.ifBlank { getString(R.string.fuel_type_choose) })
-            }
-            refresh()
-            setOnClickListener {
-                val names = FUEL_TYPES.map { getString(it) } + getString(R.string.fuel_type_other)
-                AlertDialog.Builder(this@FuelLogActivity)
-                    .setTitle(getString(R.string.fuel_type_title))
-                    .setItems(names.toTypedArray()) { _, which ->
-                        if (which < FUEL_TYPES.size) {
-                            fuelType = names[which]
-                            refresh()
-                        } else {
-                            val typed = EditText(this@FuelLogActivity).apply {
-                                hint = getString(R.string.fuel_type_other_hint)
-                                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
-                            }
-                            AlertDialog.Builder(this@FuelLogActivity)
-                                .setTitle(getString(R.string.fuel_type_other))
-                                .setView(typed)
-                                .setNegativeButton(android.R.string.cancel, null)
-                                .setPositiveButton(android.R.string.ok) { _, _ ->
-                                    fuelType = typed.text.toString().trim()
-                                    refresh()
-                                }
-                                .show()
-                        }
+        val station = form.field(getString(R.string.fuel_field_station), CarToolForm.Kind.NAME, initial = existing?.station.orEmpty())
+
+        form.show(getString(R.string.fuel_save)) {
+            val l = number(amount)
+            val b = number(paid)
+            if (!ev && fuelType == getString(R.string.fuel_type_other)) fuelType = ""
+            otherType?.takeIf { it.isShown }?.let { fuelType = it.text.toString().trim() }
+            when {
+                l == null || l <= 0 || b == null || b < 0 -> unit(R.string.fuel_invalid, R.string.fuel_invalid_ev)
+                !ev && fuelType.isBlank() -> getString(R.string.fuel_type_required)
+                else -> {
+                    if (existing != null) {
+                        FuelLogStore.update(this, existing.id, l, b, number(odometer), station.text.toString(), fuelType, timeMs)
+                    } else {
+                        FuelLogStore.add(this, l, b, number(odometer), station.text.toString(), fuelType, timeMs)
                     }
-                    .show()
+                    render()
+                    null
+                }
             }
         }
-        val note = TextView(this).apply {
-            text = getString(if (existing == null && carOdometer != null) R.string.fuel_odometer_from_car else R.string.fuel_odometer_type_it)
-            textSize = 12f
-        }
-        val form = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(8), dp(20), 0)
-            listOf(dateButton, typeButton, liters, baht, odometer, note, station).forEach { addView(it) }
-        }
-        AlertDialog.Builder(this)
-            .setTitle(
-                if (existing != null) unit(R.string.fuel_edit_title, R.string.fuel_edit_title_ev)
-                else unit(R.string.fuel_add_title, R.string.fuel_add_title_ev)
-            )
-            .setView(form)
-            .setNegativeButton(android.R.string.cancel, null)
-            .setPositiveButton(getString(R.string.fuel_save)) { _, _ ->
-                val l = number(liters)
-                val b = number(baht)
-                if (l == null || l <= 0 || b == null || b < 0) {
-                    Toast.makeText(this, unit(R.string.fuel_invalid, R.string.fuel_invalid_ev), Toast.LENGTH_LONG).show()
-                    return@setPositiveButton
-                }
-                if (!ev && fuelType.isBlank()) {
-                    Toast.makeText(this, getString(R.string.fuel_type_required), Toast.LENGTH_LONG).show()
-                    return@setPositiveButton
-                }
-                if (existing != null) {
-                    FuelLogStore.update(this, existing.id, l, b, number(odometer), station.text.toString(), fuelType, timeMs)
-                } else {
-                    FuelLogStore.add(this, l, b, number(odometer), station.text.toString(), fuelType, timeMs)
-                }
-                render()
-            }
-            .show()
     }
 
     /** Tapping a row: edit it (including its date) or delete it. */
