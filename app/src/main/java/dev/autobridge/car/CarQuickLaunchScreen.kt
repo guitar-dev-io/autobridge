@@ -246,18 +246,14 @@ class CarQuickLaunchScreen(carContext: CarContext, private val manage: Boolean =
         screenManager.pushForResult(CarBrowserSearchScreen(carContext, "")) { result ->
             val text = (result as? String)?.trim().orEmpty()
             if (text.isEmpty()) return@pushForResult
-            val url = dev.autobridge.entertainment.ContentAddress.https(text)
+            val url = dev.autobridge.browser.BrowserInputResolver.addressOf(text)
             if (url != null) {
                 val label = android.net.Uri.parse(url).host ?: text
                 QuickLaunchStore.add(carContext, label, QuickLaunchStore.Kind.URL, url)
             } else {
-                // Treat as a search shortcut.
-                QuickLaunchStore.add(
-                    carContext,
-                    text,
-                    QuickLaunchStore.Kind.URL,
-                    "https://www.google.com/search?q=" + android.net.Uri.encode(text)
-                )
+                // A search shortcut, on the engine the browser uses.
+                val engine = dev.autobridge.browser.SearchEngineStore.engine(carContext)
+                QuickLaunchStore.add(carContext, text, QuickLaunchStore.Kind.URL, engine.searchUrl(text))
             }
             invalidate()
         }

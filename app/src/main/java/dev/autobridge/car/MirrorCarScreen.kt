@@ -238,7 +238,7 @@ class MirrorCarScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
         surfaceWidth = surfaceContainer.width
         surfaceHeight = surfaceContainer.height
         Log.i(TAG, "Surface ${surfaceWidth}x${surfaceHeight} dpi=${surfaceContainer.dpi}")
-        CarDisplayInfo.record(surfaceWidth, surfaceHeight, surfaceContainer.dpi)
+        CarDisplayInfo.record(surfaceWidth, surfaceHeight, surfaceContainer.dpi, source = "mirror")
         val attached = surfaceManager.onSurfaceAvailable(surfaceContainer)
         if (!attached) {
             ProjectionService.onMirrorBindingFailed(
@@ -264,6 +264,7 @@ class MirrorCarScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
     override fun onVisibleAreaChanged(visibleArea: Rect) {
         if (!MirrorSurfaceOwnership.isOwner(this)) return
         Log.i(TAG, "Visible area changed to $visibleArea")
+        CarDisplayInfo.recordVisibleArea(visibleArea.left, visibleArea.top, visibleArea.right, visibleArea.bottom, source = "mirror")
         this.visibleArea = visibleArea
         surfaceManager.onVisibleAreaChanged(visibleArea)
     }

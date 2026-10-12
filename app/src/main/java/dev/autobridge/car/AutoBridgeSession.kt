@@ -25,6 +25,9 @@ class AutoBridgeSession : Session(), CarScreenController.Host {
                 // Register this session so the Mobile Remote's command router can drive the car app
                 // (navigation) through the SAME ScreenManager the car UI already uses.
                 RemoteRuntime.ensureStarted(carContext)
+                // A new connection may be a different head unit; its screens report their own
+                // geometry as they attach, so nothing from the previous car is carried over.
+                CarDisplayInfo.reset()
                 CarScreenController.register(this@AutoBridgeSession)
                 // A live Session IS the Android Auto connection; nothing else observes the host
                 // handshake. Without this the runtime context stayed false for the whole drive, so
@@ -39,6 +42,9 @@ class AutoBridgeSession : Session(), CarScreenController.Host {
                 // "Time for a break" every N hours of this connection, when the driver turned it on.
                 runCatching { dev.autobridge.breakreminder.BreakReminder.start(carContext) }
                 dev.autobridge.logging.StructuredLog.i(TAG, "car session connected")
+                ConnectionTimeline.record(ConnectionTimeline.Kind.SESSION_STARTED)
+                CarSessionHistory.markStarted(carContext)
+                dev.autobridge.display.PerformanceMode.acquire(carContext, "car_session")
                 // The bridge learns about the connection here rather than polling for it, and
                 // this is where a Send-to-Car that arrived while nothing was plugged in gets
                 // replayed onto the head unit.
@@ -56,6 +62,8 @@ class AutoBridgeSession : Session(), CarScreenController.Host {
                 CarConnectionMonitor.publish()
                 val stillConnected = RuntimeContextStore.context.value.connected
                 dev.autobridge.logging.StructuredLog.i(TAG, "car session destroyed connected=$stillConnected")
+                ConnectionTimeline.record(ConnectionTimeline.Kind.SESSION_ENDED, "hostConnected=$stillConnected")
+                dev.autobridge.display.PerformanceMode.release("car_session")
                 dev.autobridge.bridge.AutoBridgeSessionManager.onCarDisconnected(carContext)
                 // The browser renderer outlives individual screens on purpose, so the session is
                 // the only correct place to tear its WebView down.

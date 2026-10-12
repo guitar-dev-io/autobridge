@@ -109,6 +109,28 @@ class CarHomeDashboardScreen(
         if (active) readWeb()
     }
 
+    /**
+     * The shared media session: TV, radio, playlists and local audio play here without going
+     * through the bridge, so without it the card showed nothing (or an old bridge item) while the
+     * radio was on. See [NowPlayingChoice] for which source wins.
+     */
+    private val mediaPlayback = dev.autobridge.media.MediaPlaybackClient(carContext)
+    private var sessionPlayer: androidx.media3.common.Player? = null
+    private val sessionListener = object : androidx.media3.common.Player.Listener {
+        override fun onEvents(player: androidx.media3.common.Player, events: androidx.media3.common.Player.Events) {
+            if (active) onSessionChanged()
+        }
+    }
+
+    /** Moves the card's progress bar while the session plays; events do not fire for position. */
+    private val sessionTick = object : Runnable {
+        override fun run() {
+            if (!active) return
+            if (nowPlayingSource() == NowPlayingChoice.Source.SESSION) renderMenu()
+            handler.postDelayed(this, SESSION_TICK_MS)
+        }
+    }
+
     /** Repaints the Now Playing card as the live session plays, pauses and moves on. */
     private val scope = MainScope()
     private var sessionWatch: Job? = null
@@ -141,6 +163,7 @@ class CarHomeDashboardScreen(
                 sessionWatch = scope.launch { AutoBridgeSessionManager.state.collect { renderMenu() } }
                 WebMediaHub.addStatusListener(webStatusListener)
                 readWeb()
+                watchSession()
                 // The surface may have survived the screen above (both are surface templates).
                 renderMenu()
             }
@@ -151,12 +174,14 @@ class CarHomeDashboardScreen(
                 sessionWatch?.cancel()
                 sessionWatch = null
                 WebMediaHub.removeStatusListener(webStatusListener)
+                unwatchSession()
                 handler.removeCallbacksAndMessages(null)
                 releaseSurface()
                 if (MirrorSurfaceOwnership.release(this@CarHomeDashboardScreen)) appManager.setSurfaceCallback(null)
             }
 
             override fun onDestroy(owner: LifecycleOwner) {
+                mediaPlayback.disconnect()
                 vehicleStateSession.close()
                 speedSubscription.close()
                 scope.cancel()
@@ -198,6 +223,7 @@ class CarHomeDashboardScreen(
         surfaceDpi = surfaceContainer.dpi
         dashboardLayout = null
         StructuredLog.i(TAG, "surface ${surfaceWidth}x$surfaceHeight dpi=$surfaceDpi")
+        CarDisplayInfo.record(surfaceWidth, surfaceHeight, surfaceDpi, source = "home")
         renderMenu()
     }
 
@@ -209,6 +235,7 @@ class CarHomeDashboardScreen(
     override fun onStableAreaChanged(stableArea: Rect) {
         if (!active || !MirrorSurfaceOwnership.isOwner(this)) return
         StructuredLog.i(TAG, "stable area $stableArea")
+        CarDisplayInfo.recordStableArea(stableArea.left, stableArea.top, stableArea.right, stableArea.bottom, source = "home")
         this.stableArea = Rect(stableArea)
         dashboardLayout = null
         renderMenu()
@@ -217,6 +244,7 @@ class CarHomeDashboardScreen(
     override fun onVisibleAreaChanged(visibleArea: Rect) {
         if (!active || !MirrorSurfaceOwnership.isOwner(this)) return
         StructuredLog.i(TAG, "visible area $visibleArea")
+        CarDisplayInfo.recordVisibleArea(visibleArea.left, visibleArea.top, visibleArea.right, visibleArea.bottom, source = "home")
         this.visibleArea = Rect(visibleArea)
         dashboardLayout = null
         renderMenu()
@@ -257,7 +285,114 @@ class CarHomeDashboardScreen(
      */
     private fun actionFor(hit: HomeHit): (() -> Unit)? {
         webPlaying()?.let { now -> webAction(hit, now)?.let { return it } }
+        if (nowPlayingSource() == NowPlayingChoice.Source.SESSION) sessionAction(hit)?.let { return it }
         return bridgeAction(hit)
+    }
+
+    /** The card's buttons on the media session: the same actions as the wheel and the media card. */
+    private fun sessionAction(hit: HomeHit): (() -> Unit)? = when (hit.region) {
+        HomeRegion.CONTINUE -> {
+            {
+                val uri = sessionUri()
+                val title = mediaPlayback.currentTitle.orEmpty()
+                releaseSurface()
+                // A video item opens the video screen, which adopts the channel already loaded
+                // instead of restarting it; audio opens the session's own Now Playing screen.
+                if (mediaPlayback.hasVideo && uri != null) {
+                    CarVideoLauncher.open(screenManager, carContext, uri, title)
+                } else {
+                    CarNavigation.open(screenManager, "CarNowPlayingScreen") { CarNowPlayingScreen(carContext) }
+                }
+            }
+        }
+        HomeRegion.CONTROL_PLAY -> {
+            {
+                if (mediaPlayback.isPlaying) mediaPlayback.pause() else mediaPlayback.resume()
+            }
+        }
+        HomeRegion.CONTROL_PREVIOUS -> if (!mediaPlayback.hasPrevious) null else {
+            { mediaPlayback.previous() }
+        }
+        HomeRegion.CONTROL_NEXT -> if (!mediaPlayback.hasNext) null else {
+            { mediaPlayback.next() }
+        }
+        else -> null
+    }
+
+    private fun watchSession() {
+        if (mediaPlayback.isConnected) {
+            attachSessionListener()
+        } else {
+            mediaPlayback.connect(onConnected = {
+                if (active) {
+                    attachSessionListener()
+                    onSessionChanged()
+                }
+            })
+        }
+        handler.postDelayed(sessionTick, SESSION_TICK_MS)
+    }
+
+    private fun attachSessionListener() {
+        val player = mediaPlayback.player ?: return
+        if (sessionPlayer === player) return
+        sessionPlayer?.removeListener(sessionListener)
+        player.addListener(sessionListener)
+        sessionPlayer = player
+    }
+
+    private fun unwatchSession() {
+        sessionPlayer?.removeListener(sessionListener)
+        sessionPlayer = null
+        handler.removeCallbacks(sessionTick)
+    }
+
+    /** Whether the last paint had a card; it appearing or going changes the layout, not just paint. */
+    private var sessionCardShown = false
+
+    private fun onSessionChanged() {
+        val hasCard = shownContent().hasContinueWatching
+        if (hasCard != sessionCardShown) dashboardLayout = null
+        sessionCardShown = hasCard
+        renderMenu()
+    }
+
+    private fun sessionActive(): Boolean {
+        val player = mediaPlayback.player ?: return false
+        return NowPlayingChoice.sessionActive(player.isPlaying, player.mediaItemCount, player.playbackState)
+    }
+
+    private fun sessionUri(): String? = mediaPlayback.currentIndex?.let { mediaPlayback.currentQueueUris().getOrNull(it) }
+        ?.takeIf { it.isNotBlank() }
+
+    private fun nowPlayingSource(): NowPlayingChoice.Source = NowPlayingChoice.choose(
+        webPlaying = webPlaying() != null,
+        bridgeLive = content.continueWatching?.let(::isLive) == true,
+        sessionActive = sessionActive(),
+        hasSnapshot = content.continueWatching != null
+    )
+
+    /** The session's current item as the card draws it. */
+    private fun sessionItem(): ContinueItem? {
+        val player = mediaPlayback.player ?: return null
+        val uri = sessionUri().orEmpty()
+        val title = mediaPlayback.currentTitle
+            ?: uri.takeIf { it.isNotBlank() }?.let { BridgeSource(it).displayHost }
+            ?: return null
+        val source = BridgeSource(uri, title)
+        val artworkUri = player.mediaMetadata.artworkUri?.toString()?.takeIf { it.startsWith("http") }
+        val artwork = HomeDashboardSource.artwork(uri).let { if (artworkUri != null) it.copy(thumbnailUrl = artworkUri) else it }
+        val duration = player.duration.takeIf { it > 0L } ?: 0L
+        val position = player.currentPosition.coerceAtLeast(0L)
+        return ContinueItem(
+            source = source,
+            snapshot = BridgeStore.Snapshot(source, EngineKind.NATIVE, position, System.currentTimeMillis(), duration),
+            title = title,
+            sourceLabel = mediaPlayback.currentArtist ?: HomeDashboardSource.label(carContext, uri),
+            artwork = artwork,
+            positionMs = position,
+            durationMs = duration
+        )
     }
 
     /**
@@ -412,9 +547,12 @@ class CarHomeDashboardScreen(
         )
     }
 
-    /** What the card shows: the browser's page when it is playing something, else the bridge's. */
-    private fun shownContent(): HomeDashboardContent =
-        webPlaying()?.let { content.copy(continueWatching = webItem(it)) } ?: liveContent()
+    /** What the card shows; [NowPlayingChoice] decides between the browser, the bridge and the session. */
+    private fun shownContent(): HomeDashboardContent = when (nowPlayingSource()) {
+        NowPlayingChoice.Source.WEB -> content.copy(continueWatching = webItem(webPlaying()!!))
+        NowPlayingChoice.Source.SESSION -> sessionItem()?.let { content.copy(continueWatching = it) } ?: liveContent()
+        else -> liveContent()
+    }
 
     /** The content to draw, with the live position when the card is the session playing now. */
     private fun liveContent(): HomeDashboardContent {
@@ -682,6 +820,7 @@ class CarHomeDashboardScreen(
         @Volatile
         var resumedThisLaunch = false
         const val TAG = "CarHome"
+        const val SESSION_TICK_MS = 1_000L
         const val BASELINE_DPI = 160
 
         /** Session states in which the Now Playing buttons can act on the engine directly. */

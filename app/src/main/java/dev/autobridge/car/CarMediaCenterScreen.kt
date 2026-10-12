@@ -184,7 +184,7 @@ class CarMediaCenterScreen(carContext: CarContext) : Screen(carContext) {
                     .setBrowsable(true)
                     .setOnClickListener {
                         screenManager.pushForResult(CarBrowserSearchScreen(carContext, "")) { result ->
-                            val url = dev.autobridge.entertainment.ContentAddress.https(result as? String ?: "")
+                            val url = dev.autobridge.browser.BrowserInputResolver.addressOf(result as? String ?: "")
                             if (url != null) {
                                 RecentActivityStore.record(
                                     carContext,

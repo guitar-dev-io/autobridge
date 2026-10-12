@@ -11,12 +11,13 @@ import androidx.car.app.model.Row
 import androidx.car.app.model.Template
 import dev.autobridge.R
 import dev.autobridge.display.MirrorDiagnostics
+import dev.autobridge.display.PerformanceMode
+import dev.autobridge.display.PerformancePolicy
 import dev.autobridge.mirror.MirrorCoordinator
-import dev.autobridge.mirror.ReconnectTracker
 
 /**
  * Car-native live diagnostics for the mirror pipeline. All values are read from the same
- * [MirrorDiagnostics]/[MirrorCoordinator]/[ReconnectTracker] state used by the phone developer
+ * [MirrorDiagnostics]/[MirrorCoordinator]/[ConnectionTimeline] state used by the phone developer
  * view, so the two surfaces never disagree. Frame counters are meaningful only for the SELF_DRAWN
  * renderer; AUTO_MIRROR is a zero-copy OS path with no app-observable frames.
  */
@@ -38,6 +39,7 @@ class CarDiagnosticsScreen(carContext: CarContext) : Screen(carContext) {
 
         val list = ItemList.Builder()
             .addItem(statusRow(carContext.getString(R.string.car_diag_car_display), carDisplayText))
+            .addItem(statusRow(carContext.getString(R.string.car_diag_car_area), carAreaLabel()))
             .addItem(statusRow(carContext.getString(R.string.car_diag_pipeline), MirrorCoordinator.activePipelineMode.name))
             .addItem(
                 statusRow(
@@ -53,9 +55,10 @@ class CarDiagnosticsScreen(carContext: CarContext) : Screen(carContext) {
             .addItem(
                 statusRow(
                     carContext.getString(R.string.car_diag_reconnects),
-                    ReconnectTracker.reconnectCount.toString()
+                    connectionLabel()
                 )
             )
+            .addItem(statusRow(carContext.getString(R.string.car_diag_performance), performanceLabel()))
             .addItem(
                 statusRow(
                     carContext.getString(R.string.car_diag_frame_rate),
@@ -134,6 +137,42 @@ class CarDiagnosticsScreen(carContext: CarContext) : Screen(carContext) {
     private fun fpsLabel(stats: MirrorDiagnostics.FrameStats): String =
         if (stats.rendered > 0) "%.1f FPS".format(stats.measuredFps)
         else carContext.getString(R.string.car_diag_measuring)
+
+    /** Where content and touches can land, as the host reported it; "—" for an area not reported yet. */
+    private fun carAreaLabel(): String {
+        val print = CarDisplayInfo.fingerprint
+        return carContext.getString(
+            R.string.car_diag_car_area_value,
+            print.stable?.toString() ?: "—",
+            print.visible?.toString() ?: "—"
+        )
+    }
+
+    /** The whole drive so far, from [ConnectionTimeline]; the per-projection count resets too often to judge stability. */
+    private fun connectionLabel(): String {
+        val summary = ConnectionTimeline.summary()
+        val lastRecovery = summary.lastRecoveryMs?.let { "%.1f s".format(it / 1000f) } ?: "—"
+        return carContext.getString(
+            R.string.car_diag_reconnects_value,
+            summary.surfaceResumes,
+            summary.hostDrops,
+            summary.projectionStops,
+            lastRecovery
+        )
+    }
+
+    /** The current [PerformanceMode] level and why, e.g. "Reduced (thermal 2)". */
+    private fun performanceLabel(): String {
+        if (!PerformanceMode.enabled) return carContext.getString(R.string.car_diag_performance_off)
+        val level = carContext.getString(
+            when (PerformanceMode.level) {
+                PerformancePolicy.Level.NORMAL -> R.string.performance_level_normal
+                PerformancePolicy.Level.REDUCED -> R.string.performance_level_reduced
+                PerformancePolicy.Level.LOW -> R.string.performance_level_low
+            }
+        )
+        return carContext.getString(R.string.car_diag_performance_value, level, PerformanceMode.reason)
+    }
 
     private fun uptimeLabel(): String {
         val ms = MirrorDiagnostics.currentMirroringUptimeMs() ?: return "—"

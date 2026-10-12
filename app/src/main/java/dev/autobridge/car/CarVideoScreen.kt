@@ -267,7 +267,7 @@ class CarVideoScreen(
         // The head unit picks this size, and it is what decides how much letterboxing the picture
         // gets, so it is recorded rather than inferred from a photo of the screen.
         StructuredLog.i("CAR_VIDEO", "surface ${surfaceWidth}x$surfaceHeight dpi=${surfaceContainer.dpi}")
-        CarDisplayInfo.record(surfaceWidth, surfaceHeight, surfaceContainer.dpi)
+        CarDisplayInfo.record(surfaceWidth, surfaceHeight, surfaceContainer.dpi, source = "video")
         attach()
     }
 

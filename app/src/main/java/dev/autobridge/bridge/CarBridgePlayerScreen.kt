@@ -124,7 +124,7 @@ class CarBridgePlayerScreen(carContext: CarContext) : Screen(carContext), Surfac
 
     override fun onSurfaceAvailable(surfaceContainer: SurfaceContainer) {
         if (!active || !MirrorSurfaceOwnership.isOwner(this)) return
-        CarDisplayInfo.record(surfaceContainer.width, surfaceContainer.height, surfaceContainer.dpi)
+        CarDisplayInfo.record(surfaceContainer.width, surfaceContainer.height, surfaceContainer.dpi, source = "bridge-player")
         AutoBridgeSessionManager.attachSurface(
             surfaceContainer.surface,
             surfaceContainer.width,

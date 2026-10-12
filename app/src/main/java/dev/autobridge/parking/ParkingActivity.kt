@@ -7,15 +7,15 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.text.InputType
-import android.widget.EditText
 import android.widget.LinearLayout
-import android.widget.TextView
 import android.widget.Toast
 import dev.autobridge.R
+import dev.autobridge.core.state.RecentActivityStore
 import dev.autobridge.i18n.AppLocale
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.stack
+import dev.autobridge.ui.CarToolForm
+import dev.autobridge.ui.CarToolViews
 import java.text.DateFormat
 import java.util.Date
 
@@ -43,23 +43,17 @@ class ParkingActivity : Activity() {
         render()
     }
 
+    /**
+     * As the design: the spot as one card (pin, how long ago, when, the note, the photo), then
+     * Navigate back + Mark again, then Photo + Edit note, then one line on privacy.
+     */
     private fun render() {
         val spot = ParkingStore.get(this)
+        val hasPhoto = ParkingStore.hasPhoto(this)
         val body = AutoBridgeDesign.body(this)
-        body.stack(
-            TextView(this).apply {
-                text = getString(R.string.parking_privacy)
-                textSize = 13f
-                setTextColor(AutoBridgeDesign.TEXT_MUTED)
-            },
-            gap = 12
-        )
-        body.stack(
-            AutoBridgeDesign.pill(this, getString(R.string.parking_mark_here), primary = true, accent = accent) { markHere() },
-            gap = 16
-        )
-        // The photo works with or without a marked spot: a picture of the pillar number is worth having either way.
-        body.stack(photoSection(), gap = 16)
+        fun pill(label: Int, primary: Boolean = false, onClick: () -> Unit) =
+            AutoBridgeDesign.pill(this, getString(label), primary = primary, accent = accent, onClick = onClick)
+        val photoPill = pill(if (hasPhoto) R.string.parking_photo_retake else R.string.parking_photo_take) { takePhoto() }
         if (spot == null) {
             body.stack(
                 AutoBridgeDesign.emptyState(
@@ -67,36 +61,24 @@ class ParkingActivity : Activity() {
                     title = getString(R.string.parking_empty_title),
                     message = getString(R.string.parking_empty_message),
                     accent = accent
-                )
-            )
-        } else {
-            body.stack(
-                AutoBridgeDesign.contentRow(
-                    context = this,
-                    title = spot.note.ifBlank { getString(R.string.parking_no_note) },
-                    subtitle = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(spot.savedMs)),
-                    accent = accent,
-                    badgeText = "🅿",
-                ) { editNote(spot) },
+                ),
                 gap = 12
             )
-            body.stack(
-                LinearLayout(this).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    addView(
-                        AutoBridgeDesign.pill(this@ParkingActivity, getString(R.string.parking_navigate), primary = true, accent = accent) { navigate(spot) },
-                        LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = (8 * resources.displayMetrics.density).toInt() }
-                    )
-                    addView(
-                        AutoBridgeDesign.pill(this@ParkingActivity, getString(R.string.parking_clear), accent = accent) {
-                            ParkingStore.clear(this@ParkingActivity)
-                            render()
-                        },
-                        LinearLayout.LayoutParams(0, -2, 1f)
-                    )
-                }
-            )
+            // The photo works without a marked spot too: a picture of the pillar number is worth having.
+            body.stack(CarToolViews.pillRow(this, listOfNotNull(
+                pill(R.string.parking_mark_here, primary = true) { markHere() },
+                photoPill,
+                if (hasPhoto) pill(R.string.parking_photo_view) { showPhoto() } else null
+            )), gap = 12)
+        } else {
+            body.stack(spotCard(spot, hasPhoto), gap = 12)
+            body.stack(CarToolViews.pillRow(this, listOf(
+                pill(R.string.parking_navigate_back, primary = true) { navigate(spot) },
+                pill(R.string.parking_mark_again) { markHere() }
+            )), gap = 8)
+            body.stack(CarToolViews.pillRow(this, listOf(photoPill, pill(R.string.parking_edit_note) { editNote(spot) })), gap = 12)
         }
+        body.stack(CarToolViews.footnote(this, getString(R.string.parking_privacy_short)))
         setContentView(
             AutoBridgeDesign.page(
                 context = this,
@@ -111,41 +93,56 @@ class ParkingActivity : Activity() {
         )
     }
 
+    /** Pin, "Parked 2 hours ago", the date and time, the note; the photo on the right opens it. */
+    private fun spotCard(spot: ParkingSpot, hasPhoto: Boolean) = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = android.view.Gravity.CENTER_VERTICAL
+        background = AutoBridgeDesign.tappable(context, AutoBridgeDesign.SURFACE, 16, accent, android.graphics.Color.TRANSPARENT)
+        val pad = (16 * resources.displayMetrics.density).toInt()
+        setPadding(pad, pad, pad, pad)
+        isClickable = true
+        setOnClickListener { editNote(spot) }
+        addView(CarToolViews.iconChip(context, R.drawable.ic_car_parking, AutoBridgeDesign.ACCENT_TV).apply {
+            (layoutParams as LinearLayout.LayoutParams).marginEnd = pad * 3 / 4
+            (layoutParams as LinearLayout.LayoutParams).gravity = android.view.Gravity.TOP
+        })
+        addView(LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(CarToolViews.text(context, getString(R.string.parking_parked_ago, RecentActivityStore.relativeAge(context, spot.savedMs)), 18f, bold = true))
+            addView(CarToolViews.text(
+                context,
+                DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(spot.savedMs)),
+                13f,
+                AutoBridgeDesign.TEXT_MUTED,
+                top = 2
+            ))
+            addView(CarToolViews.text(
+                context,
+                spot.note.ifBlank { getString(R.string.parking_no_note) },
+                15f,
+                if (spot.note.isBlank()) AutoBridgeDesign.TEXT_MUTED else AutoBridgeDesign.TEXT,
+                top = 8
+            ))
+        }, LinearLayout.LayoutParams(0, -2, 1f))
+        if (hasPhoto) {
+            val side = pad * 4
+            ParkingPhoto.load(ParkingStore.photoFile(context), maxSide = side * 2)?.let { bitmap ->
+                addView(android.widget.ImageView(context).apply {
+                    setImageBitmap(bitmap)
+                    scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+                    clipToOutline = true
+                    background = AutoBridgeDesign.surface(context, AutoBridgeDesign.SURFACE_RAISED, 12, android.graphics.Color.TRANSPARENT)
+                    contentDescription = getString(R.string.parking_photo_view)
+                    setOnClickListener { showPhoto() }
+                }, LinearLayout.LayoutParams(side, side).apply { marginStart = pad * 3 / 4 })
+            }
+        }
+    }
+
     @Deprecated("Deprecated in Java")
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQUEST_LOCATION && grantResults.any { it == android.content.pm.PackageManager.PERMISSION_GRANTED }) markHere()
-    }
-
-    /** Take, view and delete the photo; a line says what it is for and where it stays. */
-    private fun photoSection(): LinearLayout = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
-        val has = ParkingStore.hasPhoto(this@ParkingActivity)
-        addView(
-            LinearLayout(this@ParkingActivity).apply {
-                orientation = LinearLayout.HORIZONTAL
-                addView(
-                    AutoBridgeDesign.pill(
-                        this@ParkingActivity,
-                        getString(if (has) R.string.parking_photo_retake else R.string.parking_photo_take),
-                        accent = accent
-                    ) { takePhoto() },
-                    LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = (8 * resources.displayMetrics.density).toInt() }
-                )
-                if (has) {
-                    addView(
-                        AutoBridgeDesign.pill(this@ParkingActivity, getString(R.string.parking_photo_view), accent = accent) { showPhoto() },
-                        LinearLayout.LayoutParams(0, -2, 1f)
-                    )
-                }
-            }
-        )
-        addView(TextView(this@ParkingActivity).apply {
-            text = getString(if (has) R.string.parking_photo_saved_hint else R.string.parking_photo_hint)
-            textSize = 12f
-            setTextColor(AutoBridgeDesign.TEXT_MUTED)
-            setPadding(0, (6 * resources.displayMetrics.density).toInt(), 0, 0)
-        })
     }
 
     /** Opens the camera app to write one picture into the app's own folder; no camera permission is needed. */
@@ -218,25 +215,17 @@ class ParkingActivity : Activity() {
 
     private fun editNote(spot: ParkingSpot?) {
         if (spot == null) return
-        val note = EditText(this).apply {
-            hint = getString(R.string.parking_note_hint)
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
-            setText(spot.note)
+        val form = CarToolForm(this, getString(R.string.parking_note_title), accent = accent)
+        val note = form.field(getString(R.string.parking_form_note), CarToolForm.Kind.TEXT, initial = spot.note, hint = getString(R.string.parking_note_hint))
+        // Clearing the spot is rare, so it lives here rather than as a button on the page.
+        form.show(getString(R.string.fuel_save), danger = getString(R.string.parking_clear_spot) to {
+            ParkingStore.clear(this)
+            render()
+        }) {
+            ParkingStore.setNote(this, note.text.toString())
+            render()
+            null
         }
-        val frame = LinearLayout(this).apply {
-            val pad = (20 * resources.displayMetrics.density).toInt()
-            setPadding(pad, pad / 2, pad, 0)
-            addView(note, LinearLayout.LayoutParams(-1, -2))
-        }
-        AlertDialog.Builder(this)
-            .setTitle(getString(R.string.parking_note_title))
-            .setView(frame)
-            .setNegativeButton(android.R.string.cancel, null)
-            .setPositiveButton(getString(R.string.fuel_save)) { _, _ ->
-                ParkingStore.setNote(this, note.text.toString())
-                render()
-            }
-            .show()
     }
 
     private fun navigate(spot: ParkingSpot) {

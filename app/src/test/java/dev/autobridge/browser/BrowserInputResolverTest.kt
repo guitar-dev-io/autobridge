@@ -44,7 +44,7 @@ class BrowserInputResolverTest {
     }
 
     @Test fun unsafeSchemesAreTreatedAsSearchesNotNavigation() {
-        for (input in listOf("javascript:alert(1)", "intent://x", "http://insecure.example")) {
+        for (input in listOf("javascript:alert(1)", "intent://x")) {
             assertTrue(
                 "$input should become a search",
                 resolve(input, SearchEngine.GOOGLE).startsWith("https://www.google.com/search?q=")
@@ -75,6 +75,19 @@ class BrowserInputResolverTest {
         val search = resolve("thai pop live concert", SearchEngine.GOOGLE)
         assertTrue(search.startsWith("https://www.google.com/search?q="))
         assertEquals("thai pop live concert", URLDecoder.decode(search.substringAfter("q="), "UTF-8"))
+    }
+
+    /** Cleartext is never loaded; a typed http address is opened over https rather than searched. */
+    @Test fun aTypedHttpAddressIsUpgradedNotSearched() {
+        assertEquals("https://insecure.example", resolve("http://insecure.example", SearchEngine.GOOGLE))
+    }
+
+    /** The bug this file now guards: one word used to open a host that does not exist. */
+    @Test fun aSingleWordSearchesInsteadOfOpeningADeadHost() {
+        for (word in listOf("weather", "bodyslam", "news")) {
+            assertTrue(word, resolve(word, SearchEngine.GOOGLE).startsWith("https://www.google.com/search?q="))
+        }
+        assertFalse(BrowserInputResolver.looksLikeUrl("weather"))
     }
 
     @Test fun looksLikeUrlDistinguishesAddressesFromQueries() {

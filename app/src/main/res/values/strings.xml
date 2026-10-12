@@ -570,8 +570,8 @@
     <string name="settings_input_touch">Input &amp; Touch</string>
     <string name="settings_input_touch_caption">Touch backend and permissions</string>
     <string name="settings_group_car">Car &amp; apps</string>
-    <string name="settings_car_connection">Car &amp; Connection</string>
-    <string name="settings_car_connection_caption">Android Auto, Bluetooth and startup</string>
+    <string name="settings_car_connection">My Car</string>
+    <string name="settings_car_connection_caption">Parking, fuel, maintenance and Android Auto</string>
     <string name="settings_app_profiles">App Profiles</string>
     <string name="settings_app_profiles_caption">Per-app display and audio</string>
     <string name="settings_group_features">Features</string>
@@ -657,12 +657,10 @@
     <string name="whats_new_0_4_24">• Car keyboard opens on a page\'s search box and closes after searching.\n• Rewinding no longer silences the song; Bridge Web gets the split screen; the phone shows "connected" whatever is on the car.</string>
     <string name="fuel_title">Fuel log</string>
     <string name="fuel_subtitle">Full tank every time</string>
-    <string name="fuel_settings_caption">Fill-ups, km/L and fuel spending</string>
     <string name="car_more_fuel">Fuel log</string>
     <string name="fuel_add">+ Fill-up</string>
     <string name="fuel_add_title">Full-tank fill-up</string>
     <string name="fuel_export">Export CSV</string>
-    <string name="fuel_history">Fill-ups</string>
     <string name="fuel_empty_title">No fill-ups yet</string>
     <string name="fuel_empty_message">Log every fill-up with a full tank. From the second one on, the average km/L appears here.</string>
     <string name="fuel_average_label">Average consumption</string>
@@ -676,13 +674,10 @@
     <string name="fuel_car_range">Range: %1$d km</string>
     <string name="fuel_last_fill">Last fill-up: %1$s</string>
     <string name="fuel_row_title">%1$s L · %2$s baht</string>
-    <string name="fuel_row_odometer">%1$s km</string>
-    <string name="fuel_field_liters">Litres</string>
-    <string name="fuel_field_baht">Total (baht)</string>
     <string name="fuel_field_odometer">Odometer (km)</string>
     <string name="fuel_field_station">Station (optional)</string>
     <string name="fuel_odometer_from_car">Odometer filled in from the car.</string>
-    <string name="fuel_odometer_type_it">Type the odometer for km/L; the car has not reported it.</string>
+    <string name="fuel_odometer_type_it">Type the odometer to work out consumption (the car has not sent it).</string>
     <string name="fuel_save">Save</string>
     <string name="fuel_invalid">Enter the litres and the total.</string>
     <string name="fuel_delete_title">Delete this fill-up?</string>
@@ -784,11 +779,9 @@
     <string name="home_bridge_duo_action">Multi-app</string>
 
     <!-- Car & Connection screen -->
-    <string name="car_connection_title">Car &amp; Connection</string>
-    <string name="car_connection_subtitle">Android Auto, Bluetooth and startup</string>
-    <string name="car_connection_current_vehicle">Current vehicle</string>
+    <string name="car_connection_title">My Car</string>
+    <string name="car_connection_subtitle">Car tools and connection</string>
     <string name="car_connection_my_car">My Car</string>
-    <string name="car_connection_settings_section">Settings</string>
     <string name="voice_no_recognizer">No speech recognizer on this phone</string>
 
     <!-- Settings &gt; Input &amp; Touch -->
@@ -866,6 +859,15 @@
     <string name="mirror_section_advanced">ADVANCED</string>
     <string name="mirror_head_unit_profile">Head-unit profile</string>
     <string name="mirror_screen_off">Screen-off behavior</string>
+    <string name="mirror_frame_rate_self_drawn">Self-drawn renderer target; measured after frames arrive</string>
+    <string name="mirror_frame_rate_auto_mirror">AUTO_MIRROR does not expose a fixed FPS control</string>
+    <string name="mirror_head_unit_profile_measured">Measured profile</string>
+    <string name="mirror_head_unit_profile_placeholder">Manual placeholder; not hardware validated</string>
+    <string name="mirror_screen_off_unavailable">Unavailable</string>
+    <string name="mirror_screen_off_panel_off">Panel off on auto-dim</string>
+    <string name="mirror_screen_off_continues">Continues</string>
+    <string name="mirror_screen_off_not_guaranteed">Not guaranteed</string>
+    <string name="mirror_panel_off_not_available">Panel-off needs Shizuku connected with display power available</string>
     <string name="mirror_panel_off">Panel off on auto-dim</string>
     <string name="mirror_panel_off_caption">ScreenOnAuto-style panel-only power-off; requires Shizuku/root and falls back to dim</string>
     <string name="mirror_dim_now">Dim phone now</string>
@@ -881,7 +883,7 @@
     <string name="mirror_auto_dim">Auto dim</string>
     <string name="mirror_auto_dim_caption">Dim after inactivity; car touch starts the timer again</string>
     <string name="mirror_stop_on_disconnect">Stop on disconnect</string>
-    <string name="mirror_stop_on_disconnect_caption">Stop projection after Android Auto stays disconnected for 2 seconds</string>
+    <string name="mirror_stop_on_disconnect_caption">Stop projection after Android Auto stays disconnected for 2 seconds; switching apps on the car screen does not count</string>
     <string name="mirror_scale_mode">Scale mode</string>
     <string name="mirror_started">Mirroring Started</string>
     <string name="mirror_capture_denied">Screen capture permission denied</string>
@@ -1062,6 +1064,8 @@
     <string name="car_diag_title">Diagnostics</string>
     <string name="car_diag_lowest_resolution">%1$s • Lowest Android Auto resolution. If the car supports it: Android Auto ▸ Developer settings ▸ Video resolution ▸ 720p, then reconnect</string>
     <string name="car_diag_car_display">Car display</string>
+    <string name="car_diag_car_area">Car content area</string>
+    <string name="car_diag_car_area_value">stable %1$s · visible %2$s</string>
     <string name="car_diag_pipeline">Pipeline</string>
     <string name="car_diag_mirror">Mirror</string>
     <string name="car_diag_active">Active</string>
@@ -1069,6 +1073,7 @@
     <string name="car_diag_uptime">Uptime</string>
     <string name="car_diag_source_size">Source size</string>
     <string name="car_diag_reconnects">Reconnects</string>
+    <string name="car_diag_reconnects_value">%1$d resumed · %2$d host drops · %3$d stops · last recovery %4$s</string>
     <string name="car_diag_frame_rate">Frame rate</string>
     <string name="car_diag_os_owned">n/a • AUTO_MIRROR is OS-owned</string>
     <string name="car_diag_frames">Frames (r/d/c)</string>
@@ -1372,7 +1377,7 @@
     <string name="car_streaming_title">Streaming</string>
 
     <!-- Car display info ([CarDisplayInfo]). -->
-    <string name="car_display_none">— (open Browser or Mirror first)</string>
+    <string name="car_display_none">— (the car has not reported a screen yet)</string>
 
     <!-- Car audio diagnostics ([CarAudioDiagnosticsScreen]). -->
     <string name="car_audio_title">Audio</string>
@@ -1596,11 +1601,8 @@
     <!-- EV mode for the fuel log -->
     <string name="fuel_title_ev">Charging log</string>
     <string name="fuel_subtitle_ev">Charge to the same level each time</string>
-    <string name="fuel_vehicle_fuel">⛽ Petrol / diesel</string>
-    <string name="fuel_vehicle_ev">⚡ EV</string>
     <string name="fuel_add_ev">+ Charge</string>
     <string name="fuel_add_title_ev">Charge</string>
-    <string name="fuel_history_ev">Charges</string>
     <string name="fuel_empty_title_ev">No charges yet</string>
     <string name="fuel_empty_message_ev">Log each charge, always to the same level (say 80 percent). From the second one on, the average km/kWh appears here.</string>
     <string name="fuel_average_pending_ev">Two charges needed</string>
@@ -1608,7 +1610,6 @@
     <string name="fuel_last_interval_ev">Last charge: %1$s km/kWh</string>
     <string name="fuel_totals_ev">%1$d charges · %2$s kWh · %3$s baht in total</string>
     <string name="fuel_row_title_ev">%1$s kWh · %2$s baht</string>
-    <string name="fuel_field_kwh">Energy (kWh)</string>
     <string name="fuel_invalid_ev">Enter the kWh and the total.</string>
     <string name="fuel_delete_title_ev">Delete this charge?</string>
     <string name="fuel_car_battery">Battery: %1$d%%</string>
@@ -1616,9 +1617,6 @@
 
     <!-- Maintenance reminders -->
     <string name="maint_title">Maintenance</string>
-    <string name="maint_subtitle">Due by distance and by date</string>
-    <string name="maint_subtitle_ev">Due by distance and by date, for an EV</string>
-    <string name="maint_settings_caption">Oil, tyres, road tax and what is due next</string>
     <string name="maint_add">+ Item</string>
     <string name="maint_add_suggested">Add suggested</string>
     <string name="maint_nothing_to_add">The suggested items are already on the list.</string>
@@ -1628,11 +1626,7 @@
     <string name="maint_odometer_now">Odometer: %1$s km</string>
     <string name="maint_odometer_unknown">Odometer unknown: log a fill-up with it, or allow the car\'s data</string>
     <string name="maint_field_name">Name</string>
-    <string name="maint_field_km">Every (km), 0 for none</string>
-    <string name="maint_field_months">Every (months), 0 for none</string>
-    <string name="maint_field_last_km">Last done at (km)</string>
     <string name="maint_invalid">Enter a name and a distance or a number of months.</string>
-    <string name="maint_done_message">Mark as done at this odometer, or delete the item.</string>
     <string name="maint_mark_done">Done today</string>
     <string name="maint_in_km">In %1$s km</string>
     <string name="maint_over_km">Overdue by %1$s km</string>
@@ -1683,8 +1677,6 @@
     <string name="backup_invalid">That is not an AutoBridge backup.</string>
 
     <!-- Fuel grade -->
-    <string name="fuel_type_button">Fuel: %1$s</string>
-    <string name="fuel_type_choose">choose</string>
     <string name="fuel_type_title">Fuel grade</string>
     <string name="fuel_type_other">Other</string>
     <string name="fuel_type_other_hint">Fuel grade</string>
@@ -1702,7 +1694,6 @@
     <string name="maps_app_missing">Google Maps is not installed or could not start navigation.</string>
     <string name="maint_due">Due %1$s</string>
     <string name="maint_due_estimate">Due around %1$s at your usual driving</string>
-    <string name="maint_due_date_button">Due date: %1$s</string>
     <string name="maint_due_date_none">not set</string>
     <plurals name="maint_reminder_title">
         <item quantity="one">%1$d maintenance item needs attention</item>
@@ -1711,9 +1702,7 @@
     <string name="youtube_sponsorblock_caveat">This may not work, or may be incomplete. The segments come from volunteers, so new or little-watched videos often have none and a marked segment can be a little off. Skipping needs the internet and works only in AutoBridge\'s own YouTube page; if YouTube changes its site, it can stop working until the app is updated.</string>
     <string name="home_donate">☕ Buy me a coffee</string>
     <string name="maint_compulsory_insurance">Compulsory insurance (Por.Ror.Bor.)</string>
-    <string name="settings_group_utilities">Utilities</string>
     <string name="car_more_group_utilities">Utilities</string>
-    <string name="fuel_date_button">Date: %1$s</string>
     <string name="fuel_edit">Edit</string>
     <string name="fuel_edit_title">Edit fill-up</string>
     <string name="fuel_edit_title_ev">Edit charge</string>
@@ -1742,15 +1731,12 @@
     <string name="about_facebook_caption">News and updates</string>
     <!-- Emergency card -->
     <string name="emergency_title">Emergency card</string>
-    <string name="emergency_subtitle">Numbers to ring and facts to quote</string>
-    <string name="emergency_settings_caption">Insurance, roadside help, emergency lines</string>
+    <string name="emergency_subtitle">Tap to call, from the car screen too</string>
     <string name="emergency_add">+ Add</string>
     <string name="emergency_add_suggested">Add emergency lines</string>
     <string name="emergency_empty_title">Nothing on the card yet</string>
     <string name="emergency_empty_message">Add your insurance hotline and policy number, roadside assistance and someone to call. Tap the emergency-lines button for the public numbers.</string>
     <string name="emergency_car_empty">Fill the card on the phone (Settings &gt; Emergency card).</string>
-    <string name="emergency_field_label">Label (e.g. Insurance hotline)</string>
-    <string name="emergency_field_value">Number or text</string>
     <string name="emergency_invalid">Enter a label and a number or text.</string>
     <string name="emergency_call">Call</string>
     <string name="emergency_cannot_dial">Could not open the dialer.</string>
@@ -1766,7 +1752,6 @@
     <!-- Break reminder -->
     <string name="break_reminder_title">Break reminder</string>
     <string name="break_reminder_off">Off</string>
-    <string name="break_reminder_explain">Tells you to take a break after this many hours with the car connected. It uses no location, only the time. Takes effect the next time the car connects.</string>
     <string name="break_reminder_message">You have been driving a while. Time for a break.</string>
     <plurals name="break_reminder_every">
         <item quantity="one">Every %1$d hour</item>
@@ -1775,8 +1760,6 @@
     <!-- Parking spot -->
     <string name="parking_title">Parking spot</string>
     <string name="parking_subtitle">Find the car again</string>
-    <string name="parking_settings_caption">Mark where you parked and navigate back</string>
-    <string name="parking_privacy">Your location is read only when you tap Mark here. Only the spot you mark, your note and your photo are kept, on this phone; nothing is shared or sent.</string>
     <string name="parking_mark_here">Mark here</string>
     <string name="parking_finding">Finding your location…</string>
     <string name="parking_saved">Parking spot saved</string>
@@ -1788,11 +1771,9 @@
     <string name="parking_note_title">Note for this spot</string>
     <string name="parking_note_hint">Floor, pillar, anything to find the car</string>
     <string name="parking_navigate">Navigate</string>
-    <string name="parking_clear">Clear</string>
     <!-- Costs -->
     <string name="costs_title">Car costs</string>
     <string name="costs_subtitle">Fuel and everything else, by month</string>
-    <string name="costs_settings_caption">What the car costs each month</string>
     <string name="costs_add">+ Expense</string>
     <string name="costs_by_month">By month</string>
     <string name="costs_expenses">Other expenses</string>
@@ -1805,10 +1786,8 @@
     <string name="costs_empty_message">Fuel and charging come from your fuel log. Add a service, a wash, tolls, parking or a tax here, or give a cost when you mark a maintenance item done.</string>
     <string name="costs_car_empty">Add fill-ups and expenses on the phone.</string>
     <string name="costs_field_label">What for (service, tolls, parking…)</string>
-    <string name="costs_field_baht">Amount (baht)</string>
     <string name="costs_invalid">Enter an amount above zero.</string>
     <string name="costs_delete_title">Delete this expense?</string>
-    <string name="maint_field_cost">Cost (baht), optional</string>
     <!-- Voice fuel entry -->
     <string name="voice_fuel_saved">Saved: %1$s</string>
     <string name="voice_fuel_not_understood">I did not catch both the amount and the price.</string>
@@ -1963,4 +1942,219 @@
     <string name="voice_media_unavailable">Nothing is playing, or there is nothing to skip to</string>
     <string name="voice_navigating">Navigating to %1$s</string>
     <string name="voice_no_navigation_app">No navigation app to hand this to</string>
+    <!-- Car setup: one sentence per cause, one label per fix (MirrorReadiness). -->
+    <string name="setup_title">Car setup</string>
+    <string name="setup_section_steps">Before using the car</string>
+    <string name="setup_section_car_connects">When a car connects</string>
+    <string name="setup_subtitle_running">Mirroring is running</string>
+    <string name="setup_subtitle_ready">Ready</string>
+    <string name="setup_subtitle_next">Next: %1$s</string>
+    <string name="setup_fix_next">Fix: %1$s</string>
+    <string name="setup_step_android_auto">Android Auto</string>
+    <string name="setup_step_notifications">Notifications</string>
+    <string name="setup_step_touch">Touch control</string>
+    <string name="setup_step_capture">Screen capture</string>
+    <string name="setup_step_battery">Background use</string>
+    <string name="setup_step_speed">Car speed</string>
+    <string name="setup_cause_aa_missing">Android Auto is not installed on this phone</string>
+    <string name="setup_cause_aa_hidden_fixable">Installed outside the Play Store, so Android Auto may hide AutoBridge on the car. Reinstall it as a Play install; your data stays</string>
+    <string name="setup_cause_aa_hidden">Installed outside the Play Store, so Android Auto may hide AutoBridge. Turn on Unknown sources in Android Auto\'s developer settings</string>
+    <string name="setup_cause_aa_connected">Connected to the car</string>
+    <string name="setup_cause_aa_ready">Ready; AutoBridge appears on the car when you connect</string>
+    <string name="setup_cause_notif_not_needed">Not required on this Android version</string>
+    <string name="setup_cause_notif_ok">The mirroring service can show its status</string>
+    <string name="setup_cause_notif_missing">Without this there is no notification to stop mirroring from</string>
+    <string name="setup_cause_touch_shizuku_full">Shizuku is connected — full multi-touch</string>
+    <string name="setup_cause_touch_shizuku">Shizuku is connected — single touch only</string>
+    <string name="setup_cause_touch_accessibility">Accessibility is on — taps and swipes work, pinch is synthetic</string>
+    <string name="setup_cause_touch_shizuku_not_granted">Shizuku is running but has not allowed AutoBridge</string>
+    <string name="setup_cause_touch_accessibility_stopped">Accessibility reads On, but Android stopped the service, often to save battery. Switch it off and on again</string>
+    <string name="setup_cause_touch_accessibility_restricted">Android locks the accessibility switch for apps installed outside a store. In App info, tap ⋮ then Allow restricted settings</string>
+    <string name="setup_cause_touch_none_shizuku_stopped">Nothing can send taps yet. Turn on the AutoBridge accessibility service, or start Shizuku</string>
+    <string name="setup_cause_touch_none">Turn on the AutoBridge accessibility service so taps on the car reach the phone</string>
+    <string name="setup_cause_capture_running">Mirroring is running</string>
+    <string name="setup_cause_capture_denied">Capture was cancelled last time. Start again and choose Start now (Android 14+: Entire screen)</string>
+    <string name="setup_cause_capture_stopped_by_system">Android ended the last capture: the screen locked, another app started recording, or the capture chip was tapped. Start again</string>
+    <string name="setup_cause_capture_failed">The last start failed. Start again; if it happens again, send the log</string>
+    <string name="setup_cause_capture_needed">Android asks each time mirroring starts (Android 14+: choose Entire screen)</string>
+    <string name="setup_cause_battery_ok">Won\'t be stopped while mirroring or playing in the background</string>
+    <string name="setup_cause_battery_ok_check_autostart">Battery use is allowed. This phone also keeps its own Autostart list; allow AutoBridge there too</string>
+    <string name="setup_cause_battery_restricted">Android may stop AutoBridge in the background until this is allowed</string>
+    <string name="setup_cause_speed_waiting">Checked when the car connects</string>
+    <string name="setup_cause_speed_ok">The car reports its speed</string>
+    <string name="setup_cause_speed_no_permission">Allow speed access when AutoBridge asks on the car screen</string>
+    <string name="setup_cause_speed_silent">Allowed, but the car has not reported a speed; parked status stays Unknown</string>
+    <string name="setup_fix_install_android_auto">Install</string>
+    <string name="setup_fix_make_visible_on_car">Fix</string>
+    <string name="setup_fix_allow_notifications">Allow</string>
+    <string name="setup_fix_grant_shizuku">Grant in Shizuku</string>
+    <string name="setup_fix_open_accessibility">Open accessibility</string>
+    <string name="setup_fix_restart_accessibility">Switch off and on</string>
+    <string name="setup_fix_allow_restricted_settings">Open App info</string>
+    <string name="setup_fix_start_capture">Start mirroring</string>
+    <string name="setup_fix_stop_capture">Stop</string>
+    <string name="setup_fix_exempt_battery_with_shizuku">Allow with Shizuku</string>
+    <string name="setup_fix_allow_battery">Allow</string>
+    <string name="setup_fix_open_autostart">Open Autostart</string>
+    <string name="setup_toast_capture_denied">Screen capture was not allowed</string>
+    <string name="setup_toast_approve_shizuku">Approve AutoBridge in Shizuku</string>
+    <string name="setup_toast_battery_shizuku_ok">Background use allowed through Shizuku</string>
+    <string name="setup_toast_battery_shizuku_failed">Shizuku could not change it; opening Android\'s dialog instead</string>
+    <string name="setup_toast_restart_accessibility">Switch AutoBridge off, then on again</string>
+    <string name="setup_toast_autostart_manual">Allow AutoBridge under Autostart in this app\'s settings</string>
+    <string name="setup_toast_battery_fallback">Allow AutoBridge to run in the background from here</string>
+    <string name="setup_toast_bluetooth_needed">Bluetooth permission is needed for this</string>
+    <string name="setup_autostart_title">Start the media service on Bluetooth</string>
+    <string name="setup_autostart_on">The session is ready as soon as the car pairs</string>
+    <string name="setup_autostart_off">The session starts when you first play something</string>
+    <string name="performance_mode">Performance mode</string>
+    <string name="performance_mode_caption">Lowers the self-drawn mirror frame rate, car browser redraws and video resolution when the phone is hot or dropping frames. Now: %1$s</string>
+    <string name="performance_level_normal">Normal</string>
+    <string name="performance_level_reduced">Reduced</string>
+    <string name="performance_level_low">Low</string>
+    <string name="car_diag_performance">Performance</string>
+    <string name="car_diag_performance_value">%1$s (%2$s)</string>
+    <string name="car_diag_performance_off">Off</string>
+    <!-- Car profiles: save, share and import (CarProfilesActivity). -->
+    <string name="car_profiles_title">Car profiles</string>
+    <string name="car_profiles_in_use">In use: %1$s</string>
+    <string name="car_profiles_save_this_car">Save this car</string>
+    <string name="car_profiles_import">Import file</string>
+    <string name="car_profiles_built_in">Built in</string>
+    <string name="car_profiles_saved">Saved and shared</string>
+    <string name="car_profiles_builtin_default">Uses what the car reports; adds nothing</string>
+    <string name="car_profiles_builtin_unverified">Placeholder; same values as Default until measured in a real car</string>
+    <string name="car_profiles_none_title">No saved profiles yet</string>
+    <string name="car_profiles_none_caption">Connect to the car and tap Save this car, or import a file someone shared</string>
+    <string name="car_profiles_unverified">Unverified</string>
+    <string name="car_profiles_matches">Matches this car</string>
+    <string name="car_profiles_use">Use</string>
+    <string name="car_profiles_share">Share</string>
+    <string name="car_profiles_delete">Delete</string>
+    <string name="car_profiles_delete_title">Delete %1$s?</string>
+    <string name="car_profiles_now_using">Using %1$s</string>
+    <string name="car_profiles_connect_first">Connect to the car first; its screen is what gets saved</string>
+    <string name="car_profiles_name_hint">Name, e.g. My Ranger</string>
+    <string name="car_profiles_vehicle_hint">Car and head unit, e.g. Ford Ranger 2023 SYNC 4A</string>
+    <string name="car_profiles_save_message">Records this car\'s screen (%1$s) so it can be shared. Nothing else is measured.</string>
+    <string name="car_profiles_save">Save</string>
+    <string name="car_profiles_default_name">My car</string>
+    <string name="car_profiles_saved_toast">Saved %1$s</string>
+    <string name="car_profiles_imported">Imported %1$s (unverified)</string>
+    <string name="car_profiles_import_unreadable">Could not read that file</string>
+    <string name="car_profiles_error_too_large">That file is too large to be a car profile</string>
+    <string name="car_profiles_error_not_profile">That file is not an AutoBridge car profile</string>
+    <string name="car_profiles_error_newer">That profile was made by a newer AutoBridge; update the app first</string>
+    <string name="car_profiles_error_bad">That profile is missing its name or has unusable values</string>
+
+    <!-- My Car (Settings > My Car) -->
+    <string name="my_car_profile_caption">Screen profile: %1$s</string>
+    <string name="my_car_section_tools">Car tools</string>
+    <string name="my_car_section_connection">Connection</string>
+    <string name="my_car_parking_empty">Tap to mark where you parked</string>
+    <string name="my_car_maint_empty">No items yet</string>
+    <string name="my_car_fuel_empty">Nothing logged yet</string>
+    <string name="my_car_fuel_no_average">Needs two odometer readings</string>
+    <plurals name="my_car_fuel_logged">
+        <item quantity="one">%1$d entry</item>
+        <item quantity="other">%1$d entries</item>
+    </plurals>
+    <plurals name="my_car_fuel_average_of">
+        <item quantity="one">Average of %1$d entry</item>
+        <item quantity="other">Average of %1$d entries</item>
+    </plurals>
+    <string name="my_car_costs_empty">Nothing this month</string>
+    <string name="my_car_costs_this_month">This month</string>
+    <string name="my_car_emergency_empty">Add the numbers to call</string>
+    <string name="my_car_emergency_caption">Tap a number to call</string>
+    <plurals name="my_car_emergency_count">
+        <item quantity="one">%1$d entry</item>
+        <item quantity="other">%1$d entries</item>
+    </plurals>
+    <string name="my_car_aa_connected">Connected</string>
+    <string name="my_car_aa_not_connected">Not connected</string>
+    <string name="my_car_phone_battery">Phone battery</string>
+    <string name="my_car_temperature">Temperature</string>
+    <string name="my_car_no_reading">—</string>
+    <string name="my_car_diagnostics">Connection diagnostics</string>
+    <string name="my_car_diagnostics_caption">Connection log and mirror events</string>
+
+    <!-- My Car tool pages -->
+    <string name="parking_parked_ago">Parked %1$s</string>
+    <string name="parking_navigate_back">Navigate back to the car</string>
+    <string name="parking_mark_again">Mark again</string>
+    <string name="parking_edit_note">Edit note</string>
+    <string name="parking_privacy_short">Location is read only when you mark the spot, and stays on this phone.</string>
+    <string name="fuel_stat_km_per_liter">km/L</string>
+    <string name="fuel_stat_km_per_kwh">km/kWh</string>
+
+    <!-- Add and edit sheets of the My Car tools -->
+    <string name="form_label_date">Date</string>
+    <string name="unit_km">km</string>
+    <string name="unit_baht">baht</string>
+    <string name="unit_months">months</string>
+    <string name="unit_liters">L</string>
+    <string name="unit_kwh">kWh</string>
+    <string name="fuel_form_amount">Amount</string>
+    <string name="fuel_form_paid">Paid</string>
+    <string name="fuel_form_odometer">Odometer</string>
+    <string name="fuel_form_price_per_liter">That is %1$s baht a litre</string>
+    <string name="fuel_form_price_per_kwh">That is %1$s baht per kWh</string>
+    <string name="costs_add_title">Add a cost</string>
+    <string name="costs_form_what">What for</string>
+    <string name="costs_form_label">Description</string>
+    <string name="costs_form_amount">Amount</string>
+    <string name="costs_quick_toll">Toll</string>
+    <string name="costs_quick_parking">Parking</string>
+    <string name="costs_quick_wash">Car wash</string>
+    <string name="costs_quick_repair">Repair</string>
+    <string name="costs_quick_insurance">Insurance</string>
+    <string name="costs_quick_tax">Tax</string>
+    <string name="maint_add_title">Add an item</string>
+    <string name="maint_form_presets">Common items</string>
+    <string name="maint_form_name">Item</string>
+    <string name="maint_form_every_km">Every (distance)</string>
+    <string name="maint_form_every_months">Or every (time)</string>
+    <string name="maint_form_interval_helper">Fill in one or both; whichever comes first counts.</string>
+    <string name="maint_form_last_km">Last done at</string>
+    <string name="maint_form_due">Due date (optional)</string>
+    <string name="maint_form_due_helper">For a tax or insurance that runs out on a set day.</string>
+    <string name="maint_form_done_odometer">Odometer when done</string>
+    <string name="maint_form_done_cost">Cost (optional)</string>
+    <string name="maint_form_done_cost_helper">Added to the car costs.</string>
+    <string name="maint_form_delete">Delete this item</string>
+    <string name="emergency_add_title">Add to the card</string>
+    <string name="emergency_form_name">Name</string>
+    <string name="emergency_form_name_hint">e.g. Insurance claims</string>
+    <string name="emergency_form_value">Phone number or text</string>
+    <string name="emergency_form_value_hint">e.g. the claims line 02-123-4567</string>
+    <string name="emergency_form_value_helper">A phone number can be called with one tap.</string>
+    <string name="emergency_form_delete">Remove from the card</string>
+    <string name="parking_form_note">Note</string>
+    <string name="form_change">Change</string>
+    <string name="maint_needs_odometer">Needs an odometer reading</string>
+    <string name="maint_odometer_unknown_short">Odometer not known yet</string>
+    <string name="emergency_edit_title">Edit</string>
+    <string name="emergency_form_detail">What to tell them (optional)</string>
+    <string name="emergency_form_detail_hint">e.g. policy 1234-5678 · plate AB 1234</string>
+    <string name="emergency_kind_insurance">Car insurance</string>
+    <string name="emergency_kind_roadside">Roadside help</string>
+    <string name="emergency_kind_family">Family</string>
+    <string name="parking_clear_spot">Clear this spot</string>
+    <string name="break_reminder_subtitle">Counts the time the car is connected; no location</string>
+    <string name="break_reminder_takes_effect">Takes effect the next time the car connects.</string>
+    <string name="money_baht">฿%1$s</string>
+    <string name="fuel_mode_fuel">Petrol / diesel</string>
+    <string name="fuel_mode_ev">Electric (EV)</string>
+    <string name="fuel_mode_fuel_short">Petrol</string>
+    <string name="fuel_mode_ev_short">EV</string>
+    <string name="fuel_stat_average">Average</string>
+    <string name="fuel_stat_per_km">Per km</string>
+    <string name="fuel_stat_this_month">This month</string>
+    <string name="fuel_row_line">%1$s · %2$s L</string>
+    <string name="fuel_row_line_ev">%1$s · %2$s kWh</string>
+    <string name="fuel_row_odometer_line">Odometer %1$s</string>
+    <string name="costs_legend_fuel">Fuel ฿%1$s</string>
+    <string name="costs_legend_other">Other ฿%1$s</string>
+    <string name="costs_average_short">3-month average ฿%1$s</string>
 </resources>

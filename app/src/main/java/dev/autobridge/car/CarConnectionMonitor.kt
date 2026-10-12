@@ -4,7 +4,9 @@ import android.content.Context
 import androidx.car.app.connection.CarConnection
 import dev.autobridge.core.state.RuntimeContextStore
 import dev.autobridge.logging.StructuredLog
+import dev.autobridge.mirror.ProjectionService
 import dev.autobridge.remote.CarScreenController
+import dev.autobridge.safety.ParkingStateStore
 
 /**
  * Decides whether the phone is connected to the car, for every phone screen that says so.
@@ -25,17 +27,44 @@ object CarConnectionMonitor {
     @Volatile
     private var hostConnected = false
 
+    /** What the Android Auto host last said about the car connection. */
+    val isHostConnected: Boolean
+        get() = hostConnected
+
+    /**
+     * True once the host has answered at all. Until then [isHostConnected] is only the default, and
+     * callers that act on a disconnect (Stop on disconnect) must not treat it as one.
+     */
+    @Volatile
+    var hostSignalKnown = false
+        private set
+
     private var installed = false
 
     /** Starts listening to the host. Main thread; called once from the Application. */
     fun install(context: Context) {
         if (installed) return
         installed = true
+        // Observation only: the store is read, never written. Registered at startup, so it runs
+        // before the mirror's own listener and the log shows the state change before any teardown.
+        ParkingStateStore.addListener { state ->
+            ConnectionTimeline.record(ConnectionTimeline.Kind.VEHICLE_STATE, state.name)
+        }
         runCatching {
-            CarConnection(context.applicationContext).type.observeForever { type ->
+            val appContext = context.applicationContext
+            CarConnection(appContext).type.observeForever { type ->
+                val wasConnected = hostConnected
                 hostConnected = type != null && type != CarConnection.CONNECTION_TYPE_NOT_CONNECTED
+                if (type != null) hostSignalKnown = true
                 StructuredLog.i(TAG, "host connection type=$type")
+                ConnectionTimeline.record(
+                    if (hostConnected) ConnectionTimeline.Kind.HOST_CONNECTED
+                    else ConnectionTimeline.Kind.HOST_DISCONNECTED,
+                    "type=$type"
+                )
                 publish()
+                if (wasConnected && !hostConnected) ProjectionService.onCarHostDisconnected(appContext)
+                if (!wasConnected && hostConnected) ProjectionService.onCarHostConnected()
             }
         }.onFailure { StructuredLog.w(TAG, "car connection signal unavailable: ${it.message}") }
     }
