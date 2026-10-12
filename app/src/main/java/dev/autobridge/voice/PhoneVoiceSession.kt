@@ -117,7 +117,7 @@ class PhoneVoiceSession(private val activity: Activity, private val actions: Act
                 positive?.visibility = View.GONE
                 pending = null
             }
-            is VoiceRecognizer.State.Done -> onTranscript(state.text)
+            is VoiceRecognizer.State.Done -> onTranscript(state.text, state.trace)
             is VoiceRecognizer.State.Failed -> {
                 dialog?.setTitle(R.string.voice_settings_title)
                 status?.text = VoiceMessages.error(activity, state.error)
@@ -128,10 +128,10 @@ class PhoneVoiceSession(private val activity: Activity, private val actions: Act
         }
     }
 
-    private fun onTranscript(text: String) {
+    private fun onTranscript(text: String, trace: VoiceLatencyTrace) {
         dialog?.setTitle(R.string.voice_test_transcript)
         heard?.text = text
-        handle(text, heardAs = text, allowAuto = true)
+        handle(text, heardAs = text, allowAuto = true, trace = trace)
     }
 
     /**
@@ -142,7 +142,7 @@ class PhoneVoiceSession(private val activity: Activity, private val actions: Act
      * go straight to the Agent too, and a misheard word then did whatever the Agent made of it
      * before the driver could see the mistake. Now it waits, with Edit beside Run.
      */
-    private fun handle(text: String, heardAs: String, allowAuto: Boolean) {
+    private fun handle(text: String, heardAs: String, allowAuto: Boolean, trace: VoiceLatencyTrace? = null) {
         val command = VoiceCommandParser.parse(text, VoiceShortcutStore.all(activity))
         StructuredLog.i(VoiceRuntime.TAG, "phone voice command ${command.action} ${command.target} conf=${command.confidence}")
         val validation = CommandValidator.validate(command)
@@ -159,6 +159,9 @@ class PhoneVoiceSession(private val activity: Activity, private val actions: Act
         }
         val recognised = validation is Validation.Valid || understood
         val auto = allowAuto && VoiceSettings.autoExecute(activity) && understood
+        trace?.mark(VoiceLatencyTrace.Mark.INTENT_RESOLVED)
+        // Only an automatic run is timed to the action; one waiting for the driver's tap is not.
+        if (!auto || run == null) trace?.let { it.outcome = if (run == null) "refused" else "confirm"; it.finish() }
         val positive = dialog?.getButton(DialogInterface.BUTTON_POSITIVE)
         val neutral = dialog?.getButton(DialogInterface.BUTTON_NEUTRAL)
         when {
@@ -168,7 +171,13 @@ class PhoneVoiceSession(private val activity: Activity, private val actions: Act
             }
             auto -> {
                 dismiss()
+                trace?.mark(VoiceLatencyTrace.Mark.ACTION_DISPATCHED)
                 run()
+                trace?.let {
+                    it.mark(VoiceLatencyTrace.Mark.ACTION_STARTED)
+                    it.outcome = "action"
+                    it.finish()
+                }
                 return
             }
             !allowAuto -> {

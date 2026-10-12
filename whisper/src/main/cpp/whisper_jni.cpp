@@ -39,6 +39,7 @@ struct Session {
     float decode_ms = 0.f;
     float sample_ms = 0.f;
     float prompt_ms = 0.f;
+    float batchd_ms = 0.f;
 };
 
 Session * session_of(jlong handle) {
@@ -90,6 +91,39 @@ bool abort_requested(void * user_data) {
 
 bool encoder_may_begin(whisper_context *, whisper_state *, void * user_data) {
     return !abort_requested(user_data);
+}
+
+// The encoder window for [count] samples: the speech that is there, rounded up and with headroom.
+// The encoder always works on a 30 s window (1500 frames, 50 per second) however short the
+// recording, and for a 3 s command most of that work is silence; this is the single biggest saving
+// for short audio. Floored at 512 frames (~10 s): narrower windows start to cost accuracy.
+int audio_ctx_for(long long count) {
+    const int frames = static_cast<int>((count * 50 + 15999) / 16000);
+    return std::min(1500, std::max(512, ((frames + 64 + 63) / 64) * 64));
+}
+
+whisper_full_params command_params(Session * session, int threads) {
+    whisper_full_params params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
+    params.n_threads = threads > 0 ? threads : 4;
+    params.detect_language = false;
+    // A voice command is a few seconds of speech: one segment, no timestamps, no carried context
+    // from a previous command (which would bias this one towards repeating it).
+    params.no_context = true;
+    params.no_timestamps = true;
+    params.single_segment = true;
+    params.print_progress = false;
+    params.print_realtime = false;
+    params.print_special = false;
+    params.print_timestamps = false;
+    params.suppress_blank = true;
+    params.suppress_nst = true;
+    // A command is a sentence. A cap stops a rare repetition loop from decoding to the limit.
+    params.max_tokens = 96;
+    params.abort_callback = abort_requested;
+    params.abort_callback_user_data = session;
+    params.encoder_begin_callback = encoder_may_begin;
+    params.encoder_begin_callback_user_data = session;
+    return params;
 }
 
 }  // namespace
@@ -164,6 +198,36 @@ Java_dev_autobridge_whisper_WhisperNative_abort(JNIEnv *, jclass, jlong handle) 
     if (session != nullptr) session->abort.store(true, std::memory_order_relaxed);
 }
 
+// Clears the abort flag before a new transcribe(). Separate from transcribe() so an abort raised
+// between the caller deciding to run and the native call starting is not silently cleared.
+JNIEXPORT void JNICALL
+Java_dev_autobridge_whisper_WhisperNative_resetAbort(JNIEnv *, jclass, jlong handle) {
+    Session * session = session_of(handle);
+    if (session != nullptr) session->abort.store(false, std::memory_order_relaxed);
+}
+
+// One throwaway pass over a second of silence, right after a load. Language auto-detection in
+// whisper_full() runs its encoder pass *before* it applies params.audio_ctx, with whatever window
+// the state was left with - on a freshly loaded context that is the full 30 s (1500 frames), about
+// three times the work of the real pass. Running once with the command window leaves the state on
+// it, so the first real command after every load is no slower than the ones after it. Returns
+// false when whisper failed; the context is still usable either way.
+JNIEXPORT jboolean JNICALL
+Java_dev_autobridge_whisper_WhisperNative_warmUp(JNIEnv *, jclass, jlong handle, jint threads) {
+    Session * session = session_of(handle);
+    if (session == nullptr) return JNI_FALSE;
+    std::vector<float> silence(16000, 0.f);
+    whisper_full_params params = command_params(session, threads);
+    params.language = "en";
+    params.audio_ctx = audio_ctx_for(static_cast<long long>(silence.size()));
+    params.max_tokens = 1;
+    params.temperature_inc = 0.f;
+    session->abort.store(false, std::memory_order_relaxed);
+    const int status = whisper_full(session->ctx, params, silence.data(), static_cast<int>(silence.size()));
+    whisper_reset_timings(session->ctx);
+    return status == 0 ? JNI_TRUE : JNI_FALSE;
+}
+
 JNIEXPORT jboolean JNICALL
 Java_dev_autobridge_whisper_WhisperNative_isMultilingual(JNIEnv *, jclass, jlong handle) {
     Session * session = session_of(handle);
@@ -184,11 +248,15 @@ Java_dev_autobridge_whisper_WhisperNative_modelFtype(JNIEnv *, jclass, jlong han
 }
 
 // Transcribes 16 kHz mono float PCM in [-1, 1]. Returns the text, or null when whisper failed or
-// the call was aborted. [language] is an ISO code ("th", "en") or "auto".
+// the call was aborted. [language] is an ISO code ("th", "en") or "auto". The caller clears the
+// abort flag first (resetAbort). [max_fallbacks] bounds whisper's temperature fallback: upstream
+// retries up to five times at rising temperatures with five sampled decoders each, which turns a
+// low-confidence command into many times the decode work and is the main source of slow outliers;
+// 0 is greedy only, and each retry here uses two decoders.
 JNIEXPORT jstring JNICALL
 Java_dev_autobridge_whisper_WhisperNative_transcribe(
         JNIEnv * env, jclass, jlong handle, jfloatArray samples, jstring language,
-        jboolean translate, jint threads, jstring prompt) {
+        jboolean translate, jint threads, jstring prompt, jint max_fallbacks) {
     Session * session = session_of(handle);
     if (session == nullptr || samples == nullptr) return nullptr;
 
@@ -199,38 +267,25 @@ Java_dev_autobridge_whisper_WhisperNative_transcribe(
     const std::string lang = to_string(env, language);
     const std::string initial_prompt = to_string(env, prompt);
 
-    session->abort.store(false, std::memory_order_relaxed);
     session->language.clear();
 
-    whisper_full_params params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
-    params.n_threads = threads > 0 ? threads : 4;
+    whisper_full_params params = command_params(session, threads);
     params.translate = translate == JNI_TRUE;
     params.language = lang.empty() ? "auto" : lang.c_str();
-    params.detect_language = false;
-    // A voice command is a few seconds of speech: one segment, no timestamps, no carried context
-    // from a previous command (which would bias this one towards repeating it).
-    params.no_context = true;
-    params.no_timestamps = true;
-    params.single_segment = true;
-    params.print_progress = false;
-    params.print_realtime = false;
-    params.print_special = false;
-    params.print_timestamps = false;
-    params.suppress_blank = true;
-    params.suppress_nst = true;
     params.initial_prompt = initial_prompt.empty() ? nullptr : initial_prompt.c_str();
-    // The encoder always works on a 30 s window (1500 frames, 50 per second) however short the
-    // recording, and for a 3 s command most of that work is silence. audio_ctx shrinks the window
-    // to the speech that is there, rounded up and with headroom; it is the single biggest saving
-    // for short audio. Floored at 512 frames (~10 s): narrower windows start to cost accuracy.
-    const int frames = static_cast<int>((static_cast<long long>(count) * 50 + 15999) / 16000);
-    params.audio_ctx = std::min(1500, std::max(512, ((frames + 64 + 63) / 64) * 64));
-    // A command is a sentence. A cap stops a rare repetition loop from decoding to the limit.
-    params.max_tokens = 96;
-    params.abort_callback = abort_requested;
-    params.abort_callback_user_data = session;
-    params.encoder_begin_callback = encoder_may_begin;
-    params.encoder_begin_callback_user_data = session;
+    params.audio_ctx = audio_ctx_for(static_cast<long long>(count));
+    // Temperatures run from 0 in steps of temperature_inc up to 1.0, so one retry needs a step
+    // above 0.5 and n retries a step of 1/n.
+    if (max_fallbacks <= 0) {
+        params.temperature_inc = 0.f;
+    } else if (max_fallbacks == 1) {
+        params.temperature_inc = 0.6f;
+        params.greedy.best_of = 2;
+    } else if (max_fallbacks < 5) {
+        params.temperature_inc = 1.f / static_cast<float>(max_fallbacks);
+        params.greedy.best_of = 2;
+    }
+    // max_fallbacks >= 5 keeps whisper's own defaults (0.2 steps, best of 5).
 
     whisper_reset_timings(session->ctx);
     const int status = whisper_full(session->ctx, params, pcm.data(), static_cast<int>(pcm.size()));
@@ -251,11 +306,14 @@ Java_dev_autobridge_whisper_WhisperNative_transcribe(
         const char * code = whisper_lang_str(lang_id);
         if (code != nullptr) session->language = code;
     }
+    // whisper_get_timings() returns a new allocation the caller owns.
     if (whisper_timings * timings = whisper_get_timings(session->ctx)) {
         session->encode_ms = timings->encode_ms;
         session->decode_ms = timings->decode_ms;
         session->sample_ms = timings->sample_ms;
         session->prompt_ms = timings->prompt_ms;
+        session->batchd_ms = timings->batchd_ms;
+        delete timings;
     }
     return to_jstring(env, text);
 }
@@ -267,14 +325,17 @@ Java_dev_autobridge_whisper_WhisperNative_lastLanguage(JNIEnv * env, jclass, jlo
     return to_jstring(env, session == nullptr ? std::string() : session->language);
 }
 
-// Per-stage timings of the last transcribe(), in milliseconds: encode, decode, sample, prompt.
+// Per-stage timings of the last transcribe(), in milliseconds per run: encode, decode, sample,
+// prompt, batched decode. Batched decode only runs with more than one decoder, so a non-zero last
+// value means the temperature fallback ran.
 JNIEXPORT jfloatArray JNICALL
 Java_dev_autobridge_whisper_WhisperNative_lastTimings(JNIEnv * env, jclass, jlong handle) {
     Session * session = session_of(handle);
-    jfloatArray result = env->NewFloatArray(4);
+    jfloatArray result = env->NewFloatArray(5);
     if (result == nullptr || session == nullptr) return result;
-    const float values[4] = {session->encode_ms, session->decode_ms, session->sample_ms, session->prompt_ms};
-    env->SetFloatArrayRegion(result, 0, 4, values);
+    const float values[5] = {session->encode_ms, session->decode_ms, session->sample_ms, session->prompt_ms,
+                             session->batchd_ms};
+    env->SetFloatArrayRegion(result, 0, 5, values);
     return result;
 }
 
