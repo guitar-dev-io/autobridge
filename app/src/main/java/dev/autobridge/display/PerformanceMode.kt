@@ -152,7 +152,7 @@ object PerformanceMode {
     /** The self-drawn mirror's rate before any cap: per-app setting, then the car profile, then 60. */
     fun configuredMirrorFps(): Int =
         MirrorSettings.preferredFps?.coerceIn(1, 60)
-            ?: SurfaceProfile.active.preferredFps?.coerceIn(1, 60)
+            ?: dev.autobridge.profile.ActiveCarProfile.preferredFps?.coerceIn(1, 60)
             ?: 60
 
     /** The self-drawn mirror's target after the cap: never above what was configured. */

@@ -114,7 +114,7 @@ class CarSettingsScreen(
             .addItem(
                 Row.Builder()
                     .setTitle(carContext.getString(R.string.car_settings_display_profile))
-                    .addText(SurfaceProfile.active.displayLabel)
+                    .addText(dev.autobridge.profile.ActiveCarProfile.label)
                     .setOnClickListener {
                         SurfaceProfile.active = if (SurfaceProfile.active == SurfaceProfile.DEFAULT) {
                             SurfaceProfile.FORD_NEXT_GEN
@@ -122,6 +122,7 @@ class CarSettingsScreen(
                             SurfaceProfile.DEFAULT
                         }
                         SettingsStore.persistSurfaceProfile(carContext, SurfaceProfile.active)
+                        dev.autobridge.profile.CarProfileStore.select(carContext, null)
                         CarToast.makeText(
                             carContext,
                             carContext.getString(

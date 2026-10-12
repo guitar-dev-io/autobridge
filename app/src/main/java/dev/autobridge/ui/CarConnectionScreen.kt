@@ -56,7 +56,8 @@ fun CarConnectionScreen(onBack: () -> Unit, links: List<SettingsLink>) {
         ) {
             SectionLabel(stringResource(R.string.car_connection_current_vehicle))
             AndroidAutoStatusCard(
-                title = SurfaceProfile.active.takeIf { it != SurfaceProfile.DEFAULT }?.displayLabel
+                title = dev.autobridge.profile.ActiveCarProfile.custom?.name
+                    ?: SurfaceProfile.active.takeIf { it != SurfaceProfile.DEFAULT }?.displayLabel
                     ?: stringResource(R.string.car_connection_my_car),
                 caption = stringResource(R.string.control_android_auto),
                 onClick = null

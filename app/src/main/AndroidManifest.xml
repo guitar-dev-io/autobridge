@@ -222,6 +222,7 @@
 
         <!-- Step-by-step permissions and car-connection options. -->
         <activity android:name=".mirror.MirrorSetupActivity" android:exported="false" />
+        <activity android:name=".profile.CarProfilesActivity" android:exported="false" />
 
         <!-- Brings the media session up when a car connects; inert unless the option is on. -->
         <receiver android:name=".media.MediaAutoStart$BluetoothReceiver" android:exported="true"

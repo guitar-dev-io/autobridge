@@ -2004,4 +2004,35 @@
     <string name="car_diag_performance">ภาระเครื่อง</string>
     <string name="car_diag_performance_value">%1$s (%2$s)</string>
     <string name="car_diag_performance_off">ปิด</string>
+    <!-- Car profiles: save, share and import (CarProfilesActivity). -->
+    <string name="car_profiles_title">โปรไฟล์รถ</string>
+    <string name="car_profiles_in_use">ใช้อยู่: %1$s</string>
+    <string name="car_profiles_save_this_car">บันทึกรถคันนี้</string>
+    <string name="car_profiles_import">นำเข้าไฟล์</string>
+    <string name="car_profiles_built_in">มีในแอป</string>
+    <string name="car_profiles_saved">บันทึกไว้และที่ได้รับมา</string>
+    <string name="car_profiles_builtin_default">ใช้ค่าที่รถส่งมา ไม่เพิ่มอะไร</string>
+    <string name="car_profiles_builtin_unverified">ค่าตั้งต้น เท่ากับ Default จนกว่าจะวัดจากรถจริง</string>
+    <string name="car_profiles_none_title">ยังไม่มีโปรไฟล์ที่บันทึกไว้</string>
+    <string name="car_profiles_none_caption">ต่อรถแล้วกด บันทึกรถคันนี้ หรือนำเข้าไฟล์ที่มีคนแชร์มา</string>
+    <string name="car_profiles_unverified">ยังไม่ยืนยัน</string>
+    <string name="car_profiles_matches">ตรงกับรถที่ต่ออยู่</string>
+    <string name="car_profiles_use">ใช้โปรไฟล์นี้</string>
+    <string name="car_profiles_share">แชร์</string>
+    <string name="car_profiles_delete">ลบ</string>
+    <string name="car_profiles_delete_title">ลบ %1$s?</string>
+    <string name="car_profiles_now_using">ใช้ %1$s แล้ว</string>
+    <string name="car_profiles_connect_first">ต่อรถก่อน ค่าจอของรถคือสิ่งที่จะถูกบันทึก</string>
+    <string name="car_profiles_name_hint">ชื่อ เช่น Ranger ของฉัน</string>
+    <string name="car_profiles_vehicle_hint">รุ่นรถและหัวจอ เช่น Ford Ranger 2023 SYNC 4A</string>
+    <string name="car_profiles_save_message">บันทึกค่าจอของรถคันนี้ (%1$s) ไว้แชร์ได้ ไม่มีการวัดค่าอื่น</string>
+    <string name="car_profiles_save">บันทึก</string>
+    <string name="car_profiles_default_name">รถของฉัน</string>
+    <string name="car_profiles_saved_toast">บันทึก %1$s แล้ว</string>
+    <string name="car_profiles_imported">นำเข้า %1$s แล้ว (ยังไม่ยืนยัน)</string>
+    <string name="car_profiles_import_unreadable">อ่านไฟล์นี้ไม่ได้</string>
+    <string name="car_profiles_error_too_large">ไฟล์ใหญ่เกินกว่าจะเป็นโปรไฟล์รถ</string>
+    <string name="car_profiles_error_not_profile">ไฟล์นี้ไม่ใช่โปรไฟล์รถของ AutoBridge</string>
+    <string name="car_profiles_error_newer">โปรไฟล์นี้สร้างจาก AutoBridge รุ่นใหม่กว่า อัปเดตแอปก่อน</string>
+    <string name="car_profiles_error_bad">โปรไฟล์นี้ไม่มีชื่อหรือมีค่าที่ใช้ไม่ได้</string>
 </resources>

@@ -279,7 +279,7 @@ object MirrorCoordinator {
         }
 
         if (carWidth <= 0 || carHeight <= 0) return false
-        val dpi = carDpi.takeIf { it > 0 } ?: SurfaceProfile.active.fallbackDpi
+        val dpi = carDpi.takeIf { it > 0 } ?: dev.autobridge.profile.ActiveCarProfile.fallbackDpi
         if (isSelfDrawnLocked()) {
             val engine = selfDrawnEngine ?: return false
             if (!engine.isRunning() && !engine.startBlocking(currentProjection)) return false
