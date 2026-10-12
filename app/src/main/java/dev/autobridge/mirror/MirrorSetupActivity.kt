@@ -2,7 +2,6 @@ package dev.autobridge.mirror
 
 import android.Manifest
 import android.app.Activity
-import android.app.AppOpsManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -12,28 +11,19 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
-import android.os.Process
 import android.provider.Settings
 import android.view.View
 import android.widget.Toast
 import dev.autobridge.R
-import dev.autobridge.car.CarSessionHistory
-import dev.autobridge.car.ConnectionTimeline
 import dev.autobridge.core.consent.PermissionDisclosure
-import dev.autobridge.core.model.Feature
-import dev.autobridge.core.policy.FeaturePolicy
-import dev.autobridge.core.state.RuntimeContextStore
 import dev.autobridge.i18n.AppLocale
-import dev.autobridge.input.AutoBridgeAccessibilityService
 import dev.autobridge.input.ShizukuInputBackend
-import dev.autobridge.install.InstallerSource
 import dev.autobridge.logging.StructuredLog
 import dev.autobridge.media.MediaAutoStart
 import dev.autobridge.mirror.MirrorReadiness.Cause
 import dev.autobridge.mirror.MirrorReadiness.Fix
 import dev.autobridge.mirror.MirrorReadiness.State
 import dev.autobridge.mirror.MirrorReadiness.Step
-import dev.autobridge.safety.ParkingStateStore
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.stack
 
@@ -56,15 +46,8 @@ class MirrorSetupActivity : Activity() {
         private const val TAG = "CarSetup"
         private const val REQUEST_NOTIFICATIONS = 5101
         private const val REQUEST_CAPTURE = 5102
-        private const val CAR_SPEED_PERMISSION = "com.google.android.gms.permission.CAR_SPEED"
         private const val REQUEST_BLUETOOTH = 5103
-        private const val ANDROID_AUTO_PACKAGE = "com.google.android.projection.gearhead"
-        private const val SHIZUKU_PACKAGE = "moe.shizuku.privileged.api"
-        /** Hidden AppOps name for Android 13+'s "restricted settings" on sideloaded apps. */
-        private const val OP_RESTRICTED_SETTINGS = "android:access_restricted_settings"
         private const val SHIZUKU_BIND_WAIT_MS = 3_000L
-        /** Built only into the sideload flavors (src/projection); same name PhoneMaintenance opens. */
-        private const val PROJECTION_SETUP = "dev.autobridge.projection.ProjectionSetupActivity"
 
         /** A cancelled capture dialog this process; cleared when capture starts. */
         @Volatile
@@ -121,42 +104,7 @@ class MirrorSetupActivity : Activity() {
         render()
     }
 
-    private fun status(): MirrorReadiness.Status {
-        val shizukuRunning = runCatching { rikka.shizuku.Shizuku.pingBinder() }.getOrDefault(false)
-        val shizukuGranted = runCatching { ShizukuInputBackend.isPermissionGranted }.getOrDefault(false)
-        val accessibilityEnabled = accessibilityEnabledInSettings()
-        return MirrorReadiness.Status(
-            notificationsRequired = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU,
-            notificationsGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-                checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) ==
-                PackageManager.PERMISSION_GRANTED,
-            shizukuRunning = shizukuRunning,
-            shizukuGranted = shizukuGranted,
-            realTouchAvailable = runCatching { ShizukuInputBackend.isRealTouchAvailable }.getOrDefault(false),
-            // Running, not merely allowed by the mode: a switched-on service Android has stopped
-            // is exactly the case this screen has to tell apart.
-            accessibilityRunning = AutoBridgeAccessibilityService.instance != null,
-            projecting = ProjectionService.sessionState == ProjectionService.SessionState.READY ||
-                ProjectionService.sessionState == ProjectionService.SessionState.STARTING,
-            batteryOptimizationExempt = runCatching {
-                getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(packageName)
-            }.getOrDefault(true),
-            carConnected = RuntimeContextStore.context.value.connected,
-            speedPermissionGranted = checkSelfPermission(CAR_SPEED_PERMISSION) == PackageManager.PERMISSION_GRANTED,
-            // Read only: the setup screen shows the reading, it never sets or overrides it.
-            speedReported = ParkingStateStore.state != ParkingStateStore.State.UNKNOWN,
-            androidAutoInstalled = isInstalled(ANDROID_AUTO_PACKAGE),
-            installerTrusted = InstallerSource.isTrusted(installer()),
-            carSessionSeen = CarSessionHistory.hasStarted(this),
-            installerRepairAvailable = projectionSetupIntent() != null,
-            shizukuInstalled = isInstalled(SHIZUKU_PACKAGE),
-            accessibilityEnabledInSettings = accessibilityEnabled,
-            accessibilityRestricted = !accessibilityEnabled && accessibilityRestricted(),
-            lastCaptureStop = lastCaptureStop(),
-            privilegedRepair = shizukuRunning && shizukuGranted && FeaturePolicy.app.isAvailable(Feature.SHIZUKU),
-            oemAutostartManager = MirrorReadiness.hasOemAutostart(Build.MANUFACTURER)
-        )
-    }
+    private fun status(): MirrorReadiness.Status = MirrorReadinessProbe.read(this, captureDenied)
 
     private fun render() {
         val status = status()
@@ -243,8 +191,8 @@ class MirrorSetupActivity : Activity() {
     private fun perform(fix: Fix) {
         StructuredLog.i(TAG, "fix $fix")
         when (fix) {
-            Fix.INSTALL_ANDROID_AUTO -> openStore(ANDROID_AUTO_PACKAGE)
-            Fix.MAKE_VISIBLE_ON_CAR -> projectionSetupIntent()?.let(::startActivity)
+            Fix.INSTALL_ANDROID_AUTO -> openStore(MirrorReadinessProbe.ANDROID_AUTO_PACKAGE)
+            Fix.MAKE_VISIBLE_ON_CAR -> MirrorReadinessProbe.projectionSetupIntent(this)?.let(::startActivity)
             Fix.ALLOW_NOTIFICATIONS -> requestNotifications()
             Fix.GRANT_SHIZUKU -> grantShizuku()
             Fix.OPEN_ACCESSIBILITY -> openAccessibility()
@@ -259,63 +207,6 @@ class MirrorSetupActivity : Activity() {
             Fix.ALLOW_BATTERY -> requestBatteryExemption()
             Fix.OPEN_AUTOSTART -> openAutostart()
         }
-    }
-
-    // ---------------------------------------------------------------- reading the live state
-
-    private fun isInstalled(pkg: String): Boolean = runCatching {
-        packageManager.getPackageInfo(pkg, 0)
-        true
-    }.getOrDefault(false)
-
-    private fun installer(): String? = runCatching {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            packageManager.getInstallSourceInfo(packageName).installingPackageName
-        } else {
-            @Suppress("DEPRECATION")
-            packageManager.getInstallerPackageName(packageName)
-        }
-    }.getOrNull()
-
-    /** The sideload-flavor screen that reinstalls with a trusted installer; null where it is not built in. */
-    private fun projectionSetupIntent(): Intent? =
-        Intent().setClassName(this, PROJECTION_SETUP)
-            .takeIf { packageManager.resolveActivity(it, 0) != null }
-
-    private fun accessibilityEnabledInSettings(): Boolean {
-        val enabled = Settings.Secure.getString(contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
-            ?: return false
-        val component = ComponentName(this, AutoBridgeAccessibilityService::class.java)
-        return enabled.split(':').any {
-            it.equals(component.flattenToString(), ignoreCase = true) ||
-                it.equals(component.flattenToShortString(), ignoreCase = true)
-        }
-    }
-
-    /**
-     * Android 13+ greys the accessibility switch out for an app installed outside a store until
-     * "Allow restricted settings" is tapped in App info. Read through the AppOps name the platform
-     * uses for it; any failure reads as not restricted, so the screen falls back to the plain
-     * "turn it on" advice rather than claiming a lock that may not be there.
-     */
-    @Suppress("DEPRECATION") // The by-name check is the only form that takes this hidden op's string.
-    private fun accessibilityRestricted(): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return false
-        return runCatching {
-            val mode = getSystemService(AppOpsManager::class.java)
-                .unsafeCheckOpNoThrow(OP_RESTRICTED_SETTINGS, Process.myUid(), packageName)
-            mode == AppOpsManager.MODE_ERRORED || mode == AppOpsManager.MODE_IGNORED
-        }.getOrDefault(false)
-    }
-
-    /** A cancelled dialog this process first; otherwise the reason the timeline recorded for the last stop. */
-    private fun lastCaptureStop(): MirrorReadiness.CaptureStop {
-        if (captureDenied) return MirrorReadiness.CaptureStop.DENIED
-        val last = ConnectionTimeline.recent().lastOrNull {
-            it.kind == ConnectionTimeline.Kind.PROJECTION_STARTED || it.kind == ConnectionTimeline.Kind.PROJECTION_STOPPED
-        } ?: return MirrorReadiness.CaptureStop.NONE
-        if (last.kind == ConnectionTimeline.Kind.PROJECTION_STARTED) return MirrorReadiness.CaptureStop.NONE
-        return MirrorReadiness.captureStopFromReason(last.detail)
     }
 
     // ---------------------------------------------------------------- fixes
@@ -464,16 +355,7 @@ class MirrorSetupActivity : Activity() {
 
     // ---------------------------------------------------------------- text
 
-    private fun stepTitle(step: Step): String = getString(
-        when (step) {
-            Step.ANDROID_AUTO -> R.string.setup_step_android_auto
-            Step.NOTIFICATIONS -> R.string.setup_step_notifications
-            Step.TOUCH -> R.string.setup_step_touch
-            Step.CAPTURE -> R.string.setup_step_capture
-            Step.BATTERY -> R.string.setup_step_battery
-            Step.SPEED -> R.string.setup_step_speed
-        }
-    )
+    private fun stepTitle(step: Step): String = MirrorReadinessProbe.stepTitle(this, step)
 
     private fun causeText(cause: Cause): Int = when (cause) {
         Cause.AA_MISSING -> R.string.setup_cause_aa_missing

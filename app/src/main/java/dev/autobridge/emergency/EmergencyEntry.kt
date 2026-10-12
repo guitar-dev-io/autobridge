@@ -2,9 +2,10 @@ package dev.autobridge.emergency
 
 /**
  * One line of the emergency card: a label and what to reach or quote — a phone number to dial, or
- * plain text such as an insurance policy number.
+ * plain text such as an insurance policy number. [detail] is what to tell whoever answers (the
+ * policy number, the plate), so an insurer's claim line and its policy number stay one entry.
  */
-data class EmergencyEntry(val id: Long, val label: String, val value: String) {
+data class EmergencyEntry(val id: Long, val label: String, val value: String, val detail: String = "") {
     /** The number to dial when [value] is a phone number, else null (it is text to read). */
     val dialable: String? get() = EmergencyNumber.dialable(value)
 }

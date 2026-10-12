@@ -9,7 +9,6 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.graphics.Typeface
-import android.text.InputType
 import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
@@ -21,6 +20,8 @@ import dev.autobridge.R
 import dev.autobridge.i18n.AppLocale
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.stack
+import dev.autobridge.ui.CarToolForm
+import dev.autobridge.ui.CarToolViews
 
 /**
  * The emergency card: numbers to ring and facts to quote (the insurance hotline, the policy number,
@@ -62,21 +63,6 @@ class EmergencyActivity : Activity() {
         val missingLines = SUGGESTED.any { (_, number) -> entries.none { it.value.trim() == number } }
 
         val body = AutoBridgeDesign.body(this)
-        body.stack(
-            LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                addView(
-                    AutoBridgeDesign.pill(this@EmergencyActivity, getString(R.string.emergency_add), primary = true, accent = accent) { showAddDialog() },
-                    LinearLayout.LayoutParams(0, -2, 1f)
-                )
-                // Once every public line is on the card the button has nothing left to add.
-                if (missingLines) addView(
-                    AutoBridgeDesign.pill(this@EmergencyActivity, getString(R.string.emergency_add_suggested), accent = accent) { addSuggested() },
-                    LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(8) }
-                )
-            },
-            gap = 12
-        )
         if (entries.isEmpty()) {
             body.stack(
                 AutoBridgeDesign.emptyState(
@@ -97,6 +83,23 @@ class EmergencyActivity : Activity() {
             body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.emergency_section_lines)), gap = 2)
             lines.forEach { body.stack(entryRow(it, lineColor(it.value.trim())), gap = 10) }
         }
+        // The numbers come first: someone opening this page in a hurry needs a number, not the add button.
+        body.stack(
+            LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                addView(
+                    AutoBridgeDesign.pill(this@EmergencyActivity, getString(R.string.emergency_add), primary = true, accent = accent) { showAddDialog() },
+                    LinearLayout.LayoutParams(0, -2, 1f)
+                )
+                // Once every public line is on the card the button has nothing left to add.
+                if (missingLines) addView(
+                    AutoBridgeDesign.pill(this@EmergencyActivity, getString(R.string.emergency_add_suggested), accent = accent) { addSuggested() },
+                    LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(8) }
+                )
+            },
+            gap = 12
+        )
+
         setContentView(
             AutoBridgeDesign.page(
                 context = this,
@@ -122,9 +125,10 @@ class EmergencyActivity : Activity() {
     }
 
     /**
-     * One line of the card: a coloured edge, the name in large type, and on the right the number
-     * itself as the call button (or Copy, for text such as a policy number). Tapping the rest of
-     * the line offers delete.
+     * One line of the card, as in the design: the name, and under it the number or the text with
+     * what to tell whoever answers; on the right a round 56 dp button that calls (or copies text
+     * such as a policy number). The colour of each public line is only in its button, lightly, so
+     * the lines are told apart without the page shouting. Tapping the rest of the line edits it.
      */
     private fun entryRow(entry: EmergencyEntry, color: Int): View {
         val dial = entry.dialable
@@ -132,52 +136,39 @@ class EmergencyActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             minimumHeight = dp(76)
-            background = AutoBridgeDesign.tappable(this@EmergencyActivity, AutoBridgeDesign.SURFACE, 18, color)
-            setPadding(0, dp(10), dp(10), dp(10))
+            background = AutoBridgeDesign.tappable(this@EmergencyActivity, AutoBridgeDesign.SURFACE, 16, color, android.graphics.Color.TRANSPARENT)
+            setPadding(dp(16), dp(10), dp(10), dp(10))
             isClickable = true
             setOnClickListener { showEntryActions(entry) }
-
-            addView(View(this@EmergencyActivity).apply {
-                background = AutoBridgeDesign.surface(this@EmergencyActivity, color, 3, android.graphics.Color.TRANSPARENT)
-            }, LinearLayout.LayoutParams(dp(5), dp(44)).apply { marginStart = dp(10); marginEnd = dp(14) })
 
             addView(LinearLayout(this@EmergencyActivity).apply {
                 orientation = LinearLayout.VERTICAL
                 addView(TextView(this@EmergencyActivity).apply {
                     text = entry.label
-                    textSize = 18f
+                    textSize = 17f
                     setTextColor(AutoBridgeDesign.TEXT)
-                    typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+                    typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
                     maxLines = 2
                     ellipsize = TextUtils.TruncateAt.END
                 })
-                // A number reads on its button; text (a policy number) is shown here in full.
-                if (dial == null) addView(TextView(this@EmergencyActivity).apply {
-                    text = entry.value
-                    textSize = 15f
+                addView(TextView(this@EmergencyActivity).apply {
+                    text = listOf(entry.value.trim(), entry.detail).filter { it.isNotBlank() }.joinToString(" · ")
+                    textSize = 14f
                     setTextColor(AutoBridgeDesign.TEXT_MUTED)
-                    setTextIsSelectable(true)
-                    setPadding(0, dp(2), 0, 0)
+                    fontFeatureSettings = "tnum"
+                    setPadding(0, dp(2), dp(8), 0)
                 })
             }, LinearLayout.LayoutParams(0, -2, 1f))
 
-            addView(TextView(this@EmergencyActivity).apply {
-                text = if (dial != null) "☎  ${entry.value.trim()}" else getString(R.string.emergency_copy)
-                textSize = if (dial != null) 20f else 15f
-                typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
-                gravity = Gravity.CENTER
-                setTextColor(if (dial != null) AutoBridgeDesign.INK else color)
-                background = if (dial != null) {
-                    AutoBridgeDesign.tappable(this@EmergencyActivity, color, 14, AutoBridgeDesign.INK, android.graphics.Color.TRANSPARENT)
+            addView(
+                if (dial != null) {
+                    CarToolViews.roundButton(this@EmergencyActivity, R.drawable.ic_car_emergency, color,
+                        "${getString(R.string.emergency_call)} ${entry.label} ${entry.value}") { dialNumber(dial) }
                 } else {
-                    AutoBridgeDesign.tappable(this@EmergencyActivity, AutoBridgeDesign.tint(color, 0.16f), 14, color, AutoBridgeDesign.tint(color, 0.4f))
+                    CarToolViews.roundButton(this@EmergencyActivity, R.drawable.ic_copy, color,
+                        "${getString(R.string.emergency_copy)} ${entry.label}") { copy(entry) }
                 }
-                setPadding(dp(16), 0, dp(16), 0)
-                minWidth = dp(96)
-                contentDescription = if (dial != null) "${getString(R.string.emergency_call)} ${entry.label} ${entry.value}" else getString(R.string.emergency_copy)
-                isClickable = true
-                setOnClickListener { if (dial != null) dialNumber(dial) else copy(entry) }
-            }, LinearLayout.LayoutParams(-2, dp(52)))
+            )
         }
     }
 
@@ -187,9 +178,12 @@ class EmergencyActivity : Activity() {
         if (!opened) Toast.makeText(this, getString(R.string.emergency_cannot_dial), Toast.LENGTH_SHORT).show()
     }
 
-    private fun copy(entry: EmergencyEntry) {
+    private fun copy(entry: EmergencyEntry) =
+        copyText(entry.label, listOf(entry.value.trim(), entry.detail).filter { it.isNotBlank() }.joinToString(" · "))
+
+    private fun copyText(label: String, text: String) {
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return
-        clipboard.setPrimaryClip(ClipData.newPlainText(entry.label, entry.value))
+        clipboard.setPrimaryClip(ClipData.newPlainText(label, text))
         Toast.makeText(this, getString(R.string.emergency_copied), Toast.LENGTH_SHORT).show()
     }
 
@@ -204,52 +198,56 @@ class EmergencyActivity : Activity() {
         render()
     }
 
-    private fun showAddDialog() {
-        val label = EditText(this).apply {
-            hint = getString(R.string.emergency_field_label)
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
+    private fun showAddDialog() = showEntryForm(null)
+
+    /**
+     * Adds an entry, or edits [existing]. The usual kinds are chips that fill the name; the third
+     * field holds what to tell whoever answers, so an insurer is one entry with its claim line
+     * and its policy number.
+     */
+    private fun showEntryForm(existing: EmergencyEntry?) {
+        val form = CarToolForm(this, getString(if (existing == null) R.string.emergency_add_title else R.string.emergency_edit_title), accent = accent)
+        lateinit var label: EditText
+        if (existing == null) {
+            form.chips(
+                null,
+                listOf(R.string.emergency_kind_insurance, R.string.emergency_kind_roadside, R.string.emergency_kind_family).map(::getString),
+                null
+            ) { label.setText(it); label.setSelection(it.length) }
         }
-        val value = EditText(this).apply {
-            hint = getString(R.string.emergency_field_value)
-            inputType = InputType.TYPE_CLASS_TEXT
-        }
-        val form = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            val pad = (20 * resources.displayMetrics.density).toInt()
-            setPadding(pad, pad / 2, pad, 0)
-            addView(label)
-            addView(value)
-        }
-        AlertDialog.Builder(this)
-            .setTitle(getString(R.string.emergency_add))
-            .setView(form)
-            .setNegativeButton(android.R.string.cancel, null)
-            .setPositiveButton(getString(R.string.fuel_save)) { _, _ ->
-                if (label.text.isBlank() || value.text.isBlank()) {
-                    Toast.makeText(this, getString(R.string.emergency_invalid), Toast.LENGTH_LONG).show()
-                    return@setPositiveButton
-                }
-                EmergencyStore.add(this, label.text.toString(), value.text.toString())
+        label = form.field(getString(R.string.emergency_form_name), CarToolForm.Kind.NAME, initial = existing?.label.orEmpty(), hint = getString(R.string.emergency_form_name_hint))
+        val value = form.field(
+            getString(R.string.emergency_form_value), CarToolForm.Kind.PHONE,
+            initial = existing?.value.orEmpty(),
+            hint = getString(R.string.emergency_form_value_hint),
+            helper = getString(R.string.emergency_form_value_helper)
+        )
+        val detail = form.field(
+            getString(R.string.emergency_form_detail), CarToolForm.Kind.TEXT,
+            initial = existing?.detail.orEmpty(),
+            hint = getString(R.string.emergency_form_detail_hint)
+        )
+        val delete = existing?.let { entry ->
+            getString(R.string.emergency_form_delete) to {
+                EmergencyStore.delete(this, entry.id)
                 render()
             }
-            .show()
+        }
+        form.show(getString(R.string.fuel_save), danger = delete) {
+            if (label.text.isBlank() || value.text.isBlank()) {
+                getString(R.string.emergency_invalid)
+            } else {
+                if (existing == null) {
+                    EmergencyStore.add(this, label.text.toString(), value.text.toString(), detail.text.toString())
+                } else {
+                    EmergencyStore.update(this, existing.id, label.text.toString(), value.text.toString(), detail.text.toString())
+                }
+                render()
+                null
+            }
+        }
     }
 
-    /** Tap: ring it (when it is a number) or delete it. */
-    private fun showEntryActions(entry: EmergencyEntry) {
-        val dial = entry.dialable
-        val items = listOfNotNull(dial?.let { getString(R.string.emergency_call) }, getString(R.string.fuel_delete))
-        AlertDialog.Builder(this)
-            .setTitle(entry.label)
-            .setMessage(entry.value)
-            .setItems(items.toTypedArray()) { _, which ->
-                if (dial != null && which == 0) {
-                    dialNumber(dial)
-                } else {
-                    EmergencyStore.delete(this, entry.id)
-                    render()
-                }
-            }
-            .show()
-    }
+    /** Tap: edit it, or remove it. Calling and copying are the button on the row itself. */
+    private fun showEntryActions(entry: EmergencyEntry) = showEntryForm(entry)
 }

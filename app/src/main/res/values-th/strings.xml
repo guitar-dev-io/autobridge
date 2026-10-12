@@ -554,8 +554,8 @@
     <string name="settings_input_touch">การสัมผัสและการป้อนข้อมูล</string>
     <string name="settings_input_touch_caption">ระบบสัมผัสและสิทธิ์ที่ต้องใช้</string>
     <string name="settings_group_car">รถและแอป</string>
-    <string name="settings_car_connection">รถและการเชื่อมต่อ</string>
-    <string name="settings_car_connection_caption">Android Auto บลูทูธ และการเริ่มต้น</string>
+    <string name="settings_car_connection">รถของฉัน</string>
+    <string name="settings_car_connection_caption">ที่จอดรถ น้ำมัน บำรุงรักษา และ Android Auto</string>
     <string name="settings_app_profiles">โปรไฟล์แต่ละแอป</string>
     <string name="settings_app_profiles_caption">การแสดงผลและเสียงแยกตามแอป</string>
     <string name="settings_group_features">ฟีเจอร์</string>
@@ -641,12 +641,10 @@
     <string name="whats_new_0_4_24">• คีย์บอร์ดรถเปิดเมื่อแตะช่องค้นหาในหน้าเว็บ และปิดหลังค้นหา\n• ถอยหลังเพลงไม่ดับ, Bridge Web แบ่งจอได้, มือถือขึ้น "เชื่อมต่อ" ตามจริง</string>
     <string name="fuel_title">บันทึกค่าน้ำมัน</string>
     <string name="fuel_subtitle">เติมเต็มถังทุกครั้ง</string>
-    <string name="fuel_settings_caption">การเติมน้ำมัน กม./ลิตร และค่าใช้จ่าย</string>
     <string name="car_more_fuel">บันทึกค่าน้ำมัน</string>
     <string name="fuel_add">+ เติมน้ำมัน</string>
     <string name="fuel_add_title">เติมเต็มถัง</string>
     <string name="fuel_export">ส่งออก CSV</string>
-    <string name="fuel_history">ประวัติการเติม</string>
     <string name="fuel_empty_title">ยังไม่มีการเติมน้ำมัน</string>
     <string name="fuel_empty_message">บันทึกทุกครั้งที่เติมเต็มถัง ตั้งแต่ครั้งที่สองจะเห็นค่าเฉลี่ย กม./ลิตร ที่นี่</string>
     <string name="fuel_average_label">อัตราสิ้นเปลืองเฉลี่ย</string>
@@ -660,13 +658,10 @@
     <string name="fuel_car_range">วิ่งได้อีก: %1$d กม.</string>
     <string name="fuel_last_fill">เติมล่าสุด: %1$s</string>
     <string name="fuel_row_title">%1$s ลิตร · %2$s บาท</string>
-    <string name="fuel_row_odometer">%1$s กม.</string>
-    <string name="fuel_field_liters">ลิตร</string>
-    <string name="fuel_field_baht">ยอดเงิน (บาท)</string>
     <string name="fuel_field_odometer">เลขไมล์ (กม.)</string>
     <string name="fuel_field_station">ปั๊ม (ไม่ใส่ก็ได้)</string>
     <string name="fuel_odometer_from_car">เลขไมล์ดึงมาจากรถ</string>
-    <string name="fuel_odometer_type_it">กรอกเลขไมล์เพื่อคำนวณ กม./ลิตร (รถยังไม่ได้ส่งค่ามา)</string>
+    <string name="fuel_odometer_type_it">กรอกเลขไมล์เพื่อคำนวณอัตราสิ้นเปลือง (รถยังไม่ได้ส่งค่ามา)</string>
     <string name="fuel_save">บันทึก</string>
     <string name="fuel_invalid">กรุณากรอกจำนวนลิตรและยอดเงิน</string>
     <string name="fuel_delete_title">ลบรายการนี้?</string>
@@ -768,11 +763,9 @@
     <string name="home_bridge_duo_action">Duo Screen</string>
 
     <!-- หน้า Car & Connection -->
-    <string name="car_connection_title">รถและการเชื่อมต่อ</string>
-    <string name="car_connection_subtitle">Android Auto, Bluetooth และการเริ่มต้นใช้งาน</string>
-    <string name="car_connection_current_vehicle">รถคันปัจจุบัน</string>
+    <string name="car_connection_title">รถของฉัน</string>
+    <string name="car_connection_subtitle">เครื่องมือรถและการเชื่อมต่อ</string>
     <string name="car_connection_my_car">รถของฉัน</string>
-    <string name="car_connection_settings_section">การตั้งค่า</string>
     <string name="voice_no_recognizer">ไม่พบระบบแปลงเสียงเป็นข้อความบนโทรศัพท์นี้</string>
 
     <!-- Settings > Input & Touch -->
@@ -1578,11 +1571,8 @@
     <!-- EV mode for the fuel log -->
     <string name="fuel_title_ev">บันทึกการชาร์จ</string>
     <string name="fuel_subtitle_ev">ชาร์จถึงระดับเดิมทุกครั้ง</string>
-    <string name="fuel_vehicle_fuel">⛽ เบนซิน / ดีเซล</string>
-    <string name="fuel_vehicle_ev">⚡ รถ EV</string>
     <string name="fuel_add_ev">+ ชาร์จ</string>
     <string name="fuel_add_title_ev">ชาร์จไฟ</string>
-    <string name="fuel_history_ev">การชาร์จ</string>
     <string name="fuel_empty_title_ev">ยังไม่มีการชาร์จ</string>
     <string name="fuel_empty_message_ev">บันทึกทุกครั้งที่ชาร์จ โดยชาร์จถึงระดับเดิมเสมอ (เช่น 80 เปอร์เซ็นต์) ตั้งแต่ครั้งที่สองจะเห็นค่าเฉลี่ย กม./kWh ที่นี่</string>
     <string name="fuel_average_pending_ev">ต้องชาร์จอย่างน้อยสองครั้ง</string>
@@ -1590,7 +1580,6 @@
     <string name="fuel_last_interval_ev">ชาร์จครั้งล่าสุด: %1$s กม./kWh</string>
     <string name="fuel_totals_ev">ชาร์จ %1$d ครั้ง · %2$s kWh · รวม %3$s บาท</string>
     <string name="fuel_row_title_ev">%1$s kWh · %2$s บาท</string>
-    <string name="fuel_field_kwh">พลังงาน (kWh)</string>
     <string name="fuel_invalid_ev">กรอกจำนวน kWh และยอดรวม</string>
     <string name="fuel_delete_title_ev">ลบการชาร์จนี้?</string>
     <string name="fuel_car_battery">แบตเตอรี่: %1$d%%</string>
@@ -1598,9 +1587,6 @@
 
     <!-- Maintenance reminders -->
     <string name="maint_title">การบำรุงรักษา</string>
-    <string name="maint_subtitle">ครบกำหนดตามระยะทางและวันที่</string>
-    <string name="maint_subtitle_ev">ครบกำหนดตามระยะทางและวันที่ สำหรับรถ EV</string>
-    <string name="maint_settings_caption">น้ำมันเครื่อง ยาง ภาษี และสิ่งที่ถึงกำหนดต่อไป</string>
     <string name="maint_add">+ รายการ</string>
     <string name="maint_add_suggested">เพิ่มรายการแนะนำ</string>
     <string name="maint_nothing_to_add">รายการแนะนำอยู่ในรายการแล้ว</string>
@@ -1610,11 +1596,7 @@
     <string name="maint_odometer_now">เลขไมล์: %1$s กม.</string>
     <string name="maint_odometer_unknown">ไม่ทราบเลขไมล์: บันทึกการเติมพร้อมเลขไมล์ หรืออนุญาตข้อมูลจากรถ</string>
     <string name="maint_field_name">ชื่อ</string>
-    <string name="maint_field_km">ทุก (กม.) ใส่ 0 ถ้าไม่ใช้</string>
-    <string name="maint_field_months">ทุก (เดือน) ใส่ 0 ถ้าไม่ใช้</string>
-    <string name="maint_field_last_km">ทำครั้งล่าสุดที่ (กม.)</string>
     <string name="maint_invalid">กรอกชื่อ และระยะทางหรือจำนวนเดือน</string>
-    <string name="maint_done_message">บันทึกว่าทำแล้วที่เลขไมล์นี้ หรือลบรายการ</string>
     <string name="maint_mark_done">ทำวันนี้แล้ว</string>
     <string name="maint_in_km">อีก %1$s กม.</string>
     <string name="maint_over_km">เลยกำหนด %1$s กม.</string>
@@ -1665,8 +1647,6 @@
     <string name="backup_invalid">ไม่ใช่ไฟล์สำรองของ AutoBridge</string>
 
     <!-- Fuel grade -->
-    <string name="fuel_type_button">น้ำมัน: %1$s</string>
-    <string name="fuel_type_choose">เลือก</string>
     <string name="fuel_type_title">ชนิดน้ำมัน</string>
     <string name="fuel_type_other">อื่น ๆ</string>
     <string name="fuel_type_other_hint">ชนิดน้ำมัน</string>
@@ -1684,7 +1664,6 @@
     <string name="maps_app_missing">ไม่ได้ติดตั้ง Google Maps หรือเริ่มนำทางไม่ได้</string>
     <string name="maint_due">ครบกำหนด %1$s</string>
     <string name="maint_due_estimate">ครบกำหนดประมาณ %1$s ตามการขับปกติ</string>
-    <string name="maint_due_date_button">วันครบกำหนด: %1$s</string>
     <string name="maint_due_date_none">ไม่ได้ตั้ง</string>
     <plurals name="maint_reminder_title">
         <item quantity="other">มีรายการบำรุงรักษาที่ต้องดู %1$d รายการ</item>
@@ -1692,9 +1671,7 @@
     <string name="youtube_sponsorblock_caveat">ฟีเจอร์นี้อาจไม่ทำงาน หรือทำงานไม่สมบูรณ์ ข้อมูลช่วงสปอนเซอร์มาจากอาสาสมัคร วิดีโอใหม่หรือที่คนดูน้อยมักไม่มีข้อมูล และช่วงที่ทำเครื่องหมายไว้อาจคลาดเคลื่อนเล็กน้อย การข้ามต้องใช้อินเทอร์เน็ต และทำงานเฉพาะในหน้า YouTube ของ AutoBridge เอง ถ้า YouTube เปลี่ยนเว็บไซต์ อาจใช้ไม่ได้จนกว่าจะอัปเดตแอป</string>
     <string name="home_donate">☕ ค่าขนมกาแฟ</string>
     <string name="maint_compulsory_insurance">พ.ร.บ.</string>
-    <string name="settings_group_utilities">อรรถประโยชน์</string>
     <string name="car_more_group_utilities">อรรถประโยชน์</string>
-    <string name="fuel_date_button">วันที่: %1$s</string>
     <string name="fuel_edit">แก้ไข</string>
     <string name="fuel_edit_title">แก้ไขการเติมน้ำมัน</string>
     <string name="fuel_edit_title_ev">แก้ไขการชาร์จ</string>
@@ -1723,15 +1700,12 @@
     <string name="about_facebook_caption">ข่าวสารและอัปเดต</string>
     <!-- Emergency card -->
     <string name="emergency_title">บัตรฉุกเฉิน</string>
-    <string name="emergency_subtitle">เบอร์ที่ต้องโทรและข้อมูลที่ต้องแจ้ง</string>
-    <string name="emergency_settings_caption">ประกัน ช่วยเหลือบนถนน และสายด่วนฉุกเฉิน</string>
+    <string name="emergency_subtitle">แตะเพื่อโทร ใช้ได้จากจอรถด้วย</string>
     <string name="emergency_add">+ เพิ่ม</string>
     <string name="emergency_add_suggested">เพิ่มสายด่วนฉุกเฉิน</string>
     <string name="emergency_empty_title">ยังไม่มีอะไรบนบัตร</string>
     <string name="emergency_empty_message">เพิ่มเบอร์ประกัน เลขกรมธรรม์ บริการช่วยเหลือบนถนน และคนที่ต้องโทรหา กดปุ่มสายด่วนฉุกเฉินเพื่อเพิ่มเบอร์สาธารณะ</string>
     <string name="emergency_car_empty">กรอกบัตรบนโทรศัพท์ (ตั้งค่า &gt; บัตรฉุกเฉิน)</string>
-    <string name="emergency_field_label">ชื่อ (เช่น สายด่วนประกัน)</string>
-    <string name="emergency_field_value">เบอร์หรือข้อความ</string>
     <string name="emergency_invalid">กรอกชื่อ และเบอร์หรือข้อความ</string>
     <string name="emergency_call">โทร</string>
     <string name="emergency_cannot_dial">เปิดแอปโทรไม่ได้</string>
@@ -1747,7 +1721,6 @@
     <!-- Break reminder -->
     <string name="break_reminder_title">เตือนพักระหว่างขับ</string>
     <string name="break_reminder_off">ปิด</string>
-    <string name="break_reminder_explain">เตือนให้พักเมื่อต่อรถไว้นานตามจำนวนชั่วโมงที่เลือก ไม่ใช้ตำแหน่ง ใช้แค่เวลา มีผลตั้งแต่การต่อรถครั้งถัดไป</string>
     <string name="break_reminder_message">ขับมานานแล้ว พักสักหน่อยดีกว่า</string>
     <plurals name="break_reminder_every">
         <item quantity="other">ทุก %1$d ชั่วโมง</item>
@@ -1755,8 +1728,6 @@
     <!-- Parking spot -->
     <string name="parking_title">ที่จอดรถ</string>
     <string name="parking_subtitle">หารถให้เจออีกครั้ง</string>
-    <string name="parking_settings_caption">ปักหมุดที่จอด และนำทางกลับ</string>
-    <string name="parking_privacy">แอปอ่านตำแหน่งของคุณเฉพาะตอนกด "ปักหมุดตรงนี้" และเก็บเฉพาะจุดที่ปักไว้ โน้ต และรูปของคุณ ในโทรศัพท์เครื่องนี้ ไม่มีการแชร์หรือส่งไปที่ไหน</string>
     <string name="parking_mark_here">ปักหมุดตรงนี้</string>
     <string name="parking_finding">กำลังหาตำแหน่ง…</string>
     <string name="parking_saved">บันทึกที่จอดรถแล้ว</string>
@@ -1768,11 +1739,9 @@
     <string name="parking_note_title">โน้ตของที่จอดนี้</string>
     <string name="parking_note_hint">ชั้น เสา หรืออะไรก็ได้ที่ช่วยหารถ</string>
     <string name="parking_navigate">นำทาง</string>
-    <string name="parking_clear">ล้าง</string>
     <!-- Costs -->
     <string name="costs_title">ค่าใช้จ่ายรถ</string>
     <string name="costs_subtitle">ค่าน้ำมันและอื่น ๆ รายเดือน</string>
-    <string name="costs_settings_caption">รถใช้เงินเดือนละเท่าไร</string>
     <string name="costs_add">+ ค่าใช้จ่าย</string>
     <string name="costs_by_month">รายเดือน</string>
     <string name="costs_expenses">ค่าใช้จ่ายอื่น ๆ</string>
@@ -1785,10 +1754,8 @@
     <string name="costs_empty_message">ค่าน้ำมันและค่าชาร์จมาจากบันทึกการเติมของคุณ เพิ่มค่าซ่อม ล้างรถ ทางด่วน ที่จอดรถ หรือภาษีได้ที่นี่ หรือใส่ราคาตอนกดว่าทำรายการบำรุงรักษาแล้ว</string>
     <string name="costs_car_empty">เพิ่มการเติมน้ำมันและค่าใช้จ่ายบนโทรศัพท์</string>
     <string name="costs_field_label">เรื่องอะไร (ซ่อม ทางด่วน ที่จอดรถ…)</string>
-    <string name="costs_field_baht">จำนวนเงิน (บาท)</string>
     <string name="costs_invalid">กรอกจำนวนเงินที่มากกว่าศูนย์</string>
     <string name="costs_delete_title">ลบค่าใช้จ่ายนี้?</string>
-    <string name="maint_field_cost">ราคา (บาท) ไม่บังคับ</string>
     <!-- Voice fuel entry -->
     <string name="voice_fuel_saved">บันทึกแล้ว: %1$s</string>
     <string name="voice_fuel_not_understood">ฟังไม่ได้ทั้งปริมาณและราคา</string>
@@ -2035,4 +2002,112 @@
     <string name="car_profiles_error_not_profile">ไฟล์นี้ไม่ใช่โปรไฟล์รถของ AutoBridge</string>
     <string name="car_profiles_error_newer">โปรไฟล์นี้สร้างจาก AutoBridge รุ่นใหม่กว่า อัปเดตแอปก่อน</string>
     <string name="car_profiles_error_bad">โปรไฟล์นี้ไม่มีชื่อหรือมีค่าที่ใช้ไม่ได้</string>
+
+    <!-- My Car (ตั้งค่า > รถของฉัน) -->
+    <string name="my_car_profile_caption">โปรไฟล์จอ: %1$s</string>
+    <string name="my_car_section_tools">เครื่องมือรถ</string>
+    <string name="my_car_section_connection">การเชื่อมต่อ</string>
+    <string name="my_car_parking_empty">แตะเพื่อบันทึกจุดจอด</string>
+    <string name="my_car_maint_empty">ยังไม่มีรายการ</string>
+    <string name="my_car_fuel_empty">ยังไม่ได้บันทึก</string>
+    <string name="my_car_fuel_no_average">ต้องมีเลขไมล์ 2 ครั้ง</string>
+    <plurals name="my_car_fuel_logged">
+        <item quantity="other">บันทึก %1$d ครั้ง</item>
+    </plurals>
+    <plurals name="my_car_fuel_average_of">
+        <item quantity="other">เฉลี่ยจาก %1$d ครั้ง</item>
+    </plurals>
+    <string name="my_car_costs_empty">เดือนนี้ยังไม่มี</string>
+    <string name="my_car_costs_this_month">เดือนนี้</string>
+    <string name="my_car_emergency_empty">เพิ่มเบอร์ที่ต้องโทร</string>
+    <string name="my_car_emergency_caption">แตะเบอร์เพื่อโทร</string>
+    <plurals name="my_car_emergency_count">
+        <item quantity="other">%1$d รายการ</item>
+    </plurals>
+    <string name="my_car_aa_connected">เชื่อมแล้ว</string>
+    <string name="my_car_aa_not_connected">ไม่ได้เชื่อม</string>
+    <string name="my_car_phone_battery">แบตมือถือ</string>
+    <string name="my_car_temperature">อุณหภูมิ</string>
+    <string name="my_car_no_reading">—</string>
+    <string name="my_car_diagnostics">วินิจฉัยการเชื่อมต่อ</string>
+    <string name="my_car_diagnostics_caption">ล็อกการเชื่อมต่อและเหตุการณ์ mirror</string>
+
+    <!-- หน้าเครื่องมือใน รถของฉัน -->
+    <string name="parking_parked_ago">จอดเมื่อ %1$s</string>
+    <string name="parking_navigate_back">นำทางกลับรถ</string>
+    <string name="parking_mark_again">ปักหมุดใหม่</string>
+    <string name="parking_edit_note">แก้โน้ต</string>
+    <string name="parking_privacy_short">อ่านตำแหน่งเฉพาะตอนกดปักหมุด และเก็บในเครื่องนี้เท่านั้น</string>
+    <string name="fuel_stat_km_per_liter">กม./ลิตร</string>
+    <string name="fuel_stat_km_per_kwh">กม./kWh</string>
+
+    <!-- แผ่นเพิ่มและแก้ไขของเครื่องมือรถ -->
+    <string name="form_label_date">วันที่</string>
+    <string name="unit_km">กม.</string>
+    <string name="unit_baht">บาท</string>
+    <string name="unit_months">เดือน</string>
+    <string name="unit_liters">ลิตร</string>
+    <string name="unit_kwh">kWh</string>
+    <string name="fuel_form_amount">ปริมาณ</string>
+    <string name="fuel_form_paid">จ่ายไป</string>
+    <string name="fuel_form_odometer">เลขไมล์</string>
+    <string name="fuel_form_price_per_liter">ตกลิตรละ %1$s บาท</string>
+    <string name="fuel_form_price_per_kwh">ตก kWh ละ %1$s บาท</string>
+    <string name="costs_add_title">เพิ่มค่าใช้จ่าย</string>
+    <string name="costs_form_what">ค่าอะไร</string>
+    <string name="costs_form_label">รายละเอียด</string>
+    <string name="costs_form_amount">จำนวนเงิน</string>
+    <string name="costs_quick_toll">ทางด่วน</string>
+    <string name="costs_quick_parking">ที่จอดรถ</string>
+    <string name="costs_quick_wash">ล้างรถ</string>
+    <string name="costs_quick_repair">ซ่อม</string>
+    <string name="costs_quick_insurance">ประกัน</string>
+    <string name="costs_quick_tax">ภาษี</string>
+    <string name="maint_add_title">เพิ่มรายการ</string>
+    <string name="maint_form_presets">รายการที่ใช้บ่อย</string>
+    <string name="maint_form_name">รายการ</string>
+    <string name="maint_form_every_km">ทำทุก (ระยะทาง)</string>
+    <string name="maint_form_every_months">หรือทุก (เวลา)</string>
+    <string name="maint_form_interval_helper">ใส่อย่างใดอย่างหนึ่งหรือทั้งสองอย่าง นับอันที่ถึงก่อน</string>
+    <string name="maint_form_last_km">ทำครั้งล่าสุดที่เลขไมล์</string>
+    <string name="maint_form_due">วันครบกำหนด (ถ้ามี)</string>
+    <string name="maint_form_due_helper">สำหรับภาษีหรือ พ.ร.บ. ที่หมดอายุในวันที่แน่นอน</string>
+    <string name="maint_form_done_odometer">เลขไมล์ตอนทำ</string>
+    <string name="maint_form_done_cost">ค่าใช้จ่าย (ไม่บังคับ)</string>
+    <string name="maint_form_done_cost_helper">จะรวมไว้ในค่าใช้จ่ายรถ</string>
+    <string name="maint_form_delete">ลบรายการนี้</string>
+    <string name="emergency_add_title">เพิ่มลงบัตร</string>
+    <string name="emergency_form_name">ชื่อ</string>
+    <string name="emergency_form_name_hint">เช่น เคลมประกันรถ</string>
+    <string name="emergency_form_value">เบอร์โทร หรือข้อความ</string>
+    <string name="emergency_form_value_hint">เช่น เบอร์เคลม 02-123-4567</string>
+    <string name="emergency_form_value_helper">ถ้าเป็นเบอร์โทร แตะแล้วโทรได้ทันที</string>
+    <string name="emergency_form_delete">ลบออกจากบัตร</string>
+    <string name="parking_form_note">โน้ต</string>
+    <string name="form_change">เปลี่ยน</string>
+    <string name="maint_needs_odometer">ต้องมีเลขไมล์</string>
+    <string name="maint_odometer_unknown_short">ยังไม่ทราบเลขไมล์</string>
+    <string name="emergency_edit_title">แก้ไข</string>
+    <string name="emergency_form_detail">ข้อมูลที่ต้องแจ้ง (ไม่บังคับ)</string>
+    <string name="emergency_form_detail_hint">เช่น กรมธรรม์ 1234-5678 · ทะเบียน กข 1234</string>
+    <string name="emergency_kind_insurance">ประกันรถ</string>
+    <string name="emergency_kind_roadside">ช่วยเหลือบนถนน</string>
+    <string name="emergency_kind_family">คนในครอบครัว</string>
+    <string name="parking_clear_spot">ล้างจุดจอดนี้</string>
+    <string name="break_reminder_subtitle">นับจากเวลาที่ต่อรถ ไม่ใช้ตำแหน่ง</string>
+    <string name="break_reminder_takes_effect">มีผลตั้งแต่การต่อรถครั้งถัดไป</string>
+    <string name="money_baht">฿%1$s</string>
+    <string name="fuel_mode_fuel">เบนซิน / ดีเซล</string>
+    <string name="fuel_mode_ev">รถ EV</string>
+    <string name="fuel_mode_fuel_short">เบนซิน</string>
+    <string name="fuel_mode_ev_short">EV</string>
+    <string name="fuel_stat_average">เฉลี่ย</string>
+    <string name="fuel_stat_per_km">ต่อ กม.</string>
+    <string name="fuel_stat_this_month">เดือนนี้</string>
+    <string name="fuel_row_line">%1$s · %2$s ลิตร</string>
+    <string name="fuel_row_line_ev">%1$s · %2$s kWh</string>
+    <string name="fuel_row_odometer_line">เลขไมล์ %1$s</string>
+    <string name="costs_legend_fuel">น้ำมัน ฿%1$s</string>
+    <string name="costs_legend_other">อื่น ๆ ฿%1$s</string>
+    <string name="costs_average_short">เฉลี่ย 3 เดือน ฿%1$s</string>
 </resources>
