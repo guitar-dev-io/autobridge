@@ -34,6 +34,7 @@ import android.widget.Toast
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import dev.autobridge.apps.AppListFilter
+import dev.autobridge.apps.AppProfileCycle
 import dev.autobridge.apps.InstalledApp
 import dev.autobridge.apps.InstalledAppRepository
 import dev.autobridge.apps.MirrorContentPolicy
@@ -43,6 +44,7 @@ import dev.autobridge.apps.QuickAppsStore
 import dev.autobridge.apps.SmartModeResolver
 import dev.autobridge.core.consent.PermissionDisclosure
 import dev.autobridge.core.datastore.SessionRestoreStore
+import dev.autobridge.core.model.AppProfile
 import dev.autobridge.core.model.AudioMode
 import dev.autobridge.core.model.AutoBridgeMode
 import dev.autobridge.core.model.Environment
@@ -1510,7 +1512,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
             appendLine("Environment:   ${runtime.environment.name}")
             appendLine("Connected:     ${runtime.connected}")
             appendLine("Vehicle state: ${runtime.vehicleState.name}")
-            appendLine("Vehicle:       ${runtime.vehicleProfile?.name ?: "—"}")
+            appendLine("Car profile:   ${SurfaceProfile.active.name}")
             appendLine("Feature:       ${runtime.currentFeature?.name ?: "—"}")
             appendLine("Pipeline:      ${ScreenOffController.pipelineMode.name}")
             appendLine("Mirroring:     ${MirrorCoordinator.isMirroring}")
@@ -1900,6 +1902,19 @@ class MainActivity : androidx.activity.ComponentActivity() {
         addCard(
             content,
             settingRow(getString(R.string.mirror_frame_rate), frameRateSubtitle(), frameRateValue()),
+            top = 8
+        )
+        addCard(
+            content,
+            settingSwitchRow(
+                getString(R.string.performance_mode),
+                getString(R.string.performance_mode_caption, performanceLevelLabel()),
+                checked = dev.autobridge.display.PerformanceMode.enabled,
+                enabled = true
+            ) { on ->
+                dev.autobridge.display.PerformanceMode.setEnabled(this, on)
+                showPhoneScreen(PhoneScreen.MIRROR_SETTINGS, force = true)
+            },
             top = 8
         )
         addCard(
@@ -2540,12 +2555,42 @@ class MainActivity : androidx.activity.ComponentActivity() {
         }
     }
 
-    private fun cycleProfileScale(pkg: String, id: String) {}
-    private fun cycleProfileResolution(pkg: String, id: String) {}
-    private fun cycleProfileFps(pkg: String, id: String) {}
-    private fun cycleProfileAudio(pkg: String, id: String) {}
-    private fun frameRateSubtitle() = "Target frame rate"
-    private fun frameRateValue() = "60 FPS"
+    private fun cycleProfileScale(pkg: String, id: String) = cycleProfile(pkg, id, AppProfileCycle::nextScale)
+    private fun cycleProfileResolution(pkg: String, id: String) = cycleProfile(pkg, id, AppProfileCycle::nextResolution)
+    private fun cycleProfileFps(pkg: String, id: String) = cycleProfile(pkg, id, AppProfileCycle::nextFps)
+    private fun cycleProfileAudio(pkg: String, id: String) = cycleProfile(pkg, id, AppProfileCycle::nextAudio)
+
+    /** Saves the next value and redraws, so the row shows what was stored. */
+    private fun cycleProfile(pkg: String, id: String, next: (AppProfile) -> AppProfile) {
+        PerAppProfileStore.save(this, next(PerAppProfileStore.profile(this, pkg, id)))
+        showPhoneScreen(PhoneScreen.PROFILE)
+    }
+    private fun performanceLevelLabel(): String = getString(
+        when (dev.autobridge.display.PerformanceMode.level) {
+            dev.autobridge.display.PerformancePolicy.Level.NORMAL -> R.string.performance_level_normal
+            dev.autobridge.display.PerformancePolicy.Level.REDUCED -> R.string.performance_level_reduced
+            dev.autobridge.display.PerformancePolicy.Level.LOW -> R.string.performance_level_low
+        }
+    )
+
+    private fun frameRateSubtitle(): String = getString(
+        if (ScreenOffController.pipelineMode == ScreenOffController.PipelineMode.SELF_DRAWN) {
+            R.string.mirror_frame_rate_self_drawn
+        } else {
+            R.string.mirror_frame_rate_auto_mirror
+        }
+    )
+
+    /** The measured rate when the self-drawn renderer has frames; AUTO_MIRROR has no app-observable FPS. */
+    private fun frameRateValue(): String {
+        val stats = MirrorDiagnostics.frameStats()
+        val selfDrawn = ScreenOffController.pipelineMode == ScreenOffController.PipelineMode.SELF_DRAWN
+        return if (selfDrawn && stats.rendered > 0) {
+            "%.1f FPS".format(stats.measuredFps)
+        } else {
+            getString(R.string.profiles_fps_system)
+        }
+    }
 
     /**
      * Switches between the OS zero-copy AUTO_MIRROR renderer and the app-owned SELF_DRAWN renderer.
@@ -2717,10 +2762,44 @@ class MainActivity : androidx.activity.ComponentActivity() {
         }
         showPhoneScreen(PhoneScreen.MIRROR_SETTINGS)
     }
-    private fun headUnitProfileSubtitle() = "Display profile"
-    private fun toggleSurfaceProfile() {}
-    private fun screenOffBehaviorValue() = "Auto"
-    private fun onPanelOffToggled(enabled: Boolean) {}
+    private fun headUnitProfileSubtitle(): String = getString(
+        if (SurfaceProfile.active.hardwareValidated) R.string.mirror_head_unit_profile_measured
+        else R.string.mirror_head_unit_profile_placeholder
+    )
+
+    /** Same two-way switch as the car settings row, so the phone and the car agree on the profile. */
+    private fun toggleSurfaceProfile() {
+        SurfaceProfile.active = if (SurfaceProfile.active == SurfaceProfile.DEFAULT) {
+            SurfaceProfile.FORD_NEXT_GEN
+        } else {
+            SurfaceProfile.DEFAULT
+        }
+        SettingsStore.persistSurfaceProfile(this, SurfaceProfile.active)
+        showPhoneScreen(PhoneScreen.MIRROR_SETTINGS, force = true)
+    }
+
+    private fun screenOffBehaviorValue(): String = getString(
+        when {
+            ScreenOffController.pipelineMode == ScreenOffController.PipelineMode.OWN_CONTENT ->
+                R.string.mirror_screen_off_unavailable
+            MirrorSettings.screenOffOnAutoDim && ScreenOffController.panelOffAvailable() ->
+                R.string.mirror_screen_off_panel_off
+            ScreenOffController.survivesScreenOff() -> R.string.mirror_screen_off_continues
+            else -> R.string.mirror_screen_off_not_guaranteed
+        }
+    )
+
+    /** Turning it off always goes through, so a setting stored while Shizuku was up can be cleared later. */
+    private fun onPanelOffToggled(enabled: Boolean) {
+        if (enabled && !ScreenOffController.panelOffAvailable()) {
+            Toast.makeText(this, getString(R.string.mirror_panel_off_not_available), Toast.LENGTH_LONG).show()
+            showPhoneScreen(PhoneScreen.MIRROR_SETTINGS, force = true)
+            return
+        }
+        SettingsStore.persistScreenOffOnAutoDim(this, enabled)
+        ProjectionService.refreshScreenPowerPolicy(this)
+        showPhoneScreen(PhoneScreen.MIRROR_SETTINGS, force = true)
+    }
     /**
      * Turns the privileged pointer sink on or off, and says why when it cannot be turned on.
      *
@@ -2756,5 +2835,9 @@ class MainActivity : androidx.activity.ComponentActivity() {
         }
     }
     private fun shizukuTouchCard(): View? = null
-    private fun cycleAutoDimDelay() {}
+    private fun cycleAutoDimDelay() {
+        SettingsStore.persistAutoDimDelay(this, MirrorSettings.autoDimDelay.next())
+        ProjectionService.refreshScreenPowerPolicy(this)
+        showPhoneScreen(PhoneScreen.MIRROR_SETTINGS, force = true)
+    }
 }

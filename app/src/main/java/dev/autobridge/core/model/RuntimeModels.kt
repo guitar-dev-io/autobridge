@@ -85,17 +85,6 @@ data class Insets(
     }
 }
 
-data class VehicleProfile(
-    val id: String,
-    val name: String,
-    val carResolution: Size?,
-    val safeInsets: Insets,
-    val touchOffsetX: Float,
-    val touchOffsetY: Float,
-    val preferredFps: Int?,
-    val defaultScale: ScaleMode
-)
-
 data class AppProfile(
     val packageName: String,
     val profileId: String = "default",
@@ -115,7 +104,6 @@ data class RuntimeContext(
     val environment: Environment,
     val vehicleState: VehicleState,
     val connected: Boolean = false,
-    val vehicleProfile: VehicleProfile? = null,
     val currentPackageName: String? = null,
     val currentFeature: Feature? = null,
     val scaleMode: ScaleMode = ScaleMode.FIT,

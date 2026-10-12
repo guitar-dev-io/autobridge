@@ -3,7 +3,6 @@ package dev.autobridge.browser
 import android.content.Context
 import android.net.Uri
 import android.util.Log
-import java.net.URLEncoder
 import android.webkit.CookieManager
 import android.webkit.PermissionRequest
 import android.webkit.WebSettings
@@ -52,8 +51,9 @@ object BrowserDefaults {
         return signInPopupHostSuffixes.any { host == it || host.endsWith(".$it") }
     }
 
-    fun resolve(input: String): String = ContentAddress.https(input)
-        ?: "https://www.google.com/search?q=" + URLEncoder.encode(input.trim(), "UTF-8")
+    /** See [BrowserInputResolver.resolve]; callers with a context pass the user's engine. */
+    fun resolve(input: String, engine: SearchEngine = SearchEngine.GOOGLE): String =
+        BrowserInputResolver.resolve(input, engine)
 
     /**
      * WebView capabilities both presentations share. Each one is enabled for a named feature; the

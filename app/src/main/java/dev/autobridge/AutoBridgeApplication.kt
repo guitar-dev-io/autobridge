@@ -36,6 +36,7 @@ class AutoBridgeApplication : Application() {
         // Load the persisted safety-bypass flag before any screen or policy read, and start the
         // notification that reflects it.
         BypassPolicyStore.init(this)
+        dev.autobridge.display.PerformanceMode.restore(this)
         BypassNotifier.install(this)
         // A car session (Duo Screen) can start without any screen of ours having run, so the screen
         // power policy has to be installed here rather than in an Activity. Registration only; it

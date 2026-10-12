@@ -37,6 +37,8 @@ import androidx.media3.session.SessionError
 import com.google.common.collect.ImmutableList
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import dev.autobridge.display.PerformanceMode
+import dev.autobridge.display.PerformancePolicy
 import dev.autobridge.MainActivity
 import dev.autobridge.car.DuoSessionState
 import dev.autobridge.core.model.Feature
@@ -451,6 +453,26 @@ class MediaPlaybackService : MediaLibraryService() {
         (0 until target.rendererCount).firstOrNull { target.getRendererType(it) == C.TRACK_TYPE_VIDEO }
             ?.let { target.getRenderer(it) }
 
+    /** Performance mode changes can come from the thermal callback; the player is main-thread only. */
+    private val performanceListener: (PerformancePolicy.Level) -> Unit = { level ->
+        mainHandler.post { applyPerformanceLevel(level) }
+    }
+
+    /**
+     * Caps the resolution adaptive (HLS/DASH) streams may choose while the phone is hot; a lower
+     * rendition decodes for less power and heat. A single-rendition stream is unaffected, since
+     * Media3 still plays its only track when it exceeds the cap. Media3 only: the VLC engine
+     * picks its own renditions.
+     */
+    private fun applyPerformanceLevel(level: PerformancePolicy.Level) {
+        val exo = exoPlayer ?: return
+        val maxHeight = level.maxVideoHeight
+        exo.trackSelectionParameters = exo.trackSelectionParameters.buildUpon().apply {
+            if (maxHeight == null) clearVideoSizeConstraints()
+            else setMaxVideoSize(maxHeight * 16 / 9, maxHeight)
+        }.build()
+    }
+
     private fun enforceVideoParking() {
         val currentPlayer = player ?: return
         currentPlayer.trackSelectionParameters = currentPlayer.trackSelectionParameters
@@ -547,8 +569,10 @@ class MediaPlaybackService : MediaLibraryService() {
         ParkingStateStore.addListener(parkingListener)
         VideoOutputGeometry.addListener(geometryListener)
         VideoSettings.addListener(videoSettingsListener)
+        PerformanceMode.addListener(performanceListener)
         applyOutputGeometry(VideoOutputGeometry.current)
         enforceVideoParking()
+        applyPerformanceLevel(PerformanceMode.level)
 
         val openAppIntent = PendingIntent.getActivity(
             this,
@@ -597,6 +621,7 @@ class MediaPlaybackService : MediaLibraryService() {
         ParkingStateStore.removeListener(parkingListener)
         VideoOutputGeometry.removeListener(geometryListener)
         VideoSettings.removeListener(videoSettingsListener)
+        PerformanceMode.removeListener(performanceListener)
         mainHandler.removeCallbacksAndMessages(null)
         // playerListener is attached only on the Media3 branch; facadeListener only under VLC.
         exoPlayer?.removeListener(playerListener)

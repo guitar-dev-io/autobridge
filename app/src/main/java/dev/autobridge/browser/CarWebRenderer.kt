@@ -38,6 +38,7 @@ import android.webkit.WebStorage
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import dev.autobridge.R
+import dev.autobridge.display.PerformanceMode
 import dev.autobridge.entertainment.ContentAddress
 import dev.autobridge.entertainment.WebHistoryStore
 import kotlin.math.abs
@@ -105,7 +106,8 @@ class CarWebRenderer(context: Context) {
 
         /** How soon after a page play a permanent focus loss counts as the WebView's own request. */
         const val SELF_FOCUS_WINDOW_MS = 1_500L
-        const val FRAME_INTERVAL_MS = 33L // ~30fps repaint pump while something is moving
+        // The repaint pump while something is moving is PerformanceMode.level.browserFrameMs:
+        // ~30fps normally, lower when the phone is hot.
 
         /**
          * Pump interval while nothing is known to be moving (~4fps). Still ticking, so auto-hide
@@ -601,7 +603,7 @@ class CarWebRenderer(context: Context) {
             pollLegacyMedia(now)
             val busy = flinging || needsFullRate(now)
             pumpIdle = !busy
-            mainHandler.postDelayed(this, if (busy) FRAME_INTERVAL_MS else IDLE_FRAME_INTERVAL_MS)
+            mainHandler.postDelayed(this, if (busy) PerformanceMode.level.browserFrameMs else IDLE_FRAME_INTERVAL_MS)
         }
     }
 
@@ -1136,7 +1138,7 @@ class CarWebRenderer(context: Context) {
 
     // ------------------------------------------------------------------ navigation
 
-    /** Loads a validated HTTPS URL or turns free text into a Google search. */
+    /** Loads a validated HTTPS URL or turns free text into a search on the chosen engine. */
     fun load(input: String) {
         runOnMain {
             // The non-DRM MP4 test page (TEST 3 of the video matrix), reachable from the car's
@@ -1145,7 +1147,7 @@ class CarWebRenderer(context: Context) {
                 focusedView?.let(WebVideoDiagnostics::loadTestPage)
                 return@runOnMain
             }
-            val target = BrowserDefaults.resolve(input)
+            val target = BrowserDefaults.resolve(input, SearchEngineStore.engine(appContext))
             val side = sideView
             if (sideActive && side != null) {
                 // The side pane has no tabs: an address typed while it has focus replaces its page.
@@ -1264,7 +1266,7 @@ class CarWebRenderer(context: Context) {
     fun openNewTab(url: String = DEFAULT_HOME) = runOnMain {
         sideFocused = false
         saveActiveTabState()
-        val target = BrowserDefaults.resolve(url)
+        val target = BrowserDefaults.resolve(url, SearchEngineStore.engine(appContext))
         val (next, evicted) = tabs.open(nextTabId++, target)
         evicted?.let {
             tabStates.remove(it.id)

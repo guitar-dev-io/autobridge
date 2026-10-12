@@ -39,34 +39,34 @@ enum class SearchEngine(
  * the "Send to car" sheet and anything else that takes a text box all resolve input the same way.
  * It is pure and side-effect free so it can be unit-tested without an Android framework.
  *
- * The rules, in order:
- *  1. A valid `http`/`https` URL (or a bare host like `youtube.com`) resolves to that URL, through
- *     [ContentAddress.https] — the same validator the rest of the app trusts, which also upgrades a
- *     scheme-less host to `https://` and rejects unsafe schemes (`javascript:`, `intent:`, …).
- *  2. Anything else is treated as a search query and encoded onto [engine]'s results URL.
+ * The rules, in order ([resolve]):
+ *  1. An address — one word with a scheme, a dot in its host, or `localhost` — opens, validated by
+ *     [ContentAddress.https] (which rejects `javascript:`, `intent:` and the like). A typed
+ *     `http://` is upgraded to https, the only scheme the browsers load.
+ *  2. Anything else is a search on [engine], including a single word: `weather` searches, it does
+ *     not open `https://weather`.
+ *
+ * Every text box resolves through here — the phone and car address bars, Send to car, the Remote
+ * and Agent commands, Quick Launch web shortcuts — so the same words give the same page wherever
+ * they are typed or spoken. Several of them used to keep their own copy, which opened a single
+ * word as a dead host, searched a typed `http://` address, and ignored the chosen engine.
  */
 object BrowserInputResolver {
-    fun resolveBrowserInput(input: String, engine: SearchEngine): String {
+    /** The one decision: an address opens, anything else searches on [engine]. Blank is an empty search. */
+    fun resolve(input: String, engine: SearchEngine): String {
         val trimmed = input.trim()
         if (trimmed.isEmpty()) return engine.searchUrl("")
-        return ContentAddress.https(trimmed) ?: engine.searchUrl(trimmed)
-    }
-
-    /** True when [input] is (or normalises to) a real address rather than a search query. */
-    fun looksLikeUrl(input: String): Boolean = ContentAddress.https(input.trim()) != null
-
-    /**
-     * The car keyboard's Go: an address opens directly, anything else searches on [engine].
-     *
-     * Stricter than [resolveBrowserInput] about what counts as an address, because on a keyboard
-     * a single word is far more often a search than a host: `weather` searches, `weather.com`
-     * opens. An address is one word with a scheme, a dot in its host, or `localhost`. A typed
-     * `http://` is upgraded to https, the only scheme this browser loads.
-     */
-    fun resolveTyped(input: String, engine: SearchEngine): String {
-        val trimmed = input.trim()
         return addressOf(trimmed) ?: engine.searchUrl(trimmed)
     }
+
+    /** Same as [resolve]; kept for the phone, Send-to-car and projection call sites. */
+    fun resolveBrowserInput(input: String, engine: SearchEngine): String = resolve(input, engine)
+
+    /** True when [input] is an address [resolve] would open rather than search. */
+    fun looksLikeUrl(input: String): Boolean = addressOf(input) != null
+
+    /** Same as [resolve]; the car keyboard's Go. */
+    fun resolveTyped(input: String, engine: SearchEngine): String = resolve(input, engine)
 
     /** The https URL [input] names, or null when it reads as a search. */
     fun addressOf(input: String): String? {

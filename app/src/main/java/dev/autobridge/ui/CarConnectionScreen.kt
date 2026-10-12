@@ -16,16 +16,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.autobridge.display.SurfaceProfile
 import dev.autobridge.R
-import dev.autobridge.core.state.RuntimeContextStore
 
 /** One tappable settings row: accent icon badge, title, caption and a chevron. */
 data class SettingsLink(
@@ -38,14 +36,13 @@ data class SettingsLink(
 /**
  * Settings > Car & Connection. Replaces the old root "Devices" tab.
  *
- * The vehicle card reads the same [RuntimeContextStore] flow as Home and Control (single source of
+ * The vehicle card reads the same `RuntimeContextStore` flow as Home and Control (single source of
  * truth for connected / parked), so it updates live when the head unit disconnects or reconnects.
  * The old Devices tab printed a hard-coded "REAL_CAR (Parked)"; that internal wording now only
  * appears under Advanced > Debug.
  */
 @Composable
 fun CarConnectionScreen(onBack: () -> Unit, links: List<SettingsLink>) {
-    val runtime by RuntimeContextStore.context.collectAsState()
     Column(Modifier.fillMaxSize().background(ComposeTokens.Ink)) {
         PhoneHeader(
             title = stringResource(R.string.car_connection_title),
@@ -59,7 +56,8 @@ fun CarConnectionScreen(onBack: () -> Unit, links: List<SettingsLink>) {
         ) {
             SectionLabel(stringResource(R.string.car_connection_current_vehicle))
             AndroidAutoStatusCard(
-                title = runtime.vehicleProfile?.name ?: stringResource(R.string.car_connection_my_car),
+                title = SurfaceProfile.active.takeIf { it != SurfaceProfile.DEFAULT }?.displayLabel
+                    ?: stringResource(R.string.car_connection_my_car),
                 caption = stringResource(R.string.control_android_auto),
                 onClick = null
             )

@@ -2,14 +2,14 @@
 
 AutoBridge is a personal/development Android project for experimenting with a parked-only phone-to-Android-Auto surface bridge. It is an independent codebase, not a merge of the reference projects tracked in the project's internal `docs/` notes.
 
-**Safety boundary:** by default the parked/mode gate holds and nothing is bypassed — mirroring, video, browser, touch, and Quick App launching are gated on an authoritative `PARKED` state, `MOVING` stops projection and leaves the car app, `UNKNOWN` is fail-closed, and LAB controls never falsify a real vehicle's speed. An optional, off-by-default user override can open that gate, and a separate audio option can keep media playing through the reverse-gear chime; both are deliberate opt-ins the driver turns on at their own risk (see [Safety first](#️-safety-first--ความปลอดภัยต้องมาก่อน)).
+**Safety boundary:** the mode gate is enforced; the parked gate currently **reports and does not block**. The `safe` flavor keeps mirroring, video, browser and touch disabled by mode whatever the vehicle is doing. In `personal` and `lab`, the build ships with `SafetyEnforcement.isBlocking = false`: the vehicle state (`PARKED`/`MOVING`/`UNKNOWN`) is read from `CAR_SPEED` and shown, and a moving or unknown state does not close the car app or deny the browser, video or touch. **Mirroring is the exception:** whenever the reading leaves `PARKED` — moving, or `UNKNOWN` because no speed arrived for three seconds — the screen-capture session is stopped and has to be started again with fresh consent. That teardown does not depend on `SafetyEnforcement`, so it applies in every flavor; only the runtime bypass below lifts it, and then mirroring keeps running whether the car is moving or stopped. The enforcing branch for the rest (`MOVING` leaves the car app, `UNKNOWN` is fail-closed) is still in the code and unit-tested, and comes back by flipping that one flag. LAB controls never falsify a real vehicle's speed. An optional, off-by-default user override can open that gate, and a separate audio option can keep media playing through the reverse-gear chime; both are deliberate opt-ins the driver turns on at their own risk (see [Safety first](#️-safety-first--ความปลอดภัยต้องมาก่อน)).
 
 ## ⚠️ Safety first / ความปลอดภัยต้องมาก่อน
 
 **English**
 - Use AutoBridge only while the vehicle is **parked**. Do not watch video, browse, or operate the phone/car screen while driving.
 - The driver is always fully responsible for operating the vehicle safely and for obeying all local traffic laws. Distracted driving is dangerous and in many places illegal.
-- The parked-only gate is a software safeguard, not a guarantee. It depends on a correct `CAR_SPEED` signal from the host/vehicle, which can be delayed, missing, or wrong on real hardware — never rely on it as a substitute for your own judgement.
+- In the current build the parked-only gate only stops mirroring, and not while the bypass is on (see the safety boundary above); the browser, video and touch keep working while moving. When it is enforcing, it is still a software safeguard, not a guarantee. It depends on a correct `CAR_SPEED` signal from the host/vehicle, which can be delayed, missing, or wrong on real hardware — never rely on it as a substitute for your own judgement.
 - Set everything up before you drive. Pull over and park before changing settings, picking content, or interacting with the car screen.
 
 _Optional overrides — advanced, at your own risk_
@@ -22,7 +22,7 @@ _Optional overrides — advanced, at your own risk_
 **ไทย**
 - ใช้ AutoBridge เฉพาะตอน **จอดรถ** เท่านั้น อย่าดูวิดีโอ ท่องเว็บ หรือใช้งานหน้าจอมือถือ/จอรถขณะขับขี่
 - ผู้ขับขี่เป็นผู้รับผิดชอบการขับขี่อย่างปลอดภัยและการปฏิบัติตามกฎจราจรทั้งหมดเสมอ การขับรถโดยเสียสมาธิเป็นอันตรายและผิดกฎหมายในหลายพื้นที่
-- ระบบล็อกเฉพาะตอนจอด เป็นเพียงมาตรการป้องกันทางซอฟต์แวร์ ไม่ใช่การรับประกัน เพราะอาศัยสัญญาณ `CAR_SPEED` ที่ถูกต้องจาก host/รถ ซึ่งบนฮาร์ดแวร์จริงอาจมาช้า ขาดหาย หรือผิดพลาดได้ อย่าใช้แทนวิจารณญาณของตนเอง
+- ในบิลด์ปัจจุบัน ระบบล็อกเฉพาะตอนจอด **รายงานสถานะอย่างเดียว ไม่ได้ปิดกั้น** (flavor `safe` ยังปิด mirror/วิดีโอ/เบราว์เซอร์/ทัชด้วยโหมด ส่วน `personal` และ `lab` เบราว์เซอร์ วิดีโอ และทัชยังใช้ได้ขณะรถเคลื่อนที่ ยกเว้น mirror ซึ่งจะถูกหยุดทุกครั้งที่สถานะไม่ใช่จอด รวมถึงเมื่อไม่ได้รับค่าความเร็วเกิน 3 วินาที และต้องกดยินยอมจับภาพใหม่ ข้อนี้มีผลทุก flavor ยกเว้นเมื่อเปิดสวิตช์ปลดล็อกไว้ ซึ่ง mirror จะทำงานต่อไม่ว่ารถจะวิ่งหรือจอด) และแม้เมื่อเปิดให้ปิดกั้น ก็ยังเป็นเพียงมาตรการป้องกันทางซอฟต์แวร์ ไม่ใช่การรับประกัน เพราะอาศัยสัญญาณ `CAR_SPEED` ที่ถูกต้องจาก host/รถ ซึ่งบนฮาร์ดแวร์จริงอาจมาช้า ขาดหาย หรือผิดพลาดได้ อย่าใช้แทนวิจารณญาณของตนเอง
 - ตั้งค่าทุกอย่างให้เสร็จก่อนออกรถ หากต้องเปลี่ยนการตั้งค่า เลือกเนื้อหา หรือแตะจอรถ ให้จอดรถในที่ปลอดภัยก่อน
 
 _ตัวเลือกการปลดล็อก — สำหรับผู้ใช้ขั้นสูง ยอมรับความเสี่ยงเอง_
@@ -88,7 +88,7 @@ The code is implemented and flavored builds/tests are the primary local validati
 | Flavor | Use | Important boundary |
 |---|---|---|
 | `safe` | Conservative baseline | Policy enables media and parked Quick Apps; mirror/browser/video/touch are disabled. |
-| `personal` | Personal parked use | Broad feature set, but parked-only features still require `PARKED`. |
+| `personal` | Personal parked use | Broad feature set. The parked gate reports rather than blocks in the current build, except that mirroring stops whenever the reading leaves `PARKED` unless the runtime bypass is on. |
 | `lab` | Emulator/DHU or controlled bench | Broad feature set plus LAB controls; real-car state is never replaced. |
 
 Mode, feature-policy and LAB behaviour are described in the project's internal `docs/` notes.
@@ -319,8 +319,8 @@ silently come up empty.
 4. Select a non-`REAL_CAR` LAB environment and set the mock vehicle state to `PARKED`.
 5. Start mirror on the phone and approve the system screen-capture consent.
 6. Verify the `READY` projection state, surface/mirror diagnostics, and visible pixels.
-7. Change the mock state to `MOVING`; projection must stop and the car app must exit.
-8. Change it to `UNKNOWN`; parked-only actions must remain blocked.
+7. Change the mock state to `MOVING`; the status rows must read Moving and projection must stop (it keeps running if the runtime bypass is on). The car app exits only in a build with `SafetyEnforcement.isBlocking = true`.
+8. Change it to `UNKNOWN`; the status rows must read Unknown and projection must stay stopped. Other parked-only actions are blocked only when enforcement is on.
 
 ### Production-style flow
 
@@ -330,7 +330,7 @@ silently come up empty.
 4. Start mirror from the phone and approve fresh MediaProjection consent.
 5. Enable Accessibility or Shizuku only if touch testing is required.
 6. If testing panel-only screen-off, connect Shizuku, confirm the capability status, and leave the opt-in setting disabled until the device behavior is understood.
-7. Stop the session before changing vehicle state; a non-zero speed must stop it automatically.
+7. Stop the session before changing vehicle state. A non-zero speed, or no speed for three seconds, stops projection in every build unless the runtime bypass is on.
 
 Android Auto's official testing guidance states that the unknown-sources exception does not apply to apps built with the Android for Cars App Library. This limitation is summarized from the [official Android testing guidance](https://developer.android.com/training/cars/testing/); content was rephrased for compliance with licensing restrictions. Therefore, an ADB-installed `personalDebug` APK can be valid and discoverable by Android's service resolver while still being absent from a real vehicle's launcher.
 
@@ -378,13 +378,13 @@ Ownership and lifecycle details live in the project's internal `docs/` notes (`A
 
 ## Futures / วิสัยทัศน์อนาคต
 
-> These are direction and intent, not promises. Anything parked-only stays gated behind an authoritative `PARKED` state, and anything host- or OEM-dependent stays a device check until it is measured on real hardware.
-> นี่คือทิศทางและความตั้งใจ ไม่ใช่คำสัญญา ฟีเจอร์ที่ใช้ได้เฉพาะตอนจอด (parked-only) จะยังถูกล็อกด้วยสถานะ `PARKED` ที่เชื่อถือได้เสมอ และส่วนที่ขึ้นกับ host/OEM จะยังเป็นสิ่งที่ต้องทดสอบบนฮาร์ดแวร์จริงก่อน
+> These are direction and intent, not promises. Parked-only features are marked as such and go through the one parked gate, which currently reports rather than blocks, except that it stops mirroring (see the safety boundary at the top), and anything host- or OEM-dependent stays a device check until it is measured on real hardware.
+> นี่คือทิศทางและความตั้งใจ ไม่ใช่คำสัญญา ฟีเจอร์ที่ใช้ได้เฉพาะตอนจอด (parked-only) ถูกระบุไว้และผ่านระบบล็อกตอนจอดตัวเดียว ซึ่งในบิลด์ปัจจุบันรายงานสถานะอย่างเดียว ไม่ได้ปิดกั้น ยกเว้นการหยุด mirror (ดูหัวข้อ safety boundary ด้านบน) และส่วนที่ขึ้นกับ host/OEM จะยังเป็นสิ่งที่ต้องทดสอบบนฮาร์ดแวร์จริงก่อน
 
 ### Mobile (phone surface)
 
-> These are the capabilities the phone app actually ships today — the full inventory of what the mobile surface can do right now, not just future direction. Items marked _parked-only_ are controlled from the phone but only open on the car once an authoritative `PARKED` state is present; items marked _flavor-gated_ depend on which build you installed (see the flavor note below).
-> นี่คือความสามารถที่แอปบนมือถือ ทำได้จริงในวันนี้ — รายการทั้งหมดของสิ่งที่ฝั่งมือถือทำได้ตอนนี้ ไม่ใช่แค่ทิศทางในอนาคต รายการที่ระบุว่า _parked-only_ สั่งงานจากมือถือได้ แต่จะเปิดบนจอรถเมื่ออยู่ในสถานะ `PARKED` ที่เชื่อถือได้เท่านั้น ส่วนที่ระบุว่า _flavor-gated_ ขึ้นกับ build ที่ติดตั้ง (ดูหมายเหตุเรื่อง flavor ด้านล่าง)
+> These are the capabilities the phone app actually ships today — the full inventory of what the mobile surface can do right now, not just future direction. Items marked _parked-only_ are controlled from the phone and pass through the parked gate on the car, which reports rather than blocks in the current build, except that mirroring stops; items marked _flavor-gated_ depend on which build you installed (see the flavor note below).
+> นี่คือความสามารถที่แอปบนมือถือ ทำได้จริงในวันนี้ — รายการทั้งหมดของสิ่งที่ฝั่งมือถือทำได้ตอนนี้ ไม่ใช่แค่ทิศทางในอนาคต รายการที่ระบุว่า _parked-only_ สั่งงานจากมือถือได้ และผ่านระบบล็อกตอนจอดบนจอรถ ซึ่งในบิลด์ปัจจุบันรายงานสถานะอย่างเดียว ไม่ได้ปิดกั้น ยกเว้นการหยุด mirror ส่วนที่ระบุว่า _flavor-gated_ ขึ้นกับ build ที่ติดตั้ง (ดูหมายเหตุเรื่อง flavor ด้านล่าง)
 
 **English**
 
@@ -525,8 +525,8 @@ Google's Android Auto policy does not generally recognise an app installed by pl
 
 นโยบาย Android Auto ของ Google โดยทั่วไปจะไม่ยอมรับแอปที่ติดตั้งด้วย APK แบบปกติ จึงอาจไม่โผล่ในหน้า launcher ของรถแม้ระบบ Android จะมองเห็นแอปแล้ว ตัวจอรถของโปรเจกต์นี้เป็น POC แบบ `NavigationTemplate` สำหรับใช้งานส่วนตัว/พัฒนา ดังนั้นการผ่านนโยบาย Play/Android Auto จึงยังไม่การันตี
 
-> **Note:** AutoBridge never bypasses DRM, and parked-only features (mirror, video, browser, touch, Quick App launch) always require an authoritative `PARKED` state regardless of how it was installed.
-> **หมายเหตุ:** AutoBridge ไม่หลบ DRM และฟีเจอร์ที่ใช้ได้เฉพาะตอนจอด (mirror, วิดีโอ, เบราว์เซอร์, ทัช, เปิด Quick App) ต้องการสถานะ `PARKED` ที่เชื่อถือได้เสมอ ไม่ว่าจะติดตั้งแบบไหน
+> **Note:** AutoBridge never bypasses DRM, and the parked gate for parked-only features (mirror, video, browser, touch, Quick App launch) behaves the same however it was installed. In the current build that gate reports rather than blocks, except that mirroring stops whenever the reading leaves `PARKED`.
+> **หมายเหตุ:** AutoBridge ไม่หลบ DRM และฟีเจอร์ที่ใช้ได้เฉพาะตอนจอด (mirror, วิดีโอ, เบราว์เซอร์, ทัช, เปิด Quick App) ผ่านระบบล็อกตอนจอดแบบเดียวกันไม่ว่าจะติดตั้งแบบไหน ซึ่งในบิลด์ปัจจุบันรายงานสถานะอย่างเดียว ไม่ได้ปิดกั้น ยกเว้น mirror ที่จะหยุดทุกครั้งที่สถานะไม่ใช่จอด
 
 ## Installation / ขั้นตอนการติดตั้ง
 

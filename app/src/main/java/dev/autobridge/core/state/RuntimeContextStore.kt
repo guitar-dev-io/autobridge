@@ -132,7 +132,6 @@ import dev.autobridge.core.model.Feature
 import dev.autobridge.core.model.RotationMode
 import dev.autobridge.core.model.RuntimeContext
 import dev.autobridge.core.model.ScaleMode
-import dev.autobridge.core.model.VehicleProfile
 import dev.autobridge.core.model.VehicleState
 import dev.autobridge.core.policy.DefaultModeProvider
 import dev.autobridge.core.policy.EnvironmentDetector
@@ -184,10 +183,6 @@ object RuntimeContextStore {
         if (mode != AutoBridgeMode.LAB || _context.value.environment == Environment.REAL_CAR) return false
         setConnected(connected)
         return true
-    }
-
-    fun setVehicleProfile(profile: VehicleProfile?) {
-        update { it.copy(vehicleProfile = profile) }
     }
 
     fun setCurrentFeature(feature: Feature?, packageName: String? = _context.value.currentPackageName) {

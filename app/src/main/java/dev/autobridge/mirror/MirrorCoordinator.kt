@@ -6,6 +6,7 @@ import android.hardware.display.VirtualDisplay
 import android.media.projection.MediaProjection
 import android.util.Log
 import android.view.Surface
+import dev.autobridge.car.ConnectionTimeline
 import dev.autobridge.core.model.Feature
 import dev.autobridge.core.model.RotationMode
 import dev.autobridge.core.model.ScaleMode
@@ -17,6 +18,7 @@ import dev.autobridge.display.ScreenPowerController
 import dev.autobridge.logging.StructuredLog
 import dev.autobridge.display.SurfaceProfile
 import dev.autobridge.input.DisplayTransform
+import dev.autobridge.safety.BypassPolicyStore
 import dev.autobridge.safety.ParkingStateStore
 import dev.autobridge.safety.SafetyEnforcement
 
@@ -41,18 +43,30 @@ object MirrorCoordinator {
     private var rotationMode: RotationMode = RotationMode.AUTO
 
     private val parkingListener: (ParkingStateStore.State) -> Unit = { state ->
-        if (state != ParkingStateStore.State.PARKED) {
+        if (MirrorParkedTeardown.shouldTearDown(state, BypassPolicyStore.overridesParked)) {
             // Safety teardown is intentionally stronger than merely hiding the output. It also
             // releases the WakeLock and projection so UNKNOWN cannot leave a live capture session.
-            ScreenPowerController.stop()
-            stopProjection()
+            tearDownForVehicleState()
         } else {
             runLocked { reconcileLocked() }
         }
     }
 
+    /** Turning the driver's bypass off while not parked applies the teardown it was holding back. */
+    private val bypassListener: (BypassPolicyStore.State) -> Unit = {
+        if (MirrorParkedTeardown.shouldTearDown(ParkingStateStore.state, BypassPolicyStore.overridesParked)) {
+            tearDownForVehicleState()
+        }
+    }
+
+    private fun tearDownForVehicleState() {
+        ScreenPowerController.stop()
+        stopProjection()
+    }
+
     init {
         ParkingStateStore.addListener(parkingListener)
+        BypassPolicyStore.addListener(bypassListener)
     }
 
     val isProjectionReady: Boolean
@@ -204,10 +218,17 @@ object MirrorCoordinator {
     fun attachCarSurface(surface: Surface, width: Int, height: Int, dpi: Int): Boolean = runLockedResult {
         val oldSurface = carSurface
         if (oldSurface == null || oldSurface !== surface) {
-            if (oldSurface != null) ReconnectTracker.onSurfaceDetached()
+            if (oldSurface != null) {
+                ReconnectTracker.onSurfaceDetached()
+                ConnectionTimeline.record(ConnectionTimeline.Kind.SURFACE_DETACHED, "replaced")
+            }
             when (ReconnectTracker.onSurfaceArrived(projectionAlive = projection != null)) {
-                ReconnectTracker.Outcome.RESUMED -> MirrorDiagnostics.record("car_session_reconnected")
-                ReconnectTracker.Outcome.FRESH_START,
+                ReconnectTracker.Outcome.RESUMED -> {
+                    MirrorDiagnostics.record("car_session_reconnected")
+                    ConnectionTimeline.record(ConnectionTimeline.Kind.SURFACE_RESUMED, "${width}x$height")
+                }
+                ReconnectTracker.Outcome.FRESH_START ->
+                    ConnectionTimeline.record(ConnectionTimeline.Kind.SURFACE_ATTACHED, "${width}x$height")
                 ReconnectTracker.Outcome.UNCHANGED -> Unit
             }
         }
@@ -231,6 +252,7 @@ object MirrorCoordinator {
             carSurface = null
             ReconnectTracker.onSurfaceDetached()
             MirrorDiagnostics.record("car_surface_detached")
+            ConnectionTimeline.record(ConnectionTimeline.Kind.SURFACE_DETACHED)
         }
     }
 

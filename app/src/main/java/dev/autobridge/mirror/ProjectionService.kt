@@ -19,7 +19,10 @@ import dev.autobridge.MainActivity
 import dev.autobridge.R
 import dev.autobridge.apps.AppRotationController
 import dev.autobridge.apps.QuickAppLauncher
+import dev.autobridge.car.CarConnectionMonitor
+import dev.autobridge.car.ConnectionTimeline
 import dev.autobridge.display.MirrorDiagnostics
+import dev.autobridge.display.PerformanceMode
 import dev.autobridge.display.MirrorOrientationController
 import dev.autobridge.display.OrientationMonitor
 import dev.autobridge.display.ScreenPowerController
@@ -43,6 +46,10 @@ class ProjectionService : Service() {
         private val mainHandler = Handler(Looper.getMainLooper())
         private var pendingDisconnectStop: Runnable? = null
 
+        /** Why the next projection release happens, for [ConnectionTimeline]; consumed by releaseProjection. */
+        @Volatile
+        private var nextStopReason: String? = null
+
         @Volatile
         var sessionState: SessionState = SessionState.IDLE
             private set
@@ -56,7 +63,23 @@ class ProjectionService : Service() {
             pendingDisconnectStop = null
         }
 
-        fun onCarSurfaceDisconnected(context: Context) {
+        /** The car surface went away; on its own that may only be the driver switching apps. */
+        fun onCarSurfaceDisconnected(context: Context) = scheduleDisconnectCheck(context)
+
+        /** The Android Auto host reports the car connection is gone. */
+        fun onCarHostDisconnected(context: Context) = scheduleDisconnectCheck(context)
+
+        /** The car is back before the grace period ran out; nothing to stop. */
+        fun onCarHostConnected() {
+            pendingDisconnectStop?.let(mainHandler::removeCallbacks)
+            pendingDisconnectStop = null
+        }
+
+        /**
+         * Re-checks after [SURFACE_DISCONNECT_GRACE_MS] so a brief flap does not end the session;
+         * [DisconnectStopPolicy] decides from the state at that moment.
+         */
+        private fun scheduleDisconnectCheck(context: Context) {
             pendingDisconnectStop?.let(mainHandler::removeCallbacks)
             pendingDisconnectStop = null
             if (!MirrorSettings.stopOnDisconnect) return
@@ -64,13 +87,15 @@ class ProjectionService : Service() {
             val appContext = context.applicationContext
             val stopRunnable = Runnable {
                 pendingDisconnectStop = null
-                if (MirrorSettings.stopOnDisconnect &&
-                    !MirrorCoordinator.isCarSurfaceReady &&
-                    sessionState != SessionState.IDLE
-                ) {
-                    StructuredLog.i(TAG, "Android Auto surface disconnected; stopping projection")
-                    stop(appContext)
-                }
+                val reason = DisconnectStopPolicy.decide(
+                    stopOnDisconnect = MirrorSettings.stopOnDisconnect,
+                    sessionIdle = sessionState == SessionState.IDLE,
+                    hostSignalKnown = CarConnectionMonitor.hostSignalKnown,
+                    hostConnected = CarConnectionMonitor.isHostConnected,
+                    surfaceReady = MirrorCoordinator.isCarSurfaceReady
+                ) ?: return@Runnable
+                StructuredLog.i(TAG, "Android Auto disconnected (${reason.label}); stopping projection")
+                stop(appContext, reason = reason.label)
             }
             pendingDisconnectStop = stopRunnable
             mainHandler.postDelayed(stopRunnable, SURFACE_DISCONNECT_GRACE_MS)
@@ -88,6 +113,7 @@ class ProjectionService : Service() {
 
         fun onMirrorBindingFailed(context: Context, message: String) {
             if (sessionState == SessionState.IDLE) return
+            nextStopReason = "bind_failed"
             markError(IllegalStateException(message))
             ScreenPowerController.stop()
             MirrorSettings.preferredFps = null
@@ -115,7 +141,8 @@ class ProjectionService : Service() {
             }
         }
 
-        fun stop(context: Context) {
+        fun stop(context: Context, reason: String = "app") {
+            nextStopReason = reason
             pendingDisconnectStop?.let(mainHandler::removeCallbacks)
             pendingDisconnectStop = null
             ScreenPowerController.stop()
@@ -152,6 +179,7 @@ class ProjectionService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> {
+                nextStopReason = "notification"
                 markIdle()
                 stopProjectionAndSelf()
                 return START_NOT_STICKY
@@ -160,6 +188,7 @@ class ProjectionService : Service() {
                 try {
                     startProjection(intent)
                 } catch (error: RuntimeException) {
+                    nextStopReason = "start_failed"
                     markError(error)
                     StructuredLog.e(TAG, "Projection startup failed; fresh consent required: ${error.message}")
                     stopProjectionAndSelf()
@@ -189,6 +218,7 @@ class ProjectionService : Service() {
         MirrorDiagnostics.record("consent_received")
         startAsProjectionForegroundService()
 
+        nextStopReason = "restarted"
         releaseProjection()
 
         val manager = getSystemService(MediaProjectionManager::class.java)
@@ -201,6 +231,9 @@ class ProjectionService : Service() {
             override fun onStop() {
                 if (projection !== newProjection) return
                 StructuredLog.i(TAG, "MediaProjection stopped by system/user")
+                // The release below sees no projection and records nothing, so this is the one record.
+                ConnectionTimeline.record(ConnectionTimeline.Kind.PROJECTION_STOPPED, "reason=system")
+                PerformanceMode.release("projection")
                 projection = null
                 MirrorSettings.preferredFps = null
                 ScreenPowerController.stop()
@@ -215,6 +248,7 @@ class ProjectionService : Service() {
 
         val projectionAttached = MirrorCoordinator.attachProjection(this, newProjection)
         if (!projectionAttached) {
+            nextStopReason = "display_failed"
             markError(IllegalStateException("Could not create the mirror virtual display"))
             StructuredLog.e(TAG, "Projection attached but mirror virtual display creation failed")
             stopProjectionAndSelf()
@@ -228,6 +262,8 @@ class ProjectionService : Service() {
             autoDimDelay = MirrorSettings.autoDimDelay
         )
         markReady()
+        ConnectionTimeline.record(ConnectionTimeline.Kind.PROJECTION_STARTED)
+        PerformanceMode.acquire(this, "projection")
         if (MirrorCoordinator.isMirroring) {
             QuickAppLauncher.autoLaunchLastSession(this)
         }
@@ -283,6 +319,12 @@ class ProjectionService : Service() {
     private fun releaseProjection() {
         val old = projection
         projection = null
+        val reason = nextStopReason
+        nextStopReason = null
+        if (old != null) {
+            ConnectionTimeline.record(ConnectionTimeline.Kind.PROJECTION_STOPPED, "reason=${reason ?: "service_stopped"}")
+            PerformanceMode.release("projection")
+        }
         ScreenPowerController.stop()
         // Restore privileged state before dropping the Shizuku binder. This is deliberately
         // repeated after ScreenPowerController.stop() so a raw pointer stream cannot remain held
