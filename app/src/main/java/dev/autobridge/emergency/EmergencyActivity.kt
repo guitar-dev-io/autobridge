@@ -21,6 +21,7 @@ import dev.autobridge.i18n.AppLocale
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.stack
 import dev.autobridge.ui.CarToolForm
+import dev.autobridge.ui.CarToolViews
 
 /**
  * The emergency card: numbers to ring and facts to quote (the insurance hotline, the policy number,
@@ -124,9 +125,10 @@ class EmergencyActivity : Activity() {
     }
 
     /**
-     * One line of the card: a coloured edge, the name in large type, and on the right the number
-     * itself as the call button (or Copy, for text such as a policy number). Tapping the rest of
-     * the line offers delete.
+     * One line of the card, as in the design: the name, and under it the number or the text with
+     * what to tell whoever answers; on the right a round 56 dp button that calls (or copies text
+     * such as a policy number). The colour of each public line is only in its button, lightly, so
+     * the lines are told apart without the page shouting. Tapping the rest of the line edits it.
      */
     private fun entryRow(entry: EmergencyEntry, color: Int): View {
         val dial = entry.dialable
@@ -134,72 +136,39 @@ class EmergencyActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             minimumHeight = dp(76)
-            background = AutoBridgeDesign.tappable(this@EmergencyActivity, AutoBridgeDesign.SURFACE, 18, color)
-            setPadding(0, dp(10), dp(10), dp(10))
+            background = AutoBridgeDesign.tappable(this@EmergencyActivity, AutoBridgeDesign.SURFACE, 16, color, android.graphics.Color.TRANSPARENT)
+            setPadding(dp(16), dp(10), dp(10), dp(10))
             isClickable = true
             setOnClickListener { showEntryActions(entry) }
-
-            addView(View(this@EmergencyActivity).apply {
-                background = AutoBridgeDesign.surface(this@EmergencyActivity, color, 3, android.graphics.Color.TRANSPARENT)
-            }, LinearLayout.LayoutParams(dp(5), dp(44)).apply { marginStart = dp(10); marginEnd = dp(14) })
 
             addView(LinearLayout(this@EmergencyActivity).apply {
                 orientation = LinearLayout.VERTICAL
                 addView(TextView(this@EmergencyActivity).apply {
                     text = entry.label
-                    textSize = 18f
+                    textSize = 17f
                     setTextColor(AutoBridgeDesign.TEXT)
-                    typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+                    typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
                     maxLines = 2
                     ellipsize = TextUtils.TruncateAt.END
                 })
-                // A number reads on its button; text (a policy number) is shown here in full.
-                if (dial == null) addView(TextView(this@EmergencyActivity).apply {
-                    text = entry.value
-                    textSize = 15f
-                    setTextColor(AutoBridgeDesign.TEXT_MUTED)
-                    setTextIsSelectable(true)
-                    setPadding(0, dp(2), 0, 0)
-                })
-                // What to tell whoever answers, under the name so it is in sight during the call;
-                // a tap copies it, for pasting into a claim form or a chat.
-                if (entry.detail.isNotBlank()) addView(TextView(this@EmergencyActivity).apply {
-                    text = getString(R.string.emergency_detail_copy, entry.detail)
-                    textSize = 15f
+                addView(TextView(this@EmergencyActivity).apply {
+                    text = listOf(entry.value.trim(), entry.detail).filter { it.isNotBlank() }.joinToString(" · ")
+                    textSize = 14f
                     setTextColor(AutoBridgeDesign.TEXT_MUTED)
                     fontFeatureSettings = "tnum"
-                    setPadding(0, dp(4), 0, dp(2))
-                    setOnClickListener { copyText(entry.label, entry.detail) }
+                    setPadding(0, dp(2), dp(8), 0)
                 })
             }, LinearLayout.LayoutParams(0, -2, 1f))
 
-            addView(TextView(this@EmergencyActivity).apply {
-                text = if (dial != null) entry.value.trim() else getString(R.string.emergency_copy)
-                textSize = if (dial != null) 20f else 15f
-                typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
-                gravity = Gravity.CENTER
-                // A quiet tint of the service's colour, the number in that colour: five solid
-                // blocks of red, green and orange made the page shout, and a colour still tells
-                // the lines apart at a glance.
-                setTextColor(color)
-                background = AutoBridgeDesign.tappable(
-                    this@EmergencyActivity, AutoBridgeDesign.tint(color, 0.14f), 14, color, AutoBridgeDesign.tint(color, 0.35f)
-                )
+            addView(
                 if (dial != null) {
-                    setCompoundDrawablesRelativeWithIntrinsicBounds(
-                        getDrawable(R.drawable.ic_car_emergency)?.mutate()?.apply {
-                            setTint(color)
-                            setBounds(0, 0, dp(20), dp(20))
-                        }, null, null, null
-                    )
-                    compoundDrawablePadding = dp(8)
+                    CarToolViews.roundButton(this@EmergencyActivity, R.drawable.ic_car_emergency, color,
+                        "${getString(R.string.emergency_call)} ${entry.label} ${entry.value}") { dialNumber(dial) }
+                } else {
+                    CarToolViews.roundButton(this@EmergencyActivity, R.drawable.ic_copy, color,
+                        "${getString(R.string.emergency_copy)} ${entry.label}") { copy(entry) }
                 }
-                setPadding(dp(16), 0, dp(16), 0)
-                minWidth = dp(96)
-                contentDescription = if (dial != null) "${getString(R.string.emergency_call)} ${entry.label} ${entry.value}" else getString(R.string.emergency_copy)
-                isClickable = true
-                setOnClickListener { if (dial != null) dialNumber(dial) else copy(entry) }
-            }, LinearLayout.LayoutParams(-2, dp(52)))
+            )
         }
     }
 
@@ -209,7 +178,8 @@ class EmergencyActivity : Activity() {
         if (!opened) Toast.makeText(this, getString(R.string.emergency_cannot_dial), Toast.LENGTH_SHORT).show()
     }
 
-    private fun copy(entry: EmergencyEntry) = copyText(entry.label, entry.value)
+    private fun copy(entry: EmergencyEntry) =
+        copyText(entry.label, listOf(entry.value.trim(), entry.detail).filter { it.isNotBlank() }.joinToString(" · "))
 
     private fun copyText(label: String, text: String) {
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return

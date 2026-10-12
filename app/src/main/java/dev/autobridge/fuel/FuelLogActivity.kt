@@ -65,19 +65,18 @@ class FuelLogActivity : Activity() {
         render()
     }
 
+    /**
+     * As the design: the three figures, then each fill-up as a dated line with its amount on the
+     * right, then Add + Export. Fuel or EV changes rarely, so the current one is the header's
+     * subtitle and the other a small pill beside it.
+     */
     private fun render() {
         ev = FuelLogStore.isEv(this)
         val entries = FuelLogStore.all(this)
         val summary = FuelStats.summarize(entries)
         val body = AutoBridgeDesign.body(this)
 
-        // With nothing logged the figures would all be zeros; the empty state below says it better.
-        if (entries.isNotEmpty()) body.stack(summaryCard(summary), gap = 12)
-        body.stack(
-            AutoBridgeDesign.pill(this, unit(R.string.fuel_add, R.string.fuel_add_ev), primary = true, accent = accent) { showAddDialog() },
-            gap = 20
-        )
-
+        // With nothing logged the figures would all be zeros; the empty state says it better.
         if (entries.isEmpty()) {
             body.stack(
                 AutoBridgeDesign.emptyState(
@@ -85,61 +84,58 @@ class FuelLogActivity : Activity() {
                     title = unit(R.string.fuel_empty_title, R.string.fuel_empty_title_ev),
                     message = unit(R.string.fuel_empty_message, R.string.fuel_empty_message_ev),
                     accent = accent
-                )
+                ),
+                gap = 12
             )
         } else {
-            body.stack(AutoBridgeDesign.sectionLabel(this, unit(R.string.fuel_history, R.string.fuel_history_ev)), gap = 8)
+            body.stack(summaryCard(summary), gap = 12)
             entries.forEach { entry ->
                 val kmPerL = FuelStats.kmPerLiterOf(entry, entries)
                 body.stack(
-                    AutoBridgeDesign.contentRow(
-                        context = this,
-                        title = getString(rowTitleRes(), decimal(entry.liters), money(entry.totalBaht)),
-                        subtitle = listOfNotNull(
+                    CarToolViews.row(
+                        this,
+                        title = getString(
+                            if (ev) R.string.fuel_row_line_ev else R.string.fuel_row_line,
                             DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(entry.timeMs)),
-                            entry.odometerKm?.let { getString(R.string.fuel_row_odometer, whole(it)) },
+                            decimal(entry.liters)
+                        ),
+                        subtitle = listOfNotNull(
+                            entry.odometerKm?.let { getString(R.string.fuel_row_odometer_line, whole(it)) },
                             kmPerL?.let { getString(kmPerUnitRes(), decimal(it)) },
                             entry.fuelType.takeIf { it.isNotBlank() },
                             entry.station.takeIf { it.isNotBlank() },
                         ).joinToString(" · "),
-                        accent = accent,
-                        badgeText = "⛽",
+                        amount = getString(R.string.money_baht, money(entry.totalBaht)),
+                        accent = accent
                     ) { showEntryActions(entry) }
                 )
             }
         }
-
-        if (entries.isNotEmpty()) {
-            body.stack(AutoBridgeDesign.pill(this, getString(R.string.fuel_export), accent = accent) { exportCsv(entries) }, gap = 20)
-        }
-        // Fuel or EV changes rarely, so it sits at the end rather than above the figures.
-        body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.fuel_vehicle_section)), gap = 8)
-        body.stack(vehicleToggle())
+        body.stack(
+            CarToolViews.pillRow(this, listOfNotNull(
+                AutoBridgeDesign.pill(this, unit(R.string.fuel_add, R.string.fuel_add_ev), primary = true, accent = accent) { showAddDialog() },
+                if (entries.isNotEmpty()) AutoBridgeDesign.pill(this, getString(R.string.fuel_export), accent = accent) { exportCsv(entries) } else null
+            )),
+            gap = 12
+        )
+        body.stack(CarToolViews.footnote(this, unit(R.string.fuel_subtitle, R.string.fuel_subtitle_ev)))
 
         setContentView(
             AutoBridgeDesign.page(
                 context = this,
-                header = AutoBridgeDesign.header(
-                    context = this,
-                    title = unit(R.string.fuel_title, R.string.fuel_title_ev),
-                    subtitle = unit(R.string.fuel_subtitle, R.string.fuel_subtitle_ev),
-                    onBack = { finish() }
-                ),
+                header = CarToolViews.headerChip(
+                    this,
+                    AutoBridgeDesign.header(
+                        context = this,
+                        title = unit(R.string.fuel_title, R.string.fuel_title_ev),
+                        subtitle = unit(R.string.fuel_mode_fuel, R.string.fuel_mode_ev),
+                        onBack = { finish() }
+                    ),
+                    unit(R.string.fuel_mode_ev_short, R.string.fuel_mode_fuel_short),
+                    accent
+                ) { setVehicle(!ev) },
                 body = body
             )
-        )
-    }
-
-    /** Fuel or EV, kept on the phone; switching only changes the unit the log is read in. */
-    private fun vehicleToggle(): View = LinearLayout(this).apply {
-        orientation = LinearLayout.HORIZONTAL
-        addView(
-            AutoBridgeDesign.pill(this@FuelLogActivity, getString(R.string.fuel_vehicle_fuel), primary = !ev, accent = accent) { setVehicle(false) },
-            LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(8) }
-        )
-        addView(
-            AutoBridgeDesign.pill(this@FuelLogActivity, getString(R.string.fuel_vehicle_ev), primary = ev, accent = accent) { setVehicle(true) },
-            LinearLayout.LayoutParams(0, -2, 1f)
         )
     }
 
@@ -157,9 +153,13 @@ class FuelLogActivity : Activity() {
     private fun summaryCard(summary: FuelSummary): View = CarToolViews.card(this) {
         val none = getString(R.string.my_car_no_reading)
         addView(CarToolViews.stats(context, listOf(
-            unit(R.string.fuel_stat_km_per_liter, R.string.fuel_stat_km_per_kwh) to (summary.averageKmPerLiter?.let(::decimal) ?: none),
-            getString(R.string.fuel_stat_baht_per_km) to (summary.bahtPerKm?.let(::decimal) ?: none),
-            getString(R.string.fuel_stat_month_baht) to money(summary.thisMonthBaht)
+            CarToolViews.Stat(
+                getString(R.string.fuel_stat_average),
+                summary.averageKmPerLiter?.let(::decimal) ?: none,
+                summary.averageKmPerLiter?.let { unit(R.string.fuel_stat_km_per_liter, R.string.fuel_stat_km_per_kwh) }
+            ),
+            CarToolViews.Stat(getString(R.string.fuel_stat_per_km), summary.bahtPerKm?.let { getString(R.string.money_baht, decimal(it)) } ?: none),
+            CarToolViews.Stat(getString(R.string.fuel_stat_this_month), getString(R.string.money_baht, money(summary.thisMonthBaht)))
         )))
         val lines = listOfNotNull(
             if (summary.averageKmPerLiter == null) unit(R.string.fuel_average_pending, R.string.fuel_average_pending_ev) else null,

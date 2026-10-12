@@ -661,7 +661,6 @@
     <string name="fuel_add">+ Fill-up</string>
     <string name="fuel_add_title">Full-tank fill-up</string>
     <string name="fuel_export">Export CSV</string>
-    <string name="fuel_history">Fill-ups</string>
     <string name="fuel_empty_title">No fill-ups yet</string>
     <string name="fuel_empty_message">Log every fill-up with a full tank. From the second one on, the average km/L appears here.</string>
     <string name="fuel_average_label">Average consumption</string>
@@ -675,7 +674,6 @@
     <string name="fuel_car_range">Range: %1$d km</string>
     <string name="fuel_last_fill">Last fill-up: %1$s</string>
     <string name="fuel_row_title">%1$s L · %2$s baht</string>
-    <string name="fuel_row_odometer">%1$s km</string>
     <string name="fuel_field_odometer">Odometer (km)</string>
     <string name="fuel_field_station">Station (optional)</string>
     <string name="fuel_odometer_from_car">Odometer filled in from the car.</string>
@@ -1603,11 +1601,8 @@
     <!-- EV mode for the fuel log -->
     <string name="fuel_title_ev">Charging log</string>
     <string name="fuel_subtitle_ev">Charge to the same level each time</string>
-    <string name="fuel_vehicle_fuel">⛽ Petrol / diesel</string>
-    <string name="fuel_vehicle_ev">⚡ EV</string>
     <string name="fuel_add_ev">+ Charge</string>
     <string name="fuel_add_title_ev">Charge</string>
-    <string name="fuel_history_ev">Charges</string>
     <string name="fuel_empty_title_ev">No charges yet</string>
     <string name="fuel_empty_message_ev">Log each charge, always to the same level (say 80 percent). From the second one on, the average km/kWh appears here.</string>
     <string name="fuel_average_pending_ev">Two charges needed</string>
@@ -1736,7 +1731,7 @@
     <string name="about_facebook_caption">News and updates</string>
     <!-- Emergency card -->
     <string name="emergency_title">Emergency card</string>
-    <string name="emergency_subtitle">Numbers to ring and facts to quote</string>
+    <string name="emergency_subtitle">Tap to call, from the car screen too</string>
     <string name="emergency_add">+ Add</string>
     <string name="emergency_add_suggested">Add emergency lines</string>
     <string name="emergency_empty_title">Nothing on the card yet</string>
@@ -1757,7 +1752,6 @@
     <!-- Break reminder -->
     <string name="break_reminder_title">Break reminder</string>
     <string name="break_reminder_off">Off</string>
-    <string name="break_reminder_explain">Tells you to take a break after this many hours with the car connected. It uses no location, only the time. Takes effect the next time the car connects.</string>
     <string name="break_reminder_message">You have been driving a while. Time for a break.</string>
     <plurals name="break_reminder_every">
         <item quantity="one">Every %1$d hour</item>
@@ -1777,7 +1771,6 @@
     <string name="parking_note_title">Note for this spot</string>
     <string name="parking_note_hint">Floor, pillar, anything to find the car</string>
     <string name="parking_navigate">Navigate</string>
-    <string name="parking_clear">Clear</string>
     <!-- Costs -->
     <string name="costs_title">Car costs</string>
     <string name="costs_subtitle">Fuel and everything else, by month</string>
@@ -2082,9 +2075,6 @@
     <string name="parking_privacy_short">Location is read only when you mark the spot, and stays on this phone.</string>
     <string name="fuel_stat_km_per_liter">km/L</string>
     <string name="fuel_stat_km_per_kwh">km/kWh</string>
-    <string name="fuel_stat_baht_per_km">Baht/km</string>
-    <string name="fuel_stat_month_baht">This month, baht</string>
-    <string name="fuel_vehicle_section">Vehicle</string>
 
     <!-- Add and edit sheets of the My Car tools -->
     <string name="form_label_date">Date</string>
@@ -2135,8 +2125,24 @@
     <string name="emergency_edit_title">Edit</string>
     <string name="emergency_form_detail">What to tell them (optional)</string>
     <string name="emergency_form_detail_hint">e.g. policy 1234-5678 · plate AB 1234</string>
-    <string name="emergency_detail_copy">%1$s  ⧉</string>
     <string name="emergency_kind_insurance">Car insurance</string>
     <string name="emergency_kind_roadside">Roadside help</string>
     <string name="emergency_kind_family">Family</string>
+    <string name="parking_clear_spot">Clear this spot</string>
+    <string name="break_reminder_subtitle">Counts the time the car is connected; no location</string>
+    <string name="break_reminder_takes_effect">Takes effect the next time the car connects.</string>
+    <string name="money_baht">฿%1$s</string>
+    <string name="fuel_mode_fuel">Petrol / diesel</string>
+    <string name="fuel_mode_ev">Electric (EV)</string>
+    <string name="fuel_mode_fuel_short">Petrol</string>
+    <string name="fuel_mode_ev_short">EV</string>
+    <string name="fuel_stat_average">Average</string>
+    <string name="fuel_stat_per_km">Per km</string>
+    <string name="fuel_stat_this_month">This month</string>
+    <string name="fuel_row_line">%1$s · %2$s L</string>
+    <string name="fuel_row_line_ev">%1$s · %2$s kWh</string>
+    <string name="fuel_row_odometer_line">Odometer %1$s</string>
+    <string name="costs_legend_fuel">Fuel ฿%1$s</string>
+    <string name="costs_legend_other">Other ฿%1$s</string>
+    <string name="costs_average_short">3-month average ฿%1$s</string>
 </resources>

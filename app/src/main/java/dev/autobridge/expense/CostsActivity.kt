@@ -54,48 +54,17 @@ class CostsActivity : Activity() {
         render()
     }
 
+    /**
+     * As the design: this month as one big figure with fuel against everything else as a split
+     * bar, then each cost as a line with its amount on the right, the past months, and Add.
+     */
     private fun render() {
         val expenses = ExpenseStore.all(this)
         val costs = CostStats.monthly(FuelLogStore.all(this), expenses)
         val now = System.currentTimeMillis()
+        val thisMonth = CostStats.thisMonth(costs, now)
         val body = AutoBridgeDesign.body(this)
 
-        body.stack(summaryCard(CostStats.thisMonth(costs, now), CostStats.average(costs, now)), gap = 12)
-        body.stack(
-            AutoBridgeDesign.pill(this, getString(R.string.costs_add), primary = true, accent = accent) { showAddDialog() },
-            gap = 20
-        )
-
-        if (costs.isNotEmpty()) {
-            body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.costs_by_month)), gap = 8)
-            costs.take(12).forEach { month ->
-                body.stack(
-                    AutoBridgeDesign.contentRow(
-                        context = this,
-                        title = monthLabel(month.month),
-                        subtitle = getString(R.string.costs_split, money(month.fuelBaht), money(month.otherBaht)),
-                        accent = accent,
-                        badgeText = "💰",
-                        trailing = money(month.totalBaht),
-                    ) {}
-                )
-            }
-        }
-        if (expenses.isNotEmpty()) {
-            body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.costs_expenses)), gap = 8)
-            expenses.take(40).forEach { expense ->
-                body.stack(
-                    AutoBridgeDesign.contentRow(
-                        context = this,
-                        title = expense.label.ifBlank { getString(R.string.costs_unnamed) },
-                        subtitle = DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(expense.timeMs)),
-                        accent = accent,
-                        badgeText = "🧾",
-                        trailing = getString(R.string.costs_baht, money(expense.baht)),
-                    ) { confirmDelete(expense) }
-                )
-            }
-        }
         if (costs.isEmpty()) {
             body.stack(
                 AutoBridgeDesign.emptyState(
@@ -103,9 +72,38 @@ class CostsActivity : Activity() {
                     title = getString(R.string.costs_empty_title),
                     message = getString(R.string.costs_empty_message),
                     accent = accent
-                )
+                ),
+                gap = 12
             )
+        } else {
+            body.stack(summaryCard(thisMonth, CostStats.average(costs, now)), gap = 12)
+            expenses.take(40).forEach { expense ->
+                body.stack(
+                    CarToolViews.row(
+                        this,
+                        title = expense.label.ifBlank { getString(R.string.costs_unnamed) },
+                        subtitle = DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(expense.timeMs)),
+                        amount = getString(R.string.money_baht, money(expense.baht)),
+                        accent = accent
+                    ) { confirmDelete(expense) }
+                )
+            }
+            val past = costs.filter { it.month != thisMonth.month }.take(12)
+            if (past.isNotEmpty()) {
+                body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.costs_by_month)), gap = 8)
+                past.forEach { month ->
+                    body.stack(
+                        CarToolViews.row(
+                            this,
+                            title = monthLabel(month.month),
+                            subtitle = getString(R.string.costs_split, money(month.fuelBaht), money(month.otherBaht)),
+                            amount = getString(R.string.money_baht, money(month.totalBaht))
+                        )
+                    )
+                }
+            }
         }
+        body.stack(AutoBridgeDesign.pill(this, getString(R.string.costs_add), primary = true, accent = accent) { showAddDialog() }, gap = 8)
 
         setContentView(
             AutoBridgeDesign.page(
@@ -113,7 +111,7 @@ class CostsActivity : Activity() {
                 header = AutoBridgeDesign.header(
                     context = this,
                     title = getString(R.string.costs_title),
-                    subtitle = getString(R.string.costs_subtitle),
+                    subtitle = monthLabel(thisMonth.month),
                     onBack = { finish() }
                 ),
                 body = body
@@ -121,24 +119,16 @@ class CostsActivity : Activity() {
         )
     }
 
-    private fun summaryCard(thisMonth: MonthCost, average: MonthCost?) = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
-        background = AutoBridgeDesign.surface(this@CostsActivity, AutoBridgeDesign.SURFACE, 16, android.graphics.Color.TRANSPARENT)
-        val pad = (16 * resources.displayMetrics.density).toInt()
-        setPadding(pad, pad, pad, pad)
-        fun line(text: String, size: Float, color: Int, top: Int = 0) = addView(TextView(this@CostsActivity).apply {
-            this.text = text
-            textSize = size
-            setTextColor(color)
-            setPadding(0, (top * resources.displayMetrics.density).toInt(), 0, 0)
-        })
-        line(getString(R.string.costs_baht, money(thisMonth.totalBaht)), 28f, AutoBridgeDesign.TEXT)
-        line(getString(R.string.costs_this_month, monthLabel(thisMonth.month)), 13f, AutoBridgeDesign.TEXT_MUTED)
+    private fun summaryCard(thisMonth: MonthCost, average: MonthCost?) = CarToolViews.card(this) {
+        addView(CarToolViews.text(context, getString(R.string.money_baht, money(thisMonth.totalBaht)), 32f, bold = true))
         if (thisMonth.totalBaht > 0) {
-            addView(CarToolViews.splitBar(this@CostsActivity, thisMonth.fuelBaht, thisMonth.otherBaht, AutoBridgeDesign.ACCENT_FILES, AutoBridgeDesign.ACCENT_SYSTEM))
+            addView(CarToolViews.splitBar(context, thisMonth.fuelBaht, thisMonth.otherBaht, AutoBridgeDesign.ACCENT_FILES, AutoBridgeDesign.ACCENT_SYSTEM))
+            addView(CarToolViews.legend(context, listOf(
+                AutoBridgeDesign.ACCENT_FILES to getString(R.string.costs_legend_fuel, money(thisMonth.fuelBaht)),
+                AutoBridgeDesign.ACCENT_SYSTEM to getString(R.string.costs_legend_other, money(thisMonth.otherBaht))
+            )))
         }
-        line(getString(R.string.costs_split, money(thisMonth.fuelBaht), money(thisMonth.otherBaht)), 14f, AutoBridgeDesign.TEXT, top = 8)
-        average?.let { line(getString(R.string.costs_average, money(it.totalBaht)), 14f, AutoBridgeDesign.TEXT, top = 6) }
+        average?.let { addView(CarToolViews.text(context, getString(R.string.costs_average_short, money(it.totalBaht)), 13f, AutoBridgeDesign.TEXT_MUTED, top = 8)) }
     }
 
     /** What it was (a chip for the usual ones, or typed), how much, and the day. */

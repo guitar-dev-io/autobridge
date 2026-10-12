@@ -558,39 +558,23 @@ class MainActivity : androidx.activity.ComponentActivity() {
         return if (hours == 0) getString(R.string.break_reminder_off) else resources.getQuantityString(R.plurals.break_reminder_every, hours, hours)
     }
 
-    /** Off, or every 1 to 4 hours of driving with the car connected. */
+    /**
+     * Off, or every 1 to 4 hours of driving with the car connected: a sheet of choices, as in the
+     * design. (The AlertDialog it replaces set a message, which made Android drop the choice list.)
+     */
     private fun showBreakReminderChoice() {
         val options = dev.autobridge.breakreminder.BreakReminderOptions.HOURS
-        val labels = (listOf(getString(R.string.break_reminder_off)) +
-            options.map { resources.getQuantityString(R.plurals.break_reminder_every, it, it) }).toTypedArray()
+        val labels = listOf(getString(R.string.break_reminder_off)) +
+            options.map { resources.getQuantityString(R.plurals.break_reminder_every, it, it) }
         val current = dev.autobridge.breakreminder.BreakReminder.hours(this)
-        // The explanation sits under the title, not in setMessage: AlertDialog drops the choice
-        // list when a message is set, which left only Cancel and no way to switch the reminder on.
-        val title = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(24), dp(20), dp(24), dp(4))
-            addView(TextView(this@MainActivity).apply {
-                // The dialog theme's own text styles, so it reads in a light or a dark dialog.
-                setTextAppearance(android.R.style.TextAppearance_Material_DialogWindowTitle)
-                text = getString(R.string.break_reminder_title)
-            })
-            addView(TextView(this@MainActivity).apply {
-                setTextAppearance(android.R.style.TextAppearance_Material_Body1)
-                text = getString(R.string.break_reminder_explain)
-                alpha = 0.7f
-                setPadding(0, dp(6), 0, 0)
-            })
+        val form = dev.autobridge.ui.CarToolForm(this, getString(R.string.break_reminder_title), getString(R.string.break_reminder_subtitle))
+        form.choices(labels, if (current == 0) 0 else options.indexOf(current) + 1) { which ->
+            dev.autobridge.breakreminder.BreakReminder.setHours(this, if (which == 0) 0 else options[which - 1])
+            // My Car re-reads its tiles on resume; a dialog does not pause the page.
+            showPhoneScreen(currentScreen, force = true)
         }
-        android.app.AlertDialog.Builder(this)
-            .setCustomTitle(title)
-            .setSingleChoiceItems(labels, if (current == 0) 0 else options.indexOf(current) + 1) { dialog, which ->
-                dev.autobridge.breakreminder.BreakReminder.setHours(this, if (which == 0) 0 else options[which - 1])
-                dialog.dismiss()
-                // My Car re-reads its tiles on resume; a dialog does not pause the page.
-                showPhoneScreen(currentScreen, force = true)
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+        form.note(getString(R.string.break_reminder_takes_effect))
+        form.showChoices()
     }
 
     /** The coffee button on Home: the same two ways to say thanks as the About page. */

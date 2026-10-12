@@ -219,6 +219,47 @@ class CarToolForm(
         addLabelled(label, box, helper)
     }
 
+    /**
+     * A list to pick one from, each a full-width row with a radio mark; picking applies at once
+     * and closes the sheet, so it is shown with [showChoices] (no Save button).
+     */
+    fun choices(labels: List<String>, selected: Int, onPick: (Int) -> Unit) {
+        labels.forEachIndexed { index, label ->
+            val on = index == selected
+            fields.addView(LinearLayout(activity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                minimumHeight = activity.dp(56)
+                setPadding(activity.dp(16), 0, activity.dp(16), 0)
+                background = AutoBridgeDesign.tappable(
+                    activity,
+                    if (on) AutoBridgeDesign.tint(accent, 0.14f) else AutoBridgeDesign.SURFACE_RAISED,
+                    14, accent,
+                    if (on) accent else Color.TRANSPARENT
+                )
+                addView(TextView(activity).apply {
+                    text = label
+                    textSize = 16f
+                    setTextColor(AutoBridgeDesign.TEXT)
+                }, LinearLayout.LayoutParams(0, -2, 1f))
+                addView(View(activity).apply {
+                    background = android.graphics.drawable.GradientDrawable().apply {
+                        shape = android.graphics.drawable.GradientDrawable.OVAL
+                        if (on) setColor(accent) else setColor(Color.TRANSPARENT)
+                        setStroke(activity.dp(2), if (on) accent else AutoBridgeDesign.TEXT_MUTED)
+                    }
+                }, LinearLayout.LayoutParams(activity.dp(20), activity.dp(20)))
+                setOnClickListener {
+                    onPick(index)
+                    dialog?.dismiss()
+                }
+            }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = activity.dp(8) })
+        }
+    }
+
+    /** Shows a sheet of [choices]: no Save, the pick is the action; Back or a tap outside cancels. */
+    fun showChoices() = build(null, null, null)
+
     /** A plain sentence in the form, for what a section means. */
     fun note(text: String) {
         fields.addView(helperText(text), LinearLayout.LayoutParams(-1, -2).apply { topMargin = activity.dp(12) })
@@ -235,7 +276,10 @@ class CarToolForm(
      * Shows the sheet. [onSave] returns null to close, or the sentence to show when something is
      * missing. [danger], when given, is a quiet red action at the bottom (delete).
      */
-    fun show(saveLabel: String, danger: Pair<String, () -> Unit>? = null, onSave: () -> String?) {
+    fun show(saveLabel: String, danger: Pair<String, () -> Unit>? = null, onSave: () -> String?) =
+        build(saveLabel, danger, onSave)
+
+    private fun build(saveLabel: String?, danger: Pair<String, () -> Unit>?, onSave: (() -> String?)?) {
         val sheet = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(activity.dp(20), activity.dp(10), activity.dp(20), activity.dp(16))
@@ -259,21 +303,23 @@ class CarToolForm(
         }, LinearLayout.LayoutParams(-1, 0, 1f))
 
         val d = Dialog(activity)
-        val save = AutoBridgeDesign.pill(activity, saveLabel, primary = true, accent = accent) {
-            val problem = onSave()
-            if (problem == null) {
-                d.dismiss()
-            } else {
-                errorLine.text = problem
-                errorLine.visibility = View.VISIBLE
-            }
-        }.apply { (this as TextView).textSize = 16f; minimumHeight = activity.dp(52) }
-        val cancel = AutoBridgeDesign.pill(activity, activity.getString(android.R.string.cancel), accent = accent) { d.dismiss() }
-            .apply { (this as TextView).textSize = 16f; minimumHeight = activity.dp(52) }
-        sheet.addView(CarToolViews.pillRow(activity, listOf(cancel, save)).apply {
-            // Save gets the wider side: it is the button the form is for.
-            (getChildAt(1).layoutParams as LinearLayout.LayoutParams).weight = 2f
-        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = activity.dp(18) })
+        if (saveLabel != null && onSave != null) {
+            val save = AutoBridgeDesign.pill(activity, saveLabel, primary = true, accent = accent) {
+                val problem = onSave()
+                if (problem == null) {
+                    d.dismiss()
+                } else {
+                    errorLine.text = problem
+                    errorLine.visibility = View.VISIBLE
+                }
+            }.apply { (this as TextView).textSize = 16f; minimumHeight = activity.dp(52) }
+            val cancel = AutoBridgeDesign.pill(activity, activity.getString(android.R.string.cancel), accent = accent) { d.dismiss() }
+                .apply { (this as TextView).textSize = 16f; minimumHeight = activity.dp(52) }
+            sheet.addView(CarToolViews.pillRow(activity, listOf(cancel, save)).apply {
+                // Save gets the wider side: it is the button the form is for.
+                (getChildAt(1).layoutParams as LinearLayout.LayoutParams).weight = 2f
+            }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = activity.dp(18) })
+        }
         if (danger != null) sheet.addView(TextView(activity).apply {
             text = danger.first
             textSize = 15f

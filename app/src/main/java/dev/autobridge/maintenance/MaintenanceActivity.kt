@@ -110,8 +110,10 @@ class MaintenanceActivity : Activity() {
             ).apply { gravity = android.view.Gravity.END; maxLines = 1 })
         })
         MyCarFacts.intervalUsed(status)?.let { addView(CarToolViews.bar(context, it, tone)) }
-        val detail = listOfNotNull(MaintenanceText.due(context, status), MaintenanceText.interval(context, status.item).ifBlank { null })
-        if (detail.isNotEmpty()) addView(CarToolViews.text(context, detail.joinToString(" · "), 12f, AutoBridgeDesign.TEXT_MUTED, top = 8))
+        // The interval only, as in the design: "in 364 days" above already says when.
+        MaintenanceText.interval(context, status.item).takeIf { it.isNotBlank() }?.let {
+            addView(CarToolViews.text(context, it, 12f, AutoBridgeDesign.TEXT_MUTED, top = 8))
+        }
         background = AutoBridgeDesign.tappable(context, AutoBridgeDesign.SURFACE, 16, accent, android.graphics.Color.TRANSPARENT)
         isClickable = true
         setOnClickListener { showItemDialog(status.item, odometer) }
