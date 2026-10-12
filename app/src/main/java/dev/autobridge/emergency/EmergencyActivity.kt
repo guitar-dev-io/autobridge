@@ -12,6 +12,7 @@ import android.graphics.Typeface
 import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -160,6 +161,16 @@ class EmergencyActivity : Activity() {
                     setTextIsSelectable(true)
                     setPadding(0, dp(2), 0, 0)
                 })
+                // What to tell whoever answers, under the name so it is in sight during the call;
+                // a tap copies it, for pasting into a claim form or a chat.
+                if (entry.detail.isNotBlank()) addView(TextView(this@EmergencyActivity).apply {
+                    text = getString(R.string.emergency_detail_copy, entry.detail)
+                    textSize = 15f
+                    setTextColor(AutoBridgeDesign.TEXT_MUTED)
+                    fontFeatureSettings = "tnum"
+                    setPadding(0, dp(4), 0, dp(2))
+                    setOnClickListener { copyText(entry.label, entry.detail) }
+                })
             }, LinearLayout.LayoutParams(0, -2, 1f))
 
             addView(TextView(this@EmergencyActivity).apply {
@@ -198,9 +209,11 @@ class EmergencyActivity : Activity() {
         if (!opened) Toast.makeText(this, getString(R.string.emergency_cannot_dial), Toast.LENGTH_SHORT).show()
     }
 
-    private fun copy(entry: EmergencyEntry) {
+    private fun copy(entry: EmergencyEntry) = copyText(entry.label, entry.value)
+
+    private fun copyText(label: String, text: String) {
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return
-        clipboard.setPrimaryClip(ClipData.newPlainText(entry.label, entry.value))
+        clipboard.setPrimaryClip(ClipData.newPlainText(label, text))
         Toast.makeText(this, getString(R.string.emergency_copied), Toast.LENGTH_SHORT).show()
     }
 
@@ -215,46 +228,56 @@ class EmergencyActivity : Activity() {
         render()
     }
 
-    private fun showAddDialog() {
-        val form = CarToolForm(this, getString(R.string.emergency_add_title), accent = accent)
-        val label = form.field(getString(R.string.emergency_form_name), CarToolForm.Kind.NAME, hint = getString(R.string.emergency_form_name_hint))
+    private fun showAddDialog() = showEntryForm(null)
+
+    /**
+     * Adds an entry, or edits [existing]. The usual kinds are chips that fill the name; the third
+     * field holds what to tell whoever answers, so an insurer is one entry with its claim line
+     * and its policy number.
+     */
+    private fun showEntryForm(existing: EmergencyEntry?) {
+        val form = CarToolForm(this, getString(if (existing == null) R.string.emergency_add_title else R.string.emergency_edit_title), accent = accent)
+        lateinit var label: EditText
+        if (existing == null) {
+            form.chips(
+                null,
+                listOf(R.string.emergency_kind_insurance, R.string.emergency_kind_roadside, R.string.emergency_kind_family).map(::getString),
+                null
+            ) { label.setText(it); label.setSelection(it.length) }
+        }
+        label = form.field(getString(R.string.emergency_form_name), CarToolForm.Kind.NAME, initial = existing?.label.orEmpty(), hint = getString(R.string.emergency_form_name_hint))
         val value = form.field(
             getString(R.string.emergency_form_value), CarToolForm.Kind.PHONE,
+            initial = existing?.value.orEmpty(),
             hint = getString(R.string.emergency_form_value_hint),
             helper = getString(R.string.emergency_form_value_helper)
         )
-        form.show(getString(R.string.fuel_save)) {
+        val detail = form.field(
+            getString(R.string.emergency_form_detail), CarToolForm.Kind.TEXT,
+            initial = existing?.detail.orEmpty(),
+            hint = getString(R.string.emergency_form_detail_hint)
+        )
+        val delete = existing?.let { entry ->
+            getString(R.string.emergency_form_delete) to {
+                EmergencyStore.delete(this, entry.id)
+                render()
+            }
+        }
+        form.show(getString(R.string.fuel_save), danger = delete) {
             if (label.text.isBlank() || value.text.isBlank()) {
                 getString(R.string.emergency_invalid)
             } else {
-                EmergencyStore.add(this, label.text.toString(), value.text.toString())
+                if (existing == null) {
+                    EmergencyStore.add(this, label.text.toString(), value.text.toString(), detail.text.toString())
+                } else {
+                    EmergencyStore.update(this, existing.id, label.text.toString(), value.text.toString(), detail.text.toString())
+                }
                 render()
                 null
             }
         }
     }
 
-    /**
-     * Tap: ring it (when it is a number) or delete it. A sheet rather than an AlertDialog with a
-     * message: AlertDialog drops its list when a message is set, which hid both choices.
-     */
-    private fun showEntryActions(entry: EmergencyEntry) {
-        val dial = entry.dialable
-        val form = CarToolForm(this, entry.label, entry.value, accent = accent)
-        val delete = getString(R.string.emergency_form_delete) to {
-            EmergencyStore.delete(this, entry.id)
-            render()
-        }
-        if (dial != null) {
-            form.show(getString(R.string.emergency_call), danger = delete) {
-                dialNumber(dial)
-                null
-            }
-        } else {
-            form.show(getString(R.string.emergency_copy), danger = delete) {
-                copy(entry)
-                null
-            }
-        }
-    }
+    /** Tap: edit it, or remove it. Calling and copying are the button on the row itself. */
+    private fun showEntryActions(entry: EmergencyEntry) = showEntryForm(entry)
 }

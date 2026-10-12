@@ -29,6 +29,8 @@ class CarEmergencyScreen(carContext: CarContext) : Screen(carContext) {
             entries.take(CarListPaging.limit(carContext)).forEach { entry ->
                 val dial = entry.dialable
                 val row = Row.Builder().setTitle(entry.label).addText(entry.value)
+                // What to tell whoever answers (a policy number) is read off the same row.
+                if (entry.detail.isNotBlank()) row.addText(entry.detail)
                 if (dial != null) {
                     row.setBrowsable(true).setOnClickListener { dial(dial) }
                 }

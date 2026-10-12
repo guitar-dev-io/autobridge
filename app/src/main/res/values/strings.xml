@@ -2125,11 +2125,18 @@
     <string name="emergency_form_name">Name</string>
     <string name="emergency_form_name_hint">e.g. Insurance claims</string>
     <string name="emergency_form_value">Phone number or text</string>
-    <string name="emergency_form_value_hint">e.g. 1557 or policy 1234-5678</string>
+    <string name="emergency_form_value_hint">e.g. the claims line 02-123-4567</string>
     <string name="emergency_form_value_helper">A phone number can be called with one tap.</string>
     <string name="emergency_form_delete">Remove from the card</string>
     <string name="parking_form_note">Note</string>
     <string name="form_change">Change</string>
     <string name="maint_needs_odometer">Needs an odometer reading</string>
     <string name="maint_odometer_unknown_short">Odometer not known yet</string>
+    <string name="emergency_edit_title">Edit</string>
+    <string name="emergency_form_detail">What to tell them (optional)</string>
+    <string name="emergency_form_detail_hint">e.g. policy 1234-5678 · plate AB 1234</string>
+    <string name="emergency_detail_copy">%1$s  ⧉</string>
+    <string name="emergency_kind_insurance">Car insurance</string>
+    <string name="emergency_kind_roadside">Roadside help</string>
+    <string name="emergency_kind_family">Family</string>
 </resources>

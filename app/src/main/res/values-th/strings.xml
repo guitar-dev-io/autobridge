@@ -2090,11 +2090,18 @@
     <string name="emergency_form_name">ชื่อ</string>
     <string name="emergency_form_name_hint">เช่น เคลมประกันรถ</string>
     <string name="emergency_form_value">เบอร์โทร หรือข้อความ</string>
-    <string name="emergency_form_value_hint">เช่น 1557 หรือ กรมธรรม์ 1234-5678</string>
+    <string name="emergency_form_value_hint">เช่น เบอร์เคลม 02-123-4567</string>
     <string name="emergency_form_value_helper">ถ้าเป็นเบอร์โทร แตะแล้วโทรได้ทันที</string>
     <string name="emergency_form_delete">ลบออกจากบัตร</string>
     <string name="parking_form_note">โน้ต</string>
     <string name="form_change">เปลี่ยน</string>
     <string name="maint_needs_odometer">ต้องมีเลขไมล์</string>
     <string name="maint_odometer_unknown_short">ยังไม่ทราบเลขไมล์</string>
+    <string name="emergency_edit_title">แก้ไข</string>
+    <string name="emergency_form_detail">ข้อมูลที่ต้องแจ้ง (ไม่บังคับ)</string>
+    <string name="emergency_form_detail_hint">เช่น กรมธรรม์ 1234-5678 · ทะเบียน กข 1234</string>
+    <string name="emergency_detail_copy">%1$s  ⧉</string>
+    <string name="emergency_kind_insurance">ประกันรถ</string>
+    <string name="emergency_kind_roadside">ช่วยเหลือบนถนน</string>
+    <string name="emergency_kind_family">คนในครอบครัว</string>
 </resources>
