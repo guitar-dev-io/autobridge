@@ -2157,4 +2157,18 @@
     <string name="costs_legend_fuel">Fuel ฿%1$s</string>
     <string name="costs_legend_other">Other ฿%1$s</string>
     <string name="costs_average_short">3-month average ฿%1$s</string>
+    <string name="parking_save_without_gps">Save without GPS</string>
+    <string name="parking_finding_card">Finding your position… up to %1$d seconds</string>
+    <string name="parking_finding_hint">Under a roof GPS may not answer. You can save the spot as a note instead.</string>
+    <string name="parking_skip_gps">Don\'t wait, save without GPS</string>
+    <string name="parking_no_gps_title">Save without GPS</string>
+    <string name="parking_no_gps_subtitle">A note of the floor and pillar finds the car too</string>
+    <string name="parking_no_fix_subtitle">No position was found here. Save the spot as a note instead.</string>
+    <string name="parking_no_permission_subtitle">Location is not allowed. Save the spot as a note instead.</string>
+    <string name="parking_no_gps_photo_hint">After saving, take a photo of the sign or pillar from this page.</string>
+    <string name="parking_no_position">No GPS position · note and photo only</string>
+    <string name="parking_add_gps">Add GPS position</string>
+    <string name="parking_new_without_gps">New spot, no GPS</string>
+    <string name="parking_position_added">Position added</string>
+    <string name="parking_car_no_fix">No position found. On the phone you can save the spot as a note.</string>
 </resources>

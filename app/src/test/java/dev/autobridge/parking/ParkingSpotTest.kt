@@ -16,7 +16,7 @@ class ParkingSpotTest {
     }
 
     @Test fun aThaiNoteKeepsItsToneMarks() {
-        val uri = ParkingSpot(13.0, 100.0, "ชั้น B2 เสา 14", 0).geoUri()
+        val uri = ParkingSpot(13.0, 100.0, "ชั้น B2 เสา 14", 0).geoUri()!!
         assertTrue(uri.endsWith("(" + java.net.URLEncoder.encode("ชั้น B2 เสา 14", "UTF-8") + ")"))
     }
 
@@ -25,7 +25,7 @@ class ParkingSpotTest {
     }
 
     @Test fun parenthesesAndQuotesInANoteCannotBreakTheLink() {
-        val uri = ParkingSpot(1.0, 2.0, "near (lift) \"A\"", 0).geoUri()
+        val uri = ParkingSpot(1.0, 2.0, "near (lift) \"A\"", 0).geoUri()!!
         assertTrue(uri.endsWith("(near+lift+A)"))
         assertEquals(1, uri.count { it == '(' })
     }
@@ -33,7 +33,7 @@ class ParkingSpotTest {
     @Test fun decimalCommasDoNotLeakFromTheLocale() {
         java.util.Locale.setDefault(java.util.Locale.GERMANY)
         try {
-            assertTrue(ParkingSpot(13.5, 100.25, "", 0).geoUri().startsWith("geo:13.500000,100.250000"))
+            assertTrue(ParkingSpot(13.5, 100.25, "", 0).geoUri()!!.startsWith("geo:13.500000,100.250000"))
         } finally {
             java.util.Locale.setDefault(java.util.Locale.US)
         }
@@ -44,5 +44,12 @@ class ParkingSpotTest {
         assertFalse(ParkingSpot.isValid(91.0, 0.0))
         assertFalse(ParkingSpot.isValid(0.0, 181.0))
         assertFalse(ParkingSpot.isValid(0.0, 0.0)) // what a provider reports when it has no fix
+    }
+
+    @Test fun aSpotWithoutAPositionHasNothingToNavigateTo() {
+        val spot = ParkingSpot(null, null, "B2 pillar 14", 0)
+        org.junit.Assert.assertFalse(spot.hasPosition)
+        org.junit.Assert.assertNull(spot.geoUri())
+        org.junit.Assert.assertNull(spot.navigationUri())
     }
 }

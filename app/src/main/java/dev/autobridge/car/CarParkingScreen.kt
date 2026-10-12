@@ -39,6 +39,7 @@ class CarParkingScreen(carContext: CarContext) : Screen(carContext) {
                 Row.Builder()
                     .setTitle(spot.note.ifBlank { carContext.getString(R.string.parking_no_note) })
                     .addText(DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(spot.savedMs)))
+                    .apply { if (!spot.hasPosition) addText(carContext.getString(R.string.parking_no_position)) }
                     // The picture itself is for the phone: not something to look at while driving.
                     .apply { if (ParkingStore.hasPhoto(carContext)) addText(carContext.getString(R.string.parking_photo_on_phone)) }
                     .build()
@@ -50,13 +51,14 @@ class CarParkingScreen(carContext: CarContext) : Screen(carContext) {
                 .setOnClickListener { if (!finding) markHere() }
                 .build()
         )
-        if (spot != null) {
+        val navigation = spot?.navigationUri()
+        if (navigation != null) {
             pane.addAction(
                 Action.Builder()
                     .setTitle(carContext.getString(R.string.parking_navigate))
                     .setOnClickListener {
                         val started = runCatching {
-                            carContext.startCarApp(Intent(CarContext.ACTION_NAVIGATE, Uri.parse(spot.navigationUri())))
+                            carContext.startCarApp(Intent(CarContext.ACTION_NAVIGATE, Uri.parse(navigation)))
                             true
                         }.getOrDefault(false)
                         if (!started) toast(R.string.car_browser_no_external)
@@ -76,8 +78,8 @@ class CarParkingScreen(carContext: CarContext) : Screen(carContext) {
 
     private fun markHere() {
         if (!ParkingLocator.hasPermission(carContext)) {
-            carContext.requestPermissions(listOf(Manifest.permission.ACCESS_FINE_LOCATION)) { granted, _ ->
-                if (Manifest.permission.ACCESS_FINE_LOCATION in granted) markHere() else toast(R.string.parking_no_fix)
+            carContext.requestPermissions(listOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)) { granted, _ ->
+                if (granted.isNotEmpty()) markHere() else toast(R.string.parking_car_no_fix)
             }
             return
         }
@@ -88,7 +90,8 @@ class CarParkingScreen(carContext: CarContext) : Screen(carContext) {
             if (location != null && ParkingStore.save(carContext, location.latitude, location.longitude)) {
                 toast(R.string.parking_saved)
             } else {
-                toast(R.string.parking_no_fix)
+                // Typing is a phone job: the car says where the no-GPS note is saved.
+                toast(R.string.parking_car_no_fix)
             }
             invalidate()
         }

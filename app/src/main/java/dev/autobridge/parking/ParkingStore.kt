@@ -6,7 +6,8 @@ import java.io.File
 
 /**
  * Where the car was last parked, on this phone only: one spot, the latest. Only what the driver
- * marks is kept; the phone's position is never tracked or stored otherwise.
+ * marks is kept; the phone's position is never tracked or stored otherwise. A spot may have no
+ * position at all ([saveWithoutPosition]): a note and a photo still find a car in a garage.
  */
 object ParkingStore {
     private const val PREFS = "autobridge_parking"
@@ -17,13 +18,12 @@ object ParkingStore {
 
     fun get(context: Context): ParkingSpot? {
         val prefs = prefs(context)
-        if (!prefs.contains(KEY_LAT) || !prefs.contains(KEY_LON)) return null
-        return ParkingSpot(
-            Double.fromBits(prefs.getLong(KEY_LAT, 0L)),
-            Double.fromBits(prefs.getLong(KEY_LON, 0L)),
-            prefs.getString(KEY_NOTE, "").orEmpty(),
-            prefs.getLong(KEY_TIME, 0L),
-        ).takeIf { ParkingSpot.isValid(it.lat, it.lon) }
+        if (!prefs.contains(KEY_TIME)) return null
+        val positioned = prefs.contains(KEY_LAT) && prefs.contains(KEY_LON)
+        val lat = if (positioned) Double.fromBits(prefs.getLong(KEY_LAT, 0L)) else null
+        val lon = if (positioned) Double.fromBits(prefs.getLong(KEY_LON, 0L)) else null
+        if (lat != null && lon != null && !ParkingSpot.isValid(lat, lon)) return null
+        return ParkingSpot(lat, lon, prefs.getString(KEY_NOTE, "").orEmpty(), prefs.getLong(KEY_TIME, 0L))
     }
 
     /** Saves the spot; false when the position is not a real place (and nothing changes). */
@@ -36,6 +36,30 @@ object ParkingStore {
             putLong(KEY_LON, lon.toRawBits())
             putString(KEY_NOTE, note.trim())
             putLong(KEY_TIME, nowMs)
+        }
+        return true
+    }
+
+    /**
+     * Saves a spot with only a note (and whatever photo is taken next): for a garage with no GPS,
+     * or a driver who would rather not use location. [keepPhoto] keeps a photo just taken for it.
+     */
+    fun saveWithoutPosition(context: Context, note: String, keepPhoto: Boolean = false, nowMs: Long = System.currentTimeMillis()) {
+        if (get(context) != null && !keepPhoto) deletePhoto(context)
+        prefs(context).edit {
+            remove(KEY_LAT)
+            remove(KEY_LON)
+            putString(KEY_NOTE, note.trim())
+            putLong(KEY_TIME, nowMs)
+        }
+    }
+
+    /** Adds a position to the spot already saved, keeping its note, photo and time. */
+    fun addPosition(context: Context, lat: Double, lon: Double): Boolean {
+        if (!ParkingSpot.isValid(lat, lon) || get(context) == null) return false
+        prefs(context).edit {
+            putLong(KEY_LAT, lat.toRawBits())
+            putLong(KEY_LON, lon.toRawBits())
         }
         return true
     }
