@@ -9,11 +9,9 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.graphics.Typeface
-import android.text.InputType
 import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
-import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -21,6 +19,7 @@ import dev.autobridge.R
 import dev.autobridge.i18n.AppLocale
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.stack
+import dev.autobridge.ui.CarToolForm
 
 /**
  * The emergency card: numbers to ring and facts to quote (the insurance hotline, the policy number,
@@ -207,51 +206,45 @@ class EmergencyActivity : Activity() {
     }
 
     private fun showAddDialog() {
-        val label = EditText(this).apply {
-            hint = getString(R.string.emergency_field_label)
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
-        }
-        val value = EditText(this).apply {
-            hint = getString(R.string.emergency_field_value)
-            inputType = InputType.TYPE_CLASS_TEXT
-        }
-        val form = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            val pad = (20 * resources.displayMetrics.density).toInt()
-            setPadding(pad, pad / 2, pad, 0)
-            addView(label)
-            addView(value)
-        }
-        AlertDialog.Builder(this)
-            .setTitle(getString(R.string.emergency_add))
-            .setView(form)
-            .setNegativeButton(android.R.string.cancel, null)
-            .setPositiveButton(getString(R.string.fuel_save)) { _, _ ->
-                if (label.text.isBlank() || value.text.isBlank()) {
-                    Toast.makeText(this, getString(R.string.emergency_invalid), Toast.LENGTH_LONG).show()
-                    return@setPositiveButton
-                }
+        val form = CarToolForm(this, getString(R.string.emergency_add_title), accent = accent)
+        val label = form.field(getString(R.string.emergency_form_name), CarToolForm.Kind.NAME, hint = getString(R.string.emergency_form_name_hint))
+        val value = form.field(
+            getString(R.string.emergency_form_value), CarToolForm.Kind.PHONE,
+            hint = getString(R.string.emergency_form_value_hint),
+            helper = getString(R.string.emergency_form_value_helper)
+        )
+        form.show(getString(R.string.fuel_save)) {
+            if (label.text.isBlank() || value.text.isBlank()) {
+                getString(R.string.emergency_invalid)
+            } else {
                 EmergencyStore.add(this, label.text.toString(), value.text.toString())
                 render()
+                null
             }
-            .show()
+        }
     }
 
-    /** Tap: ring it (when it is a number) or delete it. */
+    /**
+     * Tap: ring it (when it is a number) or delete it. A sheet rather than an AlertDialog with a
+     * message: AlertDialog drops its list when a message is set, which hid both choices.
+     */
     private fun showEntryActions(entry: EmergencyEntry) {
         val dial = entry.dialable
-        val items = listOfNotNull(dial?.let { getString(R.string.emergency_call) }, getString(R.string.fuel_delete))
-        AlertDialog.Builder(this)
-            .setTitle(entry.label)
-            .setMessage(entry.value)
-            .setItems(items.toTypedArray()) { _, which ->
-                if (dial != null && which == 0) {
-                    dialNumber(dial)
-                } else {
-                    EmergencyStore.delete(this, entry.id)
-                    render()
-                }
+        val form = CarToolForm(this, entry.label, entry.value, accent = accent)
+        val delete = getString(R.string.emergency_form_delete) to {
+            EmergencyStore.delete(this, entry.id)
+            render()
+        }
+        if (dial != null) {
+            form.show(getString(R.string.emergency_call), danger = delete) {
+                dialNumber(dial)
+                null
             }
-            .show()
+        } else {
+            form.show(getString(R.string.emergency_copy), danger = delete) {
+                copy(entry)
+                null
+            }
+        }
     }
 }

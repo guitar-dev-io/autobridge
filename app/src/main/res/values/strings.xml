@@ -676,12 +676,10 @@
     <string name="fuel_last_fill">Last fill-up: %1$s</string>
     <string name="fuel_row_title">%1$s L · %2$s baht</string>
     <string name="fuel_row_odometer">%1$s km</string>
-    <string name="fuel_field_liters">Litres</string>
-    <string name="fuel_field_baht">Total (baht)</string>
     <string name="fuel_field_odometer">Odometer (km)</string>
     <string name="fuel_field_station">Station (optional)</string>
     <string name="fuel_odometer_from_car">Odometer filled in from the car.</string>
-    <string name="fuel_odometer_type_it">Type the odometer for km/L; the car has not reported it.</string>
+    <string name="fuel_odometer_type_it">Type the odometer to work out consumption (the car has not sent it).</string>
     <string name="fuel_save">Save</string>
     <string name="fuel_invalid">Enter the litres and the total.</string>
     <string name="fuel_delete_title">Delete this fill-up?</string>
@@ -1617,7 +1615,6 @@
     <string name="fuel_last_interval_ev">Last charge: %1$s km/kWh</string>
     <string name="fuel_totals_ev">%1$d charges · %2$s kWh · %3$s baht in total</string>
     <string name="fuel_row_title_ev">%1$s kWh · %2$s baht</string>
-    <string name="fuel_field_kwh">Energy (kWh)</string>
     <string name="fuel_invalid_ev">Enter the kWh and the total.</string>
     <string name="fuel_delete_title_ev">Delete this charge?</string>
     <string name="fuel_car_battery">Battery: %1$d%%</string>
@@ -1634,11 +1631,7 @@
     <string name="maint_odometer_now">Odometer: %1$s km</string>
     <string name="maint_odometer_unknown">Odometer unknown: log a fill-up with it, or allow the car\'s data</string>
     <string name="maint_field_name">Name</string>
-    <string name="maint_field_km">Every (km), 0 for none</string>
-    <string name="maint_field_months">Every (months), 0 for none</string>
-    <string name="maint_field_last_km">Last done at (km)</string>
     <string name="maint_invalid">Enter a name and a distance or a number of months.</string>
-    <string name="maint_done_message">Mark as done at this odometer, or delete the item.</string>
     <string name="maint_mark_done">Done today</string>
     <string name="maint_in_km">In %1$s km</string>
     <string name="maint_over_km">Overdue by %1$s km</string>
@@ -1689,8 +1682,6 @@
     <string name="backup_invalid">That is not an AutoBridge backup.</string>
 
     <!-- Fuel grade -->
-    <string name="fuel_type_button">Fuel: %1$s</string>
-    <string name="fuel_type_choose">choose</string>
     <string name="fuel_type_title">Fuel grade</string>
     <string name="fuel_type_other">Other</string>
     <string name="fuel_type_other_hint">Fuel grade</string>
@@ -1708,7 +1699,6 @@
     <string name="maps_app_missing">Google Maps is not installed or could not start navigation.</string>
     <string name="maint_due">Due %1$s</string>
     <string name="maint_due_estimate">Due around %1$s at your usual driving</string>
-    <string name="maint_due_date_button">Due date: %1$s</string>
     <string name="maint_due_date_none">not set</string>
     <plurals name="maint_reminder_title">
         <item quantity="one">%1$d maintenance item needs attention</item>
@@ -1718,7 +1708,6 @@
     <string name="home_donate">☕ Buy me a coffee</string>
     <string name="maint_compulsory_insurance">Compulsory insurance (Por.Ror.Bor.)</string>
     <string name="car_more_group_utilities">Utilities</string>
-    <string name="fuel_date_button">Date: %1$s</string>
     <string name="fuel_edit">Edit</string>
     <string name="fuel_edit_title">Edit fill-up</string>
     <string name="fuel_edit_title_ev">Edit charge</string>
@@ -1753,8 +1742,6 @@
     <string name="emergency_empty_title">Nothing on the card yet</string>
     <string name="emergency_empty_message">Add your insurance hotline and policy number, roadside assistance and someone to call. Tap the emergency-lines button for the public numbers.</string>
     <string name="emergency_car_empty">Fill the card on the phone (Settings &gt; Emergency card).</string>
-    <string name="emergency_field_label">Label (e.g. Insurance hotline)</string>
-    <string name="emergency_field_value">Number or text</string>
     <string name="emergency_invalid">Enter a label and a number or text.</string>
     <string name="emergency_call">Call</string>
     <string name="emergency_cannot_dial">Could not open the dialer.</string>
@@ -1806,10 +1793,8 @@
     <string name="costs_empty_message">Fuel and charging come from your fuel log. Add a service, a wash, tolls, parking or a tax here, or give a cost when you mark a maintenance item done.</string>
     <string name="costs_car_empty">Add fill-ups and expenses on the phone.</string>
     <string name="costs_field_label">What for (service, tolls, parking…)</string>
-    <string name="costs_field_baht">Amount (baht)</string>
     <string name="costs_invalid">Enter an amount above zero.</string>
     <string name="costs_delete_title">Delete this expense?</string>
-    <string name="maint_field_cost">Cost (baht), optional</string>
     <!-- Voice fuel entry -->
     <string name="voice_fuel_saved">Saved: %1$s</string>
     <string name="voice_fuel_not_understood">I did not catch both the amount and the price.</string>
@@ -2100,4 +2085,51 @@
     <string name="fuel_stat_baht_per_km">Baht/km</string>
     <string name="fuel_stat_month_baht">This month, baht</string>
     <string name="fuel_vehicle_section">Vehicle</string>
+
+    <!-- Add and edit sheets of the My Car tools -->
+    <string name="form_label_date">Date</string>
+    <string name="unit_km">km</string>
+    <string name="unit_baht">baht</string>
+    <string name="unit_months">months</string>
+    <string name="unit_liters">L</string>
+    <string name="unit_kwh">kWh</string>
+    <string name="fuel_form_amount">Amount</string>
+    <string name="fuel_form_paid">Paid</string>
+    <string name="fuel_form_odometer">Odometer</string>
+    <string name="fuel_form_price_per_liter">That is %1$s baht a litre</string>
+    <string name="fuel_form_price_per_kwh">That is %1$s baht per kWh</string>
+    <string name="costs_add_title">Add a cost</string>
+    <string name="costs_form_what">What for</string>
+    <string name="costs_form_label">Description</string>
+    <string name="costs_form_amount">Amount</string>
+    <string name="costs_quick_toll">Toll</string>
+    <string name="costs_quick_parking">Parking</string>
+    <string name="costs_quick_wash">Car wash</string>
+    <string name="costs_quick_repair">Repair</string>
+    <string name="costs_quick_insurance">Insurance</string>
+    <string name="costs_quick_tax">Tax</string>
+    <string name="maint_add_title">Add an item</string>
+    <string name="maint_form_presets">Common items</string>
+    <string name="maint_form_name">Item</string>
+    <string name="maint_form_every_km">Every (distance)</string>
+    <string name="maint_form_every_months">Or every (time)</string>
+    <string name="maint_form_interval_helper">Fill in one or both; whichever comes first counts.</string>
+    <string name="maint_form_last_km">Last done at</string>
+    <string name="maint_form_due">Due date (optional)</string>
+    <string name="maint_form_due_helper">For a tax or insurance that runs out on a set day.</string>
+    <string name="maint_form_done_odometer">Odometer when done</string>
+    <string name="maint_form_done_cost">Cost (optional)</string>
+    <string name="maint_form_done_cost_helper">Added to the car costs.</string>
+    <string name="maint_form_delete">Delete this item</string>
+    <string name="emergency_add_title">Add to the card</string>
+    <string name="emergency_form_name">Name</string>
+    <string name="emergency_form_name_hint">e.g. Insurance claims</string>
+    <string name="emergency_form_value">Phone number or text</string>
+    <string name="emergency_form_value_hint">e.g. 1557 or policy 1234-5678</string>
+    <string name="emergency_form_value_helper">A phone number can be called with one tap.</string>
+    <string name="emergency_form_delete">Remove from the card</string>
+    <string name="parking_form_note">Note</string>
+    <string name="form_change">Change</string>
+    <string name="maint_needs_odometer">Needs an odometer reading</string>
+    <string name="maint_odometer_unknown_short">Odometer not known yet</string>
 </resources>

@@ -7,15 +7,13 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.text.InputType
-import android.widget.EditText
-import android.widget.LinearLayout
 import android.widget.Toast
 import dev.autobridge.R
 import dev.autobridge.core.state.RecentActivityStore
 import dev.autobridge.i18n.AppLocale
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.stack
+import dev.autobridge.ui.CarToolForm
 import dev.autobridge.ui.CarToolViews
 import java.text.DateFormat
 import java.util.Date
@@ -199,25 +197,13 @@ class ParkingActivity : Activity() {
 
     private fun editNote(spot: ParkingSpot?) {
         if (spot == null) return
-        val note = EditText(this).apply {
-            hint = getString(R.string.parking_note_hint)
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
-            setText(spot.note)
+        val form = CarToolForm(this, getString(R.string.parking_note_title), accent = accent)
+        val note = form.field(getString(R.string.parking_form_note), CarToolForm.Kind.TEXT, initial = spot.note, hint = getString(R.string.parking_note_hint))
+        form.show(getString(R.string.fuel_save)) {
+            ParkingStore.setNote(this, note.text.toString())
+            render()
+            null
         }
-        val frame = LinearLayout(this).apply {
-            val pad = (20 * resources.displayMetrics.density).toInt()
-            setPadding(pad, pad / 2, pad, 0)
-            addView(note, LinearLayout.LayoutParams(-1, -2))
-        }
-        AlertDialog.Builder(this)
-            .setTitle(getString(R.string.parking_note_title))
-            .setView(frame)
-            .setNegativeButton(android.R.string.cancel, null)
-            .setPositiveButton(getString(R.string.fuel_save)) { _, _ ->
-                ParkingStore.setNote(this, note.text.toString())
-                render()
-            }
-            .show()
     }
 
     private fun navigate(spot: ParkingSpot) {

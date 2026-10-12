@@ -2,21 +2,18 @@ package dev.autobridge.expense
 
 import android.app.Activity
 import android.app.AlertDialog
-import android.app.DatePickerDialog
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.text.InputType
-import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.Toast
 import dev.autobridge.R
 import dev.autobridge.fuel.FuelLogStore
 import dev.autobridge.i18n.AppLocale
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.stack
+import dev.autobridge.ui.CarToolForm
 import dev.autobridge.ui.CarToolViews
 import java.text.DateFormat
 import java.text.NumberFormat
@@ -144,53 +141,29 @@ class CostsActivity : Activity() {
         average?.let { line(getString(R.string.costs_average, money(it.totalBaht)), 14f, AutoBridgeDesign.TEXT, top = 6) }
     }
 
+    /** What it was (a chip for the usual ones, or typed), how much, and the day. */
     private fun showAddDialog() {
-        val label = EditText(this).apply {
-            hint = getString(R.string.costs_field_label)
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
-        }
-        val baht = EditText(this).apply {
-            hint = getString(R.string.costs_field_baht)
-            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
-        }
+        val form = CarToolForm(this, getString(R.string.costs_add_title), accent = accent)
+        lateinit var label: EditText
+        form.chips(
+            getString(R.string.costs_form_what),
+            listOf(R.string.costs_quick_toll, R.string.costs_quick_parking, R.string.costs_quick_wash,
+                R.string.costs_quick_repair, R.string.costs_quick_insurance, R.string.costs_quick_tax).map(::getString),
+            null
+        ) { label.setText(it); label.setSelection(it.length) }
+        label = form.field(getString(R.string.costs_form_label), CarToolForm.Kind.TEXT, hint = getString(R.string.costs_field_label))
+        val baht = form.field(getString(R.string.costs_form_amount), CarToolForm.Kind.DECIMAL, unit = getString(R.string.unit_baht))
         var timeMs = System.currentTimeMillis()
-        val dateButton = Button(this).apply {
-            isAllCaps = false
-            fun refresh() { text = getString(R.string.fuel_date_button, DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(timeMs))) }
-            refresh()
-            setOnClickListener {
-                val shown = Calendar.getInstance().apply { timeInMillis = timeMs }
-                DatePickerDialog(
-                    this@CostsActivity,
-                    { _, year, month, day ->
-                        timeMs = Calendar.getInstance().apply { timeInMillis = timeMs; set(year, month, day) }.timeInMillis
-                        refresh()
-                    },
-                    shown.get(Calendar.YEAR), shown.get(Calendar.MONTH), shown.get(Calendar.DAY_OF_MONTH)
-                ).apply { datePicker.maxDate = System.currentTimeMillis() }.show()
-            }
-        }
-        val form = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            val pad = (20 * resources.displayMetrics.density).toInt()
-            setPadding(pad, pad / 2, pad, 0)
-            addView(label)
-            addView(baht)
-            addView(dateButton)
-        }
-        AlertDialog.Builder(this)
-            .setTitle(getString(R.string.costs_add))
-            .setView(form)
-            .setNegativeButton(android.R.string.cancel, null)
-            .setPositiveButton(getString(R.string.fuel_save)) { _, _ ->
-                val amount = baht.text.toString().trim().replace(",", "").toDoubleOrNull()
-                if (amount == null || !ExpenseStore.add(this, label.text.toString(), amount, timeMs)) {
-                    Toast.makeText(this, getString(R.string.costs_invalid), Toast.LENGTH_LONG).show()
-                    return@setPositiveButton
-                }
+        form.date(getString(R.string.form_label_date), timeMs, allowFuture = false) { timeMs = it }
+        form.show(getString(R.string.fuel_save)) {
+            val amount = baht.text.toString().trim().replace(",", "").toDoubleOrNull()
+            if (amount == null || !ExpenseStore.add(this, label.text.toString(), amount, timeMs)) {
+                getString(R.string.costs_invalid)
+            } else {
                 render()
+                null
             }
-            .show()
+        }
     }
 
     private fun confirmDelete(expense: Expense) {

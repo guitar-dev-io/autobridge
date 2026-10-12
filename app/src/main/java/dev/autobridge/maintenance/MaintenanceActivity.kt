@@ -2,14 +2,10 @@ package dev.autobridge.maintenance
 
 import android.Manifest
 import android.app.Activity
-import android.app.AlertDialog
-import android.app.DatePickerDialog
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
-import android.text.InputType
-import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.Toast
@@ -18,12 +14,10 @@ import dev.autobridge.fuel.FuelLogStore
 import dev.autobridge.i18n.AppLocale
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.stack
+import dev.autobridge.ui.CarToolForm
 import dev.autobridge.ui.CarToolViews
 import dev.autobridge.mycar.MyCarFacts
-import java.text.DateFormat
 import java.text.NumberFormat
-import java.util.Calendar
-import java.util.Date
 import kotlin.math.roundToLong
 
 /**
@@ -78,13 +72,15 @@ class MaintenanceActivity : Activity() {
             gap = 8
         )
 
+        if (odometer == null) body.stack(CarToolViews.footnote(this, getString(R.string.maint_odometer_unknown)), gap = 2)
+
         setContentView(
             AutoBridgeDesign.page(
                 context = this,
                 header = AutoBridgeDesign.header(
                     context = this,
                     title = getString(R.string.maint_title),
-                    subtitle = odometer?.let { getString(R.string.maint_odometer_now, whole(it)) } ?: getString(R.string.maint_odometer_unknown),
+                    subtitle = odometer?.let { getString(R.string.maint_odometer_now, whole(it)) } ?: getString(R.string.maint_odometer_unknown_short),
                     onBack = { finish() }
                 ),
                 body = body
@@ -102,14 +98,16 @@ class MaintenanceActivity : Activity() {
         val measured = status.kmLeft != null || status.daysLeft != null
         addView(LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
-            addView(CarToolViews.text(context, status.item.name, 15f, bold = true), LinearLayout.LayoutParams(0, -2, 1f))
+            addView(CarToolViews.text(context, status.item.name, 15f, bold = true).apply { setPadding(0, 0, dp(8), 0) }, LinearLayout.LayoutParams(0, -2, 1f))
+            // Unmeasured, the long "odometer unknown" sentence would squeeze the name out; the
+            // header and the footnote already say why, so the row only says what it waits for.
             addView(CarToolViews.text(
                 context,
-                MaintenanceText.standing(context, status),
+                if (measured) MaintenanceText.standing(context, status) else getString(R.string.maint_needs_odometer),
                 13f,
                 if (measured) tone else AutoBridgeDesign.TEXT_MUTED,
                 bold = measured
-            ).apply { gravity = android.view.Gravity.END })
+            ).apply { gravity = android.view.Gravity.END; maxLines = 1 })
         })
         MyCarFacts.intervalUsed(status)?.let { addView(CarToolViews.bar(context, it, tone)) }
         val detail = listOfNotNull(MaintenanceText.due(context, status), MaintenanceText.interval(context, status.item).ifBlank { null })
@@ -141,99 +139,86 @@ class MaintenanceActivity : Activity() {
         }
     }
 
+    /**
+     * A new item: tap a usual one to fill in its name and intervals, or type your own. The two
+     * intervals sit side by side with their units, and a date is only for things that end on one.
+     */
     private fun showAddDialog() {
         val odometer = MaintenanceStore.currentOdometer(this)
-        fun field(hint: Int, numeric: Boolean, initial: String = "") = EditText(this).apply {
-            this.hint = getString(hint)
-            inputType = if (numeric) InputType.TYPE_CLASS_NUMBER else InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
-            setText(initial)
+        val form = CarToolForm(this, getString(R.string.maint_add_title), accent = accent)
+        lateinit var name: EditText
+        lateinit var km: EditText
+        lateinit var months: EditText
+        val presets = MaintenanceStats.presets(FuelLogStore.isEv(this))
+        val have = MaintenanceStore.all(this).map { it.name }.toSet()
+        val offered = presets.filter { getString(MaintenanceText.presetName(it.key)) !in have }
+        if (offered.isNotEmpty()) {
+            form.chips(getString(R.string.maint_form_presets), offered.map { getString(MaintenanceText.presetName(it.key)) }, null) { picked ->
+                val preset = offered.first { getString(MaintenanceText.presetName(it.key)) == picked }
+                name.setText(picked)
+                km.setText(preset.intervalKm.takeIf { it > 0 }?.toString().orEmpty())
+                months.setText(preset.intervalMonths.takeIf { it > 0 }?.toString().orEmpty())
+            }
         }
-        val name = field(R.string.maint_field_name, numeric = false)
-        val km = field(R.string.maint_field_km, numeric = true)
-        val months = field(R.string.maint_field_months, numeric = true)
-        val last = field(R.string.maint_field_last_km, numeric = true, initial = odometer?.let { it.roundToLong().toString() }.orEmpty())
+        name = form.field(getString(R.string.maint_form_name), CarToolForm.Kind.NAME)
+        km = form.field(getString(R.string.maint_form_every_km), CarToolForm.Kind.NUMBER, unit = getString(R.string.unit_km))
+        months = form.field(
+            getString(R.string.maint_form_every_months), CarToolForm.Kind.NUMBER,
+            unit = getString(R.string.unit_months),
+            helper = getString(R.string.maint_form_interval_helper)
+        )
+        val last = form.field(
+            getString(R.string.maint_form_last_km), CarToolForm.Kind.NUMBER,
+            initial = odometer?.let { it.roundToLong().toString() }.orEmpty(),
+            unit = getString(R.string.unit_km)
+        )
         // A date given outright (road tax runs out on the 12th) instead of counting from the last service.
         var dueDateMs = 0L
-        val dateButton = Button(this).apply {
-            isAllCaps = false
-            fun refresh() {
-                text = getString(
-                    R.string.maint_due_date_button,
-                    if (dueDateMs > 0) DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(dueDateMs)) else getString(R.string.maint_due_date_none)
-                )
-            }
-            refresh()
-            setOnClickListener {
-                val now = Calendar.getInstance().apply { if (dueDateMs > 0) timeInMillis = dueDateMs }
-                DatePickerDialog(
-                    this@MaintenanceActivity,
-                    { _, year, month, day ->
-                        dueDateMs = Calendar.getInstance().apply { set(year, month, day, 9, 0, 0); set(Calendar.MILLISECOND, 0) }.timeInMillis
-                        refresh()
-                    },
-                    now.get(Calendar.YEAR), now.get(Calendar.MONTH), now.get(Calendar.DAY_OF_MONTH)
-                ).show()
-            }
-        }
-        val form = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(8), dp(20), 0)
-            listOf(name, km, months, last, dateButton).forEach { addView(it) }
-        }
-        AlertDialog.Builder(this)
-            .setTitle(getString(R.string.maint_add))
-            .setView(form)
-            .setNegativeButton(android.R.string.cancel, null)
-            .setPositiveButton(getString(R.string.fuel_save)) { _, _ ->
-                val everyKm = km.text.toString().trim().toIntOrNull() ?: 0
-                // A date with no interval repeats yearly, which is what a tax or an insurance does.
-                val everyMonths = months.text.toString().trim().toIntOrNull() ?: if (dueDateMs > 0 && everyKm <= 0) 12 else 0
-                if (name.text.isBlank() || (everyKm <= 0 && everyMonths <= 0)) {
-                    Toast.makeText(this, getString(R.string.maint_invalid), Toast.LENGTH_LONG).show()
-                    return@setPositiveButton
-                }
+        form.date(
+            getString(R.string.maint_form_due), 0L, allowFuture = true,
+            emptyText = getString(R.string.maint_due_date_none),
+            helper = getString(R.string.maint_form_due_helper)
+        ) { dueDateMs = it }
+        form.show(getString(R.string.fuel_save)) {
+            val everyKm = km.text.toString().trim().toIntOrNull() ?: 0
+            // A date with no interval repeats yearly, which is what a tax or an insurance does.
+            val everyMonths = months.text.toString().trim().toIntOrNull() ?: if (dueDateMs > 0 && everyKm <= 0) 12 else 0
+            if (name.text.isBlank() || (everyKm <= 0 && everyMonths <= 0)) {
+                getString(R.string.maint_invalid)
+            } else {
                 MaintenanceStore.add(this, name.text.toString(), everyKm, everyMonths, last.text.toString().trim().toDoubleOrNull(), dueDateMs)
                 askForNotifications()
                 render()
+                null
             }
-            .show()
+        }
     }
 
-    /** Mark it done at today's odometer, or remove it. */
+    /** Mark it done at today's odometer (and, if wanted, what it cost), or remove it. */
     private fun showItemDialog(item: MaintenanceItem, odometer: Double?) {
-        val reading = EditText(this).apply {
-            hint = getString(R.string.fuel_field_odometer)
-            inputType = InputType.TYPE_CLASS_NUMBER
-            setText(odometer?.let { it.roundToLong().toString() }.orEmpty())
-        }
+        val form = CarToolForm(this, item.name, MaintenanceText.interval(this, item).ifBlank { null }, accent = accent)
+        val reading = form.field(
+            getString(R.string.maint_form_done_odometer), CarToolForm.Kind.NUMBER,
+            initial = odometer?.let { it.roundToLong().toString() }.orEmpty(),
+            unit = getString(R.string.unit_km)
+        )
         // What it cost, if the driver wants it in the monthly costs.
-        val cost = EditText(this).apply {
-            hint = getString(R.string.maint_field_cost)
-            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
-        }
-        val form = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(8), dp(20), 0)
-            addView(reading)
-            addView(cost)
-        }
-        AlertDialog.Builder(this)
-            .setTitle(item.name)
-            .setMessage(getString(R.string.maint_done_message))
-            .setView(form)
-            .setNegativeButton(getString(R.string.fuel_delete)) { _, _ ->
-                MaintenanceStore.delete(this, item.id)
-                render()
+        val cost = form.field(
+            getString(R.string.maint_form_done_cost), CarToolForm.Kind.DECIMAL,
+            unit = getString(R.string.unit_baht),
+            helper = getString(R.string.maint_form_done_cost_helper)
+        )
+        form.show(getString(R.string.maint_mark_done), danger = getString(R.string.maint_form_delete) to {
+            MaintenanceStore.delete(this, item.id)
+            render()
+        }) {
+            MaintenanceStore.markDone(this, item.id, reading.text.toString().trim().toDoubleOrNull())
+            cost.text.toString().trim().replace(",", "").toDoubleOrNull()?.let {
+                dev.autobridge.expense.ExpenseStore.add(this, item.name, it)
             }
-            .setPositiveButton(getString(R.string.maint_mark_done)) { _, _ ->
-                MaintenanceStore.markDone(this, item.id, reading.text.toString().trim().toDoubleOrNull())
-                cost.text.toString().trim().replace(",", "").toDoubleOrNull()?.let {
-                    dev.autobridge.expense.ExpenseStore.add(this, item.name, it)
-                }
-                render()
-            }
-            .setNeutralButton(android.R.string.cancel, null)
-            .show()
+            render()
+            null
+        }
     }
 
     private fun whole(value: Double): String = NumberFormat.getIntegerInstance().format(value.roundToLong())
