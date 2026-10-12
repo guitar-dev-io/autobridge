@@ -564,13 +564,30 @@ class MainActivity : androidx.activity.ComponentActivity() {
         val labels = (listOf(getString(R.string.break_reminder_off)) +
             options.map { resources.getQuantityString(R.plurals.break_reminder_every, it, it) }).toTypedArray()
         val current = dev.autobridge.breakreminder.BreakReminder.hours(this)
+        // The explanation sits under the title, not in setMessage: AlertDialog drops the choice
+        // list when a message is set, which left only Cancel and no way to switch the reminder on.
+        val title = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(24), dp(20), dp(24), dp(4))
+            addView(TextView(this@MainActivity).apply {
+                // The dialog theme's own text styles, so it reads in a light or a dark dialog.
+                setTextAppearance(android.R.style.TextAppearance_Material_DialogWindowTitle)
+                text = getString(R.string.break_reminder_title)
+            })
+            addView(TextView(this@MainActivity).apply {
+                setTextAppearance(android.R.style.TextAppearance_Material_Body1)
+                text = getString(R.string.break_reminder_explain)
+                alpha = 0.7f
+                setPadding(0, dp(6), 0, 0)
+            })
+        }
         android.app.AlertDialog.Builder(this)
-            .setTitle(getString(R.string.break_reminder_title))
-            .setMessage(getString(R.string.break_reminder_explain))
+            .setCustomTitle(title)
             .setSingleChoiceItems(labels, if (current == 0) 0 else options.indexOf(current) + 1) { dialog, which ->
                 dev.autobridge.breakreminder.BreakReminder.setHours(this, if (which == 0) 0 else options[which - 1])
                 dialog.dismiss()
-                showPhoneScreen(PhoneScreen.SETTINGS, force = true)
+                // My Car re-reads its tiles on resume; a dialog does not pause the page.
+                showPhoneScreen(currentScreen, force = true)
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
@@ -987,51 +1004,6 @@ class MainActivity : androidx.activity.ComponentActivity() {
                     ) {
                         showPhoneScreen(PhoneScreen.INPUT_TOUCH)
                     })
-                }),
-                // The driver's own paperwork on the car: what it burns, what it is due for, and a copy of both.
-                SettingsGroup(getString(R.string.settings_group_utilities), buildList {
-                    add(settingsEntry(
-                        getString(R.string.fuel_title),
-                        getString(R.string.fuel_settings_caption),
-                        R.drawable.ic_tile_car,
-                        accent = design.ACCENT_RADIO
-                    ) { startActivity(dev.autobridge.fuel.FuelLogActivity.intent(this@MainActivity)) })
-                    add(settingsEntry(
-                        getString(R.string.maint_title),
-                        getString(R.string.maint_settings_caption),
-                        R.drawable.ic_tile_settings,
-                        accent = design.ACCENT_RADIO
-                    ) { startActivity(dev.autobridge.maintenance.MaintenanceActivity.intent(this@MainActivity)) })
-                    add(settingsEntry(
-                        getString(R.string.break_reminder_title),
-                        breakReminderCaption(),
-                        R.drawable.ic_tile_remote,
-                        accent = design.ACCENT_FAVORITE
-                    ) { showBreakReminderChoice() })
-                    add(settingsEntry(
-                        getString(R.string.costs_title),
-                        getString(R.string.costs_settings_caption),
-                        R.drawable.ic_tile_playlist,
-                        accent = design.ACCENT_FILES
-                    ) { startActivity(dev.autobridge.expense.CostsActivity.intent(this@MainActivity)) })
-                    add(settingsEntry(
-                        getString(R.string.parking_title),
-                        getString(R.string.parking_settings_caption),
-                        R.drawable.ic_tile_car,
-                        accent = design.ACCENT_TV
-                    ) { startActivity(dev.autobridge.parking.ParkingActivity.intent(this@MainActivity)) })
-                    add(settingsEntry(
-                        getString(R.string.emergency_title),
-                        getString(R.string.emergency_settings_caption),
-                        R.drawable.ic_tile_touch,
-                        accent = design.ACCENT_VIDEO
-                    ) { startActivity(dev.autobridge.emergency.EmergencyActivity.intent(this@MainActivity)) })
-                    add(settingsEntry(
-                        getString(R.string.backup_title),
-                        getString(R.string.backup_settings_caption),
-                        R.drawable.ic_tile_folder,
-                        accent = design.ACCENT_SYSTEM
-                    ) { startActivity(dev.autobridge.backup.BackupActivity.intent(this@MainActivity)) })
                 }),
                 SettingsGroup(getString(R.string.settings_group_playback_web), listOf(
                     settingsEntry(
@@ -2163,18 +2135,149 @@ class MainActivity : androidx.activity.ComponentActivity() {
     private fun buildCarConnectionScreen(): View = composeScreen {
         dev.autobridge.ui.CarConnectionScreen(
             onBack = { goBack() },
-            links = listOf(
-                dev.autobridge.ui.SettingsLink(R.drawable.ic_tile_car, "Connection", "Permissions and Android Auto readiness") {
+            load = { myCarState() },
+            onOpenProfiles = { startActivity(Intent(this, dev.autobridge.profile.CarProfilesActivity::class.java)) },
+            onOpenSetup = { startActivity(dev.autobridge.mirror.MirrorSetupActivity.intent(this)) },
+            onAutoStartChange = { enable ->
+                // Android 12+ only delivers the Bluetooth connect broadcast to an app holding the
+                // permission, and Car setup is where it is asked for; a switch that cannot fire stays off.
+                if (enable && !dev.autobridge.media.MediaAutoStart.hasBluetoothPermission(this)) {
                     startActivity(dev.autobridge.mirror.MirrorSetupActivity.intent(this))
-                },
-                dev.autobridge.ui.SettingsLink(R.drawable.ic_tile_remote, "Startup", "Start the media service when the car pairs over Bluetooth") {
-                    startActivity(dev.autobridge.mirror.MirrorSetupActivity.intent(this))
-                },
-                dev.autobridge.ui.SettingsLink(R.drawable.ic_tile_debug, "Diagnostics", "Connection log, crash reports and mirror events") {
-                    showPhoneScreen(PhoneScreen.DEVELOPER)
+                } else {
+                    dev.autobridge.media.MediaAutoStart.setEnabled(this, enable)
                 }
+            },
+            links = listOf(
+                dev.autobridge.ui.SettingsLink(
+                    R.drawable.ic_tile_debug,
+                    getString(R.string.my_car_diagnostics),
+                    getString(R.string.my_car_diagnostics_caption)
+                ) { showPhoneScreen(PhoneScreen.DEVELOPER) },
+                dev.autobridge.ui.SettingsLink(
+                    R.drawable.ic_tile_folder,
+                    getString(R.string.backup_title),
+                    getString(R.string.backup_settings_caption)
+                ) { startActivity(dev.autobridge.backup.BackupActivity.intent(this)) }
             )
         )
+    }
+
+    /** What My Car shows, read from each tool's own store; see [dev.autobridge.mycar.MyCarFacts]. */
+    private fun myCarState(): dev.autobridge.ui.MyCarState {
+        val facts = dev.autobridge.mycar.MyCarFacts
+        val design = dev.autobridge.ui.AutoBridgeDesign
+        val now = System.currentTimeMillis()
+        fun color(argb: Int) = androidx.compose.ui.graphics.Color(argb)
+
+        val spot = dev.autobridge.parking.ParkingStore.get(this)
+        val parking = dev.autobridge.ui.MyCarTile(
+            R.drawable.ic_car_parking, color(design.ACCENT_TV), getString(R.string.parking_title),
+            value = spot?.let { dev.autobridge.core.state.RecentActivityStore.relativeAge(this, it.savedMs, now) }
+                ?: getString(R.string.my_car_parking_empty),
+            caption = spot?.note?.takeIf { it.isNotBlank() },
+            tone = if (spot == null) dev.autobridge.mycar.MyCarFacts.Tone.EMPTY else dev.autobridge.mycar.MyCarFacts.Tone.NORMAL
+        ) { startActivity(dev.autobridge.parking.ParkingActivity.intent(this)) }
+
+        val fuelEntries = dev.autobridge.fuel.FuelLogStore.all(this)
+        val ev = dev.autobridge.fuel.FuelLogStore.isEv(this)
+        val maintenanceItems = dev.autobridge.maintenance.MaintenanceStore.all(this)
+        val headline = facts.maintenanceHeadline(
+            dev.autobridge.maintenance.MaintenanceStats.ordered(
+                maintenanceItems,
+                dev.autobridge.maintenance.MaintenanceStore.currentOdometer(this),
+                now,
+                kmPerDay = dev.autobridge.maintenance.MaintenanceStore.kmPerDay(this)
+            )
+        )
+        val maintenance = dev.autobridge.ui.MyCarTile(
+            R.drawable.ic_car_maintenance, color(design.ACCENT_RADIO), getString(R.string.maint_title),
+            value = headline?.item?.name ?: getString(R.string.my_car_maint_empty),
+            caption = headline?.let { dev.autobridge.maintenance.MaintenanceText.standing(this, it) },
+            tone = facts.maintenanceTone(headline)
+        ) { startActivity(dev.autobridge.maintenance.MaintenanceActivity.intent(this)) }
+
+        val fuelFact = facts.fuel(dev.autobridge.fuel.FuelStats.summarize(fuelEntries, now))
+        val number = java.text.NumberFormat.getNumberInstance().apply { minimumFractionDigits = 1; maximumFractionDigits = 1 }
+        val fuel = dev.autobridge.ui.MyCarTile(
+            R.drawable.ic_car_fuel, color(design.ACCENT_FILES), getString(if (ev) R.string.fuel_title_ev else R.string.fuel_title),
+            value = when (fuelFact) {
+                is dev.autobridge.mycar.MyCarFacts.Fuel.Average -> getString(
+                    if (ev) R.string.fuel_km_per_kwh_value else R.string.fuel_km_per_liter_value, number.format(fuelFact.kmPerUnit)
+                )
+                is dev.autobridge.mycar.MyCarFacts.Fuel.Logged -> resources.getQuantityString(R.plurals.my_car_fuel_logged, fuelFact.fillUps, fuelFact.fillUps)
+                dev.autobridge.mycar.MyCarFacts.Fuel.Empty -> getString(R.string.my_car_fuel_empty)
+            },
+            caption = when (fuelFact) {
+                is dev.autobridge.mycar.MyCarFacts.Fuel.Average -> resources.getQuantityString(R.plurals.my_car_fuel_average_of, fuelFact.fillUps, fuelFact.fillUps)
+                is dev.autobridge.mycar.MyCarFacts.Fuel.Logged -> getString(R.string.my_car_fuel_no_average)
+                dev.autobridge.mycar.MyCarFacts.Fuel.Empty -> null
+            },
+            tone = if (fuelFact == dev.autobridge.mycar.MyCarFacts.Fuel.Empty) dev.autobridge.mycar.MyCarFacts.Tone.EMPTY else dev.autobridge.mycar.MyCarFacts.Tone.NORMAL
+        ) { startActivity(dev.autobridge.fuel.FuelLogActivity.intent(this)) }
+
+        val month = dev.autobridge.expense.CostStats.thisMonth(
+            dev.autobridge.expense.CostStats.monthly(fuelEntries, dev.autobridge.expense.ExpenseStore.all(this)), now
+        )
+        val monthTotal = facts.monthTotal(month)
+        val costs = dev.autobridge.ui.MyCarTile(
+            R.drawable.ic_car_costs, color(design.ACCENT_SYSTEM), getString(R.string.costs_title),
+            value = monthTotal?.let { getString(R.string.costs_baht, dev.autobridge.expense.CostsActivity.money(it)) }
+                ?: getString(R.string.my_car_costs_empty),
+            caption = monthTotal?.let { getString(R.string.my_car_costs_this_month) },
+            tone = if (monthTotal == null) dev.autobridge.mycar.MyCarFacts.Tone.EMPTY else dev.autobridge.mycar.MyCarFacts.Tone.NORMAL
+        ) { startActivity(dev.autobridge.expense.CostsActivity.intent(this)) }
+
+        val cards = dev.autobridge.emergency.EmergencyStore.all(this).size
+        val emergency = dev.autobridge.ui.MyCarTile(
+            R.drawable.ic_car_emergency, color(design.ACCENT_VIDEO), getString(R.string.emergency_title),
+            value = if (cards > 0) resources.getQuantityString(R.plurals.my_car_emergency_count, cards, cards)
+                else getString(R.string.my_car_emergency_empty),
+            caption = if (cards > 0) getString(R.string.my_car_emergency_caption) else null,
+            tone = if (cards > 0) dev.autobridge.mycar.MyCarFacts.Tone.NORMAL else dev.autobridge.mycar.MyCarFacts.Tone.EMPTY
+        ) { startActivity(dev.autobridge.emergency.EmergencyActivity.intent(this)) }
+
+        val breakHours = dev.autobridge.breakreminder.BreakReminder.hours(this)
+        val breakTile = dev.autobridge.ui.MyCarTile(
+            R.drawable.ic_car_break, color(design.ACCENT_FAVORITE), getString(R.string.break_reminder_title),
+            value = breakReminderCaption(),
+            caption = null,
+            tone = if (breakHours == 0) dev.autobridge.mycar.MyCarFacts.Tone.EMPTY else dev.autobridge.mycar.MyCarFacts.Tone.NORMAL
+        ) { showBreakReminderChoice() }
+
+        val readiness = dev.autobridge.mirror.MirrorReadinessProbe.read(this)
+        val next = dev.autobridge.mirror.MirrorReadiness.nextAction(readiness)
+        val battery = registerReceiver(null, android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        return dev.autobridge.ui.MyCarState(
+            vehicleTitle = dev.autobridge.profile.ActiveCarProfile.custom?.name ?: getString(R.string.car_connection_my_car),
+            profileLabel = dev.autobridge.profile.ActiveCarProfile.label,
+            tiles = listOf(parking, maintenance, fuel, costs, emergency, breakTile),
+            battery = batteryText(battery),
+            temperature = temperatureText(battery),
+            setupCaption = when {
+                readiness.projecting -> getString(R.string.setup_subtitle_running)
+                next == null -> getString(R.string.setup_subtitle_ready)
+                else -> getString(R.string.setup_subtitle_next, dev.autobridge.mirror.MirrorReadinessProbe.stepTitle(this, next.step))
+            },
+            autoStart = dev.autobridge.media.MediaAutoStart.isEnabled(this)
+        )
+    }
+
+    /** "99% ⚡" from the sticky battery broadcast, or "—" when the phone gave no reading. */
+    private fun batteryText(battery: Intent?): String {
+        val level = battery?.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1) ?: -1
+        val scale = battery?.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1) ?: -1
+        if (level < 0 || scale <= 0) return getString(R.string.my_car_no_reading)
+        val status = battery?.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1)
+        val charging = status == android.os.BatteryManager.BATTERY_STATUS_CHARGING || status == android.os.BatteryManager.BATTERY_STATUS_FULL
+        val percent = level * 100 / scale
+        return if (charging) "$percent% \u26A1" else "$percent%"
+    }
+
+    /** The battery's own temperature sensor, in tenths of a degree; "—" when absent. */
+    private fun temperatureText(battery: Intent?): String {
+        val tenths = battery?.getIntExtra(android.os.BatteryManager.EXTRA_TEMPERATURE, Int.MIN_VALUE) ?: Int.MIN_VALUE
+        if (tenths == Int.MIN_VALUE || tenths <= 0) return getString(R.string.my_car_no_reading)
+        return String.format(java.util.Locale.getDefault(), "%.1f\u00B0C", tenths / 10.0)
     }
 
     // Helper functions and UI components

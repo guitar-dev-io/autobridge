@@ -554,8 +554,8 @@
     <string name="settings_input_touch">การสัมผัสและการป้อนข้อมูล</string>
     <string name="settings_input_touch_caption">ระบบสัมผัสและสิทธิ์ที่ต้องใช้</string>
     <string name="settings_group_car">รถและแอป</string>
-    <string name="settings_car_connection">รถและการเชื่อมต่อ</string>
-    <string name="settings_car_connection_caption">Android Auto บลูทูธ และการเริ่มต้น</string>
+    <string name="settings_car_connection">รถของฉัน</string>
+    <string name="settings_car_connection_caption">ที่จอดรถ น้ำมัน บำรุงรักษา และ Android Auto</string>
     <string name="settings_app_profiles">โปรไฟล์แต่ละแอป</string>
     <string name="settings_app_profiles_caption">การแสดงผลและเสียงแยกตามแอป</string>
     <string name="settings_group_features">ฟีเจอร์</string>
@@ -768,11 +768,9 @@
     <string name="home_bridge_duo_action">Duo Screen</string>
 
     <!-- หน้า Car & Connection -->
-    <string name="car_connection_title">รถและการเชื่อมต่อ</string>
-    <string name="car_connection_subtitle">Android Auto, Bluetooth และการเริ่มต้นใช้งาน</string>
-    <string name="car_connection_current_vehicle">รถคันปัจจุบัน</string>
+    <string name="car_connection_title">รถของฉัน</string>
+    <string name="car_connection_subtitle">เครื่องมือรถและการเชื่อมต่อ</string>
     <string name="car_connection_my_car">รถของฉัน</string>
-    <string name="car_connection_settings_section">การตั้งค่า</string>
     <string name="voice_no_recognizer">ไม่พบระบบแปลงเสียงเป็นข้อความบนโทรศัพท์นี้</string>
 
     <!-- Settings > Input & Touch -->
@@ -1692,7 +1690,6 @@
     <string name="youtube_sponsorblock_caveat">ฟีเจอร์นี้อาจไม่ทำงาน หรือทำงานไม่สมบูรณ์ ข้อมูลช่วงสปอนเซอร์มาจากอาสาสมัคร วิดีโอใหม่หรือที่คนดูน้อยมักไม่มีข้อมูล และช่วงที่ทำเครื่องหมายไว้อาจคลาดเคลื่อนเล็กน้อย การข้ามต้องใช้อินเทอร์เน็ต และทำงานเฉพาะในหน้า YouTube ของ AutoBridge เอง ถ้า YouTube เปลี่ยนเว็บไซต์ อาจใช้ไม่ได้จนกว่าจะอัปเดตแอป</string>
     <string name="home_donate">☕ ค่าขนมกาแฟ</string>
     <string name="maint_compulsory_insurance">พ.ร.บ.</string>
-    <string name="settings_group_utilities">อรรถประโยชน์</string>
     <string name="car_more_group_utilities">อรรถประโยชน์</string>
     <string name="fuel_date_button">วันที่: %1$s</string>
     <string name="fuel_edit">แก้ไข</string>
@@ -2035,4 +2032,33 @@
     <string name="car_profiles_error_not_profile">ไฟล์นี้ไม่ใช่โปรไฟล์รถของ AutoBridge</string>
     <string name="car_profiles_error_newer">โปรไฟล์นี้สร้างจาก AutoBridge รุ่นใหม่กว่า อัปเดตแอปก่อน</string>
     <string name="car_profiles_error_bad">โปรไฟล์นี้ไม่มีชื่อหรือมีค่าที่ใช้ไม่ได้</string>
+
+    <!-- My Car (ตั้งค่า > รถของฉัน) -->
+    <string name="my_car_profile_caption">โปรไฟล์จอ: %1$s</string>
+    <string name="my_car_section_tools">เครื่องมือรถ</string>
+    <string name="my_car_section_connection">การเชื่อมต่อ</string>
+    <string name="my_car_parking_empty">แตะเพื่อบันทึกจุดจอด</string>
+    <string name="my_car_maint_empty">ยังไม่มีรายการ</string>
+    <string name="my_car_fuel_empty">ยังไม่ได้บันทึก</string>
+    <string name="my_car_fuel_no_average">ต้องมีเลขไมล์ 2 ครั้ง</string>
+    <plurals name="my_car_fuel_logged">
+        <item quantity="other">บันทึก %1$d ครั้ง</item>
+    </plurals>
+    <plurals name="my_car_fuel_average_of">
+        <item quantity="other">เฉลี่ยจาก %1$d ครั้ง</item>
+    </plurals>
+    <string name="my_car_costs_empty">เดือนนี้ยังไม่มี</string>
+    <string name="my_car_costs_this_month">เดือนนี้</string>
+    <string name="my_car_emergency_empty">เพิ่มเบอร์ที่ต้องโทร</string>
+    <string name="my_car_emergency_caption">แตะเบอร์เพื่อโทร</string>
+    <plurals name="my_car_emergency_count">
+        <item quantity="other">%1$d รายการ</item>
+    </plurals>
+    <string name="my_car_aa_connected">เชื่อมแล้ว</string>
+    <string name="my_car_aa_not_connected">ไม่ได้เชื่อม</string>
+    <string name="my_car_phone_battery">แบตมือถือ</string>
+    <string name="my_car_temperature">อุณหภูมิ</string>
+    <string name="my_car_no_reading">—</string>
+    <string name="my_car_diagnostics">วินิจฉัยการเชื่อมต่อ</string>
+    <string name="my_car_diagnostics_caption">ล็อกการเชื่อมต่อและเหตุการณ์ mirror</string>
 </resources>

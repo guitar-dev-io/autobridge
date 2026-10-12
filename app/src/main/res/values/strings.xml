@@ -570,8 +570,8 @@
     <string name="settings_input_touch">Input &amp; Touch</string>
     <string name="settings_input_touch_caption">Touch backend and permissions</string>
     <string name="settings_group_car">Car &amp; apps</string>
-    <string name="settings_car_connection">Car &amp; Connection</string>
-    <string name="settings_car_connection_caption">Android Auto, Bluetooth and startup</string>
+    <string name="settings_car_connection">My Car</string>
+    <string name="settings_car_connection_caption">Parking, fuel, maintenance and Android Auto</string>
     <string name="settings_app_profiles">App Profiles</string>
     <string name="settings_app_profiles_caption">Per-app display and audio</string>
     <string name="settings_group_features">Features</string>
@@ -784,11 +784,9 @@
     <string name="home_bridge_duo_action">Multi-app</string>
 
     <!-- Car & Connection screen -->
-    <string name="car_connection_title">Car &amp; Connection</string>
-    <string name="car_connection_subtitle">Android Auto, Bluetooth and startup</string>
-    <string name="car_connection_current_vehicle">Current vehicle</string>
+    <string name="car_connection_title">My Car</string>
+    <string name="car_connection_subtitle">Car tools and connection</string>
     <string name="car_connection_my_car">My Car</string>
-    <string name="car_connection_settings_section">Settings</string>
     <string name="voice_no_recognizer">No speech recognizer on this phone</string>
 
     <!-- Settings &gt; Input &amp; Touch -->
@@ -1723,7 +1721,6 @@
     <string name="youtube_sponsorblock_caveat">This may not work, or may be incomplete. The segments come from volunteers, so new or little-watched videos often have none and a marked segment can be a little off. Skipping needs the internet and works only in AutoBridge\'s own YouTube page; if YouTube changes its site, it can stop working until the app is updated.</string>
     <string name="home_donate">☕ Buy me a coffee</string>
     <string name="maint_compulsory_insurance">Compulsory insurance (Por.Ror.Bor.)</string>
-    <string name="settings_group_utilities">Utilities</string>
     <string name="car_more_group_utilities">Utilities</string>
     <string name="fuel_date_button">Date: %1$s</string>
     <string name="fuel_edit">Edit</string>
@@ -2067,4 +2064,36 @@
     <string name="car_profiles_error_not_profile">That file is not an AutoBridge car profile</string>
     <string name="car_profiles_error_newer">That profile was made by a newer AutoBridge; update the app first</string>
     <string name="car_profiles_error_bad">That profile is missing its name or has unusable values</string>
+
+    <!-- My Car (Settings > My Car) -->
+    <string name="my_car_profile_caption">Screen profile: %1$s</string>
+    <string name="my_car_section_tools">Car tools</string>
+    <string name="my_car_section_connection">Connection</string>
+    <string name="my_car_parking_empty">Tap to mark where you parked</string>
+    <string name="my_car_maint_empty">No items yet</string>
+    <string name="my_car_fuel_empty">Nothing logged yet</string>
+    <string name="my_car_fuel_no_average">Needs two odometer readings</string>
+    <plurals name="my_car_fuel_logged">
+        <item quantity="one">%1$d entry</item>
+        <item quantity="other">%1$d entries</item>
+    </plurals>
+    <plurals name="my_car_fuel_average_of">
+        <item quantity="one">Average of %1$d entry</item>
+        <item quantity="other">Average of %1$d entries</item>
+    </plurals>
+    <string name="my_car_costs_empty">Nothing this month</string>
+    <string name="my_car_costs_this_month">This month</string>
+    <string name="my_car_emergency_empty">Add the numbers to call</string>
+    <string name="my_car_emergency_caption">Tap a number to call</string>
+    <plurals name="my_car_emergency_count">
+        <item quantity="one">%1$d entry</item>
+        <item quantity="other">%1$d entries</item>
+    </plurals>
+    <string name="my_car_aa_connected">Connected</string>
+    <string name="my_car_aa_not_connected">Not connected</string>
+    <string name="my_car_phone_battery">Phone battery</string>
+    <string name="my_car_temperature">Temperature</string>
+    <string name="my_car_no_reading">—</string>
+    <string name="my_car_diagnostics">Connection diagnostics</string>
+    <string name="my_car_diagnostics_caption">Connection log and mirror events</string>
 </resources>
