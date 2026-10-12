@@ -37,6 +37,7 @@ class AutoBridgeApplication : Application() {
         // notification that reflects it.
         BypassPolicyStore.init(this)
         dev.autobridge.display.PerformanceMode.restore(this)
+        dev.autobridge.profile.CarProfileStore.restore(this)
         BypassNotifier.install(this)
         // A car session (Duo Screen) can start without any screen of ours having run, so the screen
         // power policy has to be installed here rather than in an Activity. Registration only; it

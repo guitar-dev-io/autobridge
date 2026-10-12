@@ -1512,7 +1512,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
             appendLine("Environment:   ${runtime.environment.name}")
             appendLine("Connected:     ${runtime.connected}")
             appendLine("Vehicle state: ${runtime.vehicleState.name}")
-            appendLine("Car profile:   ${SurfaceProfile.active.name}")
+            appendLine("Car profile:   ${dev.autobridge.profile.ActiveCarProfile.label}")
             appendLine("Feature:       ${runtime.currentFeature?.name ?: "—"}")
             appendLine("Pipeline:      ${ScreenOffController.pipelineMode.name}")
             appendLine("Mirroring:     ${MirrorCoordinator.isMirroring}")
@@ -1964,8 +1964,8 @@ class MainActivity : androidx.activity.ComponentActivity() {
             settingRow(
                 getString(R.string.mirror_head_unit_profile),
                 headUnitProfileSubtitle(),
-                SurfaceProfile.active.displayLabel,
-                onClick = { toggleSurfaceProfile() }
+                dev.autobridge.profile.ActiveCarProfile.label,
+                onClick = { startActivity(Intent(this, dev.autobridge.profile.CarProfilesActivity::class.java)) }
             ),
             top = 4
         )
@@ -2763,20 +2763,10 @@ class MainActivity : androidx.activity.ComponentActivity() {
         showPhoneScreen(PhoneScreen.MIRROR_SETTINGS)
     }
     private fun headUnitProfileSubtitle(): String = getString(
-        if (SurfaceProfile.active.hardwareValidated) R.string.mirror_head_unit_profile_measured
+        if (dev.autobridge.profile.ActiveCarProfile.verified) R.string.mirror_head_unit_profile_measured
         else R.string.mirror_head_unit_profile_placeholder
     )
 
-    /** Same two-way switch as the car settings row, so the phone and the car agree on the profile. */
-    private fun toggleSurfaceProfile() {
-        SurfaceProfile.active = if (SurfaceProfile.active == SurfaceProfile.DEFAULT) {
-            SurfaceProfile.FORD_NEXT_GEN
-        } else {
-            SurfaceProfile.DEFAULT
-        }
-        SettingsStore.persistSurfaceProfile(this, SurfaceProfile.active)
-        showPhoneScreen(PhoneScreen.MIRROR_SETTINGS, force = true)
-    }
 
     private fun screenOffBehaviorValue(): String = getString(
         when {

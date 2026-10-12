@@ -2036,4 +2036,35 @@
     <string name="car_diag_performance">Performance</string>
     <string name="car_diag_performance_value">%1$s (%2$s)</string>
     <string name="car_diag_performance_off">Off</string>
+    <!-- Car profiles: save, share and import (CarProfilesActivity). -->
+    <string name="car_profiles_title">Car profiles</string>
+    <string name="car_profiles_in_use">In use: %1$s</string>
+    <string name="car_profiles_save_this_car">Save this car</string>
+    <string name="car_profiles_import">Import file</string>
+    <string name="car_profiles_built_in">Built in</string>
+    <string name="car_profiles_saved">Saved and shared</string>
+    <string name="car_profiles_builtin_default">Uses what the car reports; adds nothing</string>
+    <string name="car_profiles_builtin_unverified">Placeholder; same values as Default until measured in a real car</string>
+    <string name="car_profiles_none_title">No saved profiles yet</string>
+    <string name="car_profiles_none_caption">Connect to the car and tap Save this car, or import a file someone shared</string>
+    <string name="car_profiles_unverified">Unverified</string>
+    <string name="car_profiles_matches">Matches this car</string>
+    <string name="car_profiles_use">Use</string>
+    <string name="car_profiles_share">Share</string>
+    <string name="car_profiles_delete">Delete</string>
+    <string name="car_profiles_delete_title">Delete %1$s?</string>
+    <string name="car_profiles_now_using">Using %1$s</string>
+    <string name="car_profiles_connect_first">Connect to the car first; its screen is what gets saved</string>
+    <string name="car_profiles_name_hint">Name, e.g. My Ranger</string>
+    <string name="car_profiles_vehicle_hint">Car and head unit, e.g. Ford Ranger 2023 SYNC 4A</string>
+    <string name="car_profiles_save_message">Records this car\'s screen (%1$s) so it can be shared. Nothing else is measured.</string>
+    <string name="car_profiles_save">Save</string>
+    <string name="car_profiles_default_name">My car</string>
+    <string name="car_profiles_saved_toast">Saved %1$s</string>
+    <string name="car_profiles_imported">Imported %1$s (unverified)</string>
+    <string name="car_profiles_import_unreadable">Could not read that file</string>
+    <string name="car_profiles_error_too_large">That file is too large to be a car profile</string>
+    <string name="car_profiles_error_not_profile">That file is not an AutoBridge car profile</string>
+    <string name="car_profiles_error_newer">That profile was made by a newer AutoBridge; update the app first</string>
+    <string name="car_profiles_error_bad">That profile is missing its name or has unusable values</string>
 </resources>
