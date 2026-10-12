@@ -4,7 +4,16 @@ import dev.autobridge.agent.AgentCommandParser
 import dev.autobridge.agent.AgentCommandRouter.AgentAction
 import dev.autobridge.library.HomeSection
 
-enum class VoiceAction { OPEN_APP, SEARCH, PLAY, OPEN_URL, SEND_TO_CAR, GO_HOME, GO_BACK, OPEN_SCREEN, UNKNOWN }
+enum class VoiceAction {
+    OPEN_APP, SEARCH, PLAY, OPEN_URL, SEND_TO_CAR, GO_HOME, GO_BACK, OPEN_SCREEN,
+
+    /** Whatever the media session is playing: the same as the steering-wheel buttons. */
+    MEDIA_NEXT, MEDIA_PREVIOUS, MEDIA_PAUSE,
+
+    /** Hand [VoiceCommand.query] to the navigation app as a destination. */
+    NAVIGATE,
+    UNKNOWN
+}
 
 enum class VoiceTarget { YOUTUBE, YOUTUBE_MUSIC, TIKTOK, IQIYI, BROWSER }
 
@@ -160,6 +169,35 @@ object VoiceCommandParser {
         )
     }
 
+    /**
+     * Media and navigation, the commands a driver needs without looking. Like Home and Back they
+     * match the whole utterance (with an optional "song"/"channel" word), so "เพลงถัดไปของ
+     * Bodyslam" is still a search and only "เพลงถัดไป" skips.
+     */
+    private val MEDIA_NEXT = Regex(
+        "^(?:(?:ขอ|เปลี่ยน|ไป)\\s*)?(?:เพลง|ช่อง|สถานี|คลิป)?\\s*(?:ถัดไป|ต่อไป)$" +
+            "|^ข้าม\\s*(?:เพลง|ช่อง)?$" +
+            "|^(?:skip|next)(?:\\s+(?:song|track|channel|station|one|this))?$",
+        RegexOption.IGNORE_CASE
+    )
+    private val MEDIA_PREVIOUS = Regex(
+        "^(?:(?:ขอ|เปลี่ยน|กลับ|ย้อน)\\s*)?(?:เพลง|ช่อง|สถานี|คลิป)\\s*(?:ก่อนหน้า|ที่แล้ว|เมื่อกี้)$" +
+            "|^ย้อน\\s*(?:เพลง|ช่อง)$" +
+            "|^(?:previous|last)\\s+(?:song|track|channel|station)$|^previous$",
+        RegexOption.IGNORE_CASE
+    )
+    private val MEDIA_PAUSE = Regex(
+        "^(?:หยุด(?:\\s*(?:เพลง|เล่น|ชั่วคราว|ก่อน))?|พักเพลง|ปิดเพลง|ปิดเสียงเพลง)$" +
+            "|^(?:pause|stop)(?:\\s+(?:the\\s+)?(?:music|song|playing|it))?$",
+        RegexOption.IGNORE_CASE
+    )
+    /** The destination is everything after the verb; "ไปที่" alone stays "open", it is not navigation. */
+    private val NAVIGATE = Regex(
+        "^(?:นำทาง\\s*(?:ไป\\s*(?:ที่)?)?|พา\\s*ไป\\s*(?:ที่)?|ขับ\\s*ไป\\s*(?:ที่)?|เส้นทาง\\s*ไป\\s*(?:ที่)?" +
+            "|navigate\\s+to|directions\\s+to|take\\s+me\\s+to|drive\\s+to)\\s*(.+)$",
+        RegexOption.IGNORE_CASE
+    )
+
     private val SEND_TO_CAR = Regex(
         "(?:ส่ง\\s*(?:ไป|ขึ้น)?\\s*(?:ที่|ยัง|บน)?\\s*(?:หน้าจอ\\s*)?รถ|send(?: it)? to(?: the)? car|(?:on|to) the car|ไปที่รถ|ขึ้นจอรถ)",
         RegexOption.IGNORE_CASE
@@ -219,6 +257,15 @@ object VoiceCommandParser {
 
         if (HOME.matches(text)) return VoiceCommand(VoiceAction.GO_HOME, confidence = 0.95f, text = text)
         if (BACK.matches(text)) return VoiceCommand(VoiceAction.GO_BACK, confidence = 0.95f, text = text)
+        if (MEDIA_NEXT.matches(text)) return VoiceCommand(VoiceAction.MEDIA_NEXT, confidence = 0.95f, text = text)
+        if (MEDIA_PREVIOUS.matches(text)) return VoiceCommand(VoiceAction.MEDIA_PREVIOUS, confidence = 0.95f, text = text)
+        if (MEDIA_PAUSE.matches(text)) return VoiceCommand(VoiceAction.MEDIA_PAUSE, confidence = 0.95f, text = text)
+        NAVIGATE.matchEntire(text)?.let { match ->
+            val destination = match.groupValues[1].trim()
+            if (destination.isNotEmpty()) {
+                return VoiceCommand(VoiceAction.NAVIGATE, query = destination, confidence = 0.9f, text = text)
+            }
+        }
         SCREEN_PATTERNS.firstOrNull { it.second.matches(text) }?.let { (screen, _) ->
             return VoiceCommand(VoiceAction.OPEN_SCREEN, screen = screen, confidence = 0.95f, text = text)
         }

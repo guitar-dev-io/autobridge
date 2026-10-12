@@ -1956,4 +1956,11 @@
     <string name="drawer_external_long">Open in another app</string>
     <string name="drawer_navigate_maps_long">Navigate in Maps</string>
     <string name="drawer_navigate_maps_hint">Send the address on this page to Maps</string>
+    <!-- Voice: media and navigation commands. -->
+    <string name="voice_media_next">Next</string>
+    <string name="voice_media_previous">Previous</string>
+    <string name="voice_media_paused">Paused</string>
+    <string name="voice_media_unavailable">Nothing is playing, or there is nothing to skip to</string>
+    <string name="voice_navigating">Navigating to %1$s</string>
+    <string name="voice_no_navigation_app">No navigation app to hand this to</string>
 </resources>
