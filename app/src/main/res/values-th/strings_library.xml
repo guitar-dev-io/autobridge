@@ -125,4 +125,30 @@
     <string name="library_allow_access">อนุญาตการเข้าถึง</string>
     <string name="library_settings_unavailable">เปิดการตั้งค่าไม่ได้</string>
     <string name="library_grant_media_access">อนุญาตการเข้าถึงสื่อจากการตั้งค่า Android</string>
+
+    <!-- Programme guide (Now / Next), smart groups and remembered broken channels. -->
+    <string name="guide_now_until">▶ %1$s · ถึง %2$s</string>
+    <string name="guide_next">ต่อไป %1$s · %2$s</string>
+    <string name="guide_url_hint">ลิงก์ผังรายการ (XMLTV, ไม่บังคับ)</string>
+    <string name="guide_on_now">กำลังออกอากาศ</string>
+    <string name="health_not_working">ใช้งานไม่ได้ · %1$s</string>
+    <string name="health_ago_minutes">%1$d นาทีที่แล้ว</string>
+    <string name="health_ago_hours">%1$d ชม. ที่แล้ว</string>
+    <string name="health_ago_days">%1$d วันที่แล้ว</string>
+    <string name="health_not_working_title">ใช้งานไม่ได้</string>
+    <string name="health_not_working_chip">⚠ ใช้งานไม่ได้ · %1$d</string>
+    <string name="health_not_working_empty">ทุกช่องที่ตรวจไว้ในรายการนี้ตอบสนองในครั้งล่าสุด</string>
+    <string name="smart_groups">จัดกลุ่มอัตโนมัติ</string>
+    <string name="smart_group_chip">%1$s · %2$d</string>
+    <string name="smart_news">ข่าว</string>
+    <string name="smart_sports">กีฬา</string>
+    <string name="smart_kids">เด็ก</string>
+    <string name="smart_movies">ภาพยนตร์</string>
+    <string name="smart_music">เพลง</string>
+    <string name="smart_documentary">สารคดี</string>
+    <string name="smart_religion">ศาสนา</string>
+    <string name="smart_shopping">ช้อปปิ้ง</string>
+    <string name="car_iptv_search">ค้นหาช่อง</string>
+    <string name="car_iptv_search_hint">ชื่อช่องหรือรายการ</string>
+    <string name="car_iptv_search_prompt">พิมพ์ชื่อช่อง หรือสิ่งที่อยากดู</string>
 </resources>

@@ -44,6 +44,9 @@ class AutoBridgeApplication : Application() {
         // The phone's "connected to the car" state follows Android Auto itself, not only the one
         // car screen session that used to set it; see CarConnectionMonitor.
         dev.autobridge.car.CarConnectionMonitor.install(this)
+        // Channel checks and playback failures are remembered past StreamPing's five minutes, from
+        // whichever surface ran them; see IptvHealthStore.
+        dev.autobridge.iptv.IptvHealthStore.install(this)
     }
 
     /**

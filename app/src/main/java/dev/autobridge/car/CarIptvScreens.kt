@@ -2,6 +2,7 @@ package dev.autobridge.car
 
 import android.content.Intent
 import android.text.SpannableString
+import android.text.SpannableStringBuilder
 import android.text.Spanned
 import androidx.car.app.CarContext
 import androidx.car.app.CarToast
@@ -26,7 +27,11 @@ import dev.autobridge.iptv.ChannelQueue
 import dev.autobridge.iptv.IptvCatalogData
 import dev.autobridge.iptv.IptvChannelQueue
 import dev.autobridge.iptv.IptvEntry
-import dev.autobridge.iptv.IptvEpg
+import dev.autobridge.iptv.IptvCategory
+import dev.autobridge.iptv.IptvGuide
+import dev.autobridge.iptv.IptvGuideText
+import dev.autobridge.iptv.IptvHealthStore
+import dev.autobridge.iptv.IptvSmartGroups
 import dev.autobridge.iptv.IptvHistoryStore
 import dev.autobridge.iptv.IptvKind
 import dev.autobridge.iptv.IptvPlayback
@@ -218,36 +223,31 @@ class CarIptvSourcesScreen(
     }
 }
 
-/** Categories inside one source. Large accounts are paged by [CarListPaging]. */
+/**
+ * Categories inside one source, led by the groups AutoBridge works out itself: the channels whose
+ * last attempt failed, then [IptvSmartGroups] ("News · 12"). Large accounts are paged by
+ * [CarListPaging]; the extra rows are paged with the categories so a page never overflows the host.
+ */
 class CarIptvCategoriesScreen(
     carContext: CarContext,
     private val source: IptvSource,
     private val data: IptvCatalogData,
     private val page: Int = 0
 ) : Screen(carContext) {
+    private sealed interface Item {
+        data class Broken(val entries: List<IptvEntry>) : Item
+        data class Smart(val group: IptvSmartGroups.Group) : Item
+        data class Category(val category: IptvCategory) : Item
+    }
+
     override fun onGetTemplate(): Template {
-        val paged = CarListPaging.page(carContext, data.categories, page)
+        val broken = IptvHealthStore.brokenAmong(data.entries)
+        val items = listOfNotNull<Item>(broken.takeIf { it.isNotEmpty() }?.let { Item.Broken(it) }) +
+            data.smartGroups.map { Item.Smart(it) } +
+            data.categories.map { Item.Category(it) }
+        val paged = CarListPaging.page(carContext, items, page)
         val list = ItemList.Builder()
-        paged.items.forEach { category ->
-            list.addItem(
-                Row.Builder()
-                    .setTitle(category.name)
-                    .addText(
-                        carContext.resources.getQuantityString(
-                            R.plurals.car_iptv_entries, category.count, category.count
-                        )
-                    )
-                    .setBrowsable(true)
-                    .setOnClickListener {
-                        screenManager.push(
-                            CarIptvEntriesScreen(
-                                carContext, source, data.entriesIn(category.id), category.name
-                            )
-                        )
-                    }
-                    .build()
-            )
-        }
+        paged.items.forEach { item -> list.addItem(row(item)) }
         if (paged.hasMore) {
             list.addItem(
                 Row.Builder()
@@ -260,9 +260,46 @@ class CarIptvCategoriesScreen(
             )
         }
         return ListTemplate.Builder()
-            .setHeader(Header.Builder().setTitle(source.name).setStartHeaderAction(Action.BACK).build())
+            .setHeader(
+                Header.Builder()
+                    .setTitle(source.name)
+                    .setStartHeaderAction(Action.BACK)
+                    .addEndHeaderAction(
+                        Action.Builder()
+                            .setIcon(CarIcons.of(carContext, CarIcons.SEARCH))
+                            .setOnClickListener { screenManager.push(CarIptvSearchScreen(carContext, source, data)) }
+                            .build()
+                    )
+                    .build()
+            )
             .setSingleList(list.build())
             .build()
+    }
+
+    private fun row(item: Item): Row {
+        val (title, entries) = when (item) {
+            is Item.Broken -> carContext.getString(R.string.health_not_working_title) to item.entries
+            is Item.Smart -> IptvGuideText.smartLabel(carContext, item.group.kind) to item.group.entries
+            is Item.Category -> item.category.name to null
+        }
+        val count = entries?.size ?: (item as Item.Category).category.count
+        val countText = carContext.resources.getQuantityString(R.plurals.car_iptv_entries, count, count)
+        val builder = Row.Builder()
+            .setTitle(title)
+            // The not-working group's count reads in red, like the rows inside it.
+            .addText(if (item is Item.Broken) red(countText) else countText)
+            .setBrowsable(true)
+            .setOnClickListener {
+                val shown = entries ?: data.entriesIn((item as Item.Category).category.id)
+                screenManager.push(CarIptvEntriesScreen(carContext, source, shown, title))
+            }
+        // The groups AutoBridge made itself read apart from the provider's own categories.
+        if (item is Item.Smart) builder.addText(carContext.getString(R.string.smart_groups))
+        return builder.build()
+    }
+
+    private fun red(text: String): CharSequence = SpannableString(text).apply {
+        setSpan(ForegroundCarColorSpan.create(CarColor.RED), 0, text.length, Spanned.SPAN_INCLUSIVE_EXCLUSIVE)
     }
 }
 
@@ -309,15 +346,16 @@ class CarIptvEntriesScreen(
         // Pages are cut from the full category, and dead channels are dropped only from the page
         // in view, so a check landing mid-scroll never moves a channel onto another page.
         val shown = paged.items.filterNot { CarIptvCheck.isDead(it.url) }
-        // What is on now, for the live channels in view; each answer repaints as it lands.
-        IptvEpg.load(source, shown) { repaint() }
+        // Now and next for the live channels in view; each answer repaints as it lands.
+        IptvGuide.load(carContext, source, shown) { repaint() }
         shown.forEach { entry ->
             val favorite = entry.url.isNotBlank() && IptvHistoryStore.isFavorite(carContext, entry.url)
+            val guide = IptvGuide.nowNext(source, entry)
             val row = Row.Builder()
                 .setTitle(entry.title)
                 .addText(
                     listOfNotNull(
-                        IptvEpg.cached(source, entry)?.let { "▶ $it" },
+                        IptvGuideText.now(carContext, guide),
                         entry.subtitle.takeIf { it.isNotBlank() },
                         carContext.getString(R.string.car_iptv_opens_in_browser)
                             .takeIf { entry.isWebPage },
@@ -330,8 +368,9 @@ class CarIptvEntriesScreen(
                 .setBrowsable(entry.isSeriesFolder)
                 .setOnClickListener { open(entry) }
             logos.icon(entry.logo)?.let { row.setImage(it, Row.IMAGE_TYPE_SMALL) }
-            // A full-list row may carry two lines of text; a check result earns the second one.
-            StreamPing.cached(entry.url)?.let { row.addText(CarIptvCheck.text(carContext, it)) }
+            // A full-list row may carry two lines of text: the channel's health and what is next.
+            CarIptvCheck.secondLine(carContext, entry.url, IptvGuideText.next(carContext, guide))
+                ?.let { row.addText(it) }
             list.addItem(row.build())
         }
         CarIptvCheck.hiddenRow(carContext, paged.items.size - shown.size)?.let { list.addItem(it) }
@@ -440,7 +479,7 @@ class CarIptvRecentScreen(carContext: CarContext, private val kind: IptvKind) : 
                     )
                 }
             logos.icon(item.logo)?.let { row.setImage(it, Row.IMAGE_TYPE_SMALL) }
-            StreamPing.cached(item.url)?.let { row.addText(CarIptvCheck.text(carContext, it)) }
+            CarIptvCheck.secondLine(carContext, item.url, next = null)?.let { row.addText(it) }
             list.addItem(row.build())
         }
         CarIptvCheck.hiddenRow(carContext, all.size - items.size)?.let { list.addItem(it) }
@@ -500,6 +539,24 @@ internal object CarIptvCheck {
                 start(carContext, checkable, quiet = false, repaint = repaint)
             }
             .build()
+    }
+
+    /**
+     * A channel row's second line: this session's check result, or failing that the remembered
+     * failure ("Not working · 3 h ago") in red, followed by [next] from the guide. Null when there
+     * is nothing to say. The coloured part keeps its colour; the guide part stays plain.
+     */
+    fun secondLine(carContext: CarContext, url: String, next: String?): CharSequence? {
+        val health: CharSequence? = StreamPing.cached(url)?.let { text(carContext, it) }
+            ?: IptvHealthStore.broken(url)?.let { record ->
+                val label = IptvGuideText.broken(carContext, record)
+                SpannableString(label).apply {
+                    setSpan(ForegroundCarColorSpan.create(CarColor.RED), 0, label.length, Spanned.SPAN_INCLUSIVE_EXCLUSIVE)
+                }
+            }
+        if (health == null) return next
+        if (next == null) return health
+        return SpannableStringBuilder(health).append(" • ").append(next)
     }
 
     /**

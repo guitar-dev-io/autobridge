@@ -308,6 +308,7 @@ object AutoBridgeDesign {
         badgeIcon: Int = 0,
         trailing: String? = null,
         onTrailing: (() -> Unit)? = null,
+        guide: String? = null,
         onClick: () -> Unit
     ): View = LinearLayout(context).apply {
         gravity = Gravity.CENTER_VERTICAL
@@ -372,6 +373,7 @@ object AutoBridgeDesign {
             ellipsize = TextUtils.TruncateAt.END
             setPadding(0, context.dp(3), 0, 0)
         })
+        text.addView(guideLabel(context, guide))
         addView(text, LinearLayout.LayoutParams(0, -2, 1f))
 
         if (!trailing.isNullOrBlank()) addView(
@@ -403,6 +405,7 @@ object AutoBridgeDesign {
         status: Pair<String, Int>? = null,
         corner: Pair<String, () -> Unit>? = null,
         onLongClick: (() -> Unit)? = null,
+        guide: String? = null,
         onClick: () -> Unit
     ): View = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
@@ -474,6 +477,8 @@ object AutoBridgeDesign {
             setPadding(0, context.dp(2), 0, 0)
         }, LinearLayout.LayoutParams(-1, -2))
 
+        addView(guideLabel(context, guide), LinearLayout.LayoutParams(-1, -2))
+
         // The check result in words, led by its coloured dot. Built even when there is nothing to
         // show yet: a result that lands later is written into this view, and a page that is
         // already scrolled must not be rebuilt under the user.
@@ -493,6 +498,30 @@ object AutoBridgeDesign {
     }
 
     private fun statusText(text: String) = "●  $text"
+
+    /**
+     * The programme-guide line of a [contentRow] or [contentTile]: what is on now, in the accent
+     * text colour so it reads apart from the muted subtitle. Built even while empty, for the same
+     * reason as the status line — a guide that lands later is written in with [setGuide].
+     */
+    private fun guideLabel(context: Context, guide: String?): TextView = TextView(context).apply {
+        id = R.id.autobridge_guide_label
+        textSize = 12f
+        setTextColor(TEXT)
+        maxLines = 1
+        ellipsize = TextUtils.TruncateAt.END
+        setPadding(0, context.dp(3), 0, 0)
+        text = guide.orEmpty()
+        visibility = if (guide.isNullOrBlank()) View.GONE else View.VISIBLE
+    }
+
+    /** Writes [text] into a row's or tile's guide line, or hides it when [text] is blank. */
+    fun setGuide(view: View, text: String?) {
+        val label = view.findViewById<TextView>(R.id.autobridge_guide_label) ?: return
+        if (label.text.toString() == text.orEmpty()) return
+        label.text = text.orEmpty()
+        label.visibility = if (text.isNullOrBlank()) View.GONE else View.VISIBLE
+    }
 
     /** The status line inside a [contentTile], for writing a result into a page already drawn. */
     fun statusLabel(tile: View): TextView? = tile.findViewById(R.id.autobridge_status_label)

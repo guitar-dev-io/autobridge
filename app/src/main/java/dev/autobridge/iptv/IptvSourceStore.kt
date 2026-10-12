@@ -106,6 +106,7 @@ object IptvSourceStore {
                     .put("url", source.url)
                     .put("username", source.username)
                     .put("password", source.password)
+                    .put("guideUrl", source.guideUrl)
             )
         }
         SecretPrefs.write(prefs(context), PREFS_NAME, KEY_ITEMS, array.toString())
@@ -123,7 +124,8 @@ object IptvSourceStore {
                 .getOrDefault(IptvSourceType.M3U),
             url = url,
             username = item.optString("username"),
-            password = item.optString("password")
+            password = item.optString("password"),
+            guideUrl = item.optString("guideUrl")
         )
     }
 
