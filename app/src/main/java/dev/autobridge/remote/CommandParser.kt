@@ -1,7 +1,7 @@
 package dev.autobridge.remote
 
-import android.net.Uri
-import dev.autobridge.entertainment.ContentAddress
+import dev.autobridge.browser.BrowserInputResolver
+import dev.autobridge.browser.SearchEngine
 
 /**
  * Turns free text (structured or natural language, Thai + English) into an [AutoBridgeCommand].
@@ -105,11 +105,7 @@ object CommandParser {
         text.contains(".") && !text.contains(" ") ||
             text.startsWith("http", ignoreCase = true)
 
-    /** Bare domain → https; otherwise a Google search URL. Reuses [ContentAddress] validation. */
-    fun normalizeUrl(target: String): String {
-        val t = target.trim()
-        val https = ContentAddress.https(t)
-        if (https != null) return https
-        return "https://www.google.com/search?q=" + Uri.encode(t)
-    }
+    /** An address opens, anything else searches on [engine]; see [BrowserInputResolver.resolve]. */
+    fun normalizeUrl(target: String, engine: SearchEngine = SearchEngine.GOOGLE): String =
+        BrowserInputResolver.resolve(target, engine)
 }

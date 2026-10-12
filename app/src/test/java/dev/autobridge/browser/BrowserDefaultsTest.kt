@@ -19,8 +19,16 @@ class BrowserDefaultsTest {
     }
 
     @Test fun unsafeSchemesBecomeSearchesRatherThanNavigation() {
-        for (input in listOf("http://example.com", "javascript:alert(1)", "intent://example.com")) {
+        for (input in listOf("javascript:alert(1)", "intent://example.com")) {
             assertTrue(BrowserDefaults.resolve(input).startsWith("https://www.google.com/search?q="))
         }
+    }
+
+    @Test fun aTypedHttpAddressOpensOverHttps() {
+        assertEquals("https://example.com", BrowserDefaults.resolve("http://example.com"))
+    }
+
+    @Test fun theCarBrowserSearchesOnTheChosenEngine() {
+        assertTrue(BrowserDefaults.resolve("bodyslam live", SearchEngine.YOUTUBE).startsWith("https://m.youtube.com/results"))
     }
 }

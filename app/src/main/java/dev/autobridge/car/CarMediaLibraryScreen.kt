@@ -85,7 +85,7 @@ class CarMediaLibraryScreen(carContext: CarContext, private val videoOnly: Boole
                     .addText(carContext.getString(R.string.car_lib_open_video_link_caption)).setBrowsable(true)
                     .setOnClickListener {
                         screenManager.pushForResult(CarBrowserSearchScreen(carContext, "")) { result ->
-                            val url = dev.autobridge.entertainment.ContentAddress.https(result as? String ?: "")
+                            val url = dev.autobridge.browser.BrowserInputResolver.addressOf(result as? String ?: "")
                             if (url != null) CarVideoLauncher.open(
                                 screenManager, carContext, url,
                                 carContext.getString(R.string.car_lib_video_stream)

@@ -1138,7 +1138,7 @@ class CarWebRenderer(context: Context) {
 
     // ------------------------------------------------------------------ navigation
 
-    /** Loads a validated HTTPS URL or turns free text into a Google search. */
+    /** Loads a validated HTTPS URL or turns free text into a search on the chosen engine. */
     fun load(input: String) {
         runOnMain {
             // The non-DRM MP4 test page (TEST 3 of the video matrix), reachable from the car's
@@ -1147,7 +1147,7 @@ class CarWebRenderer(context: Context) {
                 focusedView?.let(WebVideoDiagnostics::loadTestPage)
                 return@runOnMain
             }
-            val target = BrowserDefaults.resolve(input)
+            val target = BrowserDefaults.resolve(input, SearchEngineStore.engine(appContext))
             val side = sideView
             if (sideActive && side != null) {
                 // The side pane has no tabs: an address typed while it has focus replaces its page.
@@ -1266,7 +1266,7 @@ class CarWebRenderer(context: Context) {
     fun openNewTab(url: String = DEFAULT_HOME) = runOnMain {
         sideFocused = false
         saveActiveTabState()
-        val target = BrowserDefaults.resolve(url)
+        val target = BrowserDefaults.resolve(url, SearchEngineStore.engine(appContext))
         val (next, evicted) = tabs.open(nextTabId++, target)
         evicted?.let {
             tabStates.remove(it.id)
