@@ -98,6 +98,8 @@ class CarProfilesActivity : Activity() {
                     title = getString(R.string.car_profiles_none_title),
                     subtitle = getString(R.string.car_profiles_none_caption),
                     accent = AutoBridgeDesign.TEXT_MUTED,
+                    // Not an item: without this the badge shows the title's first letter.
+                    badgeText = "–",
                     subtitleMaxLines = 3,
                     onClick = {}
                 )
