@@ -163,15 +163,25 @@ class EmergencyActivity : Activity() {
             }, LinearLayout.LayoutParams(0, -2, 1f))
 
             addView(TextView(this@EmergencyActivity).apply {
-                text = if (dial != null) "☎  ${entry.value.trim()}" else getString(R.string.emergency_copy)
+                text = if (dial != null) entry.value.trim() else getString(R.string.emergency_copy)
                 textSize = if (dial != null) 20f else 15f
                 typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
                 gravity = Gravity.CENTER
-                setTextColor(if (dial != null) AutoBridgeDesign.INK else color)
-                background = if (dial != null) {
-                    AutoBridgeDesign.tappable(this@EmergencyActivity, color, 14, AutoBridgeDesign.INK, android.graphics.Color.TRANSPARENT)
-                } else {
-                    AutoBridgeDesign.tappable(this@EmergencyActivity, AutoBridgeDesign.tint(color, 0.16f), 14, color, AutoBridgeDesign.tint(color, 0.4f))
+                // A quiet tint of the service's colour, the number in that colour: five solid
+                // blocks of red, green and orange made the page shout, and a colour still tells
+                // the lines apart at a glance.
+                setTextColor(color)
+                background = AutoBridgeDesign.tappable(
+                    this@EmergencyActivity, AutoBridgeDesign.tint(color, 0.14f), 14, color, AutoBridgeDesign.tint(color, 0.35f)
+                )
+                if (dial != null) {
+                    setCompoundDrawablesRelativeWithIntrinsicBounds(
+                        getDrawable(R.drawable.ic_car_emergency)?.mutate()?.apply {
+                            setTint(color)
+                            setBounds(0, 0, dp(20), dp(20))
+                        }, null, null, null
+                    )
+                    compoundDrawablePadding = dp(8)
                 }
                 setPadding(dp(16), 0, dp(16), 0)
                 minWidth = dp(96)
