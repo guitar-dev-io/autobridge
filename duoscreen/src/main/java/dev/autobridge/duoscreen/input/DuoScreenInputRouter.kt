@@ -29,6 +29,12 @@ interface DuoScreenInputPort {
 
     /** The seam the next drag will move, or null once it is let go. Drawn as the grab affordance. */
     fun onDividerGrabbed(divider: Divider?)
+
+    /**
+     * The pane a dragged pane would trade places with if it were let go now, or null. Drawn as an
+     * outline on that pane, so the driver sees the swap before it happens.
+     */
+    fun onSwapTargetChanged(paneId: Int?) = Unit
 }
 
 /**
@@ -36,6 +42,11 @@ interface DuoScreenInputPort {
  * onScroll/onFling carry no position — see SurfaceCallback — so there is nothing else to route by).
  * Edit ("จัดหน้าจอ") mode repurposes the same gestures: tap selects a pane and brings it to front,
  * drag moves the selected pane, pinch resizes it around the focus point.
+ *
+ * A pane dragged until its centre sits over another pane, and let go there, swaps with it: each
+ * takes the other's place and size, keeping its own app — the drag-and-drop counterpart of the
+ * Swap button. Let go anywhere else and it stays where it was dragged, as before. The host gives
+ * no finger-up, so "let go" is [endDrag], which the controller calls once the drag has rested.
  *
  * Dragging the seam between two panes — the one gesture that resizes both at once, and the one a
  * driver expects from a split view — is the same two steps: a tap within
@@ -67,6 +78,16 @@ class DuoScreenInputRouter(
 
     private var grabbedDivider: Divider? = null
 
+    /** Where the pane being dragged started, so a swap can hand that place to the other pane. */
+    private var dragOrigin: Rect? = null
+
+    /** The pane the dragged one would swap with if let go now. */
+    var swapTargetId: Int? = null
+        private set
+
+    /** A pane is being dragged in edit mode and has not been let go. */
+    val isDraggingPane: Boolean get() = dragOrigin != null
+
     /** The seam the next drag moves, for callers that want to show what is grabbed. */
     val divider: Divider? get() = grabbedDivider
 
@@ -74,6 +95,7 @@ class DuoScreenInputRouter(
         if (mode == newMode) return
         mode = newMode
         if (newMode == Mode.NORMAL) {
+            cancelDrag()
             releaseDivider()
             if (selectedPaneId != null) {
                 selectedPaneId = null
@@ -87,6 +109,7 @@ class DuoScreenInputRouter(
      * the seam's handle in normal use too, not only while arranging. A tap anywhere else lets go.
      */
     fun grabDivider(seam: Divider) {
+        cancelDrag()
         grabbedDivider = seam
         if (selectedPaneId != null) {
             selectedPaneId = null
@@ -103,6 +126,8 @@ class DuoScreenInputRouter(
 
     fun onClick(x: Int, y: Int) {
         if (mode == Mode.NORMAL) releaseDivider()
+        // A tap starts a new gesture: a drag that was never let go ends where it is.
+        cancelDrag()
         if (mode == Mode.EDIT) {
             val seam = panes.dividerAt(x, y, tolerance = bounds.seamTolerance)
             if (seam != null) {
@@ -136,6 +161,7 @@ class DuoScreenInputRouter(
      */
     fun setRect(paneId: Int, rect: Rect) {
         if (panes.pane(paneId) == null) return
+        cancelDrag()
         releaseDivider()
         val clamped = DuoScreenLayout.clamp(rect, bounds)
         panes = panes.withRect(paneId, clamped)
@@ -233,8 +259,48 @@ class DuoScreenInputRouter(
     private fun moveSelected(dx: Int, dy: Int) {
         val id = selectedPaneId ?: return
         val pane = panes.pane(id) ?: return
+        if (dragOrigin == null) dragOrigin = pane.rect
         val moved = DuoScreenLayout.move(pane.rect, dx, dy, bounds)
         panes = panes.withRect(id, moved)
         port.onPaneRectChanged(id, moved)
+        setSwapTarget(targetUnder(id, moved))
+    }
+
+    /**
+     * Lets go of the pane being dragged. Over another pane, the two swap — the dragged one takes
+     * the other's rect and the other takes the place the drag started from — and the pair is
+     * returned; anywhere else the pane stays where it was dragged and this returns null.
+     */
+    fun endDrag(): Pair<Int, Int>? {
+        val origin = dragOrigin ?: return null
+        val id = selectedPaneId
+        val targetId = swapTargetId
+        dragOrigin = null
+        setSwapTarget(null)
+        if (id == null || targetId == null) return null
+        val target = panes.pane(targetId) ?: return null
+        panes = panes.withRect(id, target.rect).withRect(targetId, origin)
+        port.onPaneRectChanged(id, target.rect)
+        port.onPaneRectChanged(targetId, origin)
+        return id to targetId
+    }
+
+    /** The topmost other pane under the centre of [rect], the one a drop there would swap with. */
+    private fun targetUnder(id: Int, rect: Rect): Int? {
+        val cx = rect.left + rect.width / 2
+        val cy = rect.top + rect.height / 2
+        return panes.panes.lastOrNull { it.id != id && it.rect.contains(cx, cy) }?.id
+    }
+
+    private fun setSwapTarget(paneId: Int?) {
+        if (swapTargetId == paneId) return
+        swapTargetId = paneId
+        port.onSwapTargetChanged(paneId)
+    }
+
+    /** Ends a drag without swapping, for anything that starts a different gesture. */
+    private fun cancelDrag() {
+        dragOrigin = null
+        setSwapTarget(null)
     }
 }
