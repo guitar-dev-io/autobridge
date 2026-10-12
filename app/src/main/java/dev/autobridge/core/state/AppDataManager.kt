@@ -5,6 +5,7 @@ import dev.autobridge.core.crypto.SecretText
 import dev.autobridge.diagnostics.CrashReportStore
 import dev.autobridge.logging.StructuredLog
 import dev.autobridge.iptv.IptvCatalog
+import dev.autobridge.iptv.IptvGuide
 import dev.autobridge.ui.ImageLoader
 import java.io.File
 
@@ -61,6 +62,7 @@ object AppDataManager {
         val app = context.applicationContext
         val images = ImageLoader.clearCache(app)
         IptvCatalog.clearAll()
+        IptvGuide.clearAll(app)
         val other = clearCacheDir(app)
         val result = ClearResult(imageFilesDeleted = images, prefsFilesCleared = 0, otherFilesDeleted = other)
         StructuredLog.i(TAG, "cleared cache: images=$images otherCacheFiles=$other")
@@ -82,6 +84,7 @@ object AppDataManager {
         val app = context.applicationContext
         val images = ImageLoader.clearCache(app)
         IptvCatalog.clearAll()
+        IptvGuide.clearAll(app)
         val cacheFiles = clearCacheDir(app)
         val prefsCleared = clearAllPreferences(app)
         // Dropping the Keystore key is what makes the wipe final: the encrypted IPTV credentials

@@ -44,6 +44,7 @@ import dev.autobridge.car.DuoSessionState
 import dev.autobridge.core.model.Feature
 import dev.autobridge.core.policy.FeaturePolicy
 import dev.autobridge.audio.WebMediaStatus
+import dev.autobridge.iptv.IptvHealthStore
 import dev.autobridge.logging.StructuredLog
 import dev.autobridge.safety.ParkingStateStore
 import dev.autobridge.settings.PreferredPlayer
@@ -173,7 +174,10 @@ class MediaPlaybackService : MediaLibraryService() {
      */
     private val playerListener = object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) {
-            if (error.errorCode != PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) return
+            if (error.errorCode != PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
+                recordStreamHealth(error)
+                return
+            }
             val now = SystemClock.elapsedRealtime()
             if (now - lastLiveRecoveryMs < LIVE_RECOVERY_INTERVAL_MS) {
                 StructuredLog.w("MEDIA", "behind live window again within ${LIVE_RECOVERY_INTERVAL_MS}ms; reporting it")
@@ -185,6 +189,10 @@ class MediaPlaybackService : MediaLibraryService() {
                 target.seekToDefaultPosition()
                 target.prepare()
             }
+        }
+
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            if (isPlaying) recordStreamHealth(null)
         }
 
         /** The browse tree is the queue, so a queue change is a change of the root's children. */
@@ -211,6 +219,18 @@ class MediaPlaybackService : MediaLibraryService() {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             subtitles?.clear()
         }
+    }
+
+    /**
+     * Tells [IptvHealthStore] whether the current network stream played ([error] null) or failed.
+     * A playback failure is the strongest evidence a channel is dead, stronger than any probe, and
+     * this service sees it for the phone player and the car alike. Local files are not recorded.
+     */
+    private fun recordStreamHealth(error: PlaybackException?) {
+        val url = player?.currentMediaItem?.localConfiguration?.uri?.toString() ?: return
+        val scheme = url.substringBefore("://", "").lowercase()
+        if (scheme !in setOf("http", "https", "rtmp", "rtmps", "rtsp", "rtsps")) return
+        if (error == null) IptvHealthStore.recordSuccess(url) else IptvHealthStore.recordFailure(url, error.errorCodeName)
     }
 
     private fun rootItem(): MediaItem = MediaItem.Builder()
@@ -557,6 +577,13 @@ class MediaPlaybackService : MediaLibraryService() {
                     override fun onTimelineChanged(timeline: Timeline, reason: Int) {
                         if (reason != Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED) return
                         session?.notifyChildrenChanged(ROOT_ID, player?.mediaItemCount ?: 0, null)
+                    }
+
+                    // Stream health is engine-independent, so VLC reports it too.
+                    override fun onPlayerError(error: PlaybackException) = recordStreamHealth(error)
+
+                    override fun onIsPlayingChanged(isPlaying: Boolean) {
+                        if (isPlaying) recordStreamHealth(null)
                     }
                 }
                 facade.addListener(listener)

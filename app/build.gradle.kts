@@ -337,6 +337,9 @@ dependencies {
     // SponsorBlock response parser is ordinary JSON work and is worth testing, so the tests get a
     // real implementation of the same API. Not shipped: the platform provides it on a device.
     testImplementation("org.json:json:20250107")
+    // Same reason for org.xmlpull: the XMLTV guide reader takes a pull parser, and kXML is the
+    // parser the platform itself ships, so the tests read guides exactly as a device does.
+    testImplementation("net.sf.kxml:kxml2:2.3.0")
     // Compose BOM pinned to the last release line compatible with AGP 8.13.2 / compileSdk 36.
     // Compose 1.12+ (BOM 2026.06.01) requires compileSdk 37 and AGP 9.1.0+, so it is not used here.
     val composeBom = platform("androidx.compose:compose-bom:2025.06.01")

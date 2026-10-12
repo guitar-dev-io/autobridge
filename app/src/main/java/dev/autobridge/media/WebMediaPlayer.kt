@@ -129,5 +129,14 @@ class WebMediaPlayer(looper: Looper) : SimpleBasePlayer(looper) {
     override fun handleAddMediaItems(index: Int, mediaItems: MutableList<MediaItem>): ListenableFuture<*> =
         Futures.immediateVoidFuture()
 
+    // The page owns what plays, so there is no queue to edit. These must still answer: the session
+    // forwards a controller's clearMediaItems() here while the web source is selected (closing a
+    // channel does exactly that), and SimpleBasePlayer's defaults throw.
+    override fun handleRemoveMediaItems(fromIndex: Int, toIndex: Int): ListenableFuture<*> =
+        Futures.immediateVoidFuture()
+
+    override fun handleMoveMediaItems(fromIndex: Int, toIndex: Int, newIndex: Int): ListenableFuture<*> =
+        Futures.immediateVoidFuture()
+
     override fun handleRelease(): ListenableFuture<*> = Futures.immediateVoidFuture()
 }

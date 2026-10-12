@@ -327,6 +327,7 @@ class DuoScreenController(
         if (!running) return
         saveLayout()
         mainHandler.removeCallbacks(commitPoll)
+        mainHandler.removeCallbacks(dropPoll)
         // Kept alive, unlike in stop(): the session is only detached and resume() carries on with it.
         onInputThread {
             inputHandler?.removeCallbacks(dragIdle)
@@ -819,6 +820,7 @@ class DuoScreenController(
             density = density,
             focusedPaneId = active.lastTouchedPaneId,
             selectedPaneId = active.selectedPaneId,
+            swapTargetId = active.swapTargetId,
             gripGrabbed = active.divider != null,
             pressed = pressedChrome,
             currentPreset = DuoScreenStore.preset(context),
@@ -1125,11 +1127,29 @@ class DuoScreenController(
         if (toolbarOpen) scheduleToolbarHide()
         scheduleChromeRefresh()
         pendingSizes[paneId] = rect
+        // A pane being dragged is let go once the drag rests, the only "finger up" the host gives;
+        // the longer seam wait, so a pause mid-drag does not drop the pane on whatever is under it.
+        if (router?.isDraggingPane == true) {
+            mainHandler.removeCallbacks(dropPoll)
+            mainHandler.postDelayed(dropPoll, DIVIDER_QUIET_PERIOD_MS)
+        }
         val quiet = if (router?.divider != null) DIVIDER_QUIET_PERIOD_MS else QUIET_PERIOD_MS
         debouncer.onResizeActivity(paneId, SystemClock.uptimeMillis(), quiet)
         mainHandler.removeCallbacks(commitPoll)
         mainHandler.postDelayed(commitPoll, quiet)
     }
+
+    /** Lets go of a dragged pane: over another pane the two swap, as the Swap button would. */
+    private val dropPoll = Runnable {
+        val active = router ?: return@Runnable
+        val swapped = active.endDrag() ?: return@Runnable
+        // The dragged pane was brought to front on selection; keep the compositor's order in step.
+        compositor.bringToFront(swapped.first)
+        refreshChrome()
+        StructuredLog.i(TAG, "Dragged pane ${swapped.first} onto pane ${swapped.second}: swapped")
+    }
+
+    override fun onSwapTargetChanged(paneId: Int?) = scheduleChromeRefresh()
 
     private var loggedSeam: Triple<Int, Int, DuoScreenLayout.Axis>? = null
     private var chromeRefreshPosted = false

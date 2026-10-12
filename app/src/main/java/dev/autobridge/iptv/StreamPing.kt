@@ -115,6 +115,13 @@ object StreamPing {
 
     private data class Stamped(val result: Result, val atMs: Long)
 
+    /**
+     * Told about every address actually probed, on the probing thread — [IptvHealthStore] keeps
+     * the failures past this cache's five minutes. A run's deadline filling in "Timed out" for the
+     * stragglers is not reported: that says the pool was busy, not that the channel is dead.
+     */
+    @Volatile var observer: ((String, Result) -> Unit)? = null
+
     /** The remembered result for [url] while it is still fresh, else null. */
     fun cached(url: String): Result? {
         val stamped = results[url.trim()] ?: return null
@@ -259,6 +266,7 @@ object StreamPing {
     private fun probed(url: String): Result {
         val result = runCatching { probe(url) }.getOrElse { Result.Unreachable(reason(it)) }
         runCatching { remember(url, result) }
+        runCatching { observer?.invoke(url, result) }
         return result
     }
 

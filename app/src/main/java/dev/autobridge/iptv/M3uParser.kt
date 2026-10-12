@@ -4,20 +4,42 @@ package dev.autobridge.iptv
  * Minimal `#EXTM3U` reader for IPTV playlists, including the `m3u_plus` attribute form Xtream
  * portals serve from `get.php`.
  *
- * Only the attributes AutoBridge actually shows are read (`group-title`, the logo, `tvg-name`);
+ * Only the attributes AutoBridge actually uses are read (`group-title`, the logo, `tvg-name`, and
+ * the `tvg-id`/`tvg-country` pair that ties a channel to its guide);
  * anything else on the line is ignored rather than rejected, because provider playlists routinely
  * carry vendor-specific extras. Which attribute carries the logo, and what makes its address
  * usable, is [IptvLogos]' business — the value arrives here however the provider wrote it.
  * Pure string work, so it is unit-testable without a network.
  */
 object M3uParser {
-    /** One playlist line pair: its `#EXTINF` metadata plus the URL that follows it. */
+    /**
+     * One playlist line pair: its `#EXTINF` metadata plus the URL that follows it. [guideId] is the
+     * `tvg-id` an XMLTV guide files this channel's programmes under; [country] is `tvg-country`.
+     */
     data class Channel(
         val name: String,
         val url: String,
         val group: String = "",
-        val logo: String = ""
+        val logo: String = "",
+        val guideId: String = "",
+        val country: String = ""
     )
+
+    /**
+     * The XMLTV guides the playlist's `#EXTM3U` header points at. Generators disagree on the name
+     * (`x-tvg-url`, `url-tvg`, `tvg-url`) and some list several addresses in one value, separated
+     * by commas; every spelling is read and every address kept, in the order written.
+     */
+    fun guideUrls(text: String): List<String> {
+        val header = text.lineSequence().map { it.trim() }.firstOrNull { it.isNotEmpty() } ?: return emptyList()
+        if (!header.startsWith("#EXTM3U", ignoreCase = true)) return emptyList()
+        val attributes = parseAttributes(header)
+        return GUIDE_ATTRIBUTES.mapNotNull { attributes[it] }
+            .flatMap { it.split(',') }
+            .map { it.trim() }
+            .filter { it.startsWith("http://", ignoreCase = true) || it.startsWith("https://", ignoreCase = true) }
+            .distinct()
+    }
 
     fun parse(text: String): List<Channel> {
         val channels = mutableListOf<Channel>()
@@ -63,7 +85,9 @@ object M3uParser {
             name = name.ifBlank { attributes["tvg-name"].orEmpty() },
             url = "",
             group = attributes["group-title"].orEmpty(),
-            logo = IptvLogos.pick(attributes)
+            logo = IptvLogos.pick(attributes),
+            guideId = attributes["tvg-id"].orEmpty().trim(),
+            country = attributes["tvg-country"].orEmpty().trim()
         )
     }
 
@@ -87,6 +111,8 @@ object M3uParser {
         }
         return attributes
     }
+
+    private val GUIDE_ATTRIBUTES = listOf("x-tvg-url", "url-tvg", "tvg-url")
 
     private const val ATTRIBUTE = "([A-Za-z0-9_-]+)=\"([^\"]*)\""
 }

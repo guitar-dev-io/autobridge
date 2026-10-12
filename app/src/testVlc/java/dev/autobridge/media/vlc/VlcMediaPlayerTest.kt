@@ -223,4 +223,38 @@ class VlcMediaPlayerTest {
         backend.markLive(true)
         assertFalse("a live stream withholds in-item seek", logic.canSeekInItem)
     }
+
+    // -- removing items: closing a channel clears the queue ------------------------------------
+
+    @Test
+    fun `clearing the queue stops playback`() {
+        val backend = FakeBackend()
+        val logic = logicOver(backend)
+        logic.setMediaItems(items("a", "b"), startIndex = 1)
+        logic.removeMediaItems(0, 2)
+        assertTrue(logic.queue.isEmpty())
+        assertEquals(0, logic.currentIndex)
+        assertEquals(false, backend.hasMediaLoaded)
+    }
+
+    @Test
+    fun `removing the playing item loads the one that takes its place`() {
+        val backend = FakeBackend()
+        val logic = logicOver(backend)
+        logic.setMediaItems(items("a", "b", "c"), startIndex = 1)
+        logic.removeMediaItems(1, 2)
+        assertEquals(1, logic.currentIndex)
+        assertEquals(listOf("b", "c"), backend.loadedUris)
+    }
+
+    @Test
+    fun `removing items before the playing one keeps it current`() {
+        val backend = FakeBackend()
+        val logic = logicOver(backend)
+        logic.setMediaItems(items("a", "b", "c"), startIndex = 2)
+        logic.removeMediaItems(0, 1)
+        assertEquals(1, logic.currentIndex)
+        assertEquals("c", logic.queue[logic.currentIndex].mediaId)
+        assertEquals(listOf("c"), backend.loadedUris)
+    }
 }

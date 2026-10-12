@@ -45,4 +45,5 @@ object CarIcons {
     @DrawableRes val CONTROLS = R.drawable.ic_action_controls
     @DrawableRes val APPS = R.drawable.ic_action_apps
     @DrawableRes val SIGNAL = R.drawable.ic_action_signal
+    @DrawableRes val SEARCH = R.drawable.ic_browser_search
 }

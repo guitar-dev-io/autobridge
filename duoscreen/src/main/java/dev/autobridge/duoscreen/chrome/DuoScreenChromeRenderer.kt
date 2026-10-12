@@ -25,6 +25,8 @@ data class ChromeFrame(
     val focusedPaneId: Int?,
     /** The pane outlined while arranging. */
     val selectedPaneId: Int?,
+    /** The pane a dragged pane would swap with if let go now: highlighted, so the drop is seen. */
+    val swapTargetId: Int? = null,
     val gripGrabbed: Boolean,
     val pressed: ChromeTarget?,
     val currentPreset: DuoScreenPreset,
@@ -58,6 +60,7 @@ class DuoScreenChromeRenderer {
         const val CHIP_TEXT_SELECTED = 0xFFDCE6FF.toInt()
         const val CHIP_GLYPH = 0xFF6B7380.toInt()
         const val SWAP = 0xFF2D4470.toInt()
+        const val SWAP_TARGET = 0xB82D4470.toInt()
         const val TEXT = 0xFFF1F3F5.toInt()
         const val TEXT_MUTED = 0xFFC7CCD2.toInt()
         const val CARD_BUTTON = 0xFFF1F3F5.toInt()
@@ -410,9 +413,11 @@ class DuoScreenChromeRenderer {
         val radius = s.PANE_RADIUS * d
         frame.chrome.cards.forEach { card ->
             rect.set(card.pane.toRectF())
-            fill.color = DIM
+            // The swap target loses its dimming and takes the Swap colour, so it reads as the
+            // place the dragged pane is about to land.
+            fill.color = if (card.paneId == frame.swapTargetId) SWAP_TARGET else DIM
             canvas.drawRoundRect(rect, radius, radius, fill)
-            if (card.paneId == frame.selectedPaneId) {
+            if (card.paneId == frame.selectedPaneId || card.paneId == frame.swapTargetId) {
                 stroke.color = ACCENT
                 stroke.strokeWidth = s.SELECT_OUTLINE * d
                 rect.inset(stroke.strokeWidth / 2f, stroke.strokeWidth / 2f)

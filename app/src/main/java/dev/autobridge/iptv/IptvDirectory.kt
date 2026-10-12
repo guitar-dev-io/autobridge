@@ -18,13 +18,18 @@ object IptvDirectory {
      * One offer in the picker. [note] is what the row says about the list: its size and the thing
      * the user would otherwise find out only after loading it. [seeded] marks the ones a fresh
      * install starts with, so TV and Radio have something to show before anything is configured.
+     *
+     * [guide] is an XMLTV guide known to cover the list, tried after whatever the playlist's own
+     * header declares. It exists because headers rot: the Thai list's declared guide answers GitHub's
+     * 404 page, while epgshare01's Thai file covers the same `tvg-id`s.
      */
     data class Entry(
         val name: String,
         val url: String,
         val kind: IptvKind,
         val note: String,
-        val seeded: Boolean = false
+        val seeded: Boolean = false,
+        val guide: String = ""
     )
 
     private val ENTRIES = listOf(
@@ -40,7 +45,8 @@ object IptvDirectory {
             url = "https://dearbulut.github.io/iptv/playlists/language/tha.m3u",
             kind = IptvKind.TV,
             note = "Thai-language channels",
-            seeded = true
+            seeded = true,
+            guide = "https://epgshare01.online/epgshare01/epg_ripper_TH1.xml.gz"
         ),
         Entry(
             name = "iptv-org · All countries",
@@ -64,6 +70,10 @@ object IptvDirectory {
     )
 
     fun list(kind: IptvKind): List<Entry> = ENTRIES.filter { it.kind == kind }
+
+    /** The fallback guide for a playlist at [playlistUrl], or blank when the directory knows none. */
+    fun guideFor(playlistUrl: String): String =
+        ENTRIES.firstOrNull { it.url.equals(playlistUrl.trim(), ignoreCase = true) }?.guide.orEmpty()
 
     /** The lists a fresh install starts with. */
     fun defaults(): List<Entry> = ENTRIES.filter { it.seeded }

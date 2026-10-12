@@ -29,6 +29,10 @@ import dev.autobridge.iptv.IptvCatalogData
 import dev.autobridge.iptv.IptvCategory
 import dev.autobridge.iptv.IptvDirectory
 import dev.autobridge.iptv.IptvEntry
+import dev.autobridge.iptv.IptvEntryType
+import dev.autobridge.iptv.IptvGuide
+import dev.autobridge.iptv.IptvGuideText
+import dev.autobridge.iptv.IptvHealthStore
 import dev.autobridge.iptv.IptvHistoryStore
 import dev.autobridge.iptv.IptvKind
 import dev.autobridge.iptv.IptvPinnedCategoryStore
@@ -141,6 +145,13 @@ class LibraryActivity : Activity() {
      * in here after navigating away is only ever written to, never read from.
      */
     private val pingTiles = mutableMapOf<String, View>()
+
+    /**
+     * The rows and tiles drawn with a guide line, each with what its line should say now, so a
+     * guide landing late is written into the page the same way [pingTiles] are — see
+     * [updateGuideViews]. Cleared whenever a page that shows entries draws.
+     */
+    private val guideViews = mutableMapOf<View, () -> String?>()
 
     /**
      * The entries page's header signal icon, so a check result landing can recolour it without
@@ -258,9 +269,14 @@ class LibraryActivity : Activity() {
 
         val pinned = mutableListOf<View>()
         pinned += extraPinned
-        if (search != null) {
-            pinned += AutoBridgeDesign.searchField(this, getString(R.string.action_search), search.first, search.second)
+        // A search page redraws itself on every keystroke, and the redraw builds a new field. Unless
+        // that field takes the focus back, typing stops after the first letter.
+        val typing = (currentFocus as? EditText)?.tag == SEARCH_FIELD_TAG
+        val searchField = search?.let {
+            AutoBridgeDesign.searchField(this, getString(R.string.action_search), it.first, it.second)
+                .also { field -> field.tag = SEARCH_FIELD_TAG }
         }
+        searchField?.let { pinned += it }
         if (actions.isNotEmpty()) {
             val row = LinearLayout(this)
             actions.forEachIndexed { index, (label, handler) ->
@@ -296,6 +312,7 @@ class LibraryActivity : Activity() {
             overlay = overlay
         )
         setContentView(page)
+        if (typing) searchField?.requestFocus()
         return page
     }
 
@@ -390,6 +407,7 @@ class LibraryActivity : Activity() {
             val rows = mutableListOf<View>()
             var overlay: View? = null
             var scrollRef: ScrollView? = null
+            clearGuideViews()
 
             if (q.isBlank()) {
                 val pinnedIds = IptvPinnedCategoryStore.pinned(this, source.id)
@@ -398,6 +416,11 @@ class LibraryActivity : Activity() {
                 if (pinnedCategories.isNotEmpty() || hasRecent) {
                     rows += pinnedHeader(source, data)
                     rows += pinnedRow(source, data, pinnedCategories, hasRecent)
+                }
+                val broken = IptvHealthStore.brokenAmong(data.entries)
+                if (broken.isNotEmpty() || data.smartGroups.isNotEmpty()) {
+                    rows += AutoBridgeDesign.sectionLabel(this, getString(R.string.smart_groups))
+                    rows += smartRow(source, data, broken)
                 }
 
                 val grouped = data.categories
@@ -432,9 +455,17 @@ class LibraryActivity : Activity() {
                     .filter { it.title.contains(q, ignoreCase = true) }
                     .take(MAX_SEARCH_MATCHES)
                 val matchingCategories = data.categories.filter { it.name.contains(q, ignoreCase = true) }
+                // Channels whose programme on now matches: "football" finds the match being shown,
+                // not just channels named after it. Only guides already loaded are searched.
+                val onNow = IptvGuide.onNowMatching(source, data.entries, q, MAX_SEARCH_MATCHES)
+                    .filterNot { it in matchingEntries }
                 if (matchingEntries.isNotEmpty()) {
                     rows += AutoBridgeDesign.sectionLabel(this, getString(R.string.car_favorites_channels))
                     rows += matchingEntries.map { entryRow(source, it, matchingEntries) }
+                }
+                if (onNow.isNotEmpty()) {
+                    rows += AutoBridgeDesign.sectionLabel(this, getString(R.string.guide_on_now))
+                    rows += onNow.map { entryRow(source, it, onNow) }
                 }
                 if (matchingCategories.isNotEmpty()) {
                     rows += AutoBridgeDesign.sectionLabel(this, getString(R.string.library_categories))
@@ -461,6 +492,7 @@ class LibraryActivity : Activity() {
                 overlay = overlay
             )
             scrollRef = AutoBridgeDesign.pageScroll(page)
+            loadGuide(source)
         }
         push(draw)
     }
@@ -673,6 +705,36 @@ class LibraryActivity : Activity() {
         }
     }
 
+    /**
+     * The groups AutoBridge works out itself: the channels whose last attempt failed, in red, then
+     * one chip per [dev.autobridge.iptv.IptvSmartGroups] group ("News · 12"). Each opens as an
+     * ordinary entries page, so checking, hiding offline channels and the grid all work there too.
+     */
+    private fun smartRow(source: IptvSource, data: IptvCatalogData, broken: List<IptvEntry>): View {
+        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        if (broken.isNotEmpty()) {
+            row.addView(
+                chip(getString(R.string.health_not_working_chip, broken.size), AutoBridgeDesign.DANGER) {
+                    showEntries(source, data, null, getString(R.string.health_not_working_title), broken)
+                },
+                LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(8) }
+            )
+        }
+        data.smartGroups.forEach { group ->
+            val label = IptvGuideText.smartLabel(this, group.kind)
+            row.addView(
+                chip(getString(R.string.smart_group_chip, label, group.entries.size), accent) {
+                    showEntries(source, data, null, label, group.entries)
+                },
+                LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(8) }
+            )
+        }
+        return HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(row, ViewGroup.LayoutParams(-2, -2))
+        }
+    }
+
     private fun chip(label: String, color: Int, onClick: () -> Unit): View = TextView(this).apply {
         text = label
         textSize = 13f
@@ -730,13 +792,18 @@ class LibraryActivity : Activity() {
         }
     }
 
+    /**
+     * One list of entries. [categoryId] is the provider category it came from, or null for a list
+     * AutoBridge put together itself (a smart group, the channels not working), which has nothing
+     * to pin; [all] defaults to that category's entries.
+     */
     private fun showEntries(
         source: IptvSource,
         data: IptvCatalogData,
-        categoryId: String,
-        categoryName: String
+        categoryId: String?,
+        categoryName: String,
+        all: List<IptvEntry> = categoryId?.let(data::entriesIn).orEmpty()
     ) {
-        val all = data.entriesIn(categoryId)
         var query = ""
         var hideOffline = false
         var gridView = true
@@ -748,23 +815,20 @@ class LibraryActivity : Activity() {
             val filtered = if (query.isBlank()) all else {
                 all.filter { it.title.contains(query, ignoreCase = true) }
             }
-            val checkedResults = filtered.mapNotNull { e -> e.url.takeIf { it.isNotBlank() }?.let(StreamPing::cached) }
-            val offlineCount = checkedResults.count { StreamPing.tone(it) == StreamPing.Tone.BAD }
-            val onlineCount = checkedResults.size - offlineCount
-            val visible = if (hideOffline) {
-                filtered.filter { e ->
-                    e.url.isBlank() || StreamPing.cached(e.url)?.let { StreamPing.tone(it) != StreamPing.Tone.BAD } ?: true
-                }
-            } else {
-                filtered
-            }
+            // A channel is known to be offline from this session's check or, failing that, from
+            // the last attempt remembered across restarts; both count, and both hide.
+            val known = filtered.filter { e -> e.url.isNotBlank() && (StreamPing.cached(e.url) != null || IptvHealthStore.broken(e.url) != null) }
+            val offlineCount = known.count(::isOffline)
+            val onlineCount = known.size - offlineCount
+            val visible = if (hideOffline) filtered.filterNot(::isOffline) else filtered
             val shown = visible.take(MAX_VISIBLE_ENTRIES)
             val counted = if (query.isBlank()) getString(R.string.library_entries_counted, all.size, source.name)
             else getString(R.string.library_entries_matched, filtered.size, all.size, query)
             // The tiles about to be built are the ones a landing result writes into.
             pingTiles.clear()
+            clearGuideViews()
             val rows = mutableListOf<View>()
-            if (checkedResults.isNotEmpty()) rows += checkSummaryRow(
+            if (known.isNotEmpty()) rows += checkSummaryRow(
                 online = onlineCount,
                 offline = offlineCount,
                 hideOffline = hideOffline,
@@ -796,15 +860,15 @@ class LibraryActivity : Activity() {
                 ),
                 // A filled star to pin this category, then the grid/list toggle. The channel
                 // check moved to a button on the status summary row (see checkSummaryRow).
-                headerActions = listOf(
-                    run {
-                        val isPinned = IptvPinnedCategoryStore.isPinned(this@LibraryActivity, source.id, categoryId)
+                headerActions = listOfNotNull(
+                    categoryId?.let { pinId ->
+                        val isPinned = IptvPinnedCategoryStore.isPinned(this@LibraryActivity, source.id, pinId)
                         AutoBridgeDesign.HeaderAction(
                             glyph = if (isPinned) "★" else "☆",
                             filled = isPinned,
                             tint = if (isPinned) AutoBridgeDesign.ACCENT_FAVORITE else null,
                             onClick = {
-                                IptvPinnedCategoryStore.toggle(this@LibraryActivity, source.id, categoryId)
+                                IptvPinnedCategoryStore.toggle(this@LibraryActivity, source.id, pinId)
                                 draw()
                             }
                         )
@@ -823,12 +887,64 @@ class LibraryActivity : Activity() {
                     null
                 }
             )
+            loadGuide(source)
             if (!autoChecked) {
                 autoChecked = true
                 pingEntries(shown.take(AUTO_PING_ENTRIES), quiet = true)
             }
         }
         push(draw)
+    }
+
+    /** Offline by this session's check, or by the last attempt remembered across restarts. */
+    private fun isOffline(entry: IptvEntry): Boolean {
+        if (entry.url.isBlank()) return false
+        val checked = StreamPing.cached(entry.url)
+        return if (checked != null) StreamPing.tone(checked) == StreamPing.Tone.BAD else IptvHealthStore.broken(entry.url) != null
+    }
+
+    /**
+     * Asks the guide for the entries drawn with a guide line on this page, at most [GUIDE_ENTRIES]
+     * of them — an Xtream portal is asked once per channel — and writes each answer into the page
+     * as it lands.
+     */
+    private fun loadGuide(source: IptvSource) {
+        if (guideEntries.isEmpty()) return
+        IptvGuide.load(this, source, guideEntries.take(GUIDE_ENTRIES)) {
+            if (!isFinishing && !isDestroyed) updateGuideViews()
+        }
+    }
+
+    /** The entries behind [guideViews], in drawing order, for [loadGuide]. */
+    private val guideEntries = mutableListOf<IptvEntry>()
+
+    private fun clearGuideViews() {
+        guideViews.clear()
+        guideEntries.clear()
+    }
+
+    /** Registers [view] as showing [entry]'s guide line, worded by [text]. */
+    private fun trackGuide(view: View, entry: IptvEntry, text: () -> String?) {
+        if (entry.type != IptvEntryType.LIVE) return
+        guideViews[view] = text
+        guideEntries += entry
+    }
+
+    private fun updateGuideViews() {
+        guideViews.forEach { (view, text) -> AutoBridgeDesign.setGuide(view, text()) }
+    }
+
+    /** What a tile's guide line says: the programme on now, or failing that, what is next. */
+    private fun tileGuide(source: IptvSource, entry: IptvEntry): String? {
+        val guide = IptvGuide.nowNext(source, entry)
+        return IptvGuideText.now(this, guide) ?: IptvGuideText.next(this, guide)
+    }
+
+    /** What a row's guide line says: now and next together. */
+    private fun rowGuide(source: IptvSource, entry: IptvEntry): String? {
+        val guide = IptvGuide.nowNext(source, entry)
+        return listOfNotNull(IptvGuideText.now(this, guide), IptvGuideText.next(this, guide))
+            .joinToString(" • ").ifBlank { null }
     }
 
     /** Online/offline counts from the last check, a recheck button, and the Hide offline toggle. */
@@ -909,7 +1025,9 @@ class LibraryActivity : Activity() {
             ).joinToString(" • "),
             accent = accent,
             artworkUrl = entry.logo,
-            status = StreamPing.cached(entry.url)?.let { pingStatus(it) },
+            status = StreamPing.cached(entry.url)?.let { pingStatus(it) }
+                ?: IptvHealthStore.broken(entry.url)?.let { IptvGuideText.broken(this, it) to AutoBridgeDesign.DANGER },
+            guide = tileGuide(source, entry),
             corner = if (entry.isSeriesFolder) {
                 "›" to { openEntry(source, entry, siblings) }
             } else {
@@ -928,6 +1046,7 @@ class LibraryActivity : Activity() {
             onClick = { openEntry(source, entry, siblings) }
         )
         if (entry.url.isNotBlank()) pingTiles[entry.url] = tile
+        trackGuide(tile, entry) { tileGuide(source, entry) }
         return if (onCar) onCarBadge(tile) else tile
     }
 
@@ -1021,12 +1140,14 @@ class LibraryActivity : Activity() {
                 entry.subtitle.takeIf { it.isNotBlank() },
                 getString(R.string.car_iptv_opens_in_browser).takeIf { entry.isWebPage },
                 getString(R.string.car_iptv_catchup).takeIf { entry.supportsCatchup },
-                // Whatever the last check said about this address, for as long as it stays true;
-                // the row says nothing extra until something has actually been checked.
+                // Whatever the last check said about this address, for as long as it stays true,
+                // or else the last attempt remembered across restarts; nothing until either exists.
                 StreamPing.cached(entry.url)?.let { StreamPing.describe(it) }
+                    ?: IptvHealthStore.broken(entry.url)?.let { IptvGuideText.broken(this, it) }
             ).joinToString(" • "),
             accent = accent,
             artworkUrl = entry.logo,
+            guide = rowGuide(source, entry),
             trailing = if (entry.isSeriesFolder) "›" else if (favorite) "★" else "☆",
             onTrailing = if (entry.isSeriesFolder) null else {
                 {
@@ -1041,6 +1162,7 @@ class LibraryActivity : Activity() {
         if (!entry.isSeriesFolder && !entry.isWebPage && source.kind != IptvKind.RADIO) {
             row.setOnLongClickListener { sendChannelMenu(source, entry); true }
         }
+        trackGuide(row, entry) { rowGuide(source, entry) }
         return row
     }
 
@@ -1373,6 +1495,9 @@ class LibraryActivity : Activity() {
         )
         val username = if (xtream) field(getString(R.string.library_username), existing?.username.orEmpty()) else null
         val password = if (xtream) field(getString(R.string.library_password), existing?.password.orEmpty(), password = true) else null
+        // An Xtream portal answers its own guide; a playlist's header usually names one, and this
+        // is for the playlist whose header names none, or a dead one.
+        val guide = if (xtream) null else field(getString(R.string.guide_url_hint), existing?.guideUrl.orEmpty())
 
         AlertDialog.Builder(this)
             .setTitle(
@@ -1410,7 +1535,11 @@ class LibraryActivity : Activity() {
                         )
                     )
                 } else {
-                    if (!address.startsWith("http://", true) && !address.startsWith("https://", true)) {
+                    val guideAddress = guide?.text?.toString()?.trim().orEmpty()
+                    if (listOf(address, guideAddress).any {
+                            it.isNotEmpty() && !it.startsWith("http://", true) && !it.startsWith("https://", true)
+                        }
+                    ) {
                         alert(getString(R.string.library_invalid_url), getString(R.string.library_invalid_url_message))
                         return@setPositiveButton
                     }
@@ -1421,7 +1550,8 @@ class LibraryActivity : Activity() {
                             name = name.text.toString().trim().ifEmpty { hostOf(address) },
                             kind = iptvKind,
                             type = IptvSourceType.M3U,
-                            url = address
+                            url = address,
+                            guideUrl = guideAddress
                         )
                     )
                 }
@@ -2049,6 +2179,16 @@ private const val MAX_PING_ENTRIES = 60
  * than what tapping the signal icon will do on request.
  */
 private const val AUTO_PING_ENTRIES = 24
+
+/**
+ * Cap on channels one page asks the guide about. An XMLTV guide answers every channel at once, but
+ * an Xtream portal is asked once per channel, and the rows past the first few screenfuls are not
+ * worth that many requests.
+ */
+private const val GUIDE_ENTRIES = 60
+
+/** Tag on a page's search field, so a redraw while typing can hand the focus to the new one. */
+private const val SEARCH_FIELD_TAG = "library-search"
 
 /** Tag on the entries page's header signal icon, so a landed check result can find it again. */
 private const val SIGNAL_ACTION_TAG = "iptv-signal"

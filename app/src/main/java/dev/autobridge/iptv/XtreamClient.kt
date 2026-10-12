@@ -150,7 +150,8 @@ internal object XtreamClient {
     }
 
     private fun loadPlaylist(url: String, keepOnlyRadio: Boolean): IptvCatalogData {
-        val channels = M3uParser.parse(fetch(url))
+        val text = fetch(url)
+        val channels = M3uParser.parse(text)
         val entries = channels.mapIndexed { index, channel ->
             // Curated lists carry their notes in the display name and their warnings in the URL;
             // both are read here so the row can say "YouTube · Geo-blocked" instead of failing
@@ -170,14 +171,16 @@ internal object XtreamClient {
                     .filter { it.isNotBlank() }
                     // Same separator the rows themselves use, so a row never mixes two.
                     .joinToString(" • "),
-                playback = if (webPage) IptvPlayback.WEB_PAGE else IptvPlayback.STREAM
+                playback = if (webPage) IptvPlayback.WEB_PAGE else IptvPlayback.STREAM,
+                guideId = channel.guideId,
+                country = channel.country
             )
         }.let { if (keepOnlyRadio) it.filter(::looksLikeRadio) else it }
 
         val categories = entries.map { it.categoryId }.distinct()
             .filter { it != IptvCatalogData.ALL_CATEGORY_ID }
             .map { IptvCategory(it, it) }
-        return finish(categories, entries)
+        return finish(categories, entries).copy(guideUrls = M3uParser.guideUrls(text))
     }
 
     /**

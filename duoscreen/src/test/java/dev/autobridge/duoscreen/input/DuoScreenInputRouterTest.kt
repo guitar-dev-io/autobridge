@@ -15,6 +15,11 @@ private class RecordingPort : DuoScreenInputPort {
     val selections = mutableListOf<Int?>()
     val rectChanges = mutableListOf<Pair<Int, Rect>>()
     val grabs = mutableListOf<DuoScreenLayout.Divider?>()
+    val swapTargets = mutableListOf<Int?>()
+
+    override fun onSwapTargetChanged(paneId: Int?) {
+        swapTargets += paneId
+    }
 
     override fun onDividerGrabbed(divider: DuoScreenLayout.Divider?) {
         grabs += divider
@@ -196,5 +201,50 @@ class DuoScreenInputRouterTest {
         router.setRect(0, Rect(0, 0, 585, 600))
         assertNull(port.grabs.last())
         assertEquals(0 to Rect(0, 0, 585, 600), port.rectChanges.single())
+    }
+
+    // ----- drag a pane onto another to swap -----
+
+    private fun selectInEdit(x: Int, y: Int) {
+        router.setMode(DuoScreenInputRouter.Mode.EDIT)
+        router.onClick(x, y)
+    }
+
+    @Test fun draggingAPaneOverAnotherMarksItAsTheSwapTarget() {
+        selectInEdit(100, 10) // pane 0, the left half
+        router.onScroll(-450, 0) // finger moves right by half the width
+        assertEquals(1, router.swapTargetId)
+        assertEquals(1, port.swapTargets.last())
+    }
+
+    @Test fun lettingGoOverAnotherPaneSwapsPlacesAndSizes() {
+        val left = router.panes.pane(0)!!.rect
+        val right = router.panes.pane(1)!!.rect
+        selectInEdit(100, 10)
+        router.onScroll(-450, 0)
+        assertEquals(0 to 1, router.endDrag())
+        assertEquals(right, router.panes.pane(0)!!.rect)
+        assertEquals(left, router.panes.pane(1)!!.rect)
+        assertNull(router.swapTargetId)
+        // The apps stay with their panes: only the places moved.
+        assertEquals("a", router.panes.pane(0)!!.packageName)
+    }
+
+    @Test fun lettingGoOverNoOtherPaneLeavesTheMove() {
+        selectInEdit(100, 10)
+        router.onScroll(-20, 0) // a nudge: the centre stays over its own place
+        val moved = router.panes.pane(0)!!.rect
+        assertNull(router.endDrag())
+        assertEquals(moved, router.panes.pane(0)!!.rect)
+    }
+
+    @Test fun leavingArrangeModeDropsTheDragWithoutSwapping() {
+        val left = router.panes.pane(0)!!.rect
+        selectInEdit(100, 10)
+        router.onScroll(-450, 0)
+        router.setMode(DuoScreenInputRouter.Mode.NORMAL)
+        assertNull(router.endDrag())
+        assertNull(router.swapTargetId)
+        assertEquals(false, router.panes.pane(1)!!.rect == left)
     }
 }
