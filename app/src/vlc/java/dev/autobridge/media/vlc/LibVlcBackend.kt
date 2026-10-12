@@ -124,8 +124,18 @@ class LibVlcBackend(context: Context) : VlcBackend {
         player.setScale(scale)
     }
 
+    /**
+     * libVLC's window takes one set of views at a time and throws "Can't set view when already
+     * attached" on a second attach — which is what happened when the phone player re-bound its
+     * view to a session whose video was already showing (the car's, or its own from before). The
+     * same surface again is a no-op; a different one replaces the current one.
+     */
     override fun attachSurface(surface: Surface) {
         val vout = player.getVLCVout()
+        if (vout.areViewsAttached()) {
+            if (surface == attachedSurface) return
+            vout.detachViews()
+        }
         attachedSurface = surface
         vout.setVideoSurface(surface, null)
         vout.attachViews()

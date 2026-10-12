@@ -199,6 +199,18 @@ class VlcMediaPlayer(
         return Futures.immediateVoidFuture()
     }
 
+    /**
+     * Without this, [Player.COMMAND_CHANGE_MEDIA_ITEMS] was advertised but a removal threw
+     * "Missing implementation" — and closing a channel ends with clearMediaItems(), so turning a
+     * channel off under the VLC engine crashed the app.
+     */
+    override fun handleRemoveMediaItems(fromIndex: Int, toIndex: Int): ListenableFuture<*> {
+        logic.removeMediaItems(fromIndex, toIndex)
+        if (logic.prepared && playWhenReady && queue.isNotEmpty()) backend.play()
+        invalidateState()
+        return Futures.immediateVoidFuture()
+    }
+
     // -- Transport -----------------------------------------------------------------------------
 
     override fun handlePrepare(): ListenableFuture<*> {

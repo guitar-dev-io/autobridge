@@ -62,6 +62,30 @@ class VlcPlaybackLogic(
         }
     }
 
+    /**
+     * Removes the items in [fromIndex, toIndex). Emptying the queue stops playback — what closing a
+     * channel means; removing the item that was playing loads the one that slides into its place;
+     * removing items before it keeps the same item current.
+     */
+    fun removeMediaItems(fromIndex: Int, toIndex: Int) {
+        val from = fromIndex.coerceIn(0, queue.size)
+        val to = toIndex.coerceIn(from, queue.size)
+        if (from == to) return
+        val removedCurrent = currentIndex in from until to
+        queue.subList(from, to).clear()
+        when {
+            queue.isEmpty() -> {
+                currentIndex = 0
+                backend.stop()
+            }
+            removedCurrent -> {
+                currentIndex = from.coerceAtMost(queue.lastIndex)
+                loadCurrent()
+            }
+            currentIndex >= to -> currentIndex -= to - from
+        }
+    }
+
     fun nextIndex(): Int = if (queue.isEmpty()) 0 else (currentIndex + 1) % queue.size
     fun previousIndex(): Int =
         if (queue.isEmpty()) 0 else (currentIndex - 1 + queue.size) % queue.size
