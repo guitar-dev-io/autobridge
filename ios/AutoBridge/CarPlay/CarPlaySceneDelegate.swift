@@ -182,7 +182,7 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
                 accessoryType: .none
             )
             row.handler = { [weak self] _, completion in
-                self?.presentNote(note.title, note.subtitle)
+                self?.presentNote(note.title, note.alert)
                 completion()
             }
             sections.append(CPListSection(items: [row]))
@@ -196,14 +196,16 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
         return template
     }
 
-    private func presentNote(_ title: String, _ subtitle: String) {
+    private func presentNote(_ title: String, _ body: String) {
         let ok = CPAlertAction(
             title: NSLocalizedString("OK", comment: "Button"),
             style: .default
         ) { [weak self] _ in
             self?.interfaceController?.dismissTemplate(animated: true, completion: nil)
         }
-        let alert = CPAlertTemplate(titleVariants: [title + "\n" + subtitle, title], actions: [ok])
+        // Longest variant first: CarPlay picks the longest that fits. These are single-line, so
+        // `body` is one whole sentence rather than the title and its subtitle joined.
+        let alert = CPAlertTemplate(titleVariants: [body, title], actions: [ok])
         interfaceController?.presentTemplate(alert, animated: true, completion: nil)
     }
 

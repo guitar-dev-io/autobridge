@@ -91,19 +91,36 @@ enum CarPlayHome {
     }
 
     /// The honest note a browser-backed tile shows: the site itself opens on the phone.
-    static func phoneNote(for section: HomeSection) -> (title: String, subtitle: String)? {
+    ///
+    /// `subtitle` is the row's second line, below `title`. `alert` says the same in one sentence,
+    /// for the alert the row opens: `CPAlertTemplate`'s title variants are single-line, so joining
+    /// title and subtitle with a newline there dropped the break and ran the two words together.
+    static func phoneNote(
+        for section: HomeSection
+    ) -> (title: String, subtitle: String, alert: String)? {
         let channels = NSLocalizedString(
             "Open it on your phone. Starred and recent channels play here.",
             comment: "CarPlay"
         )
         switch section {
         case .web:
-            return (NSLocalizedString("Web pages open on your phone", comment: "CarPlay"), channels)
+            return (
+                NSLocalizedString("Web pages open on your phone", comment: "CarPlay"),
+                channels,
+                NSLocalizedString(
+                    "Web pages open on your phone. Starred and recent channels play here.",
+                    comment: "CarPlay"
+                )
+            )
         case .youtube:
             return (
                 NSLocalizedString("YouTube plays on your phone", comment: "CarPlay"),
                 NSLocalizedString(
                     "Open it on your phone. Starred and recent TV channels play here.",
+                    comment: "CarPlay"
+                ),
+                NSLocalizedString(
+                    "YouTube plays on your phone. Starred and recent TV channels play here.",
                     comment: "CarPlay"
                 )
             )
@@ -113,10 +130,21 @@ enum CarPlayHome {
                 NSLocalizedString(
                     "Open it on your phone. Starred and recent radio stations play here.",
                     comment: "CarPlay"
+                ),
+                NSLocalizedString(
+                    "YouTube Music plays on your phone. Starred and recent radio stations play here.",
+                    comment: "CarPlay"
                 )
             )
         case .streaming:
-            return (NSLocalizedString("Streaming sites open on your phone", comment: "CarPlay"), channels)
+            return (
+                NSLocalizedString("Streaming sites open on your phone", comment: "CarPlay"),
+                channels,
+                NSLocalizedString(
+                    "Streaming sites open on your phone. Starred and recent channels play here.",
+                    comment: "CarPlay"
+                )
+            )
         default:
             return nil
         }
