@@ -2122,4 +2122,18 @@
     <string name="costs_legend_fuel">น้ำมัน ฿%1$s</string>
     <string name="costs_legend_other">อื่น ๆ ฿%1$s</string>
     <string name="costs_average_short">เฉลี่ย 3 เดือน ฿%1$s</string>
+    <string name="parking_save_without_gps">บันทึกโดยไม่ใช้ GPS</string>
+    <string name="parking_finding_card">กำลังหาตำแหน่ง… ไม่เกิน %1$d วินาที</string>
+    <string name="parking_finding_hint">ใต้อาคาร GPS อาจหาไม่เจอ บันทึกเป็นโน้ตแทนได้เลย</string>
+    <string name="parking_skip_gps">ไม่ต้องรอ บันทึกโดยไม่ใช้ GPS</string>
+    <string name="parking_no_gps_title">บันทึกที่จอดโดยไม่ใช้ GPS</string>
+    <string name="parking_no_gps_subtitle">จดชั้นและเสาไว้ ก็หารถเจอได้</string>
+    <string name="parking_no_fix_subtitle">หาตำแหน่งตรงนี้ไม่เจอ บันทึกเป็นโน้ตแทนได้</string>
+    <string name="parking_no_permission_subtitle">ไม่ได้อนุญาตตำแหน่ง บันทึกเป็นโน้ตแทนได้</string>
+    <string name="parking_no_gps_photo_hint">บันทึกแล้วถ่ายรูปป้ายหรือเสาจากหน้านี้ได้</string>
+    <string name="parking_no_position">ไม่มีตำแหน่ง GPS · ใช้โน้ตและรูปช่วยหา</string>
+    <string name="parking_add_gps">เพิ่มตำแหน่ง GPS</string>
+    <string name="parking_new_without_gps">จุดใหม่ ไม่ใช้ GPS</string>
+    <string name="parking_position_added">เพิ่มตำแหน่งแล้ว</string>
+    <string name="parking_car_no_fix">หาตำแหน่งไม่เจอ บนมือถือบันทึกเป็นโน้ตแทนได้</string>
 </resources>

@@ -43,6 +43,14 @@ class ParkingActivity : Activity() {
         render()
     }
 
+    /** What a position being looked for is for, or null when none is. */
+    private enum class Finding { NEW_SPOT, ADD_TO_SPOT }
+
+    private var finding: Finding? = null
+
+    /** Bumped when a search is abandoned, so its late answer is ignored. */
+    private var search = 0
+
     /**
      * As the design: the spot as one card (pin, how long ago, when, the note, the photo), then
      * Navigate back + Mark again, then Photo + Edit note, then one line on privacy.
@@ -54,7 +62,14 @@ class ParkingActivity : Activity() {
         fun pill(label: Int, primary: Boolean = false, onClick: () -> Unit) =
             AutoBridgeDesign.pill(this, getString(label), primary = primary, accent = accent, onClick = onClick)
         val photoPill = pill(if (hasPhoto) R.string.parking_photo_retake else R.string.parking_photo_take) { takePhoto() }
-        if (spot == null) {
+        if (finding != null) {
+            // In a garage GPS may never come: the way out is on screen the whole time.
+            body.stack(CarToolViews.card(this) {
+                addView(CarToolViews.text(context, getString(R.string.parking_finding_card, (ParkingLocator.TIMEOUT_MS / 1000).toInt()), 16f, bold = true))
+                addView(CarToolViews.text(context, getString(R.string.parking_finding_hint), 13f, AutoBridgeDesign.TEXT_MUTED, top = 4))
+            }, gap = 8)
+            body.stack(pill(R.string.parking_skip_gps) { skipGps() }, gap = 12)
+        } else if (spot == null) {
             body.stack(
                 AutoBridgeDesign.emptyState(
                     context = this,
@@ -64,19 +79,33 @@ class ParkingActivity : Activity() {
                 ),
                 gap = 12
             )
+            body.stack(CarToolViews.pillRow(this, listOf(
+                pill(R.string.parking_mark_here, primary = true) { markHere(Finding.NEW_SPOT) },
+                pill(R.string.parking_save_without_gps) { saveWithoutGps(null) }
+            )), gap = 8)
             // The photo works without a marked spot too: a picture of the pillar number is worth having.
             body.stack(CarToolViews.pillRow(this, listOfNotNull(
-                pill(R.string.parking_mark_here, primary = true) { markHere() },
                 photoPill,
                 if (hasPhoto) pill(R.string.parking_photo_view) { showPhoto() } else null
             )), gap = 12)
-        } else {
+        } else if (spot.hasPosition) {
             body.stack(spotCard(spot, hasPhoto), gap = 12)
             body.stack(CarToolViews.pillRow(this, listOf(
                 pill(R.string.parking_navigate_back, primary = true) { navigate(spot) },
-                pill(R.string.parking_mark_again) { markHere() }
+                pill(R.string.parking_mark_again) { markHere(Finding.NEW_SPOT) }
             )), gap = 8)
             body.stack(CarToolViews.pillRow(this, listOf(photoPill, pill(R.string.parking_edit_note) { editNote(spot) })), gap = 12)
+        } else {
+            // Saved without a position: the note and the photo are what finds the car.
+            body.stack(spotCard(spot, hasPhoto), gap = 12)
+            body.stack(CarToolViews.pillRow(this, listOf(
+                photoPill,
+                pill(R.string.parking_edit_note) { editNote(spot) }
+            )), gap = 8)
+            body.stack(CarToolViews.pillRow(this, listOf(
+                pill(R.string.parking_add_gps) { markHere(Finding.ADD_TO_SPOT) },
+                pill(R.string.parking_new_without_gps) { saveWithoutGps(null) }
+            )), gap = 12)
         }
         body.stack(CarToolViews.footnote(this, getString(R.string.parking_privacy_short)))
         setContentView(
@@ -116,6 +145,7 @@ class ParkingActivity : Activity() {
                 AutoBridgeDesign.TEXT_MUTED,
                 top = 2
             ))
+            if (!spot.hasPosition) addView(CarToolViews.text(context, getString(R.string.parking_no_position), 13f, AutoBridgeDesign.ACCENT_RADIO, top = 4))
             addView(CarToolViews.text(
                 context,
                 spot.note.ifBlank { getString(R.string.parking_no_note) },
@@ -142,7 +172,15 @@ class ParkingActivity : Activity() {
     @Deprecated("Deprecated in Java")
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQUEST_LOCATION && grantResults.any { it == android.content.pm.PackageManager.PERMISSION_GRANTED }) markHere()
+        if (requestCode != REQUEST_LOCATION) return
+        val target = pendingFinding ?: Finding.NEW_SPOT
+        pendingFinding = null
+        if (grantResults.any { it == android.content.pm.PackageManager.PERMISSION_GRANTED }) {
+            markHere(target)
+        } else if (target == Finding.NEW_SPOT) {
+            // No location allowed: the spot can still be saved as a note.
+            saveWithoutGps(getString(R.string.parking_no_permission_subtitle))
+        }
     }
 
     /** Opens the camera app to write one picture into the app's own folder; no camera permission is needed. */
@@ -196,20 +234,60 @@ class ParkingActivity : Activity() {
             .show()
     }
 
-    private fun markHere() {
+    private var pendingFinding: Finding? = null
+
+    /**
+     * Looks for the position, at most [ParkingLocator.TIMEOUT_MS], with "save without GPS" on
+     * screen the whole time. With none in time, the note sheet opens so the spot is saved anyway.
+     */
+    private fun markHere(purpose: Finding) {
         if (!ParkingLocator.hasPermission(this)) {
-            requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), REQUEST_LOCATION)
+            pendingFinding = purpose
+            requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION), REQUEST_LOCATION)
             return
         }
-        Toast.makeText(this, getString(R.string.parking_finding), Toast.LENGTH_SHORT).show()
+        finding = purpose
+        val mine = ++search
+        render()
         ParkingLocator.fix(this) { location ->
-            if (isFinishing || isDestroyed) return@fix
-            if (location != null && ParkingStore.save(this, location.latitude, location.longitude)) {
-                render()
-                editNote(ParkingStore.get(this))
-            } else {
-                Toast.makeText(this, getString(R.string.parking_no_fix), Toast.LENGTH_LONG).show()
+            if (isFinishing || isDestroyed || mine != search) return@fix
+            finding = null
+            val saved = location != null && when (purpose) {
+                Finding.NEW_SPOT -> ParkingStore.save(this, location.latitude, location.longitude)
+                Finding.ADD_TO_SPOT -> ParkingStore.addPosition(this, location.latitude, location.longitude)
             }
+            render()
+            when {
+                saved && purpose == Finding.NEW_SPOT -> editNote(ParkingStore.get(this))
+                saved -> Toast.makeText(this, getString(R.string.parking_position_added), Toast.LENGTH_SHORT).show()
+                purpose == Finding.NEW_SPOT -> saveWithoutGps(getString(R.string.parking_no_fix_subtitle))
+                else -> Toast.makeText(this, getString(R.string.parking_no_fix), Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    /** Stops waiting for GPS and saves the spot as a note instead. */
+    private fun skipGps() {
+        val purpose = finding
+        search++
+        finding = null
+        render()
+        if (purpose == Finding.NEW_SPOT) saveWithoutGps(null)
+    }
+
+    /**
+     * A spot with no position: a note (floor, pillar, the sign) and the photo find the car. [why],
+     * when given, says why GPS is not being used (none found, not allowed).
+     */
+    private fun saveWithoutGps(why: String?) {
+        val form = CarToolForm(this, getString(R.string.parking_no_gps_title), why ?: getString(R.string.parking_no_gps_subtitle), accent = accent)
+        val note = form.field(getString(R.string.parking_form_note), CarToolForm.Kind.TEXT, hint = getString(R.string.parking_note_hint))
+        form.note(getString(R.string.parking_no_gps_photo_hint))
+        form.show(getString(R.string.fuel_save)) {
+            // A photo taken just before, for this spot, stays with it.
+            ParkingStore.saveWithoutPosition(this, note.text.toString(), keepPhoto = ParkingStore.get(this) == null)
+            render()
+            null
         }
     }
 
@@ -229,7 +307,8 @@ class ParkingActivity : Activity() {
     }
 
     private fun navigate(spot: ParkingSpot) {
-        val opened = runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(spot.geoUri()))) }.isSuccess
+        val uri = spot.geoUri() ?: return
+        val opened = runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(uri))) }.isSuccess
         if (!opened) Toast.makeText(this, getString(R.string.maps_app_missing), Toast.LENGTH_LONG).show()
     }
 }
