@@ -26,7 +26,8 @@ class VoiceAudioTest {
     @Test fun `speech then silence ends after the silence timeout`() {
         val detector = SilenceDetector(silenceTimeoutMs = 1_000, maxDurationMs = 10_000)
         repeat(framesFor(300)) { assertEquals(SilenceDetector.Decision.CONTINUE, detector.accept(frame(0.0, seed = it))) }
-        repeat(framesFor(1_000)) { assertEquals(SilenceDetector.Decision.CONTINUE, detector.accept(frame(0.3, seed = it))) }
+        // A sentence (over two seconds of speech) waits for the whole setting.
+        repeat(framesFor(2_200)) { assertEquals(SilenceDetector.Decision.CONTINUE, detector.accept(frame(0.3, seed = it))) }
         assertTrue(detector.heardSpeech)
         var decision = SilenceDetector.Decision.CONTINUE
         var silentFrames = 0
@@ -65,8 +66,10 @@ class VoiceAudioTest {
             silentFrames++
         }
         assertEquals(SilenceDetector.Decision.END_OF_SPEECH, decision)
-        // 500 ms before the click, 20 ms of click, so 480 ms more ends it.
-        assertEquals(framesFor(480), silentFrames)
+        // A 1.2 s command waits 800 ms of the 1 s setting: 500 ms before the click, 20 ms of
+        // click, so 280 ms more ends it.
+        assertEquals(800, detector.currentTimeoutMs())
+        assertEquals(framesFor(280), silentFrames)
     }
 
     @Test fun `steady cabin noise is not speech, speech above it is`() {
@@ -105,6 +108,72 @@ class VoiceAudioTest {
         assertFalse(detector.heardSpeech)
     }
 
+    /** Feeds silence until the detector decides; returns how many silent frames that took. */
+    private fun silenceUntilDecision(detector: SilenceDetector, limit: Int = 300): Pair<SilenceDetector.Decision, Int> {
+        var decision = SilenceDetector.Decision.CONTINUE
+        var silentFrames = 0
+        while (decision == SilenceDetector.Decision.CONTINUE && silentFrames < limit) {
+            decision = detector.accept(frame(0.0, seed = silentFrames))
+            silentFrames++
+        }
+        return decision to silentFrames
+    }
+
+    @Test fun `a typical command waits most of the setting, not all of it`() {
+        val detector = SilenceDetector(silenceTimeoutMs = 1_200, maxDurationMs = 10_000)
+        repeat(framesFor(300)) { detector.accept(frame(0.0, seed = it)) }
+        repeat(framesFor(1_200)) { detector.accept(frame(0.3, seed = it)) }
+        assertEquals(960, detector.currentTimeoutMs())
+        val (decision, frames) = silenceUntilDecision(detector)
+        assertEquals(SilenceDetector.Decision.END_OF_SPEECH, decision)
+        assertEquals(framesFor(960), frames)
+        assertEquals(960L, detector.silenceMs)
+    }
+
+    @Test fun `no tier ends sooner than its floor`() {
+        // 0.8 of 600 would be 480 ms: below the gap between Thai words, so it stays at 600.
+        val medium = SilenceDetector(silenceTimeoutMs = 600, maxDurationMs = 10_000)
+        repeat(framesFor(300)) { medium.accept(frame(0.0, seed = it)) }
+        repeat(framesFor(1_000)) { medium.accept(frame(0.3, seed = it)) }
+        assertEquals(SilenceDetector.MIN_MEDIUM_TIMEOUT_MS, medium.currentTimeoutMs())
+        val short = SilenceDetector(silenceTimeoutMs = 600, maxDurationMs = 10_000)
+        repeat(framesFor(300)) { short.accept(frame(0.0, seed = it)) }
+        repeat(framesFor(300)) { short.accept(frame(0.3, seed = it)) }
+        assertEquals(SilenceDetector.MIN_TIMEOUT_MS, short.currentTimeoutMs())
+    }
+
+    @Test fun `a quiet sentence-final particle after a pause is kept`() {
+        // "เปิดยูทูบ ... ครับ": the polite particle comes after a pause and is much softer.
+        val detector = SilenceDetector(silenceTimeoutMs = 1_200, maxDurationMs = 10_000)
+        repeat(framesFor(300)) { detector.accept(frame(0.0, seed = it)) }
+        repeat(framesFor(900)) { assertEquals(SilenceDetector.Decision.CONTINUE, detector.accept(frame(0.3, seed = it))) }
+        repeat(framesFor(450)) { assertEquals(SilenceDetector.Decision.CONTINUE, detector.accept(frame(0.0, seed = it))) }
+        repeat(framesFor(240)) { assertEquals(SilenceDetector.Decision.CONTINUE, detector.accept(frame(0.03, seed = it))) }
+        val (decision, frames) = silenceUntilDecision(detector)
+        assertEquals(SilenceDetector.Decision.END_OF_SPEECH, decision)
+        // The wait restarted at the particle: it was heard as speech, not as the tail of silence.
+        assertEquals(framesFor(detector.currentTimeoutMs()), frames)
+    }
+
+    @Test fun `a pause inside a sentence does not end it`() {
+        val detector = SilenceDetector(silenceTimeoutMs = 1_200, maxDurationMs = 10_000)
+        repeat(framesFor(300)) { detector.accept(frame(0.0, seed = it)) }
+        repeat(framesFor(800)) { detector.accept(frame(0.3, seed = it)) }
+        // Hesitation: 700 ms is below the 960 ms the command tier waits.
+        repeat(framesFor(700)) { assertEquals(SilenceDetector.Decision.CONTINUE, detector.accept(frame(0.0, seed = it))) }
+        repeat(framesFor(600)) { assertEquals(SilenceDetector.Decision.CONTINUE, detector.accept(frame(0.3, seed = it))) }
+        assertEquals(SilenceDetector.Decision.END_OF_SPEECH, silenceUntilDecision(detector).first)
+    }
+
+    @Test fun `speech that starts late is still heard and timed from its start`() {
+        val detector = SilenceDetector(silenceTimeoutMs = 1_200, maxDurationMs = 10_000)
+        repeat(framesFor(3_000)) { assertEquals(SilenceDetector.Decision.CONTINUE, detector.accept(frame(0.0, seed = it))) }
+        assertEquals(-1L, detector.speechStartMs)
+        repeat(framesFor(500)) { detector.accept(frame(0.3, seed = it)) }
+        assertEquals(3_000L, detector.speechStartMs)
+        assertEquals(SilenceDetector.Decision.END_OF_SPEECH, silenceUntilDecision(detector).first)
+    }
+
     @Test fun `talking without pause stops at the maximum`() {
         val detector = SilenceDetector(silenceTimeoutMs = 1_000, maxDurationMs = 2_000)
         var decision = SilenceDetector.Decision.CONTINUE
@@ -141,6 +210,31 @@ class VoiceAudioTest {
         // 600 ms of speech is a short command: it ends after 60% of the 1 s setting.
         assertEquals(1_400L, recording.durationMs)
         assertEquals(1, source.released)
+    }
+
+    @Test fun `recorder reports where speech began and the endpoint wait`() {
+        val frames = List(framesFor(400)) { frame(0.0, seed = it) } +
+            List(framesFor(600)) { frame(0.4, seed = it) } +
+            List(framesFor(2_000)) { frame(0.0, seed = it) }
+        var clock = 0L
+        val recording = VoiceRecorder.record(
+            FakeSource(frames), SilenceDetector(1_000, 10_000), 10_000, VoiceRecorder.Control(),
+            clock = { ++clock }
+        )
+        assertEquals(400L, recording.speechStartMs)
+        // Short command: 60% of the 1 s setting.
+        assertEquals(600L, recording.trailingSilenceMs)
+        assertEquals(1L, recording.endedAtNanos)
+    }
+
+    @Test fun `nothing said reports no speech and no speech start`() {
+        val recording = VoiceRecorder.record(
+            FakeSource(List(framesFor(6_000)) { frame(0.0, seed = it) }),
+            SilenceDetector(1_000, 10_000), 10_000, VoiceRecorder.Control()
+        )
+        assertEquals(VoiceRecording.Ending.NO_SPEECH, recording.ending)
+        assertFalse(recording.heardSpeech)
+        assertEquals(-1L, recording.speechStartMs)
     }
 
     @Test fun `recorder failure is reported and the microphone released`() {

@@ -20,7 +20,13 @@ class VoiceRecording(
     val samples: ShortArray,
     val count: Int,
     val ending: Ending,
-    val heardSpeech: Boolean
+    val heardSpeech: Boolean,
+    /** Audio time the first speech frame began at; -1 when nothing was said. */
+    val speechStartMs: Long = -1,
+    /** Silence after the last word when recording ended - the endpointing wait. */
+    val trailingSilenceMs: Long = 0,
+    /** [VoiceClock] time the loop decided to stop, before the microphone was released. */
+    val endedAtNanos: Long = 0
 ) {
     enum class Ending { END_OF_SPEECH, NO_SPEECH, MAX_DURATION, STOPPED, CANCELLED, INTERRUPTED, RECORDER_ERROR }
 
@@ -47,6 +53,7 @@ object VoiceRecorder {
         detector: SilenceDetector,
         maxDurationMs: Int,
         control: Control,
+        clock: () -> Long = VoiceClock::now,
         onLevel: (levelDb: Double, elapsedMs: Long) -> Unit = { _, _ -> }
     ): VoiceRecording {
         val capacity = (maxDurationMs.toLong() * WhisperEngine.SAMPLE_RATE / 1000).toInt()
@@ -54,6 +61,7 @@ object VoiceRecorder {
         val frame = ShortArray(WhisperEngine.SAMPLE_RATE * SilenceDetector.FRAME_MS / 1000)
         var count = 0
         var ending = VoiceRecording.Ending.MAX_DURATION
+        var endedAt = 0L
         try {
             while (count < capacity) {
                 if (control.cancel.get()) { ending = VoiceRecording.Ending.CANCELLED; break }
@@ -74,9 +82,15 @@ object VoiceRecorder {
                     SilenceDetector.Decision.MAX_DURATION -> { ending = VoiceRecording.Ending.MAX_DURATION; break }
                 }
             }
+            endedAt = clock()
         } finally {
             source.release()
         }
-        return VoiceRecording(samples, count, ending, detector.heardSpeech)
+        return VoiceRecording(
+            samples, count, ending, detector.heardSpeech,
+            speechStartMs = detector.speechStartMs,
+            trailingSilenceMs = detector.silenceMs,
+            endedAtNanos = endedAt
+        )
     }
 }

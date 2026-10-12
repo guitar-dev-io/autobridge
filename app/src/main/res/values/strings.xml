@@ -1888,6 +1888,11 @@
     <string name="voice_test_example">Try: \"เปิด YouTube เพลง Bodyslam\" or \"เปิด YouTube Music Taylor Swift\"</string>
     <string name="voice_test_transcript">Transcript</string>
     <string name="voice_test_command">Parsed command</string>
+    <string name="voice_test_latency">Latency (end of speech → action)</string>
+    <string name="voice_test_latency_empty">No voice commands timed yet.</string>
+    <string name="voice_test_replay">Replay last recording: threads and fallback</string>
+    <string name="voice_test_replay_running">Replaying… this takes a while and uses the CPU fully.</string>
+    <string name="voice_test_replay_none">Record something first.</string>
     <string name="voice_test_benchmark">Benchmark</string>
     <string name="voice_bench_model">Model</string>
     <string name="voice_bench_audio">Audio duration</string>

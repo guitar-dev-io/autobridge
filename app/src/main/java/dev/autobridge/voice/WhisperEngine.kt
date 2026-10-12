@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
 
 /** The native calls [WhisperEngine] needs; the app's is [NativeWhisperBackend]. */
 interface WhisperBackend {
@@ -17,9 +18,21 @@ interface WhisperBackend {
     fun load(path: String): Long
     fun free(handle: Long)
     fun abort(handle: Long)
-    fun transcribe(handle: Long, pcm: FloatArray, language: String, translate: Boolean, threads: Int, prompt: String?): String?
+    /** Clears the abort flag before a transcribe; see [WhisperEngine.Ticket]. */
+    fun resetAbort(handle: Long) = Unit
+    /** One throwaway pass right after a load; false when whisper failed. */
+    fun warmUp(handle: Long, threads: Int): Boolean = true
+    fun transcribe(
+        handle: Long,
+        pcm: FloatArray,
+        language: String,
+        translate: Boolean,
+        threads: Int,
+        prompt: String?,
+        maxFallbacks: Int
+    ): String?
     fun lastLanguage(handle: Long): String
-    /** encode, decode milliseconds of the last transcribe. */
+    /** encode, decode, sample, prompt, batched decode - ms per run - of the last transcribe. */
     fun lastTimings(handle: Long): FloatArray
     /** Native heap in use, for the benchmark screen; -1 when unknown. */
     fun nativeHeapBytes(): Long = -1L
@@ -37,7 +50,14 @@ data class Transcription(
     val decodeMs: Float,
     val threads: Int,
     /** How long the model took to load for this request; 0 when it was already loaded. */
-    val modelLoadMs: Long
+    val modelLoadMs: Long,
+    /** The warm-up pass after a load, paid by this request; 0 when it was not. */
+    val warmUpMs: Long = 0,
+    /** Whisper's temperature fallback ran (a second, sampled decode). */
+    val fallback: Boolean = false,
+    /** [VoiceClock] time the native call started and returned. */
+    val startedAtNanos: Long = 0,
+    val endedAtNanos: Long = 0
 ) {
     /** Real-time factor: processing time over audio time. Below 1 is faster than speech. */
     val realTimeFactor: Double get() = if (audioMs > 0) processingMs.toDouble() / audioMs else 0.0
@@ -57,17 +77,43 @@ class WhisperException(val reason: Reason, message: String) : Exception(message)
  * [release] frees it outright, which the app does on memory pressure and when a model is deleted.
  *
  * Every native call runs on one dedicated thread ([dispatcher]). That serialises load, transcribe
- * and free without a lock (a whisper context is not thread-safe), and keeps all of it off the main
+ * and free without a lock (a whisper context is not thread-safe), keeps two commands from ever
+ * running inference at once and competing for the same cores, and keeps all of it off the main
  * thread. [abort] is the one call that does not wait: it raises a flag the running transcription
- * checks.
+ * checks. A request carries a [Ticket], so a session cancelled while its request is still queued
+ * behind another never reaches native code, and a newer session is not left waiting behind it.
+ *
+ * A screen holds a [lease] from the moment the microphone opens until the command is handled, so
+ * memory-pressure release ([VoiceRuntime.onTrimMemory]) cannot free the model between the preload
+ * and the transcription and make the user wait for a second load after they stop speaking.
  */
 class WhisperEngine(
     private val backend: WhisperBackend,
     private val dispatcher: CoroutineDispatcher = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "AutoBridge-Whisper").apply { priority = Thread.NORM_PRIORITY + 1 }
     }.asCoroutineDispatcher(),
-    private val clock: () -> Long = System::nanoTime
+    private val clock: () -> Long = VoiceClock::now
 ) {
+    /** One request's right to run. [abort] it from any thread; it is never reused. */
+    class Ticket {
+        @Volatile
+        var aborted = false
+            internal set
+    }
+
+    /** Held by a listen session; [close] it when the session ends. Idempotent. */
+    inner class Lease internal constructor() : AutoCloseable {
+        private var open = true
+
+        @Synchronized
+        override fun close() {
+            if (open) {
+                open = false
+                leases.decrementAndGet()
+            }
+        }
+    }
+
     sealed interface State {
         data object Unloaded : State
         data class Loading(val modelId: String) : State
@@ -83,6 +129,8 @@ class WhisperEngine(
     private var loadedId: String? = null
     private var loadedPath: String? = null
     private var pendingLoadMs = 0L
+    private var pendingWarmUpMs = 0L
+    private var warmedUp = false
 
     @Volatile
     private var activeHandle = 0L
@@ -90,7 +138,20 @@ class WhisperEngine(
     @Volatile
     private var busy = false
 
+    @Volatile
+    private var running: Ticket? = null
+
+    private val leases = AtomicInteger(0)
+
     val isBusy: Boolean get() = busy
+
+    /** A session is listening or transcribing: not the moment to free the model. */
+    val isInUse: Boolean get() = busy || leases.get() > 0
+
+    fun lease(): Lease {
+        leases.incrementAndGet()
+        return Lease()
+    }
 
     val loadedModelId: String? get() = (state.value as? State.Ready)?.modelId
 
@@ -98,8 +159,29 @@ class WhisperEngine(
      * Makes [model] (stored at [file]) the loaded model, freeing any other first. Returns how long
      * the load took, or 0 when it was already loaded.
      */
-    suspend fun ensureLoaded(model: WhisperModelInfo, file: File): Long = withContext(dispatcher) {
-        loadLocked(model, file)
+    suspend fun ensureLoaded(
+        model: WhisperModelInfo,
+        file: File,
+        language: VoiceLanguage = VoiceLanguage.AUTO,
+        threads: Int = DEFAULT_THREADS
+    ): Long = withContext(dispatcher) {
+        loadLocked(model, file).also { if (language == VoiceLanguage.AUTO) warmUpLocked(threads) }
+    }
+
+    /**
+     * Language detection runs on a stale encoder window right after a load (see `warmUp` in
+     * whisper_jni.cpp), so only auto-detect needs the warm-up; a fixed language skips it.
+     */
+    private fun warmUpLocked(threads: Int) {
+        if (warmedUp || handle == 0L) return
+        val started = clock()
+        if (!backend.warmUp(handle, threads)) {
+            // Not fatal: the context still works, the first request is just slower.
+            warmedUp = true
+            return
+        }
+        warmedUp = true
+        pendingWarmUpMs = (clock() - started) / 1_000_000
     }
 
     private fun loadLocked(model: WhisperModelInfo, file: File): Long {
@@ -123,6 +205,8 @@ class WhisperEngine(
         loadedId = model.id
         loadedPath = file.path
         pendingLoadMs = elapsed
+        warmedUp = false
+        pendingWarmUpMs = 0L
         val heapAfter = backend.nativeHeapBytes()
         val memory = if (heapBefore >= 0 && heapAfter >= 0) heapAfter - heapBefore else -1L
         _state.value = State.Ready(model.id, elapsed, memory)
@@ -131,6 +215,8 @@ class WhisperEngine(
 
     /**
      * Transcribes 16 kHz mono [pcm] with [model], loading it first if it is not the one in memory.
+     * Throws [WhisperException.Reason.ABORTED] without touching native code when [ticket] was
+     * aborted while the request waited for the engine thread.
      */
     suspend fun transcribe(
         model: WhisperModelInfo,
@@ -139,18 +225,28 @@ class WhisperEngine(
         language: VoiceLanguage,
         translate: Boolean,
         threads: Int,
-        prompt: String?
+        prompt: String?,
+        ticket: Ticket = Ticket(),
+        maxFallbacks: Int = DEFAULT_MAX_FALLBACKS
     ): Transcription = withContext(dispatcher) {
+        if (ticket.aborted) throw aborted()
         busy = true
         try {
             loadLocked(model, file)
+            if (language == VoiceLanguage.AUTO) warmUpLocked(threads)
             // A load done ahead of time (while the user was still speaking) is reported with the
             // first request that used it, then not again.
             val loadMs = pendingLoadMs.also { pendingLoadMs = 0L }
+            val warmUpMs = pendingWarmUpMs.also { pendingWarmUpMs = 0L }
+            // Cleared before the ticket is checked, so an abort landing in between is kept.
+            backend.resetAbort(handle)
+            running = ticket
+            if (ticket.aborted) throw aborted()
             val started = clock()
-            val text = backend.transcribe(handle, pcm, language.code, translate, threads, prompt)
-            val elapsed = (clock() - started) / 1_000_000
+            val text = backend.transcribe(handle, pcm, language.code, translate, threads, prompt, maxFallbacks)
+            val ended = clock()
             if (text == null) {
+                if (ticket.aborted) throw aborted()
                 throw WhisperException(WhisperException.Reason.TRANSCRIPTION_FAILED, "whisper returned no result")
             }
             val timings = backend.lastTimings(handle)
@@ -159,21 +255,38 @@ class WhisperEngine(
                 language = backend.lastLanguage(handle),
                 modelId = model.id,
                 audioMs = pcm.size * 1000L / SAMPLE_RATE,
-                processingMs = elapsed,
+                processingMs = (ended - started) / 1_000_000,
                 encodeMs = timings.getOrElse(0) { 0f },
                 decodeMs = timings.getOrElse(1) { 0f },
                 threads = threads,
-                modelLoadMs = loadMs
+                modelLoadMs = loadMs,
+                warmUpMs = warmUpMs,
+                fallback = timings.getOrElse(4) { 0f } > 0f,
+                startedAtNanos = started,
+                endedAtNanos = ended
             )
         } finally {
+            running = null
             busy = false
         }
     }
+
+    private fun aborted() = WhisperException(WhisperException.Reason.ABORTED, "cancelled")
 
     /** Stops a running [transcribe] early; it then throws. Safe from any thread. */
     fun abort() {
         val current = activeHandle
         if (current != 0L && busy) backend.abort(current)
+    }
+
+    /**
+     * Abandons [ticket]'s request: never started if it is still queued, stopped at the next
+     * checkpoint if it is running. Safe from any thread, and harmless once the request finished.
+     */
+    fun abort(ticket: Ticket) {
+        ticket.aborted = true
+        val current = activeHandle
+        if (current != 0L && running === ticket) backend.abort(current)
     }
 
     /** Frees the native context. The next request loads it again. */
@@ -188,10 +301,19 @@ class WhisperEngine(
         loadedId = null
         loadedPath = null
         pendingLoadMs = 0L
+        pendingWarmUpMs = 0L
+        warmedUp = false
         _state.value = State.Unloaded
     }
 
     companion object {
         const val SAMPLE_RATE = 16_000
+        private const val DEFAULT_THREADS = 4
+        /**
+         * One retry at a higher temperature when greedy decoding is unsure, instead of whisper's
+         * five retries with five decoders each - the source of the multi-second outliers on
+         * low-confidence Thai. See `transcribe` in whisper_jni.cpp.
+         */
+        const val DEFAULT_MAX_FALLBACKS = 1
     }
 }

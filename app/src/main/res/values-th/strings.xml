@@ -1856,6 +1856,11 @@
     <string name="voice_test_example">ลองพูด: \"เปิด YouTube เพลง Bodyslam\" หรือ \"เปิด YouTube Music Taylor Swift\"</string>
     <string name="voice_test_transcript">ข้อความ</string>
     <string name="voice_test_command">คำสั่งที่แยกได้</string>
+    <string name="voice_test_latency">ความหน่วง (พูดจบ → เริ่มทำงาน)</string>
+    <string name="voice_test_latency_empty">ยังไม่มีคำสั่งเสียงที่จับเวลาไว้</string>
+    <string name="voice_test_replay">เล่นเสียงล่าสุดซ้ำ: เทียบจำนวนเธรดและ fallback</string>
+    <string name="voice_test_replay_running">กำลังวัดซ้ำ… ใช้เวลาสักครู่และใช้ CPU เต็มที่</string>
+    <string name="voice_test_replay_none">บันทึกเสียงก่อนหนึ่งครั้ง</string>
     <string name="voice_test_benchmark">ผลการวัด</string>
     <string name="voice_bench_model">โมเดล</string>
     <string name="voice_bench_audio">ความยาวเสียง</string>
