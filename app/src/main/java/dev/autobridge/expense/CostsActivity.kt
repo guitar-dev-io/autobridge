@@ -17,6 +17,7 @@ import dev.autobridge.fuel.FuelLogStore
 import dev.autobridge.i18n.AppLocale
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.stack
+import dev.autobridge.ui.CarToolViews
 import java.text.DateFormat
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
@@ -125,7 +126,7 @@ class CostsActivity : Activity() {
 
     private fun summaryCard(thisMonth: MonthCost, average: MonthCost?) = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
-        background = AutoBridgeDesign.surface(this@CostsActivity, AutoBridgeDesign.SURFACE, 20)
+        background = AutoBridgeDesign.surface(this@CostsActivity, AutoBridgeDesign.SURFACE, 16, android.graphics.Color.TRANSPARENT)
         val pad = (16 * resources.displayMetrics.density).toInt()
         setPadding(pad, pad, pad, pad)
         fun line(text: String, size: Float, color: Int, top: Int = 0) = addView(TextView(this@CostsActivity).apply {
@@ -136,7 +137,10 @@ class CostsActivity : Activity() {
         })
         line(getString(R.string.costs_baht, money(thisMonth.totalBaht)), 28f, AutoBridgeDesign.TEXT)
         line(getString(R.string.costs_this_month, monthLabel(thisMonth.month)), 13f, AutoBridgeDesign.TEXT_MUTED)
-        line(getString(R.string.costs_split, money(thisMonth.fuelBaht), money(thisMonth.otherBaht)), 14f, AutoBridgeDesign.TEXT, top = 6)
+        if (thisMonth.totalBaht > 0) {
+            addView(CarToolViews.splitBar(this@CostsActivity, thisMonth.fuelBaht, thisMonth.otherBaht, AutoBridgeDesign.ACCENT_FILES, AutoBridgeDesign.ACCENT_SYSTEM))
+        }
+        line(getString(R.string.costs_split, money(thisMonth.fuelBaht), money(thisMonth.otherBaht)), 14f, AutoBridgeDesign.TEXT, top = 8)
         average?.let { line(getString(R.string.costs_average, money(it.totalBaht)), 14f, AutoBridgeDesign.TEXT, top = 6) }
     }
 

@@ -12,13 +12,14 @@ import android.text.InputType
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
-import android.widget.TextView
 import android.widget.Toast
 import dev.autobridge.R
 import dev.autobridge.fuel.FuelLogStore
 import dev.autobridge.i18n.AppLocale
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.stack
+import dev.autobridge.ui.CarToolViews
+import dev.autobridge.mycar.MyCarFacts
 import java.text.DateFormat
 import java.text.NumberFormat
 import java.util.Calendar
@@ -48,33 +49,11 @@ class MaintenanceActivity : Activity() {
         render()
     }
 
+    /** Most urgent first, each with a bar for how much of its interval is gone; adding comes after the list. */
     private fun render() {
         val items = MaintenanceStore.all(this)
         val odometer = MaintenanceStore.currentOdometer(this)
         val body = AutoBridgeDesign.body(this)
-
-        body.stack(
-            TextView(this).apply {
-                text = odometer?.let { getString(R.string.maint_odometer_now, whole(it)) } ?: getString(R.string.maint_odometer_unknown)
-                textSize = 14f
-                setTextColor(AutoBridgeDesign.TEXT_MUTED)
-            },
-            gap = 12
-        )
-        body.stack(
-            LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                addView(
-                    AutoBridgeDesign.pill(this@MaintenanceActivity, getString(R.string.maint_add), primary = true, accent = accent) { showAddDialog() },
-                    LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(8) }
-                )
-                addView(
-                    AutoBridgeDesign.pill(this@MaintenanceActivity, getString(R.string.maint_add_suggested), accent = accent) { addSuggested() },
-                    LinearLayout.LayoutParams(0, -2, 1f)
-                )
-            },
-            gap = 20
-        )
 
         if (items.isEmpty()) {
             body.stack(
@@ -83,25 +62,21 @@ class MaintenanceActivity : Activity() {
                     title = getString(R.string.maint_empty_title),
                     message = getString(R.string.maint_empty_message),
                     accent = accent
-                )
+                ),
+                gap = 12
             )
         } else {
             MaintenanceStats.ordered(items, odometer, System.currentTimeMillis(), kmPerDay = MaintenanceStore.kmPerDay(this)).forEach { status ->
-                body.stack(
-                    AutoBridgeDesign.contentRow(
-                        context = this,
-                        title = status.item.name,
-                        subtitle = listOfNotNull(
-                            MaintenanceText.standing(this, status),
-                            MaintenanceText.due(this, status),
-                            MaintenanceText.interval(this, status.item),
-                        ).joinToString("\n"),
-                        accent = accent,
-                        badgeText = MaintenanceText.badge(status.state),
-                    ) { showItemDialog(status.item, odometer) }
-                )
+                body.stack(itemCard(status, odometer))
             }
         }
+        body.stack(
+            CarToolViews.pillRow(this, listOf(
+                AutoBridgeDesign.pill(this, getString(R.string.maint_add), primary = true, accent = accent) { showAddDialog() },
+                AutoBridgeDesign.pill(this, getString(R.string.maint_add_suggested), accent = accent) { addSuggested() }
+            )),
+            gap = 8
+        )
 
         setContentView(
             AutoBridgeDesign.page(
@@ -109,12 +84,39 @@ class MaintenanceActivity : Activity() {
                 header = AutoBridgeDesign.header(
                     context = this,
                     title = getString(R.string.maint_title),
-                    subtitle = getString(if (FuelLogStore.isEv(this)) R.string.maint_subtitle_ev else R.string.maint_subtitle),
+                    subtitle = odometer?.let { getString(R.string.maint_odometer_now, whole(it)) } ?: getString(R.string.maint_odometer_unknown),
                     onBack = { finish() }
                 ),
                 body = body
             )
         )
+    }
+
+    /** Name, where it stands in the due colour, the bar when there is a scale, then the due date and interval. */
+    private fun itemCard(status: MaintenanceStatus, odometer: Double?) = CarToolViews.card(this) {
+        val tone = when (MyCarFacts.maintenanceTone(status)) {
+            MyCarFacts.Tone.ALERT -> AutoBridgeDesign.DANGER
+            MyCarFacts.Tone.WARN -> AutoBridgeDesign.ACCENT_RADIO
+            else -> AutoBridgeDesign.ACCENT_FILES
+        }
+        val measured = status.kmLeft != null || status.daysLeft != null
+        addView(LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            addView(CarToolViews.text(context, status.item.name, 15f, bold = true), LinearLayout.LayoutParams(0, -2, 1f))
+            addView(CarToolViews.text(
+                context,
+                MaintenanceText.standing(context, status),
+                13f,
+                if (measured) tone else AutoBridgeDesign.TEXT_MUTED,
+                bold = measured
+            ).apply { gravity = android.view.Gravity.END })
+        })
+        MyCarFacts.intervalUsed(status)?.let { addView(CarToolViews.bar(context, it, tone)) }
+        val detail = listOfNotNull(MaintenanceText.due(context, status), MaintenanceText.interval(context, status.item).ifBlank { null })
+        if (detail.isNotEmpty()) addView(CarToolViews.text(context, detail.joinToString(" · "), 12f, AutoBridgeDesign.TEXT_MUTED, top = 8))
+        background = AutoBridgeDesign.tappable(context, AutoBridgeDesign.SURFACE, 16, accent, android.graphics.Color.TRANSPARENT)
+        isClickable = true
+        setOnClickListener { showItemDialog(status.item, odometer) }
     }
 
     /** Offers the usual list for this vehicle (fuel or EV), skipping names already on the list. */

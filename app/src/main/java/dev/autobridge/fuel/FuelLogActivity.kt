@@ -18,6 +18,7 @@ import dev.autobridge.R
 import dev.autobridge.i18n.AppLocale
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.stack
+import dev.autobridge.ui.CarToolViews
 import java.io.File
 import java.text.DateFormat
 import java.text.NumberFormat
@@ -73,20 +74,9 @@ class FuelLogActivity : Activity() {
         val summary = FuelStats.summarize(entries)
         val body = AutoBridgeDesign.body(this)
 
-        body.stack(vehicleToggle(), gap = 12)
         body.stack(summaryCard(summary), gap = 12)
         body.stack(
-            LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                addView(
-                    AutoBridgeDesign.pill(this@FuelLogActivity, unit(R.string.fuel_add, R.string.fuel_add_ev), primary = true, accent = accent) { showAddDialog() },
-                    LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(8) }
-                )
-                addView(
-                    AutoBridgeDesign.pill(this@FuelLogActivity, getString(R.string.fuel_export), accent = accent) { exportCsv(entries) },
-                    LinearLayout.LayoutParams(0, -2, 1f)
-                )
-            },
+            AutoBridgeDesign.pill(this, unit(R.string.fuel_add, R.string.fuel_add_ev), primary = true, accent = accent) { showAddDialog() },
             gap = 20
         )
 
@@ -120,6 +110,13 @@ class FuelLogActivity : Activity() {
                 )
             }
         }
+
+        if (entries.isNotEmpty()) {
+            body.stack(AutoBridgeDesign.pill(this, getString(R.string.fuel_export), accent = accent) { exportCsv(entries) }, gap = 20)
+        }
+        // Fuel or EV changes rarely, so it sits at the end rather than above the figures.
+        body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.fuel_vehicle_section)), gap = 8)
+        body.stack(vehicleToggle())
 
         setContentView(
             AutoBridgeDesign.page(
@@ -158,25 +155,17 @@ class FuelLogActivity : Activity() {
 
     private fun kmPerUnitRes() = if (ev) R.string.fuel_km_per_kwh_value else R.string.fuel_km_per_liter_value
 
-    private fun summaryCard(summary: FuelSummary): View = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
-        background = AutoBridgeDesign.surface(this@FuelLogActivity, AutoBridgeDesign.SURFACE, 20)
-        setPadding(dp(16), dp(16), dp(16), dp(16))
-        addView(TextView(this@FuelLogActivity).apply {
-            text = summary.averageKmPerLiter?.let { getString(kmPerUnitRes(), decimal(it)) }
-                ?: unit(R.string.fuel_average_pending, R.string.fuel_average_pending_ev)
-            textSize = 28f
-            setTextColor(AutoBridgeDesign.TEXT)
-        })
-        addView(TextView(this@FuelLogActivity).apply {
-            text = getString(R.string.fuel_average_label)
-            textSize = 13f
-            setTextColor(AutoBridgeDesign.TEXT_MUTED)
-        })
+    /** Three figures that are used day to day, then the rest as quiet lines; "—" until there is data for one. */
+    private fun summaryCard(summary: FuelSummary): View = CarToolViews.card(this) {
+        val none = getString(R.string.my_car_no_reading)
+        addView(CarToolViews.stats(context, listOf(
+            unit(R.string.fuel_stat_km_per_liter, R.string.fuel_stat_km_per_kwh) to (summary.averageKmPerLiter?.let(::decimal) ?: none),
+            getString(R.string.fuel_stat_baht_per_km) to (summary.bahtPerKm?.let(::decimal) ?: none),
+            getString(R.string.fuel_stat_month_baht) to money(summary.thisMonthBaht)
+        )))
         val lines = listOfNotNull(
+            if (summary.averageKmPerLiter == null) unit(R.string.fuel_average_pending, R.string.fuel_average_pending_ev) else null,
             summary.lastKmPerLiter?.let { getString(if (ev) R.string.fuel_last_interval_ev else R.string.fuel_last_interval, decimal(it)) },
-            summary.bahtPerKm?.let { getString(R.string.fuel_baht_per_km, decimal(it)) },
-            getString(R.string.fuel_this_month, money(summary.thisMonthBaht)),
             getString(if (ev) R.string.fuel_totals_ev else R.string.fuel_totals, summary.fillUps, decimal(summary.totalLiters), money(summary.totalBaht)),
             if (ev) {
                 CarVehicleData.batteryPercent?.let { getString(R.string.fuel_car_battery, it.roundToLong()) }
@@ -184,13 +173,8 @@ class FuelLogActivity : Activity() {
                 CarVehicleData.fuelPercent?.let { getString(R.string.fuel_car_level, it.roundToLong()) }
             },
         )
-        lines.forEach { line ->
-            addView(TextView(this@FuelLogActivity).apply {
-                text = line
-                textSize = 14f
-                setTextColor(AutoBridgeDesign.TEXT)
-                setPadding(0, dp(6), 0, 0)
-            })
+        lines.forEachIndexed { index, line ->
+            addView(CarToolViews.text(context, line, 13f, AutoBridgeDesign.TEXT_MUTED, top = if (index == 0) 12 else 4))
         }
     }
 

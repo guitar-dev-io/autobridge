@@ -10,12 +10,13 @@ import android.os.Bundle
 import android.text.InputType
 import android.widget.EditText
 import android.widget.LinearLayout
-import android.widget.TextView
 import android.widget.Toast
 import dev.autobridge.R
+import dev.autobridge.core.state.RecentActivityStore
 import dev.autobridge.i18n.AppLocale
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.stack
+import dev.autobridge.ui.CarToolViews
 import java.text.DateFormat
 import java.util.Date
 
@@ -43,23 +44,11 @@ class ParkingActivity : Activity() {
         render()
     }
 
+    /** The spot as one card, "navigate back" as the one main button, the rest below it. */
     private fun render() {
         val spot = ParkingStore.get(this)
+        val hasPhoto = ParkingStore.hasPhoto(this)
         val body = AutoBridgeDesign.body(this)
-        body.stack(
-            TextView(this).apply {
-                text = getString(R.string.parking_privacy)
-                textSize = 13f
-                setTextColor(AutoBridgeDesign.TEXT_MUTED)
-            },
-            gap = 12
-        )
-        body.stack(
-            AutoBridgeDesign.pill(this, getString(R.string.parking_mark_here), primary = true, accent = accent) { markHere() },
-            gap = 16
-        )
-        // The photo works with or without a marked spot: a picture of the pillar number is worth having either way.
-        body.stack(photoSection(), gap = 16)
         if (spot == null) {
             body.stack(
                 AutoBridgeDesign.emptyState(
@@ -67,36 +56,37 @@ class ParkingActivity : Activity() {
                     title = getString(R.string.parking_empty_title),
                     message = getString(R.string.parking_empty_message),
                     accent = accent
-                )
-            )
-        } else {
-            body.stack(
-                AutoBridgeDesign.contentRow(
-                    context = this,
-                    title = spot.note.ifBlank { getString(R.string.parking_no_note) },
-                    subtitle = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(spot.savedMs)),
-                    accent = accent,
-                    badgeText = "🅿",
-                ) { editNote(spot) },
+                ),
                 gap = 12
             )
+            body.stack(AutoBridgeDesign.pill(this, getString(R.string.parking_mark_here), primary = true, accent = accent) { markHere() }, gap = 8)
+        } else {
+            body.stack(spotCard(spot), gap = 12)
+            body.stack(AutoBridgeDesign.pill(this, getString(R.string.parking_navigate_back), primary = true, accent = accent) { navigate(spot) }, gap = 8)
+        }
+        // The photo works with or without a marked spot: a picture of the pillar number is worth having either way.
+        body.stack(
+            CarToolViews.pillRow(this, listOfNotNull(
+                spot?.let { AutoBridgeDesign.pill(this, getString(R.string.parking_mark_again), accent = accent) { markHere() } },
+                AutoBridgeDesign.pill(this, getString(if (hasPhoto) R.string.parking_photo_retake else R.string.parking_photo_take), accent = accent) { takePhoto() },
+                if (hasPhoto) AutoBridgeDesign.pill(this, getString(R.string.parking_photo_view), accent = accent) { showPhoto() } else null
+            )),
+            gap = 8
+        )
+        if (spot != null) {
             body.stack(
-                LinearLayout(this).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    addView(
-                        AutoBridgeDesign.pill(this@ParkingActivity, getString(R.string.parking_navigate), primary = true, accent = accent) { navigate(spot) },
-                        LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = (8 * resources.displayMetrics.density).toInt() }
-                    )
-                    addView(
-                        AutoBridgeDesign.pill(this@ParkingActivity, getString(R.string.parking_clear), accent = accent) {
-                            ParkingStore.clear(this@ParkingActivity)
-                            render()
-                        },
-                        LinearLayout.LayoutParams(0, -2, 1f)
-                    )
-                }
+                CarToolViews.pillRow(this, listOf(
+                    AutoBridgeDesign.pill(this, getString(R.string.parking_edit_note), accent = accent) { editNote(spot) },
+                    AutoBridgeDesign.pill(this, getString(R.string.parking_clear), accent = accent) {
+                        ParkingStore.clear(this)
+                        render()
+                    }
+                )),
+                gap = 16
             )
         }
+        body.stack(CarToolViews.footnote(this, getString(R.string.parking_privacy_short)), gap = 2)
+        body.stack(CarToolViews.footnote(this, getString(if (hasPhoto) R.string.parking_photo_saved_hint else R.string.parking_photo_hint)))
         setContentView(
             AutoBridgeDesign.page(
                 context = this,
@@ -111,41 +101,32 @@ class ParkingActivity : Activity() {
         )
     }
 
+    /** "Parked 2 hours ago", the date and time, and the note; tapping it edits the note. */
+    private fun spotCard(spot: ParkingSpot) = CarToolViews.card(this) {
+        addView(CarToolViews.text(context, getString(R.string.parking_parked_ago, RecentActivityStore.relativeAge(context, spot.savedMs)), 20f, bold = true))
+        addView(CarToolViews.text(
+            context,
+            DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(spot.savedMs)),
+            13f,
+            AutoBridgeDesign.TEXT_MUTED,
+            top = 2
+        ))
+        addView(CarToolViews.text(
+            context,
+            spot.note.ifBlank { getString(R.string.parking_no_note) },
+            15f,
+            if (spot.note.isBlank()) AutoBridgeDesign.TEXT_MUTED else AutoBridgeDesign.TEXT,
+            top = 10
+        ))
+        background = AutoBridgeDesign.tappable(context, AutoBridgeDesign.SURFACE, 16, accent, android.graphics.Color.TRANSPARENT)
+        isClickable = true
+        setOnClickListener { editNote(spot) }
+    }
+
     @Deprecated("Deprecated in Java")
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQUEST_LOCATION && grantResults.any { it == android.content.pm.PackageManager.PERMISSION_GRANTED }) markHere()
-    }
-
-    /** Take, view and delete the photo; a line says what it is for and where it stays. */
-    private fun photoSection(): LinearLayout = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
-        val has = ParkingStore.hasPhoto(this@ParkingActivity)
-        addView(
-            LinearLayout(this@ParkingActivity).apply {
-                orientation = LinearLayout.HORIZONTAL
-                addView(
-                    AutoBridgeDesign.pill(
-                        this@ParkingActivity,
-                        getString(if (has) R.string.parking_photo_retake else R.string.parking_photo_take),
-                        accent = accent
-                    ) { takePhoto() },
-                    LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = (8 * resources.displayMetrics.density).toInt() }
-                )
-                if (has) {
-                    addView(
-                        AutoBridgeDesign.pill(this@ParkingActivity, getString(R.string.parking_photo_view), accent = accent) { showPhoto() },
-                        LinearLayout.LayoutParams(0, -2, 1f)
-                    )
-                }
-            }
-        )
-        addView(TextView(this@ParkingActivity).apply {
-            text = getString(if (has) R.string.parking_photo_saved_hint else R.string.parking_photo_hint)
-            textSize = 12f
-            setTextColor(AutoBridgeDesign.TEXT_MUTED)
-            setPadding(0, (6 * resources.displayMetrics.density).toInt(), 0, 0)
-        })
     }
 
     /** Opens the camera app to write one picture into the app's own folder; no camera permission is needed. */

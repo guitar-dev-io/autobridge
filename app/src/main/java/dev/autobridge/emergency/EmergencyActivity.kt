@@ -62,21 +62,6 @@ class EmergencyActivity : Activity() {
         val missingLines = SUGGESTED.any { (_, number) -> entries.none { it.value.trim() == number } }
 
         val body = AutoBridgeDesign.body(this)
-        body.stack(
-            LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                addView(
-                    AutoBridgeDesign.pill(this@EmergencyActivity, getString(R.string.emergency_add), primary = true, accent = accent) { showAddDialog() },
-                    LinearLayout.LayoutParams(0, -2, 1f)
-                )
-                // Once every public line is on the card the button has nothing left to add.
-                if (missingLines) addView(
-                    AutoBridgeDesign.pill(this@EmergencyActivity, getString(R.string.emergency_add_suggested), accent = accent) { addSuggested() },
-                    LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(8) }
-                )
-            },
-            gap = 12
-        )
         if (entries.isEmpty()) {
             body.stack(
                 AutoBridgeDesign.emptyState(
@@ -97,6 +82,23 @@ class EmergencyActivity : Activity() {
             body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.emergency_section_lines)), gap = 2)
             lines.forEach { body.stack(entryRow(it, lineColor(it.value.trim())), gap = 10) }
         }
+        // The numbers come first: someone opening this page in a hurry needs a number, not the add button.
+        body.stack(
+            LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                addView(
+                    AutoBridgeDesign.pill(this@EmergencyActivity, getString(R.string.emergency_add), primary = true, accent = accent) { showAddDialog() },
+                    LinearLayout.LayoutParams(0, -2, 1f)
+                )
+                // Once every public line is on the card the button has nothing left to add.
+                if (missingLines) addView(
+                    AutoBridgeDesign.pill(this@EmergencyActivity, getString(R.string.emergency_add_suggested), accent = accent) { addSuggested() },
+                    LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(8) }
+                )
+            },
+            gap = 12
+        )
+
         setContentView(
             AutoBridgeDesign.page(
                 context = this,

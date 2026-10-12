@@ -641,7 +641,6 @@
     <string name="whats_new_0_4_24">• คีย์บอร์ดรถเปิดเมื่อแตะช่องค้นหาในหน้าเว็บ และปิดหลังค้นหา\n• ถอยหลังเพลงไม่ดับ, Bridge Web แบ่งจอได้, มือถือขึ้น "เชื่อมต่อ" ตามจริง</string>
     <string name="fuel_title">บันทึกค่าน้ำมัน</string>
     <string name="fuel_subtitle">เติมเต็มถังทุกครั้ง</string>
-    <string name="fuel_settings_caption">การเติมน้ำมัน กม./ลิตร และค่าใช้จ่าย</string>
     <string name="car_more_fuel">บันทึกค่าน้ำมัน</string>
     <string name="fuel_add">+ เติมน้ำมัน</string>
     <string name="fuel_add_title">เติมเต็มถัง</string>
@@ -1596,9 +1595,6 @@
 
     <!-- Maintenance reminders -->
     <string name="maint_title">การบำรุงรักษา</string>
-    <string name="maint_subtitle">ครบกำหนดตามระยะทางและวันที่</string>
-    <string name="maint_subtitle_ev">ครบกำหนดตามระยะทางและวันที่ สำหรับรถ EV</string>
-    <string name="maint_settings_caption">น้ำมันเครื่อง ยาง ภาษี และสิ่งที่ถึงกำหนดต่อไป</string>
     <string name="maint_add">+ รายการ</string>
     <string name="maint_add_suggested">เพิ่มรายการแนะนำ</string>
     <string name="maint_nothing_to_add">รายการแนะนำอยู่ในรายการแล้ว</string>
@@ -1721,7 +1717,6 @@
     <!-- Emergency card -->
     <string name="emergency_title">บัตรฉุกเฉิน</string>
     <string name="emergency_subtitle">เบอร์ที่ต้องโทรและข้อมูลที่ต้องแจ้ง</string>
-    <string name="emergency_settings_caption">ประกัน ช่วยเหลือบนถนน และสายด่วนฉุกเฉิน</string>
     <string name="emergency_add">+ เพิ่ม</string>
     <string name="emergency_add_suggested">เพิ่มสายด่วนฉุกเฉิน</string>
     <string name="emergency_empty_title">ยังไม่มีอะไรบนบัตร</string>
@@ -1752,8 +1747,6 @@
     <!-- Parking spot -->
     <string name="parking_title">ที่จอดรถ</string>
     <string name="parking_subtitle">หารถให้เจออีกครั้ง</string>
-    <string name="parking_settings_caption">ปักหมุดที่จอด และนำทางกลับ</string>
-    <string name="parking_privacy">แอปอ่านตำแหน่งของคุณเฉพาะตอนกด "ปักหมุดตรงนี้" และเก็บเฉพาะจุดที่ปักไว้ โน้ต และรูปของคุณ ในโทรศัพท์เครื่องนี้ ไม่มีการแชร์หรือส่งไปที่ไหน</string>
     <string name="parking_mark_here">ปักหมุดตรงนี้</string>
     <string name="parking_finding">กำลังหาตำแหน่ง…</string>
     <string name="parking_saved">บันทึกที่จอดรถแล้ว</string>
@@ -1769,7 +1762,6 @@
     <!-- Costs -->
     <string name="costs_title">ค่าใช้จ่ายรถ</string>
     <string name="costs_subtitle">ค่าน้ำมันและอื่น ๆ รายเดือน</string>
-    <string name="costs_settings_caption">รถใช้เงินเดือนละเท่าไร</string>
     <string name="costs_add">+ ค่าใช้จ่าย</string>
     <string name="costs_by_month">รายเดือน</string>
     <string name="costs_expenses">ค่าใช้จ่ายอื่น ๆ</string>
@@ -2061,4 +2053,16 @@
     <string name="my_car_no_reading">—</string>
     <string name="my_car_diagnostics">วินิจฉัยการเชื่อมต่อ</string>
     <string name="my_car_diagnostics_caption">ล็อกการเชื่อมต่อและเหตุการณ์ mirror</string>
+
+    <!-- หน้าเครื่องมือใน รถของฉัน -->
+    <string name="parking_parked_ago">จอด %1$s</string>
+    <string name="parking_navigate_back">นำทางกลับรถ</string>
+    <string name="parking_mark_again">ปักหมุดใหม่</string>
+    <string name="parking_edit_note">แก้โน้ต</string>
+    <string name="parking_privacy_short">อ่านตำแหน่งเฉพาะตอนกดปักหมุด และเก็บในเครื่องนี้เท่านั้น</string>
+    <string name="fuel_stat_km_per_liter">กม./ลิตร</string>
+    <string name="fuel_stat_km_per_kwh">กม./kWh</string>
+    <string name="fuel_stat_baht_per_km">บาท/กม.</string>
+    <string name="fuel_stat_month_baht">เดือนนี้ (บาท)</string>
+    <string name="fuel_vehicle_section">ประเภทรถ</string>
 </resources>

@@ -657,7 +657,6 @@
     <string name="whats_new_0_4_24">• Car keyboard opens on a page\'s search box and closes after searching.\n• Rewinding no longer silences the song; Bridge Web gets the split screen; the phone shows "connected" whatever is on the car.</string>
     <string name="fuel_title">Fuel log</string>
     <string name="fuel_subtitle">Full tank every time</string>
-    <string name="fuel_settings_caption">Fill-ups, km/L and fuel spending</string>
     <string name="car_more_fuel">Fuel log</string>
     <string name="fuel_add">+ Fill-up</string>
     <string name="fuel_add_title">Full-tank fill-up</string>
@@ -1626,9 +1625,6 @@
 
     <!-- Maintenance reminders -->
     <string name="maint_title">Maintenance</string>
-    <string name="maint_subtitle">Due by distance and by date</string>
-    <string name="maint_subtitle_ev">Due by distance and by date, for an EV</string>
-    <string name="maint_settings_caption">Oil, tyres, road tax and what is due next</string>
     <string name="maint_add">+ Item</string>
     <string name="maint_add_suggested">Add suggested</string>
     <string name="maint_nothing_to_add">The suggested items are already on the list.</string>
@@ -1752,7 +1748,6 @@
     <!-- Emergency card -->
     <string name="emergency_title">Emergency card</string>
     <string name="emergency_subtitle">Numbers to ring and facts to quote</string>
-    <string name="emergency_settings_caption">Insurance, roadside help, emergency lines</string>
     <string name="emergency_add">+ Add</string>
     <string name="emergency_add_suggested">Add emergency lines</string>
     <string name="emergency_empty_title">Nothing on the card yet</string>
@@ -1784,8 +1779,6 @@
     <!-- Parking spot -->
     <string name="parking_title">Parking spot</string>
     <string name="parking_subtitle">Find the car again</string>
-    <string name="parking_settings_caption">Mark where you parked and navigate back</string>
-    <string name="parking_privacy">Your location is read only when you tap Mark here. Only the spot you mark, your note and your photo are kept, on this phone; nothing is shared or sent.</string>
     <string name="parking_mark_here">Mark here</string>
     <string name="parking_finding">Finding your location…</string>
     <string name="parking_saved">Parking spot saved</string>
@@ -1801,7 +1794,6 @@
     <!-- Costs -->
     <string name="costs_title">Car costs</string>
     <string name="costs_subtitle">Fuel and everything else, by month</string>
-    <string name="costs_settings_caption">What the car costs each month</string>
     <string name="costs_add">+ Expense</string>
     <string name="costs_by_month">By month</string>
     <string name="costs_expenses">Other expenses</string>
@@ -2096,4 +2088,16 @@
     <string name="my_car_no_reading">—</string>
     <string name="my_car_diagnostics">Connection diagnostics</string>
     <string name="my_car_diagnostics_caption">Connection log and mirror events</string>
+
+    <!-- My Car tool pages -->
+    <string name="parking_parked_ago">Parked %1$s</string>
+    <string name="parking_navigate_back">Navigate back to the car</string>
+    <string name="parking_mark_again">Mark again</string>
+    <string name="parking_edit_note">Edit note</string>
+    <string name="parking_privacy_short">Location is read only when you mark the spot, and stays on this phone.</string>
+    <string name="fuel_stat_km_per_liter">km/L</string>
+    <string name="fuel_stat_km_per_kwh">km/kWh</string>
+    <string name="fuel_stat_baht_per_km">Baht/km</string>
+    <string name="fuel_stat_month_baht">This month, baht</string>
+    <string name="fuel_vehicle_section">Vehicle</string>
 </resources>
