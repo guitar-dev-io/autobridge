@@ -249,8 +249,35 @@ class PhoneVoiceSession(private val activity: Activity, private val actions: Act
             VoiceAction.SEND_TO_CAR -> if (url != null) sendToCar(url)
             VoiceAction.OPEN_APP, VoiceAction.SEARCH, VoiceAction.PLAY, VoiceAction.OPEN_URL ->
                 if (url == null) actions.openBrowser() else actions.openUrl(url)
+            VoiceAction.MEDIA_NEXT, VoiceAction.MEDIA_PREVIOUS, VoiceAction.MEDIA_PAUSE -> controlMedia(command.command.action)
+            VoiceAction.NAVIGATE -> command.command.query?.let(::navigate)
             VoiceAction.UNKNOWN -> Unit
         }
+    }
+
+    private fun controlMedia(action: VoiceAction) {
+        VoiceMediaControl.run(activity, action) { ok ->
+            toast(activity.getString(if (ok) VoiceMediaControl.doneText(action) else R.string.voice_media_unavailable))
+        }
+    }
+
+    /** Google Maps' navigation intent, or any app that takes a place, when Maps is not installed. */
+    private fun navigate(destination: String) {
+        val maps = android.content.Intent(
+            android.content.Intent.ACTION_VIEW,
+            android.net.Uri.parse(dev.autobridge.browser.MapsHandoff.navigationUri(destination))
+        )
+        val geo = android.content.Intent(
+            android.content.Intent.ACTION_VIEW,
+            android.net.Uri.parse("geo:0,0?q=" + android.net.Uri.encode(destination))
+        )
+        val started = runCatching { activity.startActivity(maps); true }.getOrElse {
+            runCatching { activity.startActivity(geo); true }.getOrDefault(false)
+        }
+        toast(
+            if (started) activity.getString(R.string.voice_navigating, destination)
+            else activity.getString(R.string.voice_no_navigation_app)
+        )
     }
 
     /** The shared Send to Car path, with the same messages the phone controller shows. */

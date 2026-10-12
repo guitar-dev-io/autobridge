@@ -1903,6 +1903,13 @@
     <string name="drawer_external_long">เปิดในแอปอื่น</string>
     <string name="drawer_navigate_maps_long">นำทางใน Maps</string>
     <string name="drawer_navigate_maps_hint">ส่งที่อยู่บนหน้านี้ไป Maps</string>
+    <!-- Voice: media and navigation commands. -->
+    <string name="voice_media_next">ถัดไป</string>
+    <string name="voice_media_previous">ก่อนหน้า</string>
+    <string name="voice_media_paused">หยุดแล้ว</string>
+    <string name="voice_media_unavailable">ไม่มีอะไรเล่นอยู่ หรือไม่มีรายการให้ข้าม</string>
+    <string name="voice_navigating">นำทางไป %1$s</string>
+    <string name="voice_no_navigation_app">ไม่พบแอปนำทาง</string>
     <!-- Car setup: one sentence per cause, one label per fix (MirrorReadiness). -->
     <string name="setup_title">ตั้งค่าการใช้กับรถ</string>
     <string name="setup_section_steps">ก่อนใช้กับรถ</string>
