@@ -186,6 +186,16 @@ class VoiceRecognizer(
         if (keepAudio) lastAudio = pcm
         val prompt = VoiceCommandParser.RECOGNITION_PROMPT
         VoiceRuntime.describeEnvironment(app, trace)
+        // A watchdog: on a phone short of memory whisper has been seen to run for minutes on a
+        // few seconds of speech, with the button stuck on "transcribing". Past the limit the
+        // run is aborted and the driver told it failed, instead of waiting without end.
+        var timedOut = false
+        val limitMs = VoiceTimeouts.transcribeLimitMs(recording.durationMs)
+        val watchdog = launch {
+            kotlinx.coroutines.delay(limitMs)
+            timedOut = true
+            engine.abort(ticket)
+        }
         val result = runCatching {
             engine.transcribe(
                 model = model,
@@ -197,6 +207,11 @@ class VoiceRecognizer(
                 prompt = prompt,
                 ticket = ticket
             )
+        }
+        watchdog.cancel()
+        if (timedOut && !control.cancel.get()) {
+            StructuredLog.w(VoiceRuntime.TAG, "transcription passed ${limitMs}ms for ${recording.durationMs}ms of audio; aborted")
+            return@coroutineScope fail(VoiceError.TRANSCRIPTION_FAILED, "timeout ${limitMs}ms")
         }
         if (control.cancel.get() || ticket.aborted) return@coroutineScope cancelled()
         result.exceptionOrNull()?.let { error ->

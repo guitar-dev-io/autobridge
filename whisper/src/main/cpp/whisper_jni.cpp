@@ -8,6 +8,9 @@
 // A handle is a pointer to Session, returned to Kotlin as a jlong. 0 always means "no session".
 
 #include <jni.h>
+#if defined(__ANDROID__)
+#include <sys/system_properties.h>
+#endif
 
 #include <atomic>
 #include <cstring>
@@ -141,8 +144,19 @@ Java_dev_autobridge_whisper_WhisperNative_initBackends(JNIEnv * env, jclass, jst
 #if defined(AUTOBRIDGE_BACKEND_DL)
     std::string dir = to_string(env, lib_dir);
     if (ggml_backend_reg_count() == 0) {
-        if (dir.empty()) ggml_backend_load_all();
-        else ggml_backend_load_all_from_path(dir.c_str());
+        // `adb shell setprop debug.autobridge.ggml_cpu android_armv8.6_1` loads that one CPU
+        // variant instead of the best-scored one, to compare variants on a device; unset, or a
+        // variant that will not load, falls through to the normal choice.
+        char forced[PROP_VALUE_MAX] = {0};
+        if (!dir.empty() && __system_property_get("debug.autobridge.ggml_cpu", forced) > 0) {
+            const std::string path = dir + "/libggml-cpu-" + forced + ".so";
+            if (ggml_backend_load(path.c_str()) != nullptr) LOGI("ggml CPU variant forced: %s", forced);
+            else LOGW("ggml CPU variant %s did not load", forced);
+        }
+        if (ggml_backend_reg_count() == 0) {
+            if (dir.empty()) ggml_backend_load_all();
+            else ggml_backend_load_all_from_path(dir.c_str());
+        }
     }
 #else
     (void) env;
@@ -291,6 +305,9 @@ Java_dev_autobridge_whisper_WhisperNative_transcribe(
     const int status = whisper_full(session->ctx, params, pcm.data(), static_cast<int>(pcm.size()));
     if (status != 0 || session->abort.load(std::memory_order_relaxed)) {
         LOGW("whisper_full returned %d (aborted=%d)", status, session->abort.load() ? 1 : 0);
+        // Where the time went (load, mel, encode, decode per token, fallbacks) on a run that was
+        // stopped: the one case that otherwise leaves no numbers behind.
+        whisper_print_timings(session->ctx);
         return nullptr;
     }
 
