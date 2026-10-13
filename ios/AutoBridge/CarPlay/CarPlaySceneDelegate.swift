@@ -22,6 +22,10 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
     private var interfaceController: CPInterfaceController?
     /// The CarPlay window, when the app holds the navigation entitlement; see the web section below.
     private var carWebWindow: CPWindow?
+    /// The window's root, kept so a TV channel's picture can be put over the page and taken off.
+    private var carWebController: CarWebViewController?
+    /// The map screen a channel's picture is watched under, while one is.
+    private var videoTemplate: CPMapTemplate?
     /// Where the last pan update left off, so each update scrolls by the change since then.
     private var lastPan: CGPoint = .zero
     /// Keeps the Favorites and Recently-played tabs in step with the phone while connected.
@@ -473,7 +477,45 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
         if let origin = track.origin {
             stores.history.recordPlayback(origin)
         }
-        showNowPlaying()
+        // With a window to draw in, a TV channel is watched on the car screen; otherwise (an audio
+        // app, every real car today) it plays its sound and the picture stays on the phone.
+        if track.isVideo, carWebController != nil {
+            showVideo()
+        } else {
+            showNowPlaying()
+        }
+    }
+
+    // MARK: - TV picture on the CarPlay screen
+
+    /// Puts the playing channel's picture on the car screen, under a map screen whose buttons are
+    /// the controls: play/pause and close. Back (or close) takes the picture away again.
+    private func showVideo() {
+        guard let controller = interfaceController, let car = carWebController else { return }
+        car.showVideo(stores.playback.player)
+        if let shown = videoTemplate, controller.templates.contains(where: { $0 === shown }) {
+            if controller.topTemplate !== shown { controller.pop(to: shown, animated: true, completion: nil) }
+            return
+        }
+        let map = CPMapTemplate()
+        map.automaticallyHidesNavigationBar = false
+        map.mapButtons = [
+            mapButton("playpause.fill") { [weak self] in self?.stores.playback.toggle() },
+            mapButton("xmark") { [weak self] in
+                guard let self else { return }
+                self.stores.playback.stop()
+                self.interfaceController?.popTemplate(animated: true, completion: nil)
+            },
+        ]
+        videoTemplate = map
+        controller.pushTemplate(map, animated: true, completion: nil)
+    }
+
+    /// The picture goes when its map screen does, however it was left (back or close).
+    private func hideVideoIfLeft(_ template: CPTemplate) {
+        guard template === videoTemplate else { return }
+        carWebController?.showVideo(nil)
+        videoTemplate = nil
     }
 
     /// Pushes Now Playing unless it is already on the stack; CarPlay throws on a second push of the
@@ -552,6 +594,8 @@ extension CarPlaySceneDelegate: CPMapTemplateDelegate, CPSearchTemplateDelegate 
         let controller = CarWebViewController()
         window.rootViewController = controller
         carWebWindow = window
+        carWebController = controller
+        interfaceController.delegate = self
         let screen = CarWebScreen.shared
         screen.attach(controller, as: .carPlay)
         if screen.currentURL.isEmpty, let start = URL(string: "https://www.google.com") {
@@ -569,6 +613,8 @@ extension CarPlaySceneDelegate: CPMapTemplateDelegate, CPSearchTemplateDelegate 
     ) {
         CarWebScreen.shared.detach(.carPlay)
         carWebWindow = nil
+        carWebController = nil
+        videoTemplate = nil
         self.interfaceController = nil
         subscriptions.removeAll()
         VehicleReminders.carDisconnected()
@@ -680,5 +726,11 @@ extension CarPlaySceneDelegate: CPMapTemplateDelegate, CPSearchTemplateDelegate 
             items.append(item)
         }
         return items
+    }
+}
+
+extension CarPlaySceneDelegate: CPInterfaceControllerDelegate {
+    nonisolated func templateDidDisappear(_ aTemplate: CPTemplate, animated: Bool) {
+        MainActor.assumeIsolated { hideVideoIfLeft(aTemplate) }
     }
 }

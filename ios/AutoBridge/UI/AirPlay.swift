@@ -198,10 +198,19 @@ final class CarWebScreen: ObservableObject {
     }
 }
 
-/// The car screen's root view: the shared web view when it is here, a short note otherwise.
+/// Draws an `AVPlayer`'s picture: a view whose own layer is the player layer, so it resizes with
+/// the view and needs no layout code of its own.
+final class PlayerLayerView: UIView {
+    override class var layerClass: AnyClass { AVPlayerLayer.self }
+    var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
+}
+
+/// The car screen's root view: the shared web view when it is here, a short note otherwise, and a
+/// TV channel's picture over both while one is being watched on the car.
 final class CarWebViewController: UIViewController {
     private let note = UILabel()
     private weak var hosted: WKWebView?
+    private let video = PlayerLayerView()
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -218,6 +227,21 @@ final class CarWebViewController: UIViewController {
             note.centerYAnchor.constraint(equalTo: view.centerYAnchor),
             note.widthAnchor.constraint(lessThanOrEqualTo: view.widthAnchor, multiplier: 0.8),
         ])
+        video.backgroundColor = .black
+        video.playerLayer.videoGravity = .resizeAspect
+        video.frame = view.bounds
+        video.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        video.isHidden = true
+        view.addSubview(video)
+    }
+
+    /// Shows [player]'s picture over the page, or takes it away when nil. The same player the phone
+    /// uses: the picture moves to the car, the stream is not opened a second time.
+    func showVideo(_ player: AVPlayer?) {
+        loadViewIfNeeded()
+        video.playerLayer.player = player
+        video.isHidden = player == nil
+        view.bringSubviewToFront(video)
     }
 
     /// Shows [webView] filling the screen, or the note when it is nil (the page is on another screen).
@@ -230,7 +254,7 @@ final class CarWebViewController: UIViewController {
         webView.removeFromSuperview()
         webView.frame = view.bounds
         webView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        view.addSubview(webView)
+        view.insertSubview(webView, belowSubview: video)
     }
 }
 
