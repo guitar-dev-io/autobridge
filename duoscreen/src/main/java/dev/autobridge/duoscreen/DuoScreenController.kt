@@ -879,7 +879,10 @@ class DuoScreenController(
         val titles = if (editing) panes.associate { pane ->
             pane.id to context.getString(R.string.duo_card_title, pane.id + 1, apps[pane.id]?.label.orEmpty())
         } else emptyMap()
+        // With one card chosen, the others say what a tap on them does instead of their share.
+        val chosen = active.selectedPaneId
         val shares = if (editing) laidOut.cards.associate { card ->
+            if (chosen != null && card.paneId != chosen) return@associate card.paneId to context.getString(R.string.duo_tap_to_swap)
             card.paneId to context.getString(
                 when (card.shareAxis) {
                     DuoScreenChrome.ShareAxis.HEIGHT -> R.string.duo_share_height
@@ -1224,6 +1227,15 @@ class DuoScreenController(
     }
 
     override fun onSwapTargetChanged(paneId: Int?) = scheduleChromeRefresh()
+
+    override fun onPanesSwapped(first: Int, second: Int) {
+        val active = router ?: return
+        // Whichever is now the smaller one goes on top, so a swapped picture-in-picture stays one.
+        listOf(first, second).minByOrNull { id -> active.panes.pane(id)?.rect?.let { it.width.toLong() * it.height } ?: 0L }
+            ?.let { active.bringToFront(it); compositor.bringToFront(it) }
+        refreshChrome()
+        StructuredLog.i(TAG, "Swapped panes $first and $second (tap)")
+    }
 
     private var loggedSeam: Triple<Int, Int, DuoScreenLayout.Axis>? = null
     private var chromeRefreshPosted = false

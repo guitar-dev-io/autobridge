@@ -63,4 +63,5 @@
     <string name="duo_pick_title">แอปสำหรับช่อง %1$d</string>
     <string name="duo_pick_empty">ไม่มีแอปให้เลือก</string>
     <string name="duo_keyboard_hint">พิมพ์ลงช่อง %1$d</string>
+    <string name="duo_tap_to_swap">แตะเพื่อสลับกับช่องนี้</string>
 </resources>

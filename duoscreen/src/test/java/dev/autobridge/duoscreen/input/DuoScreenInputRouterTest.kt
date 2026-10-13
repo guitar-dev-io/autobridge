@@ -16,6 +16,11 @@ private class RecordingPort : DuoScreenInputPort {
     val rectChanges = mutableListOf<Pair<Int, Rect>>()
     val grabs = mutableListOf<DuoScreenLayout.Divider?>()
     val swapTargets = mutableListOf<Int?>()
+    val swaps = mutableListOf<Pair<Int, Int>>()
+
+    override fun onPanesSwapped(first: Int, second: Int) {
+        swaps += first to second
+    }
 
     override fun onSwapTargetChanged(paneId: Int?) {
         swapTargets += paneId
@@ -246,5 +251,39 @@ class DuoScreenInputRouterTest {
         assertNull(router.endDrag())
         assertNull(router.swapTargetId)
         assertEquals(false, router.panes.pane(1)!!.rect == left)
+    }
+
+    @Test fun inArrangeATapOnAnotherCardSwapsWithTheChosenOne() {
+        router.setMode(DuoScreenInputRouter.Mode.EDIT)
+        val left = router.panes.pane(0)!!.rect
+        val right = router.panes.pane(1)!!.rect
+        router.onClick(100, 300) // choose pane 0
+        router.onClick(800, 300) // tap pane 1
+        assertEquals(listOf(0 to 1), port.swaps)
+        assertEquals(right, router.panes.pane(0)!!.rect)
+        assertEquals(left, router.panes.pane(1)!!.rect)
+        assertNull(router.selectedPaneId)
+    }
+
+    @Test fun aTapOnTheChosenCardAgainDoesNotSwap() {
+        router.setMode(DuoScreenInputRouter.Mode.EDIT)
+        router.onClick(100, 300)
+        router.onClick(120, 320)
+        assertEquals(0, port.swaps.size)
+        assertEquals(0, router.selectedPaneId)
+    }
+
+    @Test fun inArrangeACardTapNearTheSeamChoosesTheCardNotTheSeam() {
+        router.setMode(DuoScreenInputRouter.Mode.EDIT)
+        // 50 px from the seam at 450: inside the normal-mode grab zone, outside Arrange's.
+        router.onClick(400, 300)
+        assertEquals(0, router.selectedPaneId)
+        assertNull(router.divider)
+    }
+
+    @Test fun inArrangeATapRightOnTheSeamStillGrabsIt() {
+        router.setMode(DuoScreenInputRouter.Mode.EDIT)
+        router.onClick(452, 300)
+        assertEquals(true, router.divider != null)
     }
 }
