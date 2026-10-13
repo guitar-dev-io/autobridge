@@ -22,6 +22,8 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
     private var interfaceController: CPInterfaceController?
     /// The CarPlay window, when the app holds the navigation entitlement; see the web section below.
     private var carWebWindow: CPWindow?
+    /// What the connected car can do; read for `supportsVideoPlayback` (iOS 26.4).
+    private var session: CPSessionConfiguration?
     /// The window's root, kept so a TV channel's picture can be put over the page and taken off.
     private var carWebController: CarWebViewController?
     /// The map screen a channel's picture is watched under, while one is.
@@ -42,6 +44,7 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
         didConnect interfaceController: CPInterfaceController
     ) {
         self.interfaceController = interfaceController
+        startSession()
         subscriptions.removeAll()
         interfaceController.setRootTemplate(rootTemplate(), animated: true, completion: nil)
         addCloseButton()
@@ -165,6 +168,7 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
                 self?.play(tracks, index: index)
                 completion()
             }
+            markPlayable(item, video: tracks[index].isVideo)
             load(entry.logo, into: item)
             return item
         }
@@ -250,6 +254,7 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
                 self?.play(tracks, index: index)
                 completion()
             }
+            markPlayable(item, video: tracks[index].isVideo)
             load(favorite.logo, into: item)
             return item
         }
@@ -293,6 +298,7 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
                 self?.play(tracks, index: index)
                 completion()
             }
+            markPlayable(item, video: tracks[index].isVideo)
             load(entry.logo, into: item)
             return item
         }
@@ -383,6 +389,7 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
                 self?.play(tracks, index: start + offset)
                 completion()
             }
+            markPlayable(item, video: tracks[start + offset].isVideo)
             load(entry.logo, into: item)
             return item
         }
@@ -479,11 +486,41 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
         }
         // With a window to draw in, a TV channel is watched on the car screen; otherwise (an audio
         // app, every real car today) it plays its sound and the picture stays on the phone.
-        if track.isVideo, carWebController != nil {
+        if track.isVideo, carPresentsVideo {
+            // The row asked CarPlay for video presentation (`markPlayable`); the car shows the
+            // picture itself, parked only, and falls back to Now Playing on its own when it cannot.
+            return
+        } else if track.isVideo, carWebController != nil {
             showVideo()
         } else {
             showNowPlaying()
         }
+    }
+
+    private func startSession() {
+        session = CPSessionConfiguration(delegate: self)
+        if #available(iOS 26.4, *) {
+            NSLog("AutoBridge CarPlay: supportsVideoPlayback=%d", session?.supportsVideoPlayback == true ? 1 : 0)
+        }
+    }
+
+    /// True when this car can show video (CarPlay video, iOS 26.4, with the CarPlay video
+    /// entitlement). The car still decides each time: moving, it plays the sound only.
+    private var carPresentsVideo: Bool {
+        guard #available(iOS 26.4, *) else { return false }
+        return session?.supportsVideoPlayback ?? false
+    }
+
+    /// Tells CarPlay how a row plays: a TV channel as video where the car allows it, anything else
+    /// as audio. Before iOS 26.4 there is no such thing and the row simply plays as it always has.
+    private func markPlayable(_ item: CPListItem, video: Bool) {
+        guard #available(iOS 26.4, *) else { return }
+        item.playbackConfiguration = CPPlaybackConfiguration(
+            preferredPresentation: video && carPresentsVideo ? .video : .audio,
+            playbackAction: .play,
+            elapsedTime: .zero,
+            duration: .zero
+        )
     }
 
     // MARK: - TV picture on the CarPlay screen
@@ -596,6 +633,7 @@ extension CarPlaySceneDelegate: CPMapTemplateDelegate, CPSearchTemplateDelegate 
         carWebWindow = window
         carWebController = controller
         interfaceController.delegate = self
+        startSession()
         let screen = CarWebScreen.shared
         screen.attach(controller, as: .carPlay)
         if screen.currentURL.isEmpty, let start = URL(string: "https://www.google.com") {
@@ -734,3 +772,5 @@ extension CarPlaySceneDelegate: CPInterfaceControllerDelegate {
         MainActor.assumeIsolated { hideVideoIfLeft(aTemplate) }
     }
 }
+
+extension CarPlaySceneDelegate: CPSessionConfigurationDelegate {}
