@@ -20,16 +20,12 @@ import UIKit
 @objc(CarPlaySceneDelegate)
 final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     private var interfaceController: CPInterfaceController?
-    /// The CarPlay window, when the app holds the navigation entitlement; see the web section below.
-    private var carWebWindow: CPWindow?
+    /// The CarPlay window, when CarPlay hands the app one; see the drawn-screen section below.
+    private var carWindow: CPWindow?
     /// What the connected car can do; read for `supportsVideoPlayback` (iOS 26.4).
     private var session: CPSessionConfiguration?
-    /// The window's root, kept so a TV channel's picture can be put over the page and taken off.
-    private var carWebController: CarWebViewController?
-    /// The map screen a channel's picture is watched under, while one is.
-    private var videoTemplate: CPMapTemplate?
-    /// Where the last pan update left off, so each update scrolls by the change since then.
-    private var lastPan: CGPoint = .zero
+    /// The screen AutoBridge draws in that window (channels, favourites, the browser, the player).
+    private var carScreen: CarScreenViewController?
     /// Keeps the Favorites and Recently-played tabs in step with the phone while connected.
     private var subscriptions = Set<AnyCancellable>()
 
@@ -490,8 +486,10 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
             // The row asked CarPlay for video presentation (`markPlayable`); the car shows the
             // picture itself, parked only, and falls back to Now Playing on its own when it cannot.
             return
-        } else if track.isVideo, carWebController != nil {
-            showVideo()
+        } else if track.isVideo, let carScreen {
+            // With a window, the picture is watched on the drawn screen, under its own controls.
+            carScreen.showPlayer()
+            interfaceController?.popToRootTemplate(animated: true, completion: nil)
         } else {
             showNowPlaying()
         }
@@ -521,38 +519,6 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
             elapsedTime: .zero,
             duration: .zero
         )
-    }
-
-    // MARK: - TV picture on the CarPlay screen
-
-    /// Puts the playing channel's picture on the car screen, under a map screen whose buttons are
-    /// the controls: play/pause and close. Back (or close) takes the picture away again.
-    private func showVideo() {
-        guard let controller = interfaceController, let car = carWebController else { return }
-        car.showVideo(stores.playback.player)
-        if let shown = videoTemplate, controller.templates.contains(where: { $0 === shown }) {
-            if controller.topTemplate !== shown { controller.pop(to: shown, animated: true, completion: nil) }
-            return
-        }
-        let map = CPMapTemplate()
-        map.automaticallyHidesNavigationBar = false
-        map.mapButtons = [
-            mapButton("playpause.fill") { [weak self] in self?.stores.playback.toggle() },
-            mapButton("xmark") { [weak self] in
-                guard let self else { return }
-                self.stores.playback.stop()
-                self.interfaceController?.popTemplate(animated: true, completion: nil)
-            },
-        ]
-        videoTemplate = map
-        controller.pushTemplate(map, animated: true, completion: nil)
-    }
-
-    /// The picture goes when its map screen does, however it was left (back or close).
-    private func hideVideoIfLeft(_ template: CPTemplate) {
-        guard template === videoTemplate else { return }
-        carWebController?.showVideo(nil)
-        videoTemplate = nil
     }
 
     /// Pushes Now Playing unless it is already on the stack; CarPlay throws on a second push of the
@@ -609,17 +575,17 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
     }
 }
 
-// MARK: - Web pages on the CarPlay screen
+// MARK: - The drawn CarPlay screen
 
-/// A real web page on the CarPlay screen. CarPlay hands an app a window it can draw in only when
-/// the app holds the navigation entitlement (`com.apple.developer.carplay-maps`), and then calls the
-/// `to window:` variant below instead of the audio one above. Apple grants that entitlement to
-/// navigation apps only, so only the Simulator's entitlements declare it: on a device the app stays
-/// the audio surface and none of this runs.
+/// AutoBridge's own CarPlay screen, laid out like APTV (`CarScreenViewController`). CarPlay hands an
+/// app a window to draw in only with the navigation entitlement (`carplay-maps`) and, it appears,
+/// the video one (`carplay-video`: APTV holds only that and audio). Neither is granted to
+/// AutoBridge yet, so only the Simulator's entitlements declare them: on a device the app stays the
+/// audio surface above and none of this runs.
 ///
-/// The window takes no touches, so the page is driven the way a map is: pan to scroll, map buttons
-/// for up/down/back/reload, a search button for the address (CarPlay's own keyboard), and the
-/// phone browser's car controls. The audio home is one button away.
+/// The screen sits under a map template, whose buttons drive it when the window gets no touches:
+/// up, down, press and back, a drag to move the highlight sideways, CarPlay's keyboard for an
+/// address, and the template home one button away.
 extension CarPlaySceneDelegate: CPMapTemplateDelegate, CPSearchTemplateDelegate {
     func templateApplicationScene(
         _ templateApplicationScene: CPTemplateApplicationScene,
@@ -628,18 +594,14 @@ extension CarPlaySceneDelegate: CPMapTemplateDelegate, CPSearchTemplateDelegate 
     ) {
         self.interfaceController = interfaceController
         subscriptions.removeAll()
-        let controller = CarWebViewController()
-        window.rootViewController = controller
-        carWebWindow = window
-        carWebController = controller
-        interfaceController.delegate = self
+        let screen = CarScreenViewController()
+        screen.onAddress = { [weak self] in self?.openAddressSearch() }
+        window.rootViewController = screen
+        screen.adopt(window)
+        carWindow = window
+        carScreen = screen
         startSession()
-        let screen = CarWebScreen.shared
-        screen.attach(controller, as: .carPlay)
-        if screen.currentURL.isEmpty, let start = URL(string: "https://www.google.com") {
-            screen.show(start)
-        }
-        interfaceController.setRootTemplate(webMapTemplate(), animated: true, completion: nil)
+        interfaceController.setRootTemplate(screenMapTemplate(), animated: true, completion: nil)
         addCloseButton()
         VehicleReminders.carConnected()
     }
@@ -650,34 +612,35 @@ extension CarPlaySceneDelegate: CPMapTemplateDelegate, CPSearchTemplateDelegate 
         from window: CPWindow
     ) {
         CarWebScreen.shared.detach(.carPlay)
-        carWebWindow = nil
-        carWebController = nil
-        videoTemplate = nil
+        carWindow = nil
+        carScreen = nil
         self.interfaceController = nil
         subscriptions.removeAll()
         VehicleReminders.carDisconnected()
     }
 
-    private func webMapTemplate() -> CPMapTemplate {
+    private func screenMapTemplate() -> CPMapTemplate {
         let map = CPMapTemplate()
         map.mapDelegate = self
-        map.automaticallyHidesNavigationBar = false
-        let screen = CarWebScreen.shared
+        map.automaticallyHidesNavigationBar = true
+        map.hidesButtonsWithNavigationBar = false
         map.mapButtons = [
-            mapButton("chevron.up") { screen.scroll(pages: -0.8) },
-            mapButton("chevron.down") { screen.scroll(pages: 0.8) },
-            mapButton("arrow.uturn.backward") { screen.goBack() },
-            mapButton("arrow.clockwise") { screen.reload() },
+            mapButton("chevron.up") { [weak self] in self?.carScreen?.move(.up) },
+            mapButton("chevron.down") { [weak self] in self?.carScreen?.move(.down) },
+            mapButton("hand.tap.fill") { [weak self] in self?.carScreen?.activate() },
+            mapButton("arrow.uturn.backward") { [weak self] in self?.carScreen?.back() },
         ]
         let home = CPBarButton(image: UIImage(systemName: "square.grid.2x2") ?? UIImage()) { [weak self] _ in
             guard let self else { return }
             self.interfaceController?.pushTemplate(self.homeTemplate(), animated: true, completion: nil)
         }
-        let address = CPBarButton(image: UIImage(systemName: "magnifyingglass") ?? UIImage()) { [weak self] _ in
-            self?.openAddressSearch()
-        }
         map.leadingNavigationBarButtons = [home]
-        map.trailingNavigationBarButtons = [address]
+        if !BuildFlavor.isStore {
+            let address = CPBarButton(image: UIImage(systemName: "magnifyingglass") ?? UIImage()) { [weak self] _ in
+                self?.openAddressSearch()
+            }
+            map.trailingNavigationBarButtons = [address]
+        }
         return map
     }
 
@@ -693,32 +656,22 @@ extension CarPlaySceneDelegate: CPMapTemplateDelegate, CPSearchTemplateDelegate 
         interfaceController?.pushTemplate(search, animated: true, completion: nil)
     }
 
-    // MARK: Pan to scroll
+    // MARK: Pan and knob move the highlight
 
     func mapTemplateDidBeginPanGesture(_ mapTemplate: CPMapTemplate) {
-        lastPan = .zero
+        carScreen?.panBegan()
     }
 
     func mapTemplate(_ mapTemplate: CPMapTemplate, didUpdatePanGestureWithTranslation translation: CGPoint, velocity: CGPoint) {
-        // A finger moving down drags the page down, which moves the view up the page.
-        let delta = CGPoint(x: lastPan.x - translation.x, y: lastPan.y - translation.y)
-        lastPan = translation
-        CarWebScreen.shared.scroll(by: delta)
-    }
-
-    func mapTemplate(_ mapTemplate: CPMapTemplate, didEndPanGestureWithVelocity velocity: CGPoint) {
-        lastPan = .zero
+        carScreen?.panMoved(to: translation)
     }
 
     /// The pan buttons a car without a touch screen shows.
     func mapTemplate(_ mapTemplate: CPMapTemplate, panWith direction: CPMapTemplate.PanDirection) {
-        let step: CGFloat = 240
-        var delta = CGPoint.zero
-        if direction.contains(.up) { delta.y -= step }
-        if direction.contains(.down) { delta.y += step }
-        if direction.contains(.left) { delta.x -= step }
-        if direction.contains(.right) { delta.x += step }
-        CarWebScreen.shared.scroll(by: delta)
+        if direction.contains(.up) { carScreen?.move(.up) }
+        if direction.contains(.down) { carScreen?.move(.down) }
+        if direction.contains(.left) { carScreen?.move(.left) }
+        if direction.contains(.right) { carScreen?.move(.right) }
     }
 
     // MARK: Address search
@@ -738,6 +691,7 @@ extension CarPlaySceneDelegate: CPMapTemplateDelegate, CPSearchTemplateDelegate 
     ) {
         if let address = item.userInfo as? String, let url = URL(string: address) {
             CarWebScreen.shared.show(url)
+            carScreen?.openBrowser()
         }
         interfaceController?.popToRootTemplate(animated: true, completion: nil)
         completionHandler()
@@ -764,12 +718,6 @@ extension CarPlaySceneDelegate: CPMapTemplateDelegate, CPSearchTemplateDelegate 
             items.append(item)
         }
         return items
-    }
-}
-
-extension CarPlaySceneDelegate: CPInterfaceControllerDelegate {
-    nonisolated func templateDidDisappear(_ aTemplate: CPTemplate, animated: Bool) {
-        MainActor.assumeIsolated { hideVideoIfLeft(aTemplate) }
     }
 }
 

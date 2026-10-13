@@ -208,3 +208,12 @@
 "The car screen will show web pages, video included, whether the car is parked or moving; nothing here checks. Do not watch while driving." = "The car screen will show web pages, video included, whether the car is parked or moving; nothing here checks. Do not watch while driving.";
 "Open a page in AutoBridge on your phone and send it to the car screen." = "Open a page in AutoBridge on your phone and send it to the car screen.";
 "Send to car" = "Send to car";
+
+/* MARK: - Drawn CarPlay screen */
+"Channels" = "Channels";
+"Quick" = "Quick";
+"Now playing" = "Now playing";
+"Add a source on your phone first." = "Add a source on your phone first.";
+"Web pages and video sites" = "Web pages and video sites";
+"TV and radio sources" = "TV and radio sources";
+"Enter a URL or search" = "Enter a URL or search";

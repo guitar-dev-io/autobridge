@@ -205,12 +205,11 @@ final class PlayerLayerView: UIView {
     var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
 }
 
-/// The car screen's root view: the shared web view when it is here, a short note otherwise, and a
-/// TV channel's picture over both while one is being watched on the car.
+/// A car screen's web host: the shared web view when it is here, a short note otherwise. It is the
+/// AirPlay screen's root, and the page area of the browser on the drawn CarPlay screen.
 final class CarWebViewController: UIViewController {
     private let note = UILabel()
     private weak var hosted: WKWebView?
-    private let video = PlayerLayerView()
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -227,21 +226,6 @@ final class CarWebViewController: UIViewController {
             note.centerYAnchor.constraint(equalTo: view.centerYAnchor),
             note.widthAnchor.constraint(lessThanOrEqualTo: view.widthAnchor, multiplier: 0.8),
         ])
-        video.backgroundColor = .black
-        video.playerLayer.videoGravity = .resizeAspect
-        video.frame = view.bounds
-        video.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        video.isHidden = true
-        view.addSubview(video)
-    }
-
-    /// Shows [player]'s picture over the page, or takes it away when nil. The same player the phone
-    /// uses: the picture moves to the car, the stream is not opened a second time.
-    func showVideo(_ player: AVPlayer?) {
-        loadViewIfNeeded()
-        video.playerLayer.player = player
-        video.isHidden = player == nil
-        view.bringSubviewToFront(video)
     }
 
     /// Shows [webView] filling the screen, or the note when it is nil (the page is on another screen).
@@ -254,7 +238,7 @@ final class CarWebViewController: UIViewController {
         webView.removeFromSuperview()
         webView.frame = view.bounds
         webView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        view.insertSubview(webView, belowSubview: video)
+        view.addSubview(webView)
     }
 }
 
