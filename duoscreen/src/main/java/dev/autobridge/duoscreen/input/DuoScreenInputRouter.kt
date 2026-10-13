@@ -57,9 +57,13 @@ interface DuoScreenInputPort {
  */
 class DuoScreenInputRouter(
     initialPanes: DuoScreenPaneSet,
-    private val bounds: Bounds,
+    bounds: Bounds,
     private val port: DuoScreenInputPort
 ) {
+    /** What drags and resizes are clamped to; follows the surface when the car resizes it. */
+    var bounds: Bounds = bounds
+        internal set
+
     enum class Mode { NORMAL, EDIT }
 
     var mode: Mode = Mode.NORMAL

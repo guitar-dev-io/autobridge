@@ -84,7 +84,9 @@ object M3uParser {
         return Channel(
             name = name.ifBlank { attributes["tvg-name"].orEmpty() },
             url = "",
-            group = attributes["group-title"].orEmpty(),
+            // iptv-org writes group-title="Undefined" for a channel with no category; shown, it
+            // read as a broken label under the channel on the car, so it counts as no group.
+            group = attributes["group-title"].orEmpty().takeUnless { it.trim().equals("Undefined", ignoreCase = true) }.orEmpty(),
             logo = IptvLogos.pick(attributes),
             guideId = attributes["tvg-id"].orEmpty().trim(),
             country = attributes["tvg-country"].orEmpty().trim()

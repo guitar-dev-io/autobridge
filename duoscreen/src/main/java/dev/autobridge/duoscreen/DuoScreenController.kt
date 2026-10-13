@@ -56,6 +56,8 @@ class DuoScreenController(
 ) : DuoScreenInputPort {
     private companion object {
         const val TAG = "AutoBridgeDuoCtl"
+        /** Narrower or shorter than this, a reported visible area is a transition, not a layout. */
+        const val MIN_AREA_PX = 200
         const val QUIET_PERIOD_MS = 300L
         /**
          * How long a seam drag must rest before the panes' displays are resized. Longer than
@@ -152,6 +154,15 @@ class DuoScreenController(
     private var sessionBounds: Bounds? = null
     private var selectedPaneId: Int? = null
 
+    /** The host surface's size, and the part of it the car leaves visible (null: all of it). */
+    private var surfaceWidth = 0
+    private var surfaceHeight = 0
+    private var visibleArea: android.graphics.Rect? = null
+
+    /** Where the laid-out area starts on the surface; car taps arrive in surface coordinates. */
+    private var areaLeft = 0
+    private var areaTop = 0
+
     /**
      * Whether the next [stop] is a real teardown (set by [DuoScreenHost.release] and the on-phone
      * harness) rather than [restart]'s internal rebuild. Only a real teardown clears the Duo-active
@@ -194,7 +205,10 @@ class DuoScreenController(
         stop()
         dpi = panelDpi
         density = densityOf(panelDpi)
-        val bounds = DuoScreenChrome.boundsFor(width, height, density)
+        surfaceWidth = width
+        surfaceHeight = height
+        val area = contentArea()
+        val bounds = DuoScreenChrome.boundsFor(area.width(), area.height(), density)
         paneDpi = storedPaneDpi(panelDpi)
         DuoScreenStore.noteSurface(context, bounds)
         // An arrangement saved before the control bar existed tiles the surface edge to edge; it
@@ -219,6 +233,7 @@ class DuoScreenController(
             StructuredLog.e(TAG, "Compositor could not bind the host surface")
             return false
         }
+        applyArea(area)
         running = true
         sessionBounds = bounds
         hostSurface = output
@@ -283,6 +298,60 @@ class DuoScreenController(
     }
 
     /**
+     * The car's report of which part of the surface it leaves uncovered: a head unit can lay its
+     * own cards (a media card, a map) over part of the app's surface, and panes drawn under them
+     * cannot be seen or reached. The session is laid out inside this area from then on, and a live
+     * one is re-fitted to it the same way a resized surface is.
+     */
+    fun setVisibleArea(rect: android.graphics.Rect) {
+        // A sliver is a transition, not a layout to fit panes into.
+        if (rect.width() < MIN_AREA_PX || rect.height() < MIN_AREA_PX) return
+        if (rect == visibleArea) return
+        visibleArea = android.graphics.Rect(rect)
+        if (!running) return
+        val active = router ?: return
+        val previous = sessionBounds ?: return
+        val area = contentArea()
+        applyArea(area)
+        val bounds = DuoScreenChrome.boundsFor(area.width(), area.height(), density)
+        if (bounds == previous) return
+        sessionBounds = bounds
+        active.bounds = bounds
+        fitPanes(active, previous, bounds)
+        refreshChrome()
+        StructuredLog.i(TAG, "Visible area ${area.toShortString()}: re-fitted from ${previous.width}x${previous.height}")
+    }
+
+    /**
+     * Re-fits the live panes from [previous] to [bounds]. A big change of shape (the car covering
+     * a third of the surface with its own card) can squeeze the gap the control bar lives in, which
+     * would put the bar over the panes; the panes are then laid out afresh from the preset, as a
+     * saved arrangement without room for the bar is at start.
+     */
+    private fun fitPanes(active: DuoScreenInputRouter, previous: Bounds, bounds: Bounds) {
+        val byId = active.panes.panes.sortedBy { it.id }
+        val refitted = DuoScreenLayoutCodec.refit(byId, previous, bounds)
+        val fitted = if (DuoScreenChrome.hasRoomForBar(refitted, bounds)) refitted.map { it.id to it.rect }
+        else DuoScreenStore.preset(context).rects(byId.size, bounds).mapIndexed { index, rect -> byId[index].id to rect }
+            .also { StructuredLog.i(TAG, "Re-fitted panes left no room for the bar; laid out from the preset") }
+        fitted.forEach { (id, rect) -> active.setRect(id, rect) }
+    }
+
+    /** The visible area clipped to the surface, or the whole surface when none was reported. */
+    private fun contentArea(): android.graphics.Rect {
+        val whole = android.graphics.Rect(0, 0, surfaceWidth, surfaceHeight)
+        val visible = visibleArea ?: return whole
+        val clipped = android.graphics.Rect(visible)
+        return if (clipped.intersect(whole) && clipped.width() >= MIN_AREA_PX && clipped.height() >= MIN_AREA_PX) clipped else whole
+    }
+
+    private fun applyArea(area: android.graphics.Rect) {
+        areaLeft = area.left
+        areaTop = area.top
+        compositor.setContentArea(area.left, area.top, area.width(), area.height())
+    }
+
+    /**
      * Picks the live session back up on a new host Surface instead of building a new one, which is
      * what keeps the pane apps — and whatever the driver was doing in them — alive across the host
      * taking its Surface away, and across leaving Duo Screen and coming back.
@@ -303,12 +372,14 @@ class DuoScreenController(
         density = densityOf(panelDpi)
         paneDpi = storedPaneDpi(panelDpi)
         hostSurface = output
-        val bounds = DuoScreenChrome.boundsFor(width, height, density)
+        surfaceWidth = width
+        surfaceHeight = height
+        val area = contentArea()
+        applyArea(area)
+        val bounds = DuoScreenChrome.boundsFor(area.width(), area.height(), density)
         sessionBounds = bounds
-        if (bounds != previous) {
-            DuoScreenLayoutCodec.refit(active.panes.panes.sortedBy { it.id }, previous, bounds)
-                .forEach { pane -> active.setRect(pane.id, pane.rect) }
-        }
+        active.bounds = bounds
+        if (bounds != previous) fitPanes(active, previous, bounds)
         refreshChrome()
         StructuredLog.i(
             TAG,
@@ -565,7 +636,10 @@ class DuoScreenController(
 
     // --- host gestures, forwarded to the router which decides what they mean in the current mode ---
 
-    fun onClick(x: Int, y: Int) {
+    fun onClick(surfaceX: Int, surfaceY: Int) {
+        // The car reports taps on its surface; the layout lives in the visible area's coordinates.
+        val x = surfaceX - areaLeft
+        val y = surfaceY - areaTop
         val active = router
         if (active == null) {
             StructuredLog.w(TAG, "Car tap at $x,$y dropped: no live session")
@@ -869,7 +943,7 @@ class DuoScreenController(
 
     fun onScale(focusX: Int, focusY: Int, scaleFactor: Float) {
         logGesture("scale", "focus $focusX,$focusY x$scaleFactor")
-        router?.onScale(focusX, focusY, scaleFactor)
+        router?.onScale(focusX - areaLeft, focusY - areaTop, scaleFactor)
     }
 
     private var lastGestureLogMs = 0L

@@ -148,6 +148,9 @@ class DuoScreenScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
     // stay, and the next onSurfaceAvailable resumes them rather than launching them again.
     override fun onSurfaceDestroyed(surfaceContainer: SurfaceContainer) = controller.detach()
 
+    // A head unit can lay its own cards over part of the surface; the panes go in what is left.
+    override fun onVisibleAreaChanged(visibleArea: android.graphics.Rect) = controller.setVisibleArea(visibleArea)
+
     override fun onClick(x: Float, y: Float) = controller.onClick(x.toInt(), y.toInt())
 
     override fun onScroll(distanceX: Float, distanceY: Float) =
