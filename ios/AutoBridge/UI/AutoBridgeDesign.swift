@@ -4,15 +4,19 @@ import SwiftUI
 /// apps read as one product: ink surfaces, hairline borders, and a per-section accent that carries
 /// from the home card into that section's screens and player.
 ///
-/// The colour values are the Android constants, not approximations of them.
+/// The surfaces and text are the neutral greys of the Android phone app as shipped in v0.4.49
+/// (`design/reference/v0.4.49`): dark rounded cards with a faint border, tonal icon chips, and a
+/// light blue for the primary action.
 enum AutoBridgeDesign {
-    static let ink = Color(hex: 0x0B0E14)
-    static let surface = Color(hex: 0x141924)
-    static let surfaceRaised = Color(hex: 0x1C2331)
-    static let hairline = Color(hex: 0x26304A)
-    static let primaryText = Color(hex: 0xEAF0FA)
-    static let secondaryText = Color(hex: 0x8494B0)
-    static let accent = Color(hex: 0x4C7DF0)
+    static let ink = Color(hex: 0x121418)
+    static let surface = Color(hex: 0x1C1F25)
+    static let surfaceRaised = Color(hex: 0x242831)
+    static let hairline = Color(hex: 0x2C3038)
+    static let primaryText = Color(hex: 0xF1F3F5)
+    static let secondaryText = Color(hex: 0x9AA1AA)
+    static let accent = Color(hex: 0x5E9DF5)
+    /// Text and glyphs drawn on an [accent] fill.
+    static let onAccent = Color(hex: 0x0E1B30)
     static let accentSoft = Color(hex: 0x33C9D6)
     static let danger = Color(hex: 0xFF6B81)
 
@@ -66,16 +70,30 @@ struct InkCard<Content: View>: View {
         content()
             .background(AutoBridgeDesign.surface)
             .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .stroke(AutoBridgeDesign.hairline, lineWidth: 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(alignment: .leading) {
-                Rectangle()
-                    .fill(accent)
-                    .frame(width: 3)
-                    .clipShape(RoundedRectangle(cornerRadius: 2))
-            }
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+    }
+}
+
+/// The rounded square an icon sits in: the card colour with a little of the accent mixed in and a
+/// border of the same accent, as on every Android card and row.
+struct TonalChip: View {
+    let symbol: String
+    var accent: Color
+    var size: CGFloat = 52
+
+    var body: some View {
+        Image(systemName: symbol)
+            .font(.system(size: size * 0.42, weight: .semibold))
+            .foregroundStyle(accent)
+            .frame(width: size, height: size)
+            .background(accent.opacity(0.13), in: RoundedRectangle(cornerRadius: size * 0.28, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
+                    .stroke(accent.opacity(0.35), lineWidth: 1)
+            )
     }
 }
 
@@ -138,11 +156,11 @@ struct PageShell<Content: View>: View {
         HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.title2.weight(.semibold))
+                    .font(.system(size: 32, weight: .bold))
                     .foregroundStyle(AutoBridgeDesign.primaryText)
                 if !subtitle.isEmpty {
                     Text(subtitle)
-                        .font(.caption)
+                        .font(.subheadline)
                         .foregroundStyle(AutoBridgeDesign.secondaryText)
                 }
             }
@@ -208,11 +226,11 @@ struct SearchField: View {
                 .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(AutoBridgeDesign.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .background(AutoBridgeDesign.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .stroke(AutoBridgeDesign.hairline, lineWidth: 1)
         )
         .tint(accent)
@@ -235,50 +253,58 @@ struct ContentRow: View {
                 badgeView
             } else {
                 LogoImage(url: logo, title: title, accent: accent)
-                    .frame(width: 52, height: 38)
+                    .frame(width: 52, height: 52)
             }
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.body)
+                    .font(.system(size: 17, weight: .medium))
                     .foregroundStyle(AutoBridgeDesign.primaryText)
                     .lineLimit(1)
                 if let status {
                     Text(status.text)
-                        .font(.caption)
+                        .font(.subheadline)
                         .foregroundStyle(status.color)
                         .lineLimit(1)
                 } else if !subtitle.isEmpty {
                     Text(subtitle)
-                        .font(.caption)
+                        .font(.subheadline)
                         .foregroundStyle(AutoBridgeDesign.secondaryText)
                         .lineLimit(1)
                 }
             }
             Spacer(minLength: 8)
-            if !trailing.isEmpty {
+            if trailing == "›" {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(AutoBridgeDesign.secondaryText)
+            } else if !trailing.isEmpty {
                 Text(trailing)
                     .font(.body)
                     .foregroundStyle(AutoBridgeDesign.secondaryText)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 11)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(AutoBridgeDesign.surface)
         .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .stroke(AutoBridgeDesign.hairline, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .contentShape(Rectangle())
     }
 
     private var badgeView: some View {
         Text(badge.isEmpty ? initial : badge)
-            .font(.system(size: 15, weight: .semibold))
+            .font(.system(size: 20, weight: .medium))
             .foregroundStyle(accent)
-            .frame(width: 52, height: 38)
-            .background(accent.opacity(0.14), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .frame(width: 52, height: 52)
+            .background(accent.opacity(0.13), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(accent.opacity(0.35), lineWidth: 1)
+            )
     }
 
     private var initial: String {
@@ -345,10 +371,10 @@ struct ContentTile: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(AutoBridgeDesign.surface)
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .stroke(AutoBridgeDesign.hairline, lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .contentShape(Rectangle())
     }
 }
@@ -359,7 +385,8 @@ struct SectionLabel: View {
 
     var body: some View {
         Text(text.uppercased())
-            .font(.caption.weight(.semibold))
+            .font(.footnote.weight(.semibold))
+            .tracking(1.6)
             .foregroundStyle(AutoBridgeDesign.secondaryText)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.top, 10)

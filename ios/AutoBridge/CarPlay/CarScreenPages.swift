@@ -29,15 +29,268 @@ class CarGridPage: CarPage {
     }
 }
 
-// MARK: - Channels
+// MARK: - Home
 
-/// The Channels tab: every TV and radio source, as on the phone.
-final class CarSourcesPage: CarGridPage {
+/// The car home, as on Android Auto: a Now Playing card while something plays, the six
+/// quick-access cards (TV, Radio, Web browser, YouTube, YouTube Music, Streaming), and the channels
+/// played lately, three to a line.
+final class CarHomePage: CarPage {
+    private let scroll = UIScrollView()
+    private let column = UIStackView()
+    private let hero = CarNowPlayingCard()
+    private let recentHeader = CarHomePage.sectionLabel(NSLocalizedString("Recently played", comment: "Row"))
+    private let recentRows = UIStackView()
     private var subscriptions = Set<AnyCancellable>()
 
-    init() {
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        title = "AutoBridge"
+        scroll.alwaysBounceVertical = true
+        scroll.showsVerticalScrollIndicator = false
+        scroll.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(scroll)
+        column.axis = .vertical
+        column.spacing = 12
+        column.isLayoutMarginsRelativeArrangement = true
+        column.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 4, leading: 12, bottom: 20, trailing: 12)
+        column.translatesAutoresizingMaskIntoConstraints = false
+        scroll.addSubview(column)
+        NSLayoutConstraint.activate([
+            scroll.topAnchor.constraint(equalTo: view.topAnchor),
+            scroll.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            scroll.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scroll.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            column.topAnchor.constraint(equalTo: scroll.contentLayoutGuide.topAnchor),
+            column.bottomAnchor.constraint(equalTo: scroll.contentLayoutGuide.bottomAnchor),
+            column.leadingAnchor.constraint(equalTo: scroll.frameLayoutGuide.leadingAnchor),
+            column.trailingAnchor.constraint(equalTo: scroll.frameLayoutGuide.trailingAnchor),
+        ])
+
+        hero.onOpen = { [weak self] in self?.screen?.showPlayer() }
+        column.addArrangedSubview(hero)
+        column.addArrangedSubview(Self.sectionLabel(NSLocalizedString("Quick access", comment: "Car home")))
+        column.addArrangedSubview(quickAccess())
+        column.setCustomSpacing(18, after: column.arrangedSubviews.last!)
+        column.addArrangedSubview(recentHeader)
+        recentRows.axis = .vertical
+        recentRows.spacing = 12
+        column.addArrangedSubview(recentRows)
+
+        stores.playback.$current
+            .receive(on: RunLoop.main)
+            .sink { [weak self] track in self?.hero.isHidden = track == nil }
+            .store(in: &subscriptions)
+        stores.history.$recent
+            .combineLatest(stores.history.$favorites)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] recent, favorites in self?.reloadRecent(recent, favorites) }
+            .store(in: &subscriptions)
+    }
+
+    static func sectionLabel(_ text: String) -> UILabel {
+        let label = UILabel()
+        label.text = text
+        label.font = CarStyle.font(18, .semibold)
+        label.textColor = CarStyle.section
+        return label
+    }
+
+    /// The six cards, three to a line, in the Android car-home order.
+    private func quickAccess() -> UIView {
+        let sections = HomeSection.carQuickAccess.filter { section in
+            !BuildFlavor.isStore || section.iptvKind != nil
+        }
+        let cards = sections.map { section -> CarTileButton in
+            let card = CarTileButton()
+            card.configure(
+                CarTile(title: section.plainTitle, symbol: section.carSymbol, tint: section.carTint) { [weak self] in
+                    self?.open(section)
+                },
+                shape: .card
+            )
+            card.heightAnchor.constraint(equalToConstant: 96).isActive = true
+            return card
+        }
+        return Self.lines(of: cards, across: 3)
+    }
+
+    private func open(_ section: HomeSection) {
+        guard let screen else { return }
+        switch section {
+        case .tv: screen.push(CarSourcesPage(kind: .tv))
+        case .radio: screen.push(CarSourcesPage(kind: .radio))
+        case .youtube, .youtubeMusic: screen.openBrowser(section.webUrl)
+        case .streaming:
+            screen.openBrowser()
+            screen.browser.showSites()
+        default: screen.openBrowser()
+        }
+    }
+
+    /// Favourites first, then what was played lately, streams only, six at most.
+    private func reloadRecent(_ recent: [IptvHistoryItem], _ favorites: [IptvHistoryItem]) {
+        var seen = Set<String>()
+        let items = (favorites + recent.filter { $0.playback == .stream })
+            .filter { seen.insert($0.url).inserted }
+            .prefix(6)
+        let tracks = items.map(PlaybackController.Track.init(item:))
+        let rows = items.enumerated().map { index, item -> CarTileButton in
+            let row = CarTileButton()
+            let section: HomeSection = item.kind == .radio ? .radio : .tv
+            row.configure(
+                CarTile(
+                    title: item.title,
+                    subtitle: section.plainTitle,
+                    logo: item.logo,
+                    symbol: section.carSymbol,
+                    tint: section.carTint
+                ) { [weak self] in self?.screen?.play(Array(tracks), index: index) },
+                shape: .row
+            )
+            row.heightAnchor.constraint(equalToConstant: 68).isActive = true
+            return row
+        }
+        recentRows.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        recentRows.addArrangedSubview(Self.lines(of: rows, across: 3))
+        recentHeader.isHidden = rows.isEmpty
+    }
+
+    /// Lays [views] out [across] to a line, the last line padded so every cell keeps its width.
+    static func lines(of views: [UIView], across: Int) -> UIView {
+        let lines = UIStackView()
+        lines.axis = .vertical
+        lines.spacing = 12
+        for start in stride(from: 0, to: views.count, by: across) {
+            let line = UIStackView(arrangedSubviews: Array(views[start..<min(start + across, views.count)]))
+            line.axis = .horizontal
+            line.spacing = 12
+            line.distribution = .fillEqually
+            while line.arrangedSubviews.count < across { line.addArrangedSubview(UIView()) }
+            lines.addArrangedSubview(line)
+        }
+        return lines
+    }
+}
+
+/// The Now Playing card at the top of the car home: artwork, what is playing, and its controls.
+/// Pressing the artwork or the title opens the full-screen player.
+final class CarNowPlayingCard: UIView {
+    var onOpen: (() -> Void)?
+    private let open = UIControl()
+    private let art = UIImageView()
+    private let caption = UILabel()
+    private let titleLabel = UILabel()
+    private var playButton: UIButton!
+    private var subscriptions = Set<AnyCancellable>()
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        backgroundColor = CarStyle.surface
+        layer.cornerRadius = 22
+        layer.cornerCurve = .continuous
+
+        art.contentMode = .scaleAspectFit
+        art.backgroundColor = CarStyle.mix(CarStyle.surface, HomeSection.tv.carTint, 0.18)
+        art.layer.cornerRadius = 16
+        art.clipsToBounds = true
+        art.tintColor = HomeSection.tv.carTint
+        caption.text = NSLocalizedString("Now playing", comment: "Car screen")
+        caption.font = CarStyle.font(14, .semibold)
+        caption.textColor = CarStyle.wordmark
+        titleLabel.font = CarStyle.font(21, .semibold)
+        titleLabel.textColor = CarStyle.text
+        let labels = UIStackView(arrangedSubviews: [caption, titleLabel])
+        labels.axis = .vertical
+        labels.spacing = 4
+        let info = UIStackView(arrangedSubviews: [art, labels])
+        info.axis = .horizontal
+        info.alignment = .center
+        info.spacing = 16
+        info.isUserInteractionEnabled = false
+        info.translatesAutoresizingMaskIntoConstraints = false
+        open.addSubview(info)
+        open.layer.cornerRadius = 16
+        open.addAction(UIAction { [weak self] _ in self?.onOpen?() }, for: .touchUpInside)
+
+        let playback = { AutoBridgeStores.shared.playback }
+        playButton = carIconButton("pause.fill", size: 64) { playback().toggle() }
+        playButton.backgroundColor = CarStyle.accent
+        playButton.tintColor = CarStyle.onAccent
+        let controls = UIStackView(arrangedSubviews: [
+            carIconButton("backward.fill", size: 52) { playback().previous() },
+            playButton,
+            carIconButton("forward.fill", size: 52) { playback().next() },
+        ])
+        controls.axis = .horizontal
+        controls.alignment = .center
+        controls.spacing = 14
+
+        let row = UIStackView(arrangedSubviews: [open, controls])
+        row.axis = .horizontal
+        row.alignment = .center
+        row.spacing = 16
+        row.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(row)
+        NSLayoutConstraint.activate([
+            art.widthAnchor.constraint(equalToConstant: 72),
+            art.heightAnchor.constraint(equalToConstant: 72),
+            info.leadingAnchor.constraint(equalTo: open.leadingAnchor, constant: 4),
+            info.trailingAnchor.constraint(equalTo: open.trailingAnchor, constant: -4),
+            info.topAnchor.constraint(equalTo: open.topAnchor, constant: 4),
+            info.bottomAnchor.constraint(equalTo: open.bottomAnchor, constant: -4),
+            row.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14),
+            row.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -18),
+            row.topAnchor.constraint(equalTo: topAnchor, constant: 12),
+            row.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -12),
+        ])
+
+        playback().$current
+            .receive(on: RunLoop.main)
+            .sink { [weak self] track in self?.update(track) }
+            .store(in: &subscriptions)
+        playback().$isPlaying
+            .receive(on: RunLoop.main)
+            .sink { [weak self] playing in
+                self?.playButton.setImage(UIImage(systemName: playing ? "pause.fill" : "play.fill"), for: .normal)
+            }
+            .store(in: &subscriptions)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    private func update(_ track: PlaybackController.Track?) {
+        guard let track else { return }
+        titleLabel.text = track.title
+        let section: HomeSection = track.isVideo ? .tv : .radio
+        art.tintColor = section.carTint
+        art.image = UIImage(systemName: section.carSymbol)
+        guard !track.logo.isEmpty else { return }
+        if let ready = ImageLoader.shared.cached(track.logo) {
+            art.image = ready
+            return
+        }
+        Task { [weak self] in
+            guard let image = await ImageLoader.shared.load(track.logo),
+                  AutoBridgeStores.shared.playback.current?.logo == track.logo else { return }
+            self?.art.image = image
+        }
+    }
+}
+
+// MARK: - Channels
+
+/// The TV or Radio card: that kind's sources, as on the phone.
+final class CarSourcesPage: CarGridPage {
+    private let kind: IptvKind
+    private var subscriptions = Set<AnyCancellable>()
+
+    init(kind: IptvKind) {
+        self.kind = kind
         super.init(shape: .row)
-        title = NSLocalizedString("Channels", comment: "Car screen tab")
+        title = kind == .radio
+            ? NSLocalizedString("Radio", comment: "Home section")
+            : NSLocalizedString("TV", comment: "Home section")
     }
 
     override func viewDidLoad() {
@@ -49,23 +302,20 @@ final class CarSourcesPage: CarGridPage {
     }
 
     private func reload(_ sources: [IptvSource]) {
-        let sections = [IptvKind.tv, .radio].map { kind -> CarTileSection in
-            let header = kind == .radio
-                ? NSLocalizedString("Radio", comment: "Home section")
-                : NSLocalizedString("TV", comment: "Home section")
-            let tiles = sources.filter { $0.kind == kind }.map(tile(for:))
-            return CarTileSection(header: header, tiles: tiles)
-        }
-        grid.show(sections, emptyText: NSLocalizedString("Add a source on your phone first.", comment: "Car screen"))
+        let tiles = sources.filter { $0.kind == kind }.map(tile(for:))
+        grid.show(
+            [CarTileSection(header: nil, tiles: tiles)],
+            emptyText: NSLocalizedString("Add a source on your phone first.", comment: "Car screen")
+        )
     }
 
     private func tile(for source: IptvSource) -> CarTile {
-        let radio = source.kind == .radio
+        let section: HomeSection = kind == .radio ? .radio : .tv
         return CarTile(
             title: source.name,
             subtitle: subtitle(for: source),
-            symbol: radio ? "radio" : "tv",
-            tint: UIColor(radio ? AutoBridgeDesign.accentRadio : AutoBridgeDesign.accentTV)
+            symbol: section.carSymbol,
+            tint: section.carTint
         ) { [weak self] in
             self?.screen?.push(CarCategoriesPage(source: source))
         }
@@ -110,7 +360,7 @@ final class CarCategoriesPage: CarGridPage {
                 title: category.name,
                 subtitle: plural(category.count, "entry", "entries"),
                 symbol: "folder",
-                tint: UIColor(AutoBridgeDesign.accentTV)
+                tint: (source.kind == .radio ? HomeSection.radio : .tv).carTint
             ) { [weak self] in
                 self?.screen?.push(CarEntriesPage(
                     source: source,
@@ -151,13 +401,13 @@ final class CarEntriesPage: CarGridPage {
 
 // MARK: - Favorites
 
-/// The Favorites tab: starred channels, then the recently played ones, kept in step with the phone.
+/// Every starred and recently played channel, from the grid button at the top right of the home.
 final class CarFavoritesPage: CarGridPage {
     private var subscriptions = Set<AnyCancellable>()
 
     init() {
         super.init(shape: .tile)
-        title = NSLocalizedString("Favorites", comment: "Car screen tab")
+        title = NSLocalizedString("Favorites", comment: "Home section")
     }
 
     override func viewDidLoad() {
@@ -172,7 +422,7 @@ final class CarFavoritesPage: CarGridPage {
     private func reload(_ favorites: [IptvHistoryItem], _ recent: [IptvHistoryItem]) {
         grid.show(
             [
-                section(NSLocalizedString("Favorites", comment: "Car screen tab"), favorites),
+                section(NSLocalizedString("Favorites", comment: "Home section"), favorites),
                 section(
                     NSLocalizedString("Recently played", comment: "Row"),
                     Array(recent.filter { $0.playback == .stream }.prefix(30))
@@ -194,55 +444,6 @@ final class CarFavoritesPage: CarGridPage {
                 self?.screen?.play(tracks, index: index)
             }
         })
-    }
-}
-
-// MARK: - Quick
-
-/// The Quick tab: what is playing, and the browser (left out of the App Store build).
-final class CarQuickPage: CarGridPage {
-    private var subscriptions = Set<AnyCancellable>()
-
-    init() {
-        super.init(shape: .row)
-        title = NSLocalizedString("Quick", comment: "Car screen tab")
-    }
-
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        stores.playback.$current
-            .map { $0?.title }
-            .removeDuplicates()
-            .receive(on: RunLoop.main)
-            .sink { [weak self] playing in self?.reload(playing: playing) }
-            .store(in: &subscriptions)
-    }
-
-    private func reload(playing: String?) {
-        var tiles: [CarTile] = []
-        if let playing {
-            tiles.append(CarTile(
-                title: NSLocalizedString("Now playing", comment: "Car screen"),
-                subtitle: playing,
-                symbol: "play.rectangle.fill",
-                tint: UIColor(AutoBridgeDesign.accentVideo)
-            ) { [weak self] in self?.screen?.showPlayer() })
-        }
-        if !BuildFlavor.isStore {
-            tiles.append(CarTile(
-                title: NSLocalizedString("Browser", comment: "Home section"),
-                subtitle: NSLocalizedString("Web pages and video sites", comment: "Car screen"),
-                symbol: "safari.fill",
-                tint: UIColor(AutoBridgeDesign.accentWeb)
-            ) { [weak self] in self?.screen?.openBrowser() })
-        }
-        tiles.append(CarTile(
-            title: NSLocalizedString("Channels", comment: "Car screen tab"),
-            subtitle: NSLocalizedString("TV and radio sources", comment: "Car screen"),
-            symbol: "tv.fill",
-            tint: UIColor(AutoBridgeDesign.accentTV)
-        ) { [weak self] in self?.screen?.select(.channels) })
-        grid.show([CarTileSection(header: nil, tiles: tiles)])
     }
 }
 
@@ -376,6 +577,12 @@ final class CarBrowserPage: CarPage {
         case .live: return "dot.radiowaves.left.and.right"
         case .anime: return "sparkles.tv.fill"
         }
+    }
+
+    /// The grid of video sites, for the Streaming card.
+    func showSites() {
+        loadViewIfNeeded()
+        setHome(true)
     }
 
     private func open(_ url: URL) {

@@ -12,9 +12,9 @@ class CarPage: UIViewController {
     func handleMove(_ direction: CarDirection) -> Bool { false }
 }
 
-/// The CarPlay screen AutoBridge draws itself, laid out like APTV: a tab pill across the top
-/// (Channels, Favorites, Quick), a page under it, and a full-screen player over everything while a
-/// channel is watched.
+/// The CarPlay screen AutoBridge draws itself, laid out like the Android Auto car home ("Home
+/// v2"): the AutoBridge header, a Now Playing card, the quick-access cards and the recent channels,
+/// with pages pushed over it and a full-screen player over everything while a channel is watched.
 ///
 /// It exists only when CarPlay hands the app a window, which today means the Simulator (whose
 /// entitlements declare the navigation and video keys). On an iPhone with the audio entitlement
@@ -24,30 +24,19 @@ class CarPage: UIViewController {
 /// and `CarFocus` lets CarPlay's map buttons, a pan and a rotary knob move between them and press.
 @MainActor
 final class CarScreenViewController: UIViewController {
-    enum Tab: Int, CaseIterable {
-        case channels, favorites, quick
-
-        var title: String {
-            switch self {
-            case .channels: return NSLocalizedString("Channels", comment: "Car screen tab")
-            case .favorites: return NSLocalizedString("Favorites", comment: "Car screen tab")
-            case .quick: return NSLocalizedString("Quick", comment: "Car screen tab")
-            }
-        }
-    }
-
     /// Opens CarPlay's own keyboard for an address; set by the scene delegate.
     var onAddress: (() -> Void)?
 
     private let backButton = carIconButton("chevron.left", size: 40) {}
+    private let wordmark = UIStackView()
     private let titleLabel = UILabel()
-    private let pill = UIStackView()
-    private var tabButtons: [Tab: UIButton] = [:]
+    private lazy var moreButton = carIconButton("square.grid.3x3.fill", size: 44) { [weak self] in
+        self?.push(CarFavoritesPage())
+    }
     private let header = UIView()
     private let content = UIView()
     private let player = CarPlayerView()
-    private var stacks: [Tab: [CarPage]] = [:]
-    private var currentTab: Tab = .channels
+    private var stack: [CarPage] = []
     private var fullscreen = false
     private var contentTop: NSLayoutConstraint?
     /// True once the car's buttons have been used, so a new page puts the highlight on its first
@@ -70,44 +59,25 @@ final class CarScreenViewController: UIViewController {
         view.backgroundColor = CarStyle.background
 
         backButton.addAction(UIAction { [weak self] _ in self?.back() }, for: .touchUpInside)
-        titleLabel.font = CarStyle.font(20, .bold)
+        titleLabel.font = CarStyle.font(22, .bold)
         titleLabel.textColor = CarStyle.text
         titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        buildWordmark()
 
-        pill.axis = .horizontal
-        pill.spacing = 4
-        pill.backgroundColor = CarStyle.surface
-        pill.layer.cornerRadius = 22
-        pill.isLayoutMarginsRelativeArrangement = true
-        pill.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 4, leading: 4, bottom: 4, trailing: 4)
-        for tab in Tab.allCases {
-            let button = UIButton(type: .custom)
-            button.setTitle(tab.title, for: .normal)
-            button.titleLabel?.font = CarStyle.font(15, .semibold)
-            button.contentEdgeInsets = UIEdgeInsets(top: 0, left: 16, bottom: 0, right: 16)
-            button.layer.cornerRadius = 18
-            button.heightAnchor.constraint(equalToConstant: 36).isActive = true
-            button.addAction(UIAction { [weak self] _ in self?.select(tab) }, for: .touchUpInside)
-            tabButtons[tab] = button
-            pill.addArrangedSubview(button)
-        }
-
-        // The pill stays centred whatever the page title, so the tabs never move under a finger.
-        let leading = UIStackView(arrangedSubviews: [backButton, titleLabel])
+        let leading = UIStackView(arrangedSubviews: [backButton, wordmark, titleLabel])
         leading.axis = .horizontal
         leading.alignment = .center
-        leading.spacing = 10
+        leading.spacing = 12
         leading.translatesAutoresizingMaskIntoConstraints = false
-        pill.translatesAutoresizingMaskIntoConstraints = false
         header.addSubview(leading)
-        header.addSubview(pill)
+        header.addSubview(moreButton)
         header.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            pill.centerXAnchor.constraint(equalTo: header.centerXAnchor),
-            pill.centerYAnchor.constraint(equalTo: header.centerYAnchor),
             leading.leadingAnchor.constraint(equalTo: header.leadingAnchor),
             leading.centerYAnchor.constraint(equalTo: header.centerYAnchor),
-            leading.trailingAnchor.constraint(lessThanOrEqualTo: pill.leadingAnchor, constant: -10),
+            leading.trailingAnchor.constraint(lessThanOrEqualTo: moreButton.leadingAnchor, constant: -12),
+            moreButton.trailingAnchor.constraint(equalTo: header.trailingAnchor),
+            moreButton.centerYAnchor.constraint(equalTo: header.centerYAnchor),
         ])
         content.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(content)
@@ -124,13 +94,13 @@ final class CarScreenViewController: UIViewController {
         let top = content.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 8)
         contentTop = top
         NSLayoutConstraint.activate([
-            header.topAnchor.constraint(equalTo: safe.topAnchor, constant: 8),
-            header.leadingAnchor.constraint(equalTo: safe.leadingAnchor, constant: 12),
-            header.trailingAnchor.constraint(equalTo: safe.trailingAnchor, constant: -12),
+            header.topAnchor.constraint(equalTo: safe.topAnchor, constant: 10),
+            header.leadingAnchor.constraint(equalTo: safe.leadingAnchor, constant: 20),
+            header.trailingAnchor.constraint(equalTo: safe.trailingAnchor, constant: -16),
             header.heightAnchor.constraint(equalToConstant: 44),
             top,
-            content.leadingAnchor.constraint(equalTo: safe.leadingAnchor),
-            content.trailingAnchor.constraint(equalTo: safe.trailingAnchor),
+            content.leadingAnchor.constraint(equalTo: safe.leadingAnchor, constant: 8),
+            content.trailingAnchor.constraint(equalTo: safe.trailingAnchor, constant: -8),
             content.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             player.topAnchor.constraint(equalTo: view.topAnchor),
             player.bottomAnchor.constraint(equalTo: view.bottomAnchor),
@@ -138,16 +108,50 @@ final class CarScreenViewController: UIViewController {
             player.trailingAnchor.constraint(equalTo: view.trailingAnchor),
         ])
 
-        stacks[.channels] = [page(CarSourcesPage())]
-        stacks[.favorites] = [page(CarFavoritesPage())]
-        stacks[.quick] = [page(CarQuickPage())]
-        select(.channels)
+        push(CarHomePage())
 
         #if DEBUG
         let probe = UITapGestureRecognizer(target: self, action: #selector(logTap(_:)))
         probe.cancelsTouchesInView = false
         view.addGestureRecognizer(probe)
         #endif
+    }
+
+    /// The app icon and "Auto" + "Bridge", the second half in AutoBridge blue, as on Android.
+    private func buildWordmark() {
+        let icon = UIImageView(image: Self.appIcon())
+        icon.contentMode = .scaleAspectFill
+        icon.layer.cornerRadius = 9
+        icon.layer.cornerCurve = .continuous
+        icon.clipsToBounds = true
+        icon.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            icon.widthAnchor.constraint(equalToConstant: 36),
+            icon.heightAnchor.constraint(equalToConstant: 36),
+        ])
+        let name = UILabel()
+        let text = NSMutableAttributedString(
+            string: "Auto",
+            attributes: [.foregroundColor: CarStyle.text, .font: CarStyle.font(24, .semibold)]
+        )
+        text.append(NSAttributedString(
+            string: "Bridge",
+            attributes: [.foregroundColor: CarStyle.wordmark, .font: CarStyle.font(24, .semibold)]
+        ))
+        name.attributedText = text
+        wordmark.axis = .horizontal
+        wordmark.alignment = .center
+        wordmark.spacing = 12
+        wordmark.addArrangedSubview(icon)
+        wordmark.addArrangedSubview(name)
+    }
+
+    private static func appIcon() -> UIImage? {
+        guard let icons = Bundle.main.infoDictionary?["CFBundleIcons"] as? [String: Any],
+              let primary = icons["CFBundlePrimaryIcon"] as? [String: Any],
+              let files = primary["CFBundleIconFiles"] as? [String],
+              let last = files.last else { return UIImage(systemName: "car.fill") }
+        return UIImage(named: last) ?? UIImage(systemName: "car.fill")
     }
 
     #if DEBUG
@@ -165,58 +169,46 @@ final class CarScreenViewController: UIViewController {
         }
     }
 
-    private func page<P: CarPage>(_ page: P) -> P {
-        page.screen = self
-        return page
-    }
-
     // MARK: Navigation
-
-    func select(_ tab: Tab) {
-        currentTab = tab
-        for (key, button) in tabButtons {
-            let on = key == tab
-            button.backgroundColor = on ? CarStyle.text : .clear
-            button.setTitleColor(on ? CarStyle.background : CarStyle.text, for: .normal)
-        }
-        showTop()
-    }
 
     func push(_ page: CarPage) {
         page.screen = self
-        stacks[currentTab, default: []].append(page)
+        stack.removeAll { $0 === page }
+        stack.append(page)
         showTop()
     }
 
-    /// Opens the browser page on the Quick tab, for an address typed in CarPlay's keyboard.
-    func openBrowser() {
+    /// Back to the car home, for the header's home and the browser's close.
+    func popToHome() {
+        guard stack.count > 1 else { return }
+        stack = [stack[0]]
+        showTop()
+    }
+
+    /// Opens the browser, for a home card or an address typed in CarPlay's keyboard.
+    func openBrowser(_ url: URL? = nil) {
         guard !BuildFlavor.isStore else { return }
         closePlayer(stop: false)
         setFullscreen(false)
-        currentTab = .quick
-        var stack = stacks[.quick] ?? []
-        stack.removeAll { $0 === browser }
-        stack.append(browser)
-        stacks[.quick] = stack
-        select(.quick)
+        if let url { CarWebScreen.shared.show(url) }
+        push(browser)
     }
 
     /// Back, wherever the car's back comes from: out of full screen, then out of the player, then a
-    /// page up the current tab.
+    /// page up.
     func back() {
         if fullscreen {
             setFullscreen(false)
         } else if !player.isHidden {
             closePlayer(stop: false)
-        } else if var stack = stacks[currentTab], stack.count > 1 {
+        } else if stack.count > 1 {
             stack.removeLast()
-            stacks[currentTab] = stack
             showTop()
         }
     }
 
     private func showTop() {
-        guard let top = stacks[currentTab]?.last else { return }
+        guard let top = stack.last else { return }
         for child in children where child !== top {
             child.willMove(toParent: nil)
             child.view.removeFromSuperview()
@@ -229,8 +221,12 @@ final class CarScreenViewController: UIViewController {
             content.addSubview(top.view)
             top.didMove(toParent: self)
         }
+        let home = stack.count < 2
+        wordmark.isHidden = !home
+        titleLabel.isHidden = home
         titleLabel.text = top.title
-        backButton.isHidden = (stacks[currentTab]?.count ?? 0) < 2
+        backButton.isHidden = home
+        moreButton.isHidden = !home
         pageFocus.reset()
         focusFirstTile()
     }
@@ -300,7 +296,7 @@ final class CarScreenViewController: UIViewController {
                 return
             }
             player.showControls()
-        } else if let top = stacks[currentTab]?.last, top.handleMove(direction) {
+        } else if let top = stack.last, top.handleMove(direction) {
             return
         }
         focus.move(direction)
@@ -385,6 +381,8 @@ final class CarPlayerView: UIView {
 
         let playback = { AutoBridgeStores.shared.playback }
         playButton = carIconButton("pause.fill", size: 56) { playback().toggle() }
+        playButton.backgroundColor = CarStyle.accent
+        playButton.tintColor = CarStyle.onAccent
         favoriteButton = carIconButton("star", size: 48) { [weak self] in self?.toggleFavorite() }
         let bar = UIStackView(arrangedSubviews: [
             carIconButton("xmark", size: 48) { [weak self] in self?.onClose?() },

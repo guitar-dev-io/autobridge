@@ -400,9 +400,16 @@
 
 /* MARK: - Drawn CarPlay screen */
 "Channels" = "ช่อง";
+"Quick access" = "เข้าถึงด่วน";
 "Quick" = "ด่วน";
 "Now playing" = "กำลังเล่น";
 "Add a source on your phone first." = "เพิ่มแหล่งช่องบนมือถือก่อน";
 "Web pages and video sites" = "หน้าเว็บและเว็บวิดีโอ";
 "TV and radio sources" = "แหล่งช่องทีวีและวิทยุ";
 "Enter a URL or search" = "ป้อน URL หรือค้นหา";
+"Quick open" = "เปิดด่วน";
+"Send to the car" = "ส่งไปที่รถ";
+"Search or paste a URL" = "ค้นหาหรือวาง URL";
+"Connected" = "เชื่อมต่อแล้ว";
+"Not connected" = "ยังไม่ได้เชื่อมต่อ";
+"Everything AutoBridge can open" = "ทุกอย่างที่ AutoBridge เปิดได้";

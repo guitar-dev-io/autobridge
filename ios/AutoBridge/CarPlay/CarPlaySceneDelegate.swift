@@ -45,6 +45,7 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
         interfaceController.setRootTemplate(rootTemplate(), animated: true, completion: nil)
         addCloseButton()
         VehicleReminders.carConnected()
+        CarConnectionState.shared.connected = true
     }
 
     func templateApplicationScene(
@@ -54,6 +55,7 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
         self.interfaceController = nil
         subscriptions.removeAll()
         VehicleReminders.carDisconnected()
+        CarConnectionState.shared.connected = false
     }
 
     // MARK: - Root
@@ -604,6 +606,7 @@ extension CarPlaySceneDelegate: CPMapTemplateDelegate, CPSearchTemplateDelegate 
         interfaceController.setRootTemplate(screenMapTemplate(), animated: true, completion: nil)
         addCloseButton()
         VehicleReminders.carConnected()
+        CarConnectionState.shared.connected = true
     }
 
     func templateApplicationScene(
@@ -617,6 +620,7 @@ extension CarPlaySceneDelegate: CPMapTemplateDelegate, CPSearchTemplateDelegate 
         self.interfaceController = nil
         subscriptions.removeAll()
         VehicleReminders.carDisconnected()
+        CarConnectionState.shared.connected = false
     }
 
     private func screenMapTemplate() -> CPMapTemplate {

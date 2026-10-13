@@ -3,17 +3,36 @@ import UIKit
 // The building blocks of the drawn CarPlay screen (`CarScreenViewController`): its colours, a
 // focus that moves without touches, and the tile grid every page is made of.
 
+/// The car home design system, the same values as the Android `HomeDashboardTheme` ("Home v2"),
+/// so the two car screens read as one app.
 enum CarStyle {
-    static let background = UIColor(AutoBridgeDesign.ink)
-    static let surface = UIColor(AutoBridgeDesign.surface)
-    static let raised = UIColor(AutoBridgeDesign.surfaceRaised)
-    static let text = UIColor(AutoBridgeDesign.primaryText)
-    static let secondary = UIColor(AutoBridgeDesign.secondaryText)
-    static let accent = UIColor(AutoBridgeDesign.accent)
-    static let focus = UIColor(AutoBridgeDesign.accentSoft)
+    static let background = UIColor(hex: 0x121418)
+    static let surface = UIColor(hex: 0x1C1F25)
+    static let raised = UIColor(hex: 0x242831)
+    static let pressed = UIColor(hex: 0x2A2F38)
+    static let control = UIColor(hex: 0x2C3036)
+    static let text = UIColor(hex: 0xF1F3F5)
+    static let secondary = UIColor(hex: 0x9AA1AA)
+    static let section = UIColor(hex: 0xC7CCD2)
+    /// AutoBridge blue: the play button, the focus border.
+    static let accent = UIColor(hex: 0xB3C7F5)
+    static let onAccent = UIColor(hex: 0x142540)
+    /// The "Bridge" half of the wordmark.
+    static let wordmark = UIColor(hex: 0x7FA9F5)
+    static let focus = accent
 
     static func font(_ size: CGFloat, _ weight: UIFont.Weight = .regular) -> UIFont {
         .systemFont(ofSize: size, weight: weight)
+    }
+
+    /// A linear mix of two colours; [t] = 0 is [from]. Icon chips are the card colour with a little
+    /// of their accent mixed in, as on Android.
+    static func mix(_ from: UIColor, _ to: UIColor, _ t: CGFloat) -> UIColor {
+        var (r1, g1, b1, a1): (CGFloat, CGFloat, CGFloat, CGFloat) = (0, 0, 0, 0)
+        var (r2, g2, b2, a2): (CGFloat, CGFloat, CGFloat, CGFloat) = (0, 0, 0, 0)
+        from.getRed(&r1, green: &g1, blue: &b1, alpha: &a1)
+        to.getRed(&r2, green: &g2, blue: &b2, alpha: &a2)
+        return UIColor(red: r1 + (r2 - r1) * t, green: g1 + (g2 - g1) * t, blue: b1 + (b2 - b1) * t, alpha: 1)
     }
 }
 
@@ -155,49 +174,54 @@ struct CarTileSection {
     var tiles: [CarTile]
 }
 
-/// A pressable tile: an image over a title (a channel) or beside it (a row). It is a `UIControl`
-/// so the focus can land on it and press it like any button.
+/// A pressable tile, in one of three shapes from the Android car home:
+/// - `tile`: a channel logo over its name, for the channel grids;
+/// - `row`: a small icon chip beside a title and a line under it (sources, categories, recents);
+/// - `card`: the quick-access card, a large icon chip beside a big label.
+///
+/// It is a `UIControl` so the focus can land on it and press it like any button.
 final class CarTileButton: UIControl {
-    enum Shape { case tile, row }
+    enum Shape { case tile, row, card }
 
     let imageView = UIImageView()
     let titleLabel = UILabel()
     let subtitleLabel = UILabel()
     var onTap: (() -> Void)?
+    /// The rounded square the icon sits in, tinted with the tile's accent.
+    private let chip = UIView()
     private let stack = UIStackView()
     private let labels = UIStackView()
-    private var imageSize: [NSLayoutConstraint] = []
+    private var sizing: [NSLayoutConstraint] = []
     private var loading: Task<Void, Never>?
     private var logo = ""
 
     override init(frame: CGRect) {
         super.init(frame: frame)
         backgroundColor = CarStyle.surface
-        layer.cornerRadius = 14
         layer.cornerCurve = .continuous
         clipsToBounds = true
 
         imageView.contentMode = .scaleAspectFit
-        imageView.tintColor = CarStyle.accent
-        titleLabel.font = CarStyle.font(15, .semibold)
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        chip.layer.cornerCurve = .continuous
+        chip.layer.borderWidth = 1
+        chip.clipsToBounds = true
+        chip.addSubview(imageView)
         titleLabel.textColor = CarStyle.text
-        subtitleLabel.font = CarStyle.font(12)
+        subtitleLabel.font = CarStyle.font(13)
         subtitleLabel.textColor = CarStyle.secondary
         labels.axis = .vertical
         labels.spacing = 2
         labels.addArrangedSubview(titleLabel)
         labels.addArrangedSubview(subtitleLabel)
-        stack.addArrangedSubview(imageView)
+        stack.addArrangedSubview(chip)
         stack.addArrangedSubview(labels)
         stack.isUserInteractionEnabled = false
-        stack.distribution = .fill
         titleLabel.setContentCompressionResistancePriority(.required, for: .vertical)
         labels.setContentHuggingPriority(.required, for: .vertical)
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
-            stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
             stack.centerYAnchor.constraint(equalTo: centerYAnchor),
             stack.topAnchor.constraint(greaterThanOrEqualTo: topAnchor, constant: 8),
             stack.bottomAnchor.constraint(lessThanOrEqualTo: bottomAnchor, constant: -8),
@@ -209,13 +233,12 @@ final class CarTileButton: UIControl {
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
 
     override var isHighlighted: Bool {
-        didSet { backgroundColor = isHighlighted ? CarStyle.raised : CarStyle.surface }
+        didSet { backgroundColor = isHighlighted ? CarStyle.pressed : CarStyle.surface }
     }
 
     @objc private func tapped() {
         onTap?()
     }
-
 
     func configure(_ tile: CarTile, shape: Shape) {
         onTap = tile.action
@@ -223,10 +246,15 @@ final class CarTileButton: UIControl {
         subtitleLabel.text = tile.subtitle
         subtitleLabel.isHidden = tile.subtitle.isEmpty
         imageView.tintColor = tile.tint
+        chip.backgroundColor = CarStyle.mix(CarStyle.surface, tile.tint, 0.08)
+        chip.layer.borderColor = CarStyle.mix(CarStyle.surface, tile.tint, 0.30).cgColor
 
-        NSLayoutConstraint.deactivate(imageSize)
+        NSLayoutConstraint.deactivate(sizing)
+        let chipSize: CGFloat
+        let inset: CGFloat
         switch shape {
         case .tile:
+            layer.cornerRadius = 18
             stack.axis = .vertical
             stack.alignment = .fill
             stack.spacing = 6
@@ -234,22 +262,57 @@ final class CarTileButton: UIControl {
             subtitleLabel.textAlignment = .center
             titleLabel.numberOfLines = 2
             titleLabel.font = CarStyle.font(14, .semibold)
+            chip.layer.cornerRadius = 0
+            chip.layer.borderWidth = 0
+            chip.backgroundColor = .clear
             // A fixed logo height, so a tall logo can never push the name out of the tile.
-            imageSize = [imageView.heightAnchor.constraint(equalToConstant: 52)]
-        case .row:
-            stack.axis = .horizontal
-            stack.alignment = .center
-            stack.spacing = 12
-            titleLabel.textAlignment = .natural
-            subtitleLabel.textAlignment = .natural
-            titleLabel.numberOfLines = 1
-            titleLabel.font = CarStyle.font(15, .semibold)
-            imageSize = [
-                imageView.widthAnchor.constraint(equalToConstant: 36),
-                imageView.heightAnchor.constraint(equalToConstant: 36),
+            sizing = [
+                chip.heightAnchor.constraint(equalToConstant: 52),
+                imageView.leadingAnchor.constraint(equalTo: chip.leadingAnchor),
+                imageView.trailingAnchor.constraint(equalTo: chip.trailingAnchor),
+                imageView.topAnchor.constraint(equalTo: chip.topAnchor),
+                imageView.bottomAnchor.constraint(equalTo: chip.bottomAnchor),
+                stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
+                stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
             ]
+            NSLayoutConstraint.activate(sizing)
+            setLogo(tile.logo, symbol: tile.symbol)
+            return
+        case .row:
+            layer.cornerRadius = 18
+            titleLabel.font = CarStyle.font(16, .semibold)
+            chipSize = 44
+            inset = 12
+            chip.layer.cornerRadius = 13
+        case .card:
+            layer.cornerRadius = 22
+            titleLabel.font = CarStyle.font(20, .semibold)
+            chipSize = 56
+            inset = 20
+            chip.layer.cornerRadius = 16
         }
-        NSLayoutConstraint.activate(imageSize)
+        chip.layer.borderWidth = 1
+        stack.axis = .horizontal
+        stack.alignment = .center
+        stack.spacing = 14
+        titleLabel.textAlignment = .natural
+        subtitleLabel.textAlignment = .natural
+        titleLabel.numberOfLines = 1
+        // A long name ("YouTube Music") shrinks a little before it is cut.
+        titleLabel.adjustsFontSizeToFitWidth = true
+        titleLabel.minimumScaleFactor = 0.75
+        let pad = tile.logo.isEmpty ? chipSize * 0.24 : 4
+        sizing = [
+            chip.widthAnchor.constraint(equalToConstant: chipSize),
+            chip.heightAnchor.constraint(equalToConstant: chipSize),
+            imageView.leadingAnchor.constraint(equalTo: chip.leadingAnchor, constant: pad),
+            imageView.trailingAnchor.constraint(equalTo: chip.trailingAnchor, constant: -pad),
+            imageView.topAnchor.constraint(equalTo: chip.topAnchor, constant: pad),
+            imageView.bottomAnchor.constraint(equalTo: chip.bottomAnchor, constant: -pad),
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: inset),
+            stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -inset),
+        ]
+        NSLayoutConstraint.activate(sizing)
         setLogo(tile.logo, symbol: tile.symbol)
     }
 
@@ -306,8 +369,8 @@ private final class CarHeaderView: UICollectionReusableView {
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        label.font = CarStyle.font(15, .bold)
-        label.textColor = CarStyle.secondary
+        label.font = CarStyle.font(17, .semibold)
+        label.textColor = CarStyle.section
         label.frame = bounds.inset(by: UIEdgeInsets(top: 0, left: 4, bottom: 0, right: 4))
         label.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         addSubview(label)
@@ -376,7 +439,10 @@ final class CarGridView: UIView, UICollectionViewDataSource {
                 height = 120
             case .row:
                 columns = width > 520 ? 2 : 1
-                height = 64
+                height = 68
+            case .card:
+                columns = width > 520 ? 3 : 2
+                height = 104
             }
             let item = NSCollectionLayoutItem(layoutSize: .init(
                 widthDimension: .fractionalWidth(1 / CGFloat(columns)),
@@ -392,7 +458,7 @@ final class CarGridView: UIView, UICollectionViewDataSource {
             section.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 11, bottom: 12, trailing: 11)
             if let self, self.sections.indices.contains(index), self.sections[index].header != nil {
                 section.boundarySupplementaryItems = [NSCollectionLayoutBoundarySupplementaryItem(
-                    layoutSize: .init(widthDimension: .fractionalWidth(1), heightDimension: .absolute(30)),
+                    layoutSize: .init(widthDimension: .fractionalWidth(1), heightDimension: .absolute(36)),
                     elementKind: UICollectionView.elementKindSectionHeader,
                     alignment: .top
                 )]
@@ -438,7 +504,7 @@ func carIconButton(_ symbol: String, size: CGFloat = 44, action: @escaping () ->
         for: .normal
     )
     button.tintColor = CarStyle.text
-    button.backgroundColor = CarStyle.raised
+    button.backgroundColor = CarStyle.control
     button.layer.cornerRadius = size / 2
     button.translatesAutoresizingMaskIntoConstraints = false
     NSLayoutConstraint.activate([
