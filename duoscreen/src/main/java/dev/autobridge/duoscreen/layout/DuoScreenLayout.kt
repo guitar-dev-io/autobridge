@@ -19,6 +19,12 @@ object DuoScreenLayout {
      */
     const val DIVIDER_GRAB_PX = 72
 
+    /**
+     * The same, in Arrange mode, where a grip is drawn on the seam and the cards on either side
+     * are themselves targets: wide enough for a finger on the seam, not over the cards.
+     */
+    const val ARRANGE_GRAB_PX = 24
+
     /** How far two pane edges may sit apart and still be treated as one shared seam. */
     const val SEAM_TOLERANCE_PX = 8
 

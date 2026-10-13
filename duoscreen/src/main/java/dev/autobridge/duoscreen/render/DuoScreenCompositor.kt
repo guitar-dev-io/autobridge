@@ -183,6 +183,15 @@ class DuoScreenCompositor {
     private val panes = LinkedHashMap<Int, Pane>()
     private var outputWidth = 0
     private var outputHeight = 0
+
+    /**
+     * Where on the host surface the session is drawn: the part the car leaves visible (a head unit
+     * can lay its own cards over part of the app's surface). Panes and chrome are laid out in this
+     * area's own coordinates; [outputWidth] and [outputHeight] are its size.
+     */
+    private var contentLeft = 0
+    private var contentTop = 0
+    private var surfaceHeight = 0
     private var renderScheduled = false
     private var highlightedPaneId: Int? = null
     private var dividerBand: Rect? = null
@@ -219,8 +228,13 @@ class DuoScreenCompositor {
         if (!output.isValid || width <= 0 || height <= 0) return false
         val threadHandler = handler ?: Handler(glThread.start().looper).also { handler = it }
         val ready = runOnGlThread(threadHandler) {
-            outputWidth = width
-            outputHeight = height
+            if (outputWidth <= 0 || outputHeight <= 0 || surfaceHeight != height) {
+                outputWidth = width
+                outputHeight = height
+                contentLeft = 0
+                contentTop = 0
+            }
+            surfaceHeight = height
             // Whatever was selected or grabbed belonged to a gesture the surface swap interrupted.
             highlightedPaneId = null
             dividerBand = null
@@ -240,6 +254,23 @@ class DuoScreenCompositor {
         if (!ready && !hasContext) stopBlocking()
         if (ready) scheduleRender()
         return ready
+    }
+
+    /**
+     * Draws the session into [width] x [height] at [left],[top] of the host surface instead of all
+     * of it; what is outside is cleared. Called when the car reports the area it leaves visible.
+     */
+    fun setContentArea(left: Int, top: Int, width: Int, height: Int) {
+        val threadHandler = handler ?: return
+        if (width <= 0 || height <= 0) return
+        threadHandler.post {
+            contentLeft = left
+            contentTop = top
+            outputWidth = width
+            outputHeight = height
+            overlayDirty = true
+            render()
+        }
     }
 
     /**
@@ -390,7 +421,8 @@ class DuoScreenCompositor {
             Log.w(TAG, "eglMakeCurrent failed: ${EGL14.eglGetError()}")
             return
         }
-        GLES20.glViewport(0, 0, outputWidth, outputHeight)
+        // Clear clears the whole surface whatever the viewport; drawing then lands in the content area.
+        GLES20.glViewport(contentLeft, surfaceHeight - contentTop - outputHeight, outputWidth, outputHeight)
         GLES20.glClearColor(CLEAR_COLOR[0], CLEAR_COLOR[1], CLEAR_COLOR[2], CLEAR_COLOR[3])
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
         GLES20.glUseProgram(program)

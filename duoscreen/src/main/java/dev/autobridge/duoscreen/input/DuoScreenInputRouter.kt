@@ -35,6 +35,9 @@ interface DuoScreenInputPort {
      * outline on that pane, so the driver sees the swap before it happens.
      */
     fun onSwapTargetChanged(paneId: Int?) = Unit
+
+    /** Two panes traded places from a tap in Arrange mode ([first] was the selected one). */
+    fun onPanesSwapped(first: Int, second: Int) = Unit
 }
 
 /**
@@ -57,9 +60,13 @@ interface DuoScreenInputPort {
  */
 class DuoScreenInputRouter(
     initialPanes: DuoScreenPaneSet,
-    private val bounds: Bounds,
+    bounds: Bounds,
     private val port: DuoScreenInputPort
 ) {
+    /** What drags and resizes are clamped to; follows the surface when the car resizes it. */
+    var bounds: Bounds = bounds
+        internal set
+
     enum class Mode { NORMAL, EDIT }
 
     var mode: Mode = Mode.NORMAL
@@ -129,7 +136,10 @@ class DuoScreenInputRouter(
         // A tap starts a new gesture: a drag that was never let go ends where it is.
         cancelDrag()
         if (mode == Mode.EDIT) {
-            val seam = panes.dividerAt(x, y, tolerance = bounds.seamTolerance)
+            // Arrange mode draws a grip on the seam to take hold of, so a tap on a pane's card
+            // must not be taken for the seam: the wide normal-mode zone covered a quarter of a
+            // stacked layout and turned card drags into seam drags.
+            val seam = panes.dividerAt(x, y, grabPx = DuoScreenLayout.ARRANGE_GRAB_PX, tolerance = bounds.seamTolerance)
             if (seam != null) {
                 grabbedDivider = seam
                 // A grabbed seam owns the drag, so nothing stays selected underneath it.
@@ -147,6 +157,19 @@ class DuoScreenInputRouter(
             }
             Mode.EDIT -> {
                 releaseDivider()
+                // A pane already chosen, then a tap on another: the two trade places. A car host
+                // reports a drag with no starting point, so a second tap is the sure way to say
+                // "this one goes there"; dragging the card over still works as well.
+                val chosen = selectedPaneId?.let(panes::pane)
+                if (chosen != null && chosen.id != pane.id) {
+                    panes = panes.withRect(chosen.id, pane.rect).withRect(pane.id, chosen.rect)
+                    port.onPaneRectChanged(chosen.id, pane.rect)
+                    port.onPaneRectChanged(pane.id, chosen.rect)
+                    selectedPaneId = null
+                    port.onSelectionChanged(null)
+                    port.onPanesSwapped(chosen.id, pane.id)
+                    return
+                }
                 selectedPaneId = pane.id
                 panes = panes.bringToFront(pane.id)
                 port.onSelectionChanged(pane.id)

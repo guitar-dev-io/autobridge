@@ -306,4 +306,10 @@ class IptvParsingTest {
         )
         assertTrue(pending.isEmpty())
     }
+
+    @Test
+    fun anUndefinedGroupIsNoGroup() {
+        val channels = M3uParser.parse("#EXTM3U\n#EXTINF:-1 group-title=\"Undefined\",TNN16\nhttp://example.com/tnn.m3u8\n")
+        assertEquals("", channels.single().group)
+    }
 }
