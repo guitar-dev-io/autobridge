@@ -24,6 +24,9 @@ import dev.autobridge.duoscreen.R
 import dev.autobridge.duoscreen.layout.DuoScreenLayout
 import dev.autobridge.duoscreen.layout.DuoScreenPreset
 import dev.autobridge.duoscreen.layout.DuoScreenStore
+import dev.autobridge.duoscreen.system.DuoScreenBackend
+import dev.autobridge.duoscreen.system.DuoScreenOps
+import dev.autobridge.duoscreen.system.DuoScreenRootOps
 import dev.autobridge.duoscreen.system.DuoScreenSelfPane
 import dev.autobridge.i18n.AppLocale
 import dev.autobridge.input.ShizukuInputBackend
@@ -67,13 +70,14 @@ class DuoScreenSettingsActivity : Activity() {
 
     private fun render() {
         val body = AutoBridgeDesign.body(this)
-        val shizukuReady = ShizukuInputBackend.isPermissionGranted
+        val backend = DuoScreenStore.backend(this)
 
-        // ── Shizuku status banner ────────────────────────────────────────────
-        // The design replaces the old Connection section (AA + Shizuku rows)
-        // with a single banner card. AA status is shown on Home already; only
-        // the Shizuku state matters on this screen.
-        body.stack(shizukuBanner(shizukuReady))
+        // ── Backend: Shizuku or root ─────────────────────────────────────────
+        // Two ways to get the privileges Duo Screen needs; the driver picks the one their phone
+        // has. The banner under it then speaks for that one only. AA status is shown on Home
+        // already.
+        body.stack(backendSegments(backend), gap = 8)
+        body.stack(backendBanner(backend))
 
         // ── PANES ────────────────────────────────────────────────────────────
         // The car screen as it will look: each pane drawn where the current layout puts it, with
@@ -132,13 +136,92 @@ class DuoScreenSettingsActivity : Activity() {
         )
     }
 
-    // ── Shizuku status banner ────────────────────────────────────────────────
+    // ── Backend picker + status banner ───────────────────────────────────────
+
+    /** Shizuku | Root, styled like the pane-count control. Switching to root asks `su` now. */
+    private fun backendSegments(current: DuoScreenBackend): View = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        background = AutoBridgeDesign.surface(
+            this@DuoScreenSettingsActivity, AutoBridgeDesign.INK, 14
+        )
+        val inset = dp(3)
+        setPadding(inset, inset, inset, inset)
+        DuoScreenBackend.entries.forEach { backend ->
+            val active = backend == current
+            val label = getString(
+                when (backend) {
+                    DuoScreenBackend.SHIZUKU -> R.string.duo_screen_backend_shizuku
+                    DuoScreenBackend.ROOT -> R.string.duo_screen_backend_root
+                }
+            )
+            addView(
+                TextView(this@DuoScreenSettingsActivity).apply {
+                    text = label
+                    textSize = 14f
+                    gravity = Gravity.CENTER
+                    contentDescription = if (active) "$label, selected" else label
+                    setTextColor(if (active) android.graphics.Color.WHITE else AutoBridgeDesign.TEXT_MUTED)
+                    if (active) typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+                    background = if (active) AutoBridgeDesign.surface(
+                        this@DuoScreenSettingsActivity, AutoBridgeDesign.ACCENT, 11, AutoBridgeDesign.ACCENT
+                    ) else null
+                    setPadding(dp(12), dp(8), dp(12), dp(8))
+                    setOnClickListener {
+                        if (backend != current) chooseBackend(backend)
+                    }
+                },
+                LinearLayout.LayoutParams(0, -2, 1f)
+            )
+        }
+    }
+
+    private fun chooseBackend(backend: DuoScreenBackend) {
+        DuoScreenOps.choose(this, backend) { ready -> onBackendResult(backend, ready) }
+        render()
+    }
+
+    /** Fills a running session's empty panes, or says why root did not come up. */
+    private fun onBackendResult(backend: DuoScreenBackend, ready: Boolean) {
+        if (isDestroyed) return
+        if (ready) {
+            DuoScreenHost.onBackendReady()
+        } else if (backend == DuoScreenBackend.ROOT) {
+            Toast.makeText(this, R.string.duo_screen_root_failed, Toast.LENGTH_LONG).show()
+        }
+        render()
+    }
+
+    private fun backendBanner(backend: DuoScreenBackend): View = when (backend) {
+        DuoScreenBackend.SHIZUKU -> statusBanner(
+            ready = ShizukuInputBackend.isPermissionGranted,
+            readyTitle = R.string.duo_screen_shizuku_ready,
+            missingTitle = R.string.duo_screen_shizuku_missing,
+            hint = R.string.duo_screen_shizuku_hint,
+        ) {
+            ShizukuInputBackend.requestPermission()
+            render()
+        }
+        DuoScreenBackend.ROOT -> statusBanner(
+            ready = DuoScreenRootOps.isAvailable,
+            readyTitle = R.string.duo_screen_root_ready,
+            missingTitle = R.string.duo_screen_root_missing,
+            hint = R.string.duo_screen_root_hint,
+        ) {
+            DuoScreenRootOps.startAsync(this) { ready -> onBackendResult(DuoScreenBackend.ROOT, ready) }
+        }
+    }
 
     /**
      * A single card with an amber (or green) circle icon, the status title + hint text, and an
      * accent-filled "Grant" pill when permission is not yet available.
      */
-    private fun shizukuBanner(ready: Boolean): View {
+    private fun statusBanner(
+        ready: Boolean,
+        readyTitle: Int,
+        missingTitle: Int,
+        hint: Int,
+        onGrant: () -> Unit,
+    ): View {
         val bannerAccent = if (ready) AutoBridgeDesign.ACCENT_ONLINE else AutoBridgeDesign.SIGNAL_SLOW
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -172,10 +255,7 @@ class DuoScreenSettingsActivity : Activity() {
                 setPadding(dp(12), 0, dp(8), 0)
             }
             text.addView(TextView(this@DuoScreenSettingsActivity).apply {
-                this.text = getString(
-                    if (ready) R.string.duo_screen_shizuku_ready
-                    else R.string.duo_screen_shizuku_missing
-                )
+                this.text = getString(if (ready) readyTitle else missingTitle)
                 textSize = 14f
                 setTextColor(AutoBridgeDesign.TEXT)
                 typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
@@ -183,7 +263,7 @@ class DuoScreenSettingsActivity : Activity() {
                 ellipsize = TextUtils.TruncateAt.END
             })
             text.addView(TextView(this@DuoScreenSettingsActivity).apply {
-                this.text = getString(R.string.duo_screen_shizuku_hint)
+                this.text = getString(hint)
                 textSize = 12f
                 setTextColor(AutoBridgeDesign.TEXT_MUTED)
                 maxLines = 2
@@ -192,7 +272,7 @@ class DuoScreenSettingsActivity : Activity() {
             })
             addView(text, LinearLayout.LayoutParams(0, -2, 1f))
 
-            // Grant button — only when Shizuku is not ready
+            // Grant button — only when the backend is not ready
             if (!ready) {
                 addView(TextView(this@DuoScreenSettingsActivity).apply {
                     this.text = getString(R.string.duo_screen_shizuku_grant)
@@ -209,10 +289,7 @@ class DuoScreenSettingsActivity : Activity() {
                         AutoBridgeDesign.ACCENT,
                         stroke = AutoBridgeDesign.ACCENT
                     )
-                    setOnClickListener {
-                        ShizukuInputBackend.requestPermission()
-                        render()
-                    }
+                    setOnClickListener { onGrant() }
                 }, LinearLayout.LayoutParams(-2, -2))
             }
         }

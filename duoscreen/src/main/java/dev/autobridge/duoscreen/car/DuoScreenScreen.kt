@@ -15,13 +15,14 @@ import androidx.car.app.navigation.model.MessageInfo
 import androidx.car.app.navigation.model.NavigationTemplate
 import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import dev.autobridge.duoscreen.R
 import dev.autobridge.logging.StructuredLog
 import dev.autobridge.duoscreen.DuoScreenController
 import dev.autobridge.duoscreen.DuoScreenHost
 import dev.autobridge.duoscreen.layout.DuoScreenPreset
-import dev.autobridge.duoscreen.system.DuoScreenShizukuOps
+import dev.autobridge.duoscreen.system.DuoScreenOps
 
 /**
  * The car side of a Duo Screen session: hands the host's Surface and gestures to
@@ -47,6 +48,12 @@ class DuoScreenScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
             override fun onStart(owner: LifecycleOwner) {
                 carContext.getCarService(AppManager::class.java)
                     .setSurfaceCallback(this@DuoScreenScreen)
+                // On root, the helper is started here; the panes that opened without it are
+                // filled once it is up, and the banner asking for it goes.
+                DuoScreenOps.prepare(carContext) {
+                    DuoScreenHost.onBackendReady()
+                    if (lifecycle.currentState.isAtLeast(Lifecycle.State.CREATED)) invalidate()
+                }
             }
 
             override fun onDestroy(owner: LifecycleOwner) {
@@ -100,10 +107,10 @@ class DuoScreenScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
             }
             .build()
 
-        // Without the Shizuku grant the panes cannot take touch and go black when the phone sleeps,
+        // Without Shizuku or root the panes cannot take touch and go black when the phone sleeps,
         // and a toast is gone in seconds, so the reason stays on the car screen until it is granted.
         val builder = NavigationTemplate.Builder()
-        if (!DuoScreenShizukuOps.isAvailable) {
+        if (!DuoScreenOps.isAvailable) {
             builder.setNavigationInfo(
                 MessageInfo.Builder(carContext.getString(R.string.duo_screen_banner_title))
                     .setText(carContext.getString(R.string.duo_screen_banner_text))
@@ -135,7 +142,7 @@ class DuoScreenScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
         controller.applyStoredSettings()
         // The template shows the banner while the grant is missing; redraw it for this state.
         invalidate()
-        if (!DuoScreenShizukuOps.isAvailable) {
+        if (!DuoScreenOps.isAvailable) {
             CarToast.makeText(
                 carContext,
                 carContext.getString(R.string.duo_screen_needs_shizuku),

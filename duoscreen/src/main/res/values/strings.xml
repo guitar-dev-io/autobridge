@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="duo_screen_needs_shizuku">Grant Shizuku access on the phone first</string>
-    <string name="duo_screen_banner_title">Allow Shizuku on the phone</string>
-    <string name="duo_screen_banner_text">Open Shizuku on the phone, make sure it is running, and allow AutoBridge. Until then the panes cannot take touch and go black when the phone sleeps.</string>
+    <string name="duo_screen_needs_shizuku">Grant Shizuku or root access on the phone first</string>
+    <string name="duo_screen_banner_title">Allow Shizuku or root on the phone</string>
+    <string name="duo_screen_banner_text">In Multi-app on the phone, pick Shizuku or Root and allow AutoBridge. Until then the panes cannot take touch.</string>
     <string name="duo_screen_car_label">Multi-app</string>
     <string name="duo_screen_title">Multi-app</string>
     <string name="duo_screen_subtitle">Run two or three apps side by side on the car display</string>
@@ -12,6 +12,12 @@
     <string name="duo_screen_shizuku_missing">Shizuku not available</string>
     <string name="duo_screen_shizuku_hint">Needed to launch apps into the panes and pass touches to them</string>
     <string name="duo_screen_shizuku_grant">Grant</string>
+    <string name="duo_screen_backend_shizuku">Shizuku</string>
+    <string name="duo_screen_backend_root">Root</string>
+    <string name="duo_screen_root_ready">Root connected</string>
+    <string name="duo_screen_root_missing">Root not available</string>
+    <string name="duo_screen_root_hint">For rooted phones, no Shizuku needed. Panes stop when the phone sleeps unless Shizuku is also on</string>
+    <string name="duo_screen_root_failed">Root was not granted. Allow AutoBridge in Magisk, KernelSU or APatch and try again</string>
     <string name="duo_screen_cancel">Cancel</string>
     <string name="duo_screen_panes_section">Panes</string>
     <string name="duo_screen_pane_count">Number of panes</string>

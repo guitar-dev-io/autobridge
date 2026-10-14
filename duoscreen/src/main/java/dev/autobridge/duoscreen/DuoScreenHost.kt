@@ -62,6 +62,11 @@ object DuoScreenHost {
      */
     fun onLayoutReset(): Boolean = controller?.reapplyPreset() ?: false
 
+    /** The privileged backend became ready mid-session; see [DuoScreenController.onBackendReady]. */
+    fun onBackendReady() {
+        controller?.onBackendReady()
+    }
+
     /** The Screen showing the session has gone; keep it for [KEEP_ALIVE_MS] in case it comes back. */
     fun onScreenGone() {
         val active = controller ?: return

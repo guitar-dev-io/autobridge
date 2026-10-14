@@ -39,9 +39,9 @@ import dev.autobridge.duoscreen.render.DuoScreenCompositor
 import dev.autobridge.duoscreen.render.DuoScreenDisplays
 import dev.autobridge.duoscreen.render.DuoScreenResizeDebouncer
 import dev.autobridge.duoscreen.system.DuoScreenLauncherResolver
+import dev.autobridge.duoscreen.system.DuoScreenOps
 import dev.autobridge.duoscreen.system.DuoScreenPrivilegedOps
 import dev.autobridge.duoscreen.system.DuoScreenSelfPane
-import dev.autobridge.duoscreen.system.DuoScreenShizukuOps
 
 /**
  * Owns one Duo Screen session: the panes, their displays, the compositor that draws them into the
@@ -52,7 +52,7 @@ import dev.autobridge.duoscreen.system.DuoScreenShizukuOps
  */
 class DuoScreenController(
     private val context: Context,
-    private val ops: DuoScreenPrivilegedOps = DuoScreenShizukuOps
+    private val ops: DuoScreenPrivilegedOps = DuoScreenOps
 ) : DuoScreenInputPort {
     private companion object {
         const val TAG = "AutoBridgeDuoCtl"
@@ -431,7 +431,7 @@ class DuoScreenController(
         }
         val packageName = pane.packageName ?: return
         if (!ops.isAvailable) {
-            StructuredLog.w(TAG, "Pane ${pane.id}: Shizuku is not granted, $packageName not launched")
+            StructuredLog.w(TAG, "Pane ${pane.id}: neither Shizuku nor root is ready, $packageName not launched")
             return
         }
         val isSelf = DuoScreenSelfPane.isSelf(packageName, context.packageName)
@@ -550,6 +550,15 @@ class DuoScreenController(
         }
     }
 
+    /**
+     * A privileged backend came up after the session started — the root helper, whose `su`
+     * prompt the driver may only just have answered. The panes opened without it are empty, so
+     * their apps go in now.
+     */
+    fun onBackendReady() {
+        if (running) recallVacatedPanes()
+    }
+
     /** Re-launches a pane's app, for the "pane went black" reload action. */
     fun reload(paneId: Int): Boolean {
         val pane = router?.panes?.pane(paneId) ?: return false
@@ -567,7 +576,7 @@ class DuoScreenController(
     /**
      * Resolves [packageName]'s launcher activity to an explicit [ComponentName] with the app's own
      * package visibility (the QUERY_ALL_PACKAGES the personal/lab manifest declares, same as the
-     * pane picker). Returns null when nothing resolves — then [DuoScreenShizukuOps.launchOnDisplay]
+     * pane picker). Returns null when nothing resolves — then [DuoScreenPrivilegedOps.launchOnDisplay]
      * falls back to the implicit intent resolved shell-side. A null is logged, naming the package,
      * so a resulting blank pane is diagnosable rather than silent.
      */
@@ -1072,7 +1081,7 @@ class DuoScreenController(
             StructuredLog.i(
                 TAG,
                 "Tap on pane $paneId -> display $displayId at $x,$y injected=$injected" +
-                    " (shizuku=${ops.isAvailable})"
+                    " (privileged=${ops.isAvailable})"
             )
         }
     }
