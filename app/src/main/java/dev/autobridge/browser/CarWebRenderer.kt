@@ -660,6 +660,20 @@ class CarWebRenderer(context: Context) {
         }
     }
 
+    /**
+     * Like [requestFullRate], but also pulls the next frame forward when the pump is already at
+     * full rate, so a keystroke is drawn at once instead of up to one frame interval later. The
+     * pump re-arms itself from [frameRunnable], so this never leaves two frames scheduled.
+     */
+    private fun requestFrameNow() {
+        activeUntilMs = SystemClock.uptimeMillis() + ACTIVE_WINDOW_MS
+        if (running) {
+            pumpIdle = false
+            mainHandler.removeCallbacks(frameRunnable)
+            mainHandler.post(frameRunnable)
+        }
+    }
+
     // All of these describe the focused pane, because that is the page the toolbar, the drawer and
     // remote commands act on. Without a split the focused pane is always the main page.
     val canGoBack: Boolean get() = isVideoFullscreen || focusedView?.canGoBack() == true
@@ -1880,11 +1894,29 @@ class CarWebRenderer(context: Context) {
     }
 
     private fun handleKeyboardTap(board: CarSurfaceKeyboard, x: Float, y: Float) {
-        when (val result = board.onTap(x, y, keyboardArea(), sizes.dp(1f))) {
+        val started = SystemClock.uptimeMillis()
+        val result = board.onTap(x, y, keyboardArea(), sizes.dp(1f))
+        when (result) {
             is CarSurfaceKeyboard.Result.Close -> closeKeyboard()
             is CarSurfaceKeyboard.Result.Commit -> commitKeyboard(board, result.text)
             else -> Unit
         }
+        if (ViewportDebug.enabled) {
+            pendingKeyTraceMs = started
+            Log.i(TAG, "kbd tap result=$result handledMs=${SystemClock.uptimeMillis() - started}")
+        }
+        // The changed key (or the tray going away) is drawn now, not on the pump's next tick.
+        if (result != CarSurfaceKeyboard.Result.None) requestFrameNow()
+    }
+
+    /** Uptime of the last keyboard tap whose first frame has not been traced yet; 0 when none. */
+    private var pendingKeyTraceMs = 0L
+
+    private fun traceKeyFrame() {
+        if (pendingKeyTraceMs == 0L) return
+        val now = SystemClock.uptimeMillis()
+        Log.i(TAG, "kbd frame t=$now sinceTapMs=${now - pendingKeyTraceMs}")
+        pendingKeyTraceMs = 0L
     }
 
     /**
@@ -2017,8 +2049,25 @@ class CarWebRenderer(context: Context) {
         return true
     }
 
-    /** Pinch-zoom from the car surface, mapped to the WebView's own zoom. */
-    fun scaleBy(factor: Float) = runOnMain {
+    /**
+     * Pinch-zoom from the car surface, mapped to the WebView's own zoom.
+     *
+     * While the keyboard is open the page never zooms: the host reports a double tap as a scale,
+     * so two quick taps on a key would otherwise zoom the page and lose both keystrokes. A double
+     * tap on the tray is replayed as the two taps it was; a pinch is swallowed.
+     */
+    fun scaleBy(factor: Float, focusX: Float = -1f, focusY: Float = -1f) = runOnMain {
+        keyboard?.let { board ->
+            lastInputMs = SystemClock.uptimeMillis()
+            stopFling()
+            val tray = board.geometry(keyboardArea(), sizes.dp(1f)).tray
+            if (CarKeyboardGestures.isKeyboardDoubleTap(focusX, focusY, factor, tray)) {
+                handleKeyboardTap(board, focusX, focusY)
+                // Go, hide or a tap outside ends the keyboard on the first tap; act on it once.
+                if (keyboard === board) handleKeyboardTap(board, focusX, focusY)
+            }
+            return@runOnMain
+        }
         if (overlay != Overlay.NONE) return@runOnMain
         if (!factor.isFinite() || factor <= 0f) return@runOnMain
         lastInputMs = SystemClock.uptimeMillis()
@@ -3087,6 +3136,7 @@ class CarWebRenderer(context: Context) {
         }
         drawChrome(canvas, SystemClock.uptimeMillis())
         canvas.restoreToCount(save)
+        traceKeyFrame()
     }
 
     private fun drawFrame(nowMs: Long) {
@@ -3144,6 +3194,7 @@ class CarWebRenderer(context: Context) {
         } finally {
             runCatching { activeSurface.unlockCanvasAndPost(canvas) }
         }
+        traceKeyFrame()
     }
 
     /**
