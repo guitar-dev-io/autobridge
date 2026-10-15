@@ -216,7 +216,8 @@ object RadioRepository {
          * WRITE: a station becomes the (source, entry) pair [IptvHistoryStore] stores. Rejects
          * HARDWARE_FM and blank URLs — FM is never persisted.
          */
-        private fun synthForStore(station: RadioStation): Pair<IptvSource, IptvEntry> {
+        @androidx.annotation.VisibleForTesting
+        internal fun synthForStore(station: RadioStation): Pair<IptvSource, IptvEntry> {
             require(station.sourceType != RadioSourceType.HARDWARE_FM && station.streamUrl.isNotBlank()) {
                 "only playable internet/offline stations can be persisted"
             }

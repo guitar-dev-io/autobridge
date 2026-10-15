@@ -15,11 +15,27 @@ import dev.autobridge.core.policy.FeaturePolicy
 import java.util.concurrent.Executor
 
 /**
+ * The narrow transport the radio coordinator drives, so it can be faked in a JVM unit test without
+ * a live Media3 session. [MediaPlaybackClient] is the one production implementation; the interface
+ * exists only to give [dev.autobridge.radio.RadioPlaybackCoordinator] a seam. Signatures mirror the
+ * client exactly, so making the client implement this changes no behaviour.
+ */
+interface RadioTransportClient {
+    fun currentQueueUris(): List<String>
+    fun playPlaylist(uris: List<String>, startIndex: Int = 0, titles: List<String> = emptyList())
+    fun pause()
+    fun resume()
+    fun next()
+    fun previous()
+    fun stop()
+}
+
+/**
  * Connects to [MediaPlaybackService]'s MediaSession as a client controller. Playback commands
  * issued here go through the session (so external controllers, e.g. Android Auto or steering
  * wheel media buttons, observe the same state) rather than touching a player directly.
  */
-class MediaPlaybackClient(private val context: Context) {
+class MediaPlaybackClient(private val context: Context) : RadioTransportClient {
     enum class ConnectionState { DISCONNECTED, CONNECTING, CONNECTED, ERROR }
 
     private val mainExecutor = Executor { command -> Handler(Looper.getMainLooper()).post(command) }
@@ -70,7 +86,7 @@ class MediaPlaybackClient(private val context: Context) {
      * Empty when nothing is loaded. Used to tell whether a queue the phone is about to launch is
      * already the live one, so it can be adopted instead of reset.
      */
-    fun currentQueueUris(): List<String> {
+    override fun currentQueueUris(): List<String> {
         val c = controller ?: return emptyList()
         return (0 until c.mediaItemCount).map { i ->
             c.getMediaItemAt(i).localConfiguration?.uri?.toString()
@@ -147,7 +163,7 @@ class MediaPlaybackClient(private val context: Context) {
      * "Channel 3HD" rather than a playlist URL. A title is looked up by the entry's own index in
      * [uris], so an unusable entry takes its own name out of the queue with it.
      */
-    fun playPlaylist(uris: List<String>, startIndex: Int = 0, titles: List<String> = emptyList()) {
+    override fun playPlaylist(uris: List<String>, startIndex: Int, titles: List<String>) {
         if (!FeaturePolicy.app.isAvailable(Feature.MEDIA)) return
         val mediaController = controller ?: return
         val items = uris.mapIndexedNotNull { index, uri ->
@@ -170,23 +186,23 @@ class MediaPlaybackClient(private val context: Context) {
         android.util.Log.w("MediaPlaybackClient", "Playback command dropped: $reason")
     }
 
-    fun next() {
+    override fun next() {
         controller?.let { if (it.hasNextMediaItem()) it.seekToNextMediaItem() }
     }
 
-    fun previous() {
+    override fun previous() {
         controller?.let { if (it.hasPreviousMediaItem()) it.seekToPreviousMediaItem() }
     }
 
-    fun pause() {
+    override fun pause() {
         controller?.pause()
     }
 
-    fun resume() {
+    override fun resume() {
         if (FeaturePolicy.app.isAvailable(Feature.MEDIA)) controller?.play()
     }
 
-    fun stop() {
+    override fun stop() {
         // Stopping is always allowed, including after a policy transition.
         controller?.stop()
     }

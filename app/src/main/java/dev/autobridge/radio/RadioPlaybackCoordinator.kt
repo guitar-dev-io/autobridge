@@ -1,11 +1,11 @@
 package dev.autobridge.radio
 
 import android.content.Context
-import dev.autobridge.media.MediaPlaybackClient
+import dev.autobridge.media.RadioTransportClient
 
 /**
  * The single point that decides which radio source owns the shared Media3 session, over the
- * existing [MediaPlaybackClient]. It never creates a player or a second audio-focus owner: every
+ * existing [dev.autobridge.media.MediaPlaybackClient]. It never creates a player or a second audio-focus owner: every
  * audio command goes through the one session the car and the notification already observe.
  *
  * Two pieces of state, deliberately separate:
@@ -19,7 +19,7 @@ import dev.autobridge.media.MediaPlaybackClient
  *
  * [play] is the only method that loads audio; switching sources never loads a queue on its own.
  */
-class RadioPlaybackCoordinator(private val client: MediaPlaybackClient) {
+class RadioPlaybackCoordinator(private val client: RadioTransportClient) {
 
     /** The outcome of a [switchSource]. */
     sealed interface SwitchResult {
