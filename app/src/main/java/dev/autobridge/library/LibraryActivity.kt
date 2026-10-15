@@ -45,12 +45,19 @@ import dev.autobridge.iptv.IptvSourceType
 import dev.autobridge.iptv.StreamPing
 import dev.autobridge.iptv.XtreamCredentials
 import dev.autobridge.iptv.RadioBrowserSearch
+import dev.autobridge.iptv.RadioPreferencesRepository
+import dev.autobridge.iptv.RadioPresetsStore
 import dev.autobridge.iptv.RadioStationMatcher
 import dev.autobridge.media.MediaPlaybackClient
+import dev.autobridge.radio.RadioRepository
+import dev.autobridge.radio.RadioSourceType
+import dev.autobridge.radio.RadioStation
+import dev.autobridge.radio.RadioUiState
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.dp
 import dev.autobridge.ui.AutoBridgeDesign.stack
 import dev.autobridge.ui.MiniPlayer
+import dev.autobridge.ui.RadioTunerViews
 import dev.autobridge.ui.SystemBack
 
 /**
@@ -146,6 +153,28 @@ class LibraryActivity : Activity() {
     /** Debounces the radio page's online station search while the user is still typing. */
     private val radioSearchHandler = Handler(Looper.getMainLooper())
 
+    /**
+     * The radio tuner follows the one shared playback state. Rather than wire a flow collector into
+     * this plain Activity, it polls [RadioRepository.state] on a one-second tick while the tuner is
+     * on screen — the same cheap approach [MiniPlayer] uses — so a change made on the car (or by
+     * the session itself) is reflected here, and vice versa.
+     */
+    private val radioTunerHandler = Handler(Looper.getMainLooper())
+
+    /**
+     * The tuner's own page lambda, kept so the tick only repaints when the tuner is actually the
+     * page on top of the stack — never while a search or recents page the tuner opened is showing.
+     */
+    private var radioTunerPage: (() -> Unit)? = null
+    private val radioTunerShowing: Boolean
+        get() = section == Section.RADIO && stack.lastOrNull() === radioTunerPage
+    private val radioTunerTick = object : Runnable {
+        override fun run() {
+            if (radioTunerShowing) renderRadioTuner()
+            radioTunerHandler.postDelayed(this, 1_000L)
+        }
+    }
+
     /** Undoes [SystemBack.register]; see that object for why Back needs registering at all. */
     private var releaseBack: () -> Unit = {}
 
@@ -190,8 +219,13 @@ class LibraryActivity : Activity() {
     private fun showSection(target: Section) {
         section = target
         stack.clear()
+        if (target != Section.RADIO) {
+            radioTunerPage = null
+            radioTunerHandler.removeCallbacks(radioTunerTick)
+        }
         when (target) {
-            Section.TV, Section.RADIO -> showLibraryHome()
+            Section.TV -> showLibraryHome()
+            Section.RADIO -> showRadioTuner()
             Section.MUSIC -> showMusic()
             Section.FILES -> showFiles()
             Section.FAVORITES -> showFavorites()
@@ -202,9 +236,31 @@ class LibraryActivity : Activity() {
         }
     }
 
+    /**
+     * Correction #3: on every return to the foreground, the Radio tuner re-reads the stores it
+     * draws from — favourites and recents ([IptvHistoryStore], RADIO kind), presets
+     * ([RadioPresetsStore]) and the user's selected source ([RadioPreferencesRepository]) — then
+     * rebinds. A change made elsewhere (the car saved a favourite, the car switched source) must
+     * show here without the user having to leave and come back.
+     *
+     * [renderRadioTuner] already rebuilds from [RadioRepository.state], which projects exactly
+     * those stores, so re-rendering is the rebind. The selected source is re-applied to the
+     * coordinator so a persisted choice survives a cold start.
+     */
+    override fun onStart() {
+        super.onStart()
+        if (section != Section.RADIO) return
+        RadioRepository.coordinator?.switchSource(this, RadioPreferencesRepository.selectedSource(this))
+        if (radioTunerShowing) renderRadioTuner()
+    }
+
     override fun onResume() {
         super.onResume()
         miniPlayer?.start()
+        if (radioTunerShowing) {
+            radioTunerHandler.removeCallbacks(radioTunerTick)
+            radioTunerHandler.post(radioTunerTick)
+        }
         // Coming back from the player should reflect a new "recently played" entry, but the very
         // first resume follows onCreate's own render, so re-drawing then is pure waste.
         if (resumedOnce) refresh() else resumedOnce = true
@@ -213,12 +269,14 @@ class LibraryActivity : Activity() {
     override fun onPause() {
         super.onPause()
         miniPlayer?.stop()
+        radioTunerHandler.removeCallbacks(radioTunerTick)
     }
 
     override fun onDestroy() {
         super.onDestroy()
         releaseBack()
         radioSearchHandler.removeCallbacksAndMessages(null)
+        radioTunerHandler.removeCallbacks(radioTunerTick)
         miniPlayer?.stop()
         playback.disconnect()
     }
@@ -384,6 +442,163 @@ class LibraryActivity : Activity() {
             stack.removeLastOrNull()
             openLibrarySource(sources.first(), sources)
         }
+    }
+
+    // ----- Radio: the portrait tuner (Section.RADIO) -----
+
+    /**
+     * The Radio chip's root page: the portrait tuner drawn by [RadioTunerViews], driven by the
+     * shared [RadioRepository]/[dev.autobridge.radio.RadioPlaybackCoordinator]. Internet Radio is
+     * the only playable source here; FM is shown disabled with its honest reason and offline is
+     * hidden. This replaces the IPTV categories page the Radio chip used to share with TV — TV
+     * still goes through [showLibraryHome] unchanged.
+     */
+    private fun showRadioTuner() {
+        val page: () -> Unit = { drawRadioTunerPage() }
+        radioTunerPage = page
+        push(page)
+    }
+
+    /** The tuner page body, re-invoked by [refresh]/[goBack]; (re)starts the follow tick. */
+    private fun drawRadioTunerPage() {
+        RadioRepository.init(applicationContext)
+        renderRadioTuner()
+        radioTunerHandler.removeCallbacks(radioTunerTick)
+        radioTunerHandler.postDelayed(radioTunerTick, 1_000L)
+    }
+
+    /** Builds (or rebuilds in place) the tuner from the current [RadioRepository.state]. */
+    private fun renderRadioTuner() {
+        val state = RadioRepository.state.value
+        val callbacks = radioTunerCallbacks(state)
+        // Landscape caps the dial so the designed portrait target stays the primary layout while a
+        // short landscape viewport still shows the whole scrollable column.
+        val landscape = resources.configuration.orientation ==
+            android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        val rows = RadioTunerViews.buildBody(this, state, callbacks, capDial = landscape)
+        render(
+            title = Section.RADIO.title(this),
+            subtitle = radioConnectionSubtitle(state),
+            rows = rows,
+            headerActions = listOf(
+                AutoBridgeDesign.HeaderAction("⌕", onClick = { openRadioSearch() })
+            ),
+            extraPinned = listOf(chipsRow())
+        )
+    }
+
+    /** A short connection/playback line under the header, so the status is always readable. */
+    private fun radioConnectionSubtitle(state: RadioUiState): String = when {
+        state.selectedSource == RadioSourceType.HARDWARE_FM ->
+            state.fmUnavailableReason ?: getString(R.string.radio_fm_unavailable)
+        state.connection != MediaPlaybackClient.ConnectionState.CONNECTED ->
+            getString(R.string.radio_status_connecting)
+        state.isPlaying && state.selected != null ->
+            getString(R.string.radio_status_playing)
+        state.selected != null -> getString(R.string.radio_status_paused)
+        else -> getString(R.string.radio_source_internet)
+    }
+
+    private fun radioTunerCallbacks(state: RadioUiState): RadioTunerViews.Callbacks =
+        RadioTunerViews.Callbacks(
+            onSelectSource = { type -> selectRadioSource(type) },
+            onPlayPause = {
+                val coord = RadioRepository.coordinator ?: return@Callbacks
+                if (state.isPlaying) coord.pause() else coord.resume()
+                renderRadioTuner()
+            },
+            onPrevious = { RadioRepository.coordinator?.previous(); renderRadioTuner() },
+            onNext = { RadioRepository.coordinator?.next(); renderRadioTuner() },
+            onToggleFavorite = {
+                val station = state.selected ?: return@Callbacks
+                RadioRepository.toggleFavorite(this, station)
+                renderRadioTuner()
+            },
+            onToggleStationFavorite = { station ->
+                RadioRepository.toggleFavorite(this, station)
+                renderRadioTuner()
+            },
+            onRecallPreset = { slot, station -> recallRadioPreset(slot, station) },
+            onSavePreset = { slot -> saveRadioPreset(slot, state) },
+            onSearch = { openRadioSearch() },
+            onPlayStation = { station -> playRadioStation(station) },
+            onOpenRecents = { openRadioSearch() },
+        )
+
+    /**
+     * Flips the user's selected source and persists it (so a phone choice reaches the car). FM is
+     * never activated — the coordinator records the selection and keeps internet radio live — so
+     * the tuner just re-renders into its disabled FM panel.
+     */
+    private fun selectRadioSource(type: RadioSourceType) {
+        RadioPreferencesRepository.setSelectedSource(this, type)
+        RadioRepository.coordinator?.switchSource(this, type)
+        renderRadioTuner()
+    }
+
+    /** Tap a preset: play a saved station, or (empty slot) save the current station there. */
+    private fun recallRadioPreset(slot: Int, station: RadioStation?) {
+        if (station != null) {
+            playRadioStation(station)
+        } else {
+            saveRadioPreset(slot, RadioRepository.state.value)
+        }
+    }
+
+    /** Long-press / empty-tap save: store the current internet station, inline toast feedback. */
+    private fun saveRadioPreset(slot: Int, state: RadioUiState) {
+        val station = state.selected
+        if (station == null || state.selectedSource == RadioSourceType.HARDWARE_FM) {
+            Toast.makeText(this, getString(R.string.radio_preset_nothing_to_save), Toast.LENGTH_SHORT).show()
+            return
+        }
+        when (val result = RadioPresetsStore.save(this, slot, station)) {
+            is RadioPresetsStore.SaveResult.Saved ->
+                Toast.makeText(this, getString(R.string.radio_preset_saved, slot), Toast.LENGTH_SHORT).show()
+            is RadioPresetsStore.SaveResult.Rejected ->
+                Toast.makeText(this, result.reason, Toast.LENGTH_SHORT).show()
+        }
+        renderRadioTuner()
+    }
+
+    /**
+     * Plays [station] on the shared session via the FEAT-001 queue-build helper: a queue is built
+     * from the RADIO history around the station (null queue -> the station alone), so Next/Previous
+     * step through the user's own stations. Records the play so it lands in recents.
+     */
+    private fun playRadioStation(station: RadioStation) {
+        if (station.sourceType == RadioSourceType.HARDWARE_FM || station.streamUrl.isBlank()) return
+        RadioRepository.recordPlayback(this, station)
+        val items = IptvHistoryStore.recent(this, IptvKind.RADIO) +
+            IptvHistoryStore.favorites(this, IptvKind.RADIO)
+        val anchorItem = items.firstOrNull { it.url == station.streamUrl }
+        if (anchorItem != null) {
+            RadioRepository.playFromItems(station, items, anchorItem)
+        } else {
+            // Not in the stores (an online result just tapped): play it alone through the helper.
+            RadioRepository.playFromItems(station, listOf<IptvHistoryStore.Item>(), fakeItem(station))
+        }
+        renderRadioTuner()
+    }
+
+    /** A throwaway history item for a station not yet in the stores, so the queue helper can run. */
+    private fun fakeItem(station: RadioStation): IptvHistoryStore.Item = IptvHistoryStore.Item(
+        sourceId = "radio-virtual",
+        title = station.title,
+        url = station.streamUrl,
+        type = IptvEntryType.LIVE,
+        kind = IptvKind.RADIO,
+        logo = station.logo,
+    )
+
+    /** Opens the existing station search (local + radio-browser) via the IPTV radio source path. */
+    private fun openRadioSearch() {
+        val sources = IptvSourceStore.list(this, IptvKind.RADIO)
+        if (sources.isEmpty()) {
+            addFromDirectory()
+            return
+        }
+        openLibrarySource(sources.first(), sources)
     }
 
     private fun openLibrarySource(source: IptvSource, allSources: List<IptvSource>) {

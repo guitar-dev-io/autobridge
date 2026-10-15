@@ -160,4 +160,19 @@
     <string name="radio_search_failed">ค้นหาออนไลน์ไม่สำเร็จ: %1$s</string>
     <string name="radio_fm_unavailable">อุปกรณ์นี้ไม่รองรับวิทยุ FM</string>
     <string name="radio_offline_unavailable">ยังไม่ได้ตั้งค่าเสียงออฟไลน์</string>
+    <string name="radio_source_internet">วิทยุอินเทอร์เน็ต</string>
+    <string name="radio_source_fm">FM</string>
+    <string name="radio_presets">พรีเซ็ต</string>
+    <string name="radio_preset_slot">พรีเซ็ต %1$d</string>
+    <string name="radio_preset_saved">บันทึกไปยังพรีเซ็ต %1$d แล้ว</string>
+    <string name="radio_preset_nothing_to_save">ไม่มีสถานีที่กำลังเล่นให้บันทึก</string>
+    <string name="radio_recently_played">เล่นล่าสุด</string>
+    <string name="radio_view_all">ดูทั้งหมด</string>
+    <string name="radio_nothing_playing">ไม่มีการเล่น</string>
+    <string name="radio_play">เล่น</string>
+    <string name="radio_pause">หยุดชั่วคราว</string>
+    <string name="radio_dial_hint">ปัดเพื่อเปลี่ยนสถานี</string>
+    <string name="radio_status_connecting">กำลังเชื่อมต่อ…</string>
+    <string name="radio_status_playing">กำลังเล่น</string>
+    <string name="radio_status_paused">หยุดชั่วคราว</string>
 </resources>

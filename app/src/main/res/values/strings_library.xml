@@ -165,4 +165,19 @@
     <string name="radio_search_failed">Online search failed: %1$s</string>
     <string name="radio_fm_unavailable">FM radio is not available on this device.</string>
     <string name="radio_offline_unavailable">No offline audio configured.</string>
+    <string name="radio_source_internet">Internet Radio</string>
+    <string name="radio_source_fm">FM</string>
+    <string name="radio_presets">Presets</string>
+    <string name="radio_preset_slot">Preset %1$d</string>
+    <string name="radio_preset_saved">Saved to preset %1$d</string>
+    <string name="radio_preset_nothing_to_save">Nothing playing to save</string>
+    <string name="radio_recently_played">Recently played</string>
+    <string name="radio_view_all">View all</string>
+    <string name="radio_nothing_playing">Nothing playing</string>
+    <string name="radio_play">Play</string>
+    <string name="radio_pause">Pause</string>
+    <string name="radio_dial_hint">Swipe to change station</string>
+    <string name="radio_status_connecting">Connecting…</string>
+    <string name="radio_status_playing">Playing</string>
+    <string name="radio_status_paused">Paused</string>
 </resources>
