@@ -163,4 +163,6 @@
     <string name="radio_search_my_stations">My stations</string>
     <string name="radio_search_searching">Searching online…</string>
     <string name="radio_search_failed">Online search failed: %1$s</string>
+    <string name="radio_fm_unavailable">FM radio is not available on this device.</string>
+    <string name="radio_offline_unavailable">No offline audio configured.</string>
 </resources>
