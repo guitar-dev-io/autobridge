@@ -135,6 +135,15 @@ class CarIptvSourcesScreen(
      */
     private fun addRadioQuickEntries(list: ItemList.Builder) {
         if (kind != IptvKind.RADIO) return
+        // One browsable row into the category screen, placed first. A single row (not five) keeps
+        // this un-paged landing inside the host's list limit; the five categories live one tap away.
+        list.addItem(
+            Row.Builder()
+                .setTitle(carContext.getString(R.string.car_radio_browse_categories))
+                .setBrowsable(true)
+                .setOnClickListener { screenManager.push(CarRadioCategoriesScreen(carContext)) }
+                .build()
+        )
         val filled = radioPresets.count { it != null }
         list.addItem(
             Row.Builder()
