@@ -1468,10 +1468,11 @@ class CarWebRenderer(context: Context) {
         stopFling()
         keyboard?.let { board ->
             lastInputMs = now
+            val taps = keyboardTaps.onClick(now, x, y, keyboardTapSlop(board))
             if (ViewportDebug.enabled) {
-                Log.i(TAG, "kbd route TAP $x,$y inArea=${CarKeyboardGestures.inKeyboardArea(x, y, keyboardTray())}")
+                Log.i(TAG, "kbd route TAP $x,$y inArea=${CarKeyboardGestures.inKeyboardArea(x, y, keyboardTray())} taps=$taps")
             }
-            handleKeyboardTap(board, x, y)
+            if (taps > 0) handleKeyboardTap(board, x, y)
             return@runOnMain
         }
         if (overlay == Overlay.TABS) {
@@ -1850,10 +1851,24 @@ class CarWebRenderer(context: Context) {
     // ------------------------------------------------------------------ keyboard
 
     /** The surface the keyboard lays itself out in: the part of the car screen the browser owns. */
-    private fun keyboardArea(): Box = Box(
-        viewport.left.toFloat(), viewport.top.toFloat(),
-        (viewport.left + viewport.width).toFloat(), (viewport.top + viewport.height).toFloat()
-    )
+    private fun keyboardArea(): Box {
+        val left = viewport.left.toFloat()
+        val top = viewport.top.toFloat()
+        val right = (viewport.left + viewport.width).toFloat()
+        val bottom = (viewport.top + viewport.height).toFloat()
+        // Asked for several times per keystroke; reused while the viewport stays put.
+        cachedKeyboardArea?.let { if (it.left == left && it.top == top && it.right == right && it.bottom == bottom) return it }
+        return Box(left, top, right, bottom).also { cachedKeyboardArea = it }
+    }
+
+    private var cachedKeyboardArea: Box? = null
+
+    /** Keeps one host double tap from typing three characters; see [CarKeyboardTapFilter]. */
+    private val keyboardTaps = CarKeyboardTapFilter()
+
+    /** Surface pixels the keyboard-only legacy frame asks to repaint, and what the surface granted. */
+    private val keyboardDirty = Rect()
+    private val keyboardDirtyGranted = Rect()
 
     /** Opens the keyboard on the address bar, the current address selected so typing replaces it. */
     fun openAddressKeyboard(clear: Boolean = false) = runOnMain {
@@ -1902,20 +1917,83 @@ class CarWebRenderer(context: Context) {
         onKeyboardChanged?.invoke(false)
     }
 
-    private fun handleKeyboardTap(board: CarSurfaceKeyboard, x: Float, y: Float) {
+    /**
+     * Applies one keyboard tap. [draw] false leaves a changed tray for the caller to paint (a
+     * replayed double tap paints once for both keystrokes); Close and Commit always draw.
+     */
+    private fun handleKeyboardTap(board: CarSurfaceKeyboard, x: Float, y: Float, draw: Boolean = true): CarSurfaceKeyboard.Result {
         val started = SystemClock.uptimeMillis()
-        val result = board.onTap(x, y, keyboardArea(), sizes.dp(1f))
-        when (result) {
-            is CarSurfaceKeyboard.Result.Close -> closeKeyboard()
-            is CarSurfaceKeyboard.Result.Commit -> commitKeyboard(board, result.text)
-            else -> Unit
-        }
+        val result = board.onTap(x, y, keyboardArea(), sizes.dp(1f), started)
         if (ViewportDebug.enabled) {
             pendingKeyTraceMs = started
             Log.i(TAG, "kbd tap result=$result handledMs=${SystemClock.uptimeMillis() - started}")
         }
-        // The changed key (or the tray going away) is drawn now, not on the pump's next tick.
-        if (result != CarSurfaceKeyboard.Result.None) requestFrameNow()
+        when (result) {
+            // A keystroke repaints only the tray, right here: no queued pump frame, no page draw.
+            is CarSurfaceKeyboard.Result.Changed -> if (draw) drawKeyboardNow(board, started)
+            // The tray going away uncovers the page, which needs a whole frame; drawn at once.
+            is CarSurfaceKeyboard.Result.Close -> { closeKeyboard(); requestFrameNow() }
+            is CarSurfaceKeyboard.Result.Commit -> { commitKeyboard(board, result.text); requestFrameNow() }
+            // Gaps between keys: nothing changed, nothing to draw.
+            is CarSurfaceKeyboard.Result.None -> Unit
+        }
+        return result
+    }
+
+    /** Two reports of one double tap land on the same key; a key height apart is another key. */
+    private fun keyboardTapSlop(board: CarSurfaceKeyboard): Float =
+        board.geometry(keyboardArea(), sizes.dp(1f)).keyHeight
+
+    /**
+     * Puts a keystroke on the surface synchronously, ahead of anything queued on the main thread.
+     *
+     * HARDWARE: re-records the chrome layer only; the window draws it on the next vsync and the
+     * WebView's render node is not touched. LEGACY: locks just the tray's rectangle and paints the
+     * keyboard into it (the tray is opaque, so nothing under it needs drawing); the rest of the
+     * surface keeps its last frame. If the surface cannot keep the rest (it grants a larger dirty
+     * rect), the whole frame is painted as before. The next heavy page frame is then pushed back a
+     * frame interval so it does not sit in front of the next keystroke.
+     */
+    private fun drawKeyboardNow(board: CarSurfaceKeyboard, nowMs: Long) {
+        hardwareWindow?.let {
+            it.invalidateChrome()
+            return
+        }
+        if (hardwareMode) return
+        val activeSurface = surface ?: return
+        val view = webView ?: return
+        if (!activeSurface.isValid || surfaceWidth <= 0 || surfaceHeight <= 0) return
+        val tray = board.geometry(keyboardArea(), sizes.dp(1f)).tray
+        keyboardDirty.set(
+            kotlin.math.floor(tray.left).toInt(), kotlin.math.floor(tray.top).toInt(),
+            kotlin.math.ceil(tray.right).toInt(), kotlin.math.ceil(tray.bottom).toInt()
+        )
+        if (!keyboardDirty.intersect(0, 0, surfaceWidth, surfaceHeight)) return
+        keyboardDirtyGranted.set(keyboardDirty)
+        val canvas: Canvas = runCatching { activeSurface.lockCanvas(keyboardDirtyGranted) }.getOrNull() ?: return
+        try {
+            if (keyboardDirty.contains(keyboardDirtyGranted)) {
+                canvas.save()
+                canvas.clipRect(keyboardDirty)
+                clipToCard(canvas)
+                board.draw(canvas, keyboardArea(), sizes.dp(1f), nowMs) { c, icon, cx, cy, size, color ->
+                    drawIcon(c, icon, cx, cy, size, color)
+                }
+                canvas.restore()
+            } else {
+                paintFrame(canvas, view, nowMs)
+            }
+        } catch (error: RuntimeException) {
+            Log.w(TAG, "keyboard draw to car surface failed", error)
+        } finally {
+            runCatching { activeSurface.unlockCanvasAndPost(canvas) }
+        }
+        traceKeyFrame()
+        if (running) {
+            pumpIdle = false
+            mainHandler.removeCallbacks(frameRunnable)
+            mainHandler.postDelayed(frameRunnable, PerformanceMode.level.browserFrameMs)
+        }
     }
 
     /** Uptime of the last keyboard tap whose first frame has not been traced yet; 0 when none. */
@@ -2100,9 +2178,18 @@ class CarWebRenderer(context: Context) {
             lastInputMs = SystemClock.uptimeMillis()
             stopFling()
             if (CarKeyboardGestures.isKeyboardDoubleTap(focusX, focusY, factor, tray)) {
-                handleKeyboardTap(board, focusX, focusY)
+                val taps = keyboardTaps.onDoubleTap(SystemClock.uptimeMillis(), focusX, focusY, keyboardTapSlop(board))
+                if (ViewportDebug.enabled) Log.i(TAG, "kbd doubleTap focus=$focusX,$focusY taps=$taps")
+                val first = handleKeyboardTap(board, focusX, focusY, draw = taps < 2)
                 // Go, hide or a tap outside ends the keyboard on the first tap; act on it once.
-                if (keyboard === board) handleKeyboardTap(board, focusX, focusY)
+                // Both keystrokes go out in one keyboard frame rather than two back to back.
+                if (taps > 1 && keyboard === board) {
+                    val second = handleKeyboardTap(board, focusX, focusY, draw = false)
+                    val changed = CarSurfaceKeyboard.Result.Changed
+                    if (keyboard === board && (first == changed || second == changed)) {
+                        drawKeyboardNow(board, SystemClock.uptimeMillis())
+                    }
+                }
             } else if (ViewportDebug.enabled) {
                 Log.i(TAG, "kbd swallow gesture=SCALE focus=$focusX,$focusY factor=$factor")
             }
@@ -3193,48 +3280,59 @@ class CarWebRenderer(context: Context) {
         if (!activeSurface.isValid || surfaceWidth <= 0 || surfaceHeight <= 0) return
         val canvas: Canvas = runCatching { activeSurface.lockCanvas(null) }.getOrNull() ?: return
         try {
-            canvas.drawColor(BrowserTheme.dark.background)
-            // Everything for this frame — page, drawer/tab overlays, toolbar, handle — is clipped
-            // to one rect, so a rounded panel reads as a single surface rather than a rounded page
-            // with a square toolbar stitched on top of it. Squared off (the current sizing) that
-            // is an ordinary rect clip: clipPath is the slower of the two and forces the canvas off
-            // its fast paths, so it is used only when there is actually a corner to round.
-            val cardOuterSave = canvas.save()
-            val radius = sizes.cardCornerRadius
-            clipRect.set(
-                viewport.left.toFloat(), viewport.top.toFloat(),
-                (viewport.left + viewport.width).toFloat(), (viewport.top + viewport.height).toFloat()
-            )
-            if (radius > 0f) {
-                clipPath.rewind()
-                clipPath.addRoundRect(clipRect, radius, radius, android.graphics.Path.Direction.CW)
-                canvas.clipPath(clipPath)
-            } else {
-                canvas.clipRect(clipRect)
-            }
-
-            canvas.save()
-            canvas.translate(viewport.left.toFloat(), viewport.top.toFloat())
-            canvas.drawColor(Color.WHITE)
-            if (loadError != null) {
-                drawErrorOverlay(canvas)
-            } else {
-                // The page occupies the whole viewport; chrome is composited over it afterwards.
-                val scale = viewport.scale
-                canvas.save()
-                if (scale > 0f && scale != 1f) canvas.scale(scale, scale)
-                view.draw(canvas)
-                canvas.restore()
-            }
-            canvas.restore()
-            drawChrome(canvas, nowMs)
-            canvas.restoreToCount(cardOuterSave)
+            paintFrame(canvas, view, nowMs)
         } catch (error: RuntimeException) {
             Log.w(TAG, "WebView draw to car surface failed", error)
         } finally {
             runCatching { activeSurface.unlockCanvasAndPost(canvas) }
         }
         traceKeyFrame()
+    }
+
+    /**
+     * Everything for this frame — page, drawer/tab overlays, toolbar, handle — is clipped to one
+     * rect, so a rounded panel reads as a single surface rather than a rounded page with a square
+     * toolbar stitched on top of it. Squared off (the current sizing) that is an ordinary rect clip:
+     * clipPath is the slower of the two and forces the canvas off its fast paths, so it is used only
+     * when there is actually a corner to round.
+     */
+    private fun clipToCard(canvas: Canvas) {
+        val radius = sizes.cardCornerRadius
+        clipRect.set(
+            viewport.left.toFloat(), viewport.top.toFloat(),
+            (viewport.left + viewport.width).toFloat(), (viewport.top + viewport.height).toFloat()
+        )
+        if (radius > 0f) {
+            clipPath.rewind()
+            clipPath.addRoundRect(clipRect, radius, radius, android.graphics.Path.Direction.CW)
+            canvas.clipPath(clipPath)
+        } else {
+            canvas.clipRect(clipRect)
+        }
+    }
+
+    /** LEGACY: one whole frame (page, then chrome) into a locked surface canvas. */
+    private fun paintFrame(canvas: Canvas, view: WebView, nowMs: Long) {
+        canvas.drawColor(BrowserTheme.dark.background)
+        val cardOuterSave = canvas.save()
+        clipToCard(canvas)
+
+        canvas.save()
+        canvas.translate(viewport.left.toFloat(), viewport.top.toFloat())
+        canvas.drawColor(Color.WHITE)
+        if (loadError != null) {
+            drawErrorOverlay(canvas)
+        } else {
+            // The page occupies the whole viewport; chrome is composited over it afterwards.
+            val scale = viewport.scale
+            canvas.save()
+            if (scale > 0f && scale != 1f) canvas.scale(scale, scale)
+            view.draw(canvas)
+            canvas.restore()
+        }
+        canvas.restore()
+        drawChrome(canvas, nowMs)
+        canvas.restoreToCount(cardOuterSave)
     }
 
     /**
@@ -3328,7 +3426,7 @@ class CarWebRenderer(context: Context) {
         // toolbar's fade only when the user has asked for that
         // ([BrowserControlsStore.alwaysShowFloatingButton]).
         if (fabVisible(nowMs)) drawFab(canvas, fabAlpha(nowMs))
-        keyboard?.draw(canvas, keyboardArea(), sizes.dp(1f)) { c, icon, cx, cy, size, color ->
+        keyboard?.draw(canvas, keyboardArea(), sizes.dp(1f), nowMs) { c, icon, cx, cy, size, color ->
             drawIcon(c, icon, cx, cy, size, color)
         }
     }

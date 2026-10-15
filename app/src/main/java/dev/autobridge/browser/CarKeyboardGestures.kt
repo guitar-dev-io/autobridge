@@ -51,3 +51,61 @@ internal object CarKeyboardGestures {
         return abs(factor - 1f) >= DOUBLE_TAP_MIN_DELTA
     }
 }
+
+/**
+ * Makes one physical double tap type at most two characters, whichever way the host reports it.
+ *
+ * The host's double tap is normally a lone `onScale`, replayed as two taps. If a host also sends an
+ * `onClick` for the first tap just before that `onScale`, or for the second tap just after it,
+ * replaying two would type the key three times. So an `onScale` double tap that follows an
+ * unpaired `onClick` on the same spot within [PAIR_MS] types once (the click was tap one), and an
+ * `onClick` on the same spot within [ECHO_MS] after a double tap types nothing (it was tap two).
+ * "Same spot" is within [slop] on both axes; the renderer passes a key height.
+ */
+internal class CarKeyboardTapFilter {
+    private var hasClick = false
+    private var clickMs = 0L
+    private var clickX = 0f
+    private var clickY = 0f
+
+    private var hasDouble = false
+    private var doubleMs = 0L
+    private var doubleX = 0f
+    private var doubleY = 0f
+
+    /** Taps an `onClick` at (x, y) types: 0 when it is the host echoing a double tap, else 1. */
+    fun onClick(nowMs: Long, x: Float, y: Float, slop: Float): Int {
+        if (hasDouble && nowMs - doubleMs in 0..ECHO_MS && near(x, y, doubleX, doubleY, slop)) {
+            hasDouble = false
+            return 0
+        }
+        hasDouble = false
+        hasClick = true
+        clickMs = nowMs
+        clickX = x
+        clickY = y
+        return 1
+    }
+
+    /** Taps an `onScale` double tap at (x, y) types: 1 when its first tap already came as a click, else 2. */
+    fun onDoubleTap(nowMs: Long, x: Float, y: Float, slop: Float): Int {
+        val firstTyped = hasClick && nowMs - clickMs in 0..PAIR_MS && near(x, y, clickX, clickY, slop)
+        hasClick = false
+        hasDouble = true
+        doubleMs = nowMs
+        doubleX = x
+        doubleY = y
+        return if (firstTyped) 1 else 2
+    }
+
+    private fun near(x: Float, y: Float, ox: Float, oy: Float, slop: Float): Boolean =
+        abs(x - ox) <= slop && abs(y - oy) <= slop
+
+    companion object {
+        /** Longest gap between a click and the `onScale` of the same double tap (host timeout ~300 ms). */
+        const val PAIR_MS = 400L
+
+        /** Longest gap between a double tap and a click the host sends for its second tap. */
+        const val ECHO_MS = 120L
+    }
+}

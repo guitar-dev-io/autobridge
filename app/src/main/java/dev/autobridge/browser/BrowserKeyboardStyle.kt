@@ -40,6 +40,13 @@ object BrowserKeyboardStyle {
         else -> FUNCTION_CAP to INK
     }
 
+    /** A key cap while it is drawn pressed: a step lighter than any resting cap. */
+    const val PRESSED_CAP = 0xFF55657F.toInt()
+    const val GO_PRESSED_CAP = 0xFF5C9DFF.toInt()
+
+    /** The cap for [key] on the frame drawn for the tap that hit it (the car host reports no press/release). */
+    fun pressedCap(key: BrowserKey): Int = if (key is BrowserKey.Go) GO_PRESSED_CAP else PRESSED_CAP
+
     /** Go carries a chevron, like the iOS keyboard's action key. */
     fun goLabel(word: String): String = "$word ›"
 }
