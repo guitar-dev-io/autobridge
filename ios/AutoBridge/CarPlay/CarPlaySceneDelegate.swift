@@ -18,8 +18,14 @@ import UIKit
 /// scene is simply never created and the phone app is unaffected.
 @MainActor
 @objc(CarPlaySceneDelegate)
-final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
+final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate, CPSessionConfigurationDelegate {
     private var interfaceController: CPInterfaceController?
+    /// Describes the connected CarPlay system. Its `supportsVideoPlayback` (iOS 26.4+) tells whether
+    /// this car can present video on its own screen; held for the life of a connection and read on
+    /// demand (the header warns availability can change mid-session). `Any?` so the property exists
+    /// on iOS 16 where `CPSessionConfiguration` predates the video API — created lazily under
+    /// `#available`.
+    private var sessionConfiguration: CPSessionConfiguration?
     /// The CarPlay window, when the app holds the navigation entitlement; see the web section below.
     private var carWebWindow: CPWindow?
     /// Where the last pan update left off, so each update scrolls by the change since then.
@@ -39,8 +45,12 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
     ) {
         self.interfaceController = interfaceController
         subscriptions.removeAll()
+        startSessionConfiguration()
         interfaceController.setRootTemplate(rootTemplate(), animated: true, completion: nil)
         addCloseButton()
+        if #available(iOS 27.0, *) {
+            CPNowPlayingTemplate.shared.allowsMiniPlayer = true
+        }
         VehicleReminders.carConnected()
     }
 
@@ -50,7 +60,56 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
     ) {
         self.interfaceController = nil
         subscriptions.removeAll()
+        endSessionConfiguration()
         VehicleReminders.carDisconnected()
+    }
+
+    // MARK: - CarPlay Video support (iOS 26.4+)
+
+    /// Creates the session configuration and tells `PlaybackController` whether this car can present
+    /// video, so a video track started here goes to the car's system video player. On iOS < 26.4 the
+    /// session has no video API and the flag stays false — the audio path is unchanged.
+    private func startSessionConfiguration() {
+        sessionConfiguration = CPSessionConfiguration(delegate: self)
+        stores.playback.carPlayVideoAllowed = carSupportsVideo
+    }
+
+    private func endSessionConfiguration() {
+        sessionConfiguration = nil
+        stores.playback.carPlayVideoAllowed = false
+    }
+
+    /// Whether the connected car can present video. False on iOS < 26.4 and on cars that do not
+    /// report video support. Re-read on demand rather than cached, since the system may change
+    /// availability mid-session (there is no video-changed delegate callback).
+    private var carSupportsVideo: Bool {
+        if #available(iOS 26.4, *) {
+            return sessionConfiguration?.supportsVideoPlayback ?? false
+        }
+        return false
+    }
+
+    /// The playback configuration for a playable row, set only when the car supports video (iOS
+    /// 26.4+). `.video` for video tracks asks the system to present video if available, otherwise
+    /// show now playing; `.audio` for audio tracks. Live streams pass a zero duration. When the car
+    /// has no video support this returns nil and rows behave exactly as today (audio only).
+    @available(iOS 26.4, *)
+    private func playbackConfiguration(isVideo: Bool) -> CPPlaybackConfiguration? {
+        guard carSupportsVideo else { return nil }
+        return CPPlaybackConfiguration(
+            preferredPresentation: isVideo ? .video : .audio,
+            playbackAction: .play,
+            elapsedTime: .zero,
+            duration: .zero
+        )
+    }
+
+    /// Attaches the video/audio presentation hint to a row for `track`, when the car supports video.
+    /// A no-op on iOS < 26.4 or a non-video car, so the row stays identical to today's audio row.
+    private func applyPlaybackConfiguration(to item: CPListItem, isVideo: Bool) {
+        if #available(iOS 26.4, *) {
+            item.playbackConfiguration = playbackConfiguration(isVideo: isVideo)
+        }
     }
 
     // MARK: - Root
@@ -161,6 +220,7 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
                 self?.play(tracks, index: index)
                 completion()
             }
+            applyPlaybackConfiguration(to: item, isVideo: tracks[index].isVideo)
             load(entry.logo, into: item)
             return item
         }
@@ -246,6 +306,7 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
                 self?.play(tracks, index: index)
                 completion()
             }
+            applyPlaybackConfiguration(to: item, isVideo: tracks[index].isVideo)
             load(favorite.logo, into: item)
             return item
         }
@@ -289,6 +350,7 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
                 self?.play(tracks, index: index)
                 completion()
             }
+            applyPlaybackConfiguration(to: item, isVideo: tracks[index].isVideo)
             load(entry.logo, into: item)
             return item
         }
@@ -379,6 +441,7 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
                 self?.play(tracks, index: start + offset)
                 completion()
             }
+            applyPlaybackConfiguration(to: item, isVideo: tracks[start + offset].isVideo)
             load(entry.logo, into: item)
             return item
         }
@@ -469,6 +532,9 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
     private func play(_ tracks: [PlaybackController.Track], index: Int) {
         guard tracks.indices.contains(index) else { return }
         let track = tracks[index]
+        // Re-read video support just before playing: the header says availability can change
+        // mid-session and there is no video-changed callback.
+        stores.playback.carPlayVideoAllowed = carSupportsVideo
         stores.playback.play(track, queue: tracks, index: index)
         if let origin = track.origin {
             stores.history.recordPlayback(origin)
@@ -549,6 +615,7 @@ extension CarPlaySceneDelegate: CPMapTemplateDelegate, CPSearchTemplateDelegate 
     ) {
         self.interfaceController = interfaceController
         subscriptions.removeAll()
+        startSessionConfiguration()
         let controller = CarWebViewController()
         window.rootViewController = controller
         carWebWindow = window
@@ -571,6 +638,7 @@ extension CarPlaySceneDelegate: CPMapTemplateDelegate, CPSearchTemplateDelegate 
         carWebWindow = nil
         self.interfaceController = nil
         subscriptions.removeAll()
+        endSessionConfiguration()
         VehicleReminders.carDisconnected()
     }
 

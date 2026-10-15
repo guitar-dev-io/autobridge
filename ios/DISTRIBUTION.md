@@ -75,31 +75,35 @@
 
 ## 4. CarPlay
 
-**ต้องขอสิทธิ์จาก Apple:** สิทธิ์ `com.apple.developer.carplay-audio` เป็น managed entitlement ที่ Apple ต้องอนุมัติให้ App ID นี้ก่อน
+**ต้องขอสิทธิ์จาก Apple:** สิทธิ์ `com.apple.developer.carplay-audio` และ `com.apple.developer.carplay-video` เป็น managed entitlement ที่ Apple ต้องอนุมัติให้ App ID นี้ก่อน
 
-- [ ] **ส่งคำขอ:** ที่ https://developer.apple.com/contact/carplay/ ด้วยบัญชีที่จ่ายเงินแล้ว
-- [ ] **เลือกหมวด:** Audio โดยอธิบายว่าเป็นแอปวิทยุและเสียง เพราะ CarPlay ไม่อนุญาตให้เล่นวิดีโอ ฝั่ง CarPlay ของแอปเล่นแค่เสียงอยู่แล้ว (`CarPlay/CarPlaySceneDelegate.swift`)
-- [ ] **ระยะเวลา:** ไม่แน่นอน ตั้งแต่ไม่กี่วันถึงหลายสัปดาห์
-- [ ] **เมื่อได้รับอนุมัติ:** ใส่ key กลับใน `AutoBridge/Resources/AutoBridge.entitlements` ตามคอมเมนต์ในไฟล์ แล้วสร้าง provisioning profile ใหม่
+- [x] **ส่งคำขอ:** ที่ https://developer.apple.com/contact/carplay/ ด้วยบัญชีที่จ่ายเงินแล้ว
+- [x] **ได้รับอนุมัติแล้ว:** Apple อนุมัติ **ทั้ง** `com.apple.developer.carplay-audio` และ `com.apple.developer.carplay-video` ให้ App ID `dev.autobridge` (team `V9Q6ZN9L53`) แล้ว
+- [x] **ใส่ key กลับในไฟล์ entitlements:** ประกาศทั้งสอง key ใน `AutoBridge/Resources/AutoBridge.entitlements` (เครื่องจริง) และ `AutoBridge/Resources/AutoBridge-Simulator.entitlements` (Simulator) ประกาศทั้งเสียงและวิดีโอเพื่อให้แอปขึ้นหน้า CarPlay home เสมอ (แอปที่มีแต่วิดีโอจะขึ้นเฉพาะรถที่รองรับวิดีโอ)
+- [x] **Provisioning profile:** build เครื่องจริงด้วย `-allowProvisioningUpdates` ให้ดึง profile ที่มีทั้งสอง entitlement มาเอง (ยืนยันแล้วว่า profile ที่สร้างใหม่มี carplay-audio และ carplay-video ครบ)
 
-**ระหว่างรอ:**
-- ทดสอบบน CarPlay Simulator ใน Xcode ได้ (I/O → External Displays → CarPlay)
-- ใช้กับจอ CarPlay จริงหรือรถจริงไม่ได้ จนกว่าจะได้สิทธิ์
-- ตัวแอปบนมือถือทำงานได้ปกติโดยไม่มีสิทธิ์นี้
+**ทดสอบ:**
+- ทดสอบ CarPlay Simulator ใน Xcode ได้ (I/O → External Displays → CarPlay) — ใช้ตั้งค่ารถที่รองรับวิดีโอเพื่อเห็น path วิดีโอทำงาน
+- เครื่องทดสอบ iPhone 8 Plus เป็น iOS 16.7 จึงไม่รัน path วิดีโอ (API เป็น iOS 26.4+) ตัว path เสียงเดิมยังทำงานเหมือนเดิมบน iOS 16
 
-**ดูวิดีโอบน CarPlay ขณะรถวิ่ง:** บน Android เรามีสวิตช์ที่ปิดไว้เป็นค่าเริ่มต้น และผู้ใช้เปิดเองได้ แต่บน iOS ทำแบบเดียวกันไม่ได้:
-- **ไม่มี API:** CarPlay ให้แอปบุคคลที่สามใช้แค่ template จึงไม่มีพื้นที่ให้แอปวาดวิดีโอเอง
-- **ระบบล็อกตอนรถวิ่ง:** การเล่นวิดีโอใน iOS 26.4 เล่นได้ตอนจอดเท่านั้น iOS หยุดให้เอง แอปไม่มีทางเปลี่ยน
-- **ที่เห็นคนดูได้ตอนรถวิ่ง:** มักมาจาก 3 ทาง ซึ่งไม่ได้ทำผ่านแอปใน App Store เลย
+**ดูวิดีโอบน CarPlay (ทำแล้ว, modeled on APTV):** iOS 26.4 เปิดให้แอปบุคคลที่สามเล่นวิดีโอบนจอ CarPlay ได้ผ่าน CarPlay framework แอปจึงรองรับแล้ว:
+- **ผ่าน template เท่านั้น:** CarPlay ให้แอปใช้ list/thumbnail/details แล้ว **ระบบ** เป็นคนเล่นวิดีโอผ่านกลไกแบบ AirPlay video ไม่ใช่แอปวาดวิดีโอเอง และไม่ใช่เบราว์เซอร์บนจอรถ
+- **เช็กการรองรับก่อน:** อ่าน `CPSessionConfiguration.supportsVideoPlayback` ว่ารถรองรับ "video in car" ไหม ถ้ารองรับจึงตั้ง `CPPlaybackConfiguration(preferredPresentation: .video)` ให้แถวที่เป็น TV/วิดีโอ ถ้าไม่รองรับ item จะเล่นเป็นเสียงอย่างเดียว (ดู `CarPlay/CarPlaySceneDelegate.swift`)
+- **ระบบล็อกตอนรถวิ่ง:** วิดีโอเล่นได้ตอนจอดเท่านั้น iOS หยุดให้เองเมื่อรถเริ่มวิ่ง แอปไม่ต้องทำอะไรเพิ่ม
+- **gate ด้วย `@available`/`#available`:** API ใหม่ทั้งหมด (iOS 26.4+/27) ถูก gate ไว้ บน iOS 16 ไม่มีโค้ดใหม่รัน path เสียงเดิมเหมือนเดิมทุกประการ
+- **รถรุ่นเก่าส่วนใหญ่ไม่รองรับ:** รถต้องรองรับ "CarPlay with AirPlay video" จึงจะเห็นวิดีโอ ถ้าไม่รองรับแอปยังขึ้นหน้า CarPlay และเล่นเสียงได้ (เพราะประกาศทั้งสอง entitlement)
+- **ที่เห็นคนดูได้ตอนรถวิ่ง:** ยังมาจาก 3 ทางเดิม ซึ่งไม่ได้ทำผ่านแอปใน App Store เลย
   - กล่อง CarPlay AI ที่ข้างในเป็น Android เช่น Ottocast หรือ Carlinkit
   - เครื่องที่ jailbreak แล้วลง tweak เช่น CarBridge
   - จอหลังตลาดที่เปิด AirPlay mirroring ได้
+
+**หมายเหตุเรื่อง App Review ของ video browsing:** path วิดีโอบน CarPlay แสดงเฉพาะ source ที่ผู้ใช้เพิ่ม/จำไว้เอง (จุดยืนเดียวกับ IPTV เดิม — ดูหัวข้อ 3/5) ไม่ได้เพิ่มเนื้อหาติดมากับแอป จึงไม่ต้อง gate ด้วย `BuildFlavor.isStore` เพิ่ม การตัดเนื้อหาใน store build เดิม (รายการ TV, YouTube ad-skip) ยังควบคุมว่ามีเนื้อหาอะไรอยู่ ส่วนจอ CarPlay แค่สะท้อนเนื้อหาที่ build นั้นอนุญาตอยู่แล้ว
 
 **หน้าเว็บบนจอรถ:**
 - **จอ AirPlay (ใช้ได้กับเครื่องจริง):** เปิด "หน้าเว็บบนจอรถ (AirPlay)" ในตั้งค่า แล้วต่อจอใหม่ จอรถที่รับ AirPlay (จอหลังตลาด หรือกล่อง CarPlay AI) จะได้เบราว์เซอร์ของตัวเองแทนการสะท้อนจอมือถือ ส่งหน้าเว็บจากเบราว์เซอร์บนมือถือด้วยแถบปุ่มรูปรถ ไม่ต้องขอสิทธิ์เพิ่ม
 - **จอ CarPlay (เฉพาะ Simulator):** หน้าเว็บจริงบนจอ CarPlay ต้องใช้สิทธิ์ `com.apple.developer.carplay-maps` ซึ่ง Apple ให้เฉพาะแอปนำทาง จึงใส่ไว้แค่ใน `AutoBridge-Simulator.entitlements` ใน Simulator แอปจะทำงานเป็นแอปนำทาง: หน้าแรกเป็นหน้าเว็บ ลากเพื่อเลื่อน ปุ่มขึ้น/ลง/ย้อน/โหลดใหม่ ปุ่มแว่นขยายพิมพ์ที่อยู่ ปุ่มตารางเปิดหน้า Home เสียงเดิม บนเครื่องจริงไม่มีสิทธิ์นี้ แอปจึงเป็นแอปเสียงเหมือนเดิม
 
-**สิ่งที่ยังไม่เคยทดสอบบน CarPlay:** ปุ่มปิดในหน้า Now Playing จาก PR #25
+**สิ่งที่ยังไม่เคยทดสอบบนรถจริง:** ปุ่มปิดในหน้า Now Playing จาก PR #25 และ path วิดีโอใหม่ (CarPlay Video) — path วิดีโอยืนยันผ่าน CarPlay Simulator ที่ตั้งค่ารถรองรับวิดีโอ และผ่าน build-time entitlement check เท่านั้น ยังไม่ได้ทดสอบบนรถจริงที่รองรับ AirPlay video (เครื่องทดสอบ iPhone 8 Plus เป็น iOS 16.7 รัน path นี้ไม่ได้)
 
 ## 5. เทียบกับ APTV (https://aptv.app/)
 
@@ -113,12 +117,13 @@ APTV เป็นเครื่องเล่น M3U บน App Store ตา�
 - **ได้วิดีโอบน CarPlay ก่อนแอปอื่น:** iOS 26.4 เพิ่มการเล่นวิดีโอบน CarPlay ตอนจอดรถ ผ่านกลไกแบบ AirPlay video
 - **ครบทุกอุปกรณ์ Apple:** iPhone, iPad, Apple TV, Mac, Vision Pro และ sync การตั้งค่าผ่าน iCloud
 
-**เงื่อนไขของวิดีโอบน CarPlay (ตามข่าว ยังไม่ได้ยืนยันจากเอกสาร Apple):**
-- เล่นได้เฉพาะตอนรถจอด และหยุดเองเมื่อรถเริ่มวิ่ง
-- รถต้องรองรับ "CarPlay with AirPlay video" ด้วย รถรุ่นเก่าส่วนใหญ่ไม่รองรับ
-- ยังไม่พบชื่อ entitlement สำหรับแอปบุคคลที่สามโดยเฉพาะ ต้องเช็กจาก Apple Developer documentation ก่อนทำ
+**เงื่อนไขของวิดีโอบน CarPlay (ยืนยันจาก CarPlay framework headers ของ iOS 27 SDK แล้ว):**
+- เล่นได้เฉพาะตอนรถจอด และหยุดเองเมื่อรถเริ่มวิ่ง — ระบบจัดการเอง
+- รถต้องรองรับ "video in car" ด้วย เช็กผ่าน `CPSessionConfiguration.supportsVideoPlayback` (iOS 26.4+) รถรุ่นเก่าส่วนใหญ่ไม่รองรับ
+- entitlement คือ `com.apple.developer.carplay-video` (managed) ซึ่ง Apple อนุมัติให้ `dev.autobridge` แล้ว
 
-**ถ้าจะทำแบบเดียวกัน (ยังไม่ได้ทำ):**
-1. ทำตามหัวข้อ 3 ก่อน: ตัดรายการ TV สาธารณะและการข้ามโฆษณา YouTube ออก
-2. ศึกษา API วิดีโอบน CarPlay ของ iOS 26.4
-3. ทดสอบกับรถหรือจอที่รองรับ AirPlay video
+**ทำแบบเดียวกับ APTV แล้ว (IMPLEMENTED):**
+1. ✅ หัวข้อ 3 ทำแล้ว: build Release ตัดรายการ TV สาธารณะและการข้ามโฆษณา YouTube ออก
+2. ✅ ใช้ API วิดีโอบน CarPlay ของ iOS 26.4: `CPSessionConfiguration` (เช็ก `supportsVideoPlayback`), `CPPlaybackConfiguration` (`preferredPresentation = .video/.audio`), `CPListItem.playbackConfiguration` และ `CPNowPlayingTemplate.allowsMiniPlayer` (iOS 27) ทุกตัว gate ด้วย `#available` บน iOS 16 ไม่มีผล
+3. ✅ browsing วิดีโอผ่าน CarPlay template แล้ว **ระบบ** เล่นวิดีโอผ่านกลไกแบบ AirPlay video เมื่อรถรองรับและจอดอยู่ ไม่รองรับก็เล่นเสียงอย่างเดียว
+4. ⏳ ยืนยันผ่าน CarPlay Simulator (รถรองรับวิดีโอ) + build-time entitlement check แล้ว ยังไม่ได้ทดสอบบนรถจริงที่รองรับ AirPlay video (iPhone 8 Plus iOS 16.7 รันไม่ได้)
