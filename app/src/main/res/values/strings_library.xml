@@ -180,4 +180,15 @@
     <string name="radio_status_connecting">Connecting…</string>
     <string name="radio_status_playing">Playing</string>
     <string name="radio_status_paused">Paused</string>
+    <!-- Car (Android Auto) radio screens: presets grid, now playing and the FM-unavailable state. -->
+    <string name="car_radio_now_playing_title">Radio</string>
+    <string name="car_radio_presets">Presets</string>
+    <string name="car_radio_preset_empty">Empty</string>
+    <string name="car_radio_preset_recalled">Preset %1$d</string>
+    <string name="car_radio_preset_saved">Saved to preset %1$d</string>
+    <string name="car_radio_preset_nothing_to_save">Play a station first, then save it to a preset.</string>
+    <string name="car_radio_preset_empty_hint">Nothing to recall. Save the station playing now from the phone or play one here first.</string>
+    <string name="car_radio_fm_title">FM radio</string>
+    <string name="car_radio_source_fm">FM radio</string>
+    <string name="car_radio_nothing_playing">No station playing</string>
 </resources>

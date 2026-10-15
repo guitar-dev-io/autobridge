@@ -66,6 +66,10 @@ class CarIptvSourcesScreen(
     private val mediaPlayback = MediaPlaybackClient(carContext)
     private val logos = CarChannelLogos(carContext) { repaint() }
 
+    /** Radio presets, re-read on start and before every template so a phone save shows up here. */
+    private var radioPresets: List<dev.autobridge.radio.RadioStation?> =
+        List(dev.autobridge.iptv.RadioPresetsStore.SLOT_COUNT) { null }
+
     init {
         mediaPlayback.connect(onConnected = { invalidate() }, onError = { invalidate() })
         lifecycle.addObserver(object : DefaultLifecycleObserver {
@@ -73,6 +77,12 @@ class CarIptvSourcesScreen(
             // checked as soon as TV / Radio opens, quietly, so a dead one has already dropped off
             // the quick rows by the time a finger reaches them.
             override fun onStart(owner: LifecycleOwner) {
+                // Radio presets are re-read here (and again in onGetTemplate), guarded by repaint(),
+                // the same way favourites/recents are refreshed — a preset saved on the phone shows
+                // on the car without a sync step. TV has no presets, so this is radio-only.
+                if (kind == IptvKind.RADIO) {
+                    radioPresets = dev.autobridge.iptv.RadioPresetsStore.presets(carContext)
+                }
                 val urls = (IptvHistoryStore.favorites(carContext, kind) + IptvHistoryStore.recent(carContext, kind))
                     .filter { it.playback == IptvPlayback.STREAM }
                     .map { it.url }
@@ -118,6 +128,34 @@ class CarIptvSourcesScreen(
         }
     }
 
+    /**
+     * Radio-only landing rows: the six presets as a browsable [GridTemplate] (showing how many are
+     * filled), and the honest FM state. Nothing is added for TV. The row count stays tiny, so the
+     * full station list below still fits the host's list limit.
+     */
+    private fun addRadioQuickEntries(list: ItemList.Builder) {
+        if (kind != IptvKind.RADIO) return
+        val filled = radioPresets.count { it != null }
+        list.addItem(
+            Row.Builder()
+                .setTitle(carContext.getString(R.string.car_radio_presets))
+                .addText(
+                    carContext.resources.getQuantityString(R.plurals.car_iptv_items, filled, filled)
+                )
+                .setBrowsable(true)
+                .setOnClickListener { screenManager.push(CarRadioPresetsScreen(carContext)) }
+                .build()
+        )
+        list.addItem(
+            Row.Builder()
+                .setTitle(carContext.getString(R.string.car_radio_source_fm))
+                .addText(carContext.getString(R.string.radio_fm_unavailable))
+                .setBrowsable(true)
+                .setOnClickListener { screenManager.push(CarRadioFmUnavailableScreen(carContext)) }
+                .build()
+        )
+    }
+
     override fun onGetTemplate(): Template {
         val sources = IptvSourceStore.list(carContext, kind)
         if (sources.isEmpty()) {
@@ -144,7 +182,12 @@ class CarIptvSourcesScreen(
         }
 
         logos.beginTemplate()
+        // Re-read presets before building, guarded by the started state like the quick-row refresh.
+        if (kind == IptvKind.RADIO && lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+            radioPresets = dev.autobridge.iptv.RadioPresetsStore.presets(carContext)
+        }
         val list = ItemList.Builder()
+        addRadioQuickEntries(list)
         addQuickRows(list)
         val recent = IptvHistoryStore.recent(carContext, kind)
         if (recent.isNotEmpty()) {
@@ -729,7 +772,9 @@ internal object CarIptvPlayback {
                     queue.channels.map { it.url }, queue.startIndex, queue.channels.map { it.title }
                 )
             }
-            screens.push(CarNowPlayingScreen(carContext))
+            // Radio now playing is the surface-drawn large station display; a host below Car API 5
+            // (no surface taps) is sent on to the template CarNowPlayingScreen by that screen itself.
+            screens.push(CarRadioNowPlayingScreen(carContext))
         } else {
             CarVideoLauncher.open(screens, carContext, url, title, queue)
         }

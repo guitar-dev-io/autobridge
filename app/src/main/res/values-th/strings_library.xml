@@ -175,4 +175,15 @@
     <string name="radio_status_connecting">กำลังเชื่อมต่อ…</string>
     <string name="radio_status_playing">กำลังเล่น</string>
     <string name="radio_status_paused">หยุดชั่วคราว</string>
+    <!-- Car (Android Auto) radio screens -->
+    <string name="car_radio_now_playing_title">วิทยุ</string>
+    <string name="car_radio_presets">พรีเซ็ต</string>
+    <string name="car_radio_preset_empty">ว่าง</string>
+    <string name="car_radio_preset_recalled">พรีเซ็ต %1$d</string>
+    <string name="car_radio_preset_saved">บันทึกไปยังพรีเซ็ต %1$d แล้ว</string>
+    <string name="car_radio_preset_nothing_to_save">เล่นสถานีก่อน แล้วจึงบันทึกเป็นพรีเซ็ต</string>
+    <string name="car_radio_preset_empty_hint">ยังไม่มีให้เรียก บันทึกสถานีที่กำลังเล่นจากโทรศัพท์ หรือเล่นสถานีที่นี่ก่อน</string>
+    <string name="car_radio_fm_title">วิทยุ FM</string>
+    <string name="car_radio_source_fm">วิทยุ FM</string>
+    <string name="car_radio_nothing_playing">ไม่มีสถานีที่กำลังเล่น</string>
 </resources>
