@@ -8,6 +8,8 @@ import android.content.Intent
 import android.graphics.Typeface
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -42,6 +44,8 @@ import dev.autobridge.iptv.IptvSourceStore
 import dev.autobridge.iptv.IptvSourceType
 import dev.autobridge.iptv.StreamPing
 import dev.autobridge.iptv.XtreamCredentials
+import dev.autobridge.iptv.RadioBrowserSearch
+import dev.autobridge.iptv.RadioStationMatcher
 import dev.autobridge.media.MediaPlaybackClient
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.dp
@@ -109,6 +113,10 @@ class LibraryActivity : Activity() {
         /** Entries a global category-page search matches, across the whole source. */
         private const val MAX_SEARCH_MATCHES = 120
 
+        /** Radio: the online station search waits for this pause in typing and this many characters. */
+        private const val RADIO_ONLINE_DEBOUNCE_MS = 600L
+        private const val RADIO_ONLINE_MIN_CHARS = 2
+
         fun intent(context: android.content.Context, section: Section): Intent =
             Intent(context, LibraryActivity::class.java).putExtra(EXTRA_SECTION, section.name)
     }
@@ -135,6 +143,8 @@ class LibraryActivity : Activity() {
 
     /** Rendered pages, most recent last. Back pops one; popping the root finishes the Activity. */
     private val stack = ArrayDeque<() -> Unit>()
+    /** Debounces the radio page's online station search while the user is still typing. */
+    private val radioSearchHandler = Handler(Looper.getMainLooper())
 
     /** Undoes [SystemBack.register]; see that object for why Back needs registering at all. */
     private var releaseBack: () -> Unit = {}
@@ -208,6 +218,7 @@ class LibraryActivity : Activity() {
     override fun onDestroy() {
         super.onDestroy()
         releaseBack()
+        radioSearchHandler.removeCallbacksAndMessages(null)
         miniPlayer?.stop()
         playback.disconnect()
     }
@@ -401,7 +412,33 @@ class LibraryActivity : Activity() {
     private fun showLibraryCategories(source: IptvSource, allSources: List<IptvSource>, data: IptvCatalogData) {
         var query = ""
         var sortAscending = true
+        // Radio only: the radio-browser answer for [onlineKey], kept outside draw() like the query.
+        val radio = iptvKind == IptvKind.RADIO
+        var onlineKey = ""
+        var onlineEntries: List<IptvEntry> = emptyList()
+        var onlineSearching = false
+        var onlineError: String? = null
         lateinit var draw: () -> Unit
+        // Searches online for what the field says now; an answer for an older query, or one that
+        // lands after the user left this page, does not redraw it.
+        val startOnline: () -> Unit = start@{
+            if (stack.lastOrNull() !== draw) return@start
+            val key = RadioStationMatcher.apiQuery(query)
+            if (key.isBlank()) return@start
+            onlineKey = key
+            onlineEntries = emptyList()
+            onlineSearching = true
+            onlineError = null
+            RadioBrowserSearch.search(query) { result ->
+                if (RadioStationMatcher.apiQuery(result.query) != RadioStationMatcher.apiQuery(query)) return@search
+                onlineSearching = false
+                when (result) {
+                    is RadioBrowserSearch.Result.Ready -> onlineEntries = result.entries
+                    is RadioBrowserSearch.Result.Failed -> onlineError = result.message
+                }
+                if (stack.lastOrNull() === draw) draw()
+            }
+        }
         draw = {
             val q = query.trim()
             val rows = mutableListOf<View>()
@@ -451,17 +488,46 @@ class LibraryActivity : Activity() {
                     }
                 }
             } else {
-                val matchingEntries = data.entries
-                    .filter { it.title.contains(q, ignoreCase = true) }
-                    .take(MAX_SEARCH_MATCHES)
-                val matchingCategories = data.categories.filter { it.name.contains(q, ignoreCase = true) }
+                val matchingEntries = if (radio) {
+                    RadioStationMatcher.rank(data.entries.filter { !it.isSeriesFolder }, q) { it.title }
+                        .take(MAX_SEARCH_MATCHES)
+                } else {
+                    data.entries
+                        .filter { it.title.contains(q, ignoreCase = true) }
+                        .take(MAX_SEARCH_MATCHES)
+                }
+                val matchingCategories = data.categories.filter {
+                    if (radio) RadioStationMatcher.matches(it.name, q) else it.name.contains(q, ignoreCase = true)
+                }
                 // Channels whose programme on now matches: "football" finds the match being shown,
                 // not just channels named after it. Only guides already loaded are searched.
                 val onNow = IptvGuide.onNowMatching(source, data.entries, q, MAX_SEARCH_MATCHES)
                     .filterNot { it in matchingEntries }
                 if (matchingEntries.isNotEmpty()) {
-                    rows += AutoBridgeDesign.sectionLabel(this, getString(R.string.car_favorites_channels))
+                    val label = if (radio) R.string.radio_search_my_stations else R.string.car_favorites_channels
+                    rows += AutoBridgeDesign.sectionLabel(this, getString(label))
                     rows += matchingEntries.map { entryRow(source, it, matchingEntries) }
+                }
+                if (radio) {
+                    val key = RadioStationMatcher.apiQuery(q)
+                    val localUrls = matchingEntries.map { it.url }.toSet()
+                    // The API's name search did the words; a frequency still needs judging.
+                    val checkNumbers = RadioStationMatcher.hasNumber(q)
+                    val online = if (onlineKey != key) emptyList() else onlineEntries
+                        .filter { it.url !in localUrls }
+                        .filter { !checkNumbers || RadioStationMatcher.matches(it.title, q) }
+                    // A query waiting out the typing pause reads as searching, not as nothing found.
+                    val pending = key.length >= RADIO_ONLINE_MIN_CHARS && onlineKey != key
+                    val status = when {
+                        onlineKey == key && onlineSearching || pending -> getString(R.string.radio_search_searching)
+                        onlineKey == key && onlineError != null -> getString(R.string.radio_search_failed, onlineError)
+                        else -> null
+                    }
+                    if (online.isNotEmpty() || status != null) {
+                        rows += AutoBridgeDesign.sectionLabel(this, getString(R.string.radio_search_online))
+                        rows += online.map { entryRow(RadioBrowserSearch.SOURCE, it, online) }
+                        status?.let { rows += AutoBridgeDesign.sectionLabel(this, it) }
+                    }
                 }
                 if (onNow.isNotEmpty()) {
                     rows += AutoBridgeDesign.sectionLabel(this, getString(R.string.guide_on_now))
@@ -487,7 +553,18 @@ class LibraryActivity : Activity() {
                     )
                 },
                 headerActions = listOf(AutoBridgeDesign.HeaderAction("+", onClick = { addSourceChooser() })),
-                search = query to { value -> query = value; draw() },
+                search = query to { value ->
+                    query = value
+                    if (radio) {
+                        radioSearchHandler.removeCallbacksAndMessages(null)
+                        if (RadioStationMatcher.apiQuery(value).length >= RADIO_ONLINE_MIN_CHARS &&
+                            RadioStationMatcher.apiQuery(value) != onlineKey
+                        ) {
+                            radioSearchHandler.postDelayed({ startOnline() }, RADIO_ONLINE_DEBOUNCE_MS)
+                        }
+                    }
+                    draw()
+                },
                 extraPinned = listOf(chipsRow(), sourceCard(source, allSources)),
                 overlay = overlay
             )
@@ -813,7 +890,8 @@ class LibraryActivity : Activity() {
         lateinit var draw: () -> Unit
         draw = {
             val filtered = if (query.isBlank()) all else {
-                all.filter { it.title.contains(query, ignoreCase = true) }
+                if (iptvKind == IptvKind.RADIO) all.filter { RadioStationMatcher.matches(it.title, query) }
+                else all.filter { it.title.contains(query, ignoreCase = true) }
             }
             // A channel is known to be offline from this session's check or, failing that, from
             // the last attempt remembered across restarts; both count, and both hide.

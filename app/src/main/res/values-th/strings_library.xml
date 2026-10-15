@@ -151,4 +151,11 @@
     <string name="car_iptv_search">ค้นหาช่อง</string>
     <string name="car_iptv_search_hint">ชื่อช่องหรือรายการ</string>
     <string name="car_iptv_search_prompt">พิมพ์ชื่อช่อง หรือสิ่งที่อยากดู</string>
+    <string name="radio_search">ค้นหาสถานี</string>
+    <string name="radio_search_hint">ชื่อสถานีหรือคลื่น (เช่น 95.5)</string>
+    <string name="radio_search_prompt">พิมพ์ชื่อสถานีหรือคลื่น เช่น FM 95.5</string>
+    <string name="radio_search_online">ออนไลน์ · radio-browser</string>
+    <string name="radio_search_my_stations">สถานีของฉัน</string>
+    <string name="radio_search_searching">กำลังค้นหาออนไลน์…</string>
+    <string name="radio_search_failed">ค้นหาออนไลน์ไม่สำเร็จ: %1$s</string>
 </resources>

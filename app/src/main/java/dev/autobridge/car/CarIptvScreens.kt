@@ -130,6 +130,16 @@ class CarIptvSourcesScreen(
                         .setOnClickListener { openOnPhone() }
                         .build()
                 )
+                .apply {
+                    // The online search needs no source, so a driver with none can still find a station.
+                    if (kind == IptvKind.RADIO) {
+                        addAction(
+                            Action.Builder().setTitle(carContext.getString(R.string.radio_search))
+                                .setOnClickListener { screenManager.push(CarRadioSearchScreen(carContext)) }
+                                .build()
+                        )
+                    }
+                }
                 .build()
         }
 
@@ -175,7 +185,23 @@ class CarIptvSourcesScreen(
         }
 
         return ListTemplate.Builder()
-            .setHeader(Header.Builder().setTitle(title).setStartHeaderAction(Action.BACK).build())
+            .setHeader(
+                Header.Builder()
+                    .setTitle(title)
+                    .setStartHeaderAction(Action.BACK)
+                    .apply {
+                        // Radio search covers every source and radio-browser, so it sits on the landing page.
+                        if (kind == IptvKind.RADIO) {
+                            addEndHeaderAction(
+                                Action.Builder()
+                                    .setIcon(CarIcons.of(carContext, CarIcons.SEARCH))
+                                    .setOnClickListener { screenManager.push(CarRadioSearchScreen(carContext)) }
+                                    .build()
+                            )
+                        }
+                    }
+                    .build()
+            )
             .setSingleList(list.build())
             .build()
     }
@@ -267,7 +293,12 @@ class CarIptvCategoriesScreen(
                     .addEndHeaderAction(
                         Action.Builder()
                             .setIcon(CarIcons.of(carContext, CarIcons.SEARCH))
-                            .setOnClickListener { screenManager.push(CarIptvSearchScreen(carContext, source, data)) }
+                            .setOnClickListener {
+                                screenManager.push(
+                                    if (source.kind == IptvKind.RADIO) CarRadioSearchScreen(carContext)
+                                    else CarIptvSearchScreen(carContext, source, data)
+                                )
+                            }
                             .build()
                     )
                     .build()
