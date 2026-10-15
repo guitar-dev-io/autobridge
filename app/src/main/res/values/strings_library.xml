@@ -167,28 +167,15 @@
     <string name="radio_offline_unavailable">No offline audio configured.</string>
     <string name="radio_source_internet">Internet Radio</string>
     <string name="radio_source_fm">FM</string>
-    <string name="radio_presets">Presets</string>
-    <string name="radio_preset_slot">Preset %1$d</string>
-    <string name="radio_preset_saved">Saved to preset %1$d</string>
-    <string name="radio_preset_nothing_to_save">Nothing playing to save</string>
     <string name="radio_recently_played">Recently played</string>
     <string name="radio_view_all">View all</string>
     <string name="radio_nothing_playing">Nothing playing</string>
     <string name="radio_play">Play</string>
     <string name="radio_pause">Pause</string>
-    <string name="radio_dial_hint">Swipe to change station</string>
     <string name="radio_status_connecting">Connecting…</string>
     <string name="radio_status_playing">Playing</string>
     <string name="radio_status_paused">Paused</string>
-    <!-- Car (Android Auto) radio screens: presets grid, now playing and the FM-unavailable state. -->
+    <!-- Car (Android Auto) radio screens: now playing. -->
     <string name="car_radio_now_playing_title">Radio</string>
-    <string name="car_radio_presets">Presets</string>
-    <string name="car_radio_preset_empty">Empty</string>
-    <string name="car_radio_preset_recalled">Preset %1$d</string>
-    <string name="car_radio_preset_saved">Saved to preset %1$d</string>
-    <string name="car_radio_preset_nothing_to_save">Play a station first, then save it to a preset.</string>
-    <string name="car_radio_preset_empty_hint">Nothing to recall. Save the station playing now from the phone or play one here first.</string>
-    <string name="car_radio_fm_title">FM radio</string>
-    <string name="car_radio_source_fm">FM radio</string>
     <string name="car_radio_nothing_playing">No station playing</string>
 </resources>

@@ -14,7 +14,6 @@ import dev.autobridge.iptv.IptvPlayback
 import dev.autobridge.iptv.IptvSource
 import dev.autobridge.iptv.IptvSourceType
 import dev.autobridge.iptv.RadioPreferencesRepository
-import dev.autobridge.iptv.RadioPresetsStore
 import dev.autobridge.media.MediaPlaybackClient
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -35,7 +34,6 @@ data class RadioUiState(
     val isPlaying: Boolean = false,
     val connection: MediaPlaybackClient.ConnectionState = MediaPlaybackClient.ConnectionState.DISCONNECTED,
     val favorites: List<RadioStation> = emptyList(),
-    val presets: List<RadioStation?> = List(RadioPresetsStore.SLOT_COUNT) { null },
     val recents: List<RadioStation> = emptyList(),
     val fmAvailable: Boolean = false,
     val fmUnavailableReason: String? = null,
@@ -49,8 +47,8 @@ data class RadioUiState(
  * It owns a single [MediaPlaybackClient] and a single [RadioPlaybackCoordinator] — no second player
  * and no second audio-focus owner. Transport properties are republished from the session's
  * [androidx.media3.common.Player.Listener] plus a 1-second tick, the same way the car dashboard
- * already follows the session. Favourites/recents come from [IptvHistoryStore] (RADIO kind) and
- * presets from [RadioPresetsStore]; nothing here changes those stores.
+ * already follows the session. Favourites/recents come from [IptvHistoryStore] (RADIO kind);
+ * nothing here changes those stores.
  */
 object RadioRepository {
 
@@ -138,7 +136,6 @@ object RadioRepository {
         val coord = coordinatorRef
         val favorites = IptvHistoryStore.favorites(ctx, IptvKind.RADIO).map { RadioHistory.toRadioStation(it) }
         val recents = IptvHistoryStore.recent(ctx, IptvKind.RADIO).map { RadioHistory.toRadioStation(it) }
-        val presets = RadioPresetsStore.presets(ctx)
         val selected = currentSelectedStation(mediaClient)
         _state.value = _state.value.copy(
             activeSource = coord?.activeSource() ?: RadioSourceType.INTERNET_RADIO,
@@ -147,7 +144,6 @@ object RadioRepository {
             isPlaying = mediaClient?.isPlaying == true,
             connection = mediaClient?.connectionState ?: MediaPlaybackClient.ConnectionState.DISCONNECTED,
             favorites = favorites,
-            presets = presets,
             recents = recents,
         )
     }

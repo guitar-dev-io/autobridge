@@ -14,7 +14,6 @@ import android.text.TextUtils
 import android.view.Surface
 import androidx.car.app.AppManager
 import androidx.car.app.CarContext
-import androidx.car.app.CarToast
 import androidx.car.app.Screen
 import androidx.car.app.SurfaceCallback
 import androidx.car.app.SurfaceContainer
@@ -26,18 +25,14 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import dev.autobridge.R
 import dev.autobridge.display.CarSurfaceCanvas
-import dev.autobridge.iptv.RadioPresetsStore
 import dev.autobridge.logging.StructuredLog
 import dev.autobridge.media.MediaPlaybackClient
 import dev.autobridge.mirror.MirrorSurfaceOwnership
-import dev.autobridge.radio.RadioSourceType
-import dev.autobridge.radio.RadioStation
 import dev.autobridge.ui.ImageLoader
 
 /**
  * The car radio Now Playing surface: the shared MediaSession's selected station drawn large, with
- * its artwork, name, source badge, a prev / play-pause / next transport and the six presets as a
- * row along the bottom.
+ * its artwork, name, source badge and a prev / play-pause / next transport.
  *
  * It reuses the existing car rendering split rather than inventing a new one. On a Car API 5+ host
  * — which is the only level that delivers surface taps — it draws on the host surface the same way
@@ -48,8 +43,7 @@ import dev.autobridge.ui.ImageLoader
  *
  * Playback is never started here: audio always flows through the one shared
  * [dev.autobridge.media.MediaPlaybackClient] / session, so rotary and steering-wheel media buttons
- * drive the very same state with no extra code. Prev/play/next only issue session commands, and a
- * preset recall replays the preset's own stream URL on the session.
+ * drive the very same state with no extra code. Prev/play/next only issue session commands.
  */
 class CarRadioNowPlayingScreen(carContext: CarContext) : Screen(carContext), SurfaceCallback {
 
@@ -67,9 +61,6 @@ class CarRadioNowPlayingScreen(carContext: CarContext) : Screen(carContext), Sur
     private var layout: CarRadioLayout? = null
     private var active = false
     private var pressed: CarRadioRegion? = null
-
-    /** The six presets, re-read on every repaint and whenever this screen comes back to the front. */
-    private var presets: List<RadioStation?> = List(RadioPresetsStore.SLOT_COUNT) { null }
 
     /** onClick reaches a SurfaceCallback from Car API 5; older hosts fall back to the template. */
     private val drawsSurface: Boolean by lazy { carContext.carAppApiLevel >= 5 }
@@ -104,7 +95,6 @@ class CarRadioNowPlayingScreen(carContext: CarContext) : Screen(carContext), Sur
                 if (!drawsSurface) return
                 active = true
                 pressed = null
-                refreshContent()
                 MirrorSurfaceOwnership.claim(this@CarRadioNowPlayingScreen)
                 appManager.setSurfaceCallback(this@CarRadioNowPlayingScreen)
                 watchSession()
@@ -140,11 +130,6 @@ class CarRadioNowPlayingScreen(carContext: CarContext) : Screen(carContext), Sur
                 }
             }
             return NavigationTemplate.Builder().setActionStrip(backOnlyStrip()).build()
-        }
-        // Re-read presets on every template request, guarded by the same repaint() rule the other
-        // radio screens use, so a preset saved on the phone shows here when the host asks to repaint.
-        if (lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) {
-            presets = RadioPresetsStore.presets(carContext)
         }
         return NavigationTemplate.Builder().setActionStrip(backOnlyStrip()).build()
     }
@@ -183,11 +168,6 @@ class CarRadioNowPlayingScreen(carContext: CarContext) : Screen(carContext), Sur
     private fun unwatchSession() {
         sessionPlayer?.removeListener(sessionListener)
         sessionPlayer = null
-    }
-
-    /** Re-reads the presets the row draws from; the layout is not sized by them, so it stays. */
-    private fun refreshContent() {
-        presets = RadioPresetsStore.presets(carContext)
     }
 
     // --- Surface callbacks --------------------------------------------------------------------
@@ -243,36 +223,7 @@ class CarRadioNowPlayingScreen(carContext: CarContext) : Screen(carContext), Sur
             CarRadioRegion.Play -> if (media.isPlaying) media.pause() else media.resume()
             CarRadioRegion.Previous -> if (media.hasPrevious) media.previous()
             CarRadioRegion.Next -> if (media.hasNext) media.next()
-            is CarRadioRegion.Preset -> recallPreset(region.slot)
         }
-    }
-
-    /** A preset tap replays its own stream on the shared session; an empty slot says how to fill it. */
-    private fun recallPreset(slot: Int) {
-        val station = presets.getOrNull(slot - 1)
-        if (station == null || station.streamUrl.isBlank()) {
-            CarToast.makeText(
-                carContext,
-                carContext.getString(R.string.car_radio_preset_empty_hint),
-                CarToast.LENGTH_LONG
-            ).show()
-            return
-        }
-        if (!media.isConnected) {
-            CarToast.makeText(
-                carContext,
-                carContext.getString(R.string.car_iptv_connecting),
-                CarToast.LENGTH_SHORT
-            ).show()
-            return
-        }
-        media.play(station.streamUrl, station.title)
-        CarToast.makeText(
-            carContext,
-            carContext.getString(R.string.car_radio_preset_recalled, slot),
-            CarToast.LENGTH_SHORT
-        ).show()
-        render()
     }
 
     // --- Drawing ------------------------------------------------------------------------------
@@ -295,7 +246,6 @@ class CarRadioNowPlayingScreen(carContext: CarContext) : Screen(carContext), Sur
                     playing = media.isPlaying,
                     hasPrevious = media.hasPrevious,
                     hasNext = media.hasNext,
-                    presets = presets,
                 ),
                 pressed,
                 thumbnails,
@@ -338,12 +288,12 @@ internal sealed interface CarRadioRegion {
     object Play : CarRadioRegion
     object Previous : CarRadioRegion
     object Next : CarRadioRegion
-    data class Preset(val slot: Int) : CarRadioRegion
 }
 
 /**
  * Where everything sits on the radio surface, computed once per surface/area change. Landscape:
- * artwork top-left, text beside it, transport under them, presets along the bottom.
+ * artwork top-left, text beside it, transport under them. Artwork and transport fill the surface,
+ * so there is no dead band at the bottom.
  */
 internal class CarRadioLayout private constructor(
     val density: Float,
@@ -355,7 +305,6 @@ internal class CarRadioLayout private constructor(
     val previous: CarRadioBox,
     val play: CarRadioBox,
     val next: CarRadioBox,
-    val presetCells: List<CarRadioBox>,
 ) {
     fun dp(v: Float) = v * density
 
@@ -363,9 +312,6 @@ internal class CarRadioLayout private constructor(
         if (inside(play, x, y)) return CarRadioRegion.Play
         if (inside(previous, x, y)) return CarRadioRegion.Previous
         if (inside(next, x, y)) return CarRadioRegion.Next
-        presetCells.forEachIndexed { index, box ->
-            if (inside(box, x, y)) return CarRadioRegion.Preset(index + 1)
-        }
         return null
     }
 
@@ -378,18 +324,9 @@ internal class CarRadioLayout private constructor(
             val margin = dp(24f)
             val content = CarRadioBox(area.left + margin, area.top + margin, area.right - margin, area.bottom - margin)
 
-            // Presets along the bottom: six equal cells with gaps.
-            val presetHeight = dp(64f).coerceAtMost(content.height * 0.22f)
-            val presetTop = content.bottom - presetHeight
-            val presetGap = dp(10f)
-            val cellWidth = (content.width - presetGap * (RadioPresetsStore.SLOT_COUNT - 1)) / RadioPresetsStore.SLOT_COUNT
-            val presetCells = (0 until RadioPresetsStore.SLOT_COUNT).map { i ->
-                val left = content.left + i * (cellWidth + presetGap)
-                CarRadioBox(left, presetTop, left + cellWidth, content.bottom)
-            }
-
-            // Transport row above the presets.
-            val controlsBottom = presetTop - dp(18f)
+            // Transport row sits near the bottom of the content box; the band that used to hold
+            // the preset row is reclaimed so artwork/transport fill the surface with no dead gap.
+            val controlsBottom = content.bottom
             val primary = dp(84f).coerceAtMost(content.height * 0.30f)
             val secondary = primary * 0.78f
             val controlGap = dp(28f)
@@ -414,7 +351,7 @@ internal class CarRadioLayout private constructor(
             val textRight = content.right
 
             return CarRadioLayout(
-                density, content, artwork, textLeft, textRight, content.top, previous, play, next, presetCells
+                density, content, artwork, textLeft, textRight, content.top, previous, play, next
             )
         }
     }
@@ -422,7 +359,7 @@ internal class CarRadioLayout private constructor(
 
 /**
  * Paints the radio Now Playing surface. Every Paint and Path is built once; the per-frame work is
- * ellipsizing two text lines and drawing the preset chips, so this stays cheap on the 1s tick.
+ * ellipsizing two text lines, so this stays cheap on the 1s tick.
  */
 internal class CarRadioNowPlayingRenderer(private val context: CarContext) {
 
@@ -438,11 +375,9 @@ internal class CarRadioNowPlayingRenderer(private val context: CarContext) {
         val playing: Boolean,
         val hasPrevious: Boolean,
         val hasNext: Boolean,
-        val presets: List<RadioStation?>,
     )
 
     private val bold = Typeface.create("sans-serif", Typeface.BOLD)
-    private val medium = Typeface.create("sans-serif-medium", Typeface.NORMAL)
     private val regular = Typeface.create("sans-serif", Typeface.NORMAL)
 
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -458,9 +393,6 @@ internal class CarRadioNowPlayingRenderer(private val context: CarContext) {
         typeface = bold
         color = HomeDashboardTheme.ACCENT_RADIO
     }
-    private val presetNumber = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { typeface = bold }
-    private val presetLabel = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { typeface = medium }
-
     private val rect = RectF()
     private val source = Rect()
     private val path = Path()
@@ -477,7 +409,6 @@ internal class CarRadioNowPlayingRenderer(private val context: CarContext) {
         drawArtwork(canvas, layout, content, thumbnails)
         drawText(canvas, layout, content)
         drawTransport(canvas, layout, content, pressed)
-        drawPresets(canvas, layout, content, pressed)
     }
 
     private fun drawArtwork(canvas: Canvas, layout: CarRadioLayout, content: Content, thumbnails: Thumbnails) {
@@ -616,33 +547,6 @@ internal class CarRadioNowPlayingRenderer(private val context: CarContext) {
                 path.reset(); path.moveTo(x(8f), y(5f)); path.lineTo(x(8f), y(19f)); path.lineTo(x(19f), y(12f)); path.close()
                 canvas.drawPath(path, fill)
             }
-        }
-    }
-
-    private fun drawPresets(canvas: Canvas, layout: CarRadioLayout, content: Content, pressed: CarRadioRegion?) {
-        val radius = layout.dp(14f)
-        layout.presetCells.forEachIndexed { index, box ->
-            val slot = index + 1
-            val station = content.presets.getOrNull(index)
-            val isPressed = (pressed as? CarRadioRegion.Preset)?.slot == slot
-            rect.set(box.left, box.top, box.right, box.bottom)
-            fill.color = if (isPressed) HomeDashboardTheme.CARD_PRESSED else HomeDashboardTheme.CARD
-            canvas.drawRoundRect(rect, radius, radius, fill)
-
-            val pad = layout.dp(8f)
-            presetNumber.textSize = layout.dp(15f)
-            // A filled slot numbers in the active blue; an empty one is muted.
-            presetNumber.color = if (station != null) HomeDashboardTheme.ACCENT_RADIO_ACTIVE
-            else HomeDashboardTheme.TEXT_DISABLED
-            canvas.drawText(slot.toString(), box.left + pad, box.top + pad + presetNumber.textSize, presetNumber)
-
-            presetLabel.textSize = layout.dp(13f)
-            presetLabel.color = if (station != null) HomeDashboardTheme.TEXT_PRIMARY else HomeDashboardTheme.TEXT_DISABLED
-            val label = station?.title ?: context.getString(R.string.car_radio_preset_empty)
-            drawEllipsized(
-                canvas, label, presetLabel, box.left + pad, box.right - pad,
-                box.bottom - pad - presetLabel.descent()
-            )
         }
     }
 
