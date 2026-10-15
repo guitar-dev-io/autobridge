@@ -26,6 +26,36 @@ internal object RadioBrowserApi {
             "&hidebroken=true&order=votes&reverse=true"
     }
 
+    /** Thailand-wide stations by country code, most-voted first. Path segment is percent-encoded. */
+    fun byCountryUrl(countryCode: String, limit: Int = 100): String {
+        val encoded = URLEncoder.encode(countryCode, "UTF-8")
+        return "$BASE/json/stations/bycountrycodeexact/$encoded?order=votes&reverse=true" +
+            "&hidebroken=true&limit=${limit.coerceIn(1, 100)}"
+    }
+
+    /**
+     * Top-voted stations worldwide. This is the path-style endpoint: it returns stations already in
+     * vote-descending order and does not accept `order`/`reverse`, so neither is sent.
+     */
+    fun topVoteUrl(limit: Int = 100): String =
+        "$BASE/json/stations/topvote/${limit.coerceIn(1, 100)}?hidebroken=true"
+
+    /** Stations in a province/[state], most-voted first; null when [state] is blank. */
+    fun byStateUrl(state: String, limit: Int = 100): String? {
+        if (state.isBlank()) return null
+        val encoded = URLEncoder.encode(state, "UTF-8")
+        return "$BASE/json/stations/bystateexact/$encoded?order=votes&reverse=true" +
+            "&hidebroken=true&limit=${limit.coerceIn(1, 100)}"
+    }
+
+    /** Stations carrying a [tag], most-voted first; null when [tag] is blank. */
+    fun byTagUrl(tag: String, limit: Int = 100): String? {
+        if (tag.isBlank()) return null
+        val encoded = URLEncoder.encode(tag, "UTF-8")
+        return "$BASE/json/stations/bytagexact/$encoded?order=votes&reverse=true" +
+            "&hidebroken=true&limit=${limit.coerceIn(1, 100)}"
+    }
+
     /** Stations in a radio-browser JSON answer; garbage or a non-array body reads as none. */
     fun parse(json: String): List<IptvEntry> {
         val array = runCatching { JSONArray(json) }.getOrNull() ?: return emptyList()
@@ -64,6 +94,15 @@ internal object RadioBrowserApi {
     /** Blocking search. Throws on a network failure or a non-2xx answer; empty for a blank query. */
     fun search(query: String, limit: Int = 50): List<IptvEntry> {
         val url = searchUrl(query, limit) ?: return emptyList()
+        return browse(url)
+    }
+
+    /**
+     * Blocking GET of a radio-browser station [url] (one of the category builders above), read into
+     * [IptvEntry]s through [parse]. Shares [search]'s request setup — timeouts, User-Agent, Accept,
+     * 2xx check and body-size guard. Throws on a network failure or a non-2xx answer. Never on main.
+     */
+    fun browse(url: String): List<IptvEntry> {
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
             connectTimeout = CONNECT_TIMEOUT_MS
             readTimeout = READ_TIMEOUT_MS

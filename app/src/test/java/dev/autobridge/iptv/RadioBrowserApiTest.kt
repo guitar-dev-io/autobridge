@@ -65,4 +65,65 @@ class RadioBrowserApiTest {
         assertTrue(RadioBrowserApi.parse("{}").isEmpty())
         assertTrue(RadioBrowserApi.parse("not json").isEmpty())
     }
+
+    @Test fun `in-country url is bycountrycodeexact with vote order and hidebroken`() {
+        val url = RadioBrowserApi.byCountryUrl("TH")
+        assertTrue(url.startsWith("https://de1.api.radio-browser.info/json/stations/bycountrycodeexact/TH?"))
+        assertTrue(url.contains("order=votes"))
+        assertTrue(url.contains("reverse=true"))
+        assertTrue(url.contains("hidebroken=true"))
+        assertTrue(url.contains("limit=100"))
+    }
+
+    @Test fun `in-country limit is clamped`() {
+        assertTrue(RadioBrowserApi.byCountryUrl("TH", limit = 500).contains("limit=100"))
+        assertTrue(RadioBrowserApi.byCountryUrl("TH", limit = 0).contains("limit=1"))
+    }
+
+    @Test fun `top vote url is path-style with hidebroken and no order or reverse`() {
+        val url = RadioBrowserApi.topVoteUrl()
+        assertTrue(url.startsWith("https://de1.api.radio-browser.info/json/stations/topvote/100?"))
+        assertTrue(url.contains("hidebroken=true"))
+        assertFalse(url.contains("order="))
+        assertFalse(url.contains("reverse="))
+    }
+
+    @Test fun `top vote limit is clamped into the path`() {
+        assertTrue(RadioBrowserApi.topVoteUrl(limit = 500).contains("/topvote/100?"))
+        assertTrue(RadioBrowserApi.topVoteUrl(limit = 0).contains("/topvote/1?"))
+    }
+
+    @Test fun `by state url is bystateexact with vote order and encodes spaces`() {
+        val url = RadioBrowserApi.byStateUrl("Chiang Mai")!!
+        assertTrue(url.startsWith("https://de1.api.radio-browser.info/json/stations/bystateexact/"))
+        assertTrue(url.contains("Chiang+Mai") || url.contains("Chiang%20Mai"))
+        assertTrue(url.contains("order=votes"))
+        assertTrue(url.contains("reverse=true"))
+        assertTrue(url.contains("hidebroken=true"))
+    }
+
+    @Test fun `by state url percent-encodes a thai state`() {
+        val url = RadioBrowserApi.byStateUrl("กรุงเทพ")!!
+        assertTrue(url.contains("/bystateexact/%E0%B8"))
+        assertFalse(url.any { it.code > 127 })
+        assertFalse(url.contains(' '))
+    }
+
+    @Test fun `blank state has no url`() {
+        assertNull(RadioBrowserApi.byStateUrl(""))
+        assertNull(RadioBrowserApi.byStateUrl("   "))
+    }
+
+    @Test fun `by tag url is bytagexact with vote order and encoding`() {
+        val url = RadioBrowserApi.byTagUrl("talk")!!
+        assertTrue(url.startsWith("https://de1.api.radio-browser.info/json/stations/bytagexact/talk?"))
+        assertTrue(url.contains("order=votes"))
+        assertTrue(url.contains("reverse=true"))
+        assertTrue(url.contains("hidebroken=true"))
+    }
+
+    @Test fun `blank tag has no url`() {
+        assertNull(RadioBrowserApi.byTagUrl(""))
+        assertNull(RadioBrowserApi.byTagUrl("   "))
+    }
 }

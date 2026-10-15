@@ -1598,6 +1598,39 @@
     <string name="library_edit_pinned">Edit</string>
     <string name="library_check_button">↻ Check</string>
 
+    <!-- Radio browse-by-category: top-level categories, browse surface, podcasts note, province picker. -->
+    <string name="radio_cat_in_country">In-country</string>
+    <string name="radio_cat_local">Local</string>
+    <string name="radio_cat_world">World</string>
+    <string name="radio_cat_podcasts">Podcasts</string>
+    <string name="radio_cat_favorites">Favorites</string>
+    <string name="radio_browse_loading">Loading…</string>
+    <string name="radio_browse_empty">No stations here yet</string>
+    <string name="radio_browse_open">Browse stations</string>
+    <string name="radio_browse_my_stations">My stations</string>
+    <string name="radio_podcasts_note">Talk &amp; news stations, not episodes</string>
+    <string name="radio_local_pick_title">Pick a province</string>
+    <string name="radio_local_pick_cta">Choose province</string>
+    <string name="car_radio_browse_categories">Browse categories</string>
+
+    <!-- Curated Thai provinces for the Local radio category. -->
+    <string name="province_bangkok">Bangkok</string>
+    <string name="province_chiang_mai">Chiang Mai</string>
+    <string name="province_chiang_rai">Chiang Rai</string>
+    <string name="province_nakhon_ratchasima">Nakhon Ratchasima</string>
+    <string name="province_khon_kaen">Khon Kaen</string>
+    <string name="province_udon_thani">Udon Thani</string>
+    <string name="province_ubon_ratchathani">Ubon Ratchathani</string>
+    <string name="province_phuket">Phuket</string>
+    <string name="province_songkhla">Songkhla</string>
+    <string name="province_surat_thani">Surat Thani</string>
+    <string name="province_chon_buri">Chon Buri</string>
+    <string name="province_rayong">Rayong</string>
+    <string name="province_nakhon_si_thammarat">Nakhon Si Thammarat</string>
+    <string name="province_phitsanulok">Phitsanulok</string>
+    <string name="province_nakhon_sawan">Nakhon Sawan</string>
+    <string name="province_lampang">Lampang</string>
+
     <!-- EV mode for the fuel log -->
     <string name="fuel_title_ev">Charging log</string>
     <string name="fuel_subtitle_ev">Charge to the same level each time</string>

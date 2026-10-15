@@ -1568,6 +1568,39 @@
     <string name="library_edit_pinned">แก้ไข</string>
     <string name="library_check_button">↻ ตรวจสอบ</string>
 
+    <!-- Radio browse-by-category: top-level categories, browse surface, podcasts note, province picker. -->
+    <string name="radio_cat_in_country">ในประเทศ</string>
+    <string name="radio_cat_local">ท้องถิ่น</string>
+    <string name="radio_cat_world">ทั่วโลก</string>
+    <string name="radio_cat_podcasts">พอดแคสต์</string>
+    <string name="radio_cat_favorites">รายการโปรด</string>
+    <string name="radio_browse_loading">กำลังโหลด…</string>
+    <string name="radio_browse_empty">ยังไม่มีสถานีในหมวดนี้</string>
+    <string name="radio_browse_open">เรียกดูสถานี</string>
+    <string name="radio_browse_my_stations">สถานีของฉัน</string>
+    <string name="radio_podcasts_note">สถานีพูดคุยและข่าว ไม่ใช่ตอนพอดแคสต์</string>
+    <string name="radio_local_pick_title">เลือกจังหวัด</string>
+    <string name="radio_local_pick_cta">เลือกจังหวัด</string>
+    <string name="car_radio_browse_categories">เรียกดูหมวดหมู่</string>
+
+    <!-- Curated Thai provinces for the Local radio category. -->
+    <string name="province_bangkok">กรุงเทพมหานคร</string>
+    <string name="province_chiang_mai">เชียงใหม่</string>
+    <string name="province_chiang_rai">เชียงราย</string>
+    <string name="province_nakhon_ratchasima">นครราชสีมา</string>
+    <string name="province_khon_kaen">ขอนแก่น</string>
+    <string name="province_udon_thani">อุดรธานี</string>
+    <string name="province_ubon_ratchathani">อุบลราชธานี</string>
+    <string name="province_phuket">ภูเก็ต</string>
+    <string name="province_songkhla">สงขลา</string>
+    <string name="province_surat_thani">สุราษฎร์ธานี</string>
+    <string name="province_chon_buri">ชลบุรี</string>
+    <string name="province_rayong">ระยอง</string>
+    <string name="province_nakhon_si_thammarat">นครศรีธรรมราช</string>
+    <string name="province_phitsanulok">พิษณุโลก</string>
+    <string name="province_nakhon_sawan">นครสวรรค์</string>
+    <string name="province_lampang">ลำปาง</string>
+
     <!-- EV mode for the fuel log -->
     <string name="fuel_title_ev">บันทึกการชาร์จ</string>
     <string name="fuel_subtitle_ev">ชาร์จถึงระดับเดิมทุกครั้ง</string>
