@@ -1576,6 +1576,9 @@
     <string name="radio_cat_favorites">รายการโปรด</string>
     <string name="radio_browse_loading">กำลังโหลด…</string>
     <string name="radio_browse_empty">ยังไม่มีสถานีในหมวดนี้</string>
+    <string name="radio_browse_search_hint">ค้นหาสถานีหรือพอดแคสต์</string>
+    <string name="radio_section_popular">สถานียอดนิยม</string>
+    <string name="radio_play_now">ฟังเลย</string>
     <string name="radio_browse_open">เรียกดูสถานี</string>
     <string name="radio_browse_my_stations">สถานีของฉัน</string>
     <string name="radio_podcasts_note">สถานีพูดคุยและข่าว ไม่ใช่ตอนพอดแคสต์</string>

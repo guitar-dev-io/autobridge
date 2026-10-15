@@ -10,12 +10,14 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -48,7 +50,6 @@ import dev.autobridge.iptv.RadioBrowserBrowse
 import dev.autobridge.iptv.RadioBrowserSearch
 import dev.autobridge.iptv.RadioCategory
 import dev.autobridge.iptv.RadioPreferencesRepository
-import dev.autobridge.iptv.RadioPresetsStore
 import dev.autobridge.iptv.RadioProvinceRepository
 import dev.autobridge.iptv.RadioStationMatcher
 import dev.autobridge.iptv.ThaiProvinces
@@ -56,14 +57,11 @@ import dev.autobridge.iptv.toHistoryItem
 import dev.autobridge.media.MediaPlaybackClient
 import dev.autobridge.radio.InternetRadioSource
 import dev.autobridge.radio.RadioRepository
-import dev.autobridge.radio.RadioSourceType
-import dev.autobridge.radio.RadioStation
-import dev.autobridge.radio.RadioUiState
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.dp
 import dev.autobridge.ui.AutoBridgeDesign.stack
 import dev.autobridge.ui.MiniPlayer
-import dev.autobridge.ui.RadioTunerViews
+import dev.autobridge.ui.ImageLoader
 import dev.autobridge.ui.SystemBack
 
 /**
@@ -159,28 +157,6 @@ class LibraryActivity : Activity() {
     /** Debounces the radio page's online station search while the user is still typing. */
     private val radioSearchHandler = Handler(Looper.getMainLooper())
 
-    /**
-     * The radio tuner follows the one shared playback state. Rather than wire a flow collector into
-     * this plain Activity, it polls [RadioRepository.state] on a one-second tick while the tuner is
-     * on screen — the same cheap approach [MiniPlayer] uses — so a change made on the car (or by
-     * the session itself) is reflected here, and vice versa.
-     */
-    private val radioTunerHandler = Handler(Looper.getMainLooper())
-
-    /**
-     * The tuner's own page lambda, kept so the tick only repaints when the tuner is actually the
-     * page on top of the stack — never while a search or recents page the tuner opened is showing.
-     */
-    private var radioTunerPage: (() -> Unit)? = null
-    private val radioTunerShowing: Boolean
-        get() = section == Section.RADIO && stack.lastOrNull() === radioTunerPage
-    private val radioTunerTick = object : Runnable {
-        override fun run() {
-            if (radioTunerShowing) renderRadioTuner()
-            radioTunerHandler.postDelayed(this, 1_000L)
-        }
-    }
-
     /** Undoes [SystemBack.register]; see that object for why Back needs registering at all. */
     private var releaseBack: () -> Unit = {}
 
@@ -225,13 +201,9 @@ class LibraryActivity : Activity() {
     private fun showSection(target: Section) {
         section = target
         stack.clear()
-        if (target != Section.RADIO) {
-            radioTunerPage = null
-            radioTunerHandler.removeCallbacks(radioTunerTick)
-        }
         when (target) {
             Section.TV -> showLibraryHome()
-            Section.RADIO -> showRadioTuner()
+            Section.RADIO -> showRadioBrowse()
             Section.MUSIC -> showMusic()
             Section.FILES -> showFiles()
             Section.FAVORITES -> showFavorites()
@@ -243,30 +215,19 @@ class LibraryActivity : Activity() {
     }
 
     /**
-     * Correction #3: on every return to the foreground, the Radio tuner re-reads the stores it
-     * draws from — favourites and recents ([IptvHistoryStore], RADIO kind), presets
-     * ([RadioPresetsStore]) and the user's selected source ([RadioPreferencesRepository]) — then
-     * rebinds. A change made elsewhere (the car saved a favourite, the car switched source) must
-     * show here without the user having to leave and come back.
-     *
-     * [renderRadioTuner] already rebuilds from [RadioRepository.state], which projects exactly
-     * those stores, so re-rendering is the rebind. The selected source is re-applied to the
-     * coordinator so a persisted choice survives a cold start.
+     * On every return to the foreground while the Radio chip is showing, the user's selected source
+     * is re-applied to the coordinator so a persisted choice (made on the car, say) survives a cold
+     * start. [onResume]'s [refresh] rebinds the browse page from the stores it draws from.
      */
     override fun onStart() {
         super.onStart()
         if (section != Section.RADIO) return
         RadioRepository.coordinator?.switchSource(this, RadioPreferencesRepository.selectedSource(this))
-        if (radioTunerShowing) renderRadioTuner()
     }
 
     override fun onResume() {
         super.onResume()
         miniPlayer?.start()
-        if (radioTunerShowing) {
-            radioTunerHandler.removeCallbacks(radioTunerTick)
-            radioTunerHandler.post(radioTunerTick)
-        }
         // Coming back from the player should reflect a new "recently played" entry, but the very
         // first resume follows onCreate's own render, so re-drawing then is pure waste.
         if (resumedOnce) refresh() else resumedOnce = true
@@ -275,14 +236,12 @@ class LibraryActivity : Activity() {
     override fun onPause() {
         super.onPause()
         miniPlayer?.stop()
-        radioTunerHandler.removeCallbacks(radioTunerTick)
     }
 
     override fun onDestroy() {
         super.onDestroy()
         releaseBack()
         radioSearchHandler.removeCallbacksAndMessages(null)
-        radioTunerHandler.removeCallbacks(radioTunerTick)
         miniPlayer?.stop()
         playback.disconnect()
     }
@@ -450,159 +409,7 @@ class LibraryActivity : Activity() {
         }
     }
 
-    // ----- Radio: the portrait tuner (Section.RADIO) -----
-
-    /**
-     * The Radio chip's root page: the portrait tuner drawn by [RadioTunerViews], driven by the
-     * shared [RadioRepository]/[dev.autobridge.radio.RadioPlaybackCoordinator]. Internet Radio is
-     * the only playable source here; FM is shown disabled with its honest reason and offline is
-     * hidden. This replaces the IPTV categories page the Radio chip used to share with TV — TV
-     * still goes through [showLibraryHome] unchanged.
-     */
-    private fun showRadioTuner() {
-        val page: () -> Unit = { drawRadioTunerPage() }
-        radioTunerPage = page
-        push(page)
-    }
-
-    /** The tuner page body, re-invoked by [refresh]/[goBack]; (re)starts the follow tick. */
-    private fun drawRadioTunerPage() {
-        RadioRepository.init(applicationContext)
-        renderRadioTuner()
-        radioTunerHandler.removeCallbacks(radioTunerTick)
-        radioTunerHandler.postDelayed(radioTunerTick, 1_000L)
-    }
-
-    /** Builds (or rebuilds in place) the tuner from the current [RadioRepository.state]. */
-    private fun renderRadioTuner() {
-        val state = RadioRepository.state.value
-        val callbacks = radioTunerCallbacks(state)
-        // Landscape caps the dial so the designed portrait target stays the primary layout while a
-        // short landscape viewport still shows the whole scrollable column.
-        val landscape = resources.configuration.orientation ==
-            android.content.res.Configuration.ORIENTATION_LANDSCAPE
-        val rows = RadioTunerViews.buildBody(this, state, callbacks, capDial = landscape)
-        render(
-            title = Section.RADIO.title(this),
-            subtitle = radioConnectionSubtitle(state),
-            rows = rows,
-            headerActions = listOf(
-                AutoBridgeDesign.HeaderAction("⌕", onClick = { openRadioSearch() })
-            ),
-            // Browse-category entry points, added beside the untouched tuner/presets/recents:
-            // the primary pill opens the new browse page, the second reuses the existing search
-            // path (user playlists + seeded directory lists) with no new sources screen.
-            actions = listOf(
-                getString(R.string.radio_browse_open) to { showRadioBrowse() },
-                getString(R.string.radio_browse_my_stations) to { openRadioSearch() }
-            ),
-            extraPinned = listOf(chipsRow())
-        )
-    }
-
-    /** A short connection/playback line under the header, so the status is always readable. */
-    private fun radioConnectionSubtitle(state: RadioUiState): String = when {
-        state.selectedSource == RadioSourceType.HARDWARE_FM ->
-            state.fmUnavailableReason ?: getString(R.string.radio_fm_unavailable)
-        state.connection != MediaPlaybackClient.ConnectionState.CONNECTED ->
-            getString(R.string.radio_status_connecting)
-        state.isPlaying && state.selected != null ->
-            getString(R.string.radio_status_playing)
-        state.selected != null -> getString(R.string.radio_status_paused)
-        else -> getString(R.string.radio_source_internet)
-    }
-
-    private fun radioTunerCallbacks(state: RadioUiState): RadioTunerViews.Callbacks =
-        RadioTunerViews.Callbacks(
-            onSelectSource = { type -> selectRadioSource(type) },
-            onPlayPause = {
-                val coord = RadioRepository.coordinator ?: return@Callbacks
-                if (state.isPlaying) coord.pause() else coord.resume()
-                renderRadioTuner()
-            },
-            onPrevious = { RadioRepository.coordinator?.previous(); renderRadioTuner() },
-            onNext = { RadioRepository.coordinator?.next(); renderRadioTuner() },
-            onToggleFavorite = {
-                val station = state.selected ?: return@Callbacks
-                RadioRepository.toggleFavorite(this, station)
-                renderRadioTuner()
-            },
-            onToggleStationFavorite = { station ->
-                RadioRepository.toggleFavorite(this, station)
-                renderRadioTuner()
-            },
-            onRecallPreset = { slot, station -> recallRadioPreset(slot, station) },
-            onSavePreset = { slot -> saveRadioPreset(slot, state) },
-            onSearch = { openRadioSearch() },
-            onPlayStation = { station -> playRadioStation(station) },
-            onOpenRecents = { openRadioSearch() },
-        )
-
-    /**
-     * Flips the user's selected source and persists it (so a phone choice reaches the car). FM is
-     * never activated — the coordinator records the selection and keeps internet radio live — so
-     * the tuner just re-renders into its disabled FM panel.
-     */
-    private fun selectRadioSource(type: RadioSourceType) {
-        RadioPreferencesRepository.setSelectedSource(this, type)
-        RadioRepository.coordinator?.switchSource(this, type)
-        renderRadioTuner()
-    }
-
-    /** Tap a preset: play a saved station, or (empty slot) save the current station there. */
-    private fun recallRadioPreset(slot: Int, station: RadioStation?) {
-        if (station != null) {
-            playRadioStation(station)
-        } else {
-            saveRadioPreset(slot, RadioRepository.state.value)
-        }
-    }
-
-    /** Long-press / empty-tap save: store the current internet station, inline toast feedback. */
-    private fun saveRadioPreset(slot: Int, state: RadioUiState) {
-        val station = state.selected
-        if (station == null || state.selectedSource == RadioSourceType.HARDWARE_FM) {
-            Toast.makeText(this, getString(R.string.radio_preset_nothing_to_save), Toast.LENGTH_SHORT).show()
-            return
-        }
-        when (val result = RadioPresetsStore.save(this, slot, station)) {
-            is RadioPresetsStore.SaveResult.Saved ->
-                Toast.makeText(this, getString(R.string.radio_preset_saved, slot), Toast.LENGTH_SHORT).show()
-            is RadioPresetsStore.SaveResult.Rejected ->
-                Toast.makeText(this, result.reason, Toast.LENGTH_SHORT).show()
-        }
-        renderRadioTuner()
-    }
-
-    /**
-     * Plays [station] on the shared session via the FEAT-001 queue-build helper: a queue is built
-     * from the RADIO history around the station (null queue -> the station alone), so Next/Previous
-     * step through the user's own stations. Records the play so it lands in recents.
-     */
-    private fun playRadioStation(station: RadioStation) {
-        if (station.sourceType == RadioSourceType.HARDWARE_FM || station.streamUrl.isBlank()) return
-        RadioRepository.recordPlayback(this, station)
-        val items = IptvHistoryStore.recent(this, IptvKind.RADIO) +
-            IptvHistoryStore.favorites(this, IptvKind.RADIO)
-        val anchorItem = items.firstOrNull { it.url == station.streamUrl }
-        if (anchorItem != null) {
-            RadioRepository.playFromItems(station, items, anchorItem)
-        } else {
-            // Not in the stores (an online result just tapped): play it alone through the helper.
-            RadioRepository.playFromItems(station, listOf<IptvHistoryStore.Item>(), fakeItem(station))
-        }
-        renderRadioTuner()
-    }
-
-    /** A throwaway history item for a station not yet in the stores, so the queue helper can run. */
-    private fun fakeItem(station: RadioStation): IptvHistoryStore.Item = IptvHistoryStore.Item(
-        sourceId = "radio-virtual",
-        title = station.title,
-        url = station.streamUrl,
-        type = IptvEntryType.LIVE,
-        kind = IptvKind.RADIO,
-        logo = station.logo,
-    )
+    // ----- Radio: the category browse main page (Section.RADIO) -----
 
     /** Opens the existing station search (local + radio-browser) via the IPTV radio source path. */
     private fun openRadioSearch() {
@@ -614,16 +421,14 @@ class LibraryActivity : Activity() {
         openLibrarySource(sources.first(), sources)
     }
 
-    // ----- Radio: the category browse page (FEAT-002) -----
-
     /**
-     * The new Radio browse page: a sibling of the tuner, not a replacement. A pinned chip row
-     * (one chip per [RadioCategory], drawn with [AutoBridgeDesign.pill] — not a cloned tab bar) and
-     * a body that re-renders per selected category: a two-column station-logo grid for the network
-     * categories and Favorites, with the Local province picker and the Podcasts caption folded in.
-     *
-     * The tuner, presets, recents and search are untouched; this only adds a page the tuner's
-     * [R.string.radio_browse_open] pill opens.
+     * The Radio chip's root page: a pinned search row that opens the station search, a pinned chip
+     * row (one chip per [RadioCategory], drawn with [AutoBridgeDesign.pill] — not a cloned tab bar)
+     * and a body that re-renders per selected category: a three-column full-bleed station-logo grid
+     * for the network categories and Favorites, with the Local province picker and the Podcasts
+     * caption folded in. In-country leads with a hero card for the top station above a
+     * "Popular stations" labelled grid. The bottom now-playing bar comes from [render]'s shared
+     * [MiniPlayer]; this page adds none of its own.
      */
     private fun showRadioBrowse() {
         var selected = RadioCategory.IN_COUNTRY
@@ -690,9 +495,16 @@ class LibraryActivity : Activity() {
                             accent = AutoBridgeDesign.ACCENT_RADIO
                         )
                     } else {
+                        // In-country leads with the top station as a hero card, then the rest under
+                        // a "Popular stations" label. Other categories are a plain 3-col grid.
+                        if (selected == RadioCategory.IN_COUNTRY) {
+                            rows += radioHeroCard(readyEntries.first(), readyEntries)
+                            rows += AutoBridgeDesign.sectionLabel(this, getString(R.string.radio_section_popular))
+                        }
                         rows += AutoBridgeDesign.grid(
                             this,
-                            readyEntries.map { radioStationTile(it, readyEntries) }
+                            readyEntries.map { radioLogoCell(it, readyEntries) },
+                            columns = 3
                         )
                         null
                     }
@@ -708,6 +520,7 @@ class LibraryActivity : Activity() {
 
         draw = {
             val rows = mutableListOf<View>()
+            rows += radioSearchRow()
             rows += radioCategoryChips(selected) { chosen ->
                 if (chosen != selected) {
                     selected = chosen
@@ -730,7 +543,8 @@ class LibraryActivity : Activity() {
                     } else {
                         rows += AutoBridgeDesign.grid(
                             this,
-                            favorites.map { item -> radioFavoriteTile(item, favorites) }
+                            favorites.map { item -> radioFavoriteLogoCell(item, favorites) },
+                            columns = 3
                         )
                     }
                 }
@@ -759,7 +573,7 @@ class LibraryActivity : Activity() {
 
             render(
                 title = Section.RADIO.title(this),
-                subtitle = null,
+                subtitle = getString(R.string.section_radio_caption),
                 rows = rows,
                 empty = empty,
                 headerActions = listOf(
@@ -771,6 +585,20 @@ class LibraryActivity : Activity() {
         push(draw)
         startLoad()
     }
+
+    /**
+     * The search row at the top of the Radio page: a read-only [AutoBridgeDesign.searchField]
+     * shaped field whose tap/submit hands off to [openRadioSearch] (the real search page), rather
+     * than filtering in place. Kept non-editable here so a keystroke does not redraw this page.
+     */
+    private fun radioSearchRow(): View =
+        AutoBridgeDesign.searchField(this, getString(R.string.radio_browse_search_hint), "", {}).apply {
+            isFocusable = false
+            isFocusableInTouchMode = false
+            isCursorVisible = false
+            keyListener = null
+            setOnClickListener { openRadioSearch() }
+        }
 
     /** The pinned chip switcher: one [AutoBridgeDesign.pill] per category, the chosen one primary. */
     private fun radioCategoryChips(selected: RadioCategory, onSelect: (RadioCategory) -> Unit): View {
@@ -801,37 +629,154 @@ class LibraryActivity : Activity() {
         setPadding(dp(6), dp(6), dp(6), dp(10))
     }
 
-    /** One station card: logo (accent-initial placeholder), name, single-line subtitle, star toggle. */
-    private fun radioStationTile(entry: IptvEntry, categoryEntries: List<IptvEntry>): View =
-        AutoBridgeDesign.contentTile(
-            context = this,
-            title = entry.title,
-            subtitle = entry.subtitle,
-            accent = AutoBridgeDesign.ACCENT_RADIO,
-            artworkUrl = entry.logo,
-            corner = (if (IptvHistoryStore.isFavorite(this, entry.url)) "★" else "☆") to {
-                RadioRepository.RadioHistory.toggleFavorite(this, InternetRadioSource.toStation(entry))
-                refresh()
-            },
-            onClick = { playRadioEntry(entry, categoryEntries) }
-        )
+    /**
+     * A square FrameLayout that shows a station logo in three states: the grey SURFACE fill is the
+     * loading placeholder; a centred amber initial on an amber-tint square is the no-logo / failed
+     * fallback; and the real favicon (CENTER_CROP, full-bleed) once [ImageLoader] delivers it. The
+     * square clips to its ~14dp rounded outline so a wide logo fills the cell without spilling.
+     */
+    private fun radioLogoSquare(title: String, logo: String?): FrameLayout {
+        val square = FrameLayout(this).apply {
+            background = AutoBridgeDesign.surface(this@LibraryActivity, AutoBridgeDesign.SURFACE, 14)
+            clipToOutline = true
+        }
+        val initial = TextView(this).apply {
+            text = title.trim().take(1).uppercase()
+            textSize = 26f
+            gravity = Gravity.CENTER
+            setTextColor(AutoBridgeDesign.ACCENT_RADIO)
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            background = AutoBridgeDesign.surface(
+                this@LibraryActivity,
+                AutoBridgeDesign.tint(AutoBridgeDesign.ACCENT_RADIO, 0.14f),
+                14,
+                android.graphics.Color.TRANSPARENT
+            )
+        }
+        square.addView(initial, FrameLayout.LayoutParams(-1, -1))
+        if (!logo.isNullOrBlank()) {
+            val image = ImageView(this).apply {
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                visibility = View.GONE
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }
+            square.addView(image, FrameLayout.LayoutParams(-1, -1))
+            // The letter stays until a bitmap actually arrives, so a failed logo is never a hole.
+            ImageLoader.load(this, logo, image) {
+                initial.visibility = View.GONE
+                image.visibility = View.VISIBLE
+            }
+        }
+        return square
+    }
 
-    /** A Favorites card, played through the favorites queue rather than a category grid. */
-    private fun radioFavoriteTile(item: IptvHistoryStore.Item, favorites: List<IptvHistoryStore.Item>): View =
-        AutoBridgeDesign.contentTile(
-            context = this,
-            title = item.title,
-            accent = AutoBridgeDesign.ACCENT_RADIO,
-            artworkUrl = item.logo,
-            corner = "★" to {
-                RadioRepository.RadioHistory.toggleFavorite(
-                    this,
-                    RadioRepository.RadioHistory.toRadioStation(item)
-                )
-                refresh()
-            },
-            onClick = { playRadioFavorite(item, favorites) }
-        )
+    /** One grid cell: a full-bleed square logo (3 states) with the station name below it. */
+    private fun radioLogoCell(entry: IptvEntry, categoryEntries: List<IptvEntry>): View =
+        LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            isClickable = true
+            isFocusable = true
+            contentDescription = entry.title
+            setOnClickListener { playRadioEntry(entry, categoryEntries) }
+            // The grid gives every cell an equal width; squaring the logo means tying its height to
+            // that measured width, which is only known after layout — so post the width as height.
+            val square = radioLogoSquare(entry.title, entry.logo)
+            addView(square, LinearLayout.LayoutParams(-1, -2))
+            square.post { square.layoutParams = square.layoutParams.apply { height = square.width } }
+            addView(TextView(this@LibraryActivity).apply {
+                text = entry.title
+                textSize = 14f
+                setTextColor(AutoBridgeDesign.TEXT)
+                maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
+                setPadding(0, dp(6), 0, 0)
+            }, LinearLayout.LayoutParams(-1, -2))
+        }
+
+    /**
+     * The Favorites variant: the same full-bleed logo cell for a stored [item], played through the
+     * favorites queue, with a ★ corner toggle that removes the favourite and re-renders.
+     */
+    private fun radioFavoriteLogoCell(item: IptvHistoryStore.Item, favorites: List<IptvHistoryStore.Item>): View =
+        LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            isClickable = true
+            isFocusable = true
+            contentDescription = item.title
+            setOnClickListener { playRadioFavorite(item, favorites) }
+            val square = radioLogoSquare(item.title, item.logo)
+            // The ★ toggle sits in the top-trailing corner of the square.
+            square.addView(
+                AutoBridgeDesign.glyphButton(this@LibraryActivity, "★", 16f, tint = AutoBridgeDesign.ACCENT_FAVORITE) {
+                    RadioRepository.RadioHistory.toggleFavorite(
+                        this@LibraryActivity,
+                        RadioRepository.RadioHistory.toRadioStation(item)
+                    )
+                    refresh()
+                },
+                FrameLayout.LayoutParams(dp(32), dp(32), Gravity.TOP or Gravity.END)
+            )
+            addView(square, LinearLayout.LayoutParams(-1, -2))
+            square.post { square.layoutParams = square.layoutParams.apply { height = square.width } }
+            addView(TextView(this@LibraryActivity).apply {
+                text = item.title
+                textSize = 14f
+                setTextColor(AutoBridgeDesign.TEXT)
+                maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
+                setPadding(0, dp(6), 0, 0)
+            }, LinearLayout.LayoutParams(-1, -2))
+        }
+
+    /**
+     * The In-country hero: a wide SURFACE card for the top [entry] — a larger 3-state logo on the
+     * leading side, the station name and its subtitle, and a primary "▶ Play now" pill that plays
+     * it with [categoryEntries] as the queue.
+     */
+    private fun radioHeroCard(entry: IptvEntry, categoryEntries: List<IptvEntry>): View =
+        LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = AutoBridgeDesign.surface(this@LibraryActivity, AutoBridgeDesign.SURFACE, 18)
+            isClickable = true
+            isFocusable = true
+            contentDescription = entry.title
+            setPadding(dp(14), dp(14), dp(14), dp(14))
+            setOnClickListener { playRadioEntry(entry, categoryEntries) }
+
+            addView(
+                radioLogoSquare(entry.title, entry.logo),
+                LinearLayout.LayoutParams(dp(84), dp(84)).apply { marginEnd = dp(14) }
+            )
+            val text = LinearLayout(this@LibraryActivity).apply { orientation = LinearLayout.VERTICAL }
+            text.addView(TextView(this@LibraryActivity).apply {
+                this.text = entry.title
+                textSize = 18f
+                setTextColor(AutoBridgeDesign.TEXT)
+                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
+            })
+            if (entry.subtitle.isNotBlank()) text.addView(TextView(this@LibraryActivity).apply {
+                this.text = entry.subtitle
+                textSize = 13f
+                setTextColor(AutoBridgeDesign.TEXT_MUTED)
+                maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
+                setPadding(0, dp(2), 0, 0)
+            })
+            text.addView(
+                AutoBridgeDesign.pill(
+                    this@LibraryActivity,
+                    "▶  " + getString(R.string.radio_play_now),
+                    primary = true,
+                    accent = AutoBridgeDesign.ACCENT_RADIO,
+                    onClick = { playRadioEntry(entry, categoryEntries) }
+                ),
+                LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(10) }
+            )
+            addView(text, LinearLayout.LayoutParams(0, -2, 1f))
+        }
 
     /**
      * Plays a browse-grid [entry] with its category grid as the queue, so Next/Previous step through
