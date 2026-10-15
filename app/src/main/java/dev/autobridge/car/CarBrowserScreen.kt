@@ -504,11 +504,25 @@ class CarBrowserScreen(carContext: CarContext) :
     }
 
     override fun onScroll(distanceX: Float, distanceY: Float) {
+        if (ViewportDebug.enabled) {
+            Log.i(
+                KEYBOARD_TRACE_TAG,
+                "kbd onScroll t=${android.os.SystemClock.uptimeMillis()} d=$distanceX,$distanceY " +
+                    "keyboardOpen=${renderer.keyboardOpen}"
+            )
+        }
         if (!active || !MirrorSurfaceOwnership.isOwner(this)) return
         if (allowed()) renderer.scrollBy(distanceX, distanceY)
     }
 
     override fun onFling(velocityX: Float, velocityY: Float) {
+        if (ViewportDebug.enabled) {
+            Log.i(
+                KEYBOARD_TRACE_TAG,
+                "kbd onFling t=${android.os.SystemClock.uptimeMillis()} v=$velocityX,$velocityY " +
+                    "keyboardOpen=${renderer.keyboardOpen}"
+            )
+        }
         if (!active || !MirrorSurfaceOwnership.isOwner(this)) return
         if (allowed()) renderer.fling(velocityX, velocityY)
     }

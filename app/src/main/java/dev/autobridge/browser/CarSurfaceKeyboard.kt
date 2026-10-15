@@ -69,7 +69,7 @@ internal class CarSurfaceKeyboard(
 
     fun onTap(x: Float, y: Float, area: Box, density: Float): Result {
         val g = geometry(area, density)
-        if (!g.tray.contains(x, y)) return Result.Close
+        if (!CarKeyboardGestures.inKeyboardArea(x, y, g.tray)) return Result.Close
         if (g.hide.contains(x, y)) return Result.Close
         if (buffer.text.isNotEmpty() && g.clear.contains(x, y)) {
             buffer.clear()

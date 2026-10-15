@@ -1468,6 +1468,9 @@ class CarWebRenderer(context: Context) {
         stopFling()
         keyboard?.let { board ->
             lastInputMs = now
+            if (ViewportDebug.enabled) {
+                Log.i(TAG, "kbd route TAP $x,$y inArea=${CarKeyboardGestures.inKeyboardArea(x, y, keyboardTray())}")
+            }
             handleKeyboardTap(board, x, y)
             return@runOnMain
         }
@@ -1879,8 +1882,14 @@ class CarWebRenderer(context: Context) {
         keepFocusedFieldAboveKeyboard()
     }
 
+    /** The tray as drawn (same geometry and surface-pixel space as [drawChrome]); null when closed. */
+    private fun keyboardTray(): Box? = keyboard?.geometry(keyboardArea(), sizes.dp(1f))?.tray
+
     private fun showKeyboard(board: CarSurfaceKeyboard) {
         keyboard = board
+        // Nothing started before the tray appeared may keep moving the page under it.
+        stopFling()
+        if (dividerGrabbed) releaseDivider()
         visibility.onInteraction(SystemClock.uptimeMillis())
         requestFullRate()
         onKeyboardChanged?.invoke(true)
@@ -1996,10 +2005,22 @@ class CarWebRenderer(context: Context) {
     @VisibleForTesting
     internal data class PageScrollState(val x: Int, val y: Int, val maxX: Int, val maxY: Int)
 
-    /** Scrolls the page content, or the open overlay, by the given car-surface delta. */
+    /**
+     * Scrolls the page content, or the open overlay, by the given car-surface delta.
+     *
+     * While the car keyboard is open every scroll is swallowed, inside the tray or not: the host
+     * reports a scroll without the point it started from, so one that began on the keys can't be
+     * told apart from one above them, and letting either through moves the page under the keyboard.
+     * The focused field is already scrolled above the tray; closing the keyboard restores scrolling.
+     */
     fun scrollBy(distanceX: Float, distanceY: Float) = runOnMain {
         val now = SystemClock.uptimeMillis()
         lastInputMs = now
+        if (!CarKeyboardGestures.pageReceives(CarSurfaceGesture.SCROLL, null, null, keyboardTray())) {
+            stopFling()
+            if (ViewportDebug.enabled) Log.i(TAG, "kbd swallow gesture=SCROLL d=$distanceX,$distanceY")
+            return@runOnMain
+        }
         visibility.onInteraction(now)
         if (drawerOpen) {
             val model = drawer ?: return@runOnMain
@@ -2018,8 +2039,17 @@ class CarWebRenderer(context: Context) {
      * Starts a decaying glide instead of applying the whole fling as one jump. The previous
      * `scrollBy(-velocity / 8)` teleported the page by a large delta in a single frame, which read
      * as the screen lurching rather than scrolling.
+     *
+     * Swallowed while the car keyboard is open, for the same reason as [scrollBy]: a fling has no
+     * start point, so one that began on the tray can't be kept off the page any other way.
      */
     fun fling(velocityX: Float, velocityY: Float) = runOnMain {
+        if (!CarKeyboardGestures.pageReceives(CarSurfaceGesture.FLING, null, null, keyboardTray())) {
+            lastInputMs = SystemClock.uptimeMillis()
+            stopFling()
+            if (ViewportDebug.enabled) Log.i(TAG, "kbd swallow gesture=FLING v=$velocityX,$velocityY")
+            return@runOnMain
+        }
         if (overlay != Overlay.NONE) return@runOnMain
         lastInputMs = SystemClock.uptimeMillis()
         visibility.onInteraction(lastInputMs)
@@ -2034,6 +2064,11 @@ class CarWebRenderer(context: Context) {
 
     /** Advances an in-flight fling by one frame. Returns true while the page is still moving. */
     private fun stepFling(): Boolean {
+        // No glide moves the page under an open keyboard.
+        if (keyboard != null) {
+            stopFling()
+            return false
+        }
         if (abs(flingX) < FLING_MIN_VELOCITY && abs(flingY) < FLING_MIN_VELOCITY) {
             stopFling()
             return false
@@ -2057,14 +2092,19 @@ class CarWebRenderer(context: Context) {
      * tap on the tray is replayed as the two taps it was; a pinch is swallowed.
      */
     fun scaleBy(factor: Float, focusX: Float = -1f, focusY: Float = -1f) = runOnMain {
-        keyboard?.let { board ->
+        val board = keyboard
+        val tray = keyboardTray()
+        if (board != null && tray != null &&
+            !CarKeyboardGestures.pageReceives(CarSurfaceGesture.SCALE, focusX, focusY, tray)
+        ) {
             lastInputMs = SystemClock.uptimeMillis()
             stopFling()
-            val tray = board.geometry(keyboardArea(), sizes.dp(1f)).tray
             if (CarKeyboardGestures.isKeyboardDoubleTap(focusX, focusY, factor, tray)) {
                 handleKeyboardTap(board, focusX, focusY)
                 // Go, hide or a tap outside ends the keyboard on the first tap; act on it once.
                 if (keyboard === board) handleKeyboardTap(board, focusX, focusY)
+            } else if (ViewportDebug.enabled) {
+                Log.i(TAG, "kbd swallow gesture=SCALE focus=$focusX,$focusY factor=$factor")
             }
             return@runOnMain
         }
