@@ -44,11 +44,17 @@ import dev.autobridge.iptv.IptvSourceStore
 import dev.autobridge.iptv.IptvSourceType
 import dev.autobridge.iptv.StreamPing
 import dev.autobridge.iptv.XtreamCredentials
+import dev.autobridge.iptv.RadioBrowserBrowse
 import dev.autobridge.iptv.RadioBrowserSearch
+import dev.autobridge.iptv.RadioCategory
 import dev.autobridge.iptv.RadioPreferencesRepository
 import dev.autobridge.iptv.RadioPresetsStore
+import dev.autobridge.iptv.RadioProvinceRepository
 import dev.autobridge.iptv.RadioStationMatcher
+import dev.autobridge.iptv.ThaiProvinces
+import dev.autobridge.iptv.toHistoryItem
 import dev.autobridge.media.MediaPlaybackClient
+import dev.autobridge.radio.InternetRadioSource
 import dev.autobridge.radio.RadioRepository
 import dev.autobridge.radio.RadioSourceType
 import dev.autobridge.radio.RadioStation
@@ -483,6 +489,13 @@ class LibraryActivity : Activity() {
             headerActions = listOf(
                 AutoBridgeDesign.HeaderAction("⌕", onClick = { openRadioSearch() })
             ),
+            // Browse-category entry points, added beside the untouched tuner/presets/recents:
+            // the primary pill opens the new browse page, the second reuses the existing search
+            // path (user playlists + seeded directory lists) with no new sources screen.
+            actions = listOf(
+                getString(R.string.radio_browse_open) to { showRadioBrowse() },
+                getString(R.string.radio_browse_my_stations) to { openRadioSearch() }
+            ),
             extraPinned = listOf(chipsRow())
         )
     }
@@ -599,6 +612,265 @@ class LibraryActivity : Activity() {
             return
         }
         openLibrarySource(sources.first(), sources)
+    }
+
+    // ----- Radio: the category browse page (FEAT-002) -----
+
+    /**
+     * The new Radio browse page: a sibling of the tuner, not a replacement. A pinned chip row
+     * (one chip per [RadioCategory], drawn with [AutoBridgeDesign.pill] — not a cloned tab bar) and
+     * a body that re-renders per selected category: a two-column station-logo grid for the network
+     * categories and Favorites, with the Local province picker and the Podcasts caption folded in.
+     *
+     * The tuner, presets, recents and search are untouched; this only adds a page the tuner's
+     * [R.string.radio_browse_open] pill opens.
+     */
+    private fun showRadioBrowse() {
+        var selected = RadioCategory.IN_COUNTRY
+        // The latest network answer and the key it is for, kept outside draw() so a chip switch or
+        // a late answer redraws without refetching, and a stale answer is dropped by key.
+        var loadingKey: String? = null
+        var readyKey: String? = null
+        var readyEntries: List<IptvEntry> = emptyList()
+        var failedKey: String? = null
+        var failedMessage: String? = null
+        lateinit var draw: () -> Unit
+
+        // Fetches [selected] (scoped to the chosen province for Local) unless an in-freshness answer
+        // for its key is already shown. An answer for an older key, or one landing after the user
+        // left this page, never redraws it.
+        val startLoad: () -> Unit = start@{
+            val key = selected.cacheKey(RadioProvinceRepository.selected(this)) ?: return@start
+            if (readyKey == key || loadingKey == key) return@start
+            loadingKey = key
+            failedKey = null
+            failedMessage = null
+            RadioBrowserBrowse.load(selected, RadioProvinceRepository.selected(this)) { result ->
+                if (result.key != key) return@load
+                loadingKey = null
+                when (result) {
+                    is RadioBrowserBrowse.Result.Ready -> {
+                        readyKey = result.key
+                        readyEntries = result.entries
+                    }
+                    is RadioBrowserBrowse.Result.Failed -> {
+                        failedKey = result.key
+                        failedMessage = result.message
+                    }
+                }
+                if (stack.lastOrNull() === draw) draw()
+            }
+        }
+
+        // The grid-or-state body for the current network category (In-country/World/Podcasts, and
+        // Local once a province is set). Appends a two-column grid to [rows] and returns null when
+        // entries are shown, else returns the loading/empty/error view for `render`'s empty slot.
+        val networkBody: (MutableList<View>) -> View? = body@{ rows ->
+            val key = selected.cacheKey(RadioProvinceRepository.selected(this))
+            when {
+                key != null && failedKey == key -> AutoBridgeDesign.emptyState(
+                    this,
+                    failedMessage ?: getString(R.string.radio_browse_empty),
+                    "",
+                    getString(R.string.action_retry) to {
+                        readyKey = null
+                        loadingKey = null
+                        failedKey = null
+                        startLoad()
+                        draw()
+                    },
+                    accent = AutoBridgeDesign.ACCENT_RADIO
+                )
+                key != null && readyKey == key -> {
+                    if (readyEntries.isEmpty()) {
+                        AutoBridgeDesign.emptyState(
+                            this,
+                            getString(R.string.radio_browse_empty),
+                            "",
+                            accent = AutoBridgeDesign.ACCENT_RADIO
+                        )
+                    } else {
+                        rows += AutoBridgeDesign.grid(
+                            this,
+                            readyEntries.map { radioStationTile(it, readyEntries) }
+                        )
+                        null
+                    }
+                }
+                else -> AutoBridgeDesign.emptyState(
+                    this,
+                    getString(R.string.radio_browse_loading),
+                    "",
+                    accent = AutoBridgeDesign.ACCENT_RADIO
+                )
+            }
+        }
+
+        draw = {
+            val rows = mutableListOf<View>()
+            rows += radioCategoryChips(selected) { chosen ->
+                if (chosen != selected) {
+                    selected = chosen
+                    draw()
+                    if (chosen != RadioCategory.FAVORITES) startLoad()
+                }
+            }
+
+            var empty: View? = null
+            when (selected) {
+                RadioCategory.FAVORITES -> {
+                    val favorites = IptvHistoryStore.favorites(this, IptvKind.RADIO)
+                    if (favorites.isEmpty()) {
+                        empty = AutoBridgeDesign.emptyState(
+                            this,
+                            getString(R.string.radio_cat_favorites),
+                            getString(R.string.radio_browse_empty),
+                            accent = AutoBridgeDesign.ACCENT_RADIO
+                        )
+                    } else {
+                        rows += AutoBridgeDesign.grid(
+                            this,
+                            favorites.map { item -> radioFavoriteTile(item, favorites) }
+                        )
+                    }
+                }
+                RadioCategory.LOCAL -> {
+                    val province = RadioProvinceRepository.selected(this)
+                    if (province.isBlank()) {
+                        empty = AutoBridgeDesign.emptyState(
+                            this,
+                            getString(R.string.radio_local_pick_title),
+                            getString(R.string.radio_cat_local),
+                            getString(R.string.radio_local_pick_cta) to { openProvincePicker { draw(); startLoad() } },
+                            accent = AutoBridgeDesign.ACCENT_RADIO
+                        )
+                    } else {
+                        empty = networkBody(rows)
+                    }
+                }
+                RadioCategory.PODCASTS -> {
+                    rows += radioCaption(getString(R.string.radio_podcasts_note))
+                    empty = networkBody(rows)
+                }
+                else -> {
+                    empty = networkBody(rows)
+                }
+            }
+
+            render(
+                title = Section.RADIO.title(this),
+                subtitle = null,
+                rows = rows,
+                empty = empty,
+                headerActions = listOf(
+                    AutoBridgeDesign.HeaderAction("⌕", onClick = { openRadioSearch() })
+                )
+            )
+        }
+
+        push(draw)
+        startLoad()
+    }
+
+    /** The pinned chip switcher: one [AutoBridgeDesign.pill] per category, the chosen one primary. */
+    private fun radioCategoryChips(selected: RadioCategory, onSelect: (RadioCategory) -> Unit): View {
+        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        RadioCategory.values().forEach { category ->
+            row.addView(
+                AutoBridgeDesign.pill(
+                    this,
+                    getString(category.labelRes),
+                    primary = category == selected,
+                    accent = AutoBridgeDesign.ACCENT_RADIO,
+                    onClick = { onSelect(category) }
+                ),
+                LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(8) }
+            )
+        }
+        return HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(row, ViewGroup.LayoutParams(-2, -2))
+        }
+    }
+
+    /** A non-interactive caption row (the Podcasts note), drawn above its grid. */
+    private fun radioCaption(text: String): View = TextView(this).apply {
+        this.text = text
+        textSize = 13f
+        setTextColor(AutoBridgeDesign.TEXT_MUTED)
+        setPadding(dp(6), dp(6), dp(6), dp(10))
+    }
+
+    /** One station card: logo (accent-initial placeholder), name, single-line subtitle, star toggle. */
+    private fun radioStationTile(entry: IptvEntry, categoryEntries: List<IptvEntry>): View =
+        AutoBridgeDesign.contentTile(
+            context = this,
+            title = entry.title,
+            subtitle = entry.subtitle,
+            accent = AutoBridgeDesign.ACCENT_RADIO,
+            artworkUrl = entry.logo,
+            corner = (if (IptvHistoryStore.isFavorite(this, entry.url)) "★" else "☆") to {
+                RadioRepository.RadioHistory.toggleFavorite(this, InternetRadioSource.toStation(entry))
+                refresh()
+            },
+            onClick = { playRadioEntry(entry, categoryEntries) }
+        )
+
+    /** A Favorites card, played through the favorites queue rather than a category grid. */
+    private fun radioFavoriteTile(item: IptvHistoryStore.Item, favorites: List<IptvHistoryStore.Item>): View =
+        AutoBridgeDesign.contentTile(
+            context = this,
+            title = item.title,
+            accent = AutoBridgeDesign.ACCENT_RADIO,
+            artworkUrl = item.logo,
+            corner = "★" to {
+                RadioRepository.RadioHistory.toggleFavorite(
+                    this,
+                    RadioRepository.RadioHistory.toRadioStation(item)
+                )
+                refresh()
+            },
+            onClick = { playRadioFavorite(item, favorites) }
+        )
+
+    /**
+     * Plays a browse-grid [entry] with its category grid as the queue, so Next/Previous step through
+     * what the user is looking at. Records the play exactly once (through [RadioRepository]) — this
+     * path does NOT also call [IptvHistoryStore.recordPlayback].
+     */
+    private fun playRadioEntry(entry: IptvEntry, categoryEntries: List<IptvEntry>) {
+        val station = InternetRadioSource.toStation(entry)
+        if (station.streamUrl.isBlank()) return
+        RadioRepository.recordPlayback(this, station)
+        val items = categoryEntries.map { it.toHistoryItem() }
+        val anchor = items.firstOrNull { it.url == station.streamUrl } ?: entry.toHistoryItem()
+        RadioRepository.playFromItems(station, items, anchor)
+    }
+
+    /** Plays a tapped Favorites card with the favorites list as the queue; records the play once. */
+    private fun playRadioFavorite(tapped: IptvHistoryStore.Item, favorites: List<IptvHistoryStore.Item>) {
+        val station = RadioRepository.RadioHistory.toRadioStation(tapped)
+        if (station.streamUrl.isBlank()) return
+        RadioRepository.recordPlayback(this, station)
+        val anchor = favorites.firstOrNull { it.url == station.streamUrl } ?: tapped
+        RadioRepository.playFromItems(station, favorites, anchor)
+    }
+
+    /**
+     * The province picker: a plain list of the curated [ThaiProvinces] labels (no free text, no
+     * geolocation). Choosing one persists it through [RadioProvinceRepository] and runs [onPicked]
+     * so the Local grid re-queries for that state.
+     */
+    private fun openProvincePicker(onPicked: () -> Unit) {
+        val provinces = ThaiProvinces.all
+        val labels = provinces.map { getString(it.labelRes) }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.radio_local_pick_title))
+            .setItems(labels) { _, which ->
+                RadioProvinceRepository.setSelected(this, provinces[which].state)
+                onPicked()
+            }
+            .show()
     }
 
     private fun openLibrarySource(source: IptvSource, allSources: List<IptvSource>) {
