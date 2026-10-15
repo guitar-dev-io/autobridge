@@ -198,7 +198,15 @@ final class CarWebScreen: ObservableObject {
     }
 }
 
-/// The car screen's root view: the shared web view when it is here, a short note otherwise.
+/// Draws an `AVPlayer`'s picture: a view whose own layer is the player layer, so it resizes with
+/// the view and needs no layout code of its own.
+final class PlayerLayerView: UIView {
+    override class var layerClass: AnyClass { AVPlayerLayer.self }
+    var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
+}
+
+/// A car screen's web host: the shared web view when it is here, a short note otherwise. It is the
+/// AirPlay screen's root, and the page area of the browser on the drawn CarPlay screen.
 final class CarWebViewController: UIViewController {
     private let note = UILabel()
     private weak var hosted: WKWebView?

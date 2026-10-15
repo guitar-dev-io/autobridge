@@ -26,6 +26,11 @@ struct AutoBridgeApp: App {
                 .environmentObject(vehicle)
                 .environmentObject(weather)
                 .preferredColorScheme(.dark)
+                #if DEBUG
+                .overlay {
+                    if CarScreenPreview.requested { CarScreenPreview().ignoresSafeArea() }
+                }
+                #endif
         }
         // The moment the driver opens the app is the moment they are about to drive: say what
         // maintenance is due then, at most once a day, as the Android app does.
