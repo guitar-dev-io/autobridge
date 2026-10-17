@@ -26,6 +26,7 @@ import dev.autobridge.duoscreen.layout.DuoScreenPreset
 import dev.autobridge.duoscreen.layout.DuoScreenStore
 import dev.autobridge.duoscreen.system.DuoScreenBackend
 import dev.autobridge.duoscreen.system.DuoScreenOps
+import dev.autobridge.duoscreen.system.DuoScreenProtectedApps
 import dev.autobridge.duoscreen.system.DuoScreenRootOps
 import dev.autobridge.duoscreen.system.DuoScreenSelfPane
 import dev.autobridge.i18n.AppLocale
@@ -405,11 +406,14 @@ class DuoScreenSettingsActivity : Activity() {
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
             })
+            // An app that blocks its picture says so on its tile, where the black pane will be.
+            val blocked = DuoScreenProtectedApps.isProtected(chosen)
             addView(TextView(this@DuoScreenSettingsActivity).apply {
-                text = getString(R.string.duo_screen_preview_tap_hint, paneTitle)
+                text = if (blocked) "⚠ " + getString(R.string.duo_protected_badge)
+                else getString(R.string.duo_screen_preview_tap_hint, paneTitle)
                 textSize = 11.5f
                 gravity = Gravity.CENTER
-                setTextColor(accent)
+                setTextColor(if (blocked) AutoBridgeDesign.SIGNAL_SLOW else accent)
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
             })
@@ -874,12 +878,34 @@ class DuoScreenSettingsActivity : Activity() {
             .setView(grid)
             .create()
         grid.setOnItemClickListener { _, _, position, _ ->
-            DuoScreenStore.setPackage(this, paneId, items[position].packageName)
+            val chosen = items[position].packageName
             dialog.dismiss()
-            applied()
-            render()
+            if (DuoScreenProtectedApps.isProtected(chosen)) {
+                confirmProtectedApp(paneId, chosen!!, items[position].label)
+            } else {
+                choosePaneApp(paneId, chosen)
+            }
         }
         dialog.show()
+    }
+
+    private fun choosePaneApp(paneId: Int, packageName: String?) {
+        DuoScreenStore.setPackage(this, paneId, packageName)
+        applied()
+        render()
+    }
+
+    /**
+     * Netflix and the like keep their picture off any screen but the phone's, so a pane shows
+     * them black. Said before they go in, with the choice to pick something else.
+     */
+    private fun confirmProtectedApp(paneId: Int, packageName: String, label: String) {
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.duo_protected_title, label))
+            .setMessage(getString(R.string.duo_protected_message, label))
+            .setPositiveButton(R.string.duo_protected_use_anyway) { _, _ -> choosePaneApp(paneId, packageName) }
+            .setNegativeButton(R.string.duo_protected_pick_other) { _, _ -> pickAppFor(paneId) }
+            .show()
     }
 
     /** One cell of the picker. A null [packageName] is the "leave this pane empty" cell. */

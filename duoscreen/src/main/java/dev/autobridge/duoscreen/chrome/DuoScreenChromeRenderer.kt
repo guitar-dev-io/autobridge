@@ -24,6 +24,12 @@ data class PaneApp(val label: String, val icon: Bitmap?)
 data class SetupNotice(val title: String, val body: String, val apps: List<PaneApp>)
 
 /**
+ * Drawn inside a pane whose app keeps its picture off other screens (see
+ * dev.autobridge.duoscreen.system.DuoScreenProtectedApps), where it would otherwise be black.
+ */
+data class BlockedPaneNotice(val title: String, val body: String, val app: PaneApp?)
+
+/**
  * Everything one chrome frame needs, captured on the controller's thread and painted on the GL
  * thread. Immutable, so the hand-over needs no locking.
  */
@@ -45,7 +51,9 @@ data class ChromeFrame(
     val apps: Map<Int, PaneApp>,
     val labels: ChromeLabels,
     /** Shown over the panes while the privileges they need are missing; null once they are there. */
-    val setup: SetupNotice? = null
+    val setup: SetupNotice? = null,
+    /** Pane id to the note its blocked app gets in place of a black pane. */
+    val blockedPanes: Map<Int, BlockedPaneNotice> = emptyMap()
 )
 
 /**
@@ -147,6 +155,9 @@ class DuoScreenChromeRenderer {
             drawCards(canvas, frame)
         }
 
+        if (!c.editing && frame.setup == null) {
+            frame.blockedPanes.forEach { (id, notice) -> paneRect(c, id)?.let { drawBlocked(canvas, frame, it, notice) } }
+        }
         // Under the bar and the rail, which stay usable: Exit and the layout still work.
         if (!c.editing) frame.setup?.let { drawSetup(canvas, frame, it) }
 
@@ -558,6 +569,44 @@ class DuoScreenChromeRenderer {
                 x += tile + tileGap
             }
         }
+    }
+
+    /**
+     * In a blocked app's pane: its icon, the title and one line of why, centred. The pane is black
+     * under it anyway, so nothing of the app's own is covered.
+     */
+    private fun drawBlocked(canvas: Canvas, frame: ChromeFrame, pane: Rect, notice: BlockedPaneNotice) {
+        val d = frame.density
+        val s = frame.chrome.spec
+        val pad = s.CARD_GAP * d
+        val inner = (pane.width - 2 * pad).toInt()
+        if (inner <= 0 || pane.height <= 0) return
+        setupTitle.textSize = s.CARD_TITLE * 0.85f * d
+        setupBody.textSize = s.CARD_SHARE * d
+        val title = centredLayout(notice.title, setupTitle, inner, maxLines = 2)
+        val body = centredLayout(notice.body, setupBody, inner, maxLines = 3)
+        val tile = (s.CARD_TILE * 0.7f * d).coerceAtMost(pane.height * 0.3f)
+        val icon = notice.app?.icon
+        val gap = pad * 0.6f
+        val height = (if (icon != null) tile + gap else 0f) + title.height + gap * 0.5f + body.height
+        var y = (pane.top + (pane.height - height) / 2f).coerceAtLeast(pane.top.toFloat())
+        val cx = pane.centerX()
+        if (icon != null) {
+            rect.set(cx - tile / 2f, y, cx + tile / 2f, y + tile)
+            fill.color = TILE
+            val tr = tile * 0.28f
+            canvas.drawRoundRect(rect, tr, tr, fill)
+            rect.inset(tile * 0.18f, tile * 0.18f)
+            canvas.drawBitmap(icon, null, rect, image)
+            y += tile + gap
+        }
+        canvas.save()
+        canvas.clipRect(pane.left.toFloat(), pane.top.toFloat(), pane.right.toFloat(), pane.bottom.toFloat())
+        canvas.translate(pane.left + pad, y)
+        title.draw(canvas)
+        canvas.translate(0f, title.height + gap * 0.5f)
+        body.draw(canvas)
+        canvas.restore()
     }
 
     private fun centredLayout(value: String, paint: TextPaint, width: Int, maxLines: Int): StaticLayout =
