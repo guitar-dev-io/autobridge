@@ -162,8 +162,12 @@ class RadioPlayerActivity : Activity() {
                 null
             )
             setOnClickListener {
-                if (playback.isPlaying) playback.pause() else playback.resume()
+                // The session answers a beat later, so the button shows what was asked for now
+                // rather than the state it is leaving; the next tick confirms it.
+                val wasPlaying = playback.isPlaying
+                if (wasPlaying) playback.pause() else playback.resume()
                 update()
+                showPlaying(!wasPlaying)
             }
         }
         transport.addView(playToggle, LinearLayout.LayoutParams(dp(92), dp(92)).apply {
@@ -292,6 +296,11 @@ class RadioPlayerActivity : Activity() {
         update()
     }
 
+    private fun showPlaying(playing: Boolean) {
+        playToggle.text = if (playing) "❚❚" else "▶"
+        playToggle.contentDescription = getString(if (playing) R.string.radio_pause else R.string.radio_play)
+    }
+
     private fun update() {
         if (!::song.isInitialized) return
         val now = RadioNowPlaying.of(playback.currentItemTitle, playback.currentTitle, playback.currentArtist)
@@ -308,9 +317,7 @@ class RadioPlayerActivity : Activity() {
         }
         initial.text = now.station.trim().take(1).uppercase()
 
-        val playing = playback.isPlaying
-        playToggle.text = if (playing) "❚❚" else "▶"
-        playToggle.contentDescription = getString(if (playing) R.string.radio_pause else R.string.radio_play)
+        showPlaying(playback.isPlaying)
 
         val url = playback.currentUri
         val isFavorite = !url.isNullOrBlank() && IptvHistoryStore.isFavorite(this, url)
@@ -325,6 +332,10 @@ class RadioPlayerActivity : Activity() {
         val address = playback.currentArtworkUri
         if (address != shownLogo) {
             shownLogo = address
+            // Forget the last station's logo, and the fetch for it that may still be on its way:
+            // ImageLoader applies an answer only while the view's tag still names its address.
+            logo.setImageDrawable(null)
+            logo.setTag(R.id.autobridge_image_tag, null)
             logo.visibility = View.GONE
             initial.visibility = View.VISIBLE
             if (!address.isNullOrBlank()) {
