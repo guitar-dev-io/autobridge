@@ -12,6 +12,9 @@ scripts/m3u/
 docs/
 
 .agents
+# Local git worktrees. A worktree committed by accident is a gitlink with no .gitmodules entry,
+# and CI's recursive submodule checkout fails on it before a single task runs.
+.worktrees/
 # CMake's intermediate tree for the :whisper native build. The module itself (sources,
 # CMake script, the whisper.cpp submodule) must stay tracked: the app builds against it.
 whisper/.cxx/
