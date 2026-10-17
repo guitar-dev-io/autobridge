@@ -128,9 +128,13 @@ class MiniPlayer(
             return
         }
         view.visibility = View.VISIBLE
-        title.text = name
+        // A radio stream that names its song shows the song, with the artist and the station
+        // under it; anything else reads exactly as before (its title, then its artist).
+        val now = dev.autobridge.radio.RadioNowPlaying.of(playback.currentItemTitle, name, playback.currentArtist)
+        title.text = now.song ?: name
         subtitle.text = listOfNotNull(
-            playback.currentArtist,
+            now.artist,
+            now.station.takeIf { now.song != null },
             if (playback.isPlaying) "Playing" else "Paused"
         ).joinToString(" • ")
         toggle.text = if (playback.isPlaying) PAUSE else PLAY
@@ -146,9 +150,27 @@ class MiniPlayer(
                 return
             }
         }
+        // No embedded art: the address the item was queued with (a station logo), fetched once.
+        val address = playback.currentArtworkUri
+        if (address != null) {
+            if (address != loadedArtwork) {
+                loadedArtwork = address
+                artwork.visibility = View.GONE
+                glyph.visibility = View.VISIBLE
+                ImageLoader.load(context, address, artwork) {
+                    artwork.visibility = View.VISIBLE
+                    glyph.visibility = View.GONE
+                }
+            }
+            return
+        }
+        loadedArtwork = null
         artwork.visibility = View.GONE
         glyph.visibility = View.VISIBLE
     }
+
+    /** The artwork address last asked of [ImageLoader], so the one-second tick does not refetch it. */
+    private var loadedArtwork: String? = null
 
     private companion object {
         const val PLAY = "▶"

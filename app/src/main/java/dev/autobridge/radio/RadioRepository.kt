@@ -182,8 +182,14 @@ object RadioRepository {
         if (cq == null) {
             coord.play(anchorStation, queue = listOf(anchorStation), startIndex = 0)
         } else {
+            // The queue carries each station's logo too, so whatever shows the station playing
+            // (the phone's player, the car, the media card) can draw it.
+            val logos = items.associate { it.url to it.logo }
             val queue = cq.channels.map { qc ->
-                RadioStation(RadioSourceType.INTERNET_RADIO, id = qc.url, title = qc.title, streamUrl = qc.url)
+                RadioStation(
+                    RadioSourceType.INTERNET_RADIO, id = qc.url, title = qc.title, streamUrl = qc.url,
+                    logo = logos[qc.url].orEmpty()
+                )
             }
             coord.play(anchorStation, queue, startIndex = cq.startIndex)
         }

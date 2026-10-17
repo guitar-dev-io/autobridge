@@ -59,7 +59,9 @@ data class IptvEntry(
     val catchupDays: Int = 0,
     val playback: IptvPlayback = IptvPlayback.STREAM,
     val guideId: String = "",
-    val country: String = ""
+    val country: String = "",
+    /** A station's own genre tags as its directory lists them (radio-browser), comma-separated. */
+    val tags: String = ""
 ) {
     val isSeriesFolder: Boolean get() = type == IptvEntryType.SERIES && url.isEmpty()
     val supportsCatchup: Boolean get() = type == IptvEntryType.LIVE && catchupDays > 0

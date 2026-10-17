@@ -21,20 +21,24 @@ object PhoneHomeLayout {
         BROWSER(R.string.home_tile_browser),
         YOUTUBE(R.string.home_tile_youtube),
         MUSIC(R.string.home_tile_music),
-        TV_RADIO(R.string.home_tile_tv_radio),
-        FAVORITES(R.string.home_tile_favorites),
+        RADIO(R.string.home_tile_radio),
+        TV(R.string.home_tile_tv),
         MORE(R.string.home_tile_more)
     }
 
-    /** Tiles that open a single section directly. */
+    /**
+     * Tiles that open a single section directly. Radio and TV are a tile each, so the radio is one
+     * tap from Home; Favorites, which those two used to share a row with, is under More.
+     */
     val directSection: Map<Tile, HomeSection> = mapOf(
         Tile.BROWSER to HomeSection.WEB,
-        Tile.YOUTUBE to HomeSection.YOUTUBE
+        Tile.YOUTUBE to HomeSection.YOUTUBE,
+        Tile.RADIO to HomeSection.RADIO,
+        Tile.TV to HomeSection.TV
     )
 
     /** Tiles that open a short chooser page of related sections. */
     val musicSections: List<HomeSection> = listOf(HomeSection.YOUTUBE_MUSIC, HomeSection.PLAYLISTS)
-    val tvRadioSections: List<HomeSection> = listOf(HomeSection.TV, HomeSection.RADIO)
 
     /**
      * Everything else the phone offers, behind More: local media (Folders, Gallery), Streaming
@@ -44,12 +48,12 @@ object PhoneHomeLayout {
      */
     val moreSections: List<HomeSection>
         get() = HomeSection.phoneSections.filterNot {
-            it in directSection.values || it in musicSections || it in tvRadioSections
+            it in directSection.values || it in musicSections
         }
 
     /** Every section reachable from Home, for the coverage test. */
     val reachableSections: Set<HomeSection>
-        get() = (directSection.values + musicSections + tvRadioSections + moreSections).toSet()
+        get() = (directSection.values + musicSections + moreSections).toSet()
 
     /** One "Recent" chip under Send to Car: what was sent, re-sendable as the same command. */
     data class RecentSend(val label: String, val type: CommandType, val payload: String)

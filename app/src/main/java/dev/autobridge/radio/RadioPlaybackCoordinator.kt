@@ -94,6 +94,7 @@ class RadioPlaybackCoordinator(private val client: RadioTransportClient) {
             uris = queue.map { it.streamUrl },
             startIndex = startIndex.coerceIn(0, (queue.size - 1).coerceAtLeast(0)),
             titles = queue.map { it.title },
+            artworks = queue.map { it.logo },
         )
         // Playing a station makes internet radio the active and selected source.
         activeSource = station.sourceType

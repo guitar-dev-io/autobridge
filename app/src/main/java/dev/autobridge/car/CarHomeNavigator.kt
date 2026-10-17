@@ -20,8 +20,9 @@ internal object CarHomeNavigator {
         when {
             section == HomeSection.TV ->
                 screenManager.push(CarIptvSourcesScreen(carContext, dev.autobridge.iptv.IptvKind.TV))
+            // Tabs and a logo grid from Car API 6; the list landing on an older host.
             section == HomeSection.RADIO ->
-                screenManager.push(CarIptvSourcesScreen(carContext, dev.autobridge.iptv.IptvKind.RADIO))
+                screenManager.push(CarRadioHomeScreen.open(carContext))
             url != null -> {
                 // Tapping a site tile that is already open means "take me back to it", not "start
                 // over": loading the root again would throw the page away and restart whatever is

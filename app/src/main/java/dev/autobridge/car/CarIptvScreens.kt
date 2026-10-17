@@ -705,6 +705,8 @@ internal object CarIptvPlayback {
         kind: IptvKind,
         playback: IptvPlayback = IptvPlayback.STREAM,
         queue: ChannelQueue? = null,
+        /** A station's logo by its stream address, carried as the queued item's artwork. */
+        logoFor: (String) -> String? = { null },
     ) {
         if (url.isBlank()) {
             CarToast.makeText(
@@ -740,10 +742,11 @@ internal object CarIptvPlayback {
                 return
             }
             if (queue == null) {
-                mediaPlayback.play(url, title)
+                mediaPlayback.playPlaylist(listOf(url), 0, listOf(title), artworks = listOf(logoFor(url)))
             } else {
                 mediaPlayback.playPlaylist(
-                    queue.channels.map { it.url }, queue.startIndex, queue.channels.map { it.title }
+                    queue.channels.map { it.url }, queue.startIndex, queue.channels.map { it.title },
+                    artworks = queue.channels.map { logoFor(it.url) }
                 )
             }
             // Radio now playing is the surface-drawn large station display; a host below Car API 5

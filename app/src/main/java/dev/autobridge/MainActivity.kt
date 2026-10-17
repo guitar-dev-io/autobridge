@@ -438,37 +438,20 @@ class MainActivity : androidx.activity.ComponentActivity() {
         val design = dev.autobridge.ui.AutoBridgeDesign
         val tiles = dev.autobridge.ui.PhoneHomeLayout.Tile.entries.map { tile ->
             when (tile) {
-                dev.autobridge.ui.PhoneHomeLayout.Tile.BROWSER, dev.autobridge.ui.PhoneHomeLayout.Tile.YOUTUBE -> {
+                dev.autobridge.ui.PhoneHomeLayout.Tile.BROWSER, dev.autobridge.ui.PhoneHomeLayout.Tile.YOUTUBE,
+                dev.autobridge.ui.PhoneHomeLayout.Tile.RADIO, dev.autobridge.ui.PhoneHomeLayout.Tile.TV -> {
                     val section = layout.directSection.getValue(tile)
                     dev.autobridge.ui.HomeTileUi(getString(tile.titleRes), tileIcon(section), section.accent) { openHomeSection(section) }
                 }
-                // Music, TV / Radio and Favorites now open the Library screen directly, with its
-                // chip row pre-selected, instead of the old chooser pages — Library itself is the
-                // chooser now (phase 3). Favorite apps stay reachable from Settings > Apps & profiles.
+                // Music opens the Library screen directly, with its chip row pre-selected, instead
+                // of the old chooser page — Library itself is the chooser now (phase 3). Favorite
+                // apps stay reachable from Settings > Apps & profiles.
                 dev.autobridge.ui.PhoneHomeLayout.Tile.MUSIC -> dev.autobridge.ui.HomeTileUi(
                     getString(tile.titleRes), R.drawable.ic_tile_youtube_music, design.ACCENT_FILES
                 ) {
                     startActivity(
                         dev.autobridge.library.LibraryActivity.intent(
                             this, dev.autobridge.library.LibraryActivity.Section.MUSIC
-                        )
-                    )
-                }
-                dev.autobridge.ui.PhoneHomeLayout.Tile.TV_RADIO -> dev.autobridge.ui.HomeTileUi(
-                    getString(tile.titleRes), R.drawable.ic_tile_tv, design.ACCENT_TV
-                ) {
-                    startActivity(
-                        dev.autobridge.library.LibraryActivity.intent(
-                            this, dev.autobridge.library.LibraryActivity.Section.TV
-                        )
-                    )
-                }
-                dev.autobridge.ui.PhoneHomeLayout.Tile.FAVORITES -> dev.autobridge.ui.HomeTileUi(
-                    getString(tile.titleRes), R.drawable.ic_tile_favorite, design.ACCENT_FAVORITE
-                ) {
-                    startActivity(
-                        dev.autobridge.library.LibraryActivity.intent(
-                            this, dev.autobridge.library.LibraryActivity.Section.FAVORITES
                         )
                     )
                 }
@@ -491,7 +474,8 @@ class MainActivity : androidx.activity.ComponentActivity() {
                         onBridgeDuo = duoScreenIntent()?.let { intent -> { startActivity(intent) } },
                         updateVersion = homeUpdate?.release?.versionName,
                         onOpenUpdate = { homeUpdate?.let(::showUpdateDialog) },
-                        onDismissUpdate = ::dismissHomeUpdate
+                        onDismissUpdate = ::dismissHomeUpdate,
+                        resumeRadio = resumeRadio()
                     )
                 }
             }
@@ -630,6 +614,21 @@ class MainActivity : androidx.activity.ComponentActivity() {
             dev.autobridge.library.HomeSection.REMOTE -> R.drawable.ic_tile_remote
             dev.autobridge.library.HomeSection.SETTINGS -> R.drawable.ic_tile_settings
         }
+
+    /**
+     * Home's "keep listening" card: the radio station played last, if any. A tap plays it again
+     * with the recent stations as the queue (so next/previous still step) and opens the player.
+     */
+    private fun resumeRadio(): dev.autobridge.ui.ResumeRadioUi? {
+        val recent = dev.autobridge.iptv.IptvHistoryStore.recent(this, dev.autobridge.iptv.IptvKind.RADIO)
+        val last = recent.firstOrNull { it.url.isNotBlank() } ?: return null
+        return dev.autobridge.ui.ResumeRadioUi(last.title) {
+            val station = dev.autobridge.radio.RadioRepository.RadioHistory.toRadioStation(last)
+            dev.autobridge.radio.RadioRepository.recordPlayback(this, station)
+            dev.autobridge.radio.RadioRepository.playFromItems(station, recent, last)
+            startActivity(dev.autobridge.library.RadioPlayerActivity.intent(this))
+        }
+    }
 
     private fun openHomeSection(section: dev.autobridge.library.HomeSection) {
         val librarySection = section.librarySection
