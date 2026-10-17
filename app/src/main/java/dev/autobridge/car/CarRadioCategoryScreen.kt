@@ -242,9 +242,11 @@ class CarRadioCategoryScreen(
     private fun play(entry: IptvEntry, entries: List<IptvEntry>) {
         if (entry.url.isBlank()) return
         RadioRepository.recordPlayback(carContext, InternetRadioSource.toStation(entry))
+        val logos = entries.associate { it.url to it.logo }
         CarIptvPlayback.play(
             this, carContext, mediaPlayback, entry.title, entry.url, IptvKind.RADIO,
-            IptvPlayback.STREAM, IptvChannelQueue.around(entries, entry, CarIptvCheck::isDead)
+            IptvPlayback.STREAM, IptvChannelQueue.around(entries, entry, CarIptvCheck::isDead),
+            logoFor = { logos[it] }
         )
     }
 
@@ -252,9 +254,11 @@ class CarRadioCategoryScreen(
     private fun playFavorite(item: IptvHistoryStore.Item, favorites: List<IptvHistoryStore.Item>) {
         if (item.url.isBlank()) return
         RadioRepository.recordPlayback(carContext, RadioRepository.RadioHistory.toRadioStation(item))
+        val logos = favorites.associate { it.url to it.logo }
         CarIptvPlayback.play(
             this, carContext, mediaPlayback, item.title, item.url, IptvKind.RADIO,
-            item.playback, IptvChannelQueue.aroundItems(favorites, item, CarIptvCheck::isDead)
+            item.playback, IptvChannelQueue.aroundItems(favorites, item, CarIptvCheck::isDead),
+            logoFor = { logos[it] }
         )
     }
 }

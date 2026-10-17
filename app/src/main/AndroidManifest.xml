@@ -9,6 +9,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- The radio equalizer: android.media.audiofx effects on the player's own audio session. -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <!-- The car's odometer and fuel level, for the fuel log. Asked for on the car (CarFuelScreen);
          a car that does not report them, or a refusal, leaves the log to typed readings. -->
     <uses-permission android:name="com.google.android.gms.permission.CAR_MILEAGE" />
@@ -207,6 +209,10 @@
         <activity android:name=".library.PlayerActivity" android:exported="false"
             android:supportsPictureInPicture="true"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation|density|uiMode|fontScale" />
+
+        <!-- The radio player: station, song, transport and the equalizer sheet. Audio only, so it
+             has no surface to keep alive across a rotation and takes the default handling. -->
+        <activity android:name=".library.RadioPlayerActivity" android:exported="false" />
 
         <!-- Video settings for the player above, and its enhancement sub-screen. -->
         <activity android:name=".library.VideoSettingsActivity" android:exported="false" />

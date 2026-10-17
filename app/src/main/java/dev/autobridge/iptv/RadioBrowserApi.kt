@@ -85,7 +85,8 @@ internal object RadioBrowserApi {
                 subtitle = listOf(station.optString("country").trim(), format)
                     .filter { it.isNotBlank() }
                     .joinToString(" • "),
-                country = station.optString("countrycode").trim()
+                country = station.optString("countrycode").trim(),
+                tags = station.optString("tags").trim()
             )
         }
         return out

@@ -46,6 +46,9 @@ import dev.autobridge.remote.CommandSource
 /** One Quick Launch tile as the view layer needs it. */
 data class HomeTileUi(val title: String, val icon: Int, val accent: Int, val onClick: () -> Unit)
 
+/** The radio station listened to last, as Home's "keep listening" card shows it. */
+data class ResumeRadioUi(val station: String, val onPlay: () -> Unit)
+
 /**
  * Body of the phone Home (below the AutoBridge header, above the mini player):
  * Android Auto status, Send to Car with its recent sends, then Quick Launch.
@@ -66,7 +69,9 @@ fun HomeDashboard(
     /** A newer release's version name when one was found; null hides the update card. */
     updateVersion: String? = null,
     onOpenUpdate: () -> Unit = {},
-    onDismissUpdate: () -> Unit = {}
+    onDismissUpdate: () -> Unit = {},
+    /** The last radio station, for a one-tap "keep listening"; null when none was ever played. */
+    resumeRadio: ResumeRadioUi? = null
 ) {
     val history by CommandHistoryStore.entries.collectAsState()
     val lastResult = rememberLastCommandResult()
@@ -105,6 +110,9 @@ fun HomeDashboard(
                 }
             }
         )
+
+        // The station listened to last, right under the connection: back on the radio in one tap.
+        if (resumeRadio != null) ResumeRadioCard(resumeRadio)
 
         // Send to Car comes before Quick Launch: sending something to the car is what Home is
         // opened for most, so the field sits right under the connection card.
@@ -151,6 +159,45 @@ fun HomeDashboard(
                 row.forEach { tile -> QuickLaunchTile(tile, Modifier.weight(1f)) }
                 repeat(3 - row.size) { Box(Modifier.weight(1f)) }
             }
+        }
+    }
+}
+
+/** "Last radio station": the station's name and a play button, all of it one tap to play. */
+@Composable
+private fun ResumeRadioCard(resume: ResumeRadioUi) {
+    val accent = Color(0xFFFFB35C)
+    val playDescription = stringResource(R.string.radio_play)
+    Surface(
+        onClick = resume.onPlay,
+        shape = RoundedCornerShape(20.dp),
+        color = accent.copy(alpha = 0.12f),
+        modifier = Modifier.fillMaxWidth().border(1.dp, accent.copy(alpha = 0.35f), RoundedCornerShape(20.dp))
+    ) {
+        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(48.dp).background(accent.copy(alpha = 0.2f), RoundedCornerShape(14.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(painterResource(R.drawable.ic_tile_radio), contentDescription = null, tint = accent, modifier = Modifier.size(26.dp))
+            }
+            Column(Modifier.padding(start = 12.dp).weight(1f)) {
+                Text(stringResource(R.string.home_resume_radio), color = accent, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    resume.station,
+                    color = ComposeTokens.Text,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(stringResource(R.string.home_resume_tap), color = ComposeTokens.TextMuted, fontSize = 12.5.sp)
+            }
+            Box(
+                Modifier.size(48.dp).background(accent, RoundedCornerShape(24.dp))
+                    .semantics { contentDescription = playDescription },
+                contentAlignment = Alignment.Center
+            ) { Text("▶", color = ComposeTokens.Ink, fontSize = 20.sp, fontWeight = FontWeight.Bold) }
         }
     }
 }

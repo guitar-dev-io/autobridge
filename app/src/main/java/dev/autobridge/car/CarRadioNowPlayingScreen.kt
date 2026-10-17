@@ -14,6 +14,7 @@ import android.text.TextUtils
 import android.view.Surface
 import androidx.car.app.AppManager
 import androidx.car.app.CarContext
+import androidx.car.app.CarToast
 import androidx.car.app.Screen
 import androidx.car.app.SurfaceCallback
 import androidx.car.app.SurfaceContainer
@@ -25,9 +26,15 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import dev.autobridge.R
 import dev.autobridge.display.CarSurfaceCanvas
+import dev.autobridge.iptv.IptvHistoryStore
+import dev.autobridge.media.AudioEq
 import dev.autobridge.logging.StructuredLog
 import dev.autobridge.media.MediaPlaybackClient
 import dev.autobridge.mirror.MirrorSurfaceOwnership
+import dev.autobridge.radio.RadioNowPlaying
+import dev.autobridge.radio.RadioRepository
+import dev.autobridge.radio.RadioSourceType
+import dev.autobridge.radio.RadioStation
 import dev.autobridge.ui.ImageLoader
 
 /**
@@ -223,7 +230,29 @@ class CarRadioNowPlayingScreen(carContext: CarContext) : Screen(carContext), Sur
             CarRadioRegion.Play -> if (media.isPlaying) media.pause() else media.resume()
             CarRadioRegion.Previous -> if (media.hasPrevious) media.previous()
             CarRadioRegion.Next -> if (media.hasNext) media.next()
+            // One button, the next sound preset: no sliders to fiddle with while driving.
+            CarRadioRegion.Eq -> {
+                val preset = AudioEq.cyclePreset(carContext)
+                CarToast.makeText(
+                    carContext,
+                    carContext.getString(R.string.eq_car_changed, carContext.getString(preset.labelRes)),
+                    CarToast.LENGTH_SHORT
+                ).show()
+            }
+            CarRadioRegion.Favorite -> currentStation()?.let { station ->
+                RadioRepository.RadioHistory.toggleFavorite(carContext, station)
+            }
         }
+    }
+
+    /** The station playing now as the radio store knows stations, for the favourite button. */
+    private fun currentStation(): RadioStation? {
+        val url = media.currentUri?.takeIf { it.isNotBlank() } ?: return null
+        val name = media.currentItemTitle ?: media.currentTitle ?: return null
+        return RadioStation(
+            RadioSourceType.INTERNET_RADIO, id = url, title = name, streamUrl = url,
+            logo = media.currentArtworkUri.orEmpty()
+        )
     }
 
     // --- Drawing ------------------------------------------------------------------------------
@@ -242,6 +271,12 @@ class CarRadioNowPlayingScreen(carContext: CarContext) : Screen(carContext), Sur
                     title = media.currentTitle,
                     subtitle = media.currentArtist,
                     artwork = media.currentArtworkData,
+                    station = media.currentItemTitle,
+                    artworkUrl = media.currentArtworkUri,
+                    eqLabel = carContext.getString(
+                        R.string.eq_car_button, carContext.getString(AudioEq.activePreset(carContext).labelRes)
+                    ),
+                    favorite = media.currentUri?.let { IptvHistoryStore.isFavorite(carContext, it) } == true,
                     connected = media.isConnected,
                     playing = media.isPlaying,
                     hasPrevious = media.hasPrevious,
@@ -288,6 +323,8 @@ internal sealed interface CarRadioRegion {
     object Play : CarRadioRegion
     object Previous : CarRadioRegion
     object Next : CarRadioRegion
+    object Eq : CarRadioRegion
+    object Favorite : CarRadioRegion
 }
 
 /**
@@ -305,6 +342,9 @@ internal class CarRadioLayout private constructor(
     val previous: CarRadioBox,
     val play: CarRadioBox,
     val next: CarRadioBox,
+    /** The two pills under the text: the sound preset and the favourite. */
+    val eq: CarRadioBox,
+    val favorite: CarRadioBox,
 ) {
     fun dp(v: Float) = v * density
 
@@ -312,6 +352,8 @@ internal class CarRadioLayout private constructor(
         if (inside(play, x, y)) return CarRadioRegion.Play
         if (inside(previous, x, y)) return CarRadioRegion.Previous
         if (inside(next, x, y)) return CarRadioRegion.Next
+        if (inside(eq, x, y)) return CarRadioRegion.Eq
+        if (inside(favorite, x, y)) return CarRadioRegion.Favorite
         return null
     }
 
@@ -350,8 +392,15 @@ internal class CarRadioLayout private constructor(
             val textLeft = artwork.right + dp(24f)
             val textRight = content.right
 
+            // The pills sit under the four text lines, kept above the transport band.
+            val pillHeight = dp(52f)
+            val pillTop = (content.top + dp(150f)).coerceAtMost(upperBottom - pillHeight)
+            val pillWidth = ((textRight - textLeft - dp(12f)) / 2f).coerceIn(0f, dp(220f))
+            val eq = CarRadioBox(textLeft, pillTop, textLeft + pillWidth, pillTop + pillHeight)
+            val favorite = CarRadioBox(eq.right + dp(12f), pillTop, eq.right + dp(12f) + pillWidth, pillTop + pillHeight)
+
             return CarRadioLayout(
-                density, content, artwork, textLeft, textRight, content.top, previous, play, next
+                density, content, artwork, textLeft, textRight, content.top, previous, play, next, eq, favorite
             )
         }
     }
@@ -375,6 +424,12 @@ internal class CarRadioNowPlayingRenderer(private val context: CarContext) {
         val playing: Boolean,
         val hasPrevious: Boolean,
         val hasNext: Boolean,
+        /** The queue item's own name (the station), which [title] replaces with the song once the stream names it. */
+        val station: String? = null,
+        /** The station logo the item was queued with, drawn when the stream carries no artwork of its own. */
+        val artworkUrl: String? = null,
+        val eqLabel: String = "",
+        val favorite: Boolean = false,
     )
 
     private val bold = Typeface.create("sans-serif", Typeface.BOLD)
@@ -393,6 +448,7 @@ internal class CarRadioNowPlayingRenderer(private val context: CarContext) {
         typeface = bold
         color = HomeDashboardTheme.ACCENT_RADIO
     }
+    private val pillPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { typeface = bold }
     private val rect = RectF()
     private val source = Rect()
     private val path = Path()
@@ -408,7 +464,33 @@ internal class CarRadioNowPlayingRenderer(private val context: CarContext) {
 
         drawArtwork(canvas, layout, content, thumbnails)
         drawText(canvas, layout, content)
+        drawPills(canvas, layout, content, pressed)
         drawTransport(canvas, layout, content, pressed)
+    }
+
+    private fun drawPills(canvas: Canvas, layout: CarRadioLayout, content: Content, pressed: CarRadioRegion?) {
+        if (layout.eq.width < layout.dp(40f)) return
+        drawPill(canvas, layout, layout.eq, content.eqLabel, on = false, pressed = pressed == CarRadioRegion.Eq)
+        val favorite = context.getString(if (content.favorite) R.string.radio_favorite_on else R.string.radio_favorite_add)
+        drawPill(canvas, layout, layout.favorite, "★ $favorite", on = content.favorite, pressed = pressed == CarRadioRegion.Favorite)
+    }
+
+    private fun drawPill(canvas: Canvas, layout: CarRadioLayout, box: CarRadioBox, label: String, on: Boolean, pressed: Boolean) {
+        rect.set(box.left, box.top, box.right, box.bottom)
+        val radius = box.height / 2f
+        fill.color = when {
+            pressed -> HomeDashboardTheme.CONTROL_PRESSED
+            on -> HomeDashboardTheme.mix(HomeDashboardTheme.CARD, HomeDashboardTheme.ACCENT_RADIO, 0.22f)
+            else -> HomeDashboardTheme.CONTROL
+        }
+        canvas.drawRoundRect(rect, radius, radius, fill)
+        pillPaint.textSize = layout.dp(17f)
+        pillPaint.color = if (on) HomeDashboardTheme.ACCENT_RADIO else HomeDashboardTheme.TEXT_CONTROL
+        val clipped = TextUtils.ellipsize(label, pillPaint, box.width - layout.dp(24f), TextUtils.TruncateAt.END)
+        val width = pillPaint.measureText(clipped, 0, clipped.length)
+        val metrics = pillPaint.fontMetrics
+        val baseline = box.centerY - (metrics.ascent + metrics.descent) / 2f
+        canvas.drawText(clipped, 0, clipped.length, box.centerX - width / 2f, baseline, pillPaint)
     }
 
     private fun drawArtwork(canvas: Canvas, layout: CarRadioLayout, content: Content, thumbnails: Thumbnails) {
@@ -420,7 +502,7 @@ internal class CarRadioNowPlayingRenderer(private val context: CarContext) {
 
         // The session carries embedded artwork bytes; a URL still (handled by [thumbnails]) is
         // reserved for a later metadata source. Either way the fallback glyph fills the gap.
-        val bitmap = decodeEmbedded(content.artwork) ?: thumbnails.bitmap(null)
+        val bitmap = decodeEmbedded(content.artwork) ?: thumbnails.bitmap(content.artworkUrl)
         if (bitmap != null && bitmap.width > 0 && bitmap.height > 0) {
             val scale = maxOf(box.width / bitmap.width, box.height / bitmap.height)
             val cw = (box.width / scale).coerceAtMost(bitmap.width.toFloat())
@@ -467,15 +549,21 @@ internal class CarRadioNowPlayingRenderer(private val context: CarContext) {
         var y = layout.textTop + layout.dp(22f)
         canvas.drawText(badge, left, y, badgePaint)
 
+        // The song when the stream names it, the station otherwise; see RadioNowPlaying.
+        val now = RadioNowPlaying.of(content.station, content.title, content.subtitle)
         titlePaint.textSize = layout.dp(30f)
         y += layout.dp(44f)
-        val title = content.title ?: context.getString(R.string.car_radio_nothing_playing)
+        val title = when {
+            content.title == null -> context.getString(R.string.car_radio_nothing_playing)
+            else -> now.song ?: now.station
+        }
         drawEllipsized(canvas, title, titlePaint, left, right, y)
 
         val subtitle = when {
             !content.connected -> context.getString(R.string.car_lib_connecting_session)
             content.title == null -> context.getString(R.string.car_lib_nothing_playing)
-            else -> content.subtitle ?: context.getString(
+            now.song != null -> listOfNotNull(now.artist, now.station).joinToString(" · ")
+            else -> now.artist ?: context.getString(
                 if (content.playing) R.string.car_lib_playing else R.string.car_lib_paused
             )
         }

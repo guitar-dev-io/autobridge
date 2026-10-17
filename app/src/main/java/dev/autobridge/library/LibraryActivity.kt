@@ -56,6 +56,7 @@ import dev.autobridge.iptv.ThaiProvinces
 import dev.autobridge.iptv.toHistoryItem
 import dev.autobridge.media.MediaPlaybackClient
 import dev.autobridge.radio.InternetRadioSource
+import dev.autobridge.radio.RadioGenre
 import dev.autobridge.radio.RadioRepository
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.dp
@@ -127,6 +128,8 @@ class LibraryActivity : Activity() {
         /** Radio: the online station search waits for this pause in typing and this many characters. */
         private const val RADIO_ONLINE_DEBOUNCE_MS = 600L
         private const val RADIO_ONLINE_MIN_CHARS = 2
+        /** Station logos across the Radio grid: four, like a radio app's, so a screenful is a dozen. */
+        private const val RADIO_GRID_COLUMNS = 4
 
         fun intent(context: android.content.Context, section: Section): Intent =
             Intent(context, LibraryActivity::class.java).putExtra(EXTRA_SECTION, section.name)
@@ -295,7 +298,8 @@ class LibraryActivity : Activity() {
         headerActions: List<AutoBridgeDesign.HeaderAction> = emptyList(),
         search: Pair<String, (String) -> Unit>? = null,
         extraPinned: List<View> = emptyList(),
-        overlay: View? = null
+        overlay: View? = null,
+        bottomTabs: View? = null
     ): View {
         val body = AutoBridgeDesign.body(this)
         if (rows.isEmpty() && empty != null) body.addView(empty)
@@ -330,9 +334,16 @@ class LibraryActivity : Activity() {
         }
         // The bar is reused across pages, so detach it from the page it was last attached to.
         (bar.view.parent as? android.view.ViewGroup)?.removeView(bar.view)
+        // The now-playing bar, and under it the page's own tab bar when it has one (Radio's
+        // categories), so the tabs sit where a thumb reaches and the bar never covers them.
         val bottom = LinearLayout(this).apply {
-            setPadding(dp(16), 0, dp(16), dp(12))
-            addView(bar.view, LinearLayout.LayoutParams(-1, -2))
+            orientation = LinearLayout.VERTICAL
+            val barSlot = LinearLayout(this@LibraryActivity).apply {
+                setPadding(dp(16), 0, dp(16), dp(if (bottomTabs == null) 12 else 8))
+                addView(bar.view, LinearLayout.LayoutParams(-1, -2))
+            }
+            addView(barSlot, LinearLayout.LayoutParams(-1, -2))
+            if (bottomTabs != null) addView(bottomTabs, LinearLayout.LayoutParams(-1, -2))
         }
 
         val header = AutoBridgeDesign.header(this, title, subtitle, onBack = onBack, actions = headerActions)
@@ -352,6 +363,11 @@ class LibraryActivity : Activity() {
 
     private fun openNowPlaying() {
         val playing = playback.currentTitle ?: return
+        // Radio has its own player: the station, the song it is on, and the equalizer.
+        if (section == Section.RADIO && !playback.hasVideo) {
+            startActivity(RadioPlayerActivity.intent(this))
+            return
+        }
         startActivity(
             PlayerActivity.intent(
                 context = this,
@@ -432,6 +448,8 @@ class LibraryActivity : Activity() {
      */
     private fun showRadioBrowse() {
         var selected = RadioCategory.IN_COUNTRY
+        // The genre chip within the category; a new category starts from the whole list again.
+        var genre = RadioGenre.ALL
         // The latest network answer and the key it is for, kept outside draw() so a chip switch or
         // a late answer redraws without refetching, and a stale answer is dropped by key.
         var loadingKey: String? = null
@@ -495,16 +513,22 @@ class LibraryActivity : Activity() {
                             accent = AutoBridgeDesign.ACCENT_RADIO
                         )
                     } else {
-                        // In-country leads with the top station as a hero card, then the rest under
-                        // a "Popular stations" label. Other categories are a plain 3-col grid.
-                        if (selected == RadioCategory.IN_COUNTRY) {
-                            rows += radioHeroCard(readyEntries.first(), readyEntries)
-                            rows += AutoBridgeDesign.sectionLabel(this, getString(R.string.radio_section_popular))
+                        // The genres these stations actually have, as chips, then a four-across
+                        // logo grid of the ones the chosen chip keeps. A genre with no station in
+                        // this category is not offered, so a chip never leads to an empty page.
+                        val genres = RadioGenre.available(readyEntries)
+                        if (genre !in genres) genre = RadioGenre.ALL
+                        if (genres.size > 1) rows += radioGenreChips(genres, genre) { chosen ->
+                            if (chosen != genre) {
+                                genre = chosen
+                                draw()
+                            }
                         }
+                        val shown = RadioGenre.filter(readyEntries, genre)
                         rows += AutoBridgeDesign.grid(
                             this,
-                            readyEntries.map { radioLogoCell(it, readyEntries) },
-                            columns = 3
+                            shown.map { radioLogoCell(it, shown) },
+                            columns = RADIO_GRID_COLUMNS
                         )
                         null
                     }
@@ -521,13 +545,6 @@ class LibraryActivity : Activity() {
         draw = {
             val rows = mutableListOf<View>()
             rows += radioSearchRow()
-            rows += radioCategoryChips(selected) { chosen ->
-                if (chosen != selected) {
-                    selected = chosen
-                    draw()
-                    if (chosen != RadioCategory.FAVORITES) startLoad()
-                }
-            }
 
             var empty: View? = null
             when (selected) {
@@ -544,7 +561,7 @@ class LibraryActivity : Activity() {
                         rows += AutoBridgeDesign.grid(
                             this,
                             favorites.map { item -> radioFavoriteLogoCell(item, favorites) },
-                            columns = 3
+                            columns = RADIO_GRID_COLUMNS
                         )
                     }
                 }
@@ -573,12 +590,21 @@ class LibraryActivity : Activity() {
 
             render(
                 title = Section.RADIO.title(this),
-                subtitle = getString(R.string.section_radio_caption),
+                subtitle = getString(R.string.radio_page_caption),
                 rows = rows,
                 empty = empty,
                 headerActions = listOf(
                     AutoBridgeDesign.HeaderAction("⌕", onClick = { openRadioSearch() })
-                )
+                ),
+                // The five categories are the page's tabs, along the bottom like a radio app's.
+                bottomTabs = radioTabBar(selected) { chosen ->
+                    if (chosen != selected) {
+                        selected = chosen
+                        genre = RadioGenre.ALL
+                        draw()
+                        if (chosen != RadioCategory.FAVORITES) startLoad()
+                    }
+                }
             )
         }
 
@@ -600,17 +626,75 @@ class LibraryActivity : Activity() {
             setOnClickListener { openRadioSearch() }
         }
 
-    /** The pinned chip switcher: one [AutoBridgeDesign.pill] per category, the chosen one primary. */
-    private fun radioCategoryChips(selected: RadioCategory, onSelect: (RadioCategory) -> Unit): View {
-        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+    /**
+     * The Radio page's bottom tabs, one per [RadioCategory]: an icon over its name, the chosen one
+     * in the radio accent on a soft pill. Bottom tabs rather than a chip row so the five categories
+     * stay put under the thumb while the grid above them scrolls.
+     */
+    private fun radioTabBar(selected: RadioCategory, onSelect: (RadioCategory) -> Unit): View {
+        val bar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setBackgroundColor(AutoBridgeDesign.SURFACE)
+            setPadding(dp(4), dp(6), dp(4), dp(8))
+            contentDescription = getString(R.string.radio_tabs_label)
+        }
         RadioCategory.values().forEach { category ->
+            val on = category == selected
+            val color = if (on) AutoBridgeDesign.ACCENT_RADIO else AutoBridgeDesign.TEXT_MUTED
+            val tab = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER_HORIZONTAL
+                isClickable = true
+                isFocusable = true
+                minimumHeight = dp(52)
+                contentDescription = getString(category.labelRes)
+                isSelected = on
+                setOnClickListener { onSelect(category) }
+            }
+            tab.addView(ImageView(this).apply {
+                setImageResource(radioTabIcon(category))
+                imageTintList = android.content.res.ColorStateList.valueOf(color)
+                setPadding(dp(14), dp(4), dp(14), dp(4))
+                background = if (on) AutoBridgeDesign.surface(
+                    this@LibraryActivity, AutoBridgeDesign.tint(AutoBridgeDesign.ACCENT_RADIO, 0.18f), 15,
+                    android.graphics.Color.TRANSPARENT
+                ) else null
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }, LinearLayout.LayoutParams(dp(56), dp(30)))
+            tab.addView(TextView(this).apply {
+                text = getString(category.labelRes)
+                textSize = 11f
+                gravity = Gravity.CENTER
+                setTextColor(color)
+                if (on) typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+                maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
+                setPadding(0, dp(3), 0, 0)
+            }, LinearLayout.LayoutParams(-1, -2))
+            bar.addView(tab, LinearLayout.LayoutParams(0, -2, 1f))
+        }
+        return bar
+    }
+
+    private fun radioTabIcon(category: RadioCategory): Int = when (category) {
+        RadioCategory.IN_COUNTRY -> R.drawable.ic_car_home
+        RadioCategory.LOCAL -> R.drawable.ic_radio_local
+        RadioCategory.WORLD -> R.drawable.ic_tile_language
+        RadioCategory.PODCASTS -> R.drawable.ic_car_mic
+        RadioCategory.FAVORITES -> R.drawable.ic_browser_star
+    }
+
+    /** The genre chips within a category: one [AutoBridgeDesign.pill] each, the chosen one primary. */
+    private fun radioGenreChips(genres: List<RadioGenre>, selected: RadioGenre, onSelect: (RadioGenre) -> Unit): View {
+        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        genres.forEach { genre ->
             row.addView(
                 AutoBridgeDesign.pill(
                     this,
-                    getString(category.labelRes),
-                    primary = category == selected,
+                    getString(genre.labelRes),
+                    primary = genre == selected,
                     accent = AutoBridgeDesign.ACCENT_RADIO,
-                    onClick = { onSelect(category) }
+                    onClick = { onSelect(genre) }
                 ),
                 LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(8) }
             )
@@ -670,14 +754,31 @@ class LibraryActivity : Activity() {
         return square
     }
 
-    /** One grid cell: a full-bleed square logo (3 states) with the station name below it. */
+    /**
+     * One grid cell: a full-bleed square logo (3 states) with the station name below it, in a card
+     * that takes the radio accent's outline while that station is the one playing.
+     */
     private fun radioLogoCell(entry: IptvEntry, categoryEntries: List<IptvEntry>): View =
         LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             isClickable = true
             isFocusable = true
             contentDescription = entry.title
-            setOnClickListener { playRadioEntry(entry, categoryEntries) }
+            val playing = entry.url.isNotBlank() && entry.url == playback.currentUri
+            isSelected = playing
+            setPadding(dp(4), dp(4), dp(4), dp(6))
+            background = AutoBridgeDesign.tappable(
+                this@LibraryActivity,
+                if (playing) AutoBridgeDesign.tint(AutoBridgeDesign.ACCENT_RADIO, 0.14f) else AutoBridgeDesign.SURFACE,
+                16,
+                AutoBridgeDesign.ACCENT_RADIO,
+                stroke = if (playing) AutoBridgeDesign.ACCENT_RADIO else AutoBridgeDesign.HAIRLINE
+            )
+            setOnClickListener {
+                playRadioEntry(entry, categoryEntries)
+                // The outline moves to this station once the session has it.
+                postDelayed({ refresh() }, 600L)
+            }
             // The grid gives every cell an equal width; squaring the logo means tying its height to
             // that measured width, which is only known after layout — so post the width as height.
             val square = radioLogoSquare(entry.title, entry.logo)
@@ -685,11 +786,11 @@ class LibraryActivity : Activity() {
             square.post { square.layoutParams = square.layoutParams.apply { height = square.width } }
             addView(TextView(this@LibraryActivity).apply {
                 text = entry.title
-                textSize = 14f
+                textSize = 12f
                 setTextColor(AutoBridgeDesign.TEXT)
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
-                setPadding(0, dp(6), 0, 0)
+                setPadding(dp(2), dp(6), dp(2), 0)
             }, LinearLayout.LayoutParams(-1, -2))
         }
 
@@ -720,62 +821,12 @@ class LibraryActivity : Activity() {
             square.post { square.layoutParams = square.layoutParams.apply { height = square.width } }
             addView(TextView(this@LibraryActivity).apply {
                 text = item.title
-                textSize = 14f
+                textSize = 12f
                 setTextColor(AutoBridgeDesign.TEXT)
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
                 setPadding(0, dp(6), 0, 0)
             }, LinearLayout.LayoutParams(-1, -2))
-        }
-
-    /**
-     * The In-country hero: a wide SURFACE card for the top [entry] — a larger 3-state logo on the
-     * leading side, the station name and its subtitle, and a primary "▶ Play now" pill that plays
-     * it with [categoryEntries] as the queue.
-     */
-    private fun radioHeroCard(entry: IptvEntry, categoryEntries: List<IptvEntry>): View =
-        LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            background = AutoBridgeDesign.surface(this@LibraryActivity, AutoBridgeDesign.SURFACE, 18)
-            isClickable = true
-            isFocusable = true
-            contentDescription = entry.title
-            setPadding(dp(14), dp(14), dp(14), dp(14))
-            setOnClickListener { playRadioEntry(entry, categoryEntries) }
-
-            addView(
-                radioLogoSquare(entry.title, entry.logo),
-                LinearLayout.LayoutParams(dp(84), dp(84)).apply { marginEnd = dp(14) }
-            )
-            val text = LinearLayout(this@LibraryActivity).apply { orientation = LinearLayout.VERTICAL }
-            text.addView(TextView(this@LibraryActivity).apply {
-                this.text = entry.title
-                textSize = 18f
-                setTextColor(AutoBridgeDesign.TEXT)
-                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-                maxLines = 1
-                ellipsize = TextUtils.TruncateAt.END
-            })
-            if (entry.subtitle.isNotBlank()) text.addView(TextView(this@LibraryActivity).apply {
-                this.text = entry.subtitle
-                textSize = 13f
-                setTextColor(AutoBridgeDesign.TEXT_MUTED)
-                maxLines = 1
-                ellipsize = TextUtils.TruncateAt.END
-                setPadding(0, dp(2), 0, 0)
-            })
-            text.addView(
-                AutoBridgeDesign.pill(
-                    this@LibraryActivity,
-                    "▶  " + getString(R.string.radio_play_now),
-                    primary = true,
-                    accent = AutoBridgeDesign.ACCENT_RADIO,
-                    onClick = { playRadioEntry(entry, categoryEntries) }
-                ),
-                LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(10) }
-            )
-            addView(text, LinearLayout.LayoutParams(0, -2, 1f))
         }
 
     /**
