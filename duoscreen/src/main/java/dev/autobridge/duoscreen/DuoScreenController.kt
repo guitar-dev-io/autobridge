@@ -403,7 +403,6 @@ class DuoScreenController(
         mainHandler.removeCallbacks(commitPoll)
         mainHandler.removeCallbacks(dropPoll)
         mainHandler.removeCallbacks(backendPoll)
-        mainHandler.removeCallbacks(backendPollAgain)
         // Kept alive, unlike in stop(): the session is only detached and resume() carries on with it.
         onInputThread {
             inputHandler?.removeCallbacks(dragIdle)
@@ -944,13 +943,13 @@ class DuoScreenController(
         )
     }
 
-    private val backendPoll = Runnable {
-        if (!running) return@Runnable
-        if (ops.isAvailable) onBackendReady() else mainHandler.postDelayed(backendPollAgain, BACKEND_POLL_MS)
+    /** Re-posts itself while nothing is ready, without redrawing the chrome each time. */
+    private val backendPoll: Runnable = object : Runnable {
+        override fun run() {
+            if (!running) return
+            if (ops.isAvailable) onBackendReady() else mainHandler.postDelayed(this, BACKEND_POLL_MS)
+        }
     }
-
-    /** The same check again, without re-drawing the chrome every time nothing has changed. */
-    private val backendPollAgain = Runnable { backendPoll.run() }
 
     /** A pane app's name and icon for its Arrange card, loaded once per package. */
     private fun appFor(packageName: String?): PaneApp {

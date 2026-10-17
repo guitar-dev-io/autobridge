@@ -3,6 +3,7 @@ package dev.autobridge.duoscreen.car
 import androidx.annotation.DrawableRes
 import androidx.car.app.AppManager
 import androidx.car.app.CarContext
+import androidx.car.app.CarToast
 import androidx.car.app.Screen
 import androidx.car.app.SurfaceCallback
 import androidx.car.app.SurfaceContainer
