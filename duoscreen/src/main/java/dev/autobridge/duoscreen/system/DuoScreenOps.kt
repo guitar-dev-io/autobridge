@@ -6,6 +6,7 @@ import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.Surface
 import dev.autobridge.duoscreen.layout.DuoScreenStore
+import dev.autobridge.shizuku.ShizukuGrant
 
 /**
  * The privileged ops Duo Screen actually uses: whichever of the two backends is ready, the one the
@@ -53,6 +54,26 @@ object DuoScreenOps : DuoScreenPrivilegedOps {
         load(context)
         if (preferred == DuoScreenBackend.ROOT && !DuoScreenRootOps.isAvailable) {
             DuoScreenRootOps.startAsync(context) { started -> if (started) onReady() }
+        }
+    }
+
+    /** What the driver has to do before the panes can run their apps; see [setupStep]. */
+    enum class SetupStep { INSTALL_SHIZUKU, START_SHIZUKU, ALLOW_SHIZUKU, ALLOW_ROOT }
+
+    /**
+     * The one thing standing between the driver and working panes, or null when a backend is
+     * ready. For Shizuku it is told apart — not installed, installed but stopped (every reboot
+     * stops it), running without the grant — because each is a different thing to do on the phone.
+     */
+    fun setupStep(context: Context): SetupStep? {
+        if (isAvailable) return null
+        return when (preferred) {
+            DuoScreenBackend.ROOT -> SetupStep.ALLOW_ROOT
+            DuoScreenBackend.SHIZUKU -> when (ShizukuGrant.state(context)) {
+                ShizukuGrant.State.NOT_INSTALLED -> SetupStep.INSTALL_SHIZUKU
+                ShizukuGrant.State.NOT_RUNNING -> SetupStep.START_SHIZUKU
+                ShizukuGrant.State.NOT_GRANTED, ShizukuGrant.State.READY -> SetupStep.ALLOW_SHIZUKU
+            }
         }
     }
 

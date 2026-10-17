@@ -936,18 +936,43 @@ class DuoScreenController(
         mainHandler.removeCallbacks(backendPoll)
         if (ops.isAvailable) return null
         mainHandler.postDelayed(backendPoll, BACKEND_POLL_MS)
+        // Said as the one step that is missing, so "Shizuku stopped after a reboot" does not read
+        // like "Shizuku was never set up".
+        val step = DuoScreenOps.setupStep(context)
+        shownSetupStep = step
+        val (title, body) = when (step) {
+            DuoScreenOps.SetupStep.INSTALL_SHIZUKU ->
+                R.string.duo_screen_card_install_title to R.string.duo_screen_card_install_text
+            DuoScreenOps.SetupStep.START_SHIZUKU ->
+                R.string.duo_screen_card_start_title to R.string.duo_screen_card_start_text
+            DuoScreenOps.SetupStep.ALLOW_SHIZUKU ->
+                R.string.duo_screen_card_allow_title to R.string.duo_screen_card_allow_text
+            DuoScreenOps.SetupStep.ALLOW_ROOT ->
+                R.string.duo_screen_card_root_title to R.string.duo_screen_card_root_text
+            null -> R.string.duo_screen_banner_title to R.string.duo_screen_banner_text
+        }
         return SetupNotice(
-            title = context.getString(R.string.duo_screen_banner_title),
-            body = context.getString(R.string.duo_screen_banner_text),
+            title = context.getString(title),
+            body = context.getString(body),
             apps = panes.mapNotNull { it.packageName }.distinct().map(::appFor)
         )
     }
 
-    /** Re-posts itself while nothing is ready, without redrawing the chrome each time. */
+    /** The step the setup card says now, so the poll redraws it only when that changes. */
+    private var shownSetupStep: DuoScreenOps.SetupStep? = null
+
+    /**
+     * Re-posts itself while nothing is ready. The card is redrawn only when the missing step
+     * changes (Shizuku started, say, but AutoBridge not yet allowed), not on every check.
+     */
     private val backendPoll: Runnable = object : Runnable {
         override fun run() {
             if (!running) return
-            if (ops.isAvailable) onBackendReady() else mainHandler.postDelayed(this, BACKEND_POLL_MS)
+            when {
+                ops.isAvailable -> onBackendReady()
+                DuoScreenOps.setupStep(context) != shownSetupStep -> refreshChrome()
+                else -> mainHandler.postDelayed(this, BACKEND_POLL_MS)
+            }
         }
     }
 

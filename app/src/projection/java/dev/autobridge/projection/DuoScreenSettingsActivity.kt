@@ -30,6 +30,7 @@ import dev.autobridge.duoscreen.system.DuoScreenRootOps
 import dev.autobridge.duoscreen.system.DuoScreenSelfPane
 import dev.autobridge.i18n.AppLocale
 import dev.autobridge.input.ShizukuInputBackend
+import dev.autobridge.shizuku.ShizukuGrant
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.stack
 
@@ -192,15 +193,7 @@ class DuoScreenSettingsActivity : Activity() {
     }
 
     private fun backendBanner(backend: DuoScreenBackend): View = when (backend) {
-        DuoScreenBackend.SHIZUKU -> statusBanner(
-            ready = ShizukuInputBackend.isPermissionGranted,
-            readyTitle = R.string.duo_screen_shizuku_ready,
-            missingTitle = R.string.duo_screen_shizuku_missing,
-            hint = R.string.duo_screen_shizuku_hint,
-        ) {
-            ShizukuInputBackend.requestPermission()
-            render()
-        }
+        DuoScreenBackend.SHIZUKU -> shizukuBanner()
         DuoScreenBackend.ROOT -> statusBanner(
             ready = DuoScreenRootOps.isAvailable,
             readyTitle = R.string.duo_screen_root_ready,
@@ -212,14 +205,56 @@ class DuoScreenSettingsActivity : Activity() {
     }
 
     /**
+     * Shizuku's banner says the one step that is missing, with the button that does it: install
+     * it, open it to press Start (it stops at every reboot), or allow AutoBridge in it. Coming
+     * back from Shizuku lands in [onResume], which redraws this for the new state.
+     */
+    private fun shizukuBanner(): View = when (ShizukuGrant.state(this)) {
+        ShizukuGrant.State.READY -> statusBanner(
+            ready = true,
+            readyTitle = R.string.duo_screen_shizuku_ready,
+            missingTitle = R.string.duo_screen_shizuku_ready,
+            hint = R.string.duo_screen_shizuku_hint,
+        ) {}
+        ShizukuGrant.State.NOT_INSTALLED -> statusBanner(
+            ready = false,
+            readyTitle = R.string.duo_screen_shizuku_ready,
+            missingTitle = R.string.duo_screen_shizuku_not_installed,
+            hint = R.string.duo_screen_shizuku_not_installed_hint,
+            action = R.string.duo_screen_shizuku_install,
+        ) { openShizuku(ShizukuGrant::openInstallPage) }
+        ShizukuGrant.State.NOT_RUNNING -> statusBanner(
+            ready = false,
+            readyTitle = R.string.duo_screen_shizuku_ready,
+            missingTitle = R.string.duo_screen_shizuku_not_running,
+            hint = R.string.duo_screen_shizuku_not_running_hint,
+            action = R.string.duo_screen_shizuku_open,
+        ) { openShizuku(ShizukuGrant::openApp) }
+        ShizukuGrant.State.NOT_GRANTED -> statusBanner(
+            ready = false,
+            readyTitle = R.string.duo_screen_shizuku_ready,
+            missingTitle = R.string.duo_screen_shizuku_not_granted,
+            hint = R.string.duo_screen_shizuku_hint,
+        ) {
+            ShizukuInputBackend.requestPermission()
+            render()
+        }
+    }
+
+    private fun openShizuku(open: (Context) -> Boolean) {
+        if (!open(this)) Toast.makeText(this, R.string.duo_screen_shizuku_open_failed, Toast.LENGTH_LONG).show()
+    }
+
+    /**
      * A single card with an amber (or green) circle icon, the status title + hint text, and an
-     * accent-filled "Grant" pill when permission is not yet available.
+     * accent-filled [action] pill ("Grant" unless told otherwise) when it is not yet ready.
      */
     private fun statusBanner(
         ready: Boolean,
         readyTitle: Int,
         missingTitle: Int,
         hint: Int,
+        action: Int = R.string.duo_screen_shizuku_grant,
         onGrant: () -> Unit,
     ): View {
         val bannerAccent = if (ready) AutoBridgeDesign.ACCENT_ONLINE else AutoBridgeDesign.SIGNAL_SLOW
@@ -275,7 +310,7 @@ class DuoScreenSettingsActivity : Activity() {
             // Grant button — only when the backend is not ready
             if (!ready) {
                 addView(TextView(this@DuoScreenSettingsActivity).apply {
-                    this.text = getString(R.string.duo_screen_shizuku_grant)
+                    this.text = getString(action)
                     textSize = 13f
                     gravity = Gravity.CENTER
                     setTextColor(android.graphics.Color.WHITE)
