@@ -12,7 +12,7 @@
     <string name="duo_screen_shizuku_hint">Needed to launch apps into the panes and pass touches to them</string>
     <string name="duo_screen_shizuku_grant">Grant</string>
     <string name="duo_protected_title">%1$s shows black on the car</string>
-    <string name="duo_protected_message">%1$s protects its video and allows it on no screen but the phone's own. In a pane its picture stays black, though the sound may still play.</string>
+    <string name="duo_protected_message">%1$s protects its video and allows it on no screen but the phone\'s own. In a pane its picture stays black, though the sound may still play.</string>
     <string name="duo_protected_use_anyway">Use it anyway</string>
     <string name="duo_protected_pick_other">Pick another app</string>
     <string name="duo_protected_badge">Shows black on the car</string>
