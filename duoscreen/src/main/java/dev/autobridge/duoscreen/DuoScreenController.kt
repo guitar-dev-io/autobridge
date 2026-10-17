@@ -24,6 +24,7 @@ import dev.autobridge.duoscreen.chrome.ChromeTarget
 import dev.autobridge.duoscreen.chrome.DuoScreenChrome
 import dev.autobridge.duoscreen.chrome.DuoScreenChromeRenderer
 import dev.autobridge.duoscreen.chrome.PaneApp
+import dev.autobridge.duoscreen.chrome.SetupNotice
 import dev.autobridge.duoscreen.input.DuoScreenInputPort
 import dev.autobridge.duoscreen.input.DuoScreenInputRouter
 import dev.autobridge.duoscreen.input.DuoScreenTouchController
@@ -59,6 +60,8 @@ class DuoScreenController(
         /** Narrower or shorter than this, a reported visible area is a transition, not a layout. */
         const val MIN_AREA_PX = 200
         const val QUIET_PERIOD_MS = 300L
+        /** How often the setup card checks whether Shizuku or root has become ready. */
+        const val BACKEND_POLL_MS = 2_000L
         /**
          * How long a seam drag must rest before the panes' displays are resized. Longer than
          * [QUIET_PERIOD_MS] because the car host sends no finger-up: a short pause mid-drag would
@@ -399,6 +402,8 @@ class DuoScreenController(
         saveLayout()
         mainHandler.removeCallbacks(commitPoll)
         mainHandler.removeCallbacks(dropPoll)
+        mainHandler.removeCallbacks(backendPoll)
+        mainHandler.removeCallbacks(backendPollAgain)
         // Kept alive, unlike in stop(): the session is only detached and resume() carries on with it.
         onInputThread {
             inputHandler?.removeCallbacks(dragIdle)
@@ -556,7 +561,10 @@ class DuoScreenController(
      * their apps go in now.
      */
     fun onBackendReady() {
-        if (running) recallVacatedPanes()
+        if (!running) return
+        recallVacatedPanes()
+        // Takes the setup card down.
+        refreshChrome()
     }
 
     /** Re-launches a pane's app, for the "pane went black" reload action. */
@@ -913,11 +921,36 @@ class DuoScreenController(
             titles = titles,
             shares = shares,
             apps = apps,
-            labels = labels
+            labels = labels,
+            setup = setupNotice(panes)
         )
         val renderer = chromeRenderer
         compositor.setOverlay { canvas: Canvas -> renderer.draw(canvas, frame) }
     }
+
+    /**
+     * The card over the panes while neither Shizuku nor root is ready, or null. While it shows,
+     * [backendPoll] keeps looking, so granting access on the phone fills the panes without the
+     * driver having to leave Duo Screen and come back.
+     */
+    private fun setupNotice(panes: List<DuoScreenPane>): SetupNotice? {
+        mainHandler.removeCallbacks(backendPoll)
+        if (ops.isAvailable) return null
+        mainHandler.postDelayed(backendPoll, BACKEND_POLL_MS)
+        return SetupNotice(
+            title = context.getString(R.string.duo_screen_banner_title),
+            body = context.getString(R.string.duo_screen_banner_text),
+            apps = panes.mapNotNull { it.packageName }.distinct().map(::appFor)
+        )
+    }
+
+    private val backendPoll = Runnable {
+        if (!running) return@Runnable
+        if (ops.isAvailable) onBackendReady() else mainHandler.postDelayed(backendPollAgain, BACKEND_POLL_MS)
+    }
+
+    /** The same check again, without re-drawing the chrome every time nothing has changed. */
+    private val backendPollAgain = Runnable { backendPoll.run() }
 
     /** A pane app's name and icon for its Arrange card, loaded once per package. */
     private fun appFor(packageName: String?): PaneApp {

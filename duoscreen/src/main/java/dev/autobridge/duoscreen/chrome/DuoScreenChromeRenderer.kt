@@ -6,6 +6,8 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Typeface
+import android.text.Layout
+import android.text.StaticLayout
 import android.text.TextPaint
 import android.text.TextUtils
 import dev.autobridge.duoscreen.layout.DuoScreenLayout.Rect
@@ -13,6 +15,13 @@ import dev.autobridge.duoscreen.layout.DuoScreenPreset
 
 /** What a pane is running, as its Arrange card shows it. */
 data class PaneApp(val label: String, val icon: Bitmap?)
+
+/**
+ * What to tell the driver while neither Shizuku nor root is ready: the panes cannot run their apps
+ * yet, so one card over them says what to do on the phone, with the icons of the apps that will
+ * open once it is done.
+ */
+data class SetupNotice(val title: String, val body: String, val apps: List<PaneApp>)
 
 /**
  * Everything one chrome frame needs, captured on the controller's thread and painted on the GL
@@ -34,7 +43,9 @@ data class ChromeFrame(
     val titles: Map<Int, String>,
     val shares: Map<Int, String>,
     val apps: Map<Int, PaneApp>,
-    val labels: ChromeLabels
+    val labels: ChromeLabels,
+    /** Shown over the panes while the privileges they need are missing; null once they are there. */
+    val setup: SetupNotice? = null
 )
 
 /**
@@ -69,6 +80,9 @@ class DuoScreenChromeRenderer {
         /** The floating toolbar over the seam: nearly opaque, with a soft drop below it. */
         const val TOOLBAR = 0xF21C1F25.toInt()
         const val TOOLBAR_SHADOW = 0x66000000
+        /** The setup card's hairline edge and the soft accent disc behind its lock. */
+        const val CARD_EDGE = 0x1FFFFFFF
+        const val ACCENT_SOFT = 0x2EB3C7F5
     }
 
     private enum class Glyph { LAYOUT_STACKED, LAYOUT_COLUMNS, SWAP, RELOAD, ARRANGE, DONE, KEYBOARD }
@@ -83,6 +97,14 @@ class DuoScreenChromeRenderer {
         typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
     }
     private val image = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+
+    // A StaticLayout keeps the paint it was built with, so the setup card's text gets paints of
+    // its own rather than [text], whose size every other element changes.
+    private val setupTitle = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        color = TEXT
+    }
+    private val setupBody = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = TEXT_MUTED }
     private val rect = RectF()
     private val path = Path()
     private val scratch = Path()
@@ -124,6 +146,9 @@ class DuoScreenChromeRenderer {
         } else {
             drawCards(canvas, frame)
         }
+
+        // Under the bar and the rail, which stay usable: Exit and the layout still work.
+        if (!c.editing) frame.setup?.let { drawSetup(canvas, frame, it) }
 
         drawBar(canvas, frame)
         if (c.editing) drawChips(canvas, frame) else drawRail(canvas, frame)
@@ -454,6 +479,112 @@ class DuoScreenChromeRenderer {
             text.color = CARD_BUTTON_TEXT
             drawCentred(canvas, frame.labels.changeApp, card.button, card.button.width.toFloat())
         }
+    }
+
+    // ------------------------------------------------------------------------- setup card
+
+    /**
+     * The panes dimmed, and over their middle a floating card: a lock in a soft accent disc, the
+     * title, what to do on the phone, and the apps that will open here once that is done.
+     */
+    private fun drawSetup(canvas: Canvas, frame: ChromeFrame, setup: SetupNotice) {
+        val c = frame.chrome
+        val d = frame.density
+        val s = c.spec
+        val compact = s == DuoScreenChromeSpec.COMPACT
+        val radius = s.PANE_RADIUS * d
+        fill.color = DIM
+        panesOf(c).forEach { pane ->
+            rect.set(pane.toRectF())
+            canvas.drawRoundRect(rect, radius, radius, fill)
+        }
+
+        val pad = (if (compact) 20f else 32f) * d
+        val gap = s.CARD_GAP * d
+        val badge = (if (compact) 48f else 68f) * d
+        val tile = s.CARD_TILE * 0.62f * d
+        val tileGap = (if (compact) 10f else 14f) * d
+        val width = minOf(c.bounds.width * 0.72f, (if (compact) 380f else 560f) * d)
+        val inner = (width - 2 * pad).toInt().coerceAtLeast(1)
+
+        setupTitle.textSize = s.CARD_TITLE * d
+        setupBody.textSize = s.CARD_SHARE * d
+        val title = centredLayout(setup.title, setupTitle, inner, maxLines = 2)
+        val body = centredLayout(setup.body, setupBody, inner, maxLines = 4)
+        val apps = setup.apps.filter { it.icon != null }.take(3)
+        val iconsHeight = if (apps.isEmpty()) 0f else gap * 1.4f + tile
+        val height = pad + badge + gap + title.height + gap * 0.5f + body.height + iconsHeight + pad
+
+        val left = (c.bounds.width - width) / 2f
+        val top = ((c.bounds.height - height) / 2f).coerceAtLeast(0f)
+        val cardRadius = s.CARD_TILE_RADIUS * d
+        val shadow = 6f * d
+        rect.set(left, top + shadow, left + width, top + height + shadow)
+        fill.color = TOOLBAR_SHADOW
+        canvas.drawRoundRect(rect, cardRadius, cardRadius, fill)
+        rect.set(left, top, left + width, top + height)
+        fill.color = TOOLBAR
+        canvas.drawRoundRect(rect, cardRadius, cardRadius, fill)
+        stroke.color = CARD_EDGE
+        stroke.strokeWidth = 1f * d
+        canvas.drawRoundRect(rect, cardRadius, cardRadius, stroke)
+
+        val cx = left + width / 2f
+        var y = top + pad
+        fill.color = ACCENT_SOFT
+        canvas.drawCircle(cx, y + badge / 2f, badge / 2f, fill)
+        drawLock(canvas, cx, y + badge / 2f, badge * 0.5f)
+        y += badge + gap
+
+        canvas.save()
+        canvas.translate(left + pad, y)
+        title.draw(canvas)
+        canvas.translate(0f, title.height + gap * 0.5f)
+        body.draw(canvas)
+        canvas.restore()
+        y += title.height + gap * 0.5f + body.height
+
+        if (apps.isNotEmpty()) {
+            y += gap * 1.4f
+            val row = apps.size * tile + (apps.size - 1) * tileGap
+            var x = cx - row / 2f
+            val tr = tile * 0.3f
+            apps.forEach { app ->
+                rect.set(x, y, x + tile, y + tile)
+                fill.color = TILE
+                canvas.drawRoundRect(rect, tr, tr, fill)
+                rect.inset(tile * 0.18f, tile * 0.18f)
+                canvas.drawBitmap(app.icon!!, null, rect, image)
+                x += tile + tileGap
+            }
+        }
+    }
+
+    private fun centredLayout(value: String, paint: TextPaint, width: Int, maxLines: Int): StaticLayout =
+        StaticLayout.Builder.obtain(value, 0, value.length, paint, width)
+            .setAlignment(Layout.Alignment.ALIGN_CENTER)
+            .setMaxLines(maxLines)
+            .setEllipsize(TextUtils.TruncateAt.END)
+            .setLineSpacing(0f, 1.1f)
+            .build()
+
+    /** A padlock about [size] tall, centred on ([cx], [cy]), in the accent's line weight. */
+    private fun drawLock(canvas: Canvas, cx: Float, cy: Float, size: Float) {
+        val bodyTop = cy - size * 0.05f
+        val shackle = size * 0.2f
+        stroke.color = ACCENT
+        stroke.strokeWidth = size * 0.1f
+        path.reset()
+        path.moveTo(cx - shackle, bodyTop)
+        path.lineTo(cx - shackle, cy - size * 0.22f)
+        path.arcTo(RectF(cx - shackle, cy - size * 0.5f + stroke.strokeWidth / 2f, cx + shackle, cy + size * 0.06f), 180f, 180f, false)
+        path.lineTo(cx + shackle, bodyTop)
+        canvas.drawPath(path, stroke)
+        fill.color = ACCENT
+        rect.set(cx - size * 0.32f, bodyTop, cx + size * 0.32f, cy + size * 0.45f)
+        canvas.drawRoundRect(rect, size * 0.1f, size * 0.1f, fill)
+        fill.color = TOOLBAR
+        canvas.drawCircle(cx, cy + size * 0.17f, size * 0.06f, fill)
     }
 
     private fun drawCentred(canvas: Canvas, value: String, box: Rect, maxWidth: Float) {
