@@ -15,21 +15,24 @@ import android.widget.SeekBar
 import android.widget.Switch
 import android.widget.TextView
 import dev.autobridge.R
+import dev.autobridge.media.AudioEffectsService
 import dev.autobridge.media.AudioEq
+import dev.autobridge.media.EffectScope
 import dev.autobridge.media.EqMath
 import dev.autobridge.media.EqPreset
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.dp
 
 /**
- * The equalizer, as a sheet from the bottom of the radio player: an on switch, the one-tap
- * presets, five bands to set by hand, bass boost, and levelling between loud and quiet stations.
+ * The sound effects, as a sheet from the bottom of the screen — the radio player, the video
+ * player, or Settings: an on switch, the one-tap presets, five bands to set by hand, bass boost,
+ * virtualizer, volume boost, and which sound it all reaches ([EffectScope]).
  *
- * Every change goes straight to [AudioEq], which stores it and applies it to the playing session,
+ * Every change goes straight to [AudioEq], which stores it and applies it to the playing sessions,
  * so what the driver hears follows the finger. A preset tap redraws the sheet (the chips and the
  * sliders both show it); a slider only updates its own number while it moves.
  */
-class RadioEqSheet(private val context: Context) {
+class AudioEffectsSheet(private val context: Context) {
     private val dialog = Dialog(context)
     private val content = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
@@ -111,27 +114,77 @@ class RadioEqSheet(private val context: Context) {
             content.addView(bandRow(band, hz, gains.getOrElse(band) { 0 }))
         }
 
-        // Bass boost and loudness levelling.
-        content.addView(label(context.getString(R.string.eq_bass)).apply { setPadding(0, context.dp(14), 0, context.dp(4)) })
-        content.addView(SeekBar(context).apply {
-            max = AudioEq.BASS_MAX
-            progress = settings.bass
+        // Bass boost, virtualizer and volume boost: one slider each, off at the left.
+        content.addView(strengthRow(context.getString(R.string.eq_bass), settings.bass, AudioEq.BASS_MAX,
+            { "${it / 10}%" }) { AudioEq.setBass(context, it) })
+        content.addView(strengthRow(context.getString(R.string.eq_virtualizer), settings.virtualizer, AudioEq.VIRTUALIZER_MAX,
+            { "${it / 10}%" }) { AudioEq.setVirtualizer(context, it) })
+        content.addView(strengthRow(context.getString(R.string.eq_boost), settings.boostMb, AudioEq.BOOST_MAX_MB,
+            { context.getString(R.string.eq_band_value, it / 100) }) { AudioEq.setBoost(context, it) })
+
+        // Which sound the effects reach.
+        content.addView(label(context.getString(R.string.eq_scope)).apply { setPadding(0, context.dp(18), 0, context.dp(8)) })
+        val scopes = listOf(
+            EffectScope.APP to R.string.eq_scope_app,
+            EffectScope.MUSIC_APPS to R.string.eq_scope_music_apps,
+            EffectScope.ALL to R.string.eq_scope_all,
+        ).map { (scope, labelRes) ->
+            AutoBridgeDesign.pill(
+                context,
+                context.getString(labelRes),
+                primary = settings.scope == scope,
+                accent = AutoBridgeDesign.ACCENT_RADIO
+            ) {
+                AudioEq.setScope(context, scope)
+                AudioEffectsService.sync(context)
+                render()
+            }
+        }
+        AutoBridgeDesign.grid(context, scopes, columns = 3).forEach { row ->
+            content.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = context.dp(8) })
+        }
+        content.addView(TextView(context).apply {
+            text = context.getString(when (settings.scope) {
+                EffectScope.APP -> R.string.eq_scope_app_caption
+                EffectScope.MUSIC_APPS -> R.string.eq_scope_music_apps_caption
+                EffectScope.ALL -> R.string.eq_scope_all_caption
+            })
+            textSize = 13f
+            setTextColor(AutoBridgeDesign.TEXT_MUTED)
+        })
+    }
+
+    /** A titled 0..[max] slider with its value on the right, for the strength-style effects. */
+    private fun strengthRow(title: String, current: Int, max: Int, format: (Int) -> String, onChange: (Int) -> Unit): View {
+        val box = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, context.dp(14), 0, 0)
+        }
+        val head = LinearLayout(context).apply { gravity = Gravity.CENTER_VERTICAL }
+        head.addView(label(title).apply { setPadding(0, 0, 0, context.dp(4)) }, LinearLayout.LayoutParams(0, -2, 1f))
+        val value = TextView(context).apply {
+            text = format(current)
+            textSize = 13f
+            setTextColor(AutoBridgeDesign.ACCENT_RADIO)
+        }
+        head.addView(value)
+        box.addView(head)
+        box.addView(SeekBar(context).apply {
+            this.max = max
+            progress = current
+            contentDescription = title
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-                override fun onProgressChanged(bar: SeekBar, value: Int, fromUser: Boolean) {
-                    if (fromUser) AudioEq.setBass(context, value)
+                override fun onProgressChanged(bar: SeekBar, at: Int, fromUser: Boolean) {
+                    if (!fromUser) return
+                    value.text = format(at)
+                    onChange(at)
                 }
                 override fun onStartTrackingTouch(bar: SeekBar) = Unit
-                override fun onStopTrackingTouch(bar: SeekBar) = Unit
+                // Moving one turns the effects on; redraw so the switch says so.
+                override fun onStopTrackingTouch(bar: SeekBar) = render()
             })
         })
-        content.addView(Switch(context).apply {
-            text = context.getString(R.string.eq_level)
-            textSize = 15f
-            setTextColor(AutoBridgeDesign.TEXT)
-            isChecked = settings.levelVolume
-            setPadding(0, context.dp(12), 0, 0)
-            setOnCheckedChangeListener { _, on -> AudioEq.setLevelVolume(context, on) }
-        }, LinearLayout.LayoutParams(-1, -2))
+        return box
     }
 
     /** One band: its frequency, a slider of -12..+12 dB, and the value it is at. */
