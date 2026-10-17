@@ -11,6 +11,13 @@
     <string name="duo_screen_shizuku_missing">ยังไม่ได้สิทธิ์ Shizuku</string>
     <string name="duo_screen_shizuku_hint">ใช้สำหรับเปิดแอปลงแต่ละช่องและส่งการแตะเข้าไป</string>
     <string name="duo_screen_shizuku_grant">อนุญาต</string>
+    <string name="duo_protected_title">%1$s จะเป็นจอดำบนรถ</string>
+    <string name="duo_protected_message">%1$s ป้องกันวิดีโอของตัวเอง ไม่อนุญาตให้แสดงบนจออื่นนอกจากจอมือถือ ในช่องของ Duo Screen ภาพจะเป็นสีดำ แต่เสียงอาจยังออก</string>
+    <string name="duo_protected_use_anyway">ใช้ต่อ</string>
+    <string name="duo_protected_pick_other">เลือกแอปอื่น</string>
+    <string name="duo_protected_badge">ภาพจะดำบนรถ</string>
+    <string name="duo_protected_pane_title">%1$s แสดงบนจอรถไม่ได้</string>
+    <string name="duo_protected_pane_text">แอปนี้ไม่อนุญาตให้แสดงภาพบนจออื่น เสียงอาจยังออก</string>
     <string name="duo_screen_shizuku_not_installed">ยังไม่ได้ติดตั้ง Shizuku</string>
     <string name="duo_screen_shizuku_not_installed_hint">ติดตั้ง Shizuku กดเริ่ม แล้วอนุญาต AutoBridge เพื่อให้ช่องเปิดแอปได้</string>
     <string name="duo_screen_shizuku_install">ติดตั้ง</string>

@@ -18,6 +18,7 @@ import androidx.car.app.model.Template
 import androidx.core.graphics.drawable.IconCompat
 import dev.autobridge.duoscreen.R
 import dev.autobridge.duoscreen.layout.DuoScreenStore
+import dev.autobridge.duoscreen.system.DuoScreenProtectedApps
 import dev.autobridge.logging.StructuredLog
 
 /**
@@ -54,6 +55,12 @@ class DuoScreenAppPickerScreen(
                 Row.Builder()
                     .setTitle(app.label)
                     .apply { app.icon?.let { setImage(it) } }
+                    // Said before it is picked: this app's pane would be black on the car.
+                    .apply {
+                        if (DuoScreenProtectedApps.isProtected(app.packageName)) {
+                            addText(carContext.getString(R.string.duo_protected_badge))
+                        }
+                    }
                     .setOnClickListener {
                         DuoScreenStore.setPackage(carContext, paneId, app.packageName)
                         StructuredLog.i(TAG, "Pane $paneId -> ${app.packageName}")

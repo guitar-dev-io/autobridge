@@ -59,6 +59,12 @@ class CarRadioHomeScreen(carContext: CarContext) : Screen(carContext) {
             else CarIptvSourcesScreen(carContext, IptvKind.RADIO)
 
         private const val FALLBACK_GRID_LIMIT = 6
+
+        /**
+         * The tabs: a host takes at most four ("There cannot be more than 4 tabs"), so Podcasts,
+         * the least used, is a cell inside In Country instead of a tab of its own.
+         */
+        val TABS = listOf(RadioCategory.IN_COUNTRY, RadioCategory.LOCAL, RadioCategory.WORLD, RadioCategory.FAVORITES)
     }
 
     private sealed interface State {
@@ -110,13 +116,13 @@ class CarRadioHomeScreen(carContext: CarContext) : Screen(carContext) {
         logos.beginTemplate()
         val builder = TabTemplate.Builder(object : TabTemplate.TabCallback {
             override fun onTabSelected(tabContentId: String) {
-                val category = RadioCategory.values().firstOrNull { it.name == tabContentId } ?: return
+                val category = TABS.firstOrNull { it.name == tabContentId } ?: return
                 selected = category
                 load(category)
                 invalidate()
             }
         }).setHeaderAction(Action.APP_ICON)
-        RadioCategory.values().forEach { category ->
+        TABS.forEach { category ->
             builder.addTab(
                 Tab.Builder()
                     .setTitle(carContext.getString(category.labelRes))
@@ -179,6 +185,9 @@ class CarRadioHomeScreen(carContext: CarContext) : Screen(carContext) {
         if (category == RadioCategory.IN_COUNTRY) {
             extras += actionCell(carContext.getString(R.string.radio_search), CarIcons.SEARCH) {
                 screenManager.push(CarRadioSearchScreen(carContext))
+            }
+            extras += actionCell(carContext.getString(RadioCategory.PODCASTS.labelRes), R.drawable.ic_car_mic) {
+                screenManager.push(CarRadioCategoryScreen(carContext, RadioCategory.PODCASTS))
             }
         }
         val limit = gridLimit()
