@@ -53,6 +53,13 @@
 -keep interface dev.autobridge.input.IShizukuTouchService { *; }
 -keep class dev.autobridge.input.IShizukuTouchService$* { *; }
 
+# -- Duo Screen root helper (personal and lab flavors only) -------------------------------------
+# DuoScreenRootOps starts DuoScreenRootServer with `su -c "CLASSPATH=<apk> app_process ..."`, and
+# app_process looks its static main up by name. Nothing in the APK calls main, so R8 would drop it.
+-keep class dev.autobridge.duoscreen.system.DuoScreenRootServer {
+    public static void main(java.lang.String[]);
+}
+
 # -- Projection route (personal and lab flavors only) -------------------------------------------
 # ProjectionCarService returns ProjectionBrowserActivity's Class to the Android Auto host, which
 # instantiates it itself. R8 sees the class literal but not the no-arg constructor the host calls,

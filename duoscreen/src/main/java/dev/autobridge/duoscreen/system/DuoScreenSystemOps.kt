@@ -1,0 +1,529 @@
+package dev.autobridge.duoscreen.system
+
+import android.app.ActivityOptions
+import android.content.ComponentName
+import android.content.Intent
+import android.os.Binder
+import android.os.Bundle
+import android.os.IBinder
+import android.view.InputEvent
+import android.view.KeyEvent
+import android.view.MotionEvent
+import android.view.Surface
+import dev.autobridge.duoscreen.DuoLog
+import java.lang.reflect.Method
+import java.lang.reflect.Proxy
+import java.util.concurrent.ConcurrentHashMap
+
+/**
+ * The privileged ops as direct calls on the system services' hidden interfaces, made with whatever
+ * identity [systemBinder] hands back. Two backends share this, and differ only there:
+ *
+ * - [DuoScreenShizukuOps], in this app's process, wraps each service binder so its transactions
+ *   run as the shell UID through the Shizuku server.
+ * - [DuoScreenRootServer], in a separate process started with `su`, already *is* uid 0, so it uses
+ *   the service binders as they are.
+ *
+ * The system interfaces are reached reflectively because they are hidden APIs whose signatures
+ * move between releases; every lookup probes and reports failure rather than assuming support, the
+ * same approach [dev.autobridge.input.ShizukuDisplayPowerController] takes.
+ */
+abstract class DuoScreenSystemOps : DuoScreenPrivilegedOps {
+    /**
+     * The binder of system service [serviceName], ready to be called with privileges, or null
+     * when it cannot be had. Called once per interface and cached until [reset].
+     */
+    protected abstract fun systemBinder(serviceName: String): IBinder?
+
+    private companion object {
+        private const val TAG = "AutoBridgeDuoOps"
+        /**
+         * Fire-and-forget, not WAIT_FOR_FINISH (2).
+         *
+         * WAIT_FOR_FINISH blocks the caller until the app that receives the event has finished
+         * handling it. The call that gets here starts at the car host's onClick/onScroll, which the
+         * car app library dispatches on the main thread, so waiting meant the phone's whole UI was
+         * frozen for as long as a pane's app took to answer — and a scroll is six of these in a row.
+         * Android calls that at five seconds: "Input dispatching timed out".
+         *
+         * Nothing here needs the finish signal. The boolean the caller uses is "was the event
+         * accepted", which ASYNC returns just the same.
+         */
+        private const val INJECT_INPUT_EVENT_MODE_ASYNC = 0
+
+        /** WindowManager.DISPLAY_IME_POLICY_LOCAL: the keyboard opens on the display that asked for it. */
+        private const val DISPLAY_IME_POLICY_LOCAL = 0
+
+        /**
+         * The launch is attributed to the shell package, not ours: the transaction arrives from uid
+         * 2000, and the system rejects a calling package that does not belong to the calling uid. This
+         * is what `adb shell am start` itself passes.
+         */
+        private const val SHELL_PACKAGE = "com.android.shell"
+
+        /**
+         * A wake lock held for one trusted pane display, so that display's own group stays awake.
+         *
+         * The pane displays are created in their own display group (FLAG_OWN_DISPLAY_GROUP), which
+         * is what keeps them out of the phone's power state: pressing the power button turns display
+         * 0 off and the panes carry on. But a display group has its own idle timeout too, and with the
+         * phone's screen off nothing counts as activity on it, so about ten seconds later the system
+         * put the group to sleep ("going to sleep ... groupId=100 why=OFF_BECAUSE_OF_TIMEOUT") and the
+         * car panes went black. A SCREEN_BRIGHT wake lock bound to the pane's display id (the
+         * displayId argument PowerManagerService has taken since Android 12) holds that group awake
+         * and nothing else; acquired as the shell UID, which holds WAKE_LOCK, over the same binder
+         * wrapper as everything here.
+         */
+        private const val SCREEN_BRIGHT_WAKE_LOCK = 0x0000000a
+        private const val ACQUIRE_CAUSES_WAKEUP = 0x10000000
+        private const val WAKE_LOCK_TAG = "AutoBridge:DuoPane"
+    }
+
+    private data class PowerApi(val service: Any, val acquire: Method, val release: Method)
+
+    @Volatile
+    private var powerApi: PowerApi? = null
+
+    /** The token of the wake lock held for each trusted display, by display id. */
+    private val wakeLocks = ConcurrentHashMap<Int, IBinder>()
+
+    private data class ActivityApi(val service: Any, val start: Method)
+    private data class InputApi(val service: Any, val inject: Method)
+
+    /**
+     * The shell-wrapped IDisplayManager plus the methods a trusted display needs over its lifetime.
+     * Signatures are reflected once and reused; see IDisplayManager AIDL —
+     * `int createVirtualDisplay(VirtualDisplayConfig, IVirtualDisplayCallback, IMediaProjection, String)`,
+     * `void releaseVirtualDisplay(IVirtualDisplayCallback)`,
+     * `void resizeVirtualDisplay(IVirtualDisplayCallback, int, int, int)`,
+     * `void setVirtualDisplaySurface(IVirtualDisplayCallback, Surface)`.
+     */
+    private data class DisplayApi(
+        val service: Any,
+        val create: Method,
+        val release: Method?,
+        val resize: Method?,
+        val setSurface: Method?,
+    )
+
+    @Volatile
+    private var activityApi: ActivityApi? = null
+
+    @Volatile
+    private var inputApi: InputApi? = null
+
+    @Volatile
+    private var displayApi: DisplayApi? = null
+
+    /**
+     * The callback token each trusted display was created with, keyed by its display id. The token
+     * is the identity the system matches on for release/resize, so it must be the very object
+     * passed to `createVirtualDisplay`, kept until the display is released.
+     */
+    private val displayTokens = ConcurrentHashMap<Int, Any>()
+
+    /** Whether hidden interfaces may be reflected on in this process; see [DuoScreenShizukuOps]. */
+    protected open val hiddenApiExempted: Boolean get() = true
+
+    fun reset() {
+        activityApi = null
+        inputApi = null
+        displayApi = null
+        // The tokens are only valid against the server that minted them; a reconnected privileged
+        // server does not know them, so drop them with the stale api handle.
+        displayTokens.clear()
+    }
+
+    override fun launchOnDisplay(
+        displayId: Int,
+        packageName: String,
+        component: ComponentName?,
+        allowSecondInstance: Boolean,
+    ): Boolean {
+        if (!isAvailable) return false
+        // Prefer an explicit component when the caller resolved one. The caller
+        // ([dev.autobridge.duoscreen.DuoScreenController]) resolves the launcher activity in-app under the
+        // QUERY_ALL_PACKAGES the personal/lab manifest already declares (app/src/projection/
+        // AndroidManifest.xml) — the same visibility the pane picker already uses — because an
+        // *implicit* MAIN/LAUNCHER + setPackage launch fails to resolve on this device's MIUI
+        // build for a package whose launcher activity is only "enabled by default", leaving a
+        // blank pane. The implicit intent below stays as the fallback for any package the caller
+        // could not resolve, so the shell transaction still resolves it with shell's visibility
+        // and nothing that worked before regresses. The launch itself is unchanged either way:
+        // startActivityAsUser still runs as com.android.shell on the target display id.
+        val intent = Intent(Intent.ACTION_MAIN)
+            .addCategory(Intent.CATEGORY_LAUNCHER)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (allowSecondInstance) intent.addFlags(Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
+        if (component != null) intent.component = component else intent.setPackage(packageName)
+        val api = resolveActivityApi() ?: return false
+        val options = ActivityOptions.makeBasic().setLaunchDisplayId(displayId).toBundle()
+        val args = buildStartActivityArgs(api.start, intent, options)
+        return runCatching {
+            val result = api.start.invoke(api.service, *args) as? Int ?: -1
+            // ActivityManager.START_* : anything >= 0 started or was already running.
+            val started = result >= 0
+            if (!started) DuoLog.w(TAG, "startActivityAsUser($packageName -> display $displayId) returned $result")
+            started
+        }.onFailure { error ->
+            activityApi = null
+            DuoLog.w(TAG, "startActivityAsUser failed for $packageName on display $displayId", error)
+        }.getOrDefault(false)
+    }
+
+    /**
+     * Asks the activity task manager for the root tasks on [displayId]:
+     * `getAllRootTaskInfosOnDisplay(int)` since Android 12, `getAllStackInfosOnDisplay(int)` on 10
+     * and 11. Null when neither exists or the call fails, so the caller can tell "empty" from
+     * "unknown".
+     */
+    override fun hasTaskOnDisplay(displayId: Int): Boolean? {
+        if (!isAvailable) return null
+        val api = resolveActivityApi() ?: return null
+        val method = api.service.javaClass.methods.firstOrNull {
+            (it.name == "getAllRootTaskInfosOnDisplay" || it.name == "getAllStackInfosOnDisplay") &&
+                it.parameterTypes.size == 1 && it.parameterTypes[0] == Int::class.javaPrimitiveType
+        } ?: return null
+        return runCatching {
+            val tasks = method.invoke(api.service, displayId) as? List<*> ?: return@runCatching null
+            tasks.isNotEmpty()
+        }.onFailure { DuoLog.w(TAG, "${method.name}($displayId) failed", it) }.getOrNull()
+    }
+
+    /**
+     * `IWindowManager.setDisplayImePolicy(displayId, DISPLAY_IME_POLICY_LOCAL)` since Android 12,
+     * `setShouldShowIme(displayId, true)` on 10 and 11. Both need INTERNAL_SYSTEM_WINDOW, which
+     * the shell UID holds, and only take effect on a trusted display, which the panes are.
+     */
+    override fun showImeOnDisplay(displayId: Int): Boolean {
+        if (!isAvailable) return false
+        val service = asShellInterface("window", "android.view.IWindowManager") ?: return false
+        val methods = service.javaClass.methods
+        val int = Int::class.javaPrimitiveType
+        val policy = methods.firstOrNull {
+            it.name == "setDisplayImePolicy" && it.parameterTypes.contentEquals(arrayOf(int, int))
+        }
+        val legacy = methods.firstOrNull {
+            it.name == "setShouldShowIme" &&
+                it.parameterTypes.contentEquals(arrayOf(int, Boolean::class.javaPrimitiveType))
+        }
+        return runCatching {
+            when {
+                policy != null -> policy.invoke(service, displayId, DISPLAY_IME_POLICY_LOCAL)
+                legacy != null -> legacy.invoke(service, displayId, true)
+                else -> error("neither setDisplayImePolicy nor setShouldShowIme exists")
+            }
+            true
+        }.onFailure { DuoLog.w(TAG, "Could not put the keyboard on display $displayId", it) }
+            .getOrDefault(false)
+    }
+
+    override fun injectMotion(event: MotionEvent, displayId: Int): Boolean = inject(event, displayId)
+
+    override fun injectKey(event: KeyEvent, displayId: Int): Boolean = inject(event, displayId)
+
+    private fun inject(event: InputEvent, displayId: Int): Boolean {
+        if (!isAvailable) return false
+        val api = resolveInputApi() ?: return false
+        if (!setDisplayId(event, displayId)) return false
+        return runCatching {
+            val args = buildInjectArgs(api.inject, event)
+            api.inject.invoke(api.service, *args) as? Boolean ?: false
+        }.onFailure { error ->
+            inputApi = null
+            DuoLog.w(TAG, "injectInputEvent failed on display $displayId", error)
+        }.getOrDefault(false)
+    }
+
+    override fun createTrustedVirtualDisplay(
+        name: String,
+        width: Int,
+        height: Int,
+        dpi: Int,
+        surface: Surface,
+        flags: Int,
+    ): Int {
+        if (!isAvailable) return -1
+        val api = resolveDisplayApi() ?: return -1
+        return runCatching {
+            val config = buildVirtualDisplayConfig(name, width, height, dpi, surface, flags)
+                ?: error("VirtualDisplayConfig.Builder is unavailable")
+            val token = newVirtualDisplayCallback()
+                ?: error("IVirtualDisplayCallback could not be built")
+            val args = buildCreateDisplayArgs(api.create, config, token)
+            val displayId = api.create.invoke(api.service, *args) as? Int ?: -1
+            if (displayId < 0) {
+                DuoLog.w(TAG, "createVirtualDisplay(trusted $name) returned $displayId")
+            } else {
+                // Keep the token so release/resize can match it later.
+                displayTokens[displayId] = token
+                DuoLog.i(TAG, "Trusted display created: $name -> $displayId (${width}x$height @ ${dpi}dpi)")
+                keepDisplayAwake(displayId)
+            }
+            displayId
+        }.onFailure { error ->
+            displayApi = null
+            DuoLog.w(TAG, "createTrustedVirtualDisplay failed for $name", error)
+        }.getOrDefault(-1)
+    }
+
+    override fun resizeTrustedVirtualDisplay(displayId: Int, width: Int, height: Int, dpi: Int): Boolean {
+        val token = displayTokens[displayId] ?: return false
+        val api = resolveDisplayApi() ?: return false
+        val resize = api.resize ?: run {
+            DuoLog.w(TAG, "No resizeVirtualDisplay method; display $displayId not resized over shell")
+            return false
+        }
+        return runCatching {
+            resize.invoke(api.service, token, width, height, dpi)
+            true
+        }.onFailure { DuoLog.w(TAG, "resizeVirtualDisplay($displayId) failed", it) }.getOrDefault(false)
+    }
+
+    override fun setTrustedVirtualDisplaySurface(displayId: Int, surface: Surface?): Boolean {
+        val token = displayTokens[displayId] ?: return false
+        val api = resolveDisplayApi() ?: return false
+        val setSurface = api.setSurface ?: run {
+            DuoLog.w(TAG, "No setVirtualDisplaySurface method; display $displayId surface not set over shell")
+            return false
+        }
+        return runCatching {
+            setSurface.invoke(api.service, token, surface)
+            true
+        }.onFailure { DuoLog.w(TAG, "setVirtualDisplaySurface($displayId) failed", it) }.getOrDefault(false)
+    }
+
+    override fun releaseTrustedVirtualDisplay(displayId: Int) {
+        releaseDisplayAwake(displayId)
+        val token = displayTokens.remove(displayId) ?: return
+        val api = resolveDisplayApi() ?: return
+        val release = api.release ?: run {
+            DuoLog.w(TAG, "No releaseVirtualDisplay method; display $displayId not released over shell")
+            return
+        }
+        runCatching { release.invoke(api.service, token) }
+            .onFailure { DuoLog.w(TAG, "releaseVirtualDisplay($displayId) failed", it) }
+    }
+
+    /**
+     * Builds a [android.hardware.display.VirtualDisplayConfig] carrying [flags] through its hidden
+     * Builder, reflectively because the Builder's trusted-flag setters are @hide. Name/width/
+     * height/dpi go through the public Builder constructor; the surface and flags through the
+     * hidden setters that `DisplayManager.createVirtualDisplay(...)` uses internally.
+     */
+    private fun buildVirtualDisplayConfig(
+        name: String,
+        width: Int,
+        height: Int,
+        dpi: Int,
+        surface: Surface,
+        flags: Int,
+    ): Any? = runCatching {
+        val builderClass = Class.forName("android.hardware.display.VirtualDisplayConfig\$Builder")
+        val builder = builderClass
+            .getConstructor(String::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)
+            .newInstance(name, width, height, dpi)
+        builderClass.getMethod("setFlags", Int::class.javaPrimitiveType).invoke(builder, flags)
+        builderClass.getMethod("setSurface", Surface::class.java).invoke(builder, surface)
+        builderClass.getMethod("build").invoke(builder)
+    }.onFailure { DuoLog.w(TAG, "Could not build VirtualDisplayConfig", it) }.getOrNull()
+
+    /**
+     * A minimal [android.hardware.display.IVirtualDisplayCallback] whose only job is to be a stable
+     * binder identity: the system matches resize/release against the token's `asBinder()`, and
+     * nothing calls back into it for the uses here (the display paints from its Surface). A
+     * [Proxy] over the interface, returning a real local [Binder] from `asBinder()`, is that
+     * identity without needing the hidden abstract `Stub`.
+     */
+    private fun newVirtualDisplayCallback(): Any? = runCatching {
+        val callbackClass = Class.forName("android.hardware.display.IVirtualDisplayCallback")
+        val binder = Binder()
+        Proxy.newProxyInstance(callbackClass.classLoader, arrayOf(callbackClass)) { _, method, args ->
+            when (method.name) {
+                "asBinder" -> binder
+                "toString" -> "AutoBridgeDuoVirtualDisplayCallback"
+                "hashCode" -> binder.hashCode()
+                "equals" -> args?.getOrNull(0) === binder
+                else -> null
+            }
+        }
+    }.onFailure { DuoLog.w(TAG, "Could not build IVirtualDisplayCallback", it) }.getOrNull()
+
+    /**
+     * Fills createVirtualDisplay's parameters positionally by type: the config, the callback token,
+     * null for the IMediaProjection (we hold none; the trusted flag is what grants the display,
+     * not a projection token), and the shell package for the String. Done by type, like
+     * [buildStartActivityArgs], so a parameter-list change across releases does not break it.
+     */
+    private fun buildCreateDisplayArgs(method: Method, config: Any, token: Any): Array<Any?> {
+        val configClass = config.javaClass
+        val callbackClass = token.javaClass
+        return method.parameterTypes.map { type ->
+            when {
+                type.isAssignableFrom(configClass) -> config
+                type.isAssignableFrom(callbackClass) -> token
+                type == String::class.java -> SHELL_PACKAGE
+                else -> null // IMediaProjection projectionToken, and any future added slot
+            }
+        }.toTypedArray()
+    }
+
+    private fun resolveDisplayApi(): DisplayApi? {
+        displayApi?.let { return it }
+        return runCatching {
+            val service = asShellInterface("display", "android.hardware.display.IDisplayManager")
+                ?: error("IDisplayManager could not be wrapped")
+            val methods = service.javaClass.methods
+            val create = methods.firstOrNull { it.name == "createVirtualDisplay" }
+                ?: error("createVirtualDisplay not found on ${service.javaClass.name}")
+            val release = methods.firstOrNull { it.name == "releaseVirtualDisplay" }
+            val resize = methods.firstOrNull { it.name == "resizeVirtualDisplay" }
+            val setSurface = methods.firstOrNull { it.name == "setVirtualDisplaySurface" }
+            DisplayApi(service, create, release, resize, setSurface).also { displayApi = it }
+        }.onFailure { DuoLog.w(TAG, "Could not reach the display manager with privileges", it) }.getOrNull()
+    }
+
+    /**
+     * Fills [method]'s parameters positionally by type: the intent, the launch options, the shell
+     * package for the first String (callingPackage) and null for the rest (callingFeatureId,
+     * resolvedType, resultWho), 0 for every int (requestCode, flags, and userId 0 = the current
+     * user), and null for the binder/IApplicationThread/ProfilerInfo slots. Done by type rather
+     * than by a fixed signature because the parameter list has gained entries across releases.
+     */
+    private fun buildStartActivityArgs(method: Method, intent: Intent, options: Bundle): Array<Any?> {
+        var seenString = false
+        return method.parameterTypes.map { type ->
+            when {
+                type == Intent::class.java -> intent
+                type == Bundle::class.java -> options
+                type == String::class.java -> if (seenString) null else SHELL_PACKAGE.also { seenString = true }
+                type == Int::class.javaPrimitiveType -> 0
+                else -> null
+            }
+        }.toTypedArray()
+    }
+
+    private fun buildInjectArgs(method: Method, event: InputEvent): Array<Any?> {
+        var seenInt = false
+        return method.parameterTypes.map { type ->
+            when {
+                type.isInstance(event) -> event
+                type == Int::class.javaPrimitiveType ->
+                    // The first int is the injection mode; a later one (injectInputEventToTarget's
+                    // targetUid) stays 0, meaning "no specific target". Both are 0 now that the
+                    // mode is ASYNC, but the positions still differ in meaning.
+                    if (seenInt) 0 else INJECT_INPUT_EVENT_MODE_ASYNC.also { seenInt = true }
+                else -> null
+            }
+        }.toTypedArray()
+    }
+
+    private fun setDisplayId(event: InputEvent, displayId: Int): Boolean = runCatching {
+        // Hidden on both MotionEvent and KeyEvent (declared abstract on InputEvent).
+        event.javaClass
+            .getMethod("setDisplayId", Int::class.javaPrimitiveType)
+            .invoke(event, displayId)
+        true
+    }.onFailure { DuoLog.w(TAG, "${event.javaClass.simpleName}.setDisplayId is unavailable; cannot target a display", it) }
+        .getOrDefault(false)
+
+    private fun resolveActivityApi(): ActivityApi? {
+        activityApi?.let { return it }
+        return runCatching {
+            // "activity_task" since Android 10; "activity" is the pre-split fallback.
+            val service = asShellInterface("activity_task", "android.app.IActivityTaskManager")
+                ?: asShellInterface("activity", "android.app.IActivityManager")
+                ?: error("Neither IActivityTaskManager nor IActivityManager could be wrapped")
+            val start = service.javaClass.methods.firstOrNull { it.name == "startActivityAsUser" }
+                ?: error("startActivityAsUser not found on ${service.javaClass.name}")
+            ActivityApi(service, start).also { activityApi = it }
+        }.onFailure { DuoLog.w(TAG, "Could not reach the activity manager with privileges", it) }.getOrNull()
+    }
+
+    private fun resolveInputApi(): InputApi? {
+        inputApi?.let { return it }
+        return runCatching {
+            val service = asShellInterface("input", "android.hardware.input.IInputManager")
+                ?: error("IInputManager could not be wrapped")
+            val inject = service.javaClass.methods.firstOrNull { it.name == "injectInputEvent" }
+                ?: service.javaClass.methods.firstOrNull { it.name == "injectInputEventToTarget" }
+                ?: error("No injectInputEvent method on ${service.javaClass.name}")
+            InputApi(service, inject).also { inputApi = it }
+        }.onFailure { DuoLog.w(TAG, "Could not reach the input manager with privileges", it) }.getOrNull()
+    }
+
+    /** Holds [displayId]'s display group awake for as long as the pane lives; see [SCREEN_BRIGHT_WAKE_LOCK]. */
+    private fun keepDisplayAwake(displayId: Int) {
+        val api = resolvePowerApi() ?: return
+        val token = Binder()
+        runCatching {
+            var ints = 0
+            var strings = 0
+            val args = api.acquire.parameterTypes.map { type ->
+                when {
+                    type == IBinder::class.java -> token
+                    // acquireWakeLock(lock, flags, tag, packageName, workSource, historyTag,
+                    // displayId, callback): the first int is the level and flags, the second
+                    // the display; the strings are the tag, then the shell package, then none.
+                    type == Int::class.javaPrimitiveType -> when (ints++) {
+                        0 -> SCREEN_BRIGHT_WAKE_LOCK or ACQUIRE_CAUSES_WAKEUP
+                        else -> displayId
+                    }
+                    type == String::class.java -> when (strings++) {
+                        0 -> WAKE_LOCK_TAG
+                        1 -> SHELL_PACKAGE
+                        else -> null
+                    }
+                    else -> null
+                }
+            }.toTypedArray()
+            if (ints < 2) error("acquireWakeLock has no displayId parameter (${api.acquire})")
+            api.acquire.invoke(api.service, *args)
+            wakeLocks[displayId] = token
+            DuoLog.i(TAG, "Display $displayId held awake (its own group survives the power button)")
+        }.onFailure { error ->
+            powerApi = null
+            DuoLog.w(TAG, "Could not hold display $displayId awake; it will sleep with the phone", error)
+        }
+    }
+
+    private fun releaseDisplayAwake(displayId: Int) {
+        val token = wakeLocks.remove(displayId) ?: return
+        val api = resolvePowerApi() ?: return
+        runCatching {
+            val args = api.release.parameterTypes.map { type ->
+                when (type) {
+                    IBinder::class.java -> token
+                    Int::class.javaPrimitiveType -> 0
+                    else -> null
+                }
+            }.toTypedArray()
+            api.release.invoke(api.service, *args)
+        }.onFailure { DuoLog.w(TAG, "Releasing the wake lock for display $displayId failed", it) }
+    }
+
+    private fun resolvePowerApi(): PowerApi? {
+        powerApi?.let { return it }
+        return runCatching {
+            val service = asShellInterface("power", "android.os.IPowerManager")
+                ?: error("IPowerManager could not be wrapped")
+            val methods = service.javaClass.methods
+            // The longest acquireWakeLock is the one that carries a displayId.
+            val acquire = methods.filter { it.name == "acquireWakeLock" }.maxByOrNull { it.parameterCount }
+                ?: error("acquireWakeLock not found on ${service.javaClass.name}")
+            val release = methods.firstOrNull { it.name == "releaseWakeLock" }
+                ?: error("releaseWakeLock not found on ${service.javaClass.name}")
+            PowerApi(service, acquire, release).also { powerApi = it }
+        }.onFailure { DuoLog.w(TAG, "Could not reach the power manager with privileges", it) }.getOrNull()
+    }
+
+    /** The privileged binder of [serviceName] from [systemBinder], asInterface()d to [interfaceName]. */
+    private fun asShellInterface(serviceName: String, interfaceName: String): Any? = runCatching {
+        if (!hiddenApiExempted) error("hidden-API restriction is still in place")
+        val binder = systemBinder(serviceName)
+            ?: error("ServiceManager has no \"$serviceName\" binder")
+        Class.forName("$interfaceName\$Stub")
+            .getMethod("asInterface", IBinder::class.java)
+            .invoke(null, binder)
+    }.onFailure { DuoLog.w(TAG, "Could not wrap $serviceName as $interfaceName: $it") }.getOrNull()
+}

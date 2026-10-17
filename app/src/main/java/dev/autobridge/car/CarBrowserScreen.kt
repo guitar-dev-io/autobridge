@@ -52,6 +52,9 @@ class CarBrowserScreen(carContext: CarContext) :
     private companion object {
         const val TAG = "AutoBridgeCarBrowser"
 
+        /** The renderer's tag, so keyboard input traces line up with its frame traces. */
+        const val KEYBOARD_TRACE_TAG = "AutoBridgeCarWeb"
+
         /** A visible area narrower or shorter than this share of the surface is treated as transient. */
         const val MIN_VISIBLE_FRACTION = 0.4f
     }
@@ -493,6 +496,7 @@ class CarBrowserScreen(carContext: CarContext) :
                 "onClick $x,$y active=$active owner=${MirrorSurfaceOwnership.isOwner(this)} " +
                     "allowed=${allowed()} parked=${ParkingStateStore.isParked}"
             )
+            Log.i(KEYBOARD_TRACE_TAG, "kbd onClick t=${android.os.SystemClock.uptimeMillis()} $x,$y")
         }
         if (!active || !MirrorSurfaceOwnership.isOwner(this)) return
         if (!allowed()) return
@@ -500,17 +504,38 @@ class CarBrowserScreen(carContext: CarContext) :
     }
 
     override fun onScroll(distanceX: Float, distanceY: Float) {
+        if (ViewportDebug.enabled) {
+            Log.i(
+                KEYBOARD_TRACE_TAG,
+                "kbd onScroll t=${android.os.SystemClock.uptimeMillis()} d=$distanceX,$distanceY " +
+                    "keyboardOpen=${renderer.keyboardOpen}"
+            )
+        }
         if (!active || !MirrorSurfaceOwnership.isOwner(this)) return
         if (allowed()) renderer.scrollBy(distanceX, distanceY)
     }
 
     override fun onFling(velocityX: Float, velocityY: Float) {
+        if (ViewportDebug.enabled) {
+            Log.i(
+                KEYBOARD_TRACE_TAG,
+                "kbd onFling t=${android.os.SystemClock.uptimeMillis()} v=$velocityX,$velocityY " +
+                    "keyboardOpen=${renderer.keyboardOpen}"
+            )
+        }
         if (!active || !MirrorSurfaceOwnership.isOwner(this)) return
         if (allowed()) renderer.fling(velocityX, velocityY)
     }
 
     override fun onScale(focusX: Float, focusY: Float, scaleFactor: Float) {
+        if (ViewportDebug.enabled) {
+            Log.i(
+                KEYBOARD_TRACE_TAG,
+                "kbd onScale t=${android.os.SystemClock.uptimeMillis()} focus=$focusX,$focusY " +
+                    "factor=$scaleFactor keyboardOpen=${renderer.keyboardOpen}"
+            )
+        }
         if (!active || !MirrorSurfaceOwnership.isOwner(this)) return
-        if (allowed()) renderer.scaleBy(scaleFactor)
+        if (allowed()) renderer.scaleBy(scaleFactor, focusX, focusY)
     }
 }

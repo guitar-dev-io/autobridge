@@ -24,6 +24,8 @@ import dev.autobridge.duoscreen.chrome.ChromeTarget
 import dev.autobridge.duoscreen.chrome.DuoScreenChrome
 import dev.autobridge.duoscreen.chrome.DuoScreenChromeRenderer
 import dev.autobridge.duoscreen.chrome.PaneApp
+import dev.autobridge.duoscreen.chrome.SetupNotice
+import dev.autobridge.duoscreen.chrome.BlockedPaneNotice
 import dev.autobridge.duoscreen.input.DuoScreenInputPort
 import dev.autobridge.duoscreen.input.DuoScreenInputRouter
 import dev.autobridge.duoscreen.input.DuoScreenTouchController
@@ -39,9 +41,10 @@ import dev.autobridge.duoscreen.render.DuoScreenCompositor
 import dev.autobridge.duoscreen.render.DuoScreenDisplays
 import dev.autobridge.duoscreen.render.DuoScreenResizeDebouncer
 import dev.autobridge.duoscreen.system.DuoScreenLauncherResolver
+import dev.autobridge.duoscreen.system.DuoScreenOps
+import dev.autobridge.duoscreen.system.DuoScreenProtectedApps
 import dev.autobridge.duoscreen.system.DuoScreenPrivilegedOps
 import dev.autobridge.duoscreen.system.DuoScreenSelfPane
-import dev.autobridge.duoscreen.system.DuoScreenShizukuOps
 
 /**
  * Owns one Duo Screen session: the panes, their displays, the compositor that draws them into the
@@ -52,13 +55,15 @@ import dev.autobridge.duoscreen.system.DuoScreenShizukuOps
  */
 class DuoScreenController(
     private val context: Context,
-    private val ops: DuoScreenPrivilegedOps = DuoScreenShizukuOps
+    private val ops: DuoScreenPrivilegedOps = DuoScreenOps
 ) : DuoScreenInputPort {
     private companion object {
         const val TAG = "AutoBridgeDuoCtl"
         /** Narrower or shorter than this, a reported visible area is a transition, not a layout. */
         const val MIN_AREA_PX = 200
         const val QUIET_PERIOD_MS = 300L
+        /** How often the setup card checks whether Shizuku or root has become ready. */
+        const val BACKEND_POLL_MS = 2_000L
         /**
          * How long a seam drag must rest before the panes' displays are resized. Longer than
          * [QUIET_PERIOD_MS] because the car host sends no finger-up: a short pause mid-drag would
@@ -399,6 +404,7 @@ class DuoScreenController(
         saveLayout()
         mainHandler.removeCallbacks(commitPoll)
         mainHandler.removeCallbacks(dropPoll)
+        mainHandler.removeCallbacks(backendPoll)
         // Kept alive, unlike in stop(): the session is only detached and resume() carries on with it.
         onInputThread {
             inputHandler?.removeCallbacks(dragIdle)
@@ -431,7 +437,7 @@ class DuoScreenController(
         }
         val packageName = pane.packageName ?: return
         if (!ops.isAvailable) {
-            StructuredLog.w(TAG, "Pane ${pane.id}: Shizuku is not granted, $packageName not launched")
+            StructuredLog.w(TAG, "Pane ${pane.id}: neither Shizuku nor root is ready, $packageName not launched")
             return
         }
         val isSelf = DuoScreenSelfPane.isSelf(packageName, context.packageName)
@@ -550,6 +556,18 @@ class DuoScreenController(
         }
     }
 
+    /**
+     * A privileged backend came up after the session started — the root helper, whose `su`
+     * prompt the driver may only just have answered. The panes opened without it are empty, so
+     * their apps go in now.
+     */
+    fun onBackendReady() {
+        if (!running) return
+        recallVacatedPanes()
+        // Takes the setup card down.
+        refreshChrome()
+    }
+
     /** Re-launches a pane's app, for the "pane went black" reload action. */
     fun reload(paneId: Int): Boolean {
         val pane = router?.panes?.pane(paneId) ?: return false
@@ -567,7 +585,7 @@ class DuoScreenController(
     /**
      * Resolves [packageName]'s launcher activity to an explicit [ComponentName] with the app's own
      * package visibility (the QUERY_ALL_PACKAGES the personal/lab manifest declares, same as the
-     * pane picker). Returns null when nothing resolves — then [DuoScreenShizukuOps.launchOnDisplay]
+     * pane picker). Returns null when nothing resolves — then [DuoScreenPrivilegedOps.launchOnDisplay]
      * falls back to the implicit intent resolved shell-side. A null is logged, naming the package,
      * so a resulting blank pane is diagnosable rather than silent.
      */
@@ -904,11 +922,73 @@ class DuoScreenController(
             titles = titles,
             shares = shares,
             apps = apps,
-            labels = labels
+            labels = labels,
+            setup = setupNotice(panes),
+            blockedPanes = blockedPanes(panes)
         )
         val renderer = chromeRenderer
         compositor.setOverlay { canvas: Canvas -> renderer.draw(canvas, frame) }
     }
+
+    /**
+     * The card over the panes while neither Shizuku nor root is ready, or null. While it shows,
+     * [backendPoll] keeps looking, so granting access on the phone fills the panes without the
+     * driver having to leave Duo Screen and come back.
+     */
+    private fun setupNotice(panes: List<DuoScreenPane>): SetupNotice? {
+        mainHandler.removeCallbacks(backendPoll)
+        if (ops.isAvailable) return null
+        mainHandler.postDelayed(backendPoll, BACKEND_POLL_MS)
+        // Said as the one step that is missing, so "Shizuku stopped after a reboot" does not read
+        // like "Shizuku was never set up".
+        val step = DuoScreenOps.setupStep(context)
+        shownSetupStep = step
+        val (title, body) = when (step) {
+            DuoScreenOps.SetupStep.INSTALL_SHIZUKU ->
+                R.string.duo_screen_card_install_title to R.string.duo_screen_card_install_text
+            DuoScreenOps.SetupStep.START_SHIZUKU ->
+                R.string.duo_screen_card_start_title to R.string.duo_screen_card_start_text
+            DuoScreenOps.SetupStep.ALLOW_SHIZUKU ->
+                R.string.duo_screen_card_allow_title to R.string.duo_screen_card_allow_text
+            DuoScreenOps.SetupStep.ALLOW_ROOT ->
+                R.string.duo_screen_card_root_title to R.string.duo_screen_card_root_text
+            null -> R.string.duo_screen_banner_title to R.string.duo_screen_banner_text
+        }
+        return SetupNotice(
+            title = context.getString(title),
+            body = context.getString(body),
+            apps = panes.mapNotNull { it.packageName }.distinct().map(::appFor)
+        )
+    }
+
+    /** The step the setup card says now, so the poll redraws it only when that changes. */
+    private var shownSetupStep: DuoScreenOps.SetupStep? = null
+
+    /**
+     * Re-posts itself while nothing is ready. The card is redrawn only when the missing step
+     * changes (Shizuku started, say, but AutoBridge not yet allowed), not on every check.
+     */
+    private val backendPoll: Runnable = object : Runnable {
+        override fun run() {
+            if (!running) return
+            when {
+                ops.isAvailable -> onBackendReady()
+                DuoScreenOps.setupStep(context) != shownSetupStep -> refreshChrome()
+                else -> mainHandler.postDelayed(this, BACKEND_POLL_MS)
+            }
+        }
+    }
+
+    /** The note each pane holding a picture-blocking app gets instead of a black square. */
+    private fun blockedPanes(panes: List<DuoScreenPane>): Map<Int, BlockedPaneNotice> =
+        panes.filter { DuoScreenProtectedApps.isProtected(it.packageName) }.associate { pane ->
+            val app = appFor(pane.packageName)
+            pane.id to BlockedPaneNotice(
+                title = context.getString(R.string.duo_protected_pane_title, app.label),
+                body = context.getString(R.string.duo_protected_pane_text),
+                app = app
+            )
+        }
 
     /** A pane app's name and icon for its Arrange card, loaded once per package. */
     private fun appFor(packageName: String?): PaneApp {
@@ -1072,7 +1152,7 @@ class DuoScreenController(
             StructuredLog.i(
                 TAG,
                 "Tap on pane $paneId -> display $displayId at $x,$y injected=$injected" +
-                    " (shizuku=${ops.isAvailable})"
+                    " (privileged=${ops.isAvailable})"
             )
         }
     }

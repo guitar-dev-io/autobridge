@@ -16,8 +16,8 @@ class PhoneHomeLayoutTest {
                 R.string.home_tile_browser,
                 R.string.home_tile_youtube,
                 R.string.home_tile_music,
-                R.string.home_tile_tv_radio,
-                R.string.home_tile_favorites,
+                R.string.home_tile_radio,
+                R.string.home_tile_tv,
                 R.string.home_tile_more
             ),
             PhoneHomeLayout.Tile.entries.map { it.titleRes }
@@ -32,9 +32,11 @@ class PhoneHomeLayoutTest {
 
     @Test fun groupsMergeTheExpectedSections() {
         assertEquals(listOf(HomeSection.YOUTUBE_MUSIC, HomeSection.PLAYLISTS), PhoneHomeLayout.musicSections)
-        assertEquals(listOf(HomeSection.TV, HomeSection.RADIO), PhoneHomeLayout.tvRadioSections)
+        // Radio and TV are a tile each now, one tap from Home.
+        assertEquals(HomeSection.RADIO, PhoneHomeLayout.directSection[PhoneHomeLayout.Tile.RADIO])
+        assertEquals(HomeSection.TV, PhoneHomeLayout.directSection[PhoneHomeLayout.Tile.TV])
         val more = PhoneHomeLayout.moreSections
-        listOf(HomeSection.FOLDERS, HomeSection.GALLERY, HomeSection.MIRROR, HomeSection.WEATHER).forEach {
+        listOf(HomeSection.FOLDERS, HomeSection.GALLERY, HomeSection.MIRROR, HomeSection.WEATHER, HomeSection.FAVORITES).forEach {
             assertTrue("$it should be under More", it in more)
         }
         assertTrue(PhoneHomeLayout.reachableSections.none { it == HomeSection.SETTINGS || it == HomeSection.REMOTE })
@@ -42,7 +44,7 @@ class PhoneHomeLayoutTest {
 
     @Test fun noSectionAppearsInTwoPlaces() {
         val all = PhoneHomeLayout.directSection.values.toList() + PhoneHomeLayout.musicSections +
-            PhoneHomeLayout.tvRadioSections + PhoneHomeLayout.moreSections
+            PhoneHomeLayout.moreSections
         assertEquals(all.size, all.toSet().size)
     }
 

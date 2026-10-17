@@ -156,4 +156,26 @@
     <string name="car_iptv_search">Search channels</string>
     <string name="car_iptv_search_hint">Channel or programme</string>
     <string name="car_iptv_search_prompt">Type a channel name or what you want to watch.</string>
+    <string name="radio_search">Search stations</string>
+    <string name="radio_search_hint">Station name or frequency (e.g. 95.5)</string>
+    <string name="radio_search_prompt">Type a station name or a frequency like FM 95.5.</string>
+    <string name="radio_search_online">Online · radio-browser</string>
+    <string name="radio_search_my_stations">My stations</string>
+    <string name="radio_search_searching">Searching online…</string>
+    <string name="radio_search_failed">Online search failed: %1$s</string>
+    <string name="radio_fm_unavailable">FM radio is not available on this device.</string>
+    <string name="radio_offline_unavailable">No offline audio configured.</string>
+    <string name="radio_source_internet">Internet Radio</string>
+    <string name="radio_source_fm">FM</string>
+    <string name="radio_recently_played">Recently played</string>
+    <string name="radio_view_all">View all</string>
+    <string name="radio_nothing_playing">Nothing playing</string>
+    <string name="radio_play">Play</string>
+    <string name="radio_pause">Pause</string>
+    <string name="radio_status_connecting">Connecting…</string>
+    <string name="radio_status_playing">Playing</string>
+    <string name="radio_status_paused">Paused</string>
+    <!-- Car (Android Auto) radio screens: now playing. -->
+    <string name="car_radio_now_playing_title">Radio</string>
+    <string name="car_radio_nothing_playing">No station playing</string>
 </resources>

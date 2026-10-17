@@ -71,6 +71,42 @@ final class CarPlayHomeTests: XCTestCase {
         )
     }
 
+    func testIsVideoItemMatchesTrackVideoRule() {
+        // Mirrors PlaybackController.Track.init(item:): video iff a stream that is not radio.
+        XCTAssertTrue(CarPlayHome.isVideoItem(item("http://tv", kind: .tv)))
+        XCTAssertFalse(CarPlayHome.isVideoItem(item("http://radio", kind: .radio)))
+        XCTAssertFalse(CarPlayHome.isVideoItem(item("http://web", kind: .tv, playback: .webPage)))
+    }
+
+    func testVideoPlayableSelectsTvStreamsOnlyDeduplicated() {
+        let favorites = [
+            item("http://tv", kind: .tv, title: "fav-tv"),
+            item("http://radio", kind: .radio),
+            item("http://web", kind: .tv, playback: .webPage)
+        ]
+        let recent = [
+            item("http://tv", kind: .tv, title: "recent-tv"), // duplicate url, dropped
+            item("http://tv2", kind: .tv)
+        ]
+        // Web tile takes both kinds, but videoPlayable keeps only the TV streams, de-duplicated.
+        let result = CarPlayHome.videoPlayable(for: .web, favorites: favorites, recent: recent)
+        XCTAssertEqual(result.map(\.url), ["http://tv", "http://tv2"])
+        XCTAssertEqual(result.first?.title, "fav-tv")
+    }
+
+    func testVideoPlayableExcludesRadioOnlyTiles() {
+        let favorites = [item("http://tv", kind: .tv), item("http://radio", kind: .radio)]
+        // YouTube Music is a radio tile, so nothing is video.
+        XCTAssertTrue(
+            CarPlayHome.videoPlayable(for: .youtubeMusic, favorites: favorites, recent: []).isEmpty
+        )
+        // YouTube is a TV tile, so its one TV stream is video.
+        XCTAssertEqual(
+            CarPlayHome.videoPlayable(for: .youtube, favorites: favorites, recent: []).map(\.url),
+            ["http://tv"]
+        )
+    }
+
     func testPhoneNoteOnlyForBrowserBackedTiles() {
         for section in HomeSection.allCases {
             let expected: Set<HomeSection> = [.web, .youtube, .youtubeMusic, .streaming]

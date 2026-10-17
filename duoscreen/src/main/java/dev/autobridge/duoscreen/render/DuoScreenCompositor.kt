@@ -44,6 +44,18 @@ class DuoScreenCompositor {
         const val COORDS_PER_VERTEX = 2
         const val THREAD_JOIN_TIMEOUT_MS = 1_000L
 
+        /**
+         * When the same frame is drawn again after a host Surface is bound, in ms from the bind.
+         *
+         * Coming back to Duo Screen from another car app left the panes black until the driver
+         * touched something. The one frame drawn at bind time can reach the host before its
+         * Surface is actually on screen, and some hosts drop it; a pane app that is sitting still
+         * sends nothing new to replace it, so nothing was drawn again until a tap made the app
+         * redraw. Drawing the last frames again a few times over the first moments means one of
+         * them lands after the host is showing the Surface.
+         */
+        val REDRAW_AFTER_ATTACH_MS = longArrayOf(100L, 300L, 700L, 1_500L)
+
         const val VERTEX_SHADER = """
             attribute vec4 aPosition;
             attribute vec4 aTexCoord;
@@ -164,6 +176,9 @@ class DuoScreenCompositor {
     )
     private var handler: Handler? = null
 
+    /** Tags the [REDRAW_AFTER_ATTACH_MS] redraws so a detach can drop the ones still pending. */
+    private val redrawToken = Any()
+
     private var eglDisplay: EGLDisplay = EGL14.EGL_NO_DISPLAY
     private var eglContext: EGLContext = EGL14.EGL_NO_CONTEXT
     private var eglSurface: EGLSurface = EGL14.EGL_NO_SURFACE
@@ -252,7 +267,13 @@ class DuoScreenCompositor {
         // A failed first bind must clean up here or the thread and any half-built EGL state would
         // outlive it; a failed re-bind leaves the session intact for the next Surface to try.
         if (!ready && !hasContext) stopBlocking()
-        if (ready) scheduleRender()
+        if (ready) {
+            scheduleRender()
+            threadHandler.removeCallbacksAndMessages(redrawToken)
+            REDRAW_AFTER_ATTACH_MS.forEach { delay ->
+                threadHandler.postDelayed({ render() }, redrawToken, delay)
+            }
+        }
         return ready
     }
 
@@ -284,6 +305,7 @@ class DuoScreenCompositor {
      */
     fun detachBlocking() {
         val threadHandler = handler ?: return
+        threadHandler.removeCallbacksAndMessages(redrawToken)
         runOnGlThread(threadHandler) {
             releaseWindowSurface()
             true
@@ -397,6 +419,7 @@ class DuoScreenCompositor {
     fun stopBlocking() {
         val threadHandler = handler ?: return
         handler = null
+        threadHandler.removeCallbacksAndMessages(redrawToken)
         runOnGlThread(threadHandler) {
             panes.keys.toList().forEach(::removePaneLocked)
             releaseEgl()

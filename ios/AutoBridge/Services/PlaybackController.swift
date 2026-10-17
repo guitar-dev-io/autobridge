@@ -92,6 +92,20 @@ public final class PlaybackController: NSObject, ObservableObject {
     /// Set when the item failed, so the screen can say so instead of showing a stalled player.
     @Published public private(set) var failure: String?
 
+    /// True while connected to a CarPlay head unit that reports `supportsVideoPlayback`. When set,
+    /// a video track is allowed to present on the car's system video player regardless of the
+    /// `CarScreenVideo` aftermarket-AirPlay toggle, because a CarPlay car that reports video support
+    /// is the sanctioned, motion-gated path (the system shows video only when parked). Defaults
+    /// false, so with no CarPlay-video car connected — and on iOS 16 — behaviour is exactly today's:
+    /// external playback stays governed by `CarScreenVideo.enabled` alone. Set by
+    /// `CarPlaySceneDelegate` on connect/disconnect; call `applyExternalPlayback()` after changing it.
+    public var carPlayVideoAllowed = false {
+        didSet {
+            guard carPlayVideoAllowed != oldValue else { return }
+            applyExternalPlayback()
+        }
+    }
+
     private var timeObserver: Any?
     private var observations: Set<AnyCancellable> = []
     private var statusObservation: NSKeyValueObservation?
@@ -199,12 +213,13 @@ public final class PlaybackController: NSObject, ObservableObject {
         loadArtwork(for: track)
     }
 
-    /// Whether a video's picture may go to an AirPlay screen: only with `CarScreenVideo` on. Off,
-    /// AirPlay still carries the sound and the picture stays on the phone. Applied again when the
-    /// option changes, so it takes effect on what is already playing.
+    /// Whether a video's picture may go to an external screen: with the `CarScreenVideo` AirPlay
+    /// option on, or when a CarPlay head unit that supports video is connected (`carPlayVideoAllowed`).
+    /// Off, AirPlay still carries the sound and the picture stays on the phone. Applied again when
+    /// either input changes, so it takes effect on what is already playing.
     func applyExternalPlayback() {
         let video = current?.isVideo ?? false
-        player.allowsExternalPlayback = video && CarScreenVideo.enabled
+        player.allowsExternalPlayback = video && (CarScreenVideo.enabled || carPlayVideoAllowed)
         player.usesExternalPlaybackWhileExternalScreenIsActive = player.allowsExternalPlayback
     }
 

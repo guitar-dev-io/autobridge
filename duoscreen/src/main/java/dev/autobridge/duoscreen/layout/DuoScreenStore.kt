@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.core.content.edit
 import dev.autobridge.duoscreen.layout.DuoScreenLayout.Bounds
 import dev.autobridge.duoscreen.layout.DuoScreenLayout.Rect
+import dev.autobridge.duoscreen.system.DuoScreenBackend
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -114,6 +115,7 @@ object DuoScreenStore {
     private const val KEY_ARRANGED = "arranged"
     private const val KEY_CONTENT_SCALE = "content_scale"
     private const val KEY_RAIL_SIDE = "rail_side"
+    private const val KEY_BACKEND = "backend"
     private const val DEFAULT_PANE_COUNT = 2
 
     const val MIN_PANES = 2
@@ -183,6 +185,16 @@ object DuoScreenStore {
 
     fun setRailSide(context: Context, side: dev.autobridge.duoscreen.chrome.RailSide) {
         prefs(context).edit { putString(KEY_RAIL_SIDE, side.name) }
+    }
+
+    /** Which privileged backend the driver chose; Shizuku unless they picked root. */
+    fun backend(context: Context): DuoScreenBackend =
+        prefs(context).getString(KEY_BACKEND, null)
+            ?.let { name -> DuoScreenBackend.entries.firstOrNull { it.name == name } }
+            ?: DuoScreenBackend.SHIZUKU
+
+    fun setBackend(context: Context, backend: DuoScreenBackend) {
+        prefs(context).edit { putString(KEY_BACKEND, backend.name) }
     }
 
     fun setPreset(context: Context, preset: DuoScreenPreset) {

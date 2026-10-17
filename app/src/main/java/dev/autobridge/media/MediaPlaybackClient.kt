@@ -15,11 +15,31 @@ import dev.autobridge.core.policy.FeaturePolicy
 import java.util.concurrent.Executor
 
 /**
+ * The narrow transport the radio coordinator drives, so it can be faked in a JVM unit test without
+ * a live Media3 session. [MediaPlaybackClient] is the one production implementation; the interface
+ * exists only to give [dev.autobridge.radio.RadioPlaybackCoordinator] a seam. Signatures mirror the
+ * client exactly, so making the client implement this changes no behaviour.
+ */
+interface RadioTransportClient {
+    fun currentQueueUris(): List<String>
+    fun playPlaylist(uris: List<String>, startIndex: Int = 0, titles: List<String> = emptyList())
+
+    /** [playPlaylist] with a positional artwork (logo) address per entry; a fake may ignore them. */
+    fun playPlaylist(uris: List<String>, startIndex: Int, titles: List<String>, artworks: List<String?>) =
+        playPlaylist(uris, startIndex, titles)
+    fun pause()
+    fun resume()
+    fun next()
+    fun previous()
+    fun stop()
+}
+
+/**
  * Connects to [MediaPlaybackService]'s MediaSession as a client controller. Playback commands
  * issued here go through the session (so external controllers, e.g. Android Auto or steering
  * wheel media buttons, observe the same state) rather than touching a player directly.
  */
-class MediaPlaybackClient(private val context: Context) {
+class MediaPlaybackClient(private val context: Context) : RadioTransportClient {
     enum class ConnectionState { DISCONNECTED, CONNECTING, CONNECTED, ERROR }
 
     private val mainExecutor = Executor { command -> Handler(Looper.getMainLooper()).post(command) }
@@ -70,7 +90,7 @@ class MediaPlaybackClient(private val context: Context) {
      * Empty when nothing is loaded. Used to tell whether a queue the phone is about to launch is
      * already the live one, so it can be adopted instead of reset.
      */
-    fun currentQueueUris(): List<String> {
+    override fun currentQueueUris(): List<String> {
         val c = controller ?: return emptyList()
         return (0 until c.mediaItemCount).map { i ->
             c.getMediaItemAt(i).localConfiguration?.uri?.toString()
@@ -98,6 +118,24 @@ class MediaPlaybackClient(private val context: Context) {
     /** Embedded album artwork bytes when the session exposes them, or null. */
     val currentArtworkData: ByteArray?
         get() = controller?.mediaMetadata?.artworkData
+
+    /**
+     * The name the app gave the current queue item (a radio station's name), which stays put
+     * while [currentTitle] follows what the stream says is playing now.
+     */
+    val currentItemTitle: String?
+        get() = controller?.currentMediaItem?.mediaMetadata?.title?.toString()?.takeIf { it.isNotBlank() }
+
+    /** The artwork address the current item was queued with (a station logo), or null. */
+    val currentArtworkUri: String?
+        get() = (controller?.mediaMetadata?.artworkUri ?: controller?.currentMediaItem?.mediaMetadata?.artworkUri)
+            ?.toString()?.takeIf { it.isNotBlank() }
+
+    /** The queued item's address, for telling which station in a grid is the one playing. */
+    val currentUri: String?
+        get() = controller?.currentMediaItem?.let { item ->
+            (item.localConfiguration?.uri ?: item.requestMetadata.mediaUri)?.toString()
+        }?.takeIf { it.isNotBlank() }
 
     fun connect(onConnected: () -> Unit = {}, onError: () -> Unit = {}) {
         disconnect()
@@ -147,16 +185,27 @@ class MediaPlaybackClient(private val context: Context) {
      * "Channel 3HD" rather than a playlist URL. A title is looked up by the entry's own index in
      * [uris], so an unusable entry takes its own name out of the queue with it.
      */
-    fun playPlaylist(uris: List<String>, startIndex: Int = 0, titles: List<String> = emptyList()) {
+    override fun playPlaylist(uris: List<String>, startIndex: Int, titles: List<String>) =
+        playPlaylist(uris, startIndex, titles, artworks = emptyList())
+
+    /**
+     * [playPlaylist] with a positional [artworks] list too: an http(s) image address per entry (a
+     * station logo), carried as the item's artwork so the phone, the car and the media card can
+     * all show it. A blank or missing one leaves that item without.
+     */
+    override fun playPlaylist(uris: List<String>, startIndex: Int, titles: List<String>, artworks: List<String?>) {
         if (!FeaturePolicy.app.isAvailable(Feature.MEDIA)) return
         val mediaController = controller ?: return
         val items = uris.mapIndexedNotNull { index, uri ->
             val source = buildMediaItem(uri) ?: return@mapIndexedNotNull null
             val name = titles.getOrNull(index)?.takeIf { it.isNotBlank() }
-                ?: return@mapIndexedNotNull source
-            source.buildUpon()
-                .setMediaMetadata(MediaMetadata.Builder().setTitle(name).build())
-                .build()
+            val art = artworks.getOrNull(index)?.trim()
+                ?.takeIf { it.startsWith("http://", ignoreCase = true) || it.startsWith("https://", ignoreCase = true) }
+            if (name == null && art == null) return@mapIndexedNotNull source
+            val metadata = MediaMetadata.Builder()
+            if (name != null) metadata.setTitle(name)
+            if (art != null) metadata.setArtworkUri(android.net.Uri.parse(art))
+            source.buildUpon().setMediaMetadata(metadata.build()).build()
         }
         if (items.isEmpty()) return
         val safeIndex = startIndex.coerceIn(0, items.size - 1)
@@ -170,23 +219,23 @@ class MediaPlaybackClient(private val context: Context) {
         android.util.Log.w("MediaPlaybackClient", "Playback command dropped: $reason")
     }
 
-    fun next() {
+    override fun next() {
         controller?.let { if (it.hasNextMediaItem()) it.seekToNextMediaItem() }
     }
 
-    fun previous() {
+    override fun previous() {
         controller?.let { if (it.hasPreviousMediaItem()) it.seekToPreviousMediaItem() }
     }
 
-    fun pause() {
+    override fun pause() {
         controller?.pause()
     }
 
-    fun resume() {
+    override fun resume() {
         if (FeaturePolicy.app.isAvailable(Feature.MEDIA)) controller?.play()
     }
 
-    fun stop() {
+    override fun stop() {
         // Stopping is always allowed, including after a policy transition.
         controller?.stop()
     }

@@ -72,9 +72,17 @@ class MiniPlayer(
         ellipsize = TextUtils.TruncateAt.END
     }
     private val toggle = AutoBridgeDesign.glyphButton(context, PLAY, 16f, filled = true) {
-        if (playback.isPlaying) playback.pause() else playback.resume()
-        // Reflect the tap immediately; the next tick confirms it against the session.
+        val wasPlaying = playback.isPlaying
+        if (wasPlaying) playback.pause() else playback.resume()
+        // Reflect the tap immediately: the session still reports the old state for a moment, so
+        // the glyph shows what was asked for, and the next tick confirms it against the session.
         render()
+        showPlaying(!wasPlaying)
+    }
+
+    private fun showPlaying(playing: Boolean) {
+        toggle.text = if (playing) PAUSE else PLAY
+        toggle.contentDescription = if (playing) "Pause" else "Play"
     }
 
     private val ticker = Handler(Looper.getMainLooper())
@@ -128,13 +136,16 @@ class MiniPlayer(
             return
         }
         view.visibility = View.VISIBLE
-        title.text = name
+        // A radio stream that names its song shows the song, with the artist and the station
+        // under it; anything else reads exactly as before (its title, then its artist).
+        val now = dev.autobridge.radio.RadioNowPlaying.of(playback.currentItemTitle, name, playback.currentArtist)
+        title.text = now.song ?: name
         subtitle.text = listOfNotNull(
-            playback.currentArtist,
+            now.artist,
+            now.station.takeIf { now.song != null },
             if (playback.isPlaying) "Playing" else "Paused"
         ).joinToString(" • ")
-        toggle.text = if (playback.isPlaying) PAUSE else PLAY
-        toggle.contentDescription = if (playback.isPlaying) "Pause" else "Play"
+        showPlaying(playback.isPlaying)
 
         val art = playback.currentArtworkData
         if (art != null && art.isNotEmpty()) {
@@ -146,9 +157,33 @@ class MiniPlayer(
                 return
             }
         }
+        // No embedded art: the address the item was queued with (a station logo), fetched once.
+        val address = playback.currentArtworkUri
+        if (address != null) {
+            if (address != loadedArtwork) {
+                loadedArtwork = address
+                artwork.setImageDrawable(null)
+                artwork.visibility = View.GONE
+                glyph.visibility = View.VISIBLE
+                ImageLoader.load(context, address, artwork) {
+                    artwork.visibility = View.VISIBLE
+                    glyph.visibility = View.GONE
+                }
+            }
+            return
+        }
+        if (loadedArtwork != null) {
+            // The station changed to one without a logo: a fetch for the old one must not land.
+            loadedArtwork = null
+            artwork.setImageDrawable(null)
+            artwork.setTag(dev.autobridge.R.id.autobridge_image_tag, null)
+        }
         artwork.visibility = View.GONE
         glyph.visibility = View.VISIBLE
     }
+
+    /** The artwork address last asked of [ImageLoader], so the one-second tick does not refetch it. */
+    private var loadedArtwork: String? = null
 
     private companion object {
         const val PLAY = "▶"

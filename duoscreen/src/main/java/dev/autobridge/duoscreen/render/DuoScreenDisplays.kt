@@ -120,7 +120,7 @@ object DuoScreenDisplays {
             }
             DuoLog.w(TAG, "Pane $paneId trusted display unavailable; falling back to untrusted")
         } else {
-            DuoLog.w(TAG, "Pane $paneId: Shizuku is not granted, so the display is untrusted and will stop when the phone sleeps")
+            DuoLog.w(TAG, "Pane $paneId: no privileged backend, so the display is untrusted and will stop when the phone sleeps")
         }
 
         val manager = context.getSystemService(DisplayManager::class.java) ?: return -1

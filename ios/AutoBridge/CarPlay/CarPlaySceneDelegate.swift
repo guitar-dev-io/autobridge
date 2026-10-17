@@ -44,6 +44,9 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
         subscriptions.removeAll()
         interfaceController.setRootTemplate(rootTemplate(), animated: true, completion: nil)
         addCloseButton()
+        if #available(iOS 27.0, *) {
+            CPNowPlayingTemplate.shared.allowsMiniPlayer = true
+        }
         VehicleReminders.carConnected()
         CarConnectionState.shared.connected = true
     }
@@ -54,6 +57,7 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
     ) {
         self.interfaceController = nil
         subscriptions.removeAll()
+        endSession()
         VehicleReminders.carDisconnected()
         CarConnectionState.shared.connected = false
     }
@@ -478,6 +482,9 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
     private func play(_ tracks: [PlaybackController.Track], index: Int) {
         guard tracks.indices.contains(index) else { return }
         let track = tracks[index]
+        // Re-read video support just before playing: availability can change mid-session and
+        // there is no video-changed callback.
+        stores.playback.carPlayVideoAllowed = carPresentsVideo
         stores.playback.play(track, queue: tracks, index: index)
         if let origin = track.origin {
             stores.history.recordPlayback(origin)
@@ -502,6 +509,13 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
         if #available(iOS 26.4, *) {
             NSLog("AutoBridge CarPlay: supportsVideoPlayback=%d", session?.supportsVideoPlayback == true ? 1 : 0)
         }
+        // A video-capable car routes video to its system player (PlaybackController).
+        stores.playback.carPlayVideoAllowed = carPresentsVideo
+    }
+
+    private func endSession() {
+        session = nil
+        stores.playback.carPlayVideoAllowed = false
     }
 
     /// True when this car can show video (CarPlay video, iOS 26.4, with the CarPlay video
@@ -581,9 +595,9 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
 
 /// AutoBridge's own CarPlay screen, laid out like APTV (`CarScreenViewController`). CarPlay hands an
 /// app a window to draw in only with the navigation entitlement (`carplay-maps`) and, it appears,
-/// the video one (`carplay-video`: APTV holds only that and audio). Neither is granted to
-/// AutoBridge yet, so only the Simulator's entitlements declare them: on a device the app stays the
-/// audio surface above and none of this runs.
+/// the video one (`carplay-video`: APTV holds only that and audio). Device builds now carry
+/// `carplay-video` too; if a car hands the app a window for it, this screen runs there, and
+/// otherwise the app stays the audio surface above and none of this runs.
 ///
 /// The screen sits under a map template, whose buttons drive it when the window gets no touches:
 /// up, down, press and back, a drag to move the highlight sideways, CarPlay's keyboard for an
@@ -619,6 +633,7 @@ extension CarPlaySceneDelegate: CPMapTemplateDelegate, CPSearchTemplateDelegate 
         carScreen = nil
         self.interfaceController = nil
         subscriptions.removeAll()
+        endSession()
         VehicleReminders.carDisconnected()
         CarConnectionState.shared.connected = false
     }

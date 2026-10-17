@@ -118,6 +118,22 @@ class CarIptvSourcesScreen(
         }
     }
 
+    /**
+     * Radio-only landing row into the category browse screen. Nothing is added for TV. A single
+     * row (not five) keeps this un-paged landing inside the host's list limit; the five categories
+     * live one tap away.
+     */
+    private fun addRadioQuickEntries(list: ItemList.Builder) {
+        if (kind != IptvKind.RADIO) return
+        list.addItem(
+            Row.Builder()
+                .setTitle(carContext.getString(R.string.car_radio_browse_categories))
+                .setBrowsable(true)
+                .setOnClickListener { screenManager.push(CarRadioCategoriesScreen(carContext)) }
+                .build()
+        )
+    }
+
     override fun onGetTemplate(): Template {
         val sources = IptvSourceStore.list(carContext, kind)
         if (sources.isEmpty()) {
@@ -130,11 +146,22 @@ class CarIptvSourcesScreen(
                         .setOnClickListener { openOnPhone() }
                         .build()
                 )
+                .apply {
+                    // The online search needs no source, so a driver with none can still find a station.
+                    if (kind == IptvKind.RADIO) {
+                        addAction(
+                            Action.Builder().setTitle(carContext.getString(R.string.radio_search))
+                                .setOnClickListener { screenManager.push(CarRadioSearchScreen(carContext)) }
+                                .build()
+                        )
+                    }
+                }
                 .build()
         }
 
         logos.beginTemplate()
         val list = ItemList.Builder()
+        addRadioQuickEntries(list)
         addQuickRows(list)
         val recent = IptvHistoryStore.recent(carContext, kind)
         if (recent.isNotEmpty()) {
@@ -175,7 +202,23 @@ class CarIptvSourcesScreen(
         }
 
         return ListTemplate.Builder()
-            .setHeader(Header.Builder().setTitle(title).setStartHeaderAction(Action.BACK).build())
+            .setHeader(
+                Header.Builder()
+                    .setTitle(title)
+                    .setStartHeaderAction(Action.BACK)
+                    .apply {
+                        // Radio search covers every source and radio-browser, so it sits on the landing page.
+                        if (kind == IptvKind.RADIO) {
+                            addEndHeaderAction(
+                                Action.Builder()
+                                    .setIcon(CarIcons.of(carContext, CarIcons.SEARCH))
+                                    .setOnClickListener { screenManager.push(CarRadioSearchScreen(carContext)) }
+                                    .build()
+                            )
+                        }
+                    }
+                    .build()
+            )
             .setSingleList(list.build())
             .build()
     }
@@ -267,7 +310,12 @@ class CarIptvCategoriesScreen(
                     .addEndHeaderAction(
                         Action.Builder()
                             .setIcon(CarIcons.of(carContext, CarIcons.SEARCH))
-                            .setOnClickListener { screenManager.push(CarIptvSearchScreen(carContext, source, data)) }
+                            .setOnClickListener {
+                                screenManager.push(
+                                    if (source.kind == IptvKind.RADIO) CarRadioSearchScreen(carContext)
+                                    else CarIptvSearchScreen(carContext, source, data)
+                                )
+                            }
                             .build()
                     )
                     .build()
@@ -657,6 +705,8 @@ internal object CarIptvPlayback {
         kind: IptvKind,
         playback: IptvPlayback = IptvPlayback.STREAM,
         queue: ChannelQueue? = null,
+        /** A station's logo by its stream address, carried as the queued item's artwork. */
+        logoFor: (String) -> String? = { null },
     ) {
         if (url.isBlank()) {
             CarToast.makeText(
@@ -692,13 +742,16 @@ internal object CarIptvPlayback {
                 return
             }
             if (queue == null) {
-                mediaPlayback.play(url, title)
+                mediaPlayback.playPlaylist(listOf(url), 0, listOf(title), artworks = listOf(logoFor(url)))
             } else {
                 mediaPlayback.playPlaylist(
-                    queue.channels.map { it.url }, queue.startIndex, queue.channels.map { it.title }
+                    queue.channels.map { it.url }, queue.startIndex, queue.channels.map { it.title },
+                    artworks = queue.channels.map { logoFor(it.url) }
                 )
             }
-            screens.push(CarNowPlayingScreen(carContext))
+            // Radio now playing is the surface-drawn large station display; a host below Car API 5
+            // (no surface taps) is sent on to the template CarNowPlayingScreen by that screen itself.
+            screens.push(CarRadioNowPlayingScreen(carContext))
         } else {
             CarVideoLauncher.open(screens, carContext, url, title, queue)
         }

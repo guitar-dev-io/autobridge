@@ -191,6 +191,12 @@ class MediaPlaybackService : MediaLibraryService() {
             }
         }
 
+        // The equalizer follows the player's audio session; a new one is a new set of effects.
+        @OptIn(UnstableApi::class)
+        override fun onAudioSessionIdChanged(audioSessionId: Int) {
+            AudioEq.attach(this@MediaPlaybackService, audioSessionId)
+        }
+
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             if (isPlaying) recordStreamHealth(null)
         }
@@ -542,6 +548,7 @@ class MediaPlaybackService : MediaLibraryService() {
         // start. A single-item queue still has nowhere to go, which is correct.
         exo.repeatMode = Player.REPEAT_MODE_ALL
         exo.addListener(playerListener)
+        AudioEq.attach(this, exo.audioSessionId)
         // Arms the effect pipeline. The renderer only builds it when a video-effects list has been
         // set before the first prepare(), so this empty call has to happen at construction even
         // though the real letterbox ratio is not known until a screen attaches a surface.
@@ -650,6 +657,7 @@ class MediaPlaybackService : MediaLibraryService() {
         VideoSettings.removeListener(videoSettingsListener)
         PerformanceMode.removeListener(performanceListener)
         mainHandler.removeCallbacksAndMessages(null)
+        AudioEq.detach()
         // playerListener is attached only on the Media3 branch; facadeListener only under VLC.
         exoPlayer?.removeListener(playerListener)
         facadeListener?.let { player?.removeListener(it) }

@@ -36,6 +36,10 @@ ALLOW_THAI_IN_CODE=(
   "dev/autobridge/iptv/XtreamClient.kt"
   # Smart-group keywords: matched against what a provider named its channels ("ข่าว", "กีฬา").
   "dev/autobridge/iptv/IptvSmartGroups.kt"
+  # Radio search band words: matched against what the user types ("คลื่น 95"), never shown.
+  "dev/autobridge/iptv/RadioStationMatcher.kt"
+  # Radio genre keywords: matched against what stations call themselves ("ลูกทุ่ง"), never shown.
+  "dev/autobridge/radio/RadioGenre.kt"
   # Keycaps, for the same reason: the Kedmanee layout *is* the Thai alphabet, and a Thai keyboard
   # types Thai whatever language the UI is drawn in. These are characters the key emits, not copy.
   "dev/autobridge/browser/CarKeyboardLayout.kt"
