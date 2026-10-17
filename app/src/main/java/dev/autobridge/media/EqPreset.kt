@@ -52,3 +52,28 @@ object EqMath {
             gains.getOrElse(nearest) { 0 }.coerceIn(minMb, maxMb)
         }
 }
+
+/**
+ * Which sound the effects reach. [APP] is AutoBridge's own players; [MUSIC_APPS] adds every other
+ * player that announces its audio session (Spotify, YouTube Music, JOOX, Poweramp and most others
+ * send the platform's "open effect session" broadcast); [ALL] puts one set of effects on the
+ * phone's whole output mix (session 0) — everything, including apps that announce nothing, on the
+ * phones that still honour it.
+ */
+enum class EffectScope { APP, MUSIC_APPS, ALL }
+
+/** Which audio sessions get effects, kept off android.media.audiofx so it runs as a JVM test. */
+object EffectTargets {
+    /** Owners whose key starts with this are other apps' sessions, not AutoBridge's own players. */
+    const val EXTERNAL_PREFIX = "app:"
+
+    /**
+     * The sessions to hold effects on. Under [EffectScope.ALL] only the output mix: an effect on a
+     * player's own session as well would apply the same EQ twice to that player.
+     */
+    fun sessions(scope: EffectScope, owners: Map<String, Int>): Set<Int> = when (scope) {
+        EffectScope.ALL -> setOf(0)
+        EffectScope.MUSIC_APPS -> owners.values.filter { it > 0 }.toSet()
+        EffectScope.APP -> owners.filterKeys { !it.startsWith(EXTERNAL_PREFIX) }.values.filter { it > 0 }.toSet()
+    }
+}

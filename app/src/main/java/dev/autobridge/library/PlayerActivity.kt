@@ -318,6 +318,7 @@ class PlayerActivity : Activity() {
                 if (SubtitleSettings.isSupported) {
                     add(AutoBridgeDesign.HeaderAction("💬", { startActivity(SubtitleSettingsActivity.intent(this@PlayerActivity)) }))
                 }
+                add(AutoBridgeDesign.HeaderAction("🎚", { AudioEffectsSheet(this@PlayerActivity).show() }))
                 add(AutoBridgeDesign.HeaderAction("⚙", { startActivity(VideoSettingsActivity.intent(this@PlayerActivity)) }))
                 // Back keeps audio, and anything the car is showing, playing on purpose; this is
                 // how a channel is actually turned off.
