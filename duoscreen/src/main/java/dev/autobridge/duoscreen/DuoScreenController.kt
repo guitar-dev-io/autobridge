@@ -25,6 +25,7 @@ import dev.autobridge.duoscreen.chrome.DuoScreenChrome
 import dev.autobridge.duoscreen.chrome.DuoScreenChromeRenderer
 import dev.autobridge.duoscreen.chrome.PaneApp
 import dev.autobridge.duoscreen.chrome.SetupNotice
+import dev.autobridge.duoscreen.chrome.BlockedPaneNotice
 import dev.autobridge.duoscreen.input.DuoScreenInputPort
 import dev.autobridge.duoscreen.input.DuoScreenInputRouter
 import dev.autobridge.duoscreen.input.DuoScreenTouchController
@@ -41,6 +42,7 @@ import dev.autobridge.duoscreen.render.DuoScreenDisplays
 import dev.autobridge.duoscreen.render.DuoScreenResizeDebouncer
 import dev.autobridge.duoscreen.system.DuoScreenLauncherResolver
 import dev.autobridge.duoscreen.system.DuoScreenOps
+import dev.autobridge.duoscreen.system.DuoScreenProtectedApps
 import dev.autobridge.duoscreen.system.DuoScreenPrivilegedOps
 import dev.autobridge.duoscreen.system.DuoScreenSelfPane
 
@@ -921,7 +923,8 @@ class DuoScreenController(
             shares = shares,
             apps = apps,
             labels = labels,
-            setup = setupNotice(panes)
+            setup = setupNotice(panes),
+            blockedPanes = blockedPanes(panes)
         )
         val renderer = chromeRenderer
         compositor.setOverlay { canvas: Canvas -> renderer.draw(canvas, frame) }
@@ -975,6 +978,17 @@ class DuoScreenController(
             }
         }
     }
+
+    /** The note each pane holding a picture-blocking app gets instead of a black square. */
+    private fun blockedPanes(panes: List<DuoScreenPane>): Map<Int, BlockedPaneNotice> =
+        panes.filter { DuoScreenProtectedApps.isProtected(it.packageName) }.associate { pane ->
+            val app = appFor(pane.packageName)
+            pane.id to BlockedPaneNotice(
+                title = context.getString(R.string.duo_protected_pane_title, app.label),
+                body = context.getString(R.string.duo_protected_pane_text),
+                app = app
+            )
+        }
 
     /** A pane app's name and icon for its Arrange card, loaded once per package. */
     private fun appFor(packageName: String?): PaneApp {

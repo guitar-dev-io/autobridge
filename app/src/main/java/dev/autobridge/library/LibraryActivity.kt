@@ -130,6 +130,7 @@ class LibraryActivity : Activity() {
         private const val RADIO_ONLINE_MIN_CHARS = 2
         /** Station logos across the Radio grid: four, like a radio app's, so a screenful is a dozen. */
         private const val RADIO_GRID_COLUMNS = 4
+        private const val RADIO_NOW_WATCH_MS = 1_000L
 
         fun intent(context: android.content.Context, section: Section): Intent =
             Intent(context, LibraryActivity::class.java).putExtra(EXTRA_SECTION, section.name)
@@ -157,6 +158,25 @@ class LibraryActivity : Activity() {
 
     /** Rendered pages, most recent last. Back pops one; popping the root finishes the Activity. */
     private val stack = ArrayDeque<() -> Unit>()
+    /**
+     * The station the Radio grid was last drawn with as playing, and the check that redraws it
+     * when the session moves on — a tap here, next/previous from the car or the steering wheel —
+     * so the outline is always on the station actually playing.
+     */
+    private var drawnRadioUri: String? = null
+    /** The Radio grid page's draw, so the watch redraws only that page and never a search or list. */
+    private var radioBrowseDraw: (() -> Unit)? = null
+    private val radioNowWatch = object : Runnable {
+        override fun run() {
+            val onGrid = radioBrowseDraw != null && stack.lastOrNull() === radioBrowseDraw
+            if (onGrid && playback.currentUri != drawnRadioUri) {
+                drawnRadioUri = playback.currentUri
+                refresh()
+            }
+            radioSearchHandler.postDelayed(this, RADIO_NOW_WATCH_MS)
+        }
+    }
+
     /** Debounces the radio page's online station search while the user is still typing. */
     private val radioSearchHandler = Handler(Looper.getMainLooper())
 
@@ -231,6 +251,8 @@ class LibraryActivity : Activity() {
     override fun onResume() {
         super.onResume()
         miniPlayer?.start()
+        radioSearchHandler.removeCallbacks(radioNowWatch)
+        radioSearchHandler.postDelayed(radioNowWatch, RADIO_NOW_WATCH_MS)
         // Coming back from the player should reflect a new "recently played" entry, but the very
         // first resume follows onCreate's own render, so re-drawing then is pure waste.
         if (resumedOnce) refresh() else resumedOnce = true
@@ -239,6 +261,7 @@ class LibraryActivity : Activity() {
     override fun onPause() {
         super.onPause()
         miniPlayer?.stop()
+        radioSearchHandler.removeCallbacks(radioNowWatch)
     }
 
     override fun onDestroy() {
@@ -543,6 +566,7 @@ class LibraryActivity : Activity() {
         }
 
         draw = {
+            drawnRadioUri = playback.currentUri
             val rows = mutableListOf<View>()
             rows += radioSearchRow()
 
@@ -608,6 +632,7 @@ class LibraryActivity : Activity() {
             )
         }
 
+        radioBrowseDraw = draw
         push(draw)
         startLoad()
     }
@@ -774,11 +799,7 @@ class LibraryActivity : Activity() {
                 AutoBridgeDesign.ACCENT_RADIO,
                 stroke = if (playing) AutoBridgeDesign.ACCENT_RADIO else AutoBridgeDesign.HAIRLINE
             )
-            setOnClickListener {
-                playRadioEntry(entry, categoryEntries)
-                // The outline moves to this station once the session has it.
-                postDelayed({ refresh() }, 600L)
-            }
+            setOnClickListener { playRadioEntry(entry, categoryEntries) }
             // The grid gives every cell an equal width; squaring the logo means tying its height to
             // that measured width, which is only known after layout — so post the width as height.
             val square = radioLogoSquare(entry.title, entry.logo)
