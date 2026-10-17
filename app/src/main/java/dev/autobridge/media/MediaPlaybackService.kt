@@ -192,6 +192,7 @@ class MediaPlaybackService : MediaLibraryService() {
         }
 
         // The equalizer follows the player's audio session; a new one is a new set of effects.
+        @OptIn(UnstableApi::class)
         override fun onAudioSessionIdChanged(audioSessionId: Int) {
             AudioEq.attach(this@MediaPlaybackService, audioSessionId)
         }

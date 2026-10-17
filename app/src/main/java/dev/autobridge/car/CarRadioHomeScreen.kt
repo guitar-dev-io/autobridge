@@ -1,8 +1,10 @@
 package dev.autobridge.car
 
 import androidx.annotation.DrawableRes
+import androidx.annotation.OptIn
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
+import androidx.car.app.annotations.ExperimentalCarApi
 import androidx.car.app.annotations.RequiresCarApi
 import androidx.car.app.constraints.ConstraintManager
 import androidx.car.app.model.Action
@@ -45,6 +47,9 @@ import dev.autobridge.radio.RadioRepository
  * Country also carries the search, and the driver's own lists when there are any, so nothing the
  * old landing offered is out of reach.
  */
+// TabTemplate and its parts were experimental before car-app 1.7; the opt-in keeps lint quiet
+// whichever way this version marks them.
+@OptIn(ExperimentalCarApi::class)
 @RequiresCarApi(6)
 class CarRadioHomeScreen(carContext: CarContext) : Screen(carContext) {
     companion object {
