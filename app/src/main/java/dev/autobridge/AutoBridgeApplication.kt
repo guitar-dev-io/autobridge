@@ -49,6 +49,10 @@ class AutoBridgeApplication : Application() {
         // Channel checks and playback failures are remembered past StreamPing's five minutes, from
         // whichever surface ran them; see IptvHealthStore.
         dev.autobridge.iptv.IptvHealthStore.install(this)
+        // The radio domain owns the one shared Media3 session the phone tuner and the car both
+        // render. Starting it here (idempotent) means the first screen to read RadioRepository.state
+        // already has a connected coordinator; see dev.autobridge.radio.RadioRepository.
+        dev.autobridge.radio.RadioRepository.init(this)
     }
 
     /**

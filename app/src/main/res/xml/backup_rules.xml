@@ -7,6 +7,7 @@
 <full-backup-content>
     <exclude domain="sharedpref" path="autobridge_iptv_sources.xml" />
     <exclude domain="sharedpref" path="autobridge_iptv_history.xml" />
+    <exclude domain="sharedpref" path="autobridge_radio_presets.xml" />
     <!-- Downloaded Whisper models: too large to back up, and downloadable again. -->
     <exclude domain="file" path="whisper/" />
 </full-backup-content>

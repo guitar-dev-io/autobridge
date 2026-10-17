@@ -10,5 +10,16 @@
     -->
     <key>com.apple.developer.carplay-audio</key>
     <true/>
+    <!--
+      CarPlay video is likewise a MANAGED entitlement, GRANTED by Apple to the App ID
+      dev.autobridge (team V9Q6ZN9L53) alongside carplay-audio. It lets the app browse video
+      content with CarPlay templates and play it through the system video player when the car
+      reports video support (parked only); otherwise the item plays audio-only. Signing needs a
+      provisioning profile that carries it; build with -allowProvisioningUpdates (or Xcode's
+      automatic signing) to fetch one. Both audio and video are declared so the app always appears
+      on the CarPlay home screen (a video-only app shows only in video-capable cars).
+    -->
+    <key>com.apple.developer.carplay-video</key>
+    <true/>
 </dict>
 </plist>

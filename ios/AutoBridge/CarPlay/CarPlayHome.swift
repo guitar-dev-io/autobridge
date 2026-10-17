@@ -90,6 +90,26 @@ enum CarPlayHome {
         }
     }
 
+    /// Whether a remembered item is video content, matching `PlaybackController.Track.init(item:)`
+    /// which sets `isVideo = kind != .radio`. A `.tv`-kind stream shows video on a video-capable
+    /// CarPlay head unit; a `.radio` item stays audio-only. Web-page items are not playable at all
+    /// and are never video.
+    static func isVideoItem(_ item: IptvHistoryItem) -> Bool {
+        item.playback == .stream && item.kind != .radio
+    }
+
+    /// Of the channels a tile can play in the car (see `playable(for:...)`), the ones that are video
+    /// — i.e. would present on the car's system video player when the car reports video support.
+    /// Kept here, out of `CarPlaySceneDelegate`, so the video/audio split is unit-testable without a
+    /// head unit. Radio stations and web-page items are excluded.
+    static func videoPlayable(
+        for section: HomeSection,
+        favorites: [IptvHistoryItem],
+        recent: [IptvHistoryItem]
+    ) -> [IptvHistoryItem] {
+        playable(for: section, favorites: favorites, recent: recent).filter(isVideoItem)
+    }
+
     /// The honest note a browser-backed tile shows: the site itself opens on the phone.
     ///
     /// `subtitle` is the row's second line, below `title`. `alert` says the same in one sentence,

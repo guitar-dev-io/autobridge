@@ -151,4 +151,26 @@
     <string name="car_iptv_search">ค้นหาช่อง</string>
     <string name="car_iptv_search_hint">ชื่อช่องหรือรายการ</string>
     <string name="car_iptv_search_prompt">พิมพ์ชื่อช่อง หรือสิ่งที่อยากดู</string>
+    <string name="radio_search">ค้นหาสถานี</string>
+    <string name="radio_search_hint">ชื่อสถานีหรือคลื่น (เช่น 95.5)</string>
+    <string name="radio_search_prompt">พิมพ์ชื่อสถานีหรือคลื่น เช่น FM 95.5</string>
+    <string name="radio_search_online">ออนไลน์ · radio-browser</string>
+    <string name="radio_search_my_stations">สถานีของฉัน</string>
+    <string name="radio_search_searching">กำลังค้นหาออนไลน์…</string>
+    <string name="radio_search_failed">ค้นหาออนไลน์ไม่สำเร็จ: %1$s</string>
+    <string name="radio_fm_unavailable">อุปกรณ์นี้ไม่รองรับวิทยุ FM</string>
+    <string name="radio_offline_unavailable">ยังไม่ได้ตั้งค่าเสียงออฟไลน์</string>
+    <string name="radio_source_internet">วิทยุอินเทอร์เน็ต</string>
+    <string name="radio_source_fm">FM</string>
+    <string name="radio_recently_played">เล่นล่าสุด</string>
+    <string name="radio_view_all">ดูทั้งหมด</string>
+    <string name="radio_nothing_playing">ไม่มีการเล่น</string>
+    <string name="radio_play">เล่น</string>
+    <string name="radio_pause">หยุดชั่วคราว</string>
+    <string name="radio_status_connecting">กำลังเชื่อมต่อ…</string>
+    <string name="radio_status_playing">กำลังเล่น</string>
+    <string name="radio_status_paused">หยุดชั่วคราว</string>
+    <!-- Car (Android Auto) radio screens -->
+    <string name="car_radio_now_playing_title">วิทยุ</string>
+    <string name="car_radio_nothing_playing">ไม่มีสถานีที่กำลังเล่น</string>
 </resources>

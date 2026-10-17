@@ -12,6 +12,13 @@
     <key>com.apple.developer.carplay-audio</key>
     <true/>
     <!--
+      CarPlay video, also granted by Apple to dev.autobridge. Declared here too so the CarPlay
+      Simulator with a video-capable vehicle config exercises the video-browsing path. Simulator
+      builds are ad-hoc signed, so declaring it does not depend on a provisioning profile.
+    -->
+    <key>com.apple.developer.carplay-video</key>
+    <true/>
+    <!--
       Also Simulator-only: the navigation entitlement is what makes CarPlay hand the app a window
       it can draw in, which is how a real web page shows on the CarPlay screen
       (CarPlaySceneDelegate, "Web pages on the CarPlay screen"). With it the Simulator runs the
