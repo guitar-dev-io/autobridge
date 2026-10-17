@@ -1630,6 +1630,12 @@
     <string name="radio_all_stations">All stations</string>
     <string name="radio_previous_station">Previous station</string>
     <string name="radio_next_station">Next station</string>
+    <string name="radio_play_on_car">Play on car</string>
+    <string name="radio_sleep_timer">Sleep timer</string>
+    <string name="radio_sleep_off">Turn off the timer</string>
+    <string name="radio_sleep_minutes">%1$d min</string>
+    <string name="radio_sleep_remaining">Stops in %1$d min</string>
+    <string name="radio_sleep_set">Radio stops in %1$d min</string>
     <string name="eq_title">Equalizer</string>
     <string name="eq_enabled">On</string>
     <string name="eq_presets">Presets</string>

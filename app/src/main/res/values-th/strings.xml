@@ -1600,6 +1600,12 @@
     <string name="radio_all_stations">ทุกสถานี</string>
     <string name="radio_previous_station">สถานีก่อนหน้า</string>
     <string name="radio_next_station">สถานีถัดไป</string>
+    <string name="radio_play_on_car">เล่นบนรถ</string>
+    <string name="radio_sleep_timer">ตั้งเวลาปิด</string>
+    <string name="radio_sleep_off">ยกเลิกตั้งเวลา</string>
+    <string name="radio_sleep_minutes">%1$d นาที</string>
+    <string name="radio_sleep_remaining">หยุดในอีก %1$d นาที</string>
+    <string name="radio_sleep_set">วิทยุจะหยุดในอีก %1$d นาที</string>
     <string name="eq_title">อีควอไลเซอร์</string>
     <string name="eq_enabled">เปิดใช้</string>
     <string name="eq_presets">แบบสำเร็จรูป</string>

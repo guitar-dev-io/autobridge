@@ -1,6 +1,7 @@
 package dev.autobridge.library
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.content.res.ColorStateList
@@ -18,12 +19,14 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import dev.autobridge.R
 import dev.autobridge.i18n.AppLocale
 import dev.autobridge.iptv.IptvHistoryStore
 import dev.autobridge.media.MediaPlaybackClient
 import dev.autobridge.radio.RadioNowPlaying
 import dev.autobridge.radio.RadioRepository
+import dev.autobridge.radio.RadioSleepTimer
 import dev.autobridge.radio.RadioSourceType
 import dev.autobridge.radio.RadioStation
 import dev.autobridge.ui.AutoBridgeDesign
@@ -56,6 +59,7 @@ class RadioPlayerActivity : Activity() {
     private lateinit var stationLine: TextView
     private lateinit var playToggle: TextView
     private lateinit var favorite: TextView
+    private lateinit var sleep: TextView
     private var shownLogo: String? = null
 
     private val ticker = Handler(Looper.getMainLooper())
@@ -173,18 +177,21 @@ class RadioPlayerActivity : Activity() {
         )
         body.addView(transport, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(28) })
 
-        // EQ, favourite, all stations.
+        // EQ, favourite, all stations; then the car and the sleep timer.
         favorite = action(getString(R.string.radio_favorite_add)) { toggleFavorite() }
+        sleep = action(getString(R.string.radio_sleep_timer)) { chooseSleepTimer() }
         val actions = listOf(
             action(getString(R.string.eq_title)) { RadioEqSheet(this).show() },
             favorite,
             action(getString(R.string.radio_all_stations)) {
                 startActivity(LibraryActivity.intent(this, LibraryActivity.Section.RADIO))
                 finish()
-            }
+            },
+            action(getString(R.string.radio_play_on_car)) { sendToCar() },
+            sleep
         )
-        AutoBridgeDesign.grid(this, actions, columns = 3).forEach { row ->
-            body.addView(row, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(28) })
+        AutoBridgeDesign.grid(this, actions, columns = 3).forEachIndexed { index, row ->
+            body.addView(row, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(if (index == 0) 28 else 8) })
         }
 
         val header = AutoBridgeDesign.header(this, getString(R.string.radio_player_title), onBack = { finish() })
@@ -224,6 +231,61 @@ class RadioPlayerActivity : Activity() {
         )
     }
 
+    /**
+     * Hands the station to the car the way the video player does, through the bridge: it opens
+     * there now when the car is connected and waits for it otherwise.
+     */
+    private fun sendToCar() {
+        val url = playback.currentUri
+        if (url.isNullOrBlank()) {
+            toast(getString(R.string.player_send_car_nothing))
+            return
+        }
+        val title = playback.currentItemTitle ?: playback.currentTitle.orEmpty()
+        val result = dev.autobridge.bridge.AutoBridgeSessionManager.sendToCar(
+            this,
+            dev.autobridge.bridge.BridgeSource(
+                url = url,
+                title = title,
+                origin = dev.autobridge.bridge.BridgeSource.Origin.PHONE
+            )
+        )
+        toast(
+            getString(
+                when (result) {
+                    is dev.autobridge.bridge.AutoBridgeSessionManager.SendResult.Opened -> R.string.player_send_car_opened
+                    is dev.autobridge.bridge.AutoBridgeSessionManager.SendResult.Pending -> R.string.player_send_car_pending
+                    is dev.autobridge.bridge.AutoBridgeSessionManager.SendResult.Refused -> R.string.player_send_car_refused
+                }
+            )
+        )
+    }
+
+    /** The sleep timer's choices, with "turn off" first while one is running. */
+    private fun chooseSleepTimer() {
+        val minutes = RadioSleepTimer.OPTIONS_MINUTES
+        val labels = buildList {
+            if (RadioSleepTimer.isSet) add(getString(R.string.radio_sleep_off))
+            minutes.forEach { add(getString(R.string.radio_sleep_minutes, it)) }
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.radio_sleep_timer)
+            .setItems(labels.toTypedArray()) { _, which ->
+                val offset = if (RadioSleepTimer.isSet) 1 else 0
+                if (which < offset) {
+                    RadioSleepTimer.cancel()
+                } else {
+                    val chosen = minutes[which - offset]
+                    RadioSleepTimer.start(this, chosen)
+                    toast(getString(R.string.radio_sleep_set, chosen))
+                }
+                update()
+            }
+            .show()
+    }
+
+    private fun toast(message: String) = Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+
     private fun toggleFavorite() {
         val station = currentStation() ?: return
         RadioRepository.RadioHistory.toggleFavorite(this, station)
@@ -254,6 +316,10 @@ class RadioPlayerActivity : Activity() {
         val isFavorite = !url.isNullOrBlank() && IptvHistoryStore.isFavorite(this, url)
         favorite.text = getString(if (isFavorite) R.string.radio_favorite_on else R.string.radio_favorite_add)
         favorite.setTextColor(if (isFavorite) AutoBridgeDesign.ACCENT_RADIO else AutoBridgeDesign.TEXT)
+
+        val left = RadioSleepTimer.remainingMinutes()
+        sleep.text = if (left > 0) getString(R.string.radio_sleep_remaining, left) else getString(R.string.radio_sleep_timer)
+        sleep.setTextColor(if (left > 0) AutoBridgeDesign.ACCENT_RADIO else AutoBridgeDesign.TEXT)
 
         // The logo is fetched once per station, not once a second.
         val address = playback.currentArtworkUri
