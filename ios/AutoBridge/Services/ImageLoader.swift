@@ -32,16 +32,21 @@ final class ImageLoader: @unchecked Sendable {
         return URLSession(configuration: configuration)
     }()
 
-    private lazy var directory: URL? = {
-        guard let caches = FileManager.default.urls(
-            for: .cachesDirectory, in: .userDomainMask
-        ).first else { return nil }
-        let directory = caches.appendingPathComponent(Self.directoryName, isDirectory: true)
-        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        return directory
-    }()
+    /// Set once in `init`, never after. It was a `lazy var`, and a lazy property is not thread-safe:
+    /// a catalog page starts hundreds of logo loads at once on the cooperative pool, two of them
+    /// initialised it together, and the URL they read back was torn — `EXC_BAD_ACCESS` on a real
+    /// iPhone, "percentEncodedPath with invalid characters" in the Simulator.
+    private let directory: URL?
 
-    private init() {}
+    private init() {
+        if let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first {
+            let directory = caches.appendingPathComponent(Self.directoryName, isDirectory: true)
+            try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            self.directory = directory
+        } else {
+            directory = nil
+        }
+    }
 
     /// The in-memory image for `url`, so a row that already has one draws without a hop.
     func cached(_ url: String) -> UIImage? {
