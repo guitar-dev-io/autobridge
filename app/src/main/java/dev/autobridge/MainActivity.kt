@@ -313,6 +313,8 @@ class MainActivity : androidx.activity.ComponentActivity() {
         statusHandler.removeCallbacks(refreshStatusRunnable)
         refreshStatusRunnable.run()
         maintenance.runPostUpdateChecks()
+        // Sound effects on other apps need their service; it can only start while a screen is up.
+        dev.autobridge.media.AudioEffectsService.sync(this)
     }
 
     override fun onPause() {
@@ -996,6 +998,14 @@ class MainActivity : androidx.activity.ComponentActivity() {
                         accent = design.ACCENT_VIDEO
                     ) {
                         startActivity(dev.autobridge.library.VideoSettingsActivity.intent(this))
+                    },
+                    settingsEntry(
+                        getString(R.string.settings_sound_effects),
+                        getString(R.string.settings_sound_effects_caption),
+                        R.drawable.ic_tile_radio,
+                        accent = design.ACCENT_RADIO
+                    ) {
+                        dev.autobridge.library.AudioEffectsSheet(this).show()
                     },
                     settingsEntry(
                         getString(R.string.settings_youtube),

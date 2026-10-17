@@ -295,6 +295,10 @@
             </intent-filter>
         </service>
 
+        <!-- Holds the sound effects on other apps' audio while the effects reach past AutoBridge
+             (AudioEffectsService). Not exported: it is started from AutoBridge's own screens. -->
+        <service android:name=".media.AudioEffectsService" android:exported="false" android:foregroundServiceType="mediaPlayback" />
+
         <service android:name=".input.AutoBridgeAccessibilityService" android:exported="true" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter>
                 <action android:name="android.accessibilityservice.AccessibilityService" />

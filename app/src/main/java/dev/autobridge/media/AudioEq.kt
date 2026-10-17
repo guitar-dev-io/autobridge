@@ -4,17 +4,19 @@ import android.content.Context
 import android.media.audiofx.BassBoost
 import android.media.audiofx.Equalizer
 import android.media.audiofx.LoudnessEnhancer
+import android.media.audiofx.Virtualizer
 import androidx.core.content.edit
 import dev.autobridge.logging.StructuredLog
 
 /**
- * The player's equalizer: the driver's sound settings, stored, and applied to the shared player's
- * audio session through the platform's own effects ([Equalizer], [BassBoost], [LoudnessEnhancer]).
+ * The sound effects: the driver's settings, stored, and applied through the platform's own effects
+ * ([Equalizer], [BassBoost], [Virtualizer], [LoudnessEnhancer]) to every audio session they reach.
  *
- * One object for the process because there is one player ([MediaPlaybackService]) and every
- * screen that changes the sound — the phone's EQ sheet, the car's "change sound" button — lives
- * in the same process. A setting changed while nothing plays is stored and applied when the
- * service next attaches a session.
+ * Sessions come from owners: the shared player ([MediaPlaybackService], ExoPlayer or VLC) under
+ * [OWNER_PLAYER], and — while [AudioEffectsService] runs — other apps' players under
+ * `app:<package>`. [EffectScope] picks which of them get effects, or the whole output mix instead
+ * ([EffectTargets.sessions]). One object for the process, because every screen that changes the
+ * sound lives in it; a setting changed while nothing plays is stored and applied on the next attach.
  *
  * Every effect call is guarded: some phones ship without one or other effect, or refuse a session,
  * and a missing equalizer must never stop the audio.
@@ -26,30 +28,54 @@ object AudioEq {
     private const val KEY_PRESET = "preset"
     private const val KEY_CUSTOM = "custom_"
     private const val KEY_BASS = "bass"
+    private const val KEY_VIRTUALIZER = "virtualizer"
+    private const val KEY_BOOST = "boost_mb"
+    private const val KEY_SCOPE = "scope"
+    /** The old on/off levelling switch; read once as a 6 dB boost when no boost is stored. */
     private const val KEY_LEVEL = "level_volume"
+    private const val LEGACY_LEVEL_MB = 600
 
-    /** Bass boost strength range the platform takes (0..1000 permille). */
+    /** The shared player's session, whichever engine it runs on. */
+    const val OWNER_PLAYER = "player"
+
+    /** Bass boost and virtualizer strength range the platform takes (0..1000 permille). */
     const val BASS_MAX = 1_000
+    const val VIRTUALIZER_MAX = 1_000
 
-    /** How much the loudness levelling lifts a quiet station, in millibels. */
-    private const val LEVEL_GAIN_MB = 600
+    /** Volume boost ceiling, in millibels: +15 dB is loud without clipping most music to mush. */
+    const val BOOST_MAX_MB = 1_500
 
     data class Settings(
         val enabled: Boolean,
         val preset: EqPreset,
         val custom: IntArray,
         val bass: Int,
-        val levelVolume: Boolean,
+        val virtualizer: Int,
+        val boostMb: Int,
+        val scope: EffectScope,
     ) {
         /** The gains on the five reference bands that [preset] means right now. */
         val gains: IntArray get() = if (preset == EqPreset.CUSTOM) custom else preset.gains
     }
 
+    /** One session's effects; any of them may be missing on a phone that lacks it. */
+    private class Chain(
+        val equalizer: Equalizer?,
+        val bassBoost: BassBoost?,
+        val virtualizer: Virtualizer?,
+        val loudness: LoudnessEnhancer?,
+    ) {
+        fun release() {
+            runCatching { equalizer?.release() }
+            runCatching { bassBoost?.release() }
+            runCatching { virtualizer?.release() }
+            runCatching { loudness?.release() }
+        }
+    }
+
     private var appContext: Context? = null
-    private var equalizer: Equalizer? = null
-    private var bassBoost: BassBoost? = null
-    private var loudness: LoudnessEnhancer? = null
-    private var sessionId: Int = 0
+    private val owners = mutableMapOf<String, Int>()
+    private val chains = mutableMapOf<Int, Chain>()
 
     private fun prefs(context: Context) =
         context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -58,12 +84,17 @@ object AudioEq {
         val prefs = prefs(context)
         val preset = prefs.getString(KEY_PRESET, null)
             ?.let { name -> EqPreset.entries.firstOrNull { it.name == name } } ?: EqPreset.NORMAL
+        val boost = if (prefs.contains(KEY_BOOST)) prefs.getInt(KEY_BOOST, 0)
+        else if (prefs.getBoolean(KEY_LEVEL, false)) LEGACY_LEVEL_MB else 0
         return Settings(
             enabled = prefs.getBoolean(KEY_ENABLED, false),
             preset = preset,
             custom = IntArray(EqMath.REFERENCE_HZ.size) { prefs.getInt(KEY_CUSTOM + it, 0) },
             bass = prefs.getInt(KEY_BASS, 0).coerceIn(0, BASS_MAX),
-            levelVolume = prefs.getBoolean(KEY_LEVEL, false),
+            virtualizer = prefs.getInt(KEY_VIRTUALIZER, 0).coerceIn(0, VIRTUALIZER_MAX),
+            boostMb = boost.coerceIn(0, BOOST_MAX_MB),
+            scope = prefs.getString(KEY_SCOPE, null)
+                ?.let { name -> EffectScope.entries.firstOrNull { it.name == name } } ?: EffectScope.APP,
         )
     }
 
@@ -99,7 +130,22 @@ object AudioEq {
         putBoolean(KEY_ENABLED, true)
     }
 
-    fun setLevelVolume(context: Context, on: Boolean) = update(context) { putBoolean(KEY_LEVEL, on) }
+    fun setVirtualizer(context: Context, strength: Int) = update(context) {
+        putInt(KEY_VIRTUALIZER, strength.coerceIn(0, VIRTUALIZER_MAX))
+        putBoolean(KEY_ENABLED, true)
+    }
+
+    fun setBoost(context: Context, millibels: Int) = update(context) {
+        putInt(KEY_BOOST, millibels.coerceIn(0, BOOST_MAX_MB))
+        putBoolean(KEY_ENABLED, true)
+    }
+
+    /** Wider than [EffectScope.APP] needs [AudioEffectsService] running; the caller starts or stops it. */
+    fun setScope(context: Context, scope: EffectScope) {
+        prefs(context).edit { putString(KEY_SCOPE, scope.name) }
+        appContext = context.applicationContext
+        reconcile()
+    }
 
     /** The car's one button: the next preset, wrapping. Returns what is on now. */
     fun cyclePreset(context: Context): EqPreset {
@@ -116,42 +162,68 @@ object AudioEq {
 
     private fun update(context: Context, change: android.content.SharedPreferences.Editor.() -> Unit) {
         prefs(context).edit { change() }
-        applyNow()
-    }
-
-    /** Called by the service for its player's audio session; replaces whatever was attached. */
-    @Synchronized
-    fun attach(context: Context, audioSessionId: Int) {
-        if (audioSessionId <= 0) return
-        if (audioSessionId == sessionId && equalizer != null) return
-        detach()
         appContext = context.applicationContext
-        sessionId = audioSessionId
-        equalizer = runCatching { Equalizer(0, audioSessionId) }
-            .onFailure { StructuredLog.w(TAG, "No equalizer on session $audioSessionId: ${it.message}") }.getOrNull()
-        bassBoost = runCatching { BassBoost(0, audioSessionId) }
-            .onFailure { StructuredLog.w(TAG, "No bass boost on session $audioSessionId: ${it.message}") }.getOrNull()
-        loudness = runCatching { LoudnessEnhancer(audioSessionId) }
-            .onFailure { StructuredLog.w(TAG, "No loudness enhancer on session $audioSessionId: ${it.message}") }.getOrNull()
         applyNow()
     }
 
+    /** The shared player's session; replaces whatever the player had attached before. */
+    fun attach(context: Context, audioSessionId: Int) = attach(context, OWNER_PLAYER, audioSessionId)
+
+    fun detach() = detach(OWNER_PLAYER)
+
+    /** [owner] now plays on [audioSessionId]; its previous session, if another, is let go. */
     @Synchronized
-    fun detach() {
-        runCatching { equalizer?.release() }
-        runCatching { bassBoost?.release() }
-        runCatching { loudness?.release() }
-        equalizer = null
-        bassBoost = null
-        loudness = null
-        sessionId = 0
+    fun attach(context: Context, owner: String, audioSessionId: Int) {
+        if (audioSessionId <= 0) return
+        appContext = context.applicationContext
+        if (owners[owner] == audioSessionId && chains.containsKey(audioSessionId)) return
+        owners[owner] = audioSessionId
+        reconcile()
+    }
+
+    @Synchronized
+    fun detach(owner: String) {
+        if (owners.remove(owner) != null) reconcile()
+    }
+
+    /** Every other app's session goes: [AudioEffectsService] stopped, so nothing announces their closing. */
+    @Synchronized
+    fun detachExternal() {
+        owners.keys.removeAll { it.startsWith(EffectTargets.EXTERNAL_PREFIX) }
+        reconcile()
+    }
+
+    /** Holds effects on exactly the sessions the scope reaches, then applies the settings to them. */
+    @Synchronized
+    private fun reconcile() {
+        val context = appContext ?: return
+        val wanted = EffectTargets.sessions(settings(context).scope, owners)
+        chains.keys.filter { it !in wanted }.forEach { session -> chains.remove(session)?.release() }
+        wanted.filter { it !in chains }.forEach { session -> chains[session] = open(session) }
+        applyNow()
+    }
+
+    private fun open(session: Int): Chain {
+        fun <T> make(name: String, build: () -> T): T? = runCatching(build)
+            .onFailure { StructuredLog.w(TAG, "No $name on session $session: ${it.message}") }.getOrNull()
+        StructuredLog.i(TAG, "Effects on session $session")
+        return Chain(
+            equalizer = make("equalizer") { Equalizer(0, session) },
+            bassBoost = make("bass boost") { BassBoost(0, session) },
+            virtualizer = make("virtualizer") { Virtualizer(0, session) },
+            loudness = make("loudness enhancer") { LoudnessEnhancer(session) },
+        )
     }
 
     @Synchronized
     private fun applyNow() {
         val context = appContext ?: return
         val current = settings(context)
-        equalizer?.let { eq ->
+        chains.values.forEach { apply(it, current) }
+    }
+
+    private fun apply(chain: Chain, current: Settings) {
+        chain.equalizer?.let { eq ->
             runCatching {
                 val bands = eq.numberOfBands.toInt()
                 val range = eq.bandLevelRange
@@ -161,16 +233,22 @@ object AudioEq {
                 eq.enabled = current.enabled
             }.onFailure { StructuredLog.w(TAG, "Equalizer refused the settings: ${it.message}") }
         }
-        bassBoost?.let { boost ->
+        chain.bassBoost?.let { boost ->
             runCatching {
                 if (boost.strengthSupported) boost.setStrength(current.bass.toShort())
                 boost.enabled = current.enabled && current.bass > 0
             }.onFailure { StructuredLog.w(TAG, "Bass boost refused the settings: ${it.message}") }
         }
-        loudness?.let { level ->
+        chain.virtualizer?.let { virt ->
             runCatching {
-                level.setTargetGain(LEVEL_GAIN_MB)
-                level.enabled = current.levelVolume
+                if (virt.strengthSupported) virt.setStrength(current.virtualizer.toShort())
+                virt.enabled = current.enabled && current.virtualizer > 0
+            }.onFailure { StructuredLog.w(TAG, "Virtualizer refused the settings: ${it.message}") }
+        }
+        chain.loudness?.let { level ->
+            runCatching {
+                level.setTargetGain(current.boostMb)
+                level.enabled = current.enabled && current.boostMb > 0
             }.onFailure { StructuredLog.w(TAG, "Loudness enhancer refused the settings: ${it.message}") }
         }
     }

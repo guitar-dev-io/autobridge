@@ -1,9 +1,11 @@
 package dev.autobridge.media.vlc
 
 import android.content.Context
+import android.media.AudioManager
 import android.net.Uri
 import android.view.Surface
 import dev.autobridge.logging.StructuredLog
+import dev.autobridge.media.AudioEq
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
 import org.videolan.libvlc.MediaPlayer
@@ -20,7 +22,18 @@ import org.videolan.libvlc.MediaPlayer
  */
 class LibVlcBackend(context: Context) : VlcBackend {
 
-    private val libVlc = LibVLC(context.applicationContext)
+    /**
+     * A session of our own for libVLC's AudioTrack output, so the sound effects ([AudioEq]) can sit
+     * on it exactly as they do on ExoPlayer's. Without the option libVLC opens an anonymous session
+     * nothing else can reach.
+     */
+    private val audioSessionId: Int =
+        runCatching { context.getSystemService(AudioManager::class.java).generateAudioSessionId() }.getOrDefault(0)
+
+    private val libVlc = LibVLC(
+        context.applicationContext,
+        if (audioSessionId > 0) arrayListOf("--audiotrack-session-id=$audioSessionId") else arrayListOf()
+    )
     private val player = MediaPlayer(libVlc)
 
     private var listener: VlcBackend.Listener? = null
@@ -33,6 +46,7 @@ class LibVlcBackend(context: Context) : VlcBackend {
     private data class LibVlcSource(override val uri: String) : VlcBackend.Source
 
     init {
+        AudioEq.attach(context, audioSessionId)
         player.setEventListener { event ->
             when (event.type) {
                 MediaPlayer.Event.Buffering -> updatePhase(VlcBackend.PlaybackPhase.BUFFERING)
@@ -151,6 +165,7 @@ class LibVlcBackend(context: Context) : VlcBackend {
     }
 
     override fun release() {
+        AudioEq.detach()
         runCatching { player.getVLCVout().detachViews() }
         player.release()
         libVlc.release()

@@ -37,7 +37,7 @@ import dev.autobridge.ui.SystemBack
 /**
  * The radio player on the phone: the station's logo large, "Live", the song and artist when the
  * stream names them and the station either way, previous / play-pause / next, and the three
- * things a listener reaches for — the equalizer ([RadioEqSheet]), the favourite, all stations.
+ * things a listener reaches for — the equalizer ([AudioEffectsSheet]), the favourite, all stations.
  *
  * It holds no playback state of its own: everything is read from the shared session through
  * [MediaPlaybackClient] on a one-second tick, the same way [dev.autobridge.ui.MiniPlayer] does, so
@@ -181,7 +181,7 @@ class RadioPlayerActivity : Activity() {
         favorite = action(getString(R.string.radio_favorite_add)) { toggleFavorite() }
         sleep = action(getString(R.string.radio_sleep_timer)) { chooseSleepTimer() }
         val actions = listOf(
-            action(getString(R.string.eq_title)) { RadioEqSheet(this).show() },
+            action(getString(R.string.eq_title)) { AudioEffectsSheet(this).show() },
             favorite,
             action(getString(R.string.radio_all_stations)) {
                 startActivity(LibraryActivity.intent(this, LibraryActivity.Section.RADIO))
