@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="desktop_settings_unsupported">มือถือหรือบิลด์นี้ใช้เบราว์เซอร์เดสก์ท็อปไม่ได้ ต้องเป็นมือถือ arm64 และ AutoBridge บิลด์ sideload (personal หรือ lab)</string>
-    <string name="desktop_settings_choice_section">เบราว์เซอร์ที่ใช้กับเมนูเบราว์เซอร์เดสก์ท็อป</string>
+    <string name="desktop_settings_choice_section">เบราว์เซอร์สำหรับการ์ดเว็บบนจอรถ</string>
     <string name="desktop_settings_choice_autobridge">เบราว์เซอร์ AutoBridge</string>
     <string name="desktop_settings_choice_autobridge_caption">เบราว์เซอร์ในตัว ปิดเอนจินเดสก์ท็อป</string>
     <string name="desktop_settings_browser_desktop">%1$s เดสก์ท็อป</string>
@@ -61,4 +61,8 @@
     <string name="desktop_car_settings_title">เบราว์เซอร์เดสก์ท็อป</string>
     <string name="desktop_car_mode_touch">โหมดสัมผัส: แตะเพื่อคลิก ลากเพื่อเลื่อน</string>
     <string name="desktop_car_mode_mouse">โหมดเมาส์: ลากเพื่อเลื่อนเคอร์เซอร์ แตะเพื่อคลิก</string>
+    <!-- The engine choice on the car, inside AutoBridge (CarExtensions). -->
+    <string name="car_more_browser_engine">เอนจินเบราว์เซอร์: %1$s</string>
+    <string name="car_engine_title">เอนจินเบราว์เซอร์</string>
+    <string name="car_engine_install_on_phone">ติดตั้งบนมือถือก่อน: ตั้งค่า › Desktop Browser Engine</string>
 </resources>

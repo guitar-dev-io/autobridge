@@ -619,8 +619,8 @@
     <string name="send_log_preparing">Preparing the log…</string>
     <string name="send_log_via">Send log via</string>
     <string name="whats_new_title">What\'s new in %1$s</string>
-    <string name="aa_hidden_title">Bridge Web is hidden on Android Auto</string>
-    <string name="aa_hidden_message">Installing this update reset the install source, so Android Auto will not show Bridge Web until it is set again. It takes one tap with Shizuku.</string>
+    <string name="aa_hidden_title">AutoBridge is hidden on Android Auto</string>
+    <string name="aa_hidden_message">Installing this update reset the install source, so Android Auto will not show AutoBridge until it is set again. It takes one tap with Shizuku.</string>
     <string name="aa_hidden_fix">Fix now</string>
     <string name="whats_new_0_4_57">• Duo Screen: dragging the split is smoother; the panes resize once you let go.\n• Car browser: Split screen is one row that opens a page of layout pictures; no address bar while split; filling a page field (a phone number) says so instead of looking like a search.\n• Sound from the phone browser no longer cuts into music playing on the car (tap the banner to let it through).\n• Queue: adding to it starts playing on an idle car, and videos and streams move on to the next item by themselves.\n• Control: the playback time keeps moving.\n• Emergency card: easier to read, the number is the call button.\n• Voice: My commands (your own words for a screen, a site or a command), fix a misheard transcript and remember the fix, and faster transcription of short commands.</string>
     <string name="whats_new_0_4_55">• Duo Screen settings are shorter: tap a pane in the car-screen preview to pick its app, and Number of panes now sits in the Layout card.\n• Car home (Android Auto): new design with Now Playing beside the quick-access grid.</string>
@@ -2281,4 +2281,8 @@
     <string name="support_car_scan_title">Scan from your phone</string>
     <string name="support_car_next">Next: %1$s</string>
     <string name="support_car_row_caption">QR codes for Buy Me a Coffee and other ways to say thanks</string>
+    <!-- One Android Auto app: Multi-app opens inside AutoBridge; Bridge Web is listed only on request. -->
+    <string name="car_more_multi_app">Multi-app</string>
+    <string name="projection_setup_web_title">List Bridge Web on Android Auto</string>
+    <string name="projection_setup_web_caption">Off by default: AutoBridge is the one Android Auto app, with its browser, Multi-app and the desktop browser inside it. Turn this on only for Bridge Web\'s split screen beside Maps, then reconnect Android Auto.</string>
 </resources>

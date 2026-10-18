@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="desktop_settings_unsupported">This phone or build cannot run desktop browsers: they need an arm64 phone and a sideload (personal or lab) build of AutoBridge.</string>
-    <string name="desktop_settings_choice_section">Browser for the Desktop Browser entry</string>
+    <string name="desktop_settings_choice_section">Browser for the car\'s Web card</string>
     <string name="desktop_settings_choice_autobridge">AutoBridge Browser</string>
     <string name="desktop_settings_choice_autobridge_caption">Built-in browser; desktop engine off</string>
     <string name="desktop_settings_browser_desktop">%1$s Desktop</string>
@@ -61,4 +61,8 @@
     <string name="desktop_car_settings_title">Desktop browser</string>
     <string name="desktop_car_mode_touch">Touch mode: tap clicks, drag scrolls</string>
     <string name="desktop_car_mode_mouse">Mouse mode: drag moves the cursor, tap clicks it</string>
+    <!-- The engine choice on the car, inside AutoBridge (CarExtensions). -->
+    <string name="car_more_browser_engine">Browser engine: %1$s</string>
+    <string name="car_engine_title">Browser engine</string>
+    <string name="car_engine_install_on_phone">Install it on the phone first: Settings › Desktop Browser Engine</string>
 </resources>

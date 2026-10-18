@@ -35,14 +35,19 @@ import dev.autobridge.desktop.input.Keysym
 import dev.autobridge.desktop.input.PointerMode
 import dev.autobridge.display.CarSurfaceCanvas
 import dev.autobridge.desktop.session.DesktopSession
+import dev.autobridge.desktop.browser.DesktopBrowsers
+import dev.autobridge.desktop.install.EngineChoice
+import dev.autobridge.mirror.MirrorSurfaceOwnership
+import androidx.car.app.CarToast
 import dev.autobridge.safety.ParkingStateStore
 import dev.autobridge.safety.SafetyEnforcement
 
 /**
- * The desktop browser's own Android Auto entry ("Desktop Browser"). A separate CarAppService, like
- * Duo Screen's, so the experimental Linux runtime never shares a session with the template route
- * every flavor ships. It is a navigation-category app because only those receive a drawing
- * surface; Android Auto therefore shows it full screen in place of the navigation app.
+ * The desktop browser's standalone Android Auto entry ("Desktop Browser"). Declared disabled: the
+ * engine is opened from inside AutoBridge (the Web card, once a desktop browser is chosen and
+ * installed - see dev.autobridge.car.CarExtensions), so AutoBridge is the one Android Auto app the
+ * project lists. Kept so the standalone route can still be switched on for testing with
+ * `adb shell pm enable dev.autobridge/dev.autobridge.projection.desktop.DesktopBrowserCarAppService`.
  */
 class DesktopBrowserCarAppService : CarAppService() {
     override fun createHostValidator(): HostValidator =
@@ -66,8 +71,16 @@ class DesktopBrowserCarAppService : CarAppService() {
  * Parked-only, enforced exactly like the built-in car browser: `SafetyEnforcement.gateParked` +
  * `FeaturePolicy` for [Feature.BROWSER]. While moving the page is replaced by a notice and input
  * is ignored; the browser itself keeps running (audio follows the media policy).
+ *
+ * [embedded]: pushed inside the AutoBridge session rather than the root of the standalone service.
+ * The action strip then has Home, back to AutoBridge, and the surface callback is shared with
+ * AutoBridge's own surface screens through [MirrorSurfaceOwnership], so popping back cannot clear
+ * the callback of the screen underneath.
  */
-class DesktopBrowserCarScreen(carContext: CarContext) : Screen(carContext), SurfaceCallback {
+class DesktopBrowserCarScreen(
+    carContext: CarContext,
+    private val embedded: Boolean = false
+) : Screen(carContext), SurfaceCallback {
     private var session: DesktopSession? = null
     private val adapter: DesktopBrowserAdapter? = DesktopEngine.let { it.init(carContext); it.chosenInstalledBrowser() }
     private var surfaceWidth = 0
@@ -88,14 +101,19 @@ class DesktopBrowserCarScreen(carContext: CarContext) : Screen(carContext), Surf
         lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onCreate(owner: LifecycleOwner) {
                 ParkingStateStore.addListener(parkingListener)
-                if (adapter != null) carContext.getCarService(AppManager::class.java).setSurfaceCallback(this@DesktopBrowserCarScreen)
+                if (adapter != null) {
+                    MirrorSurfaceOwnership.claim(this@DesktopBrowserCarScreen)
+                    carContext.getCarService(AppManager::class.java).setSurfaceCallback(this@DesktopBrowserCarScreen)
+                }
             }
 
             override fun onDestroy(owner: LifecycleOwner) {
                 ParkingStateStore.removeListener(parkingListener)
                 session?.detachSurface()
                 DesktopEngine.noteSurfaceDetached()
-                carContext.getCarService(AppManager::class.java).setSurfaceCallback(null)
+                if (MirrorSurfaceOwnership.release(this@DesktopBrowserCarScreen)) {
+                    carContext.getCarService(AppManager::class.java).setSurfaceCallback(null)
+                }
             }
         })
     }
@@ -107,19 +125,22 @@ class DesktopBrowserCarScreen(carContext: CarContext) : Screen(carContext), Surf
         // The rail drawn on the surface is the control set; NavigationTemplate still needs a
         // non-empty action strip, so it carries the one action a driver reaches for most: back.
         // PAN in the map strip is what makes the host deliver pan/fling/zoom gestures.
+        // Inside AutoBridge, Home goes back to it: a head unit without a hardware back key has no
+        // other way out of a full-screen navigation template.
+        val strip = ActionStrip.Builder()
+            .addAction(action(R.drawable.ic_browser_back) { session?.input?.back(); session?.renderer?.burst() })
+        if (embedded) strip.addAction(action(R.drawable.ic_car_home) { screenManager.popToRoot() })
         return NavigationTemplate.Builder()
-            .setActionStrip(
-                ActionStrip.Builder()
-                    .addAction(action(R.drawable.ic_browser_back) { session?.input?.back(); session?.renderer?.burst() })
-                    .build()
-            )
+            .setActionStrip(strip.build())
             .setMapActionStrip(ActionStrip.Builder().addAction(Action.PAN).build())
             .build()
     }
 
     private fun message(title: String, text: String): Template = PaneTemplate.Builder(
         Pane.Builder().addRow(Row.Builder().setTitle(title).addText(text).build()).build()
-    ).setHeader(Header.Builder().setTitle(title).setStartHeaderAction(Action.APP_ICON).build()).build()
+    ).setHeader(
+        Header.Builder().setTitle(title).setStartHeaderAction(if (embedded) Action.BACK else Action.APP_ICON).build()
+    ).build()
 
     private fun action(icon: Int, onClick: () -> Unit): Action =
         Action.Builder().setIcon(CarIcons.of(carContext, icon)).setOnClickListener(onClick).build()
@@ -170,6 +191,8 @@ class DesktopBrowserCarScreen(carContext: CarContext) : Screen(carContext), Surf
     // ── SurfaceCallback ─────────────────────────────────────────────────────
 
     override fun onSurfaceAvailable(surfaceContainer: SurfaceContainer) {
+        // A surface handed to a screen that no longer owns the callback belongs to its successor.
+        if (!MirrorSurfaceOwnership.isOwner(this)) return
         val surface = surfaceContainer.surface ?: return
         val browser = adapter ?: return
         surfaceWidth = surfaceContainer.width
@@ -284,5 +307,61 @@ class DesktopBrowserCarMenuScreen(
             .setSingleList(list)
             .setHeader(Header.Builder().setTitle(carContext.getString(R.string.desktop_car_settings_title)).setStartHeaderAction(Action.BACK).build())
             .build()
+    }
+}
+
+/**
+ * Which browser the car's Web card opens: AutoBridge's built-in browser or an installed desktop
+ * browser. The same choice as Settings › Desktop Browser Engine on the phone (one [EngineChoice]),
+ * offered on the car so switching back to the built-in browser never needs the phone. A browser that
+ * is not installed is listed with what it needs instead of being selectable.
+ */
+class DesktopEngineChoiceCarScreen(carContext: CarContext) : Screen(carContext) {
+    override fun onGetTemplate(): Template {
+        DesktopEngine.init(carContext)
+        val chosen = DesktopEngine.chosenInstalledBrowser()?.id
+        fun mark(title: String, selected: Boolean) = if (selected) "$title ✓" else title
+        val list = ItemList.Builder().addItem(
+            Row.Builder()
+                .setTitle(mark(carContext.getString(R.string.desktop_settings_choice_autobridge), chosen == null))
+                .addText(carContext.getString(R.string.desktop_settings_choice_autobridge_caption))
+                .setOnClickListener { choose(EngineChoice.AUTOBRIDGE) }
+                .build()
+        )
+        DesktopBrowsers.all.forEach { browser ->
+            val installed = DesktopEngine.state(browser.id).state.installed
+            val choice = EngineChoice.entries.first { it.browser == browser.id }
+            list.addItem(
+                Row.Builder()
+                    .setTitle(mark(browser.displayName, chosen == browser.id))
+                    .addText(
+                        carContext.getString(
+                            if (installed) R.string.desktop_settings_choice_installed else R.string.car_engine_install_on_phone
+                        )
+                    )
+                    .setOnClickListener {
+                        if (installed) {
+                            choose(choice)
+                        } else {
+                            CarToast.makeText(
+                                carContext, carContext.getString(R.string.car_engine_install_on_phone), CarToast.LENGTH_LONG
+                            ).show()
+                        }
+                    }
+                    .build()
+            )
+        }
+        return ListTemplate.Builder()
+            .setSingleList(list.build())
+            .setHeader(
+                Header.Builder().setTitle(carContext.getString(R.string.car_engine_title))
+                    .setStartHeaderAction(Action.BACK).build()
+            )
+            .build()
+    }
+
+    private fun choose(choice: EngineChoice) {
+        DesktopEngine.choice = choice
+        screenManager.pop()
     }
 }

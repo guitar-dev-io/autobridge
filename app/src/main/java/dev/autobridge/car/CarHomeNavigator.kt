@@ -33,8 +33,13 @@ internal object CarHomeNavigator {
                 }
                 CarNavigation.open(screenManager, "CarBrowserScreen") { CarBrowserScreen(carContext) }
             }
+            // The browser engine chosen for the Web card (a desktop engine in the sideload builds,
+            // when one is chosen and installed); the built-in browser otherwise, and always as the
+            // fallback when the chosen engine is not available.
             section == HomeSection.WEB ->
-                CarNavigation.open(screenManager, "CarBrowserScreen") { CarBrowserScreen(carContext) }
+                if (!CarExtensions.openWeb(carContext, screenManager)) {
+                    CarNavigation.open(screenManager, "CarBrowserScreen") { CarBrowserScreen(carContext) }
+                }
             section == HomeSection.FOLDERS ->
                 screenManager.push(CarLibraryScreen(carContext, CarLibraryScreen.Mode.FOLDERS))
             section == HomeSection.PLAYLISTS ->

@@ -3,6 +3,9 @@ package dev.autobridge.mirror
 /**
  * Guards the process-wide Android Auto surface callback against an old car screen clearing a
  * replacement callback during reconnect. Ownership is identity-based rather than equals-based.
+ *
+ * Lives in :common because :duoscreen's car screen shares the same callback slot when it is opened
+ * from inside the AutoBridge session rather than from its own car app service.
  */
 object MirrorSurfaceOwnership {
     private var owner: Any? = null

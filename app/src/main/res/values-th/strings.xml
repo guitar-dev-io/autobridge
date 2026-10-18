@@ -603,8 +603,8 @@
     <string name="send_log_preparing">กำลังเตรียม log…</string>
     <string name="send_log_via">ส่ง log ทาง</string>
     <string name="whats_new_title">มีอะไรใหม่ใน %1$s</string>
-    <string name="aa_hidden_title">Bridge Web ถูกซ่อนใน Android Auto</string>
-    <string name="aa_hidden_message">การติดตั้งอัปเดตนี้ทำให้ที่มาของการติดตั้งถูกรีเซ็ต Android Auto จะไม่แสดง Bridge Web จนกว่าจะตั้งค่าใหม่ กดครั้งเดียวผ่าน Shizuku</string>
+    <string name="aa_hidden_title">AutoBridge ถูกซ่อนใน Android Auto</string>
+    <string name="aa_hidden_message">การติดตั้งอัปเดตนี้ทำให้ที่มาของการติดตั้งถูกรีเซ็ต Android Auto จะไม่แสดง AutoBridge จนกว่าจะตั้งค่าใหม่ กดครั้งเดียวผ่าน Shizuku</string>
     <string name="aa_hidden_fix">แก้ตอนนี้</string>
     <string name="whats_new_0_4_57">• Duo Screen: ลากตัวแบ่งจอลื่นขึ้น ปรับขนาดจริงหลังปล่อยนิ้ว\n• เบราว์เซอร์บนรถ: แบ่งจอเหลือปุ่มเดียว เปิดหน้าเลือกเลย์เอาต์แบบมีรูปตัวอย่าง ตอนแบ่งจอไม่มีแถบที่อยู่ทับ และแตะช่องกรอกในหน้าเว็บ (เช่น เบอร์โทร) จะบอกว่ากำลังกรอกช่อง ไม่ดูเหมือนช่องค้นหา\n• เสียงจากเบราว์เซอร์มือถือไม่แทรกเพลงที่เล่นบนรถแล้ว (แตะแถบเพื่อเปิดเสียงได้)\n• คิว: รถว่างอยู่แล้วกดเพิ่มในคิวจะเริ่มเล่นทันที และวิดีโอหรือสตรีมเล่นจบแล้วไปรายการถัดไปเอง\n• หน้าควบคุม: เวลาเพลงเดินตามจริง\n• บัตรฉุกเฉินอ่านง่ายขึ้น แตะตัวเบอร์เพื่อโทรได้เลย\n• เสียง: คำสั่งของฉัน (ตั้งคำพูดเองให้ไปหน้า เว็บ หรือคำสั่ง) แก้คำที่ฟังผิดและจำไว้ใช้ครั้งหน้า และถอดคำสั่งสั้นๆ ได้เร็วขึ้น</string>
     <string name="whats_new_0_4_55">• หน้าตั้งค่า Duo Screen กระชับขึ้น: แตะจอย่อยในภาพตัวอย่างจอรถเพื่อเลือกแอป และจำนวนจอย้ายไปอยู่ในการ์ดเลย์เอาต์\n• หน้าแรกบนรถ (Android Auto): ดีไซน์ใหม่ เพลงที่กำลังเล่นอยู่ข้างปุ่มลัด</string>
@@ -2246,4 +2246,8 @@
     <string name="support_car_scan_title">สแกนจากมือถือ</string>
     <string name="support_car_next">ถัดไป: %1$s</string>
     <string name="support_car_row_caption">QR โค้ดสำหรับ Buy Me a Coffee และช่องทางอื่นๆ</string>
+    <!-- One Android Auto app: Multi-app opens inside AutoBridge; Bridge Web is listed only on request. -->
+    <string name="car_more_multi_app">หลายแอป</string>
+    <string name="projection_setup_web_title">แสดง Bridge Web บน Android Auto</string>
+    <string name="projection_setup_web_caption">ปิดไว้ตามค่าเริ่มต้น: AutoBridge เป็นแอปเดียวบน Android Auto โดยมีเบราว์เซอร์ หลายแอป และเบราว์เซอร์เดสก์ท็อปอยู่ข้างใน เปิดเฉพาะเมื่อต้องการแบ่งจอ Bridge Web ข้าง Maps แล้วเชื่อมต่อ Android Auto ใหม่</string>
 </resources>

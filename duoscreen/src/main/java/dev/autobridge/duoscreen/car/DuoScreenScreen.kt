@@ -21,6 +21,7 @@ import dev.autobridge.duoscreen.DuoScreenController
 import dev.autobridge.duoscreen.DuoScreenHost
 import dev.autobridge.duoscreen.layout.DuoScreenPreset
 import dev.autobridge.duoscreen.system.DuoScreenOps
+import dev.autobridge.mirror.MirrorSurfaceOwnership
 
 /**
  * The car side of a Duo Screen session: hands the host's Surface and gestures to
@@ -28,8 +29,17 @@ import dev.autobridge.duoscreen.system.DuoScreenOps
  *
  * Panes start from the preset chosen in [DuoScreenStore] and are rearranged by hand in edit mode;
  * [DEFAULT_PANES] fills them only until an app has been picked on the phone.
+ *
+ * [embedded] is true when the screen is pushed inside the AutoBridge session (Multi-app in its
+ * More list) rather than shown as the root of [DuoScreenSession]. AutoBridge is then the only
+ * Android Auto entry the driver sees, and Exit returns to AutoBridge instead of closing the car app.
+ * Either way the surface callback is taken through [MirrorSurfaceOwnership], the guard AutoBridge's
+ * own surface screens use, so popping back cannot clear the callback of the screen underneath.
  */
-class DuoScreenScreen(carContext: CarContext) : Screen(carContext), SurfaceCallback {
+class DuoScreenScreen(
+    carContext: CarContext,
+    private val embedded: Boolean = false
+) : Screen(carContext), SurfaceCallback {
     private companion object {
         const val TAG = "AutoBridgeDuoScreen"
 
@@ -44,6 +54,7 @@ class DuoScreenScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
     init {
         lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) {
+                MirrorSurfaceOwnership.claim(this@DuoScreenScreen)
                 carContext.getCarService(AppManager::class.java)
                     .setSurfaceCallback(this@DuoScreenScreen)
                 // On root, the helper is started here; the panes that opened without it are
@@ -52,7 +63,9 @@ class DuoScreenScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
             }
 
             override fun onDestroy(owner: LifecycleOwner) {
-                carContext.getCarService(AppManager::class.java).setSurfaceCallback(null)
+                if (MirrorSurfaceOwnership.release(this@DuoScreenScreen)) {
+                    carContext.getCarService(AppManager::class.java).setSurfaceCallback(null)
+                }
                 // The controller outlives this screen; it must not keep a dead one to call back.
                 controller.chromeListener = null
                 DuoScreenHost.onScreenGone()
@@ -97,8 +110,10 @@ class DuoScreenScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
             .setIcon(icon(R.drawable.ic_duo_exit))
             .setOnClickListener {
                 val ended = DuoScreenHost.release()
-                StructuredLog.i(TAG, "Exit requested; session ended=$ended")
-                carContext.finishCarApp()
+                StructuredLog.i(TAG, "Exit requested; session ended=$ended embedded=$embedded")
+                // Inside AutoBridge, Exit ends the panes and goes back to the AutoBridge screen it
+                // came from; finishing the car app would close AutoBridge itself.
+                if (embedded) screenManager.pop() else carContext.finishCarApp()
             }
             .build()
 
@@ -114,6 +129,8 @@ class DuoScreenScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
         CarIcon.Builder(IconCompat.createWithResource(carContext, resId)).build()
 
     override fun onSurfaceAvailable(surfaceContainer: SurfaceContainer) {
+        // A surface handed to a screen that no longer owns the callback belongs to its successor.
+        if (!MirrorSurfaceOwnership.isOwner(this)) return
         val surface = surfaceContainer.surface ?: return
         val started = controller.start(
             surface,
@@ -132,7 +149,9 @@ class DuoScreenScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
 
     // Hands the Surface back without ending the session: the pane displays and the apps in them
     // stay, and the next onSurfaceAvailable resumes them rather than launching them again.
-    override fun onSurfaceDestroyed(surfaceContainer: SurfaceContainer) = controller.detach()
+    override fun onSurfaceDestroyed(surfaceContainer: SurfaceContainer) {
+        if (MirrorSurfaceOwnership.isOwner(this)) controller.detach()
+    }
 
     // A head unit can lay its own cards over part of the surface; the panes go in what is left.
     override fun onVisibleAreaChanged(visibleArea: android.graphics.Rect) = controller.setVisibleArea(visibleArea)

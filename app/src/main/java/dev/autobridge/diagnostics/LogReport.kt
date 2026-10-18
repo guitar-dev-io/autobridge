@@ -58,7 +58,10 @@ object LogReport {
         appendLine("android auto connected: ${runtime.connected}")
         appendLine("vehicle:   ${runtime.vehicleState.name}")
         appendLine("shizuku:   ${if (ShizukuInputBackend.isPermissionGranted) "granted" else "not granted"}")
-        appendLine("bridge mirror listed: ${mirrorListed(context)}")
+        appendLine("bridge mirror listed: ${listed(context, "dev.autobridge.projection.ProjectionMirrorCarService")}")
+        appendLine("bridge web listed:    ${listed(context, "dev.autobridge.projection.ProjectionCarService")}")
+        appendLine("multi-app listed:     ${listed(context, "dev.autobridge.duoscreen.car.DuoScreenCarAppService")}")
+        appendLine("desktop listed:       ${listed(context, "dev.autobridge.projection.desktop.DesktopBrowserCarAppService")}")
         appendLine("split (car app browser): ${BrowserSplitStore.layout(context).name}")
         appendLine("split (bridge web):      ${BrowserSplitStore.projection.layout(context).name}")
         appendLine()
@@ -103,9 +106,16 @@ object LogReport {
         }
     }.getOrNull()
 
-    /** Resolved by name: the service only exists in the sideload flavors. */
-    private fun mirrorListed(context: Context): String = runCatching {
-        val component = ComponentName(context.packageName, "dev.autobridge.projection.ProjectionMirrorCarService")
+    /**
+     * Whether a project-owned Android Auto entry other than AutoBridge itself is listed. Resolved by
+     * name: these services only exist in the sideload flavors, and all of them are declared
+     * disabled, so "no (default)" is the expected answer.
+     */
+    private fun listed(context: Context, className: String): String = runCatching {
+        val component = ComponentName(context.packageName, className)
+        // Throws for a component this build does not have, which getComponentEnabledSetting alone
+        // would not: it reports DEFAULT for any name.
+        context.packageManager.getServiceInfo(component, PackageManager.MATCH_DISABLED_COMPONENTS)
         when (context.packageManager.getComponentEnabledSetting(component)) {
             PackageManager.COMPONENT_ENABLED_STATE_ENABLED -> "yes"
             PackageManager.COMPONENT_ENABLED_STATE_DISABLED -> "no (switched off)"

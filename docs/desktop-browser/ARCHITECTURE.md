@@ -15,7 +15,7 @@ AutoBridge app process (uid u0_aNNN, untrusted_app sandbox)
 ├── app/src/projection/…/desktop/            UI (needs app internals: design system, FeaturePolicy)
 │   ├── DesktopBrowserSettingsActivity       Settings › Desktop Browser Engine
 │   ├── DesktopBrowserActivity               phone viewer (SurfaceView + touch + IME)
-│   └── DesktopBrowserCarAppService/Screen   Android Auto entry "Desktop Browser" (NavigationTemplate)
+│   └── DesktopBrowserCarAppService/Screen   car screen, opened inside AutoBridge (service disabled)
 │
 └── :desktopbrowser module (dev.autobridge.desktop)
     ├── DesktopEngine            facade: state flows, one op queue, one session, idle stop
@@ -78,9 +78,17 @@ those.
 
 ## Android Auto
 
-- Its own `CarAppService` ("Desktop Browser", category NAVIGATION, `ALLOW_ALL_HOSTS_VALIDATOR` like
-  the other sideload car services). Only navigation apps get a drawing surface, so Android Auto
-  shows it full screen in place of the navigation app.
+- No Android Auto entry of its own. AutoBridge is the single Android Auto app the project lists:
+  `DesktopBrowserCarScreen` is pushed inside AutoBridge's own session (a NAVIGATION app, so it has
+  the drawing surface) when the car's Web card is opened and a desktop browser is chosen *and*
+  installed; otherwise the Web card opens the built-in browser exactly as before, which is also
+  the fallback whenever the engine is unavailable. Car › More › "Browser engine" switches between
+  them (the same `EngineChoice` as the phone setting). The surface callback is shared with
+  AutoBridge's other surface screens through `MirrorSurfaceOwnership`, and Home returns to AutoBridge.
+- `DesktopBrowserCarAppService` (the earlier standalone "Desktop Browser" entry) is kept but declared
+  `android:enabled="false"`; `scripts/check-car-entries.py` fails CI if it, Multi-app's or Bridge
+  Web's service is listed by default again. For a standalone test:
+  `adb shell pm enable dev.autobridge/dev.autobridge.projection.desktop.DesktopBrowserCarAppService`.
 - `NavigationTemplate` with an action strip (keyboard, back, reload) and `Action.PAN`, which is
   what makes the host deliver `onScroll`/`onFling`/`onScale`.
 - Text uses the host keyboard (`CarBrowserSearchScreen`), then is typed into the focused field + Enter.

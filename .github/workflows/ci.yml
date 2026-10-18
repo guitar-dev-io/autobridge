@@ -71,6 +71,13 @@ jobs:
       - name: Play manifest guard
         run: ./scripts/check-play-manifest.sh
 
+      # Gate: AutoBridge is the only Android Auto entry the project lists, in every flavor.
+      # Multi-app, Bridge Web and Bridge Mirror are reached from inside AutoBridge (or listed by the
+      # user at runtime), so their car components must stay declared android:enabled="false".
+      # Reads the source manifests, so it covers personal and lab without building them.
+      - name: Android Auto entry guard
+        run: python3 scripts/check-car-entries.py
+
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
@@ -127,3 +134,10 @@ jobs:
 
       - name: Assemble personal + lab debug
         run: ./gradlew --no-daemon assemblePersonalDebug assembleLabDebug
+
+      # The same Android Auto entry guard as the main job, on what the merge actually produced.
+      - name: Android Auto entry guard (merged manifests)
+        run: |
+          shopt -s nullglob
+          manifests=(app/build/intermediates/merged_manifests/*/process*Manifest/AndroidManifest.xml)
+          python3 scripts/check-car-entries.py "${manifests[@]}"

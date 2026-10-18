@@ -21,7 +21,7 @@ What was built, where it lives, and how to rebuild and test it. For the design s
 | Input: click, right click (long press), drag-select (long press + drag), scroll + fling, pinch zoom, text incl. Thai, keys | `input/*`, `display/X11Connection.kt` |
 | Audio → AudioTrack with audio focus | `audio/BrowserAudioBridge.kt` |
 | Phone viewer: landscape, keyboard, back, reload, close; back key = browser back | `app/src/projection/.../desktop/DesktopBrowserActivity.kt` |
-| Android Auto "Desktop Browser" entry, parked-only, keyboard/back/reload, pan/fling/zoom | `.../desktop/DesktopBrowserCarAppService.kt` |
+| Car screen inside AutoBridge (Web card / More › Browser engine), parked-only, keyboard/back/reload, pan/fling/zoom | `.../desktop/DesktopBrowserCarAppService.kt` |
 | Settings › Desktop Browser Engine: browser choice (AutoBridge / Chrome / Brave), runtime and per-browser cards (state, version, download estimate, measured sizes, progress, buttons), diagnostics (runtime, PRoot, glibc, child-process limit, session, X11, browser process, first paint, fps, memory, storage, last error), copy diagnostics, fast/compatible PRoot mode, stop browser | `.../desktop/DesktopBrowserSettingsActivity.kt` |
 | Idle stop: a browser with no surface for 10 min is stopped (profile saved) | `DesktopEngine.noteSurfaceDetached` |
 | Android 12+ child-process limit detected and explained | `runtime/ChildProcessLimit.kt` |
@@ -109,8 +109,9 @@ DESKTOP_ROOTFS_TAR=/path/to/layer.tar.gz X11_TEST_PORT=6001 ./gradlew :desktopbr
 ```
 
 On the phone: Settings › Desktop Browser Engine › Install runtime › Install (Chrome or Brave) ›
-Open. On the car: pick Chrome or Brave as the browser, then open "Desktop Browser" in Android
-Auto's launcher (sideload apps must be enabled in Android Auto's developer settings). Live log:
+Open. On the car: open AutoBridge (sideload apps must be enabled in Android Auto's developer
+settings), pick Chrome or Brave under More › Browser engine (or on the phone), then tap the Web
+card. Live log:
 
 ```bash
 adb logcat -s AutoBridgeDesktop
