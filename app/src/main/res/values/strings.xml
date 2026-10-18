@@ -434,10 +434,16 @@
     <string name="action_retry">Try again</string>
 
     <!-- Phone browser ([BrowserActivity]): page chrome, confirmations and dialogs. -->
-    <string name="browser_start_page_title">AutoBridge</string>
+    <string name="browser_start_page_title">AutoBridge Browser</string>
     <string name="browser_start_page_search_hint">Search or enter address</string>
     <string name="browser_start_page_label">Browser start page</string>
-    <string name="browser_start_page_shortcuts">Favourites</string>
+    <string name="browser_start_page_shortcuts">Quick Links</string>
+    <string name="browser_start_page_subtitle">Quick access to the sites you use most.</string>
+    <string name="browser_start_page_go">Go</string>
+    <string name="browser_start_page_slot">Slot %1$d</string>
+    <string name="car_browser_entry_label">AutoBridge Browser</string>
+    <string name="projection_setup_browser_title">List AutoBridge Browser on Android Auto</string>
+    <string name="projection_setup_browser_caption">On by default: the browser as its own Android Auto app, opening on the start page and typing with your phone\'s keyboard (Gboard), like AABrowser. Needs Android 15 or later and Unknown sources in Android Auto\'s developer settings. Reconnect Android Auto after changing.</string>
     <string name="browser_error_no_internet">No internet connection</string>
     <string name="browser_error_host_not_found">Can\'t find this website\nCheck the address and try again</string>
     <string name="browser_error_blocked">This page can\'t be opened right now</string>

@@ -137,6 +137,17 @@ class BrowserActivity : Activity() {
         }
 
     /**
+     * Opened from the "AutoBridge Browser" car launcher entry ([CAR_ENTRY], sideload flavors).
+     * Android Auto runs that entry as a real window on its own display, where the phone's keyboard
+     * (Gboard or whichever is set) comes up like on any screen - the way AABrowser does it - so the
+     * address bar and page fields use it instead of [BrowserKeyboardView].
+     */
+    private var systemKeyboardOnCar = false
+
+    /** On the car display and typing with the app's own keyboard, not the system one. */
+    private val ownCarKeyboard: Boolean get() = onCarDisplay && !systemKeyboardOnCar
+
+    /**
      * Pins the page's CSS width to the same band the car surface uses, by re-basing the whole
      * activity's density. Doing it here rather than on the WebView alone keeps the toolbar and the
      * page on one density; see [CarDisplayScaling].
@@ -166,7 +177,8 @@ class BrowserActivity : Activity() {
     private fun applyCarDisplayWindow() {
         // The address bar types with the app's own keyboard here; the window never asks for the
         // system one. Only the state bits change, so how the window adjusts is left as it was.
-        window.setSoftInputMode(
+        // The car launcher entry keeps the system keyboard, so it leaves the state alone.
+        if (ownCarKeyboard) window.setSoftInputMode(
             (window.attributes.softInputMode and WindowManager.LayoutParams.SOFT_INPUT_MASK_STATE.inv()) or
                 WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
         )
@@ -183,6 +195,7 @@ class BrowserActivity : Activity() {
         BrowserAppearanceStore.syncChrome(this)
         setTheme(BrowserAppearanceStore.activityTheme(this))
         super.onCreate(savedInstanceState)
+        systemKeyboardOnCar = intent?.component?.className == CAR_ENTRY
         releaseBack = dev.autobridge.ui.SystemBack.register(this) { goBack() }
         root = FrameLayout(this)
         applyStartPageBackground()
@@ -313,7 +326,7 @@ class BrowserActivity : Activity() {
 
         val restored = savedInstanceState?.getBundle("web")?.let { web.restoreState(it) } != null
         pendingUrl = savedInstanceState?.getString("pending_url")
-            ?: if (!restored) intent.dataString?.let(ContentAddress::https) ?: BrowserStartupStore.coldStartUrl(this) else null
+            ?: if (!restored) intent.dataString?.let(ContentAddress::https) ?: coldStartUrl() else null
         // A saved instance (rotation, process restore) keeps whatever the user had on screen; a
         // cold start uses the stored fullscreen preference, which defaults to on for a fresh
         // install and remembers a later toggle-off. See [BrowserControlsStore.startFullscreen].
@@ -325,6 +338,13 @@ class BrowserActivity : Activity() {
         // Settings > Browser launches us with this extra so the settings sheet opens straight away.
         if (savedInstanceState == null) maybeOpenSettingsSheet(intent)
     }
+
+    /**
+     * What a launch without a URL opens. The car launcher entry always opens on the start page
+     * (search box and quick links), like AABrowser; the phone keeps the user's launch behaviour.
+     */
+    private fun coldStartUrl(): String =
+        if (systemKeyboardOnCar) BrowserStartupStore.START_PAGE else BrowserStartupStore.coldStartUrl(this)
 
     /** Opens the browser settings sheet when launched with [EXTRA_OPEN_SETTINGS]. */
     private fun maybeOpenSettingsSheet(intent: Intent) {
@@ -432,7 +452,7 @@ class BrowserActivity : Activity() {
         imeOptions = EditorInfo.IME_ACTION_GO
         // On the car display the app's own keyboard types here ([BrowserKeyboardView]); the field
         // still takes focus and shows its cursor, but never raises the system keyboard.
-        if (onCarDisplay) showSoftInputOnFocus = false
+        if (ownCarKeyboard) showSoftInputOnFocus = false
         setPadding(
             sizes.dpInt(AutoUiSizes.HORIZONTAL_PADDING_DP),
             0,
@@ -455,7 +475,7 @@ class BrowserActivity : Activity() {
                 setText(if (showingStartPage) "" else web.url.orEmpty())
                 setSelection(0, text.length)
                 updateAddressDecorations()
-                if (onCarDisplay) {
+                if (ownCarKeyboard) {
                     hideSystemKeyboard()
                     openAddressKeyboard()
                 } else {
@@ -464,7 +484,7 @@ class BrowserActivity : Activity() {
                 }
             } else {
                 // The address keyboard belongs to the field; it goes when the field lets go.
-                if (onCarDisplay) closeCarKeyboard()
+                if (ownCarKeyboard) closeCarKeyboard()
                 // Leaving edit mode collapses back to the compact hostname with no clear button.
                 setHint(HINT_IDLE)
                 setText(if (showingStartPage) "" else displayUrl(web.url.orEmpty()))
@@ -573,7 +593,7 @@ class BrowserActivity : Activity() {
         // On a car display a tap on one of the page's text fields gets the car keyboard when the
         // system one does not come up there. Never consumes: the page still gets every touch.
         setOnTouchListener { _, event ->
-            if (onCarDisplay && event.actionMasked == android.view.MotionEvent.ACTION_UP) {
+            if (ownCarKeyboard && event.actionMasked == android.view.MotionEvent.ACTION_UP) {
                 postDelayed({ offerCarKeyboardForPage() }, CAR_KEYBOARD_DELAY_MS)
             }
             false
@@ -999,7 +1019,7 @@ class BrowserActivity : Activity() {
     private fun focusAddressBar() {
         if (fullscreen) setFullscreen(false)
         address.requestFocus()
-        if (!onCarDisplay) {
+        if (!ownCarKeyboard) {
             (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager)
                 .showSoftInput(address, InputMethodManager.SHOW_IMPLICIT)
         }
@@ -1143,7 +1163,7 @@ class BrowserActivity : Activity() {
      * up on the car display, opens the car keyboard on that field. A tap anywhere else closes it.
      */
     private fun offerCarKeyboardForPage() {
-        if (!onCarDisplay || isFinishing) return
+        if (!ownCarKeyboard || isFinishing) return
         web.evaluateJavascript(CarKeyboardPanel.FOCUSED_FIELD_SCRIPT.trimIndent()) { raw ->
             val parsed = runCatching { org.json.JSONArray("[${raw ?: "null"}]") }.getOrNull()
             val field = if (parsed == null || parsed.isNull(0)) null else parsed.optString(0)
@@ -1749,6 +1769,13 @@ class BrowserActivity : Activity() {
         const val TIMER_GATE_OWNER = "phone-browser"
 
         /**
+         * The activity-alias the sideload flavors list in the Android Auto launcher as
+         * "AutoBridge Browser" (src/projection/AndroidManifest.xml). The Play flavor declares no
+         * such alias, so nothing there ever starts this activity under this name.
+         */
+        const val CAR_ENTRY = "dev.autobridge.browser.CarBrowserEntry"
+
+        /**
          * Height of the compact address pill, in dp. Deliberately shorter than the toolbar's
          * [AutoUiSizes.TOUCH_TARGET_DP] buttons so the field reads as a slim chip, not a boxed text
          * field, while still clearing the minimum a finger can hit.
@@ -1966,6 +1993,11 @@ class BrowserActivity : Activity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        // The car launcher entry can bring an instance the phone started onto the car display.
+        if (intent.component?.className == CAR_ENTRY && !systemKeyboardOnCar) {
+            systemKeyboardOnCar = true
+            address.showSoftInputOnFocus = true
+        }
         // AutoBridgeVideoDiag (temporary): allow triggering the test page via adb without typing,
         // e.g. `adb shell am start -n dev.autobridge/.browser.BrowserActivity -d videodiag`.
         val data = intent.dataString

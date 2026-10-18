@@ -13,6 +13,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import dev.autobridge.R
+import dev.autobridge.browser.BrowserActivity
 import dev.autobridge.i18n.AppLocale
 import dev.autobridge.input.ShizukuInputBackend
 import dev.autobridge.ui.AutoBridgeDesign
@@ -113,6 +114,20 @@ class ProjectionSetupActivity : Activity() {
                 accent = AutoBridgeDesign.ACCENT,
                 checked = webShown,
             ) { setListed(webService, !webShown); render() },
+        )), gap = 14)
+
+        // AutoBridge Browser is listed by default (its own car launcher entry, with the phone's
+        // keyboard); this hides it for a driver who only wants AutoBridge on the car.
+        val browserShown = isBrowserEntryShown()
+        body.stack(SettingsUi.group(this, getString(R.string.car_browser_entry_label), listOf(
+            SettingsUi.switchRow(
+                this,
+                title = getString(R.string.projection_setup_browser_title),
+                caption = getString(R.string.projection_setup_browser_caption),
+                icon = R.drawable.ic_tile_web,
+                accent = AutoBridgeDesign.ACCENT,
+                checked = browserShown,
+            ) { setBrowserEntryShown(!browserShown); render() },
         )), gap = 14)
 
         val mirrorShown = isMirrorShown()
@@ -226,6 +241,22 @@ class ProjectionSetupActivity : Activity() {
 
     private val mirrorService get() = ComponentName(this, ProjectionMirrorCarService::class.java)
     private val webService get() = ComponentName(this, ProjectionCarService::class.java)
+
+    private val browserEntry get() = ComponentName(this, BrowserActivity.CAR_ENTRY)
+
+    /** On unless switched off: unlike the projection services, the manifest declares it enabled. */
+    private fun isBrowserEntryShown(): Boolean =
+        packageManager.getComponentEnabledSetting(browserEntry) != PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+
+    private fun setBrowserEntryShown(shown: Boolean) {
+        if (shown == isBrowserEntryShown()) return
+        packageManager.setComponentEnabledSetting(
+            browserEntry,
+            if (shown) PackageManager.COMPONENT_ENABLED_STATE_DEFAULT else PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+            PackageManager.DONT_KILL_APP
+        )
+        toast(getString(R.string.projection_setup_reconnect))
+    }
 
     /** Off unless switched on: the manifest declares the service disabled; see the comment there. */
     private fun isMirrorShown(): Boolean = isListed(mirrorService)

@@ -421,10 +421,16 @@
     <string name="action_retry">ลองใหม่</string>
 
     <!-- Phone browser: page chrome, confirmations and dialogs -->
-    <string name="browser_start_page_title">AutoBridge</string>
+    <string name="browser_start_page_title">AutoBridge Browser</string>
     <string name="browser_start_page_search_hint">ค้นหาหรือป้อนที่อยู่เว็บ</string>
     <string name="browser_start_page_label">หน้าแรกของเบราว์เซอร์</string>
-    <string name="browser_start_page_shortcuts">รายการโปรด</string>
+    <string name="browser_start_page_shortcuts">ลิงก์ด่วน</string>
+    <string name="browser_start_page_subtitle">เข้าเว็บที่ใช้บ่อยได้ในแตะเดียว</string>
+    <string name="browser_start_page_go">ไป</string>
+    <string name="browser_start_page_slot">ช่อง %1$d</string>
+    <string name="car_browser_entry_label">AutoBridge Browser</string>
+    <string name="projection_setup_browser_title">แสดง AutoBridge Browser บน Android Auto</string>
+    <string name="projection_setup_browser_caption">เปิดไว้ตามค่าเริ่มต้น: เบราว์เซอร์เป็นแอปแยกบน Android Auto เปิดมาที่หน้าแรก และพิมพ์ด้วยคีย์บอร์ดของมือถือ (Gboard) แบบ AABrowser ต้องใช้ Android 15 ขึ้นไป และเปิด Unknown sources ในตั้งค่านักพัฒนาของ Android Auto เปลี่ยนแล้วให้เชื่อมต่อ Android Auto ใหม่</string>
     <string name="browser_error_no_internet">ไม่มีการเชื่อมต่ออินเทอร์เน็ต</string>
     <string name="browser_error_host_not_found">หาเว็บไซต์นี้ไม่พบ\nตรวจสอบที่อยู่แล้วลองใหม่</string>
     <string name="browser_error_blocked">ตอนนี้เปิดหน้านี้ไม่ได้</string>
