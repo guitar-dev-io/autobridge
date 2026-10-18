@@ -18,7 +18,6 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputMethodManager
 import android.widget.FrameLayout
-import android.widget.PopupMenu
 import android.widget.TextView
 import android.widget.Toast
 import dev.autobridge.R
@@ -27,7 +26,6 @@ import dev.autobridge.desktop.browser.DesktopBrowserId
 import dev.autobridge.desktop.display.DesktopView
 import dev.autobridge.desktop.input.ControlRail
 import dev.autobridge.desktop.input.Keysym
-import dev.autobridge.desktop.input.PointerMode
 import dev.autobridge.desktop.input.TouchGestureMapper
 import dev.autobridge.desktop.session.DesktopSession
 import dev.autobridge.i18n.AppLocale
@@ -42,9 +40,9 @@ import kotlinx.coroutines.launch
  *
  * The browser window is resized to the screen's own shape (DesktopEngine.phoneViewport), so the
  * page fills the screen in portrait and in landscape, and rotating the phone reflows the page
- * instead of letterboxing it. A floating rail on the left (same as on the car) switches between
- * touch and mouse (trackpad) input, opens the keyboard, and opens a menu with back, forward,
- * reload, new tab, zoom and close.
+ * instead of letterboxing it. The same [ControlRail] as on the car sits on the left edge as a
+ * handle; tapped, it opens back, address, type, touch ⇄ mouse and More (forward, reload, new tab,
+ * zoom, how soon it collapses, and close).
  *
  * Leaving the screen only detaches the view; the browser keeps its tabs and is stopped after
  * [DesktopEngine.IDLE_STOP_MS] if nobody comes back.
@@ -76,7 +74,7 @@ class DesktopBrowserActivity : Activity() {
             return
         }
         browserId = id
-        rail = ControlRail(this, resources.displayMetrics.density)
+        rail = ControlRail(this, resources.displayMetrics.density).apply { showClose = true }
 
         val root = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
         desktopView = DesktopView(this)
@@ -155,25 +153,21 @@ class DesktopBrowserActivity : Activity() {
         }
     }
 
-    /** Rail buttons first; everything else is the page. */
+    /** The rail's handle, panel and More sheet first; everything else is the page. */
     private fun onPageTouch(event: MotionEvent): Boolean {
         if (event.actionMasked == MotionEvent.ACTION_DOWN) {
-            // The rail hides itself over the page; a touch on its strip while hidden only brings
-            // it back, and any other touch brings it back as well as reaching the page.
-            val railWasShown = rail.shown
-            rail.wake()
-            if (!railWasShown && rail.inZone(event.x, event.y)) {
-                railPressed = true
+            railPressed = when (val tap = rail.onTap(event.x, event.y)) {
+                is ControlRail.Tap.Perform -> {
+                    onRailAction(tap.action)
+                    true
+                }
+                ControlRail.Tap.Consumed -> true
+                ControlRail.Tap.PassThrough -> false
+            }
+            if (railPressed) {
                 session?.renderer?.burst()
                 return true
             }
-            val button = rail.hit(event.x, event.y)
-            if (button != null) {
-                railPressed = true
-                onRail(button)
-                return true
-            }
-            railPressed = false
         }
         if (railPressed) return true
         return gestures.onTouchEvent(event)
@@ -181,45 +175,26 @@ class DesktopBrowserActivity : Activity() {
 
     private var railPressed = false
 
-    private fun onRail(button: ControlRail.Button) {
-        when (button) {
-            ControlRail.Button.TOUCH -> rail.mode = PointerMode.TOUCH
-            ControlRail.Button.MOUSE -> rail.mode = PointerMode.MOUSE
-            ControlRail.Button.KEYBOARD -> keyInput.toggle()
-            ControlRail.Button.SETTINGS -> showMenu()
-        }
-        session?.renderer?.burst()
-    }
-
-    private fun showMenu() {
-        val anchor = View(this)
-        (desktopView.parent as FrameLayout).addView(anchor, FrameLayout.LayoutParams(1, 1).apply {
-            leftMargin = dp(70); topMargin = desktopView.height / 2
-        })
+    /** What the rail asked for; the rail has already changed its own state. */
+    private fun onRailAction(action: ControlRail.Action) {
         val input = session?.input
-        PopupMenu(this, anchor).apply {
-            menu.add(0, 1, 0, R.string.desktop_viewer_back)
-            menu.add(0, 2, 1, R.string.desktop_menu_forward)
-            menu.add(0, 3, 2, R.string.desktop_viewer_reload)
-            menu.add(0, 4, 3, R.string.desktop_menu_new_tab)
-            menu.add(0, 5, 4, R.string.desktop_menu_zoom_in)
-            menu.add(0, 6, 5, R.string.desktop_menu_zoom_out)
-            menu.add(0, 7, 6, R.string.desktop_viewer_close)
-            setOnMenuItemClickListener { item ->
-                when (item.itemId) {
-                    1 -> input?.back()
-                    2 -> input?.forward()
-                    3 -> input?.reload()
-                    4 -> input?.newTab()
-                    5 -> input?.key('='.code, Keysym.CONTROL_L)
-                    6 -> input?.key('-'.code, Keysym.CONTROL_L)
-                    7 -> finish()
-                }
-                session?.renderer?.burst()
-                true
+        when (action) {
+            ControlRail.Action.BACK -> input?.back()
+            ControlRail.Action.FORWARD -> input?.forward()
+            ControlRail.Action.RELOAD -> input?.reload()
+            ControlRail.Action.NEW_TAB -> input?.newTab()
+            ControlRail.Action.ZOOM_IN -> input?.key('='.code, Keysym.CONTROL_L)
+            ControlRail.Action.ZOOM_OUT -> input?.key('-'.code, Keysym.CONTROL_L)
+            // The phone's own keyboard types into the address bar once Ctrl+L has focused it.
+            ControlRail.Action.ADDRESS -> {
+                input?.focusAddressBar()
+                keyInput.toggle()
             }
-            setOnDismissListener { (anchor.parent as? FrameLayout)?.removeView(anchor) }
-            show()
+            ControlRail.Action.KEYBOARD -> keyInput.toggle()
+            ControlRail.Action.CLOSE -> finish()
+            ControlRail.Action.MODE_CHANGED,
+            ControlRail.Action.KEYBOARD_AUTOBRIDGE,
+            ControlRail.Action.KEYBOARD_CAR -> Unit
         }
     }
 

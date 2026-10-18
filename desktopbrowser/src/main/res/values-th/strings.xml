@@ -19,4 +19,24 @@
 
     <string name="desktop_starting">กำลังเปิดเบราว์เซอร์…</string>
     <string name="desktop_park_to_browse">จอดรถก่อนจึงจะใช้เบราว์เซอร์เดสก์ท็อปได้</string>
+    <!-- The control rail over the page (ControlRail). -->
+    <string name="desktop_rail_back">ย้อนกลับ</string>
+    <string name="desktop_rail_address">ที่อยู่</string>
+    <string name="desktop_rail_type">พิมพ์</string>
+    <string name="desktop_rail_touch">สัมผัส</string>
+    <string name="desktop_rail_mouse">เมาส์</string>
+    <string name="desktop_rail_more">เพิ่มเติม</string>
+    <string name="desktop_rail_this_page">หน้านี้</string>
+    <string name="desktop_rail_forward">ไปข้างหน้า</string>
+    <string name="desktop_rail_reload">โหลดใหม่</string>
+    <string name="desktop_rail_new_tab">แท็บใหม่</string>
+    <string name="desktop_rail_zoom">ซูมหน้าเว็บ</string>
+    <string name="desktop_rail_keyboard">คีย์บอร์ด</string>
+    <string name="desktop_rail_keyboard_autobridge">AutoBridge</string>
+    <string name="desktop_rail_keyboard_car">ของรถ</string>
+    <string name="desktop_rail_menu">เมนู</string>
+    <string name="desktop_rail_hide_2s">2 วิ</string>
+    <string name="desktop_rail_hide_4s">4 วิ</string>
+    <string name="desktop_rail_hide_never">ไม่ซ่อน</string>
+    <string name="desktop_rail_close">ปิดเบราว์เซอร์</string>
 </resources>

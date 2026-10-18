@@ -45,27 +45,15 @@
     <string name="desktop_settings_chrome_terms_accept">Accept and install</string>
     <string name="desktop_settings_chrome_terms_read">Read terms</string>
     <string name="desktop_viewer_keyboard">Keyboard</string>
-    <string name="desktop_viewer_back">Back</string>
-    <string name="desktop_viewer_reload">Reload</string>
-    <string name="desktop_viewer_close">Close</string>
     <string name="desktop_car_choose_browser">Choose Google Chrome or Brave under Settings › Desktop Browser Engine in AutoBridge on the phone.</string>
     <string name="desktop_settings_child_limit_title">Android may stop the browser</string>
     <string name="desktop_settings_child_limit_14">Android limits how many background processes an app may run, and a desktop browser needs many. Turn on Developer options › Disable child process restrictions, or the browser can close by itself.</string>
     <string name="desktop_settings_child_limit_12">Android 12 and 13 limit how many background processes an app may run, and a desktop browser needs many. Lift the limit once with the adb command below from a computer, or the browser can close by itself.</string>
     <string name="desktop_settings_open_developer_options">Open Developer options</string>
     <string name="desktop_settings_copy_adb">Copy adb command</string>
-    <string name="desktop_menu_forward">Forward</string>
-    <string name="desktop_menu_new_tab">New tab</string>
-    <string name="desktop_menu_zoom_in">Zoom in</string>
-    <string name="desktop_menu_zoom_out">Zoom out</string>
-    <string name="desktop_car_settings_title">Desktop browser</string>
-    <string name="desktop_car_mode_touch">Touch mode: tap clicks, drag scrolls</string>
-    <string name="desktop_car_mode_mouse">Mouse mode: drag moves the cursor, tap clicks it</string>
     <!-- The engine choice on the car, inside AutoBridge (CarExtensions). -->
     <string name="car_more_browser_engine">Browser engine: %1$s</string>
     <string name="car_engine_title">Browser engine</string>
     <string name="car_engine_install_on_phone">Install it on the phone first: Settings › Desktop Browser Engine</string>
     <string name="desktop_car_keyboard_hint">Type, then Search to send it to the page</string>
-    <string name="desktop_car_keyboard_use_car">Keyboard: use the car\'s keyboard</string>
-    <string name="desktop_car_keyboard_use_autobridge">Keyboard: use the AutoBridge keyboard</string>
 </resources>

@@ -101,7 +101,10 @@ class DesktopBrowserCarScreen(
     private var surfaceHeight = 0
     private var surfaceDpi = 160
     private var stableArea: Rect? = null
-    private val rail = ControlRail(carContext, 1f)
+    private val rail = ControlRail(carContext, 1f).apply {
+        showKeyboardChoice = true
+        useCarKeyboard = DesktopCarKeyboard.useCarKeyboard(carContext)
+    }
 
     /**
      * AutoBridge's own keyboard, drawn on the car surface over the bottom of the page while it is
@@ -110,6 +113,9 @@ class DesktopBrowserCarScreen(
      * ([DesktopCarKeyboard]).
      */
     @Volatile private var keyboard: CarSurfaceKeyboard? = null
+
+    /** The open keyboard is typing an address (Ctrl+L, then Enter) rather than into the page. */
+    private var keyboardForAddress = false
     private val iconCache = HashMap<Int, Drawable>()
 
     /** The rail, then the keyboard over the page when it is open. */
@@ -174,27 +180,54 @@ class DesktopBrowserCarScreen(
     private fun action(icon: Int, onClick: () -> Unit): Action =
         Action.Builder().setIcon(CarIcons.of(carContext, icon)).setOnClickListener(onClick).build()
 
-    private fun openKeyboard() {
+    /**
+     * The chosen keyboard (AutoBridge's, drawn on the page, or the car's search box). [address]
+     * types into the browser's own address bar: Ctrl+L first, so the text replaces the URL.
+     */
+    private fun openKeyboard(address: Boolean = false) {
         if (!DesktopCarKeyboard.useCarKeyboard(carContext)) {
+            keyboardForAddress = address
             keyboard = CarSurfaceKeyboard(
-                carContext, CarSurfaceKeyboard.Target.FIELD,
+                carContext,
+                if (address) CarSurfaceKeyboard.Target.ADDRESS else CarSurfaceKeyboard.Target.FIELD,
                 seed = "",
-                mode = BrowserKeyboardMode.SEARCH,
-                hint = carContext.getString(R.string.desktop_car_keyboard_hint),
+                mode = if (address) BrowserKeyboardMode.URL else BrowserKeyboardMode.SEARCH,
+                hint = carContext.getString(if (address) R.string.car_keyboard_hint else R.string.desktop_car_keyboard_hint),
             )
             session?.renderer?.burst()
             return
         }
         screenManager.pushForResult(CarBrowserSearchScreen(carContext, "")) { result ->
             val text = result as? String ?: return@pushForResult
-            session?.input?.typeText(text)
-            session?.input?.key(Keysym.RETURN)
-            session?.renderer?.burst()
+            sendText(text, address)
         }
     }
 
-    private fun openSettings() {
-        screenManager.push(DesktopBrowserCarMenuScreen(carContext, { session }, rail))
+    private fun sendText(text: String, address: Boolean) {
+        val input = session?.input ?: return
+        if (address) input.focusAddressBar()
+        if (text.isNotEmpty()) input.typeText(text)
+        input.key(Keysym.RETURN)
+        session?.renderer?.burst()
+    }
+
+    /** What the rail asked for; the rail has already changed its own state. */
+    private fun onRailAction(action: ControlRail.Action) {
+        val input = session?.input
+        when (action) {
+            ControlRail.Action.BACK -> input?.back()
+            ControlRail.Action.FORWARD -> input?.forward()
+            ControlRail.Action.RELOAD -> input?.reload()
+            ControlRail.Action.NEW_TAB -> input?.newTab()
+            ControlRail.Action.ZOOM_IN -> input?.key('='.code, Keysym.CONTROL_L)
+            ControlRail.Action.ZOOM_OUT -> input?.key('-'.code, Keysym.CONTROL_L)
+            ControlRail.Action.ADDRESS -> openKeyboard(address = true)
+            ControlRail.Action.KEYBOARD -> openKeyboard()
+            ControlRail.Action.KEYBOARD_AUTOBRIDGE -> DesktopCarKeyboard.setUseCarKeyboard(carContext, false)
+            ControlRail.Action.KEYBOARD_CAR -> DesktopCarKeyboard.setUseCarKeyboard(carContext, true)
+            // The car leaves with Home or Back; there is no Close on the car.
+            ControlRail.Action.MODE_CHANGED, ControlRail.Action.CLOSE -> Unit
+        }
     }
 
     /** The page area the keyboard tray sits at the bottom of, in surface pixels. */
@@ -221,8 +254,7 @@ class DesktopBrowserCarScreen(
         when (val result = board.onTap(x, y, keyboardArea(), rail.density, SystemClock.uptimeMillis())) {
             is CarSurfaceKeyboard.Result.Commit -> {
                 keyboard = null
-                if (result.text.isNotEmpty()) s.input?.typeText(result.text)
-                s.input?.key(Keysym.RETURN)
+                sendText(result.text, keyboardForAddress)
             }
             CarSurfaceKeyboard.Result.Close -> keyboard = null
             else -> Unit
@@ -311,19 +343,18 @@ class DesktopBrowserCarScreen(
             onKeyboardTap(board, s, x, y)
             return
         }
-        // The rail hides itself over the page; a tap on its strip while hidden only brings it back.
-        val railWasShown = rail.shown
-        rail.wake()
-        if (!railWasShown && rail.inZone(x, y)) {
-            s.renderer.burst()
-            return
-        }
-        when (rail.hit(x, y)) {
-            ControlRail.Button.TOUCH -> { rail.mode = PointerMode.TOUCH; s.renderer.burst(); return }
-            ControlRail.Button.MOUSE -> { rail.mode = PointerMode.MOUSE; s.renderer.burst(); return }
-            ControlRail.Button.KEYBOARD -> { openKeyboard(); return }
-            ControlRail.Button.SETTINGS -> { openSettings(); return }
-            null -> Unit
+        // The rail's handle, panel and More sheet take their taps first; the rest is the page.
+        when (val tap = rail.onTap(x, y)) {
+            is ControlRail.Tap.Perform -> {
+                onRailAction(tap.action)
+                s.renderer.burst()
+                return
+            }
+            ControlRail.Tap.Consumed -> {
+                s.renderer.burst()
+                return
+            }
+            ControlRail.Tap.PassThrough -> Unit
         }
         if (rail.mode == PointerMode.MOUSE) {
             s.input?.clickAtCursor()
@@ -363,42 +394,6 @@ class DesktopBrowserCarScreen(
         val (dx, dy) = s.renderer.mapping?.toDisplay(focusX, focusY) ?: return
         s.input?.zoom(dx, dy, scaleFactor)
         s.renderer.burst()
-    }
-}
-
-/** Settings from the rail: navigation the page's own toolbar is too small for, and the input mode. */
-class DesktopBrowserCarMenuScreen(
-    carContext: CarContext,
-    private val session: () -> DesktopSession?,
-    private val rail: ControlRail,
-) : Screen(carContext) {
-    override fun onGetTemplate(): Template {
-        fun row(title: Int, action: () -> Unit) = Row.Builder()
-            .setTitle(carContext.getString(title))
-            .setOnClickListener { action(); session()?.renderer?.burst(); screenManager.pop() }
-            .build()
-        val input = { session()?.input }
-        val list = ItemList.Builder()
-            .addItem(row(R.string.desktop_viewer_back) { input()?.back() })
-            .addItem(row(R.string.desktop_menu_forward) { input()?.forward() })
-            .addItem(row(R.string.desktop_viewer_reload) { input()?.reload() })
-            .addItem(row(R.string.desktop_menu_new_tab) { input()?.newTab() })
-            .addItem(row(R.string.desktop_menu_zoom_in) { input()?.key('='.code, Keysym.CONTROL_L) })
-            .addItem(row(R.string.desktop_menu_zoom_out) { input()?.key('-'.code, Keysym.CONTROL_L) })
-            .addItem(
-                row(
-                    if (DesktopCarKeyboard.useCarKeyboard(carContext)) R.string.desktop_car_keyboard_use_autobridge
-                    else R.string.desktop_car_keyboard_use_car
-                ) { DesktopCarKeyboard.setUseCarKeyboard(carContext, !DesktopCarKeyboard.useCarKeyboard(carContext)) }
-            )
-            .addItem(row(if (rail.mode == PointerMode.TOUCH) R.string.desktop_car_mode_mouse else R.string.desktop_car_mode_touch) {
-                rail.mode = if (rail.mode == PointerMode.TOUCH) PointerMode.MOUSE else PointerMode.TOUCH
-            })
-            .build()
-        return ListTemplate.Builder()
-            .setSingleList(list)
-            .setHeader(Header.Builder().setTitle(carContext.getString(R.string.desktop_car_settings_title)).setStartHeaderAction(Action.BACK).build())
-            .build()
     }
 }
 
