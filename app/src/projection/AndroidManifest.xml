@@ -85,6 +85,32 @@
             android:label="@string/duo_screen_title"
             android:description="@string/duo_screen_subtitle" />
 
+        <!-- "AutoBridge Browser": the browser as its own Android Auto launcher entry, the way
+             AABrowser is listed. Android Auto (Android 15+, Unknown sources on) runs a
+             CAR_LAUNCHER activity as a real window on the car display, so the phone's own
+             keyboard comes up in its address bar and page fields; the template browser inside
+             AutoBridge has no window and draws its own keyboard. An alias of BrowserActivity,
+             which reads its name (BrowserActivity.CAR_ENTRY) to open on the start page and use
+             the system keyboard there. Listed by default; Settings > Bridge Web on Android Auto
+             > "List AutoBridge Browser" hides it. Sideload flavors only: Play rejects a
+             CAR_LAUNCHER activity beside the car.application meta-data (see the main manifest).
+             The Web card inside AutoBridge keeps opening the built-in browser. -->
+        <activity-alias android:name="dev.autobridge.browser.CarBrowserEntry"
+            android:targetActivity="dev.autobridge.browser.BrowserActivity"
+            android:exported="true"
+            android:label="@string/car_browser_entry_label"
+            android:icon="@mipmap/ic_car_browser_launcher">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.CAR_LAUNCHER" />
+                <category android:name="androidx.car.app.category.NAVIGATION" />
+                <category android:name="android.intent.category.APP_MAPS" />
+            </intent-filter>
+            <meta-data android:name="distractionOptimized" android:value="true" />
+            <meta-data android:name="android.max_aspect" android:value="5.0" />
+        </activity-alias>
+
         <!-- Desktop Browser Engine (Linux Chrome / Brave, :desktopbrowser). Settings and the phone
              viewer are reached only from inside the app. On the car it opens inside AutoBridge (the
              Web card, once a desktop browser is chosen and installed), so its own CarAppService is

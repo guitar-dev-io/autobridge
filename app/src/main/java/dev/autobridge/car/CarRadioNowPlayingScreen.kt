@@ -228,6 +228,8 @@ class CarRadioNowPlayingScreen(carContext: CarContext) : Screen(carContext), Sur
 
     private fun actOn(region: CarRadioRegion) {
         when (region) {
+            // The design's round arrow before the title: back to the station grid.
+            CarRadioRegion.Back -> screenManager.pop()
             CarRadioRegion.Play -> if (media.isPlayRequested) media.pause() else media.resume()
             // The station list this was played from is the screen under this one.
             CarRadioRegion.AllStations -> screenManager.pop()
@@ -323,6 +325,7 @@ internal data class CarRadioBox(val left: Float, val top: Float, val right: Floa
 
 /** What a tap on the radio surface stands for. */
 internal sealed interface CarRadioRegion {
+    object Back : CarRadioRegion
     object Play : CarRadioRegion
     object Previous : CarRadioRegion
     object Next : CarRadioRegion
@@ -345,6 +348,8 @@ internal class CarRadioLayout private constructor(
     /** Below-the-header scale: 1 on a roomy surface, less on a short one. */
     val fit: Float,
     val content: CarRadioBox,
+    /** The round back button at the start of the header; the title starts after it. */
+    val back: CarRadioBox,
     val titleBaseline: Float,
     val artwork: CarRadioBox,
     val badge: CarRadioBox,
@@ -363,6 +368,7 @@ internal class CarRadioLayout private constructor(
     fun body(v: Float) = v * density * fit
 
     fun hit(x: Float, y: Float): CarRadioRegion? {
+        if (inside(back, x, y)) return CarRadioRegion.Back
         if (inside(play, x, y)) return CarRadioRegion.Play
         if (inside(next, x, y)) return CarRadioRegion.Next
         if (inside(eq, x, y)) return CarRadioRegion.Eq
@@ -395,6 +401,7 @@ internal class CarRadioLayout private constructor(
             val allStations = CarRadioBox(content.right - dp(170f), content.top, content.right, headerBottom)
             val favorite = CarRadioBox(allStations.left - gap - dp(140f), content.top, allStations.left - gap, headerBottom)
             val eq = CarRadioBox(favorite.left - gap - dp(220f), content.top, favorite.left - gap, headerBottom)
+            val back = CarRadioBox(content.left, content.top, content.left + pill, headerBottom)
             val titleBaseline = content.top + pill / 2f + dp(10f)
 
             // Body: cover left, text right, the block centred in what is left under the header.
@@ -424,7 +431,7 @@ internal class CarRadioLayout private constructor(
             val next = CarRadioBox(nextLeft, buttonsTop, (nextLeft + body(250f)).coerceAtMost(textRight), buttonsBottom)
 
             return CarRadioLayout(
-                density, fit, content, titleBaseline, artwork, badge, textLeft, textRight, textTop,
+                density, fit, content, back, titleBaseline, artwork, badge, textLeft, textRight, textTop,
                 play, next, eq, favorite, allStations
             )
         }
@@ -488,7 +495,8 @@ internal class CarRadioNowPlayingRenderer(private val context: CarContext) {
         text.textSize = layout.dp(28f)
         text.color = TEXT_SOFT
         val title = context.getString(R.string.car_lib_now_playing)
-        drawEllipsized(canvas, title, text, layout.content.left, layout.eq.left - layout.dp(14f), layout.titleBaseline)
+        drawEllipsized(canvas, title, text, layout.back.right + layout.dp(14f), layout.eq.left - layout.dp(14f), layout.titleBaseline)
+        drawBack(canvas, layout, pressed == CarRadioRegion.Back)
 
         drawPill(canvas, layout, layout.eq, Icon.EQ, content.eqLabel, warm = false, pressed = pressed == CarRadioRegion.Eq)
         drawPill(
@@ -500,6 +508,26 @@ internal class CarRadioNowPlayingRenderer(private val context: CarContext) {
             canvas, layout, layout.allStations, Icon.LIST, context.getString(R.string.radio_all_stations),
             warm = false, pressed = pressed == CarRadioRegion.AllStations
         )
+    }
+
+    /** The round back button: a chevron on the control fill. */
+    private fun drawBack(canvas: Canvas, layout: CarRadioLayout, pressed: Boolean) {
+        val box = layout.back
+        fill.style = Paint.Style.FILL
+        fill.color = if (pressed) CONTROL_PRESSED else CONTROL
+        canvas.drawCircle(box.centerX, box.centerY, box.width / 2f, fill)
+        val arm = box.width * 0.16f
+        fill.style = Paint.Style.STROKE
+        fill.strokeWidth = layout.dp(2.6f)
+        fill.strokeCap = Paint.Cap.ROUND
+        fill.strokeJoin = Paint.Join.ROUND
+        fill.color = TEXT_PRIMARY
+        path.reset()
+        path.moveTo(box.centerX + arm * 0.6f, box.centerY - arm * 1.2f)
+        path.lineTo(box.centerX - arm * 0.6f, box.centerY)
+        path.lineTo(box.centerX + arm * 0.6f, box.centerY + arm * 1.2f)
+        canvas.drawPath(path, fill)
+        fill.style = Paint.Style.FILL
     }
 
     private enum class Icon { EQ, STAR, STAR_ON, LIST, PAUSE, PLAY, NEXT }

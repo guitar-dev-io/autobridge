@@ -12,9 +12,22 @@ car opens from inside it.
 | `projection.desktop.DesktopBrowserCarAppService` ("Desktop Browser") | CarAppService, NAVIGATION | yes | disabled; opens from the Web card |
 | `projection.ProjectionCarService` ("Bridge Web") | CATEGORY_PROJECTION (unofficial SDK) | yes | disabled; can be listed again in Settings |
 | `projection.ProjectionMirrorCarService` ("Bridge Mirror") | CATEGORY_PROJECTION | no (already off) | unchanged |
+| `browser.CarBrowserEntry` ("AutoBridge Browser", added in 0.4.59-rc7) | CAR_LAUNCHER activity-alias of `BrowserActivity` | – | **yes**; Settings can hide it |
 
 The safe (Play) flavor only ever had AutoBridge. Third-party apps (VelvetLauncher, AABrowser) are
 not touched. `scripts/check-car-entries.py` checks this table on every CI run.
+
+## AutoBridge Browser (the one deliberate second entry)
+
+The browser inside AutoBridge draws the page onto the template surface, so there is no window for
+the phone's keyboard; it draws its own. AABrowser shows that Android Auto (Android 15+, Unknown
+sources on) runs a plain `CAR_LAUNCHER` activity as a real window on the car display, where
+`showSoftInput` brings up Gboard like on any screen. AutoBridge Browser is that route for our own
+`BrowserActivity`: an activity-alias, sideload flavors only (Play rejects `CAR_LAUNCHER` beside the
+`car.application` meta-data). Started under that name the activity opens on the start page (search
+box, Quick Links) and keeps the system keyboard; everywhere else it behaves as before. Settings ›
+Bridge Web on Android Auto › "List AutoBridge Browser on Android Auto" hides it. The Web card
+inside AutoBridge still opens the built-in (template) browser.
 
 ## How each feature is reached now
 
