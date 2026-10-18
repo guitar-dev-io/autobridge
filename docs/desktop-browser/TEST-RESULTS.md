@@ -46,7 +46,7 @@ with the reason.
 | 29 | Audio | PASS (phone) | YouTube in Brave: the tab shows the speaker icon and AutoBridge holds USAGE_MEDIA audio focus (`dumpsys audio`). Loudness was not heard by the tester |
 | 30 | X11 client: XTEST, keymap, DAMAGE | PASS | integration test against a real Xvfb + Brave |
 | 31 | HTML5 video | PASS (phone) | Big Buck Bunny on YouTube plays in Brave; 27 fps drawn, browser GPU process ~48 % of one core. Fullscreen video not tried |
-| 32 | DHU: entry and full-screen page | PASS | "Desktop Browser" appears in the Android Auto launcher; page fills the screen at 1280×600 (720-hidpi), 1785×1050 (1080-hidpi), 800×400 (Ford) |
+| 32 | DHU: entry and full-screen page | PASS | (tested as the former standalone "Desktop Browser" launcher entry, now opened inside AutoBridge; re-check with step 5 below) page fills the screen at 1280×600 (720-hidpi), 1785×1050 (1080-hidpi), 800×400 (Ford) |
 | 34 | DHU: control rail | PASS | touch/mouse/keyboard/settings rail on the left, selected mode blue; mode switch works; settings opens a list (back, forward, reload, new tab, zoom, mode) and "New tab" opened a tab |
 | 35 | DHU: tap accuracy | PASS | tapped the 12 px close button of Chrome's warning bar on a 1280×600 surface; it closed |
 | 36 | DHU: screen-size change | PASS | 720-hidpi → 1080-hidpi restarted the browser at the bigger screen with the session restored |
@@ -102,7 +102,7 @@ adb install -r -t app/build/outputs/apk/personal/debug/app-personal-debug.apk
 scripts/dhu-run.sh personal --no-build
 ```
 
-5. Open "Desktop Browser" in the car launcher: check tap and pan alignment, keyboard (search template), back and reload, the parked gate (LAB mock MOVING → notice), disconnect/reconnect, and that leaving the screen keeps the browser (10-min idle stop).
+5. Open AutoBridge in the car launcher, choose the engine under More › Browser engine and tap the Web card (no separate "Desktop Browser" entry should be listed): check tap and pan alignment, keyboard (search template), back and reload, the parked gate (LAB mock MOVING → notice), disconnect/reconnect, and that leaving the screen keeps the browser (10-min idle stop).
 
 ```bash
 adb logcat -s AutoBridgeDesktop

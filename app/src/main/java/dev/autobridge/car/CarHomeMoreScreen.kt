@@ -90,7 +90,8 @@ class CarHomeMoreScreen(
             entry(R.string.car_more_quick_launch) {
                 CarHomeNavigator.open(carContext, screenManager, HomeSection.APPS, requestSafety)
             },
-            section(HomeSection.MIRROR),
+            section(HomeSection.MIRROR)
+        ) + extensions(CarExtensionEntry.Placement.FREQUENT) + listOf(
             entry(R.string.car_more_recent) {
                 CarNavigation.open(screenManager, "CarRecentScreen") { CarRecentScreen(carContext) }
             },
@@ -111,8 +112,18 @@ class CarHomeMoreScreen(
             entry(R.string.car_more_bookmarks) {
                 CarNavigation.open(screenManager, "CarBookmarksScreen") { CarBookmarksScreen(carContext) }
             }
-        )
+        ) + extensions(CarExtensionEntry.Placement.CONTENT)
     )
+
+    /**
+     * Rows the build flavor adds ([CarExtensions]): Multi-app and the browser engine choice in the
+     * sideload builds, nothing in the Play build. Re-read with every template ([groups]), so a row
+     * that names a current choice (the browser engine) is never stale after coming back to it.
+     */
+    private var extensionEntries: List<CarExtensionEntry> = emptyList()
+
+    private fun extensions(placement: CarExtensionEntry.Placement): List<Entry> =
+        extensionEntries.filter { it.placement == placement }.map { Entry(it.title, it.action) }
 
     private fun deviceGroup() = Group(
         R.string.car_more_group_device,
@@ -154,9 +165,11 @@ class CarHomeMoreScreen(
         )
     )
 
-    private fun groups(): List<Group> =
-        listOf(frequentGroup(), contentGroup(), deviceGroup(), utilitiesGroup(), otherGroup())
+    private fun groups(): List<Group> {
+        extensionEntries = CarExtensions.moreEntries(carContext, screenManager)
+        return listOf(frequentGroup(), contentGroup(), deviceGroup(), utilitiesGroup(), otherGroup())
             .filter { it.entries.isNotEmpty() }
+    }
 
     override fun onGetTemplate(): Template {
         // Paged over the flattened order, so the host's row budget is respected exactly as before.

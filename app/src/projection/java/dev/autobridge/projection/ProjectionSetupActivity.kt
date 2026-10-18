@@ -101,6 +101,20 @@ class ProjectionSetupActivity : Activity() {
             body.stack(primaryButton(label, enabled = !working) { onAction() }, gap = 14)
         }
 
+        // Bridge Web is unlisted by default (AutoBridge is the one Android Auto entry); this lists it
+        // again for the one thing only it can do, the split screen beside Maps.
+        val webShown = isListed(webService)
+        body.stack(SettingsUi.group(this, "Bridge Web", listOf(
+            SettingsUi.switchRow(
+                this,
+                title = getString(R.string.projection_setup_web_title),
+                caption = getString(R.string.projection_setup_web_caption),
+                icon = R.drawable.ic_tile_web,
+                accent = AutoBridgeDesign.ACCENT,
+                checked = webShown,
+            ) { setListed(webService, !webShown); render() },
+        )), gap = 14)
+
         val mirrorShown = isMirrorShown()
         body.stack(SettingsUi.group(this, "Bridge Mirror", listOf(
             SettingsUi.switchRow(
@@ -211,11 +225,29 @@ class ProjectionSetupActivity : Activity() {
     }
 
     private val mirrorService get() = ComponentName(this, ProjectionMirrorCarService::class.java)
+    private val webService get() = ComponentName(this, ProjectionCarService::class.java)
 
     /** Off unless switched on: the manifest declares the service disabled; see the comment there. */
-    private fun isMirrorShown(): Boolean =
-        packageManager.getComponentEnabledSetting(mirrorService) ==
-            PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+    private fun isMirrorShown(): Boolean = isListed(mirrorService)
+
+    /** Both projection services are declared disabled, so only an explicit "enabled" lists one. */
+    private fun isListed(service: ComponentName): Boolean =
+        packageManager.getComponentEnabledSetting(service) == PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+
+    /**
+     * Lists or unlists a projection service on Android Auto. Off goes back to the manifest's
+     * default (disabled) rather than to an explicit "disabled", so a later build that changes the
+     * default is not overridden by an old choice.
+     */
+    private fun setListed(service: ComponentName, listed: Boolean) {
+        if (listed == isListed(service)) return
+        packageManager.setComponentEnabledSetting(
+            service,
+            if (listed) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DEFAULT,
+            PackageManager.DONT_KILL_APP
+        )
+        toast(getString(R.string.projection_setup_reconnect))
+    }
 
     /**
      * Lists or unlists Bridge Mirror on Android Auto by enabling or disabling its service. It is
@@ -223,15 +255,7 @@ class ProjectionSetupActivity : Activity() {
      * host offered its split screen beside Maps for Bridge Web, so this lets that be tested on the
      * car without a separate build.
      */
-    private fun setMirrorShown(shown: Boolean) {
-        if (shown == isMirrorShown()) return
-        packageManager.setComponentEnabledSetting(
-            mirrorService,
-            if (shown) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DEFAULT,
-            PackageManager.DONT_KILL_APP
-        )
-        toast(getString(R.string.projection_setup_reconnect))
-    }
+    private fun setMirrorShown(shown: Boolean) = setListed(mirrorService, shown)
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 

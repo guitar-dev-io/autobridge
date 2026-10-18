@@ -14,8 +14,15 @@
 
              Declared here rather than in :app because these components, their label and their
              icon all belong to this module; merging only happens for the flavors that depend on
-             it, which is the gating this feature needs. -->
+             it, which is the gating this feature needs.
+
+             enabled="false": Multi-app opens from inside AutoBridge (More › Multi-app, through
+             CarExtensions), so AutoBridge is the only Android Auto entry this project lists. The
+             service is kept rather than deleted so the standalone route can still be switched on
+             for testing (`adb shell pm enable dev.autobridge/dev.autobridge.duoscreen.car.DuoScreenCarAppService`);
+             nothing in the app depends on it being listed. -->
         <service android:name="dev.autobridge.duoscreen.car.DuoScreenCarAppService"
+            android:enabled="false"
             android:exported="true"
             android:label="@string/duo_screen_car_label"
             android:icon="@mipmap/ic_duoscreen_launcher">

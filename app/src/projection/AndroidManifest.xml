@@ -13,7 +13,14 @@
      never reaches the safe (Play) flavor.
 
      exported: Android Auto (gearhead) binds it. CarActivityService accepts only the car host's
-     binding protocol; it exposes no data or commands of this app beyond the activity it hosts. -->
+     binding protocol; it exposes no data or commands of this app beyond the activity it hosts.
+
+     enabled="false" (every car service in this file): AutoBridge is the one Android Auto entry
+     this project lists. The browser, Multi-app and the desktop browser are all reached from inside
+     AutoBridge. What only Bridge Web can do is sit in the main area beside Maps (split screen),
+     which a template app cannot, so it is not deleted: Settings › Bridge Web on Android Auto lists
+     it again for a driver who wants that split. scripts/check-car-entries.py fails CI if any of
+     these is declared enabled again. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
@@ -25,6 +32,7 @@
     <application>
         <service
             android:name="dev.autobridge.projection.ProjectionCarService"
+            android:enabled="false"
             android:exported="true"
             android:label="Bridge Web"
             android:icon="@mipmap/ic_browser_launcher"
@@ -78,8 +86,9 @@
             android:description="@string/duo_screen_subtitle" />
 
         <!-- Desktop Browser Engine (Linux Chrome / Brave, :desktopbrowser). Settings and the phone
-             viewer are reached only from inside the app; the car entry is its own CarAppService,
-             a navigation app like Duo Screen's because only those get a drawing surface. -->
+             viewer are reached only from inside the app. On the car it opens inside AutoBridge (the
+             Web card, once a desktop browser is chosen and installed), so its own CarAppService is
+             declared disabled and Android Auto lists no "Desktop Browser" entry. -->
         <activity android:name="dev.autobridge.projection.desktop.DesktopBrowserSettingsActivity"
             android:exported="false"
             android:label="@string/settings_desktop_browser" />
@@ -89,6 +98,7 @@
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode"
             android:windowSoftInputMode="adjustNothing|stateHidden" />
         <service android:name="dev.autobridge.projection.desktop.DesktopBrowserCarAppService"
+            android:enabled="false"
             android:exported="true"
             android:label="@string/desktop_engine_car_label"
             android:icon="@mipmap/ic_browser_launcher"
