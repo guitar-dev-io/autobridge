@@ -1,7 +1,19 @@
 package dev.autobridge.projection.desktop
 
+import android.content.Context
 import android.content.Intent
+import android.graphics.Canvas
 import android.graphics.Rect
+import android.graphics.drawable.Drawable
+import android.os.SystemClock
+import androidx.core.content.ContextCompat
+import androidx.core.content.edit
+import dev.autobridge.browser.Box
+import dev.autobridge.browser.BrowserIcon
+import dev.autobridge.browser.BrowserKeyboardMode
+import dev.autobridge.browser.CarSurfaceKeyboard
+import dev.autobridge.desktop.display.FrameRenderer
+import kotlin.math.roundToInt
 import androidx.car.app.AppManager
 import androidx.car.app.CarAppService
 import androidx.car.app.CarContext
@@ -89,6 +101,21 @@ class DesktopBrowserCarScreen(
     private var stableArea: Rect? = null
     private val rail = ControlRail(carContext, 1f)
 
+    /**
+     * AutoBridge's own keyboard, drawn on the car surface over the bottom of the page while it is
+     * open (null otherwise): the same keyboard the built-in car browser uses, with its Thai and
+     * English layouts. The car's own search keyboard stays one menu row away
+     * ([DesktopCarKeyboard]).
+     */
+    @Volatile private var keyboard: CarSurfaceKeyboard? = null
+    private val iconCache = HashMap<Int, Drawable>()
+
+    /** The rail, then the keyboard over the page when it is open. */
+    private val overlay = FrameRenderer.Overlay { canvas, width, height ->
+        rail.draw(canvas, width, height)
+        keyboard?.draw(canvas, keyboardArea(), rail.density, SystemClock.uptimeMillis(), ::drawIcon)
+    }
+
     private fun allowed(): Boolean =
         SafetyEnforcement.gateParked(ParkingStateStore.isParked) && FeaturePolicy.app.isAvailable(Feature.BROWSER)
 
@@ -146,6 +173,16 @@ class DesktopBrowserCarScreen(
         Action.Builder().setIcon(CarIcons.of(carContext, icon)).setOnClickListener(onClick).build()
 
     private fun openKeyboard() {
+        if (!DesktopCarKeyboard.useCarKeyboard(carContext)) {
+            keyboard = CarSurfaceKeyboard(
+                carContext, CarSurfaceKeyboard.Target.FIELD,
+                seed = "",
+                mode = BrowserKeyboardMode.SEARCH,
+                hint = carContext.getString(R.string.desktop_car_keyboard_hint),
+            )
+            session?.renderer?.burst()
+            return
+        }
         screenManager.pushForResult(CarBrowserSearchScreen(carContext, "")) { result ->
             val text = result as? String ?: return@pushForResult
             session?.input?.typeText(text)
@@ -158,7 +195,42 @@ class DesktopBrowserCarScreen(
         screenManager.push(DesktopBrowserCarMenuScreen(carContext, { session }, rail))
     }
 
+    /** The page area the keyboard tray sits at the bottom of, in surface pixels. */
+    private fun keyboardArea(): Box {
+        val area = pageArea()
+        return Box(area.left.toFloat(), area.top.toFloat(), area.right.toFloat(), area.bottom.toFloat())
+    }
+
+    private fun drawIcon(canvas: Canvas, icon: BrowserIcon, cx: Float, cy: Float, size: Float, color: Int) {
+        val drawable = iconCache.getOrPut(icon.resId) {
+            ContextCompat.getDrawable(carContext, icon.resId)?.mutate() ?: return
+        }
+        val half = size / 2f
+        drawable.setBounds((cx - half).roundToInt(), (cy - half).roundToInt(), (cx + half).roundToInt(), (cy + half).roundToInt())
+        drawable.setTint(color)
+        drawable.draw(canvas)
+    }
+
+    /**
+     * A tap while AutoBridge's keyboard is open belongs to it. Search types the text into the
+     * focused field and presses Enter, as the car keyboard does; a tap above the tray closes it.
+     */
+    private fun onKeyboardTap(board: CarSurfaceKeyboard, s: DesktopSession, x: Float, y: Float) {
+        when (val result = board.onTap(x, y, keyboardArea(), rail.density, SystemClock.uptimeMillis())) {
+            is CarSurfaceKeyboard.Result.Commit -> {
+                keyboard = null
+                if (result.text.isNotEmpty()) s.input?.typeText(result.text)
+                s.input?.key(Keysym.RETURN)
+            }
+            CarSurfaceKeyboard.Result.Close -> keyboard = null
+            else -> Unit
+        }
+        s.renderer.burst()
+    }
+
     private fun applyGate() {
+        // Typing is part of browsing: nothing is left open over the page while moving.
+        if (!allowed()) keyboard = null
         session?.renderer?.blockedMessage =
             if (allowed()) null else carContext.getString(dev.autobridge.desktop.R.string.desktop_park_to_browse)
         rail.visible = allowed()
@@ -209,7 +281,7 @@ class DesktopBrowserCarScreen(
         }
         session = s
         s.renderer.placeholderText = carContext.getString(dev.autobridge.desktop.R.string.desktop_starting)
-        s.renderer.overlay = rail
+        s.renderer.overlay = overlay
         s.renderer.setSurfaceDrawer { target, block -> CarSurfaceCanvas.draw(carContext, target, block) }
         applyGate()
         s.renderer.attachSurface(surface, surfaceWidth, surfaceHeight)
@@ -232,6 +304,10 @@ class DesktopBrowserCarScreen(
     override fun onClick(x: Float, y: Float) {
         if (!allowed()) return
         val s = session ?: return
+        keyboard?.let { board ->
+            onKeyboardTap(board, s, x, y)
+            return
+        }
         when (rail.hit(x, y)) {
             ControlRail.Button.TOUCH -> { rail.mode = PointerMode.TOUCH; s.renderer.burst(); return }
             ControlRail.Button.MOUSE -> { rail.mode = PointerMode.MOUSE; s.renderer.burst(); return }
@@ -299,6 +375,12 @@ class DesktopBrowserCarMenuScreen(
             .addItem(row(R.string.desktop_menu_new_tab) { input()?.newTab() })
             .addItem(row(R.string.desktop_menu_zoom_in) { input()?.key('='.code, Keysym.CONTROL_L) })
             .addItem(row(R.string.desktop_menu_zoom_out) { input()?.key('-'.code, Keysym.CONTROL_L) })
+            .addItem(
+                row(
+                    if (DesktopCarKeyboard.useCarKeyboard(carContext)) R.string.desktop_car_keyboard_use_autobridge
+                    else R.string.desktop_car_keyboard_use_car
+                ) { DesktopCarKeyboard.setUseCarKeyboard(carContext, !DesktopCarKeyboard.useCarKeyboard(carContext)) }
+            )
             .addItem(row(if (rail.mode == PointerMode.TOUCH) R.string.desktop_car_mode_mouse else R.string.desktop_car_mode_touch) {
                 rail.mode = if (rail.mode == PointerMode.TOUCH) PointerMode.MOUSE else PointerMode.TOUCH
             })
@@ -364,4 +446,20 @@ class DesktopEngineChoiceCarScreen(carContext: CarContext) : Screen(carContext) 
         DesktopEngine.choice = choice
         screenManager.pop()
     }
+}
+
+/**
+ * Which keyboard the rail's keyboard button opens on the car: AutoBridge's own (the default, the
+ * same one the built-in browser draws) or the car's search keyboard. Switched from the rail's
+ * settings list and remembered.
+ */
+object DesktopCarKeyboard {
+    private const val PREFS = "desktop_car"
+    private const val KEY_USE_CAR_KEYBOARD = "use_car_keyboard"
+
+    fun useCarKeyboard(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_USE_CAR_KEYBOARD, false)
+
+    fun setUseCarKeyboard(context: Context, use: Boolean) =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putBoolean(KEY_USE_CAR_KEYBOARD, use) }
 }

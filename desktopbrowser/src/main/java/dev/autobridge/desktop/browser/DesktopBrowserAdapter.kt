@@ -73,8 +73,11 @@ interface DesktopBrowserAdapter {
      * - `--ozone-platform=x11`: the display is Xvfb; never let Ozone guess Wayland.
      * - `--no-sandbox`: REQUIRED under PRoot. Chromium's sandbox needs user namespaces or a setuid
      *   helper, neither of which an Android app can have. Renderer processes are therefore only
-     *   contained by the Android app sandbox around AutoBridge. The browser shows a warning bar
-     *   about it, which is left visible on purpose.
+     *   contained by the Android app sandbox around AutoBridge.
+     * - `--test-type`: hides the "unsupported command-line flag: --no-sandbox" bar Chromium shows
+     *   for it (bad_flags_prompt skips the warning for test runs). The bar covered the top of every
+     *   page on a car screen and cannot be acted on; the trade-off is written down in
+     *   docs/desktop-browser/ARCHITECTURE.md instead.
      * - `--disable-dev-shm-usage`: shared memory goes to /tmp instead of a tiny emulated /dev/shm.
      * - `--disable-gpu`: there is no GPU driver inside the runtime; Chromium uses SwiftShader.
      * - `--password-store=basic`: there is no keyring daemon.
@@ -89,6 +92,7 @@ interface DesktopBrowserAdapter {
         add("--no-default-browser-check")
         add("--password-store=basic")
         add("--no-sandbox")
+        add("--test-type")
         add("--disable-dev-shm-usage")
         add("--disable-gpu")
         add("--touch-events=enabled")
