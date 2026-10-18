@@ -72,7 +72,7 @@ class MiniPlayer(
         ellipsize = TextUtils.TruncateAt.END
     }
     private val toggle = AutoBridgeDesign.glyphButton(context, PLAY, 16f, filled = true) {
-        val wasPlaying = playback.isPlaying
+        val wasPlaying = playback.isPlayRequested
         if (wasPlaying) playback.pause() else playback.resume()
         // Reflect the tap immediately: the session still reports the old state for a moment, so
         // the glyph shows what was asked for, and the next tick confirms it against the session.
@@ -89,6 +89,7 @@ class MiniPlayer(
     private val tick = object : Runnable {
         override fun run() {
             render()
+            onTick?.invoke()
             ticker.postDelayed(this, 1_000L)
         }
     }
@@ -129,9 +130,18 @@ class MiniPlayer(
 
     fun stop() = ticker.removeCallbacks(tick)
 
+    /**
+     * A screen that shows what is loaded its own way: while this answers true the bar stays
+     * hidden. Home does this for radio, whose card under the connection is then the player.
+     */
+    var hideWhen: (() -> Boolean)? = null
+
+    /** Called on every one-second tick, so a screen can refresh its own now-playing view with it. */
+    var onTick: (() -> Unit)? = null
+
     private fun render() {
         val name = playback.currentTitle
-        if (!playback.isConnected || name.isNullOrBlank()) {
+        if (!playback.isConnected || name.isNullOrBlank() || hideWhen?.invoke() == true) {
             view.visibility = View.GONE
             return
         }
@@ -143,9 +153,13 @@ class MiniPlayer(
         subtitle.text = listOfNotNull(
             now.artist,
             now.station.takeIf { now.song != null },
-            if (playback.isPlaying) "Playing" else "Paused"
+            when {
+                playback.isPlaying -> "Playing"
+                playback.isPlayRequested -> "Loading…"
+                else -> "Paused"
+            }
         ).joinToString(" • ")
-        showPlaying(playback.isPlaying)
+        showPlaying(playback.isPlayRequested)
 
         val art = playback.currentArtworkData
         if (art != null && art.isNotEmpty()) {

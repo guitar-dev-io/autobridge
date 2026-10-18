@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
@@ -25,6 +26,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -46,8 +50,17 @@ import dev.autobridge.remote.CommandSource
 /** One Quick Launch tile as the view layer needs it. */
 data class HomeTileUi(val title: String, val icon: Int, val accent: Int, val onClick: () -> Unit)
 
-/** The radio station listened to last, as Home's "keep listening" card shows it. */
-data class ResumeRadioUi(val station: String, val onPlay: () -> Unit)
+/**
+ * Home's radio card: the station on the air when [live], else the one listened to last.
+ * [song] is the song and artist when the stream names them; [logo] is null until it has loaded.
+ */
+data class ResumeRadioUi(
+    val station: String,
+    val logo: android.graphics.Bitmap? = null,
+    val live: Boolean = false,
+    val playing: Boolean = false,
+    val song: String? = null
+)
 
 /**
  * Body of the phone Home (below the AutoBridge header, above the mini player):
@@ -70,8 +83,12 @@ fun HomeDashboard(
     updateVersion: String? = null,
     onOpenUpdate: () -> Unit = {},
     onDismissUpdate: () -> Unit = {},
-    /** The last radio station, for a one-tap "keep listening"; null when none was ever played. */
-    resumeRadio: ResumeRadioUi? = null
+    /** The radio card's station; null when none was ever played. */
+    resumeRadio: ResumeRadioUi? = null,
+    /** The card: opens the radio player (starting the last station when nothing is on). */
+    onOpenRadio: () -> Unit = {},
+    /** The card's round button: pause/resume what is on, or play the last station. */
+    onToggleRadio: () -> Unit = {}
 ) {
     val history by CommandHistoryStore.entries.collectAsState()
     val lastResult = rememberLastCommandResult()
@@ -112,7 +129,7 @@ fun HomeDashboard(
         )
 
         // The station listened to last, right under the connection: back on the radio in one tap.
-        if (resumeRadio != null) ResumeRadioCard(resumeRadio)
+        if (resumeRadio != null) ResumeRadioCard(resumeRadio, onOpenRadio, onToggleRadio)
 
         // Send to Car comes before Quick Launch: sending something to the car is what Home is
         // opened for most, so the field sits right under the connection card.
@@ -163,26 +180,53 @@ fun HomeDashboard(
     }
 }
 
-/** "Last radio station": the station's name and a play button, all of it one tap to play. */
+/**
+ * The radio card: the station's logo (its initials until the logo loads), what it is, and a round
+ * play/pause button. While the station is on the air it is the player itself, so Home shows no
+ * second now-playing bar for radio.
+ */
 @Composable
-private fun ResumeRadioCard(resume: ResumeRadioUi) {
+private fun ResumeRadioCard(resume: ResumeRadioUi, onOpen: () -> Unit, onToggle: () -> Unit) {
     val accent = Color(0xFFFFB35C)
-    val playDescription = stringResource(R.string.radio_play)
+    val warm = Color(0xFF2A2116)
+    val edge = Color(0xFF5A4022)
+    val toggleDescription = stringResource(if (resume.playing) R.string.radio_pause else R.string.radio_play)
     Surface(
-        onClick = resume.onPlay,
+        onClick = onOpen,
         shape = RoundedCornerShape(20.dp),
-        color = accent.copy(alpha = 0.12f),
-        modifier = Modifier.fillMaxWidth().border(1.dp, accent.copy(alpha = 0.35f), RoundedCornerShape(20.dp))
+        color = warm,
+        modifier = Modifier.fillMaxWidth().border(1.dp, edge, RoundedCornerShape(20.dp))
     ) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                Modifier.size(48.dp).background(accent.copy(alpha = 0.2f), RoundedCornerShape(14.dp)),
+                Modifier.size(52.dp).clip(RoundedCornerShape(12.dp))
+                    .background(Color(dev.autobridge.car.CarStationTile.colorFor(resume.station))),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(painterResource(R.drawable.ic_tile_radio), contentDescription = null, tint = accent, modifier = Modifier.size(26.dp))
+                if (resume.logo != null) {
+                    androidx.compose.foundation.Image(
+                        bitmap = resume.logo.asImageBitmap(),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Text(
+                        dev.autobridge.car.CarStationTile.label(resume.station),
+                        color = Color.White,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
+                    )
+                }
             }
             Column(Modifier.padding(start = 12.dp).weight(1f)) {
-                Text(stringResource(R.string.home_resume_radio), color = accent, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    stringResource(if (resume.live) R.string.home_radio_live else R.string.home_resume_radio),
+                    color = Color(0xFFFFC985),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
                 Text(
                     resume.station,
                     color = ComposeTokens.Text,
@@ -191,13 +235,29 @@ private fun ResumeRadioCard(resume: ResumeRadioUi) {
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Text(stringResource(R.string.home_resume_tap), color = ComposeTokens.TextMuted, fontSize = 12.5.sp)
+                Text(
+                    resume.song ?: stringResource(if (resume.live) R.string.home_radio_open else R.string.home_resume_tap),
+                    color = Color(0xFFC9CDD3),
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
-            Box(
-                Modifier.size(48.dp).background(accent, RoundedCornerShape(24.dp))
-                    .semantics { contentDescription = playDescription },
-                contentAlignment = Alignment.Center
-            ) { Text("▶", color = ComposeTokens.Ink, fontSize = 20.sp, fontWeight = FontWeight.Bold) }
+            Surface(
+                onClick = onToggle,
+                shape = CircleShape,
+                color = accent,
+                modifier = Modifier.size(48.dp).semantics { contentDescription = toggleDescription }
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        if (resume.playing) "❚❚" else "▶",
+                        color = Color(0xFF2A1A05),
+                        fontSize = if (resume.playing) 16.sp else 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
         }
     }
 }

@@ -2,6 +2,7 @@ package dev.autobridge.car
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Rect
@@ -227,7 +228,9 @@ class CarRadioNowPlayingScreen(carContext: CarContext) : Screen(carContext), Sur
 
     private fun actOn(region: CarRadioRegion) {
         when (region) {
-            CarRadioRegion.Play -> if (media.isPlaying) media.pause() else media.resume()
+            CarRadioRegion.Play -> if (media.isPlayRequested) media.pause() else media.resume()
+            // The station list this was played from is the screen under this one.
+            CarRadioRegion.AllStations -> screenManager.pop()
             CarRadioRegion.Previous -> if (media.hasPrevious) media.previous()
             CarRadioRegion.Next -> if (media.hasNext) media.next()
             // One button, the next sound preset: no sliders to fiddle with while driving.
@@ -278,7 +281,7 @@ class CarRadioNowPlayingScreen(carContext: CarContext) : Screen(carContext), Sur
                     ),
                     favorite = media.currentUri?.let { IptvHistoryStore.isFavorite(carContext, it) } == true,
                     connected = media.isConnected,
-                    playing = media.isPlaying,
+                    playing = media.isPlayRequested,
                     hasPrevious = media.hasPrevious,
                     hasNext = media.hasNext,
                 ),
@@ -325,82 +328,104 @@ internal sealed interface CarRadioRegion {
     object Next : CarRadioRegion
     object Eq : CarRadioRegion
     object Favorite : CarRadioRegion
+    object AllStations : CarRadioRegion
 }
 
 /**
- * Where everything sits on the radio surface, computed once per surface/area change. Landscape:
- * artwork top-left, text beside it, transport under them. Artwork and transport fill the surface,
- * so there is no dead band at the bottom.
+ * Where everything sits on the radio surface, computed once per surface/area change, after the
+ * radio design's car player: a header row (the title, then the EQ, favourite and all-stations
+ * pills on the right), and under it the cover on the left with the station's logo as a badge on
+ * its corner, the text beside it, and the pause and next-station pills under the text. There is
+ * no on-screen previous: the steering wheel steps both ways, and the hint under the text says so.
+ *
+ * Everything below the header scales down together on a short surface, so nothing overlaps.
  */
 internal class CarRadioLayout private constructor(
     val density: Float,
+    /** Below-the-header scale: 1 on a roomy surface, less on a short one. */
+    val fit: Float,
     val content: CarRadioBox,
+    val titleBaseline: Float,
     val artwork: CarRadioBox,
+    val badge: CarRadioBox,
     val textLeft: Float,
     val textRight: Float,
     val textTop: Float,
-    val previous: CarRadioBox,
     val play: CarRadioBox,
     val next: CarRadioBox,
-    /** The two pills under the text: the sound preset and the favourite. */
     val eq: CarRadioBox,
     val favorite: CarRadioBox,
+    val allStations: CarRadioBox,
 ) {
     fun dp(v: Float) = v * density
 
+    /** A size in the body below the header, scaled with [fit]. */
+    fun body(v: Float) = v * density * fit
+
     fun hit(x: Float, y: Float): CarRadioRegion? {
         if (inside(play, x, y)) return CarRadioRegion.Play
-        if (inside(previous, x, y)) return CarRadioRegion.Previous
         if (inside(next, x, y)) return CarRadioRegion.Next
         if (inside(eq, x, y)) return CarRadioRegion.Eq
         if (inside(favorite, x, y)) return CarRadioRegion.Favorite
+        if (inside(allStations, x, y)) return CarRadioRegion.AllStations
         return null
     }
 
     private fun inside(box: CarRadioBox, x: Float, y: Float) =
-        x >= box.left && x <= box.right && y >= box.top && y <= box.bottom
+        box.width > 0f && x >= box.left && x <= box.right && y >= box.top && y <= box.bottom
 
     companion object {
+        /** Offsets in the text column, in body dp from [textTop]; the block is [TEXT_BLOCK] tall. */
+        const val BADGE_LINE = 18f
+        const val TITLE_LINE = 72f
+        const val SUBTITLE_LINE = 108f
+        const val HINT_LINE = 138f
+        const val BUTTONS_TOP = 162f
+        const val BUTTON_HEIGHT = 76f
+        const val TEXT_BLOCK = BUTTONS_TOP + BUTTON_HEIGHT
+
         fun compute(area: CarRadioBox, density: Float): CarRadioLayout {
             fun dp(v: Float) = v * density
-            val margin = dp(24f)
-            val content = CarRadioBox(area.left + margin, area.top + margin, area.right - margin, area.bottom - margin)
+            val content = CarRadioBox(area.left + dp(28f), area.top + dp(22f), area.right - dp(28f), area.bottom - dp(22f))
 
-            // Transport row sits near the bottom of the content box; the band that used to hold
-            // the preset row is reclaimed so artwork/transport fill the surface with no dead gap.
-            val controlsBottom = content.bottom
-            val primary = dp(84f).coerceAtMost(content.height * 0.30f)
-            val secondary = primary * 0.78f
-            val controlGap = dp(28f)
-            val controlsTop = controlsBottom - primary
-            val cx = content.centerX
-            val play = CarRadioBox(cx - primary / 2f, controlsTop, cx + primary / 2f, controlsBottom)
-            val prevRight = play.left - controlGap
-            val previous = CarRadioBox(
-                prevRight - secondary, play.centerY - secondary / 2f, prevRight, play.centerY + secondary / 2f
-            )
-            val nextLeft = play.right + controlGap
-            val next = CarRadioBox(
-                nextLeft, play.centerY - secondary / 2f, nextLeft + secondary, play.centerY + secondary / 2f
+            // Header: 56dp pills, right-aligned, all stations outermost.
+            val pill = dp(56f)
+            val headerBottom = content.top + pill
+            val gap = dp(14f)
+            val allStations = CarRadioBox(content.right - dp(170f), content.top, content.right, headerBottom)
+            val favorite = CarRadioBox(allStations.left - gap - dp(140f), content.top, allStations.left - gap, headerBottom)
+            val eq = CarRadioBox(favorite.left - gap - dp(220f), content.top, favorite.left - gap, headerBottom)
+            val titleBaseline = content.top + pill / 2f + dp(10f)
+
+            // Body: cover left, text right, the block centred in what is left under the header.
+            val bodyTop = headerBottom + dp(18f)
+            val bodyHeight = (content.bottom - bodyTop).coerceAtLeast(dp(120f))
+            val fit = (bodyHeight / dp(TEXT_BLOCK + 20f)).coerceIn(0.55f, 1f)
+            fun body(v: Float) = v * density * fit
+
+            val art = minOf(body(300f), bodyHeight, content.width * 0.34f)
+            val artTop = bodyTop + (bodyHeight - art) / 2f
+            val artwork = CarRadioBox(content.left, artTop, content.left + art, artTop + art)
+            val badgeSize = art * 92f / 300f
+            val badgeOut = art * 12f / 300f
+            val badge = CarRadioBox(
+                artwork.right + badgeOut - badgeSize, artwork.bottom + badgeOut - badgeSize,
+                artwork.right + badgeOut, artwork.bottom + badgeOut
             )
 
-            // Artwork + text occupy the band above the controls.
-            val upperBottom = controlsTop - dp(18f)
-            val upperHeight = (upperBottom - content.top).coerceAtLeast(dp(80f))
-            val artSize = upperHeight.coerceAtMost(content.width * 0.42f)
-            val artwork = CarRadioBox(content.left, content.top, content.left + artSize, content.top + artSize)
-            val textLeft = artwork.right + dp(24f)
+            val textLeft = artwork.right + body(44f)
             val textRight = content.right
-
-            // The pills sit under the four text lines, kept above the transport band.
-            val pillHeight = dp(52f)
-            val pillTop = (content.top + dp(150f)).coerceAtMost(upperBottom - pillHeight)
-            val pillWidth = ((textRight - textLeft - dp(12f)) / 2f).coerceIn(0f, dp(220f))
-            val eq = CarRadioBox(textLeft, pillTop, textLeft + pillWidth, pillTop + pillHeight)
-            val favorite = CarRadioBox(eq.right + dp(12f), pillTop, eq.right + dp(12f) + pillWidth, pillTop + pillHeight)
+            val block = body(TEXT_BLOCK)
+            val textTop = (artwork.centerY - block / 2f).coerceIn(bodyTop, (content.bottom - block).coerceAtLeast(bodyTop))
+            val buttonsTop = textTop + body(BUTTONS_TOP)
+            val buttonsBottom = buttonsTop + body(BUTTON_HEIGHT)
+            val play = CarRadioBox(textLeft, buttonsTop, (textLeft + body(200f)).coerceAtMost(textRight), buttonsBottom)
+            val nextLeft = play.right + body(16f)
+            val next = CarRadioBox(nextLeft, buttonsTop, (nextLeft + body(250f)).coerceAtMost(textRight), buttonsBottom)
 
             return CarRadioLayout(
-                density, content, artwork, textLeft, textRight, content.top, previous, play, next, eq, favorite
+                density, fit, content, titleBaseline, artwork, badge, textLeft, textRight, textTop,
+                play, next, eq, favorite, allStations
             )
         }
     }
@@ -408,7 +433,7 @@ internal class CarRadioLayout private constructor(
 
 /**
  * Paints the radio Now Playing surface. Every Paint and Path is built once; the per-frame work is
- * ellipsizing two text lines, so this stays cheap on the 1s tick.
+ * ellipsizing a few text lines, so this stays cheap on the 1s tick.
  */
 internal class CarRadioNowPlayingRenderer(private val context: CarContext) {
 
@@ -426,29 +451,18 @@ internal class CarRadioNowPlayingRenderer(private val context: CarContext) {
         val hasNext: Boolean,
         /** The queue item's own name (the station), which [title] replaces with the song once the stream names it. */
         val station: String? = null,
-        /** The station logo the item was queued with, drawn when the stream carries no artwork of its own. */
+        /** The station logo the item was queued with: the badge, or the cover when the stream has none. */
         val artworkUrl: String? = null,
         val eqLabel: String = "",
         val favorite: Boolean = false,
     )
 
     private val bold = Typeface.create("sans-serif", Typeface.BOLD)
+    private val medium = Typeface.create("sans-serif-medium", Typeface.NORMAL)
     private val regular = Typeface.create("sans-serif", Typeface.NORMAL)
 
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val titlePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = bold
-        color = HomeDashboardTheme.TEXT_PRIMARY
-    }
-    private val subtitlePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = regular
-        color = HomeDashboardTheme.TEXT_SECONDARY
-    }
-    private val badgePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = bold
-        color = HomeDashboardTheme.ACCENT_RADIO
-    }
-    private val pillPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { typeface = bold }
+    private val text = TextPaint(Paint.ANTI_ALIAS_FLAG)
     private val rect = RectF()
     private val source = Rect()
     private val path = Path()
@@ -460,104 +474,234 @@ internal class CarRadioNowPlayingRenderer(private val context: CarContext) {
         pressed: CarRadioRegion?,
         thumbnails: Thumbnails,
     ) {
-        canvas.drawColor(HomeDashboardTheme.BACKGROUND)
-
+        canvas.drawColor(BACKGROUND)
+        drawHeader(canvas, layout, content, pressed)
         drawArtwork(canvas, layout, content, thumbnails)
         drawText(canvas, layout, content)
-        drawPills(canvas, layout, content, pressed)
-        drawTransport(canvas, layout, content, pressed)
+        drawButtons(canvas, layout, content, pressed)
     }
 
-    private fun drawPills(canvas: Canvas, layout: CarRadioLayout, content: Content, pressed: CarRadioRegion?) {
-        if (layout.eq.width < layout.dp(40f)) return
-        drawPill(canvas, layout, layout.eq, content.eqLabel, on = false, pressed = pressed == CarRadioRegion.Eq)
-        val favorite = context.getString(if (content.favorite) R.string.radio_favorite_on else R.string.radio_favorite_add)
-        drawPill(canvas, layout, layout.favorite, "★ $favorite", on = content.favorite, pressed = pressed == CarRadioRegion.Favorite)
+    // --- Header -------------------------------------------------------------------------------
+
+    private fun drawHeader(canvas: Canvas, layout: CarRadioLayout, content: Content, pressed: CarRadioRegion?) {
+        text.typeface = medium
+        text.textSize = layout.dp(28f)
+        text.color = TEXT_SOFT
+        val title = context.getString(R.string.car_lib_now_playing)
+        drawEllipsized(canvas, title, text, layout.content.left, layout.eq.left - layout.dp(14f), layout.titleBaseline)
+
+        drawPill(canvas, layout, layout.eq, Icon.EQ, content.eqLabel, warm = false, pressed = pressed == CarRadioRegion.Eq)
+        drawPill(
+            canvas, layout, layout.favorite, if (content.favorite) Icon.STAR_ON else Icon.STAR,
+            context.getString(R.string.radio_favorite_add), warm = content.favorite,
+            pressed = pressed == CarRadioRegion.Favorite
+        )
+        drawPill(
+            canvas, layout, layout.allStations, Icon.LIST, context.getString(R.string.radio_all_stations),
+            warm = false, pressed = pressed == CarRadioRegion.AllStations
+        )
     }
 
-    private fun drawPill(canvas: Canvas, layout: CarRadioLayout, box: CarRadioBox, label: String, on: Boolean, pressed: Boolean) {
+    private enum class Icon { EQ, STAR, STAR_ON, LIST, PAUSE, PLAY, NEXT }
+
+    /** A rounded pill: an icon then a label, centred; warm when it is on (the favourite). */
+    private fun drawPill(
+        canvas: Canvas, layout: CarRadioLayout, box: CarRadioBox, icon: Icon, label: String,
+        warm: Boolean, pressed: Boolean, primary: Boolean = false, enabled: Boolean = true,
+        textSize: Float = layout.dp(18f),
+    ) {
+        if (box.width <= 0f) return
         rect.set(box.left, box.top, box.right, box.bottom)
         val radius = box.height / 2f
+        fill.style = Paint.Style.FILL
         fill.color = when {
-            pressed -> HomeDashboardTheme.CONTROL_PRESSED
-            on -> HomeDashboardTheme.mix(HomeDashboardTheme.CARD, HomeDashboardTheme.ACCENT_RADIO, 0.22f)
-            else -> HomeDashboardTheme.CONTROL
+            primary && pressed -> HomeDashboardTheme.mix(ACCENT, Color.WHITE, 0.25f)
+            primary -> ACCENT
+            pressed -> CONTROL_PRESSED
+            warm -> WARM
+            else -> CONTROL
         }
         canvas.drawRoundRect(rect, radius, radius, fill)
-        pillPaint.textSize = layout.dp(17f)
-        pillPaint.color = if (on) HomeDashboardTheme.ACCENT_RADIO else HomeDashboardTheme.TEXT_CONTROL
-        val clipped = TextUtils.ellipsize(label, pillPaint, box.width - layout.dp(24f), TextUtils.TruncateAt.END)
-        val width = pillPaint.measureText(clipped, 0, clipped.length)
-        val metrics = pillPaint.fontMetrics
-        val baseline = box.centerY - (metrics.ascent + metrics.descent) / 2f
-        canvas.drawText(clipped, 0, clipped.length, box.centerX - width / 2f, baseline, pillPaint)
+
+        val ink = when {
+            primary -> ON_ACCENT
+            !enabled -> TEXT_DISABLED
+            warm -> ACCENT
+            else -> TEXT_PRIMARY
+        }
+        text.typeface = if (primary) bold else medium
+        text.textSize = textSize
+        text.color = ink
+        val iconSize = textSize * 1.3f
+        val spacing = textSize * 0.45f
+        val room = box.width - box.height * 0.7f - iconSize - spacing
+        val clipped = TextUtils.ellipsize(label, text, room.coerceAtLeast(0f), TextUtils.TruncateAt.END)
+        val labelWidth = text.measureText(clipped, 0, clipped.length)
+        val total = iconSize + (if (clipped.isEmpty()) 0f else spacing + labelWidth)
+        val startX = box.centerX - total / 2f
+        drawIcon(canvas, icon, startX, box.centerY - iconSize / 2f, iconSize, ink)
+        if (clipped.isNotEmpty()) {
+            val metrics = text.fontMetrics
+            val baseline = box.centerY - (metrics.ascent + metrics.descent) / 2f
+            text.color = ink
+            canvas.drawText(clipped, 0, clipped.length, startX + iconSize + spacing, baseline, text)
+        }
     }
+
+    /** The design's icons on a 24-unit grid, drawn at [size] with its top-left at ([left], [top]). */
+    private fun drawIcon(canvas: Canvas, icon: Icon, left: Float, top: Float, size: Float, color: Int) {
+        val unit = size / 24f
+        fun x(v: Float) = left + v * unit
+        fun y(v: Float) = top + v * unit
+        fill.color = color
+        fill.strokeCap = Paint.Cap.ROUND
+        fill.strokeJoin = Paint.Join.ROUND
+        fill.strokeWidth = 2f * unit
+        when (icon) {
+            Icon.EQ -> {
+                fill.style = Paint.Style.STROKE
+                for (cx in floatArrayOf(6f, 12f, 18f)) canvas.drawLine(x(cx), y(4f), x(cx), y(20f), fill)
+                for ((cx, cy) in listOf(6f to 14f, 12f to 8f, 18f to 16f)) {
+                    fill.style = Paint.Style.FILL
+                    fill.color = CONTROL
+                    canvas.drawCircle(x(cx), y(cy), 2f * unit, fill)
+                    fill.style = Paint.Style.STROKE
+                    fill.color = color
+                    canvas.drawCircle(x(cx), y(cy), 2f * unit, fill)
+                }
+            }
+            Icon.STAR, Icon.STAR_ON -> {
+                path.reset()
+                val points = floatArrayOf(12f, 3f, 14.7f, 8.6f, 20.8f, 9.5f, 16.4f, 13.8f, 17.4f, 19.9f, 12f, 17f, 6.6f, 19.9f, 7.6f, 13.8f, 3.2f, 9.5f, 9.3f, 8.6f)
+                path.moveTo(x(points[0]), y(points[1]))
+                var i = 2
+                while (i < points.size) { path.lineTo(x(points[i]), y(points[i + 1])); i += 2 }
+                path.close()
+                fill.style = if (icon == Icon.STAR_ON) Paint.Style.FILL_AND_STROKE else Paint.Style.STROKE
+                canvas.drawPath(path, fill)
+            }
+            Icon.LIST -> {
+                fill.style = Paint.Style.STROKE
+                canvas.drawLine(x(4f), y(6f), x(20f), y(6f), fill)
+                canvas.drawLine(x(4f), y(12f), x(20f), y(12f), fill)
+                canvas.drawLine(x(4f), y(18f), x(14f), y(18f), fill)
+            }
+            Icon.PAUSE -> {
+                fill.style = Paint.Style.FILL
+                rect.set(x(6f), y(5f), x(10f), y(19f)); canvas.drawRoundRect(rect, unit, unit, fill)
+                rect.set(x(14f), y(5f), x(18f), y(19f)); canvas.drawRoundRect(rect, unit, unit, fill)
+            }
+            Icon.PLAY -> {
+                fill.style = Paint.Style.FILL
+                path.reset(); path.moveTo(x(7f), y(5f)); path.lineTo(x(7f), y(19f)); path.lineTo(x(19f), y(12f)); path.close()
+                canvas.drawPath(path, fill)
+            }
+            Icon.NEXT -> {
+                fill.style = Paint.Style.FILL
+                path.reset(); path.moveTo(x(6f), y(6f)); path.lineTo(x(6f), y(18f)); path.lineTo(x(15f), y(12f)); path.close()
+                canvas.drawPath(path, fill)
+                rect.set(x(16f), y(6f), x(18f), y(18f)); canvas.drawRect(rect, fill)
+            }
+        }
+        fill.style = Paint.Style.FILL
+    }
+
+    // --- Cover and badge ----------------------------------------------------------------------
 
     private fun drawArtwork(canvas: Canvas, layout: CarRadioLayout, content: Content, thumbnails: Thumbnails) {
         val box = layout.artwork
-        rect.set(box.left, box.top, box.right, box.bottom)
-        val radius = layout.dp(18f)
-        fill.color = HomeDashboardTheme.CARD
-        canvas.drawRoundRect(rect, radius, radius, fill)
+        val radius = box.width * 48f / 300f
+        val cover = decodeEmbedded(content.artwork)
+        val logo = thumbnails.bitmap(content.artworkUrl)
+        val station = content.station ?: content.title.orEmpty()
 
-        // The session carries embedded artwork bytes; a URL still (handled by [thumbnails]) is
-        // reserved for a later metadata source. Either way the fallback glyph fills the gap.
-        val bitmap = decodeEmbedded(content.artwork) ?: thumbnails.bitmap(content.artworkUrl)
-        if (bitmap != null && bitmap.width > 0 && bitmap.height > 0) {
-            val scale = maxOf(box.width / bitmap.width, box.height / bitmap.height)
-            val cw = (box.width / scale).coerceAtMost(bitmap.width.toFloat())
-            val ch = (box.height / scale).coerceAtMost(bitmap.height.toFloat())
-            source.set(
-                ((bitmap.width - cw) / 2f).toInt(),
-                ((bitmap.height - ch) / 2f).toInt(),
-                ((bitmap.width + cw) / 2f).toInt(),
-                ((bitmap.height + ch) / 2f).toInt(),
-            )
-            canvas.save()
-            path.reset()
-            path.addRoundRect(rect, radius, radius, Path.Direction.CW)
-            canvas.clipPath(path)
-            canvas.drawBitmap(bitmap, source, rect, fill)
-            canvas.restore()
-            return
+        // The stream's own cover in the square with the logo as the badge; without a cover the
+        // logo takes the square; without either, the station's colour card with its frequency.
+        val big = cover ?: logo
+        if (big != null) {
+            drawCropped(canvas, big, box, radius)
+        } else {
+            rect.set(box.left, box.top, box.right, box.bottom)
+            fill.color = if (station.isBlank()) CONTROL else CarStationTile.colorFor(station)
+            canvas.drawRoundRect(rect, radius, radius, fill)
+            if (station.isNotBlank()) {
+                text.typeface = bold
+                text.color = Color.WHITE
+                val label = CarStationTile.label(station)
+                text.textSize = box.width * (if (label.length <= 2) 0.36f else 0.24f)
+                val width = text.measureText(label)
+                val metrics = text.fontMetrics
+                canvas.drawText(label, box.centerX - width / 2f, box.centerY - (metrics.ascent + metrics.descent) / 2f, text)
+            }
         }
-        // Fallback glyph: a radio mark in the section's amber identity.
-        fill.color = HomeDashboardTheme.ACCENT_RADIO
-        val g = box.width * 0.34f
-        val cxg = box.centerX
-        val cyg = box.centerY
-        canvas.drawCircle(cxg, cyg + g * 0.35f, g * 0.28f, fill)
-        fill.strokeWidth = g * 0.14f
-        fill.style = Paint.Style.STROKE
-        canvas.drawLine(cxg, cyg + g * 0.35f, cxg + g * 0.5f, cyg - g * 0.7f, fill)
-        fill.style = Paint.Style.FILL
+        if (cover != null && logo != null) {
+            val badge = layout.badge
+            val border = badge.width * 5f / 92f
+            val badgeRadius = badge.width * 22f / 92f
+            rect.set(badge.left - border, badge.top - border, badge.right + border, badge.bottom + border)
+            fill.color = BACKGROUND
+            canvas.drawRoundRect(rect, badgeRadius + border, badgeRadius + border, fill)
+            drawCropped(canvas, logo, badge, badgeRadius)
+        }
     }
+
+    private fun drawCropped(canvas: Canvas, bitmap: Bitmap, box: CarRadioBox, radius: Float) {
+        if (bitmap.width <= 0 || bitmap.height <= 0) return
+        rect.set(box.left, box.top, box.right, box.bottom)
+        val scale = maxOf(box.width / bitmap.width, box.height / bitmap.height)
+        val cw = (box.width / scale).coerceAtMost(bitmap.width.toFloat())
+        val ch = (box.height / scale).coerceAtMost(bitmap.height.toFloat())
+        source.set(
+            ((bitmap.width - cw) / 2f).toInt(),
+            ((bitmap.height - ch) / 2f).toInt(),
+            ((bitmap.width + cw) / 2f).toInt(),
+            ((bitmap.height + ch) / 2f).toInt(),
+        )
+        canvas.save()
+        path.reset()
+        path.addRoundRect(rect, radius, radius, Path.Direction.CW)
+        canvas.clipPath(path)
+        fill.color = Color.WHITE
+        canvas.drawRect(rect, fill)
+        canvas.drawBitmap(bitmap, source, rect, bitmapPaint)
+        canvas.restore()
+    }
+
+    private val bitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
 
     private fun decodeEmbedded(data: ByteArray?): Bitmap? {
         if (data == null || data.isEmpty()) return null
         return runCatching { android.graphics.BitmapFactory.decodeByteArray(data, 0, data.size) }.getOrNull()
     }
 
+    // --- Text ---------------------------------------------------------------------------------
+
     private fun drawText(canvas: Canvas, layout: CarRadioLayout, content: Content) {
         val left = layout.textLeft
         val right = layout.textRight
         if (right - left < layout.dp(8f)) return
+        val top = layout.textTop
 
-        // Source badge above the title.
-        badgePaint.textSize = layout.dp(15f)
-        val badge = context.getString(R.string.radio_source_internet).uppercase()
-        var y = layout.textTop + layout.dp(22f)
-        canvas.drawText(badge, left, y, badgePaint)
+        // "● Live": the red dot says on air.
+        text.typeface = medium
+        text.textSize = layout.body(17f)
+        val badgeY = top + layout.body(CarRadioLayout.BADGE_LINE)
+        val dot = layout.body(5f)
+        fill.color = LIVE_RED
+        canvas.drawCircle(left + dot, badgeY - text.textSize * 0.35f, dot, fill)
+        text.color = WARM_TEXT
+        canvas.drawText(context.getString(R.string.radio_live), left + dot * 2f + layout.body(8f), badgeY, text)
 
         // The song when the stream names it, the station otherwise; see RadioNowPlaying.
         val now = RadioNowPlaying.of(content.station, content.title, content.subtitle)
-        titlePaint.textSize = layout.dp(30f)
-        y += layout.dp(44f)
         val title = when {
             content.title == null -> context.getString(R.string.car_radio_nothing_playing)
             else -> now.song ?: now.station
         }
-        drawEllipsized(canvas, title, titlePaint, left, right, y)
+        text.typeface = bold
+        text.color = TEXT_PRIMARY
+        text.textSize = layout.body(44f)
+        drawEllipsized(canvas, title, text, left, right, top + layout.body(CarRadioLayout.TITLE_LINE))
 
         val subtitle = when {
             !content.connected -> context.getString(R.string.car_lib_connecting_session)
@@ -567,80 +711,52 @@ internal class CarRadioNowPlayingRenderer(private val context: CarContext) {
                 if (content.playing) R.string.car_lib_playing else R.string.car_lib_paused
             )
         }
-        subtitlePaint.textSize = layout.dp(18f)
-        y += layout.dp(30f)
-        drawEllipsized(canvas, subtitle, subtitlePaint, left, right, y)
+        text.typeface = regular
+        text.color = TEXT_CONTROL
+        text.textSize = layout.body(22f)
+        drawEllipsized(canvas, subtitle, text, left, right, top + layout.body(CarRadioLayout.SUBTITLE_LINE))
+
+        text.color = TEXT_HINT
+        text.textSize = layout.body(17f)
+        drawEllipsized(canvas, context.getString(R.string.car_radio_wheel_hint), text, left, right, top + layout.body(CarRadioLayout.HINT_LINE))
     }
 
-    private fun drawTransport(canvas: Canvas, layout: CarRadioLayout, content: Content, pressed: CarRadioRegion?) {
-        drawControl(canvas, layout, layout.previous, Glyph.PREVIOUS, primary = false,
-            enabled = content.hasPrevious, pressed = pressed == CarRadioRegion.Previous)
-        drawControl(canvas, layout, layout.play, if (content.playing) Glyph.PAUSE else Glyph.PLAY, primary = true,
-            enabled = content.connected, pressed = pressed == CarRadioRegion.Play)
-        drawControl(canvas, layout, layout.next, Glyph.NEXT, primary = false,
-            enabled = content.hasNext, pressed = pressed == CarRadioRegion.Next)
+    // --- Transport ----------------------------------------------------------------------------
+
+    private fun drawButtons(canvas: Canvas, layout: CarRadioLayout, content: Content, pressed: CarRadioRegion?) {
+        drawPill(
+            canvas, layout, layout.play, if (content.playing) Icon.PAUSE else Icon.PLAY,
+            context.getString(if (content.playing) R.string.car_radio_stop else R.string.radio_play),
+            warm = false, pressed = pressed == CarRadioRegion.Play, primary = true,
+            enabled = content.connected, textSize = layout.body(24f)
+        )
+        drawPill(
+            canvas, layout, layout.next, Icon.NEXT, context.getString(R.string.radio_next_station),
+            warm = false, pressed = pressed == CarRadioRegion.Next, enabled = content.hasNext,
+            textSize = layout.body(24f)
+        )
     }
 
-    private enum class Glyph { PREVIOUS, PLAY, PAUSE, NEXT }
-
-    private fun drawControl(
-        canvas: Canvas,
-        layout: CarRadioLayout,
-        box: CarRadioBox,
-        glyph: Glyph,
-        primary: Boolean,
-        enabled: Boolean,
-        pressed: Boolean,
-    ) {
-        val radius = box.width / 2f
-        // The active control is the shared electric-blue ACCENT_RADIO_ACTIVE, never the periwinkle
-        // home ACCENT; the amber ACCENT_RADIO stays the section identity (badge, fallback artwork).
-        fill.color = when {
-            primary && pressed -> HomeDashboardTheme.mix(
-                HomeDashboardTheme.ACCENT_RADIO_ACTIVE, HomeDashboardTheme.TEXT_PRIMARY, 0.30f
-            )
-            primary -> HomeDashboardTheme.ACCENT_RADIO_ACTIVE
-            pressed -> HomeDashboardTheme.CONTROL_PRESSED
-            else -> HomeDashboardTheme.CONTROL
-        }
-        canvas.drawCircle(box.centerX, box.centerY, radius, fill)
-
-        fill.color = when {
-            primary -> HomeDashboardTheme.ON_ACCENT_RADIO_ACTIVE
-            enabled -> HomeDashboardTheme.TEXT_CONTROL
-            else -> HomeDashboardTheme.CONTROL_DISABLED_GLYPH
-        }
-        val size = box.width * 0.42f
-        val unit = size / 24f
-        val ox = box.centerX - size / 2f
-        val oy = box.centerY - size / 2f
-        fun x(v: Float) = ox + v * unit
-        fun y(v: Float) = oy + v * unit
-        when (glyph) {
-            Glyph.PREVIOUS -> {
-                rect.set(x(6f), y(5f), x(8f), y(19f)); canvas.drawRect(rect, fill)
-                path.reset(); path.moveTo(x(20f), y(5f)); path.lineTo(x(20f), y(19f)); path.lineTo(x(9f), y(12f)); path.close()
-                canvas.drawPath(path, fill)
-            }
-            Glyph.NEXT -> {
-                rect.set(x(16f), y(5f), x(18f), y(19f)); canvas.drawRect(rect, fill)
-                path.reset(); path.moveTo(x(4f), y(5f)); path.lineTo(x(4f), y(19f)); path.lineTo(x(15f), y(12f)); path.close()
-                canvas.drawPath(path, fill)
-            }
-            Glyph.PAUSE -> {
-                rect.set(x(6f), y(5f), x(10f), y(19f)); canvas.drawRect(rect, fill)
-                rect.set(x(14f), y(5f), x(18f), y(19f)); canvas.drawRect(rect, fill)
-            }
-            Glyph.PLAY -> {
-                path.reset(); path.moveTo(x(8f), y(5f)); path.lineTo(x(8f), y(19f)); path.lineTo(x(19f), y(12f)); path.close()
-                canvas.drawPath(path, fill)
-            }
-        }
-    }
-
-    private fun drawEllipsized(canvas: Canvas, text: String, paint: TextPaint, left: Float, right: Float, baseline: Float) {
-        if (text.isBlank() || right <= left) return
-        val clipped = TextUtils.ellipsize(text, paint, right - left, TextUtils.TruncateAt.END)
+    private fun drawEllipsized(canvas: Canvas, value: String, paint: TextPaint, left: Float, right: Float, baseline: Float) {
+        if (value.isBlank() || right <= left) return
+        val clipped = TextUtils.ellipsize(value, paint, right - left, TextUtils.TruncateAt.END)
         canvas.drawText(clipped, 0, clipped.length, left, baseline, paint)
+    }
+
+    private companion object {
+        // The radio design's car palette.
+        val BACKGROUND = 0xFF0B0D10.toInt()
+        val CONTROL = 0xFF1C2027.toInt()
+        val CONTROL_PRESSED = 0xFF343A44.toInt()
+        val WARM = 0xFF2A2116.toInt()
+        val ACCENT = 0xFFFFB35C.toInt()
+        val ON_ACCENT = 0xFF2A1A05.toInt()
+        val WARM_TEXT = 0xFFFFC985.toInt()
+        val LIVE_RED = 0xFFFF5C5C.toInt()
+        val TEXT_PRIMARY = 0xFFF3F5F7.toInt()
+        val TEXT_SOFT = 0xFFC9CDD3.toInt()
+        val TEXT_CONTROL = 0xFFE3E6EA.toInt()
+        val TEXT_HINT = 0xFFA9AFB8.toInt()
+        val TEXT_DISABLED = 0xFF5A616B.toInt()
     }
 }

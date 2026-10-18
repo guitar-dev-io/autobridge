@@ -1594,6 +1594,11 @@
     <string name="radio_tabs_label">หมวดวิทยุ</string>
     <string name="radio_page_caption">สถานีไทยและทั่วโลกจาก radio-browser</string>
     <string name="radio_player_title">กำลังเล่น · วิทยุ</string>
+    <string name="car_radio_stop">หยุด</string>
+    <string name="car_radio_wheel_hint">ปุ่มพวงมาลัยเปลี่ยนสถานีได้</string>
+    <string name="eq_short">EQ</string>
+    <string name="radio_player_step_hint">ก่อนหน้า/ถัดไป = เลื่อนสถานีในรายการที่เปิดอยู่</string>
+    <string name="radio_player_collapse">ย่อหน้าเล่น</string>
     <string name="radio_live">สด</string>
     <string name="radio_favorite_add">โปรด</string>
     <string name="radio_favorite_on">โปรดแล้ว</string>
@@ -1642,6 +1647,8 @@
     <string name="home_tile_tv">ทีวี</string>
     <string name="home_resume_radio">วิทยุที่ฟังล่าสุด</string>
     <string name="home_resume_tap">แตะเพื่อฟังต่อ</string>
+    <string name="home_radio_live">กำลังเล่น · วิทยุ</string>
+    <string name="home_radio_open">แตะเพื่อเปิดหน้าเล่น</string>
 
     <!-- Curated Thai provinces for the Local radio category. -->
     <string name="province_bangkok">กรุงเทพมหานคร</string>
