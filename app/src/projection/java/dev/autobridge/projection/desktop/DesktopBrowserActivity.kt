@@ -26,6 +26,7 @@ import dev.autobridge.desktop.browser.DesktopBrowserId
 import dev.autobridge.desktop.browser.DesktopBrowsers
 import dev.autobridge.desktop.display.DesktopView
 import dev.autobridge.desktop.input.ControlRail
+import dev.autobridge.desktop.input.PointerMode
 import dev.autobridge.desktop.input.Keysym
 import dev.autobridge.desktop.input.TouchGestureMapper
 import dev.autobridge.desktop.session.DesktopSession
@@ -103,6 +104,15 @@ class DesktopBrowserActivity : Activity() {
         }
         // The keyboard takes the bottom of the screen: the browser window shrinks to what is left
         // above it, so the field being typed in stays visible.
+        // A zoom change in Settings restarts the browser; follow it to the new session.
+        scope.launch {
+            DesktopEngine.session.collect { s ->
+                if (s != null && s !== session && session != null && s.adapter.id == browserId) {
+                    attach(s)
+                    fit()
+                }
+            }
+        }
         root.setOnApplyWindowInsetsListener { _, insets ->
             val ime = insets.getInsets(WindowInsets.Type.ime()).bottom
             if (ime != imeHeight) {
@@ -136,6 +146,7 @@ class DesktopBrowserActivity : Activity() {
 
     private fun attach(s: DesktopSession) {
         session = s
+        rail.dragHeld = false
         desktopView.renderer = s.renderer
         s.renderer.overlay = rail
         rail.onAutoHide = { session?.renderer?.requestFrame() }
@@ -174,10 +185,30 @@ class DesktopBrowserActivity : Activity() {
             }
         }
         if (railPressed) return true
+        // With Drag held (rail), a drag moves the held pointer as usual and a tap drops it.
+        if (rail.dragHeld) {
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> { heldDownX = event.x; heldDownY = event.y }
+                MotionEvent.ACTION_UP -> if (kotlin.math.hypot(event.x - heldDownX, event.y - heldDownY) < tapSlop) {
+                    session?.input?.releaseAtCursor()
+                    rail.dragHeld = false
+                    session?.renderer?.burst()
+                    return true
+                }
+            }
+            if (event.actionMasked == MotionEvent.ACTION_UP) {
+                // A drag that ended: let the mapper see it as a move, not a tap.
+                session?.renderer?.burst()
+                return true
+            }
+        }
         return gestures.onTouchEvent(event)
     }
 
     private var railPressed = false
+    private var heldDownX = 0f
+    private var heldDownY = 0f
+    private val tapSlop by lazy { android.view.ViewConfiguration.get(this).scaledTouchSlop.toFloat() }
 
     /** What the rail asked for; the rail has already changed its own state. */
     private fun onRailAction(action: ControlRail.Action) {
@@ -196,7 +227,14 @@ class DesktopBrowserActivity : Activity() {
             }
             ControlRail.Action.KEYBOARD -> keyInput.toggle()
             ControlRail.Action.CLOSE -> finish()
-            ControlRail.Action.MODE_CHANGED,
+            ControlRail.Action.DRAG_START -> input?.pressAtCursor()
+            ControlRail.Action.DRAG_END -> input?.releaseAtCursor()
+            ControlRail.Action.MODE_CHANGED -> {
+                if (rail.dragHeld) { input?.releaseAtCursor(); rail.dragHeld = false }
+                if (rail.mode == PointerMode.MOUSE) {
+                    session?.renderer?.mapping?.let { m -> input?.moveTo(m.displayWidth / 2, m.displayHeight / 2) }
+                }
+            }
             ControlRail.Action.KEYBOARD_AUTOBRIDGE,
             ControlRail.Action.KEYBOARD_CAR -> Unit
         }

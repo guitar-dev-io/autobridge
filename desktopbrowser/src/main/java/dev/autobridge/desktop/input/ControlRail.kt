@@ -23,7 +23,9 @@ import kotlin.math.min
  *    still shows where the controls are, which a rail that disappears completely does not.
  *  - **Open**: a panel slides out with the everyday controls, each a large labelled button:
  *    back, address, type, the touch ⇄ mouse switch (one button that shows the current mode) and
- *    more. It collapses after any action, or [hideDelayMs] after the last touch.
+ *    more. In mouse mode a Drag button joins them: it holds the left button down so the next pan
+ *    drags (select text, move a slider), and the next tap on the page drops it — the click-drag a
+ *    car screen cannot otherwise do, because the host reports no touch-down or touch-up. It collapses after any action, or [hideDelayMs] after the last touch.
  *  - **More**: a second sheet beside the panel for what is used less: forward, reload, new tab,
  *    zoom, the keyboard choice (car only), how soon the panel collapses, and close (phone only).
  *
@@ -40,7 +42,11 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
     /** What a tap asked for. Mode switches and the collapse delay are handled inside the rail. */
     enum class Action {
         BACK, ADDRESS, KEYBOARD, FORWARD, RELOAD, NEW_TAB, ZOOM_OUT, ZOOM_IN,
-        KEYBOARD_AUTOBRIDGE, KEYBOARD_CAR, MODE_CHANGED, CLOSE
+        KEYBOARD_AUTOBRIDGE, KEYBOARD_CAR, MODE_CHANGED, CLOSE,
+        /** Mouse mode: hold the left button down ([dragHeld] is now true). */
+        DRAG_START,
+        /** Mouse mode: let it go ([dragHeld] is now false). */
+        DRAG_END
     }
 
     sealed class Tap {
@@ -52,6 +58,12 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
     }
 
     @Volatile var mode: PointerMode = PointerMode.TOUCH
+
+    /** Mouse mode with the left button held: a pan drags. Set by the Drag button, cleared by the owner. */
+    @Volatile var dragHeld = false
+
+    /** Panel buttons: back, address, type, mode, (drag in mouse mode), more. */
+    private fun buttonCount() = if (mode == PointerMode.MOUSE) 6 else 5
 
     /** The owner's gate (parked, a session to control): nothing is drawn or hit while false. */
     @Volatile var visible = true
@@ -113,7 +125,7 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
 
     /** Scale that fits the open panel (the tallest part) into the target's height. */
     private fun scaleFor(height: Int): Float {
-        val panelDp = PANEL_PAD * 2 + CHEVRON + GAP + 5 * (BUTTON + GAP) - GAP
+        val panelDp = PANEL_PAD * 2 + CHEVRON + GAP + buttonCount() * (BUTTON + GAP) - GAP
         val sheetDp = sheetHeightDp()
         val needed = maxOf(panelDp, sheetDp) * density
         return min(1f, height * 0.92f / needed).coerceAtLeast(0.45f)
@@ -141,7 +153,7 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
 
         // --- Panel ---
         val panelW = s(PANEL_W, sc)
-        val panelH = s(PANEL_PAD * 2 + CHEVRON + GAP + 5 * (BUTTON + GAP) - GAP, sc)
+        val panelH = s(PANEL_PAD * 2 + CHEVRON + GAP + buttonCount() * (BUTTON + GAP) - GAP, sc)
         val left = s(PANEL_LEFT, sc)
         val top = ((height - panelH) / 2f).coerceAtLeast(0f)
         val panel = RectF(left, top, left + panelW, top + panelH)
@@ -171,6 +183,12 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
             mode = if (mode == PointerMode.TOUCH) PointerMode.MOUSE else PointerMode.TOUCH
             touched()
             Tap.Perform(Action.MODE_CHANGED)
+        }
+        if (mode == PointerMode.MOUSE) {
+            panelButton(R.drawable.ic_rail_drag, context.getString(R.string.desktop_rail_drag), dragHeld, false) {
+                dragHeld = !dragHeld
+                done(if (dragHeld) Action.DRAG_START else Action.DRAG_END)
+            }
         }
         panelButton(R.drawable.ic_rail_more, context.getString(R.string.desktop_rail_more), false, state == State.MORE) {
             state = if (state == State.MORE) State.OPEN else State.MORE

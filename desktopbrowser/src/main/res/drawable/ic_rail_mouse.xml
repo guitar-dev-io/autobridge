@@ -1,6 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Material icon "mouse" (Apache License 2.0, Google). -->
+<!-- Mouse: rounded body outline, split left/right buttons and a scroll wheel. Drawn for AutoBridge;
+     tinted by the rail like the other icons. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
-    <path android:fillColor="#FFFFFFFF" android:pathData="M13,1.07V9h7c0,-4.08 -3.05,-7.44 -7,-7.93zM4,15c0,4.42 3.58,8 8,8s8,-3.58 8,-8v-4H4v4zM11,1.07C7.05,1.56 4,4.92 4,9h7V1.07z"/>
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="1.8" android:fillColor="#00000000"
+        android:strokeLineJoin="round"
+        android:pathData="M12,2.5 C15.9,2.5 18.5,5.2 18.5,9.2 L18.5,14.8 C18.5,18.8 15.9,21.5 12,21.5 C8.1,21.5 5.5,18.8 5.5,14.8 L5.5,9.2 C5.5,5.2 8.1,2.5 12,2.5 Z"/>
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="1.6" android:strokeLineCap="round"
+        android:pathData="M5.8,10.2 L18.2,10.2"/>
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="1.6" android:strokeLineCap="round"
+        android:pathData="M12,2.8 L12,10.2"/>
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M11,5.2 a1,1 0 0 1 2,0 L13,7.4 a1,1 0 0 1 -2,0 Z"/>
 </vector>

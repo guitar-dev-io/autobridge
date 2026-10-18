@@ -10,5 +10,10 @@
             android:name="dev.autobridge.desktop.install.DesktopEngineInstallService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+        <!-- "Start on launch" hook: runs when the app process starts; no data, not exported. -->
+        <provider
+            android:name="dev.autobridge.desktop.DesktopEngineStarter"
+            android:authorities="${applicationId}.desktopengine.starter"
+            android:exported="false" />
     </application>
 </manifest>

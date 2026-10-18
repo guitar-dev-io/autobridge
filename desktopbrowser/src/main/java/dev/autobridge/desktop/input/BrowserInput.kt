@@ -34,9 +34,19 @@ class BrowserInput(private val x: X11Connection) {
     }
 
     /** Trackpad move, clamped to the visible window. */
+    /**
+     * Touch sensitivity from settings: multiplies scroll distance and trackpad movement. 1 is
+     * finger-for-pixel; above 1 the page and the pointer move further than the finger.
+     */
+    @Volatile var sensitivity = 1f
+
+    /** Button down / up where the pointer is: the two halves of a mouse click-drag. */
+    fun pressAtCursor(button: Int = BUTTON_LEFT) = press(cursorX.toInt(), cursorY.toInt(), button)
+    fun releaseAtCursor(button: Int = BUTTON_LEFT) = release(cursorX.toInt(), cursorY.toInt(), button)
+
     fun moveBy(dx: Float, dy: Float, maxX: Int, maxY: Int) {
-        cursorX = (cursorX + dx).coerceIn(0f, (maxX - 1).toFloat())
-        cursorY = (cursorY + dy).coerceIn(0f, (maxY - 1).toFloat())
+        cursorX = (cursorX + dx * sensitivity).coerceIn(0f, (maxX - 1).toFloat())
+        cursorY = (cursorY + dy * sensitivity).coerceIn(0f, (maxY - 1).toFloat())
         val tx = cursorX.toInt()
         val ty = cursorY.toInt()
         post { x.fakeInput(X11Connection.MOTION_NOTIFY, 0, tx, ty) }
@@ -67,8 +77,8 @@ class BrowserInput(private val x: X11Connection) {
      */
     fun scroll(atX: Int, atY: Int, dx: Float, dy: Float) = post {
         x.fakeInput(X11Connection.MOTION_NOTIFY, 0, atX, atY)
-        carryY += dy
-        carryX += dx
+        carryY += dy * sensitivity
+        carryX += dx * sensitivity
         val notchesY = (carryY / PIXELS_PER_NOTCH).toInt()
         val notchesX = (carryX / PIXELS_PER_NOTCH).toInt()
         carryY -= notchesY * PIXELS_PER_NOTCH

@@ -39,4 +39,5 @@
     <string name="desktop_rail_hide_4s">4 s</string>
     <string name="desktop_rail_hide_never">Stay open</string>
     <string name="desktop_rail_close">Close the browser</string>
+    <string name="desktop_rail_drag">Drag</string>
 </resources>

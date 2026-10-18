@@ -78,6 +78,30 @@ class EngineStore(context: Context) {
     fun error(id: DesktopBrowserId): String? = prefs.getString("error_${id.key}", null)
     fun setError(id: DesktopBrowserId, value: String?) { prefs.edit().putString("error_${id.key}", value).apply() }
 
+    /** Start the chosen browser in the background as soon as AutoBridge starts, so it is ready. */
+    var startOnLaunch: Boolean
+        get() = prefs.getBoolean("start_on_launch", false)
+        set(value) { prefs.edit().putBoolean("start_on_launch", value).apply() }
+
+    /** Page and toolbar zoom for one browser, in percent (multiplies Chromium's device scale). */
+    fun zoom(id: DesktopBrowserId): Int = prefs.getInt("zoom_${id.key}", 100)
+    fun setZoom(id: DesktopBrowserId, percent: Int) { prefs.edit().putInt("zoom_${id.key}", percent).apply() }
+
+    /** Scroll and trackpad speed multiplier. */
+    var touchSensitivity: Float
+        get() = prefs.getFloat("touch_sensitivity", 1f)
+        set(value) { prefs.edit().putFloat("touch_sensitivity", value).apply() }
+
+    /** The last car page size and scale, so a start on launch opens at the car's size. */
+    fun lastCar(): Triple<Int, Int, Float>? {
+        val w = prefs.getInt("car_w", 0)
+        val h = prefs.getInt("car_h", 0)
+        return if (w > 0 && h > 0) Triple(w, h, prefs.getFloat("car_scale", 1.5f)) else null
+    }
+    fun setLastCar(width: Int, height: Int, scale: Float) {
+        prefs.edit().putInt("car_w", width).putInt("car_h", height).putFloat("car_scale", scale).apply()
+    }
+
     /** When the user accepted the Google Chrome Terms of Service; Chrome is not fetched before. */
     var chromeTermsAcceptedAt: Long
         get() = prefs.getLong("chrome_terms_at", 0)

@@ -39,4 +39,5 @@
     <string name="desktop_rail_hide_4s">4 วิ</string>
     <string name="desktop_rail_hide_never">ไม่ซ่อน</string>
     <string name="desktop_rail_close">ปิดเบราว์เซอร์</string>
+    <string name="desktop_rail_drag">ลาก</string>
 </resources>
