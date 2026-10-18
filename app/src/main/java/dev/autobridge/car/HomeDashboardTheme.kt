@@ -70,6 +70,9 @@ internal object HomeDashboardTheme {
     const val ACCENT_YOUTUBE = 0xFFF0848F.toInt()
     const val ACCENT_YOUTUBE_MUSIC = 0xFFF28BB0.toInt()
     const val ACCENT_STREAMING = 0xFFE8C27A.toInt()
+    /** The sideload builds' extra home cards (CarExtensions). */
+    const val ACCENT_MULTI_APP = 0xFF7FD6C2.toInt()
+    const val ACCENT_DESKTOP = 0xFF9DC3F7.toInt()
 
     /** Share of the accent mixed into [CARD] for an icon tile's fill and its hairline border. */
     const val ICON_TILE_TINT = 0.08f

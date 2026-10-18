@@ -91,10 +91,12 @@ class DesktopBrowserCarAppService : CarAppService() {
  */
 class DesktopBrowserCarScreen(
     carContext: CarContext,
-    private val embedded: Boolean = false
+    private val embedded: Boolean = false,
+    /** The browser to show; null shows the one chosen for the Web card. */
+    browser: DesktopBrowserAdapter? = null
 ) : Screen(carContext), SurfaceCallback {
     private var session: DesktopSession? = null
-    private val adapter: DesktopBrowserAdapter? = DesktopEngine.let { it.init(carContext); it.chosenInstalledBrowser() }
+    private val adapter: DesktopBrowserAdapter? = DesktopEngine.let { it.init(carContext); browser ?: it.chosenInstalledBrowser() }
     private var surfaceWidth = 0
     private var surfaceHeight = 0
     private var surfaceDpi = 160
@@ -398,7 +400,11 @@ class DesktopBrowserCarMenuScreen(
  * offered on the car so switching back to the built-in browser never needs the phone. A browser that
  * is not installed is listed with what it needs instead of being selectable.
  */
-class DesktopEngineChoiceCarScreen(carContext: CarContext) : Screen(carContext) {
+class DesktopEngineChoiceCarScreen(
+    carContext: CarContext,
+    /** From the Desktop browser home card: picking a browser opens it rather than going back. */
+    private val openAfterChoice: Boolean = false
+) : Screen(carContext) {
     override fun onGetTemplate(): Template {
         DesktopEngine.init(carContext)
         val chosen = DesktopEngine.chosenInstalledBrowser()?.id
@@ -444,7 +450,13 @@ class DesktopEngineChoiceCarScreen(carContext: CarContext) : Screen(carContext) 
 
     private fun choose(choice: EngineChoice) {
         DesktopEngine.choice = choice
+        val browser = choice.browser?.let(DesktopBrowsers::of)
         screenManager.pop()
+        if (openAfterChoice && browser != null) {
+            dev.autobridge.car.CarNavigation.open(screenManager, "DesktopBrowserCarScreen") {
+                DesktopBrowserCarScreen(carContext, embedded = true, browser = browser)
+            }
+        }
     }
 }
 
