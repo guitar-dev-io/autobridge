@@ -360,6 +360,8 @@ dependencies {
     // Custom Tabs for provider sign-in pages that block embedded WebView login; shares Chrome's
     // cookie jar so an already-signed-in Chrome session skips the credential prompt entirely.
     implementation("androidx.browser:browser:1.8.0")
+    // On-device QR for the support card and the car support screen.
+    implementation("com.google.zxing:core:3.5.3")
     implementation("dev.rikka.shizuku:api:13.1.5")
     implementation("dev.rikka.shizuku:provider:13.1.5")
     implementation("androidx.media3:media3-exoplayer:1.11.1")

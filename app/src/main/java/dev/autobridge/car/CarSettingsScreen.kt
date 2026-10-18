@@ -231,6 +231,16 @@ class CarSettingsScreen(
             )
             .build()
 
+        val supportList = ItemList.Builder()
+            .addItem(
+                Row.Builder()
+                    .setTitle(carContext.getString(R.string.support_card_title))
+                    .addText(carContext.getString(R.string.support_car_row_caption))
+                    .setOnClickListener { CarNavigation.open(screenManager, "CarSupportScreen") { CarSupportScreen(carContext) } }
+                    .build()
+            )
+            .build()
+
         return ListTemplate.Builder()
             .setHeader(
                 Header.Builder()
@@ -241,6 +251,7 @@ class CarSettingsScreen(
             .addSectionedList(SectionedItemList.create(generalList, carContext.getString(R.string.car_settings_section_general)))
             .addSectionedList(SectionedItemList.create(drivingList, carContext.getString(R.string.car_settings_section_driving)))
             .addSectionedList(SectionedItemList.create(list, carContext.getString(R.string.car_settings_section_mirror)))
+            .addSectionedList(SectionedItemList.create(supportList, carContext.getString(R.string.about_group_support)))
             .build()
     }
 

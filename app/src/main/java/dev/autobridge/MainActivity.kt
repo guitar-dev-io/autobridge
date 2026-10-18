@@ -110,7 +110,6 @@ class MainActivity : androidx.activity.ComponentActivity() {
         const val REQUEST_NOTIFICATIONS = 2002
         const val REQUEST_VOICE_SEARCH = 2003
 
-        const val SUPPORT_URL = "https://buymeacoffee.com/guitar.story"
         const val GITHUB_URL = "https://github.com/guitar-dev-io/autobridge"
         const val FACEBOOK_URL = "https://www.facebook.com/share/19mw1X5Lou/"
 
@@ -577,15 +576,24 @@ class MainActivity : androidx.activity.ComponentActivity() {
         form.showChoices()
     }
 
-    /** The coffee button on Home: the same two ways to say thanks as the About page. */
+    /** The coffee button on Home: the same support card as the About page, in a dialog. */
     private fun showDonateChoices() {
+        val content = ScrollView(this).apply {
+            setPadding(dp(8), dp(8), dp(8), dp(8))
+            addView(supportCard(framed = true))
+        }
         android.app.AlertDialog.Builder(this)
-            .setTitle(getString(R.string.about_promptpay_title))
-            .setItems(arrayOf(getString(R.string.about_support_caption), getString(R.string.about_promptpay))) { _, which ->
-                if (which == 0) openInAppUrl(SUPPORT_URL) else showPromptPayDialog()
-            }
+            .setView(content)
+            .setPositiveButton(getString(R.string.about_promptpay_close), null)
             .show()
     }
+
+    /** The phone's support card (see [dev.autobridge.ui.SupportCard]); links open in a Custom Tab. */
+    private fun supportCard(framed: Boolean): View = dev.autobridge.ui.SupportCard.view(
+        context = this,
+        channels = dev.autobridge.support.SupportChannels.available(safeBuild = BuildConfig.AUTOBRIDGE_MODE == "SAFE"),
+        framed = framed
+    ) { url -> openInAppUrl(url) }
 
     /** Home > Music / TV / Radio / More: a short list of the sections grouped behind one tile. */
     private fun buildHomeGroupScreen(
@@ -1166,33 +1174,21 @@ class MainActivity : androidx.activity.ComponentActivity() {
         subtitle = "AutoBridge ${BuildConfig.VERSION_NAME}",
         back = { goBack() },
         groups = listOf(
-            SettingsGroup(getString(R.string.about_group_support), buildList {
-                add(settingsEntry(
-                    getString(R.string.about_support),
-                    getString(R.string.about_support_caption),
-                    R.drawable.ic_tile_favorite
-                ) {
-                    openInAppUrl(SUPPORT_URL)
-                })
-                // PromptPay donate QR. Off-store payment prompts breach Google Play policy, so the
-                // row only exists on the sideload flavors (personal/lab), never on `safe`.
-                if (BuildConfig.AUTOBRIDGE_MODE != "SAFE") {
-                    add(settingsEntry(
-                        getString(R.string.about_promptpay),
-                        getString(R.string.about_promptpay_caption),
+            // "Developed by", then the support card under it. SupportChannels keeps PromptPay off
+            // the `safe` build (Google Play's payment policy).
+            SettingsGroup(
+                getString(R.string.about_group_support),
+                rows = listOf(
+                    settingsEntry(
+                        getString(R.string.about_developer),
+                        getString(R.string.about_developer_caption),
                         R.drawable.ic_tile_favorite
                     ) {
-                        showPromptPayDialog()
-                    })
-                }
-                add(settingsEntry(
-                    getString(R.string.about_developer),
-                    getString(R.string.about_developer_caption),
-                    R.drawable.ic_tile_favorite
-                ) {
-                    Toast.makeText(this@MainActivity, getString(R.string.about_developer_caption), Toast.LENGTH_SHORT).show()
-                })
-            }),
+                        Toast.makeText(this@MainActivity, getString(R.string.about_developer_caption), Toast.LENGTH_SHORT).show()
+                    }
+                ),
+                customRows = listOf(supportCard(framed = false))
+            ),
             SettingsGroup(getString(R.string.about_group_app), listOf(
                 settingsEntry(
                     getString(R.string.about_check_update),
@@ -1241,27 +1237,6 @@ class MainActivity : androidx.activity.ComponentActivity() {
             .setTitle(getString(R.string.about_credits_title))
             .setMessage(getString(R.string.about_credits_body))
             .setPositiveButton(getString(R.string.about_credits_close), null)
-            .show()
-    }
-
-    /**
-     * PromptPay donate QR. The image is a bundled drawable (never fetched over the network, so it
-     * cannot be swapped out from under the user). Only reachable on the sideload flavors — the
-     * About row that opens it is gated out of `safe` to stay within Google Play's payment policy.
-     */
-    private fun showPromptPayDialog() {
-        val image = ImageView(this).apply {
-            setImageResource(R.drawable.promptpay_qr)
-            adjustViewBounds = true
-            val pad = (24 * resources.displayMetrics.density).toInt()
-            setPadding(pad, pad, pad, pad)
-            contentDescription = getString(R.string.about_promptpay_title)
-        }
-        android.app.AlertDialog.Builder(this)
-            .setTitle(getString(R.string.about_promptpay_title))
-            .setMessage(getString(R.string.about_promptpay_message))
-            .setView(image)
-            .setPositiveButton(getString(R.string.about_promptpay_close), null)
             .show()
     }
 

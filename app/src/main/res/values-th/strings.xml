@@ -2172,4 +2172,12 @@
     <string name="parking_new_without_gps">จุดใหม่ ไม่ใช้ GPS</string>
     <string name="parking_position_added">เพิ่มตำแหน่งแล้ว</string>
     <string name="parking_car_no_fix">หาตำแหน่งไม่เจอ บนมือถือบันทึกเป็นโน้ตแทนได้</string>
+    <string name="support_card_title">เลี้ยงค่าขนมผู้พัฒนา</string>
+    <string name="support_card_message">ถ้า AutoBridge ทำให้การขับรถสนุกขึ้น ค่าขนมเล็กๆ น้อยๆ ช่วยให้มีอัปเดตใหม่ๆ ต่อไปได้ ขอบคุณมากครับ ☕✨</string>
+    <string name="support_scan_bank_app">สแกนด้วยแอปธนาคารของคุณ</string>
+    <string name="support_open">เปิด %1$s</string>
+    <string name="support_qr_description">QR โค้ด %1$s</string>
+    <string name="support_car_scan_title">สแกนจากมือถือ</string>
+    <string name="support_car_next">ถัดไป: %1$s</string>
+    <string name="support_car_row_caption">QR โค้ดสำหรับ Buy Me a Coffee และช่องทางอื่นๆ</string>
 </resources>
