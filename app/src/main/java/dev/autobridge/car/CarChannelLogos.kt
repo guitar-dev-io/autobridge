@@ -67,18 +67,21 @@ internal class CarChannelLogos(
 
     /**
      * The radio grid's art for a station: its logo on a card ([CarStationTile.framed]) once the
-     * logo is here, its coloured name card until then or when it has none. Spends the same budget
-     * as [icon]; past it, null, and the caller draws its plain mark.
+     * logo is here, its coloured name card until then or when it has none, ringed when [playing].
+     * Spends the same budget as [icon]; past it, null, and the caller draws its plain mark.
      */
-    fun tile(url: String?, title: String): CarIcon? {
+    fun tile(url: String?, title: String, playing: Boolean = false): CarIcon? {
         if (budget <= 0) return null
         budget--
         val address = url?.trim().orEmpty()
-        val key = if (address.isEmpty()) "tile:name:${title.trim().lowercase()}" else "tile:$address"
+        val key = (if (address.isEmpty()) "tile:name:${title.trim().lowercase()}" else "tile:$address") +
+            if (playing) ":on" else ""
         icons[key]?.let { return it }
         val logo = address.takeIf { it.isNotEmpty() }?.let { ImageLoader.bitmap(context, it) { scheduleRefresh() } }
         val icon = CarIcon.Builder(
-            IconCompat.createWithBitmap(if (logo != null) CarStationTile.framed(logo) else CarStationTile.placeholder(title))
+            IconCompat.createWithBitmap(
+                if (logo != null) CarStationTile.framed(logo, playing) else CarStationTile.placeholder(title, playing)
+            )
         ).build()
         // A name card standing in for a logo still on its way is not kept: the logo replaces it.
         if (logo != null || address.isEmpty()) remember(key, icon)

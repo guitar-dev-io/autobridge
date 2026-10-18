@@ -52,15 +52,22 @@ class RadioPlayerActivity : Activity() {
     private lateinit var playback: MediaPlaybackClient
     private var releaseBack: () -> Unit = {}
 
+    private lateinit var cover: FrameLayout
     private lateinit var logo: ImageView
+    private lateinit var badge: ImageView
     private lateinit var initial: TextView
     private lateinit var song: TextView
     private lateinit var artist: TextView
     private lateinit var stationLine: TextView
     private lateinit var playToggle: TextView
-    private lateinit var favorite: TextView
-    private lateinit var sleep: TextView
+    private lateinit var favorite: ActionButton
+    private lateinit var sleep: FrameLayout
+    private lateinit var sleepIcon: View
+    private lateinit var sleepMinutes: TextView
     private var shownLogo: String? = null
+    /** The cover bytes last looked at, and the ones actually shown (null when they did not decode). */
+    private var seenCover: ByteArray? = null
+    private var shownCover: ByteArray? = null
 
     private val ticker = Handler(Looper.getMainLooper())
     private val tick = object : Runnable {
@@ -104,56 +111,80 @@ class RadioPlayerActivity : Activity() {
         val body = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(dp(20), dp(8), dp(20), dp(24))
+            setPadding(dp(20), dp(8), dp(20), dp(28))
         }
 
-        // The logo, with the station's frequency or initials until (or unless) the image arrives.
-        val art = FrameLayout(this).apply {
+        // The cover large with the station's logo as a badge on its corner. A stream without a
+        // cover of its own puts the logo in the big square, and the badge stays away; until the
+        // logo arrives the square shows the station's frequency or initials on its colour.
+        val art = FrameLayout(this).apply { clipChildren = false; clipToPadding = false }
+        cover = FrameLayout(this).apply {
             background = AutoBridgeDesign.surface(this@RadioPlayerActivity, AutoBridgeDesign.tint(AutoBridgeDesign.ACCENT_RADIO, 0.14f), 40, Color.TRANSPARENT)
             clipToOutline = true
+            elevation = dp(18).toFloat()
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                outlineSpotShadowColor = AutoBridgeDesign.ACCENT_RADIO
+                outlineAmbientShadowColor = AutoBridgeDesign.ACCENT_RADIO
+            }
         }
         initial = TextView(this).apply {
-            textSize = 72f
+            textSize = 64f
             gravity = Gravity.CENTER
-            setTextColor(AutoBridgeDesign.ACCENT_RADIO)
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            setTextColor(Color.WHITE)
+            typeface = Typeface.create("sans-serif", Typeface.BOLD)
         }
         logo = ImageView(this).apply {
             scaleType = ImageView.ScaleType.CENTER_CROP
             visibility = View.GONE
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
-        art.addView(initial, FrameLayout.LayoutParams(-1, -1))
-        art.addView(logo, FrameLayout.LayoutParams(-1, -1))
-        body.addView(art, LinearLayout.LayoutParams(dp(248), dp(248)).apply { topMargin = dp(12) })
+        cover.addView(initial, FrameLayout.LayoutParams(-1, -1))
+        cover.addView(logo, FrameLayout.LayoutParams(-1, -1))
+        art.addView(cover, FrameLayout.LayoutParams(dp(248), dp(248)).apply { setMargins(dp(10), dp(10), dp(10), dp(10)) })
+        badge = ImageView(this).apply {
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            background = AutoBridgeDesign.surface(this@RadioPlayerActivity, AutoBridgeDesign.INK, 18, Color.TRANSPARENT)
+            setPadding(dp(4), dp(4), dp(4), dp(4))
+            clipToOutline = true
+            elevation = dp(20).toFloat()
+            visibility = View.GONE
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }
+        art.addView(badge, FrameLayout.LayoutParams(dp(80), dp(80), Gravity.END or Gravity.BOTTOM))
+        body.addView(art, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(8) })
 
+        // "● Live": the red dot says on air, the pill says radio.
         body.addView(TextView(this).apply {
-            text = getString(R.string.radio_live)
+            text = android.text.SpannableString("●  " + getString(R.string.radio_live)).apply {
+                setSpan(android.text.style.ForegroundColorSpan(LIVE_RED), 0, 1, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                setSpan(android.text.style.RelativeSizeSpan(0.8f), 0, 1, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
             textSize = 13f
-            setTextColor(AutoBridgeDesign.ACCENT_RADIO)
+            setTextColor(WARM_TEXT)
             typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
-            background = AutoBridgeDesign.surface(this@RadioPlayerActivity, AutoBridgeDesign.tint(AutoBridgeDesign.ACCENT_RADIO, 0.16f), 12, Color.TRANSPARENT)
+            background = AutoBridgeDesign.surface(this@RadioPlayerActivity, WARM_SURFACE, 12, Color.TRANSPARENT)
             setPadding(dp(12), dp(4), dp(12), dp(4))
-        }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(22) })
+        }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(18) })
 
         song = centred(26f, AutoBridgeDesign.TEXT, bold = true, lines = 2)
-        artist = centred(16f, AutoBridgeDesign.TEXT, bold = false, lines = 1)
+        artist = centred(16f, SOFT_TEXT, bold = false, lines = 1)
         stationLine = centred(14f, AutoBridgeDesign.TEXT_MUTED, bold = false, lines = 1)
-        body.addView(song, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10) })
+        body.addView(song, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
         body.addView(artist, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) })
         body.addView(stationLine, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) })
 
-        // Previous, play/pause, next.
+        // Previous, play/pause, next, spread across the width.
         val transport = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         transport.addView(
             AutoBridgeDesign.glyphButton(this, "⏮", 22f) { playback.previous() }
                 .apply { contentDescription = getString(R.string.radio_previous_station) },
             LinearLayout.LayoutParams(dp(64), dp(64))
         )
+        transport.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
         playToggle = TextView(this).apply {
             textSize = 30f
             gravity = Gravity.CENTER
-            setTextColor(AutoBridgeDesign.INK)
+            setTextColor(WARM_INK)
             isClickable = true
             isFocusable = true
             background = RippleDrawable(
@@ -170,36 +201,91 @@ class RadioPlayerActivity : Activity() {
                 showPlaying(!wasPlaying)
             }
         }
-        transport.addView(playToggle, LinearLayout.LayoutParams(dp(92), dp(92)).apply {
-            marginStart = dp(28)
-            marginEnd = dp(28)
-        })
+        transport.addView(playToggle, LinearLayout.LayoutParams(dp(92), dp(92)))
+        transport.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
         transport.addView(
             AutoBridgeDesign.glyphButton(this, "⏭", 22f) { playback.next() }
                 .apply { contentDescription = getString(R.string.radio_next_station) },
             LinearLayout.LayoutParams(dp(64), dp(64))
         )
-        body.addView(transport, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(28) })
+        body.addView(transport, LinearLayout.LayoutParams(-1, -2).apply {
+            topMargin = dp(28)
+            leftMargin = dp(6)
+            rightMargin = dp(6)
+        })
+        body.addView(centred(13f, HINT_TEXT, bold = false, lines = 2).apply {
+            text = getString(R.string.radio_player_step_hint)
+        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10) })
 
-        // EQ, favourite, all stations; then the car and the sleep timer.
-        favorite = action(getString(R.string.radio_favorite_add)) { toggleFavorite() }
-        sleep = action(getString(R.string.radio_sleep_timer)) { chooseSleepTimer() }
-        val actions = listOf(
-            action(getString(R.string.eq_title)) { AudioEffectsSheet(this).show() },
+        // EQ, favourite, all stations, the car: one row, icon over label.
+        favorite = action(R.drawable.ic_radio_star, getString(R.string.radio_favorite_add)) { toggleFavorite() }
+        val actions = LinearLayout(this)
+        listOf(
+            action(R.drawable.ic_radio_eq, getString(R.string.eq_short)) { AudioEffectsSheet(this).show() },
             favorite,
-            action(getString(R.string.radio_all_stations)) {
+            action(R.drawable.ic_radio_list, getString(R.string.radio_all_stations)) {
                 startActivity(LibraryActivity.intent(this, LibraryActivity.Section.RADIO))
                 finish()
             },
-            action(getString(R.string.radio_play_on_car)) { sendToCar() },
-            sleep
-        )
-        AutoBridgeDesign.grid(this, actions, columns = 3).forEachIndexed { index, row ->
-            body.addView(row, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(if (index == 0) 28 else 8) })
+            action(R.drawable.ic_radio_car_screen, getString(R.string.radio_play_on_car)) { sendToCar() }
+        ).forEachIndexed { index, button ->
+            actions.addView(button.view, LinearLayout.LayoutParams(0, dp(64), 1f).apply {
+                if (index > 0) marginStart = dp(8)
+            })
         }
+        body.addView(actions, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(22) })
 
-        val header = AutoBridgeDesign.header(this, getString(R.string.radio_player_title), onBack = { finish() })
-        return AutoBridgeDesign.page(this, header = header, body = body)
+        return AutoBridgeDesign.page(this, header = header(), body = body)
+    }
+
+    /** Collapse on the left, "Now playing · Radio" in the middle, the sleep timer on the right. */
+    private fun header(): View {
+        val row = LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(16), dp(14), dp(16), dp(6))
+        }
+        row.addView(roundIcon(R.drawable.ic_radio_collapse, getString(R.string.radio_player_collapse)) { finish() },
+            LinearLayout.LayoutParams(dp(44), dp(44)))
+        row.addView(TextView(this).apply {
+            text = getString(R.string.radio_player_title)
+            textSize = 14f
+            gravity = Gravity.CENTER
+            setTextColor(SOFT_TEXT)
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+        }, LinearLayout.LayoutParams(0, -2, 1f))
+        sleepIcon = roundIcon(R.drawable.ic_radio_timer, getString(R.string.radio_sleep_timer)) { chooseSleepTimer() }
+        sleepMinutes = TextView(this).apply {
+            textSize = 13f
+            gravity = Gravity.CENTER
+            setTextColor(WARM_INK)
+            typeface = Typeface.create("sans-serif", Typeface.BOLD)
+            background = AutoBridgeDesign.surface(this@RadioPlayerActivity, AutoBridgeDesign.ACCENT_RADIO, 22, Color.TRANSPARENT)
+            isClickable = true
+            isFocusable = true
+            visibility = View.GONE
+            setOnClickListener { chooseSleepTimer() }
+        }
+        sleep = FrameLayout(this).apply {
+            addView(sleepIcon, FrameLayout.LayoutParams(-1, -1))
+            addView(sleepMinutes, FrameLayout.LayoutParams(-1, -1))
+        }
+        row.addView(sleep, LinearLayout.LayoutParams(dp(44), dp(44)))
+        return row
+    }
+
+    private fun roundIcon(icon: Int, description: String, onClick: () -> Unit): View = ImageView(this).apply {
+        setImageResource(icon)
+        scaleType = ImageView.ScaleType.CENTER
+        contentDescription = description
+        isClickable = true
+        isFocusable = true
+        background = RippleDrawable(
+            ColorStateList.valueOf(AutoBridgeDesign.tint(Color.WHITE, 0.2f)),
+            GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(AutoBridgeDesign.SURFACE) },
+            null
+        )
+        setOnClickListener { onClick() }
     }
 
     private fun centred(size: Float, color: Int, bold: Boolean, lines: Int): TextView = TextView(this).apply {
@@ -211,19 +297,36 @@ class RadioPlayerActivity : Activity() {
         ellipsize = TextUtils.TruncateAt.END
     }
 
-    private fun action(label: String, onClick: () -> Unit): TextView = TextView(this).apply {
-        text = label
-        textSize = 14f
-        gravity = Gravity.CENTER
-        setTextColor(AutoBridgeDesign.TEXT)
-        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-        isClickable = true
-        isFocusable = true
-        minHeight = dp(56)
-        setPadding(dp(8), dp(12), dp(8), dp(12))
-        background = AutoBridgeDesign.tappable(this@RadioPlayerActivity, AutoBridgeDesign.SURFACE, 16, AutoBridgeDesign.ACCENT_RADIO)
-        setOnClickListener { onClick() }
+    /** One of the four buttons under the transport: an icon over a short label. */
+    private fun action(icon: Int, label: String, onClick: () -> Unit): ActionButton {
+        val image = ImageView(this).apply {
+            setImageResource(icon)
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }
+        val text = TextView(this).apply {
+            this.text = label
+            textSize = 13f
+            gravity = Gravity.CENTER
+            setTextColor(AutoBridgeDesign.TEXT)
+            typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+        }
+        val column = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            isClickable = true
+            isFocusable = true
+            contentDescription = label
+            background = AutoBridgeDesign.tappable(this@RadioPlayerActivity, AutoBridgeDesign.SURFACE, 16, AutoBridgeDesign.ACCENT_RADIO, Color.TRANSPARENT)
+            setOnClickListener { onClick() }
+            addView(image, LinearLayout.LayoutParams(dp(20), dp(20)))
+            addView(text, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) })
+        }
+        return ActionButton(column, image, text)
     }
+
+    private class ActionButton(val view: LinearLayout, val icon: ImageView, val label: TextView)
 
     /** The station playing now as the radio store knows stations, for the favourite toggle. */
     private fun currentStation(): RadioStation? {
@@ -315,19 +418,52 @@ class RadioPlayerActivity : Activity() {
             stationLine.text = if (now.song != null) now.station else ""
             stationLine.visibility = if (now.song != null) View.VISIBLE else View.GONE
         }
-        // "101 kiss fm" reads as 101, not as a lone "1": the same label the car's station cards use.
+        // "101 kiss fm" reads as 101, not as a lone "1"; on the station's own colour.
         initial.text = if (now.station.isBlank()) "" else dev.autobridge.car.CarStationTile.label(now.station)
+        (cover.background as? GradientDrawable)?.setColor(
+            if (now.station.isBlank()) AutoBridgeDesign.tint(AutoBridgeDesign.ACCENT_RADIO, 0.14f)
+            else dev.autobridge.car.CarStationTile.colorFor(now.station)
+        )
 
         showPlaying(playback.isPlayRequested)
 
         val url = playback.currentUri
         val isFavorite = !url.isNullOrBlank() && IptvHistoryStore.isFavorite(this, url)
-        favorite.text = getString(if (isFavorite) R.string.radio_favorite_on else R.string.radio_favorite_add)
-        favorite.setTextColor(if (isFavorite) AutoBridgeDesign.ACCENT_RADIO else AutoBridgeDesign.TEXT)
+        favorite.label.text = getString(if (isFavorite) R.string.radio_favorite_on else R.string.radio_favorite_add)
+        favorite.label.setTextColor(if (isFavorite) AutoBridgeDesign.ACCENT_RADIO else AutoBridgeDesign.TEXT)
+        favorite.icon.setImageResource(if (isFavorite) R.drawable.ic_radio_star_filled else R.drawable.ic_radio_star)
+        favorite.icon.setColorFilter(if (isFavorite) AutoBridgeDesign.ACCENT_RADIO else AutoBridgeDesign.TEXT)
+        favorite.view.background = AutoBridgeDesign.tappable(
+            this, if (isFavorite) WARM_SURFACE else AutoBridgeDesign.SURFACE, 16, AutoBridgeDesign.ACCENT_RADIO, Color.TRANSPARENT
+        )
 
+        // The sleep timer's button turns into the minutes left while one runs.
         val left = RadioSleepTimer.remainingMinutes()
-        sleep.text = if (left > 0) getString(R.string.radio_sleep_remaining, left) else getString(R.string.radio_sleep_timer)
-        sleep.setTextColor(if (left > 0) AutoBridgeDesign.ACCENT_RADIO else AutoBridgeDesign.TEXT)
+        sleepMinutes.visibility = if (left > 0) View.VISIBLE else View.GONE
+        sleepIcon.visibility = if (left > 0) View.GONE else View.VISIBLE
+        sleepMinutes.text = left.toString()
+        sleep.contentDescription = if (left > 0) getString(R.string.radio_sleep_remaining, left) else getString(R.string.radio_sleep_timer)
+
+        // A cover the stream carries goes in the big square, the logo then becoming the badge.
+        val embedded = playback.currentArtworkData?.takeIf { it.isNotEmpty() }
+        if (!embedded.contentEquals(seenCover)) {
+            seenCover = embedded
+            // Whatever the square held belongs to the last item; the logo is placed again below.
+            shownLogo = LOGO_UNSET
+            val bitmap = embedded?.let { runCatching { android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size) }.getOrNull() }
+            shownCover = embedded.takeIf { bitmap != null }
+            logo.setTag(R.id.autobridge_image_tag, null)
+            if (bitmap != null) {
+                logo.setImageBitmap(bitmap)
+                logo.visibility = View.VISIBLE
+                initial.visibility = View.GONE
+            } else {
+                logo.setImageDrawable(null)
+                logo.visibility = View.GONE
+                initial.visibility = View.VISIBLE
+            }
+        }
+        val hasCover = shownCover != null
 
         // The logo is fetched once per station, not once a second.
         val address = playback.currentArtworkUri
@@ -335,16 +471,34 @@ class RadioPlayerActivity : Activity() {
             shownLogo = address
             // Forget the last station's logo, and the fetch for it that may still be on its way:
             // ImageLoader applies an answer only while the view's tag still names its address.
-            logo.setImageDrawable(null)
-            logo.setTag(R.id.autobridge_image_tag, null)
-            logo.visibility = View.GONE
-            initial.visibility = View.VISIBLE
+            val target = if (hasCover) badge else logo
+            badge.setImageDrawable(null)
+            badge.setTag(R.id.autobridge_image_tag, null)
+            badge.visibility = View.GONE
+            if (!hasCover) {
+                logo.setImageDrawable(null)
+                logo.setTag(R.id.autobridge_image_tag, null)
+                logo.visibility = View.GONE
+                initial.visibility = View.VISIBLE
+            }
             if (!address.isNullOrBlank()) {
-                ImageLoader.load(this, address, logo) {
-                    initial.visibility = View.GONE
-                    logo.visibility = View.VISIBLE
+                ImageLoader.load(this, address, target) {
+                    target.visibility = View.VISIBLE
+                    if (target === logo) initial.visibility = View.GONE
                 }
             }
         }
+    }
+
+    private companion object {
+        val LIVE_RED = 0xFFFF5C5C.toInt()
+        val WARM_SURFACE = 0xFF2A2116.toInt()
+        val WARM_TEXT = 0xFFFFC985.toInt()
+        val WARM_INK = 0xFF2A1A05.toInt()
+        val SOFT_TEXT = 0xFFC9CDD3.toInt()
+        val HINT_TEXT = 0xFF8A919B.toInt()
+
+        /** Never a real address: forces the logo to be placed again on the next update. */
+        const val LOGO_UNSET = "\u0000"
     }
 }

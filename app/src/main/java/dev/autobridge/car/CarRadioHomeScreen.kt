@@ -231,22 +231,32 @@ class CarRadioHomeScreen(carContext: CarContext) : Screen(carContext) {
      * only past the image budget. The station on the air says so under its name.
      */
     private fun stationCell(title: String, logo: String?, url: String, onClick: () -> Unit): GridItem {
+        val onAir = url == mediaPlayback.currentUri
         val cell = GridItem.Builder()
             .setTitle(title)
-            .setImage(logos.tile(logo, title) ?: radioMark(), GridItem.IMAGE_TYPE_LARGE)
+            .setImage(logos.tile(logo, title, onAir) ?: radioMark(), GridItem.IMAGE_TYPE_LARGE)
             .setOnClickListener(onClick)
-        if (url == mediaPlayback.currentUri) {
+        if (onAir) {
             cell.setText(carContext.getString(if (mediaPlayback.isPlaying) R.string.car_lib_playing else R.string.car_lib_paused))
         }
         return cell.build()
     }
 
-    private fun actionCell(title: String, @DrawableRes iconRes: Int, onClick: () -> Unit): GridItem =
-        GridItem.Builder()
+    /** Search, podcasts, all stations: a dark card like the stations', not a bare icon. */
+    private fun actionCell(title: String, @DrawableRes iconRes: Int, onClick: () -> Unit): GridItem {
+        val card = actionCards.getOrPut(iconRes) {
+            androidx.core.content.ContextCompat.getDrawable(carContext, iconRes)?.let { glyph ->
+                CarIcon.Builder(IconCompat.createWithBitmap(CarStationTile.action(glyph))).build()
+            } ?: icon(iconRes)
+        }
+        return GridItem.Builder()
             .setTitle(title)
-            .setImage(icon(iconRes), GridItem.IMAGE_TYPE_ICON)
+            .setImage(card, GridItem.IMAGE_TYPE_LARGE)
             .setOnClickListener(onClick)
             .build()
+    }
+
+    private val actionCards = mutableMapOf<Int, CarIcon>()
 
     private fun message(text: String): Template = MessageTemplate.Builder(text).build()
 

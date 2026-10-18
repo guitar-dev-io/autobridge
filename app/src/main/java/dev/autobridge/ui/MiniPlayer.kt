@@ -89,6 +89,7 @@ class MiniPlayer(
     private val tick = object : Runnable {
         override fun run() {
             render()
+            onTick?.invoke()
             ticker.postDelayed(this, 1_000L)
         }
     }
@@ -130,29 +131,21 @@ class MiniPlayer(
     fun stop() = ticker.removeCallbacks(tick)
 
     /**
-     * Told whenever the bar shows or hides, so a screen can drop what would repeat it: Home hides
-     * its "last radio station" card while this bar is already showing what is loaded.
+     * A screen that shows what is loaded its own way: while this answers true the bar stays
+     * hidden. Home does this for radio, whose card under the connection is then the player.
      */
-    var onShownChange: ((Boolean) -> Unit)? = null
-        set(value) {
-            field = value
-            value?.invoke(view.visibility == View.VISIBLE)
-        }
+    var hideWhen: (() -> Boolean)? = null
 
-    private fun setShown(shown: Boolean) {
-        val visibility = if (shown) View.VISIBLE else View.GONE
-        if (view.visibility == visibility) return
-        view.visibility = visibility
-        onShownChange?.invoke(shown)
-    }
+    /** Called on every one-second tick, so a screen can refresh its own now-playing view with it. */
+    var onTick: (() -> Unit)? = null
 
     private fun render() {
         val name = playback.currentTitle
-        if (!playback.isConnected || name.isNullOrBlank()) {
-            setShown(false)
+        if (!playback.isConnected || name.isNullOrBlank() || hideWhen?.invoke() == true) {
+            view.visibility = View.GONE
             return
         }
-        setShown(true)
+        view.visibility = View.VISIBLE
         // A radio stream that names its song shows the song, with the artist and the station
         // under it; anything else reads exactly as before (its title, then its artist).
         val now = dev.autobridge.radio.RadioNowPlaying.of(playback.currentItemTitle, name, playback.currentArtist)

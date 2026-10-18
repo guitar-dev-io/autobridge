@@ -163,8 +163,8 @@ class MainActivity : androidx.activity.ComponentActivity() {
 
     /** The home screen's now-playing bar, kept across re-renders so its ticker is not restarted. */
     private var homeMiniPlayer: dev.autobridge.ui.MiniPlayer? = null
-    /** Whether Home's mini player is up; the "last radio station" card stays hidden while it is. */
-    private val homeMiniPlayerShown = androidx.compose.runtime.mutableStateOf(false)
+    /** Home's radio card as it stands now; the mini player's tick keeps it current. */
+    private val homeRadio = androidx.compose.runtime.mutableStateOf<dev.autobridge.ui.ResumeRadioUi?>(null)
     private var currentScreen = PhoneScreen.HOME
 
     /**
@@ -479,9 +479,9 @@ class MainActivity : androidx.activity.ComponentActivity() {
                         updateVersion = homeUpdate?.release?.versionName,
                         onOpenUpdate = { homeUpdate?.let(::showUpdateDialog) },
                         onDismissUpdate = ::dismissHomeUpdate,
-                        // The mini player already shows what is loaded, with its own play button;
-                        // the card under the connection would repeat it, often naming another station.
-                        resumeRadio = if (homeMiniPlayerShown.value) null else resumeRadio()
+                        resumeRadio = homeRadio.value,
+                        onOpenRadio = ::openHomeRadio,
+                        onToggleRadio = ::toggleHomeRadio
                     )
                 }
             }
@@ -511,7 +511,13 @@ class MainActivity : androidx.activity.ComponentActivity() {
                 )
             )
         }.also { homeMiniPlayer = it; it.start() }
-        bar.onShownChange = { homeMiniPlayerShown.value = it }
+        // Radio on the session is shown by the radio card, live: the bar would say it twice.
+        bar.hideWhen = { radioOnSession() != null }
+        bar.onTick = ::refreshHomeRadio
+        // History may have moved since the last build (a station played elsewhere): read it again.
+        lastRadioRead = false
+        radioLookupUrl = null
+        refreshHomeRadio()
         (bar.view.parent as? ViewGroup)?.removeView(bar.view)
         val bottom = LinearLayout(this).apply {
             setPadding(dp(16), 0, dp(16), dp(10))
@@ -623,18 +629,87 @@ class MainActivity : androidx.activity.ComponentActivity() {
         }
 
     /**
-     * Home's "keep listening" card: the radio station played last, if any. A tap plays it again
-     * with the recent stations as the queue (so next/previous still step) and opens the player.
+     * The radio station the media session is on, when it is one (not a TV channel, not a song).
+     * Asked every second by the tick, so the history lookup is redone only when the item changes.
      */
-    private fun resumeRadio(): dev.autobridge.ui.ResumeRadioUi? {
-        val recent = dev.autobridge.iptv.IptvHistoryStore.recent(this, dev.autobridge.iptv.IptvKind.RADIO)
-        val last = recent.firstOrNull { it.url.isNotBlank() } ?: return null
-        return dev.autobridge.ui.ResumeRadioUi(last.title) {
-            val station = dev.autobridge.radio.RadioRepository.RadioHistory.toRadioStation(last)
-            dev.autobridge.radio.RadioRepository.recordPlayback(this, station)
-            dev.autobridge.radio.RadioRepository.playFromItems(station, recent, last)
-            startActivity(dev.autobridge.library.RadioPlayerActivity.intent(this))
+    private fun radioOnSession(): dev.autobridge.iptv.IptvHistoryStore.Item? {
+        if (!::mediaPlayback.isInitialized || !mediaPlayback.isConnected || mediaPlayback.hasVideo) return null
+        val url = mediaPlayback.currentUri?.takeIf { it.isNotBlank() } ?: return null
+        if (url != radioLookupUrl) {
+            radioLookupUrl = url
+            lastRadioRead = false
+            radioLookup = dev.autobridge.iptv.IptvHistoryStore.recent(this, dev.autobridge.iptv.IptvKind.RADIO)
+                .firstOrNull { it.url == url }
         }
+        return radioLookup
+    }
+
+    private var radioLookupUrl: String? = null
+    private var radioLookup: dev.autobridge.iptv.IptvHistoryStore.Item? = null
+
+    /** The station played last; read once per Home build, not once per tick. */
+    private fun lastRadio(): dev.autobridge.iptv.IptvHistoryStore.Item? {
+        if (!lastRadioRead) {
+            lastRadioRead = true
+            lastRadioItem = dev.autobridge.iptv.IptvHistoryStore.recent(this, dev.autobridge.iptv.IptvKind.RADIO)
+                .firstOrNull { it.url.isNotBlank() }
+        }
+        return lastRadioItem
+    }
+
+    private var lastRadioRead = false
+    private var lastRadioItem: dev.autobridge.iptv.IptvHistoryStore.Item? = null
+
+    /**
+     * Home's radio card: the station on the air, live, when the session is on one; otherwise the
+     * station played last, one tap from playing again. Null when no station was ever played.
+     */
+    private fun refreshHomeRadio() {
+        val live = radioOnSession()
+        val last = live ?: lastRadio()
+        val next = last?.let { item ->
+            val now = live?.let {
+                dev.autobridge.radio.RadioNowPlaying.of(mediaPlayback.currentItemTitle, mediaPlayback.currentTitle, mediaPlayback.currentArtist)
+            }
+            val logoAddress = (if (live != null) mediaPlayback.currentArtworkUri else null) ?: item.logo
+            dev.autobridge.ui.ResumeRadioUi(
+                station = now?.station?.takeIf { it.isNotBlank() } ?: item.title,
+                logo = logoAddress.takeIf { it.isNotBlank() }?.let { address ->
+                    dev.autobridge.ui.ImageLoader.bitmap(this, address) { refreshHomeRadio() }
+                },
+                live = live != null,
+                playing = live != null && mediaPlayback.isPlayRequested,
+                song = now?.song?.let { song -> listOfNotNull(song, now.artist).joinToString(" · ") }
+            )
+        }
+        if (homeRadio.value != next) homeRadio.value = next
+    }
+
+    /** The card itself: the player for the station on the air, or the last station played again. */
+    private fun openHomeRadio() {
+        if (radioOnSession() == null) playLastRadio()
+        startActivity(dev.autobridge.library.RadioPlayerActivity.intent(this))
+    }
+
+    /** The card's round button: pause or resume the station on the air, else play the last one. */
+    private fun toggleHomeRadio() {
+        if (radioOnSession() == null) {
+            playLastRadio()
+        } else if (mediaPlayback.isPlayRequested) {
+            mediaPlayback.pause()
+        } else {
+            mediaPlayback.resume()
+        }
+        refreshHomeRadio()
+    }
+
+    /** Plays the last station with the recent stations as the queue, so next/previous still step. */
+    private fun playLastRadio() {
+        val recent = dev.autobridge.iptv.IptvHistoryStore.recent(this, dev.autobridge.iptv.IptvKind.RADIO)
+        val last = recent.firstOrNull { it.url.isNotBlank() } ?: return
+        val station = dev.autobridge.radio.RadioRepository.RadioHistory.toRadioStation(last)
+        dev.autobridge.radio.RadioRepository.recordPlayback(this, station)
+        dev.autobridge.radio.RadioRepository.playFromItems(station, recent, last)
     }
 
     private fun openHomeSection(section: dev.autobridge.library.HomeSection) {
