@@ -2,6 +2,7 @@ package dev.autobridge.media
 
 import android.content.Context
 import android.media.audiofx.BassBoost
+import android.media.audiofx.DynamicsProcessing
 import android.media.audiofx.Equalizer
 import android.media.audiofx.LoudnessEnhancer
 import android.media.audiofx.Virtualizer
@@ -10,7 +11,8 @@ import dev.autobridge.logging.StructuredLog
 
 /**
  * The sound effects: the driver's settings, stored, and applied through the platform's own effects
- * ([Equalizer], [BassBoost], [Virtualizer], [LoudnessEnhancer]) to every audio session they reach.
+ * ([Equalizer], [BassBoost], [Virtualizer], [LoudnessEnhancer], and [DynamicsProcessing] for
+ * levelling) to every audio session they reach.
  *
  * Sessions come from owners: the shared player ([MediaPlaybackService], ExoPlayer or VLC) under
  * [OWNER_PLAYER], and — while [AudioEffectsService] runs — other apps' players under
@@ -31,6 +33,7 @@ object AudioEq {
     private const val KEY_VIRTUALIZER = "virtualizer"
     private const val KEY_BOOST = "boost_mb"
     private const val KEY_SCOPE = "scope"
+    private const val KEY_NORMALIZE = "normalize"
     /** The old on/off levelling switch; read once as a 6 dB boost when no boost is stored. */
     private const val KEY_LEVEL = "level_volume"
     private const val LEGACY_LEVEL_MB = 600
@@ -53,6 +56,8 @@ object AudioEq {
         val virtualizer: Int,
         val boostMb: Int,
         val scope: EffectScope,
+        /** Level stations to one loudness: a compressor with make-up gain, then a limiter. */
+        val normalize: Boolean = false,
     ) {
         /** The gains on the five reference bands that [preset] means right now. */
         val gains: IntArray get() = if (preset == EqPreset.CUSTOM) custom else preset.gains
@@ -64,8 +69,10 @@ object AudioEq {
         val bassBoost: BassBoost?,
         val virtualizer: Virtualizer?,
         val loudness: LoudnessEnhancer?,
+        val leveller: DynamicsProcessing? = null,
     ) {
         fun release() {
+            runCatching { leveller?.release() }
             runCatching { equalizer?.release() }
             runCatching { bassBoost?.release() }
             runCatching { virtualizer?.release() }
@@ -95,6 +102,7 @@ object AudioEq {
             boostMb = boost.coerceIn(0, BOOST_MAX_MB),
             scope = prefs.getString(KEY_SCOPE, null)
                 ?.let { name -> EffectScope.entries.firstOrNull { it.name == name } } ?: EffectScope.APP,
+            normalize = prefs.getBoolean(KEY_NORMALIZE, false),
         )
     }
 
@@ -138,6 +146,11 @@ object AudioEq {
     fun setBoost(context: Context, millibels: Int) = update(context) {
         putInt(KEY_BOOST, millibels.coerceIn(0, BOOST_MAX_MB))
         putBoolean(KEY_ENABLED, true)
+    }
+
+    fun setNormalize(context: Context, on: Boolean) = update(context) {
+        putBoolean(KEY_NORMALIZE, on)
+        if (on) putBoolean(KEY_ENABLED, true)
     }
 
     /** Wider than [EffectScope.APP] needs [AudioEffectsService] running; the caller starts or stops it. */
@@ -212,8 +225,38 @@ object AudioEq {
             bassBoost = make("bass boost") { BassBoost(0, session) },
             virtualizer = make("virtualizer") { Virtualizer(0, session) },
             loudness = make("loudness enhancer") { LoudnessEnhancer(session) },
+            leveller = make("dynamics processing") { leveller(session) },
         )
     }
+
+    /**
+     * The "same loudness on every station" chain: one full-band compressor that pulls loud stations
+     * down and, with its make-up gain, quiet ones up, then a limiter so the gain never clips.
+     */
+    private fun leveller(session: Int): DynamicsProcessing {
+        val config = DynamicsProcessing.Config.Builder(
+            DynamicsProcessing.VARIANT_FAVOR_FREQUENCY_RESOLUTION, 2,
+            false, 0, true, 1, false, 0, true
+        ).build()
+        val processing = DynamicsProcessing(0, session, config)
+        processing.setMbcBandAllChannelsTo(0, DynamicsProcessing.MbcBand(
+            true, 20_000f, LEVEL_ATTACK_MS, LEVEL_RELEASE_MS, LEVEL_RATIO, LEVEL_THRESHOLD_DB,
+            LEVEL_KNEE_DB, -90f, 1f, 0f, LEVEL_MAKEUP_DB
+        ))
+        processing.setLimiterAllChannelsTo(DynamicsProcessing.Limiter(
+            true, true, 0, 1f, 60f, 10f, LIMIT_THRESHOLD_DB, 0f
+        ))
+        processing.enabled = false
+        return processing
+    }
+
+    private const val LEVEL_ATTACK_MS = 20f
+    private const val LEVEL_RELEASE_MS = 300f
+    private const val LEVEL_RATIO = 4f
+    private const val LEVEL_THRESHOLD_DB = -24f
+    private const val LEVEL_KNEE_DB = 6f
+    private const val LEVEL_MAKEUP_DB = 8f
+    private const val LIMIT_THRESHOLD_DB = -2f
 
     @Synchronized
     private fun applyNow() {
@@ -250,6 +293,10 @@ object AudioEq {
                 level.setTargetGain(current.boostMb)
                 level.enabled = current.enabled && current.boostMb > 0
             }.onFailure { StructuredLog.w(TAG, "Loudness enhancer refused the settings: ${it.message}") }
+        }
+        chain.leveller?.let { leveller ->
+            runCatching { leveller.enabled = current.enabled && current.normalize }
+                .onFailure { StructuredLog.w(TAG, "Dynamics processing refused the settings: ${it.message}") }
         }
     }
 }

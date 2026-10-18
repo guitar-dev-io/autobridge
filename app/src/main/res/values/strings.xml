@@ -1610,13 +1610,15 @@
     <string name="radio_cat_world">World</string>
     <string name="radio_cat_podcasts">Podcasts</string>
     <string name="radio_cat_favorites">Favorites</string>
+    <string name="radio_tab_favorites">Favourites</string>
     <string name="radio_browse_loading">Loading…</string>
     <string name="radio_browse_empty">No stations here yet</string>
-    <string name="radio_browse_search_hint">Search stations or podcasts</string>
+    <string name="radio_browse_search_hint">Search stations or frequency, e.g. 93</string>
     <string name="radio_section_popular">Popular stations</string>
     <string name="radio_play_now">Play now</string>
     <string name="radio_browse_open">Browse stations</string>
     <string name="radio_browse_my_stations">My stations</string>
+    <string name="radio_manage_lists">Manage station lists</string>
     <string name="radio_podcasts_note">Talk &amp; news stations, not episodes</string>
     <string name="radio_local_pick_title">Pick a province</string>
     <string name="radio_local_pick_cta">Choose province</string>
@@ -1655,6 +1657,7 @@
     <string name="eq_bass">Bass boost</string>
     <string name="eq_virtualizer">Virtualizer (wider sound)</string>
     <string name="eq_boost">Volume boost</string>
+    <string name="eq_normalize">Same loudness on every station</string>
     <string name="eq_scope">Applies to</string>
     <string name="eq_scope_app">AutoBridge</string>
     <string name="eq_scope_music_apps">+ Music apps</string>

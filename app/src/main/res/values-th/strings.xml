@@ -1580,13 +1580,15 @@
     <string name="radio_cat_world">ทั่วโลก</string>
     <string name="radio_cat_podcasts">พอดแคสต์</string>
     <string name="radio_cat_favorites">รายการโปรด</string>
+    <string name="radio_tab_favorites">โปรด</string>
     <string name="radio_browse_loading">กำลังโหลด…</string>
     <string name="radio_browse_empty">ยังไม่มีสถานีในหมวดนี้</string>
-    <string name="radio_browse_search_hint">ค้นหาสถานีหรือพอดแคสต์</string>
+    <string name="radio_browse_search_hint">ค้นหาสถานีหรือคลื่น เช่น 93</string>
     <string name="radio_section_popular">สถานียอดนิยม</string>
     <string name="radio_play_now">ฟังเลย</string>
     <string name="radio_browse_open">เรียกดูสถานี</string>
     <string name="radio_browse_my_stations">สถานีของฉัน</string>
+    <string name="radio_manage_lists">จัดการรายการสถานี</string>
     <string name="radio_podcasts_note">สถานีพูดคุยและข่าว ไม่ใช่ตอนพอดแคสต์</string>
     <string name="radio_local_pick_title">เลือกจังหวัด</string>
     <string name="radio_local_pick_cta">เลือกจังหวัด</string>
@@ -1625,6 +1627,7 @@
     <string name="eq_bass">เพิ่มเบส</string>
     <string name="eq_virtualizer">เสียงรอบทิศทาง (Virtualizer)</string>
     <string name="eq_boost">เพิ่มความดัง</string>
+    <string name="eq_normalize">ปรับเสียงให้ดังเท่ากันทุกสถานี</string>
     <string name="eq_scope">ใช้กับ</string>
     <string name="eq_scope_app">AutoBridge</string>
     <string name="eq_scope_music_apps">+ แอปเพลง</string>

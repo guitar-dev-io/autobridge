@@ -130,6 +130,18 @@ class LibraryActivity : Activity() {
         private const val RADIO_ONLINE_MIN_CHARS = 2
         /** Station logos across the Radio grid: four, like a radio app's, so a screenful is a dozen. */
         private const val RADIO_GRID_COLUMNS = 4
+
+        // The radio design's phone palette.
+        private const val RADIO_CARD = 0xFF1C2027.toInt()
+        private const val RADIO_WARM_CARD = 0xFF2A2116.toInt()
+        private const val RADIO_FIELD = 0xFF1A1E25.toInt()
+        private const val RADIO_OUTLINE = 0xFF343A44.toInt()
+        private const val RADIO_MUTED = 0xFFA9AFB8.toInt()
+        private const val RADIO_CHIP_TEXT = 0xFFE3E6EA.toInt()
+        private const val RADIO_ON_AMBER = 0xFF2A1A05.toInt()
+        private const val RADIO_TAB_BAR = 0xFF0E1014.toInt()
+        private const val RADIO_TAB_EDGE = 0xFF22262E.toInt()
+        private const val RADIO_TAB_PILL = 0xFF3A2C1A.toInt()
         private const val RADIO_NOW_WATCH_MS = 1_000L
 
         fun intent(context: android.content.Context, section: Section): Intent =
@@ -322,7 +334,9 @@ class LibraryActivity : Activity() {
         search: Pair<String, (String) -> Unit>? = null,
         extraPinned: List<View> = emptyList(),
         overlay: View? = null,
-        bottomTabs: View? = null
+        bottomTabs: View? = null,
+        /** The Radio page: the now-playing bar takes the radio design's warm style. */
+        radioBar: Boolean = false,
     ): View {
         val body = AutoBridgeDesign.body(this)
         if (rows.isEmpty() && empty != null) body.addView(empty)
@@ -355,6 +369,7 @@ class LibraryActivity : Activity() {
             miniPlayer = it
             it.start()
         }
+        bar.radioStyle = radioBar
         // The bar is reused across pages, so detach it from the page it was last attached to.
         (bar.view.parent as? android.view.ViewGroup)?.removeView(bar.view)
         // The now-playing bar, and under it the page's own tab bar when it has one (Radio's
@@ -511,6 +526,8 @@ class LibraryActivity : Activity() {
         // The grid-or-state body for the current network category (In-country/World/Podcasts, and
         // Local once a province is set). Appends a two-column grid to [rows] and returns null when
         // entries are shown, else returns the loading/empty/error view for `render`'s empty slot.
+        // Views pinned above the scrolling grid (search, genre chips, captions), refilled per draw.
+        val radioPinned = mutableListOf<View>()
         val networkBody: (MutableList<View>) -> View? = body@{ rows ->
             val key = selected.cacheKey(RadioProvinceRepository.selected(this))
             when {
@@ -541,7 +558,7 @@ class LibraryActivity : Activity() {
                         // this category is not offered, so a chip never leads to an empty page.
                         val genres = RadioGenre.available(readyEntries)
                         if (genre !in genres) genre = RadioGenre.ALL
-                        if (genres.size > 1) rows += radioGenreChips(genres, genre) { chosen ->
+                        if (genres.size > 1) radioPinned += radioGenreChips(genres, genre) { chosen ->
                             if (chosen != genre) {
                                 genre = chosen
                                 draw()
@@ -568,7 +585,8 @@ class LibraryActivity : Activity() {
         draw = {
             drawnRadioUri = playback.currentUri
             val rows = mutableListOf<View>()
-            rows += radioSearchRow()
+            radioPinned.clear()
+            radioPinned += radioSearchRow()
 
             var empty: View? = null
             when (selected) {
@@ -604,7 +622,7 @@ class LibraryActivity : Activity() {
                     }
                 }
                 RadioCategory.PODCASTS -> {
-                    rows += radioCaption(getString(R.string.radio_podcasts_note))
+                    radioPinned += radioCaption(getString(R.string.radio_podcasts_note))
                     empty = networkBody(rows)
                 }
                 else -> {
@@ -617,9 +635,9 @@ class LibraryActivity : Activity() {
                 subtitle = getString(R.string.radio_page_caption),
                 rows = rows,
                 empty = empty,
-                headerActions = listOf(
-                    AutoBridgeDesign.HeaderAction("⌕", onClick = { openRadioSearch() })
-                ),
+                // Search sits in the pinned row under the header, so the header carries no search.
+                extraPinned = radioPinned.toList(),
+                radioBar = true,
                 // The five categories are the page's tabs, along the bottom like a radio app's.
                 bottomTabs = radioTabBar(selected) { chosen ->
                     if (chosen != selected) {
@@ -638,18 +656,54 @@ class LibraryActivity : Activity() {
     }
 
     /**
-     * The search row at the top of the Radio page: a read-only [AutoBridgeDesign.searchField]
-     * shaped field whose tap/submit hands off to [openRadioSearch] (the real search page), rather
-     * than filtering in place. Kept non-editable here so a keystroke does not redraw this page.
+     * The search row at the top of the Radio page, as the radio design draws it: a round search
+     * pill (magnifier, hint) whose tap hands off to [openRadioSearch], the real search page, and
+     * beside it the station-lists button that opens the radio lists (M3U, Xtream, public lists).
      */
-    private fun radioSearchRow(): View =
-        AutoBridgeDesign.searchField(this, getString(R.string.radio_browse_search_hint), "", {}).apply {
-            isFocusable = false
-            isFocusableInTouchMode = false
-            isCursorVisible = false
-            keyListener = null
+    private fun radioSearchRow(): View {
+        val row = LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(4), 0, dp(4))
+        }
+        val pill = LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(16), 0, dp(16), 0)
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(RADIO_FIELD)
+                cornerRadius = dp(24).toFloat()
+                setStroke((1.5f * resources.displayMetrics.density).toInt().coerceAtLeast(1), RADIO_OUTLINE)
+            }
+            isClickable = true
+            isFocusable = true
+            contentDescription = getString(R.string.radio_browse_search_hint)
             setOnClickListener { openRadioSearch() }
         }
+        pill.addView(ImageView(this).apply {
+            setImageResource(R.drawable.ic_browser_search)
+            imageTintList = android.content.res.ColorStateList.valueOf(RADIO_MUTED)
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }, LinearLayout.LayoutParams(dp(22), dp(22)).apply { marginEnd = dp(10) })
+        pill.addView(TextView(this).apply {
+            text = getString(R.string.radio_browse_search_hint)
+            textSize = 16f
+            setTextColor(RADIO_MUTED)
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+        }, LinearLayout.LayoutParams(0, -2, 1f))
+        row.addView(pill, LinearLayout.LayoutParams(0, dp(48), 1f).apply { marginEnd = dp(8) })
+        row.addView(ImageView(this).apply {
+            setImageResource(R.drawable.ic_radio_list)
+            imageTintList = android.content.res.ColorStateList.valueOf(AutoBridgeDesign.TEXT)
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
+            setPadding(dp(13), dp(13), dp(13), dp(13))
+            background = AutoBridgeDesign.tappable(this@LibraryActivity, RADIO_CARD, 16, AutoBridgeDesign.ACCENT_RADIO)
+            contentDescription = getString(R.string.radio_manage_lists)
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { showLibraryHome() }
+        }, LinearLayout.LayoutParams(dp(48), dp(48)))
+        return row
+    }
 
     /**
      * The Radio page's bottom tabs, one per [RadioCategory]: an icon over its name, the chosen one
@@ -659,8 +713,12 @@ class LibraryActivity : Activity() {
     private fun radioTabBar(selected: RadioCategory, onSelect: (RadioCategory) -> Unit): View {
         val bar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            setBackgroundColor(AutoBridgeDesign.SURFACE)
-            setPadding(dp(4), dp(6), dp(4), dp(8))
+            // The design's bar: a darker strip with a hairline along its top edge.
+            background = android.graphics.drawable.LayerDrawable(arrayOf(
+                android.graphics.drawable.ColorDrawable(RADIO_TAB_EDGE),
+                android.graphics.drawable.ColorDrawable(RADIO_TAB_BAR),
+            )).apply { setLayerInset(1, 0, dp(1), 0, 0) }
+            setPadding(dp(4), dp(6), dp(4), dp(14))
             contentDescription = getString(R.string.radio_tabs_label)
         }
         RadioCategory.values().forEach { category ->
@@ -672,7 +730,7 @@ class LibraryActivity : Activity() {
                 isClickable = true
                 isFocusable = true
                 minimumHeight = dp(52)
-                contentDescription = getString(category.labelRes)
+                contentDescription = getString(radioTabLabel(category))
                 isSelected = on
                 setOnClickListener { onSelect(category) }
             }
@@ -681,14 +739,13 @@ class LibraryActivity : Activity() {
                 imageTintList = android.content.res.ColorStateList.valueOf(color)
                 setPadding(dp(14), dp(4), dp(14), dp(4))
                 background = if (on) AutoBridgeDesign.surface(
-                    this@LibraryActivity, AutoBridgeDesign.tint(AutoBridgeDesign.ACCENT_RADIO, 0.18f), 15,
-                    android.graphics.Color.TRANSPARENT
+                    this@LibraryActivity, RADIO_TAB_PILL, 15, android.graphics.Color.TRANSPARENT
                 ) else null
                 importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-            }, LinearLayout.LayoutParams(dp(56), dp(30)))
+            }, LinearLayout.LayoutParams(dp(52), dp(30)))
             tab.addView(TextView(this).apply {
-                text = getString(category.labelRes)
-                textSize = 11f
+                text = getString(radioTabLabel(category))
+                textSize = 12f
                 gravity = Gravity.CENTER
                 setTextColor(color)
                 if (on) typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
@@ -701,6 +758,10 @@ class LibraryActivity : Activity() {
         return bar
     }
 
+    /** The tab's short name: Favourites is "โปรด" there, the full name elsewhere. */
+    private fun radioTabLabel(category: RadioCategory): Int =
+        if (category == RadioCategory.FAVORITES) R.string.radio_tab_favorites else category.labelRes
+
     private fun radioTabIcon(category: RadioCategory): Int = when (category) {
         RadioCategory.IN_COUNTRY -> R.drawable.ic_car_home
         RadioCategory.LOCAL -> R.drawable.ic_radio_local
@@ -709,25 +770,41 @@ class LibraryActivity : Activity() {
         RadioCategory.FAVORITES -> R.drawable.ic_browser_star
     }
 
-    /** The genre chips within a category: one [AutoBridgeDesign.pill] each, the chosen one primary. */
+    /** The genre chips within a category, as the design's chips: amber when chosen, else an outline. */
     private fun radioGenreChips(genres: List<RadioGenre>, selected: RadioGenre, onSelect: (RadioGenre) -> Unit): View {
         val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         genres.forEach { genre ->
             row.addView(
-                AutoBridgeDesign.pill(
-                    this,
-                    getString(genre.labelRes),
-                    primary = genre == selected,
-                    accent = AutoBridgeDesign.ACCENT_RADIO,
-                    onClick = { onSelect(genre) }
-                ),
-                LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(8) }
+                radioChip(getString(genre.labelRes), genre == selected) { onSelect(genre) },
+                LinearLayout.LayoutParams(-2, dp(38)).apply { marginEnd = dp(8) }
             )
         }
         return HorizontalScrollView(this).apply {
             isHorizontalScrollBarEnabled = false
+            setPadding(0, 0, 0, dp(4))
             addView(row, ViewGroup.LayoutParams(-2, -2))
         }
+    }
+
+    private fun radioChip(label: String, on: Boolean, onClick: () -> Unit): View = TextView(this).apply {
+        text = label
+        textSize = 14f
+        gravity = Gravity.CENTER
+        maxLines = 1
+        setPadding(dp(16), 0, dp(16), 0)
+        setTextColor(if (on) RADIO_ON_AMBER else RADIO_CHIP_TEXT)
+        typeface = Typeface.create("sans-serif", if (on) Typeface.BOLD else Typeface.NORMAL)
+        background = android.graphics.drawable.GradientDrawable().apply {
+            cornerRadius = dp(19).toFloat()
+            if (on) setColor(AutoBridgeDesign.ACCENT_RADIO) else {
+                setColor(android.graphics.Color.TRANSPARENT)
+                setStroke((1.5f * resources.displayMetrics.density).toInt().coerceAtLeast(1), RADIO_OUTLINE)
+            }
+        }
+        isClickable = true
+        isFocusable = true
+        isSelected = on
+        setOnClickListener { onClick() }
     }
 
     /** A non-interactive caption row (the Podcasts note), drawn above its grid. */
@@ -789,16 +866,10 @@ class LibraryActivity : Activity() {
             isClickable = true
             isFocusable = true
             contentDescription = entry.title
-            val playing = entry.url.isNotBlank() && entry.url == playback.currentUri
+            val playing = radioOnAir(entry.url, entry.title)
             isSelected = playing
-            setPadding(dp(4), dp(4), dp(4), dp(6))
-            background = AutoBridgeDesign.tappable(
-                this@LibraryActivity,
-                if (playing) AutoBridgeDesign.tint(AutoBridgeDesign.ACCENT_RADIO, 0.14f) else AutoBridgeDesign.SURFACE,
-                16,
-                AutoBridgeDesign.ACCENT_RADIO,
-                stroke = if (playing) AutoBridgeDesign.ACCENT_RADIO else AutoBridgeDesign.HAIRLINE
-            )
+            setPadding(dp(5), dp(5), dp(5), dp(6))
+            background = radioCellBackground(playing)
             setOnClickListener { playRadioEntry(entry, categoryEntries) }
             // The grid gives every cell an equal width; squaring the logo means tying its height to
             // that measured width, which is only known after layout — so post the width as height.
@@ -808,12 +879,36 @@ class LibraryActivity : Activity() {
             addView(TextView(this@LibraryActivity).apply {
                 text = entry.title
                 textSize = 12f
-                setTextColor(AutoBridgeDesign.TEXT)
+                setTextColor(RADIO_CHIP_TEXT)
+                typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
                 setPadding(dp(2), dp(6), dp(2), 0)
             }, LinearLayout.LayoutParams(-1, -2))
         }
+
+    /**
+     * The station on the air, matched by its stream address or, when the session reports the
+     * address differently (a redirect, a resolved playlist), by its name.
+     */
+    private fun radioOnAir(url: String, title: String): Boolean {
+        val current = playback.currentUri
+        if (url.isNotBlank() && current == url) return true
+        val name = playback.currentItemTitle?.trim() ?: return false
+        return name.isNotEmpty() && name.equals(title.trim(), ignoreCase = true)
+    }
+
+    /** A grid cell's card: the design's dark card, or the warm one with an amber ring when on air. */
+    private fun radioCellBackground(playing: Boolean): android.graphics.drawable.Drawable =
+        android.graphics.drawable.RippleDrawable(
+            android.content.res.ColorStateList.valueOf(AutoBridgeDesign.tint(AutoBridgeDesign.ACCENT_RADIO, 0.22f)),
+            android.graphics.drawable.GradientDrawable().apply {
+                cornerRadius = dp(16).toFloat()
+                setColor(if (playing) RADIO_WARM_CARD else RADIO_CARD)
+                if (playing) setStroke(dp(2), AutoBridgeDesign.ACCENT_RADIO)
+            },
+            null
+        )
 
     /**
      * The Favorites variant: the same full-bleed logo cell for a stored [item], played through the
@@ -825,11 +920,15 @@ class LibraryActivity : Activity() {
             isClickable = true
             isFocusable = true
             contentDescription = item.title
+            val playing = radioOnAir(item.url, item.title)
+            isSelected = playing
+            setPadding(dp(5), dp(5), dp(5), dp(6))
+            background = radioCellBackground(playing)
             setOnClickListener { playRadioFavorite(item, favorites) }
             val square = radioLogoSquare(item.title, item.logo)
             // The ★ toggle sits in the top-trailing corner of the square.
             square.addView(
-                AutoBridgeDesign.glyphButton(this@LibraryActivity, "★", 16f, tint = AutoBridgeDesign.ACCENT_FAVORITE) {
+                AutoBridgeDesign.glyphButton(this@LibraryActivity, "★", 16f, tint = AutoBridgeDesign.ACCENT_RADIO) {
                     RadioRepository.RadioHistory.toggleFavorite(
                         this@LibraryActivity,
                         RadioRepository.RadioHistory.toRadioStation(item)
@@ -843,10 +942,11 @@ class LibraryActivity : Activity() {
             addView(TextView(this@LibraryActivity).apply {
                 text = item.title
                 textSize = 12f
-                setTextColor(AutoBridgeDesign.TEXT)
+                setTextColor(RADIO_CHIP_TEXT)
+                typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
-                setPadding(0, dp(6), 0, 0)
+                setPadding(dp(2), dp(6), dp(2), 0)
             }, LinearLayout.LayoutParams(-1, -2))
         }
 
