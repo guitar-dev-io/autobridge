@@ -68,7 +68,7 @@ class DesktopSession internal constructor(
     private var x11: X11Connection? = null
     private var xvfb: Process? = null
     private var pulse: Process? = null
-    private var browser: Process? = null
+    @Volatile private var browser: Process? = null
     private var audio: BrowserAudioBridge? = null
     @Volatile private var stopping = false
     private var startedAt = 0L
@@ -160,19 +160,7 @@ class DesktopSession internal constructor(
             connection.onClosed = { error -> if (!stopping) fail("X display closed", error) }
             input = BrowserInput(connection)
 
-            val args = adapter.launchArgs(LaunchSpec(width, height, scale, startUrl)) +
-                if (restoreLastSession) listOf("--restore-last-session") else emptyList()
-            val pidFile = "${RuntimeLayout.GUEST_RUN_DIR}/${adapter.id.key}.pid"
-            browser = runtime.start(
-                listOf("/bin/sh", "-c", "echo \$\$ > $pidFile; exec \"\$0\" \"\$@\"", adapter.launcher) + args,
-                environment = mapOf(
-                    "HOME" to RuntimeLayout.GUEST_HOME,
-                    "DISPLAY" to ":${RuntimeLayout.DISPLAY_NUMBER}",
-                    "PULSE_SERVER" to "unix:${RuntimeLayout.GUEST_PULSE_DIR}/native",
-                ),
-                logFile = layout.logFile(adapter.id.key),
-                workingDirectory = RuntimeLayout.GUEST_HOME,
-            )
+            browser = launchBrowser(startUrl, restoreLastSession)
             audio = BrowserAudioBridge(context, layout.pulsePcmSocket).also { it.start() }
             _status.value = Status(Phase.RUNNING, startedAtMs = System.currentTimeMillis())
             renderer.requestFrame()
@@ -181,6 +169,23 @@ class DesktopSession internal constructor(
         } catch (e: Exception) {
             fail("Could not start ${adapter.displayName}", e)
         }
+    }
+
+    /** Starts the browser on this session's display; the process is the PRoot tree's root. */
+    private fun launchBrowser(startUrl: String?, restore: Boolean): Process {
+        val args = adapter.launchArgs(LaunchSpec(width, height, scale, startUrl)) +
+            if (restore) listOf("--restore-last-session") else emptyList()
+        val pidFile = "${RuntimeLayout.GUEST_RUN_DIR}/${adapter.id.key}.pid"
+        return runtime.start(
+            listOf("/bin/sh", "-c", "echo \$\$ > $pidFile; exec \"\$0\" \"\$@\"", adapter.launcher) + args,
+            environment = mapOf(
+                "HOME" to RuntimeLayout.GUEST_HOME,
+                "DISPLAY" to ":${RuntimeLayout.DISPLAY_NUMBER}",
+                "PULSE_SERVER" to "unix:${RuntimeLayout.GUEST_PULSE_DIR}/native",
+            ),
+            logFile = layout.logFile(adapter.id.key),
+            workingDirectory = RuntimeLayout.GUEST_HOME,
+        )
     }
 
     fun detachSurface() = renderer.detach()
@@ -209,12 +214,39 @@ class DesktopSession internal constructor(
         layout.logFile(adapter.id.key).readLines().filterNot { it.contains("dbus/") }.takeLast(lines).joinToString("\n")
     }.getOrDefault("")
 
+    /**
+     * Follows the browser process. Closing the last tab or window makes Chrome and Brave quit
+     * normally (exit 0), which used to end the whole session: a black screen with the browser's
+     * log, and no way back short of leaving and reopening. A normal exit the app did not ask for
+     * now starts the browser again on the same display, with a new tab, as a desktop browser
+     * window would be reopened. A crash (non-zero) still fails the session, and so does a browser
+     * that keeps quitting straight away ([BrowserRelaunchPolicy]), so a broken install cannot loop.
+     */
     private fun watch(process: Process) {
-        Thread({
+        Thread(watcher@{
             val code = process.waitFor()
-            if (!stopping) fail("${adapter.displayName} exited ($code)", null)
+            if (stopping) return@watcher
+            if (!relaunchPolicy.shouldRelaunch(code, SystemClock.elapsedRealtime())) {
+                fail("${adapter.displayName} exited ($code)", null)
+                return@watcher
+            }
+            DesktopLog.i("${adapter.id.key} closed its last window; starting it again")
+            try {
+                val next = launchBrowser(startUrl = null, restore = false)
+                if (stopping) {
+                    runtime.kill(next)
+                    return@watcher
+                }
+                browser = next
+                renderer.requestFrame()
+                watch(next)
+            } catch (e: Exception) {
+                fail("Could not restart ${adapter.displayName}", e)
+            }
         }, "desktop-browser-watch").apply { isDaemon = true; start() }
     }
+
+    private val relaunchPolicy = BrowserRelaunchPolicy()
 
     private fun fail(message: String, error: Throwable?) {
         DesktopLog.w(message, error)
