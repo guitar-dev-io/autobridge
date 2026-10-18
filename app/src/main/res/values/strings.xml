@@ -2264,4 +2264,14 @@
     <string name="parking_new_without_gps">New spot, no GPS</string>
     <string name="parking_position_added">Position added</string>
     <string name="parking_car_no_fix">No position found. On the phone you can save the spot as a note.</string>
+    <string name="support_card_title">Buy me a snack</string>
+    <string name="settings_desktop_browser">Desktop Browser Engine</string>
+    <string name="settings_desktop_browser_caption">Linux Chrome or Brave on the phone and the car</string>
+    <string name="support_card_message">If AutoBridge made your drives better, a little snack money keeps the updates coming. Thank you! ☕✨</string>
+    <string name="support_scan_bank_app">Scan with your banking app</string>
+    <string name="support_open">Open %1$s</string>
+    <string name="support_qr_description">%1$s QR code</string>
+    <string name="support_car_scan_title">Scan from your phone</string>
+    <string name="support_car_next">Next: %1$s</string>
+    <string name="support_car_row_caption">QR codes for Buy Me a Coffee and other ways to say thanks</string>
 </resources>

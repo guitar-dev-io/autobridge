@@ -1,0 +1,8 @@
+# PulseAudio config for the AutoBridge desktop browser runtime (read by `pulseaudio -n -F`).
+# Browsers play into a null sink; its monitor is exported as raw s16le PCM on a Unix socket in the
+# app's private storage, where AutoBridge reads it into an AudioTrack. No TCP listener: a localhost
+# port would let any app on the phone record the browser's audio.
+load-module module-null-sink sink_name=autobridge rate=48000 channels=2 sink_properties=device.description=AutoBridge
+set-default-sink autobridge
+load-module module-simple-protocol-unix source=autobridge.monitor record=true playback=false format=s16le rate=48000 channels=2 socket=/tmp/autobridge-pulse/pcm
+load-module module-native-protocol-unix auth-anonymous=1 socket=/tmp/autobridge-pulse/native
