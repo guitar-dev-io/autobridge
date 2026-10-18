@@ -23,6 +23,7 @@ import android.widget.Toast
 import dev.autobridge.R
 import dev.autobridge.desktop.DesktopEngine
 import dev.autobridge.desktop.browser.DesktopBrowserId
+import dev.autobridge.desktop.browser.DesktopBrowsers
 import dev.autobridge.desktop.display.DesktopView
 import dev.autobridge.desktop.input.ControlRail
 import dev.autobridge.desktop.input.Keysym
@@ -66,8 +67,11 @@ class DesktopBrowserActivity : Activity() {
         super.onCreate(savedInstanceState)
         DesktopEngine.init(this)
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_FULL_USER
+        // Started by name (the Multi-app pane) there is no extra: the browser chosen for the Web
+        // card, else the first one installed, since a pane asks for "the desktop browser".
         val id = DesktopBrowserId.fromKey(intent.getStringExtra(EXTRA_BROWSER))
             ?: DesktopEngine.chosenInstalledBrowser()?.id
+            ?: DesktopBrowsers.all.firstOrNull { DesktopEngine.state(it.id).state.installed }?.id
         if (id == null || !DesktopEngine.state(id).state.installed) {
             Toast.makeText(this, R.string.desktop_settings_install_first, Toast.LENGTH_LONG).show()
             finish()

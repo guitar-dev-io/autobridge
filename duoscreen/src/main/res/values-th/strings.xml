@@ -92,4 +92,8 @@
     <string name="duo_pick_empty">ไม่มีแอปให้เลือก</string>
     <string name="duo_keyboard_hint">พิมพ์ลงช่อง %1$d</string>
     <string name="duo_tap_to_swap">แตะเพื่อสลับกับช่องนี้</string>
+    <!-- AutoBridge's desktop browser (Linux Chrome / Brave) as a pane target. -->
+    <string name="duo_screen_desktop_pane">เบราว์เซอร์เดสก์ท็อป (AutoBridge)</string>
+    <string name="duo_screen_desktop_pane_caption">Chrome หรือ Brave ที่ติดตั้งไว้บนมือถือ</string>
+    <string name="duo_pick_current">อยู่ในช่องนี้ตอนนี้</string>
 </resources>

@@ -97,6 +97,15 @@
             android:label="@string/settings_desktop_browser"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode"
             android:windowSoftInputMode="adjustNothing|stateHidden" />
+        <!-- The desktop browser as a Multi-app pane: the same viewer, started on a pane's display by
+             the shell user (Shizuku) or root (am start on the pane display). exported so that
+             launch can reach it; INTERACT_ACROSS_USERS_FULL so nothing else can, as no ordinary
+             app holds it (the same guard ShizukuProvider uses in the main manifest). No intent
+             filter and no launcher entry: it exists only to be launched by name. -->
+        <activity-alias android:name="dev.autobridge.projection.desktop.DesktopBrowserPane"
+            android:targetActivity="dev.autobridge.projection.desktop.DesktopBrowserActivity"
+            android:exported="true"
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
         <service android:name="dev.autobridge.projection.desktop.DesktopBrowserCarAppService"
             android:enabled="false"
             android:exported="true"
