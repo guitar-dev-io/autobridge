@@ -77,5 +77,28 @@
             android:label="@string/duo_screen_title"
             android:description="@string/duo_screen_subtitle" />
 
+        <!-- Desktop Browser Engine (Linux Chrome / Brave, :desktopbrowser). Settings and the phone
+             viewer are reached only from inside the app; the car entry is its own CarAppService,
+             a navigation app like Duo Screen's because only those get a drawing surface. -->
+        <activity android:name="dev.autobridge.projection.desktop.DesktopBrowserSettingsActivity"
+            android:exported="false"
+            android:label="@string/settings_desktop_browser" />
+        <activity android:name="dev.autobridge.projection.desktop.DesktopBrowserActivity"
+            android:exported="false"
+            android:label="@string/settings_desktop_browser"
+            android:screenOrientation="sensorLandscape"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode"
+            android:windowSoftInputMode="adjustNothing|stateHidden" />
+        <service android:name="dev.autobridge.projection.desktop.DesktopBrowserCarAppService"
+            android:exported="true"
+            android:label="@string/desktop_engine_car_label"
+            android:icon="@mipmap/ic_browser_launcher"
+            tools:ignore="ExportedService">
+            <intent-filter>
+                <action android:name="androidx.car.app.CarAppService" />
+                <category android:name="androidx.car.app.category.NAVIGATION" />
+            </intent-filter>
+        </service>
+
     </application>
 </manifest>

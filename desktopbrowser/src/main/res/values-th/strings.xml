@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="desktop_engine_title">เบราว์เซอร์เดสก์ท็อป</string>
+    <string name="desktop_engine_subtitle">Google Chrome หรือ Brave แบบ Linux บนมือถือและจอรถ</string>
+    <string name="desktop_engine_notification_channel">การดาวน์โหลดเบราว์เซอร์เดสก์ท็อป</string>
+    <string name="desktop_engine_working">กำลังทำงาน…</string>
+    <string name="desktop_engine_car_label">เบราว์เซอร์เดสก์ท็อป</string>
+
+    <string name="desktop_state_not_installed">ยังไม่ได้ติดตั้ง</string>
+    <string name="desktop_state_downloading">กำลังดาวน์โหลด</string>
+    <string name="desktop_state_verifying">กำลังตรวจสอบ</string>
+    <string name="desktop_state_extracting">กำลังแตกไฟล์</string>
+    <string name="desktop_state_configuring">กำลังตั้งค่า</string>
+    <string name="desktop_state_ready">ติดตั้งแล้ว</string>
+    <string name="desktop_state_running">กำลังทำงาน</string>
+    <string name="desktop_state_failed">ล้มเหลว</string>
+    <string name="desktop_state_update_available">มีอัปเดต</string>
+    <string name="desktop_state_unsupported">มือถือนี้ใช้ไม่ได้</string>
+
+    <string name="desktop_starting">กำลังเปิดเบราว์เซอร์…</string>
+    <string name="desktop_park_to_browse">จอดรถก่อนจึงจะใช้เบราว์เซอร์เดสก์ท็อปได้</string>
+</resources>

@@ -970,6 +970,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
                         showPhoneScreen(PhoneScreen.CAR_CONNECTION)
                     })
                     addAll(duoScreenEntry())
+                    addAll(desktopBrowserEntry())
                     addAll(projectionSetupEntry())
                     add(settingsEntry(
                         getString(R.string.settings_app_profiles),
@@ -1103,6 +1104,23 @@ class MainActivity : androidx.activity.ComponentActivity() {
                 getString(R.string.settings_projection_setup_caption),
                 R.drawable.ic_tile_settings,
                 accent = dev.autobridge.ui.AutoBridgeDesign.ACCENT_SYSTEM
+            ) { startActivity(intent) }
+        )
+    }
+
+    /**
+     * Settings > Desktop Browser Engine (Linux Chrome / Brave). Resolved by name like
+     * [duoScreenIntent]: the screen and its engine exist only in the sideload flavors.
+     */
+    private fun desktopBrowserEntry(): List<SettingsRow> {
+        val intent = Intent().setClassName(this, "dev.autobridge.projection.desktop.DesktopBrowserSettingsActivity")
+            .takeIf { packageManager.resolveActivity(it, 0) != null } ?: return emptyList()
+        return listOf(
+            settingsEntry(
+                getString(R.string.settings_desktop_browser),
+                getString(R.string.settings_desktop_browser_caption),
+                R.drawable.ic_browser_desktop,
+                accent = dev.autobridge.ui.AutoBridgeDesign.ACCENT_WEB
             ) { startActivity(intent) }
         )
     }

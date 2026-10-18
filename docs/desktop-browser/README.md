@@ -1,23 +1,28 @@
-# Desktop Browser (research)
+# Desktop Browser Engine
 
-Running a real desktop Chromium browser (Brave, Google Chrome) inside a Linux runtime on the
-phone and showing it on the Android Auto screen, next to the existing embedded WebView browser.
+Linux Google Chrome and Brave (arm64 desktop builds), run in a shared Debian runtime on the phone
+and shown on the phone and on Android Auto, next to the built-in AutoBridge browser. Personal and
+lab flavors only.
 
-**Status: research and plan only.** No production code, no runtime downloaded.
+**Status:** implemented. Runtime, Brave install, phone rendering and input are verified on an
+Android 15 arm64 emulator. Chrome is verified in an arm64 container. Android Auto/DHU is pending
+on the phone. See TEST-RESULTS.md.
 
 | Doc | Topic |
 |---|---|
-| 01–10 | Earlier single-browser research. **Not in this repository.** Add them here so 11–13 and the roadmap can be checked against them |
-| [11-multi-browser-architecture.md](11-multi-browser-architecture.md) | shared runtime, browser adapters, process model, rendering bridge, policy |
-| [12-chrome-vs-brave-compatibility.md](12-chrome-vs-brave-compatibility.md) | availability, dependencies, flags, media/DRM, Shields, which browser first, device test plan |
-| [13-browser-package-management.md](13-browser-package-management.md) | sources and rights, integrity, install/update/remove, Browser Manager features, diagnostics |
-| [ROADMAP.md](ROADMAP.md) | phases |
+| [IMPLEMENTATION.md](IMPLEMENTATION.md) | what was built, files, sources, sizes, rebuild/test commands |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | layers, data flow, choices and why, Android Auto, blockers |
+| [TEST-RESULTS.md](TEST-RESULTS.md) | every test with its result and evidence; pending device steps |
+| [11-multi-browser-architecture.md](11-multi-browser-architecture.md) | research: one runtime, browser adapters |
+| [12-chrome-vs-brave-compatibility.md](12-chrome-vs-brave-compatibility.md) | research: availability, dependencies, flags, DRM, which first |
+| [13-browser-package-management.md](13-browser-package-management.md) | research: sources, integrity, operations |
+| [ROADMAP.md](ROADMAP.md) | the original phase plan (phases 1–4 are now built) |
 
-## Recommendation in one paragraph
+The research brief's docs 01–10 were never written separately. The implementation brief replaced
+that phase, and ARCHITECTURE.md covers their topics (current architecture, VelvetLauncher
+findings, options, rendering, security/licensing, POC, test matrix, roadmap).
 
-Chrome and Brave share **one** runtime (Debian 13 arm64 rootfs, PRoot, one X server, one audio,
-input and rendering bridge), and each is a small adapter with its own package, profile, cache,
-flags and update path. Both have **official arm64 Linux packages** (verified in the vendors' APT
-indexes on 2026-10-18: Chrome 155.0.8059.84, Brave 1.97.59). Build **Brave first**: it has years of
-arm64 Linux releases, native ad blocking, and a simpler install flow. Chrome follows as a second
-adapter, unless DRM streaming turns out to be the main use case.
+VelvetLauncher findings, from static inspection of v0.3.1 only (nothing copied): targetSdk 36,
+PRoot + loader in `nativeLibraryDir`, and a GameNative/Winlator-derived stack (box64, FEX, Wine,
+DXVK, `libasurface_renderer.so` from GameNative, GPL-3.0). Its runtime comes from
+`downloads.gamenative.app`. AutoBridge uses none of it.

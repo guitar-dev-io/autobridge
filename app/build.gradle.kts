@@ -324,6 +324,10 @@ dependencies {
     // its own Shizuku and hidden-API dependencies with it.
     "personalImplementation"(project(":duoscreen"))
     "labImplementation"(project(":duoscreen"))
+    // Desktop browser engine (Linux Chrome / Brave under PRoot + Xvfb). Sideload flavors only, for
+    // the same reason: it downloads a Linux runtime and runs it. Its PRoot binaries are arm64-only.
+    "personalImplementation"(project(":desktopbrowser"))
+    "labImplementation"(project(":desktopbrowser"))
     testImplementation("junit:junit:4.13.2")
     // The subtitle pipeline launches its translation on an injected CoroutineScope; the test
     // drives that scope with a test dispatcher so a line's result lands synchronously and the
