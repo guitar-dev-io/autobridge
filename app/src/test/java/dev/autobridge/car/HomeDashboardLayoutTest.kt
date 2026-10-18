@@ -319,5 +319,24 @@ class HomeDashboardLayoutTest {
         assertEquals(base.cards.first(), stretched.cards.first())
     }
 
+    // ------------------------------------------------------------------ eight cards (sideload)
+
+    @Test
+    fun `eight cards keep two rows of four`() {
+        val eight = labels + listOf("Multi-app", "Desktop browser")
+        val layout = HomeDashboardLayout.compute(MenuBox(0f, 0f, 1184f, 720f), 1f, eight, content(), measure)
+        assertEquals(8, layout.cards.size)
+        assertEquals(4, layout.columns)
+        assertEquals(2, layout.cards.map { it.top }.distinct().size)
+        assertEquals(layout.cards[0].top, layout.cards[3].top, 0f)
+        // Every card is still a tap target of its own.
+        layout.cards.forEachIndexed { index, box -> assertEquals(HomeHit(HomeRegion.QUICK_ACCESS, index), layout.hitAt(box)) }
+    }
+
+    @Test
+    fun `six cards keep the three column design`() {
+        assertEquals(3, layout(content()).columns)
+    }
+
     private fun HomeDashboardLayout.hitAt(box: MenuBox) = hit(box.centerX, box.centerY, 0f)
 }

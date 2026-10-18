@@ -12,6 +12,9 @@ package dev.autobridge.car
 internal data class CarExtensionEntry(
     val title: String,
     val placement: Placement,
+    /** Set for an entry that also gets a card on the car home, next to the six primary ones. */
+    val homeGlyph: HomeMenuGlyph? = null,
+    val homeAccent: Int = 0,
     val action: () -> Unit
 ) {
     /** Which group of the More list the row joins; see [CarHomeMoreScreen]. */

@@ -88,6 +88,8 @@ class EngineUnitTest {
         for (args in listOf(chrome, brave)) {
             assertTrue(args.contains("--ozone-platform=x11"))
             assertTrue(args.contains("--no-sandbox"))
+            // Hides the --no-sandbox warning bar over the top of the page.
+            assertTrue(args.contains("--test-type"))
             assertTrue(args.contains("--window-size=1280,720"))
             assertTrue(args.contains("--force-device-scale-factor=1.50"))
             assertEquals("https://example.com", args.last())

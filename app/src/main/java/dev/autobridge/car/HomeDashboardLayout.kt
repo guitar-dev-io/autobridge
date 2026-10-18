@@ -92,7 +92,9 @@ internal class HomeDashboardLayout private constructor(
     val maxScroll: Float,
     val scrollUp: MenuBox?,
     val scrollDown: MenuBox?,
-    val labelSize: Float
+    val labelSize: Float,
+    /** Cards per row: [columnsFor] the card count. */
+    val columns: Int
 ) {
     val scrollable: Boolean get() = maxScroll > 0f
 
@@ -133,10 +135,17 @@ internal class HomeDashboardLayout private constructor(
 
     /** One card row plus its gap: what a single scroll-button tap moves. */
     val scrollStep: Float
-        get() = if (cards.size > COLUMNS) cards[COLUMNS].top - cards[0].top else viewport.height / 2f
+        get() = if (cards.size > columns) cards[columns].top - cards[0].top else viewport.height / 2f
 
     companion object {
         const val COLUMNS = 3
+
+        /**
+         * Cards per row. Six cards keep the 3 × 2 design; the sideload builds add Multi-app and
+         * Desktop browser cards (CarExtensions), and eight go 4 × 2 rather than 3 + 3 + 2, so the
+         * home keeps two card rows and the same height instead of every card shrinking for a third.
+         */
+        fun columnsFor(count: Int): Int = if (count > COLUMNS * 2) 4 else COLUMNS
 
         /** Most sent items the row shows; the rest are on the Recently Sent screen. */
         const val MAX_RECENT = 3
@@ -186,7 +195,8 @@ internal class HomeDashboardLayout private constructor(
             // "Queue empty" means something only next to something else; on a fresh install,
             // with nothing played and nothing sent, the line is just the title.
             val showQueue = content.queueTotal > 0 || hasHero || recentCount > 0
-            val gridRows = (labels.size + COLUMNS - 1) / COLUMNS
+            val columns = columnsFor(labels.size)
+            val gridRows = (labels.size + columns - 1) / columns
             val gridHeight = gridRows * profile.cardHeight + (gridRows - 1) * Dp.GAP
 
             val usable = max(1f, safe.height - (profile.topPadding + profile.bottomPadding) * d)
@@ -205,7 +215,7 @@ internal class HomeDashboardLayout private constructor(
             /** What the column needs across at scale 1: the design's card width, not the minimum. */
             fun widthDp(a: Arrangement): Float =
                 Dp.MARGIN * 2 + (if (a.heroBeside) profile.heroWidth + Dp.GAP else 0f) +
-                    COLUMNS * Dp.CARD_WIDTH + (COLUMNS - 1) * Dp.GAP
+                    columns * Dp.CARD_WIDTH + (columns - 1) * Dp.GAP
 
             fun columnWidth(unit: Float, scrolling: Boolean): Float {
                 val lane = if (scrolling) (Dp.SCROLL_BUTTON + Dp.SCROLL_COLUMN_GAP) * d else 0f
@@ -215,7 +225,7 @@ internal class HomeDashboardLayout private constructor(
             fun arrangementAt(unit: Float, scrolling: Boolean): Arrangement {
                 val width = columnWidth(unit, scrolling)
                 val gridBeside = width - (profile.heroWidth + Dp.GAP) * unit
-                val heroBeside = (gridBeside - Dp.GAP * unit * (COLUMNS - 1)) / COLUMNS >= Dp.CARD_MIN_WIDTH * unit
+                val heroBeside = (gridBeside - Dp.GAP * unit * (columns - 1)) / columns >= Dp.CARD_MIN_WIDTH * unit
                 val rowsAcross = rowSlots <= 1 ||
                     (width - Dp.GAP * unit * (rowSlots - 1)) / rowSlots >= Dp.ROW_MIN_WIDTH * unit
                 return Arrangement(heroBeside, rowsAcross)
@@ -277,11 +287,11 @@ internal class HomeDashboardLayout private constructor(
             val emptyHero = if (hasHero) null else slot
             cursor = gridTop + gridHeight * u
 
-            val cardWidth = (right - gridLeft - gap * (COLUMNS - 1)) / COLUMNS
+            val cardWidth = (right - gridLeft - gap * (columns - 1)) / columns
             val cardHeight = profile.cardHeight * u
             val cards = labels.indices.map { index ->
-                val cardLeft = gridLeft + (index % COLUMNS) * (cardWidth + gap)
-                val cardTop = gridTop + (index / COLUMNS) * (cardHeight + gap)
+                val cardLeft = gridLeft + (index % columns) * (cardWidth + gap)
+                val cardTop = gridTop + (index / columns) * (cardHeight + gap)
                 MenuBox(cardLeft, cardTop, cardLeft + cardWidth, cardTop + cardHeight)
             }
 
@@ -376,7 +386,8 @@ internal class HomeDashboardLayout private constructor(
                 maxScroll = maxScroll,
                 scrollUp = scrollUp,
                 scrollDown = scrollDown,
-                labelSize = labelSize
+                labelSize = labelSize,
+                columns = columns
             )
         }
 

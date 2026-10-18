@@ -105,7 +105,7 @@ class CarHomeMoreScreen(
         R.string.car_more_group_content,
         // The primary six in the order the home cards show them, so the two surfaces read the same,
         // then the places that collect content rather than being one site.
-        HomeMenuItem.primary.map { section(it.section) } + listOf(
+        HomeMenuItem.primary.mapNotNull { it.section?.let(::section) } + listOf(
             entry(R.string.car_more_media_center) {
                 CarNavigation.open(screenManager, "CarMediaCenterScreen") { CarMediaCenterScreen(carContext) }
             },

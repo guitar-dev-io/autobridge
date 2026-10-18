@@ -73,7 +73,8 @@ class CarHomeDashboardScreen(
 
     // --- Surface-drawn menu state ---
     private val appManager = carContext.getCarService(AppManager::class.java)
-    private val menuItems = HomeMenuItem.primary
+    /** The six primary cards plus any the flavor adds (Multi-app, Desktop browser). */
+    private val menuItems by lazy { HomeMenuItem.forHome(CarExtensions.moreEntries(carContext, screenManager)) }
     private val dashboardRenderer by lazy { HomeDashboardRenderer(carContext) }
     private val handler = Handler(Looper.getMainLooper())
     private var surface: Surface? = null
@@ -465,9 +466,14 @@ class CarHomeDashboardScreen(
 
         HomeRegion.QUICK_ACCESS -> menuItems.getOrNull(hit.index)?.let { item ->
             {
-                focusedSection = item.section
+                val section = item.section
                 releaseSurface()
-                CarHomeNavigator.open(carContext, screenManager, item.section, ::requestSafety)
+                if (section != null) {
+                    focusedSection = section
+                    CarHomeNavigator.open(carContext, screenManager, section, ::requestSafety)
+                } else {
+                    item.extension?.action?.invoke()
+                }
             }
         }
 
@@ -651,7 +657,7 @@ class CarHomeDashboardScreen(
         // Not lockHardwareCanvas directly: on some devices it takes the process down a frame
         // later, uncatchably. See [dev.autobridge.display.CarSurfaceCanvas].
         dev.autobridge.display.CarSurfaceCanvas.draw(carContext, target) { canvas ->
-            val focused = menuItems.indexOfFirst { it.section == focusedSection }
+            val focused = menuItems.indexOfFirst { it.section != null && it.section == focusedSection }
             val webNow = webPlaying()
             val live = webNow == null && content.continueWatching?.let { isLive(it) } == true
             val playing = webNow?.status?.playing ?: (live && AutoBridgeSessionManager.current.isPlaying)
@@ -683,7 +689,7 @@ class CarHomeDashboardScreen(
      * too and where the current order is right.
      */
     private fun gridOrder(): List<HomeSection> {
-        val lead = HomeMenuItem.primary.map { it.section } +
+        val lead = HomeMenuItem.primary.mapNotNull { it.section } +
             listOf(HomeSection.MIRROR, HomeSection.APPS)
         return lead + HomeSection.carSections.filterNot { it in lead }
     }

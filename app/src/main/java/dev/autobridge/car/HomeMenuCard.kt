@@ -11,16 +11,20 @@ import android.text.TextUtils
 import dev.autobridge.library.HomeSection
 
 /** The glyph drawn inside a card's icon tile. One entry per home menu feature. */
-internal enum class HomeMenuGlyph { TV, RADIO, GLOBE, YOUTUBE, YOUTUBE_MUSIC, STREAMING }
+internal enum class HomeMenuGlyph { TV, RADIO, GLOBE, YOUTUBE, YOUTUBE_MUSIC, STREAMING, SPLIT, DESKTOP }
 
-/** One home menu entry: what it says, how it looks, and which existing section it opens. */
+/**
+ * One home menu entry: what it says, how it looks, and what it opens - an existing [section], or,
+ * for a card the build flavor adds ([CarExtensions]: Multi-app, Desktop browser), its [extension].
+ */
 internal data class HomeMenuItem(
-    val section: HomeSection,
+    val section: HomeSection?,
     val glyph: HomeMenuGlyph,
-    val accent: Int
+    val accent: Int,
+    val extension: CarExtensionEntry? = null
 ) {
     /** The tile's label, from the shared [HomeSection] so the two launchers cannot drift apart. */
-    fun title(context: Context): String = section.title(context)
+    fun title(context: Context): String = section?.title(context) ?: extension?.title.orEmpty()
 
     companion object {
         /** The six primary destinations, in reading order (3 columns × 2 rows). */
@@ -35,6 +39,12 @@ internal data class HomeMenuItem(
             ),
             HomeMenuItem(HomeSection.STREAMING, HomeMenuGlyph.STREAMING, HomeDashboardTheme.ACCENT_STREAMING)
         )
+
+        /** The primary cards, then the cards the flavor adds; the Play build adds none. */
+        fun forHome(extensions: List<CarExtensionEntry>): List<HomeMenuItem> =
+            primary + extensions.mapNotNull { entry ->
+                entry.homeGlyph?.let { HomeMenuItem(null, it, entry.homeAccent, extension = entry) }
+            }
     }
 }
 
@@ -210,6 +220,31 @@ internal class HomeMenuCard {
                 path.lineTo(58f, 59f)
                 path.close()
                 canvas.drawPath(path, glyph)
+            }
+            HomeMenuGlyph.SPLIT -> {
+                // Two panes side by side: the left one filled, the right one outlined.
+                glyph.style = Paint.Style.FILL
+                glyph.color = HomeDashboardTheme.withAlpha(accent, 0.22f)
+                rect.set(22f, 30f, 47f, 70f)
+                canvas.drawRoundRect(rect, 5f, 5f, glyph)
+                glyph.color = accent
+                glyph.style = Paint.Style.STROKE
+                canvas.drawRoundRect(rect, 5f, 5f, glyph)
+                rect.set(53f, 30f, 78f, 70f)
+                canvas.drawRoundRect(rect, 5f, 5f, glyph)
+            }
+            HomeMenuGlyph.DESKTOP -> {
+                // A monitor on a stand, with a browser window's title bar inside.
+                glyph.style = Paint.Style.STROKE
+                rect.set(22f, 26f, 78f, 64f)
+                canvas.drawRoundRect(rect, 5f, 5f, glyph)
+                canvas.drawLine(22f, 37f, 78f, 37f, glyph)
+                glyph.style = Paint.Style.FILL
+                canvas.drawCircle(29f, 31.5f, 2.2f, glyph)
+                canvas.drawCircle(36f, 31.5f, 2.2f, glyph)
+                glyph.style = Paint.Style.STROKE
+                canvas.drawLine(50f, 65f, 50f, 73f, glyph)
+                canvas.drawLine(38f, 74f, 62f, 74f, glyph)
             }
         }
     }

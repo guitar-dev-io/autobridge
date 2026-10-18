@@ -72,7 +72,7 @@ those.
 | Input | XTEST over the X socket (Kotlin client) | Browsers see a mouse and keyboard, which every site handles. Unmapped characters (Thai, emoji) get bound to a spare keycode first. |
 | Audio | PulseAudio null sink → `module-simple-protocol-unix` → AudioTrack | Focus is requested only when the page actually makes sound, and is never grabbed back after a permanent loss. |
 | One runtime, two browsers | Shared rootfs, Xvfb, Pulse. Separate package, profile, cache, policy and launcher per adapter | apt reference-counts the shared libraries, so removing one browser keeps the other's. |
-| Sandbox | `--no-sandbox` (required) | PRoot cannot provide user namespaces or a setuid helper. Renderers are contained only by the Android app sandbox. The browser's warning bar stays visible. |
+| Sandbox | `--no-sandbox` (required) | PRoot cannot provide user namespaces or a setuid helper. Renderers are contained only by the Android app sandbox. `--test-type` hides the browser's "unsupported command-line flag" bar, which covered the top of every page and could not be acted on; the missing sandbox is the trade-off stated here. |
 | GPU | `--disable-gpu` (SwiftShader) | No GPU driver inside the runtime. virgl/Turnip is a LAB follow-up. |
 | Safety | Car screen uses the built-in browser's gate: `SafetyEnforcement.gateParked` + `FeaturePolicy` for `BROWSER` | While not parked, the car shows a notice and input is ignored. Protected safety files are not modified. |
 

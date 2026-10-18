@@ -65,4 +65,7 @@
     <string name="car_more_browser_engine">เอนจินเบราว์เซอร์: %1$s</string>
     <string name="car_engine_title">เอนจินเบราว์เซอร์</string>
     <string name="car_engine_install_on_phone">ติดตั้งบนมือถือก่อน: ตั้งค่า › Desktop Browser Engine</string>
+    <string name="desktop_car_keyboard_hint">พิมพ์ แล้วกดค้นหาเพื่อส่งเข้าหน้าเว็บ</string>
+    <string name="desktop_car_keyboard_use_car">คีย์บอร์ด: ใช้คีย์บอร์ดของรถ</string>
+    <string name="desktop_car_keyboard_use_autobridge">คีย์บอร์ด: ใช้คีย์บอร์ด AutoBridge</string>
 </resources>

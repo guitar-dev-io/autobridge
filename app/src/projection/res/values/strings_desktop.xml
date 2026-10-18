@@ -65,4 +65,7 @@
     <string name="car_more_browser_engine">Browser engine: %1$s</string>
     <string name="car_engine_title">Browser engine</string>
     <string name="car_engine_install_on_phone">Install it on the phone first: Settings › Desktop Browser Engine</string>
+    <string name="desktop_car_keyboard_hint">Type, then Search to send it to the page</string>
+    <string name="desktop_car_keyboard_use_car">Keyboard: use the car\'s keyboard</string>
+    <string name="desktop_car_keyboard_use_autobridge">Keyboard: use the AutoBridge keyboard</string>
 </resources>
