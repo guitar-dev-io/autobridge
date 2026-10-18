@@ -136,6 +136,7 @@ class DesktopBrowserActivity : Activity() {
         session = s
         desktopView.renderer = s.renderer
         s.renderer.overlay = rail
+        rail.onAutoHide = { session?.renderer?.requestFrame() }
         s.renderer.placeholderText = getString(dev.autobridge.desktop.R.string.desktop_starting)
         scope.launch {
             s.status.collect { status ->
@@ -157,6 +158,15 @@ class DesktopBrowserActivity : Activity() {
     /** Rail buttons first; everything else is the page. */
     private fun onPageTouch(event: MotionEvent): Boolean {
         if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+            // The rail hides itself over the page; a touch on its strip while hidden only brings
+            // it back, and any other touch brings it back as well as reaching the page.
+            val railWasShown = rail.shown
+            rail.wake()
+            if (!railWasShown && rail.inZone(event.x, event.y)) {
+                railPressed = true
+                session?.renderer?.burst()
+                return true
+            }
             val button = rail.hit(event.x, event.y)
             if (button != null) {
                 railPressed = true

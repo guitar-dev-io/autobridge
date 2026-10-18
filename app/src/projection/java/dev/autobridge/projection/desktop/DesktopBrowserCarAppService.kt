@@ -284,6 +284,7 @@ class DesktopBrowserCarScreen(
         session = s
         s.renderer.placeholderText = carContext.getString(dev.autobridge.desktop.R.string.desktop_starting)
         s.renderer.overlay = overlay
+        rail.onAutoHide = { session?.renderer?.requestFrame() }
         s.renderer.setSurfaceDrawer { target, block -> CarSurfaceCanvas.draw(carContext, target, block) }
         applyGate()
         s.renderer.attachSurface(surface, surfaceWidth, surfaceHeight)
@@ -308,6 +309,13 @@ class DesktopBrowserCarScreen(
         val s = session ?: return
         keyboard?.let { board ->
             onKeyboardTap(board, s, x, y)
+            return
+        }
+        // The rail hides itself over the page; a tap on its strip while hidden only brings it back.
+        val railWasShown = rail.shown
+        rail.wake()
+        if (!railWasShown && rail.inZone(x, y)) {
+            s.renderer.burst()
             return
         }
         when (rail.hit(x, y)) {
