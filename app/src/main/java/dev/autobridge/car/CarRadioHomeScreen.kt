@@ -145,7 +145,7 @@ class CarRadioHomeScreen(carContext: CarContext) : Screen(carContext) {
             val items = ItemList.Builder()
             val logoByUrl = favorites.associate { it.url to it.logo }
             favorites.take(gridLimit()).forEach { item ->
-                items.addItem(stationCell(item.title, item.logo) {
+                items.addItem(stationCell(item.title, item.logo, item.url) {
                     RadioRepository.recordPlayback(carContext, RadioRepository.RadioHistory.toRadioStation(item))
                     CarIptvPlayback.play(
                         this, carContext, mediaPlayback, item.title, item.url, IptvKind.RADIO, item.playback,
@@ -180,7 +180,9 @@ class CarRadioHomeScreen(carContext: CarContext) : Screen(carContext) {
     }
 
     private fun stationGrid(category: RadioCategory, entries: List<IptvEntry>): Template {
+        // The directory lists some stations twice (one per stream); the grid shows each name once.
         val stations = entries.filterNot { CarIptvCheck.isDead(it.url) || it.url.isBlank() }
+            .distinctBy { it.title.trim().lowercase() }
         val extras = mutableListOf<GridItem>()
         if (category == RadioCategory.IN_COUNTRY) {
             extras += actionCell(carContext.getString(R.string.radio_search), CarIcons.SEARCH) {
@@ -199,7 +201,7 @@ class CarRadioHomeScreen(carContext: CarContext) : Screen(carContext) {
         extras.forEach(items::addItem)
         val logoByUrl = stations.associate { it.url to it.logo }
         stations.take(room).forEach { entry ->
-            items.addItem(stationCell(entry.title, entry.logo) { play(entry, stations, logoByUrl) })
+            items.addItem(stationCell(entry.title, entry.logo, entry.url) { play(entry, stations, logoByUrl) })
         }
         if (overflow) {
             items.addItem(actionCell(carContext.getString(R.string.radio_all_stations), R.drawable.ic_tile_radio) {
@@ -224,13 +226,20 @@ class CarRadioHomeScreen(carContext: CarContext) : Screen(carContext) {
         )
     }
 
-    /** A station: its logo once loaded, the radio mark until then. */
-    private fun stationCell(title: String, logo: String?, onClick: () -> Unit): GridItem =
-        GridItem.Builder()
+    /**
+     * A station: its logo on a card, or its coloured name card ([CarStationTile]); the radio mark
+     * only past the image budget. The station on the air says so under its name.
+     */
+    private fun stationCell(title: String, logo: String?, url: String, onClick: () -> Unit): GridItem {
+        val cell = GridItem.Builder()
             .setTitle(title)
-            .setImage(logos.icon(logo) ?: radioMark(), GridItem.IMAGE_TYPE_LARGE)
+            .setImage(logos.tile(logo, title) ?: radioMark(), GridItem.IMAGE_TYPE_LARGE)
             .setOnClickListener(onClick)
-            .build()
+        if (url == mediaPlayback.currentUri) {
+            cell.setText(carContext.getString(if (mediaPlayback.isPlaying) R.string.car_lib_playing else R.string.car_lib_paused))
+        }
+        return cell.build()
+    }
 
     private fun actionCell(title: String, @DrawableRes iconRes: Int, onClick: () -> Unit): GridItem =
         GridItem.Builder()

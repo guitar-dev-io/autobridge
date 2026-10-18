@@ -107,7 +107,7 @@ class RadioPlayerActivity : Activity() {
             setPadding(dp(20), dp(8), dp(20), dp(24))
         }
 
-        // The logo, with the station's first letter until (or unless) the image arrives.
+        // The logo, with the station's frequency or initials until (or unless) the image arrives.
         val art = FrameLayout(this).apply {
             background = AutoBridgeDesign.surface(this@RadioPlayerActivity, AutoBridgeDesign.tint(AutoBridgeDesign.ACCENT_RADIO, 0.14f), 40, Color.TRANSPARENT)
             clipToOutline = true
@@ -164,7 +164,7 @@ class RadioPlayerActivity : Activity() {
             setOnClickListener {
                 // The session answers a beat later, so the button shows what was asked for now
                 // rather than the state it is leaving; the next tick confirms it.
-                val wasPlaying = playback.isPlaying
+                val wasPlaying = playback.isPlayRequested
                 if (wasPlaying) playback.pause() else playback.resume()
                 update()
                 showPlaying(!wasPlaying)
@@ -315,9 +315,10 @@ class RadioPlayerActivity : Activity() {
             stationLine.text = if (now.song != null) now.station else ""
             stationLine.visibility = if (now.song != null) View.VISIBLE else View.GONE
         }
-        initial.text = now.station.trim().take(1).uppercase()
+        // "101 kiss fm" reads as 101, not as a lone "1": the same label the car's station cards use.
+        initial.text = if (now.station.isBlank()) "" else dev.autobridge.car.CarStationTile.label(now.station)
 
-        showPlaying(playback.isPlaying)
+        showPlaying(playback.isPlayRequested)
 
         val url = playback.currentUri
         val isFavorite = !url.isNullOrBlank() && IptvHistoryStore.isFavorite(this, url)

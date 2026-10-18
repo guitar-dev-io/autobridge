@@ -65,6 +65,26 @@ internal class CarChannelLogos(
         return icon
     }
 
+    /**
+     * The radio grid's art for a station: its logo on a card ([CarStationTile.framed]) once the
+     * logo is here, its coloured name card until then or when it has none. Spends the same budget
+     * as [icon]; past it, null, and the caller draws its plain mark.
+     */
+    fun tile(url: String?, title: String): CarIcon? {
+        if (budget <= 0) return null
+        budget--
+        val address = url?.trim().orEmpty()
+        val key = if (address.isEmpty()) "tile:name:${title.trim().lowercase()}" else "tile:$address"
+        icons[key]?.let { return it }
+        val logo = address.takeIf { it.isNotEmpty() }?.let { ImageLoader.bitmap(context, it) { scheduleRefresh() } }
+        val icon = CarIcon.Builder(
+            IconCompat.createWithBitmap(if (logo != null) CarStationTile.framed(logo) else CarStationTile.placeholder(title))
+        ).build()
+        // A name card standing in for a logo still on its way is not kept: the logo replaces it.
+        if (logo != null || address.isEmpty()) remember(key, icon)
+        return icon
+    }
+
     /** Drops the pending repaint when the screen goes away, so a dead screen is never pushed. */
     fun stop() {
         handler.removeCallbacksAndMessages(null)

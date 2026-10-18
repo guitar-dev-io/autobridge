@@ -163,6 +163,8 @@ class MainActivity : androidx.activity.ComponentActivity() {
 
     /** The home screen's now-playing bar, kept across re-renders so its ticker is not restarted. */
     private var homeMiniPlayer: dev.autobridge.ui.MiniPlayer? = null
+    /** Whether Home's mini player is up; the "last radio station" card stays hidden while it is. */
+    private val homeMiniPlayerShown = androidx.compose.runtime.mutableStateOf(false)
     private var currentScreen = PhoneScreen.HOME
 
     /**
@@ -477,7 +479,9 @@ class MainActivity : androidx.activity.ComponentActivity() {
                         updateVersion = homeUpdate?.release?.versionName,
                         onOpenUpdate = { homeUpdate?.let(::showUpdateDialog) },
                         onDismissUpdate = ::dismissHomeUpdate,
-                        resumeRadio = resumeRadio()
+                        // The mini player already shows what is loaded, with its own play button;
+                        // the card under the connection would repeat it, often naming another station.
+                        resumeRadio = if (homeMiniPlayerShown.value) null else resumeRadio()
                     )
                 }
             }
@@ -507,6 +511,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
                 )
             )
         }.also { homeMiniPlayer = it; it.start() }
+        bar.onShownChange = { homeMiniPlayerShown.value = it }
         (bar.view.parent as? ViewGroup)?.removeView(bar.view)
         val bottom = LinearLayout(this).apply {
             setPadding(dp(16), 0, dp(16), dp(10))

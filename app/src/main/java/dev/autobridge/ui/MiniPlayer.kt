@@ -72,7 +72,7 @@ class MiniPlayer(
         ellipsize = TextUtils.TruncateAt.END
     }
     private val toggle = AutoBridgeDesign.glyphButton(context, PLAY, 16f, filled = true) {
-        val wasPlaying = playback.isPlaying
+        val wasPlaying = playback.isPlayRequested
         if (wasPlaying) playback.pause() else playback.resume()
         // Reflect the tap immediately: the session still reports the old state for a moment, so
         // the glyph shows what was asked for, and the next tick confirms it against the session.
@@ -129,13 +129,30 @@ class MiniPlayer(
 
     fun stop() = ticker.removeCallbacks(tick)
 
+    /**
+     * Told whenever the bar shows or hides, so a screen can drop what would repeat it: Home hides
+     * its "last radio station" card while this bar is already showing what is loaded.
+     */
+    var onShownChange: ((Boolean) -> Unit)? = null
+        set(value) {
+            field = value
+            value?.invoke(view.visibility == View.VISIBLE)
+        }
+
+    private fun setShown(shown: Boolean) {
+        val visibility = if (shown) View.VISIBLE else View.GONE
+        if (view.visibility == visibility) return
+        view.visibility = visibility
+        onShownChange?.invoke(shown)
+    }
+
     private fun render() {
         val name = playback.currentTitle
         if (!playback.isConnected || name.isNullOrBlank()) {
-            view.visibility = View.GONE
+            setShown(false)
             return
         }
-        view.visibility = View.VISIBLE
+        setShown(true)
         // A radio stream that names its song shows the song, with the artist and the station
         // under it; anything else reads exactly as before (its title, then its artist).
         val now = dev.autobridge.radio.RadioNowPlaying.of(playback.currentItemTitle, name, playback.currentArtist)
@@ -143,9 +160,13 @@ class MiniPlayer(
         subtitle.text = listOfNotNull(
             now.artist,
             now.station.takeIf { now.song != null },
-            if (playback.isPlaying) "Playing" else "Paused"
+            when {
+                playback.isPlaying -> "Playing"
+                playback.isPlayRequested -> "Loading…"
+                else -> "Paused"
+            }
         ).joinToString(" • ")
-        showPlaying(playback.isPlaying)
+        showPlaying(playback.isPlayRequested)
 
         val art = playback.currentArtworkData
         if (art != null && art.isNotEmpty()) {

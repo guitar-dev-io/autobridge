@@ -65,6 +65,21 @@ class MediaPlaybackClient(private val context: Context) : RadioTransportClient {
         get() = controller?.isPlaying == true
 
     /**
+     * Playing, or asked to play and still loading. A live stream can sit buffering for seconds
+     * after play, and during that time [isPlaying] is false: a play/pause button reading it shows
+     * ▶ for a station that is about to be heard, and a tap on it would pause instead of play.
+     * Buttons read this; status text that must say "playing" only when it is heard reads [isPlaying].
+     */
+    val isPlayRequested: Boolean
+        get() {
+            val c = controller ?: return false
+            if (c.isPlaying) return true
+            return c.playWhenReady &&
+                (c.playbackState == androidx.media3.common.Player.STATE_BUFFERING ||
+                    c.playbackState == androidx.media3.common.Player.STATE_READY)
+        }
+
+    /**
      * Whether the item the session is currently on carries a video track. Used by the now-playing
      * bar to open the player as video rather than audio: a TV channel opened from the mini player
      * must reattach the video surface, not sit on the audio-only path. Reads the current size
