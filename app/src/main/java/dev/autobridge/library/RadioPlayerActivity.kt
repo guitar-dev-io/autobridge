@@ -47,6 +47,17 @@ import dev.autobridge.ui.SystemBack
 class RadioPlayerActivity : Activity() {
     companion object {
         fun intent(context: Context): Intent = Intent(context, RadioPlayerActivity::class.java)
+
+        // The radio design's warm palette.
+        private val LIVE_RED = 0xFFFF5C5C.toInt()
+        private val WARM_SURFACE = 0xFF2A2116.toInt()
+        private val WARM_TEXT = 0xFFFFC985.toInt()
+        private val WARM_INK = 0xFF2A1A05.toInt()
+        private val SOFT_TEXT = 0xFFC9CDD3.toInt()
+        private val HINT_TEXT = 0xFF8A919B.toInt()
+
+        /** Never a real address: forces the logo to be placed again on the next update. */
+        private const val LOGO_UNSET = "\u0000"
     }
 
     private lateinit var playback: MediaPlaybackClient
@@ -488,17 +499,5 @@ class RadioPlayerActivity : Activity() {
                 }
             }
         }
-    }
-
-    private companion object {
-        val LIVE_RED = 0xFFFF5C5C.toInt()
-        val WARM_SURFACE = 0xFF2A2116.toInt()
-        val WARM_TEXT = 0xFFFFC985.toInt()
-        val WARM_INK = 0xFF2A1A05.toInt()
-        val SOFT_TEXT = 0xFFC9CDD3.toInt()
-        val HINT_TEXT = 0xFF8A919B.toInt()
-
-        /** Never a real address: forces the logo to be placed again on the next update. */
-        const val LOGO_UNSET = "\u0000"
     }
 }
