@@ -45,27 +45,15 @@
     <string name="desktop_settings_chrome_terms_accept">ยอมรับและติดตั้ง</string>
     <string name="desktop_settings_chrome_terms_read">อ่านข้อกำหนด</string>
     <string name="desktop_viewer_keyboard">แป้นพิมพ์</string>
-    <string name="desktop_viewer_back">ย้อนกลับ</string>
-    <string name="desktop_viewer_reload">โหลดใหม่</string>
-    <string name="desktop_viewer_close">ปิด</string>
     <string name="desktop_car_choose_browser">เลือก Google Chrome หรือ Brave ที่ การตั้งค่า › เบราว์เซอร์เดสก์ท็อป ใน AutoBridge บนมือถือ</string>
     <string name="desktop_settings_child_limit_title">Android อาจหยุดเบราว์เซอร์</string>
     <string name="desktop_settings_child_limit_14">Android จำกัดจำนวนโปรเซสเบื้องหลังของแอป แต่เบราว์เซอร์เดสก์ท็อปต้องใช้หลายโปรเซส เปิด ตัวเลือกสำหรับนักพัฒนาแอป › ปิดใช้ข้อจำกัดของกระบวนการย่อย ไม่เช่นนั้นเบราว์เซอร์อาจปิดไปเอง</string>
     <string name="desktop_settings_child_limit_12">Android 12 และ 13 จำกัดจำนวนโปรเซสเบื้องหลังของแอป แต่เบราว์เซอร์เดสก์ท็อปต้องใช้หลายโปรเซส ยกเลิกข้อจำกัดครั้งเดียวด้วยคำสั่ง adb ด้านล่างจากคอมพิวเตอร์ ไม่เช่นนั้นเบราว์เซอร์อาจปิดไปเอง</string>
     <string name="desktop_settings_open_developer_options">เปิดตัวเลือกสำหรับนักพัฒนาแอป</string>
     <string name="desktop_settings_copy_adb">คัดลอกคำสั่ง adb</string>
-    <string name="desktop_menu_forward">ไปข้างหน้า</string>
-    <string name="desktop_menu_new_tab">แท็บใหม่</string>
-    <string name="desktop_menu_zoom_in">ขยาย</string>
-    <string name="desktop_menu_zoom_out">ย่อ</string>
-    <string name="desktop_car_settings_title">เบราว์เซอร์เดสก์ท็อป</string>
-    <string name="desktop_car_mode_touch">โหมดสัมผัส: แตะเพื่อคลิก ลากเพื่อเลื่อน</string>
-    <string name="desktop_car_mode_mouse">โหมดเมาส์: ลากเพื่อเลื่อนเคอร์เซอร์ แตะเพื่อคลิก</string>
     <!-- The engine choice on the car, inside AutoBridge (CarExtensions). -->
     <string name="car_more_browser_engine">เอนจินเบราว์เซอร์: %1$s</string>
     <string name="car_engine_title">เอนจินเบราว์เซอร์</string>
     <string name="car_engine_install_on_phone">ติดตั้งบนมือถือก่อน: ตั้งค่า › Desktop Browser Engine</string>
     <string name="desktop_car_keyboard_hint">พิมพ์ แล้วกดค้นหาเพื่อส่งเข้าหน้าเว็บ</string>
-    <string name="desktop_car_keyboard_use_car">คีย์บอร์ด: ใช้คีย์บอร์ดของรถ</string>
-    <string name="desktop_car_keyboard_use_autobridge">คีย์บอร์ด: ใช้คีย์บอร์ด AutoBridge</string>
 </resources>

@@ -19,12 +19,16 @@ import androidx.core.graphics.drawable.IconCompat
 import dev.autobridge.duoscreen.R
 import dev.autobridge.duoscreen.layout.DuoScreenStore
 import dev.autobridge.duoscreen.system.DuoScreenProtectedApps
+import dev.autobridge.duoscreen.system.DuoScreenSelfPane
 import dev.autobridge.logging.StructuredLog
 
 /**
  * The Arrange card's "Change app": the phone's launchable apps as a car list, the pane's current
  * one first. Picking one stores it for the pane and goes back; [DuoScreenScreen] applies the
  * stored choice as soon as its surface returns, the same path a choice made on the phone takes.
+ *
+ * AutoBridge's desktop browser (Linux Chrome or Brave) is offered first when one is installed:
+ * it is the one pane target the phone's app list cannot show, since it has no launcher icon.
  */
 class DuoScreenAppPickerScreen(
     carContext: CarContext,
@@ -49,8 +53,25 @@ class DuoScreenAppPickerScreen(
         val list = ItemList.Builder()
         val current = DuoScreenStore.packages(carContext).getOrNull(paneId)
         val ordered = apps.sortedBy { if (it.packageName == current) 0 else 1 }.take(limit)
-        if (ordered.isEmpty()) list.setNoItemsMessage(carContext.getString(R.string.duo_pick_empty))
-        ordered.forEach { app ->
+        val own = carContext.packageName
+        val desktopRow = DuoScreenSelfPane.desktopAvailable()
+        if (ordered.isEmpty() && !desktopRow) list.setNoItemsMessage(carContext.getString(R.string.duo_pick_empty))
+        if (desktopRow) {
+            val selected = current == own && paneId in DuoScreenStore.desktopPanes(carContext)
+            list.addItem(
+                Row.Builder()
+                    .setTitle(carContext.getString(R.string.duo_screen_desktop_pane))
+                    .addText(carContext.getString(if (selected) R.string.duo_pick_current else R.string.duo_screen_desktop_pane_caption))
+                    .setOnClickListener {
+                        DuoScreenStore.setPackage(carContext, paneId, own)
+                        DuoScreenStore.setDesktop(carContext, paneId, true)
+                        StructuredLog.i(TAG, "Pane $paneId -> desktop browser")
+                        screenManager.pop()
+                    }
+                    .build()
+            )
+        }
+        ordered.take((limit - if (desktopRow) 1 else 0).coerceAtLeast(0)).forEach { app ->
             list.addItem(
                 Row.Builder()
                     .setTitle(app.label)

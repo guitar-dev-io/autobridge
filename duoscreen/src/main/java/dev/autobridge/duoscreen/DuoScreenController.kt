@@ -128,6 +128,9 @@ class DuoScreenController(
     private val collapseRail = Runnable { closeRail() }
     private val appInfo = HashMap<String, PaneApp>()
 
+    /** Panes launched with our desktop browser, so switching to or from it reopens the pane. */
+    private val launchedDesktop = HashSet<Int>()
+
     private val mainHandler = Handler(Looper.getMainLooper())
     private val compositor = DuoScreenCompositor()
     private val touch = DuoScreenTouchController(ops)
@@ -441,7 +444,7 @@ class DuoScreenController(
             return
         }
         val isSelf = DuoScreenSelfPane.isSelf(packageName, context.packageName)
-        val component = resolveLauncherComponent(packageName)
+        val component = resolveLauncherComponent(packageName, pane.id)
         val launched = ops.launchOnDisplay(displayId, packageName, component, allowSecondInstance = isSelf)
         StructuredLog.i(
             TAG,
@@ -488,7 +491,14 @@ class DuoScreenController(
             StructuredLog.i(TAG, "Pane content scale applied: ${paneDpi}dpi from a ${dpi}dpi panel")
         }
 
-        val changed = active.panes.panesWithOtherPackage(stored)
+        // Our own app in a pane can be either browser; moving between them is a different app too.
+        val desktop = DuoScreenStore.desktopPanes(context)
+        val switchedBrowser = live.filter { pane ->
+            val packageName = stored.getOrNull(pane.id)
+            packageName != null && DuoScreenSelfPane.isSelf(packageName, context.packageName) &&
+                packageName == pane.packageName && (pane.id in desktop) != (pane.id in launchedDesktop)
+        }.map { it.id }
+        val changed = (active.panes.panesWithOtherPackage(stored) + switchedBrowser).distinct()
         changed.forEach { paneId ->
             active.setPackage(paneId, stored.getOrNull(paneId))
             active.panes.pane(paneId)?.let(::reopenPane)
@@ -577,7 +587,7 @@ class DuoScreenController(
         return ops.launchOnDisplay(
             displayId,
             packageName,
-            resolveLauncherComponent(packageName),
+            resolveLauncherComponent(packageName, paneId),
             allowSecondInstance = DuoScreenSelfPane.isSelf(packageName, context.packageName),
         )
     }
@@ -589,10 +599,13 @@ class DuoScreenController(
      * falls back to the implicit intent resolved shell-side. A null is logged, naming the package,
      * so a resulting blank pane is diagnosable rather than silent.
      */
-    private fun resolveLauncherComponent(packageName: String): ComponentName? {
+    private fun resolveLauncherComponent(packageName: String, paneId: Int): ComponentName? {
         // Our own app resolves to MainActivity, the phone's home UI, which is the wrong screen for
-        // a pane; DuoScreenSelfPane names the right one.
-        DuoScreenSelfPane.activityOrNull(packageName, context.packageName)?.let { activity ->
+        // a pane; DuoScreenSelfPane names the right one: the built-in or the desktop browser.
+        val desktop = DuoScreenSelfPane.isSelf(packageName, context.packageName) &&
+            paneId in DuoScreenStore.desktopPanes(context)
+        if (desktop) launchedDesktop += paneId else launchedDesktop -= paneId
+        DuoScreenSelfPane.activityOrNull(packageName, context.packageName, desktop)?.let { activity ->
             return ComponentName(packageName, activity)
         }
         val intent = Intent(Intent.ACTION_MAIN)
@@ -892,7 +905,7 @@ class DuoScreenController(
         )
         chrome = laidOut
         val apps = if (editing || (railOpen && laidOut.rail?.panel != null)) {
-            panes.associate { it.id to appFor(it.packageName) }
+            panes.associate { it.id to appFor(it.packageName, it.id in DuoScreenStore.desktopPanes(context)) }
         } else emptyMap()
         val titles = if (editing) panes.associate { pane ->
             pane.id to context.getString(R.string.duo_card_title, pane.id + 1, apps[pane.id]?.label.orEmpty())
@@ -982,7 +995,7 @@ class DuoScreenController(
     /** The note each pane holding a picture-blocking app gets instead of a black square. */
     private fun blockedPanes(panes: List<DuoScreenPane>): Map<Int, BlockedPaneNotice> =
         panes.filter { DuoScreenProtectedApps.isProtected(it.packageName) }.associate { pane ->
-            val app = appFor(pane.packageName)
+            val app = appFor(pane.packageName, pane.id in DuoScreenStore.desktopPanes(context))
             pane.id to BlockedPaneNotice(
                 title = context.getString(R.string.duo_protected_pane_title, app.label),
                 body = context.getString(R.string.duo_protected_pane_text),
@@ -991,18 +1004,21 @@ class DuoScreenController(
         }
 
     /** A pane app's name and icon for its Arrange card, loaded once per package. */
-    private fun appFor(packageName: String?): PaneApp {
+    private fun appFor(packageName: String?, desktop: Boolean = false): PaneApp {
         if (packageName == null) return PaneApp(context.getString(R.string.duo_screen_pane_empty), null)
-        appInfo[packageName]?.let { return it }
+        val self = DuoScreenSelfPane.isSelf(packageName, context.packageName)
+        val key = if (self && desktop) "$packageName#desktop" else packageName
+        appInfo[key]?.let { return it }
         val pm = context.packageManager
-        val loaded = if (DuoScreenSelfPane.isSelf(packageName, context.packageName)) {
-            PaneApp(context.getString(R.string.duo_screen_self_pane), iconBitmap { pm.getApplicationIcon(packageName) })
+        val loaded = if (self) {
+            val label = context.getString(if (desktop) R.string.duo_screen_desktop_pane else R.string.duo_screen_self_pane)
+            PaneApp(label, iconBitmap { pm.getApplicationIcon(packageName) })
         } else {
             val label = runCatching { pm.getApplicationLabel(pm.getApplicationInfo(packageName, 0)).toString() }
                 .getOrDefault(packageName)
             PaneApp(label, iconBitmap { pm.getApplicationIcon(packageName) })
         }
-        appInfo[packageName] = loaded
+        appInfo[key] = loaded
         return loaded
     }
 

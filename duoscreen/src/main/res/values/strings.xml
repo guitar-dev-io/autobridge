@@ -96,4 +96,8 @@
     <string name="duo_pick_empty">No apps to show</string>
     <string name="duo_keyboard_hint">Type into pane %1$d</string>
     <string name="duo_tap_to_swap">Tap to swap with it</string>
+    <!-- AutoBridge's desktop browser (Linux Chrome / Brave) as a pane target. -->
+    <string name="duo_screen_desktop_pane">Desktop browser (AutoBridge)</string>
+    <string name="duo_screen_desktop_pane_caption">Chrome or Brave, as installed on the phone</string>
+    <string name="duo_pick_current">In this pane now</string>
 </resources>

@@ -116,6 +116,7 @@ object DuoScreenStore {
     private const val KEY_CONTENT_SCALE = "content_scale"
     private const val KEY_RAIL_SIDE = "rail_side"
     private const val KEY_BACKEND = "backend"
+    private const val KEY_DESKTOP_PANES = "desktop_panes"
     private const val DEFAULT_PANE_COUNT = 2
 
     const val MIN_PANES = 2
@@ -237,8 +238,21 @@ object DuoScreenStore {
         return (0 until count).map { index -> saved?.panes?.getOrNull(index)?.packageName }
     }
 
+    /**
+     * Panes whose AutoBridge entry is the desktop browser rather than the built-in one. Only
+     * meaningful for a pane holding our own package; any other app clears it ([setPackage]).
+     */
+    fun desktopPanes(context: Context): Set<Int> =
+        prefs(context).getStringSet(KEY_DESKTOP_PANES, emptySet()).orEmpty().mapNotNull { it.toIntOrNull() }.toSet()
+
+    fun setDesktop(context: Context, paneId: Int, desktop: Boolean) {
+        val now = desktopPanes(context).let { if (desktop) it + paneId else it - paneId }
+        prefs(context).edit { putStringSet(KEY_DESKTOP_PANES, now.map(Int::toString).toSet()) }
+    }
+
     /** Changing a pane's app leaves the arrangement — and whether there is one — exactly as it was. */
     fun setPackage(context: Context, paneId: Int, packageName: String?) {
+        if (packageName != context.packageName) setDesktop(context, paneId, false)
         val stored = DuoScreenLayoutCodec.decode(prefs(context).getString(KEY_LAYOUT, null))
         val count = paneCount(context)
         val bounds = stored?.bounds ?: Bounds(count * 100, 100)

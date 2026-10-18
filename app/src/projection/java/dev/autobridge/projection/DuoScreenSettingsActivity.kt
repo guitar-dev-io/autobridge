@@ -67,6 +67,7 @@ class DuoScreenSettingsActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        dev.autobridge.projection.desktop.DesktopPaneTarget.install(this)
         render()
     }
 
@@ -384,7 +385,8 @@ class DuoScreenSettingsActivity : Activity() {
     private fun previewTile(index: Int, chosen: String?): View {
         val accent = paneAccent(index)
         val paneTitle = getString(R.string.duo_screen_pane_label, index + 1)
-        val appName = chosen?.let(::paneLabel) ?: getString(R.string.duo_screen_pane_empty)
+        val appName = chosen?.let { paneLabel(it, desktop = index in DuoScreenStore.desktopPanes(this)) }
+            ?: getString(R.string.duo_screen_pane_empty)
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
@@ -883,14 +885,16 @@ class DuoScreenSettingsActivity : Activity() {
             if (DuoScreenProtectedApps.isProtected(chosen)) {
                 confirmProtectedApp(paneId, chosen!!, items[position].label)
             } else {
-                choosePaneApp(paneId, chosen)
+                choosePaneApp(paneId, chosen, items[position].desktop)
             }
         }
         dialog.show()
     }
 
-    private fun choosePaneApp(paneId: Int, packageName: String?) {
+    private fun choosePaneApp(paneId: Int, packageName: String?, desktop: Boolean = false) {
         DuoScreenStore.setPackage(this, paneId, packageName)
+        // Our own app is either browser; setPackage has already cleared the flag for any other app.
+        if (packageName == this.packageName) DuoScreenStore.setDesktop(this, paneId, desktop)
         applied()
         render()
     }
@@ -908,8 +912,11 @@ class DuoScreenSettingsActivity : Activity() {
             .show()
     }
 
-    /** One cell of the picker. A null [packageName] is the "leave this pane empty" cell. */
-    private data class PaneApp(val label: String, val packageName: String?)
+    /**
+     * One cell of the picker. A null [packageName] is the "leave this pane empty" cell; [desktop]
+     * is AutoBridge's desktop browser rather than its built-in one.
+     */
+    private data class PaneApp(val label: String, val packageName: String?, val desktop: Boolean = false)
 
     private fun pickerItems(): List<PaneApp> {
         val launchable = packageManager.queryIntentActivities(
@@ -921,7 +928,14 @@ class DuoScreenSettingsActivity : Activity() {
             .sortedBy { paneLabel(it).lowercase() }
         // "Leave empty" stays first, where the list had it: it is the one cell that is not an app,
         // and a driver looking for it should not have to hunt through the icons.
-        return listOf(PaneApp(getString(R.string.duo_screen_clear_app), null)) +
+        // The desktop browser has no launcher icon of its own, so the app list cannot show it: it
+        // gets its own cell, next to "Leave empty", when Chrome or Brave is installed.
+        val desktop = if (DuoScreenSelfPane.desktopAvailable()) {
+            listOf(PaneApp(paneLabel(packageName, desktop = true), packageName, desktop = true))
+        } else {
+            emptyList()
+        }
+        return listOf(PaneApp(getString(R.string.duo_screen_clear_app), null)) + desktop +
             launchable.map { PaneApp(paneLabel(it), it) }
     }
 
@@ -1028,9 +1042,9 @@ class DuoScreenSettingsActivity : Activity() {
      * pane runs AutoBridge's car browser, not the phone home the app's icon stands for (see
      * [DuoScreenSelfPane]).
      */
-    private fun paneLabel(packageName: String): String =
+    private fun paneLabel(packageName: String, desktop: Boolean = false): String =
         if (DuoScreenSelfPane.isSelf(packageName, this.packageName)) {
-            getString(R.string.duo_screen_self_pane)
+            getString(if (desktop) R.string.duo_screen_desktop_pane else R.string.duo_screen_self_pane)
         } else {
             appLabel(packageName)
         }

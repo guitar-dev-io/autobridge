@@ -19,4 +19,24 @@
 
     <string name="desktop_starting">Starting the browser…</string>
     <string name="desktop_park_to_browse">Park the car to use the desktop browser</string>
+    <!-- The control rail over the page (ControlRail). -->
+    <string name="desktop_rail_back">Back</string>
+    <string name="desktop_rail_address">Address</string>
+    <string name="desktop_rail_type">Type</string>
+    <string name="desktop_rail_touch">Touch</string>
+    <string name="desktop_rail_mouse">Mouse</string>
+    <string name="desktop_rail_more">More</string>
+    <string name="desktop_rail_this_page">This page</string>
+    <string name="desktop_rail_forward">Forward</string>
+    <string name="desktop_rail_reload">Reload</string>
+    <string name="desktop_rail_new_tab">New tab</string>
+    <string name="desktop_rail_zoom">Page zoom</string>
+    <string name="desktop_rail_keyboard">Keyboard</string>
+    <string name="desktop_rail_keyboard_autobridge">AutoBridge</string>
+    <string name="desktop_rail_keyboard_car">Car\'s</string>
+    <string name="desktop_rail_menu">Menu</string>
+    <string name="desktop_rail_hide_2s">2 s</string>
+    <string name="desktop_rail_hide_4s">4 s</string>
+    <string name="desktop_rail_hide_never">Stay open</string>
+    <string name="desktop_rail_close">Close the browser</string>
 </resources>

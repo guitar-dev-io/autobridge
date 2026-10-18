@@ -31,4 +31,18 @@ class DuoScreenSelfPaneTest {
     @Test fun anotherAppResolvesItsLauncherActivityAsBefore() {
         assertNull(DuoScreenSelfPane.activityOrNull("com.google.android.apps.maps", own))
     }
+
+    @Test fun aDesktopPaneOpensTheDesktopBrowserAlias() {
+        assertEquals(DuoScreenSelfPane.DESKTOP_ACTIVITY, DuoScreenSelfPane.activityOrNull(own, own, desktop = true))
+        assertEquals(DuoScreenSelfPane.ACTIVITY, DuoScreenSelfPane.activityOrNull(own, own, desktop = false))
+    }
+
+    /** The flag means "our desktop browser"; it can never turn another app's pane into ours. */
+    @Test fun theDesktopFlagDoesNothingForAnotherApp() {
+        assertNull(DuoScreenSelfPane.activityOrNull("com.google.android.apps.maps", own, desktop = true))
+    }
+
+    @Test fun theDesktopBrowserIsNotOfferedUntilTheAppSaysItIsInstalled() {
+        assertFalse(DuoScreenSelfPane.desktopAvailable())
+    }
 }

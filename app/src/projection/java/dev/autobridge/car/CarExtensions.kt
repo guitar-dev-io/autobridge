@@ -28,6 +28,8 @@ import dev.autobridge.projection.desktop.DesktopEngineChoiceCarScreen
  */
 internal object CarExtensions {
     fun moreEntries(carContext: CarContext, screenManager: ScreenManager): List<CarExtensionEntry> {
+        // Multi-app's pane picker offers the desktop browser when it is installed.
+        dev.autobridge.projection.desktop.DesktopPaneTarget.install(carContext)
         val entries = mutableListOf(
             CarExtensionEntry(
                 carContext.getString(R.string.car_more_multi_app),
