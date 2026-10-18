@@ -86,7 +86,6 @@
         <activity android:name="dev.autobridge.projection.desktop.DesktopBrowserActivity"
             android:exported="false"
             android:label="@string/settings_desktop_browser"
-            android:screenOrientation="sensorLandscape"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode"
             android:windowSoftInputMode="adjustNothing|stateHidden" />
         <service android:name="dev.autobridge.projection.desktop.DesktopBrowserCarAppService"

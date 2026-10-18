@@ -22,9 +22,30 @@ class BrowserInput(private val x: X11Connection) {
     @Volatile var lastEventAt = 0L
         private set
 
-    fun moveTo(dx: Int, dy: Int) = post { x.fakeInput(X11Connection.MOTION_NOTIFY, 0, dx, dy) }
+    /** Where the X pointer is, in display pixels; mouse (trackpad) mode moves it relatively. */
+    @Volatile var cursorX = 0f
+        private set
+    @Volatile var cursorY = 0f
+        private set
+
+    fun moveTo(dx: Int, dy: Int) {
+        cursorX = dx.toFloat(); cursorY = dy.toFloat()
+        post { x.fakeInput(X11Connection.MOTION_NOTIFY, 0, dx, dy) }
+    }
+
+    /** Trackpad move, clamped to the visible window. */
+    fun moveBy(dx: Float, dy: Float, maxX: Int, maxY: Int) {
+        cursorX = (cursorX + dx).coerceIn(0f, (maxX - 1).toFloat())
+        cursorY = (cursorY + dy).coerceIn(0f, (maxY - 1).toFloat())
+        val tx = cursorX.toInt()
+        val ty = cursorY.toInt()
+        post { x.fakeInput(X11Connection.MOTION_NOTIFY, 0, tx, ty) }
+    }
+
+    fun clickAtCursor(button: Int = BUTTON_LEFT) = click(cursorX.toInt(), cursorY.toInt(), button)
 
     fun click(dx: Int, dy: Int, button: Int = BUTTON_LEFT) = post {
+        cursorX = dx.toFloat(); cursorY = dy.toFloat()
         x.fakeInput(X11Connection.MOTION_NOTIFY, 0, dx, dy)
         x.fakeInput(X11Connection.BUTTON_PRESS, button)
         x.fakeInput(X11Connection.BUTTON_RELEASE, button)

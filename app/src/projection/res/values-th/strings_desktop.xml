@@ -54,4 +54,11 @@
     <string name="desktop_settings_child_limit_12">Android 12 และ 13 จำกัดจำนวนโปรเซสเบื้องหลังของแอป แต่เบราว์เซอร์เดสก์ท็อปต้องใช้หลายโปรเซส ยกเลิกข้อจำกัดครั้งเดียวด้วยคำสั่ง adb ด้านล่างจากคอมพิวเตอร์ ไม่เช่นนั้นเบราว์เซอร์อาจปิดไปเอง</string>
     <string name="desktop_settings_open_developer_options">เปิดตัวเลือกสำหรับนักพัฒนาแอป</string>
     <string name="desktop_settings_copy_adb">คัดลอกคำสั่ง adb</string>
+    <string name="desktop_menu_forward">ไปข้างหน้า</string>
+    <string name="desktop_menu_new_tab">แท็บใหม่</string>
+    <string name="desktop_menu_zoom_in">ขยาย</string>
+    <string name="desktop_menu_zoom_out">ย่อ</string>
+    <string name="desktop_car_settings_title">เบราว์เซอร์เดสก์ท็อป</string>
+    <string name="desktop_car_mode_touch">โหมดสัมผัส: แตะเพื่อคลิก ลากเพื่อเลื่อน</string>
+    <string name="desktop_car_mode_mouse">โหมดเมาส์: ลากเพื่อเลื่อนเคอร์เซอร์ แตะเพื่อคลิก</string>
 </resources>

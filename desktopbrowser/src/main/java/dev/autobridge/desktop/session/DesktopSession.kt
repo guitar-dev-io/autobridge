@@ -9,7 +9,7 @@ import dev.autobridge.desktop.DesktopLog
 import dev.autobridge.desktop.audio.BrowserAudioBridge
 import dev.autobridge.desktop.browser.DesktopBrowserAdapter
 import dev.autobridge.desktop.browser.LaunchSpec
-import dev.autobridge.desktop.display.SurfaceFrameRenderer
+import dev.autobridge.desktop.display.FrameRenderer
 import dev.autobridge.desktop.display.X11Connection
 import dev.autobridge.desktop.display.XwdFramebuffer
 import dev.autobridge.desktop.input.BrowserInput
@@ -19,23 +19,29 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import java.io.File
 import java.io.IOException
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 /**
  * One running desktop browser: its own Xvfb display, PulseAudio and browser process tree, plus
  * the bridges that show it on a Surface and feed it input and audio.
  *
- * Every guest process is a separate PRoot tree started with `--kill-on-exit`, so [stop] — or the
- * app process dying — always leaves nothing running. The browser gets SIGTERM first and a few
- * seconds to write its profile; only then is its tree killed.
+ * The X screen is a [screenSize] square, big enough for any shape the session is shown in; the
+ * browser window is resized with [fitTo] to exactly the target's shape — phone portrait, phone
+ * landscape, a 1280×600 car, a 1920×720 one — so the page always fills the screen and rotating
+ * the phone reflows the page instead of restarting the browser.
+ *
+ * Every guest process is a separate PRoot tree; [stop] reads the tree and ends all of it. The
+ * browser gets SIGTERM first and a few seconds to write its profile; only then is it killed.
  */
 class DesktopSession internal constructor(
     private val context: Context,
     private val runtime: LinuxRuntime,
     val adapter: DesktopBrowserAdapter,
-    val width: Int,
-    val height: Int,
-    private val dpi: Int,
+    val screenSize: Int,
+    /** Chromium's device scale factor, fixed for the life of the browser process. */
+    val scale: Float,
+    private val restoreLastSession: Boolean,
 ) {
     enum class Phase { STARTING, RUNNING, STOPPED, FAILED }
     data class Status(
@@ -49,7 +55,12 @@ class DesktopSession internal constructor(
     private val _status = MutableStateFlow(Status(Phase.STARTING))
     val status: StateFlow<Status> = _status
 
-    val renderer = SurfaceFrameRenderer()
+    val renderer = FrameRenderer()
+    private val xThread = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "desktop-x").apply { isDaemon = true } }
+    @Volatile var width = 0
+        private set
+    @Volatile var height = 0
+        private set
     @Volatile var input: BrowserInput? = null
         private set
     @Volatile var x11Connected = false
@@ -62,10 +73,53 @@ class DesktopSession internal constructor(
     @Volatile private var stopping = false
     private var startedAt = 0L
 
-    val scale: Float get() = (dpi / 160f).coerceIn(1f, 2f)
-
-    fun start(startUrl: String?) {
+    fun start(startUrl: String?, initialWidth: Int, initialHeight: Int) {
+        width = clampSize(initialWidth)
+        height = clampSize(initialHeight)
+        renderer.setViewport(width, height)
         Thread({ startBlocking(startUrl) }, "desktop-session-start").start()
+    }
+
+    /**
+     * Makes the browser window exactly [w]×[h] display pixels (clamped to the screen) and shows
+     * that region. Cheap: one X ConfigureWindow; Chromium relayouts the page.
+     */
+    fun fitTo(w: Int, h: Int) {
+        val nw = clampSize(w)
+        val nh = clampSize(h)
+        if (nw == width && nh == height) return
+        width = nw
+        height = nh
+        renderer.setViewport(nw, nh)
+        xThread.execute { resizeBrowserWindows() }
+    }
+
+    /** True when [w]×[h] does not fit this session's screen and needs a bigger one. */
+    fun tooSmallFor(w: Int, h: Int): Boolean = w > screenSize || h > screenSize
+
+    private fun clampSize(v: Int) = (v and 1.inv()).coerceIn(320, screenSize)
+
+    /**
+     * Top-level browser windows (viewable, not override-redirect menus or tooltips, bigger than a
+     * dialog) are moved to 0,0 and sized to the viewport. Run on resize and periodically, so a
+     * window the browser opens later (Ctrl+N, a popup) is fitted too.
+     */
+    private fun resizeBrowserWindows() {
+        val x = x11 ?: return
+        if (!x.isOpen) return
+        try {
+            for (id in x.queryTree()) {
+                val info = x.windowInfo(id)
+                if (!info.viewable || info.overrideRedirect || info.width < 200 || info.height < 150) continue
+                if (info.x != 0 || info.y != 0 || info.width != width || info.height != height) {
+                    x.configureWindow(id, 0, 0, width, height)
+                }
+            }
+            x.sync()
+            renderer.burst()
+        } catch (e: Exception) {
+            if (!stopping) DesktopLog.w("window fit failed", e)
+        }
     }
 
     private fun startBlocking(startUrl: String?) {
@@ -80,9 +134,9 @@ class DesktopSession internal constructor(
             )
             xvfb = runtime.start(
                 listOf("Xvfb", ":${RuntimeLayout.DISPLAY_NUMBER}",
-                    "-screen", "0", "${width}x${height}x24",
+                    "-screen", "0", "${screenSize}x${screenSize}x24",
                     "-fbdir", RuntimeLayout.GUEST_FB_DIR,
-                    "-dpi", dpi.toString(),
+                    "-dpi", (scale * 96).toInt().toString(),
                     // Unix socket in private storage only: no TCP port and no abstract socket,
                     // either of which another app on the phone could connect to.
                     "-nolisten", "tcp", "-nolisten", "local", "-listen", "unix",
@@ -106,7 +160,8 @@ class DesktopSession internal constructor(
             connection.onClosed = { error -> if (!stopping) fail("X display closed", error) }
             input = BrowserInput(connection)
 
-            val args = adapter.launchArgs(LaunchSpec(width, height, scale, startUrl))
+            val args = adapter.launchArgs(LaunchSpec(width, height, scale, startUrl)) +
+                if (restoreLastSession) listOf("--restore-last-session") else emptyList()
             val pidFile = "${RuntimeLayout.GUEST_RUN_DIR}/${adapter.id.key}.pid"
             browser = runtime.start(
                 listOf("/bin/sh", "-c", "echo \$\$ > $pidFile; exec \"\$0\" \"\$@\"", adapter.launcher) + args,
@@ -121,14 +176,13 @@ class DesktopSession internal constructor(
             audio = BrowserAudioBridge(context, layout.pulsePcmSocket).also { it.start() }
             _status.value = Status(Phase.RUNNING, startedAtMs = System.currentTimeMillis())
             renderer.requestFrame()
+            xThread.scheduleWithFixedDelay({ resizeBrowserWindows() }, 1, 3, TimeUnit.SECONDS)
             watch(browser!!)
         } catch (e: Exception) {
             fail("Could not start ${adapter.displayName}", e)
         }
     }
 
-    fun attachSurface(surface: Surface, width: Int, height: Int) = renderer.attach(surface, width, height)
-    fun setContentArea(left: Int, top: Int, right: Int, bottom: Int) = renderer.setArea(left, top, right, bottom)
     fun detachSurface() = renderer.detach()
 
     /** Graceful stop: the browser saves its profile, then every process of the session goes. */
@@ -137,6 +191,7 @@ class DesktopSession internal constructor(
         stopping = true
         audio?.stop()
         input?.shutdown()
+        xThread.shutdownNow()
         // The browser first, with SIGTERM to its own pid so it writes its profile and session.
         val pid = readPid()
         if (pid != null) runtime.terminate(pid)

@@ -27,8 +27,8 @@ AutoBridge app process (uid u0_aNNN, untrusted_app sandbox)
     ├── browser/                 DesktopBrowserAdapter, ChromeAdapter, BraveAdapter
     ├── session/                 DesktopSession: Xvfb + PulseAudio + browser + bridges
     ├── display/                 X11Connection (XTEST, DAMAGE, keymap), XwdFramebuffer,
-    │                            SurfaceFrameRenderer, DisplayMapping
-    ├── input/                   BrowserInput, X11Keyboard, TouchGestureMapper
+    │                            FrameRenderer, DesktopView, DisplayMapping
+    ├── input/                   BrowserInput, X11Keyboard, TouchGestureMapper, ControlRail
     └── audio/                   BrowserAudioBridge (PulseAudio PCM → AudioTrack + focus)
 
 Child processes, one PRoot tree each (--kill-on-exit):
@@ -65,6 +65,9 @@ those.
 | Root filesystem | Official Debian 13 trixie-slim arm64 layer from Docker Hub, pinned by digest (= SHA-256) | Debian is the vendors' primary target and has a small layer (30 MB). The digest was cross-checked with Debian's own debuerreotype artifacts. GameNative's Wine-oriented image (used by VelvetLauncher) is not used. |
 | Browser binaries | Vendors' own signed APT repositories, key fingerprints pinned | Chrome cannot be redistributed and Brave's binary may not be rehosted. Downloading them at the user's request from the vendor is the only legitimate path. apt verifies every Release file and .deb against the pinned key. |
 | Display server | Xvfb (X.Org, MIT) from Debian, `-fbdir` | Installed at runtime and licence-clean. Termux:X11 (GPL-3.0) and GameNative/Winlator's X server (GPL-3.0 / LGPL) cannot be linked into this MIT app. |
+| Screen size | X screen is a square (≥1600, ≥ the target's long side); the browser window is resized with X ConfigureWindow to exactly the target's shape | Fills phone portrait, phone landscape and every head-unit size without letterboxing; rotation reflows live. A target larger than the screen, or a big scale change (phone → car), restarts the browser with `--restore-last-session` |
+| Drawing | Car: the app's `CarSurfaceCanvas` (hardware canvas with a crash canary, software fallback). Phone: an ordinary View drawn in `onDraw` | `lockHardwareCanvas` on a SurfaceView aborted the process on HyperOS 3 / Android 16 (HWUI "no surface") |
+| Controls | Floating rail on the left (touch, mouse/trackpad, keyboard, settings), drawn over the page on car and phone | Matches the requested design; the page keeps the whole screen |
 | Frame transport | mmap of Xvfb's framebuffer file, DAMAGE-driven, one `copyPixelsFromBuffer` + texture upload per changed frame, R/B swap in a GPU color matrix | No pipes or sockets, and no per-pixel CPU work. **Limitation:** one ~3.7 MB copy per changed frame at 1280×720. Zero-copy would need an X server that renders into AHardwareBuffers (GameNative's `ASurfaceRenderer` does this) and is a follow-up. |
 | Input | XTEST over the X socket (Kotlin client) | Browsers see a mouse and keyboard, which every site handles. Unmapped characters (Thai, emoji) get bound to a spare keycode first. |
 | Audio | PulseAudio null sink → `module-simple-protocol-unix` → AudioTrack | Focus is requested only when the page actually makes sound, and is never grabbed back after a permanent loss. |
@@ -81,8 +84,11 @@ those.
 - `NavigationTemplate` with an action strip (keyboard, back, reload) and `Action.PAN`, which is
   what makes the host deliver `onScroll`/`onFling`/`onScale`.
 - Text uses the host keyboard (`CarBrowserSearchScreen`), then is typed into the focused field + Enter.
-- The X display is created at the car surface size and DPI (scale = dpi/160, clamped 1–2), so car
-  pixels map 1:1. A session started on the phone (1280×720) is letterboxed on the car.
+- The page takes the whole car surface 1:1 (scale = dpi/160, clamped 1–2). The host's stable area
+  is ignored when it only reserves the auto-hidden action strip; it is used when a Coolwalk
+  widget covers part of the screen.
+- Portrait head units that give an app only a narrow strip (DHU portrait config: 182×1830) are a
+  host layout limit.
 - Surface churn (another screen pushed, DHU reconnect) only detaches the renderer; the browser
   keeps running. Ten minutes without any surface stops it, after it saves its profile.
 

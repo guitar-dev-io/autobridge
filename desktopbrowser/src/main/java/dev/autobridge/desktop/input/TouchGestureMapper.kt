@@ -19,6 +19,9 @@ import kotlin.math.hypot
  * - long press, then drag: left-button drag (select text, move a slider, drag a scrollbar);
  * - two fingers: pinch zooms the page (Ctrl+wheel), moving them scrolls.
  *
+ * In [PointerMode.MOUSE] the screen is a trackpad instead: drag moves the cursor, tap clicks
+ * where the cursor is, long press right-clicks there, two fingers still scroll.
+ *
  * Coordinates go through the same [DisplayMapping] the renderer drew with, so the click lands on
  * the pixel under the finger.
  */
@@ -26,6 +29,7 @@ class TouchGestureMapper(
     context: Context,
     private val input: () -> BrowserInput?,
     private val mapping: () -> DisplayMapping?,
+    private val mode: () -> PointerMode = { PointerMode.TOUCH },
     private val onInput: () -> Unit = {},
 ) {
     private val slop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
@@ -46,6 +50,7 @@ class TouchGestureMapper(
     private val longPress = Runnable {
         if (!moved && !multi) {
             longPressed = true
+            if (mode() == PointerMode.MOUSE) return@Runnable
             val (dx, dy) = toDisplay(downX, downY) ?: return@Runnable
             input()?.moveTo(dx, dy)
         }
@@ -83,12 +88,16 @@ class TouchGestureMapper(
                     if (!moved && hypot(event.x - downX, event.y - downY) > slop) {
                         moved = true
                         handler.removeCallbacks(longPress)
-                        if (longPressed) {
+                        if (longPressed && mode() == PointerMode.TOUCH) {
                             dragging = true
                             toDisplay(downX, downY)?.let { (dx, dy) -> target.press(dx, dy) }
                         }
                     }
-                    if (moved) {
+                    if (moved && mode() == PointerMode.MOUSE) {
+                        mapping()?.let { map ->
+                            target.moveBy(map.toDisplayDistance(event.x - lastX), map.toDisplayDistance(event.y - lastY), map.displayWidth, map.displayHeight)
+                        }
+                    } else if (moved) {
                         if (dragging) {
                             toDisplay(event.x, event.y)?.let { (dx, dy) -> target.moveTo(dx, dy) }
                         } else {
@@ -100,7 +109,12 @@ class TouchGestureMapper(
             }
             MotionEvent.ACTION_UP -> {
                 handler.removeCallbacks(longPress)
-                if (!multi) {
+                if (!multi && mode() == PointerMode.MOUSE) {
+                    when {
+                        longPressed && !moved -> target.clickAtCursor(BrowserInput.BUTTON_RIGHT)
+                        !moved -> target.clickAtCursor()
+                    }
+                } else if (!multi) {
                     when {
                         dragging -> toDisplay(event.x, event.y)?.let { (dx, dy) -> target.release(dx, dy) }
                         longPressed && !moved -> toDisplay(downX, downY)?.let { (dx, dy) -> target.click(dx, dy, BrowserInput.BUTTON_RIGHT) }

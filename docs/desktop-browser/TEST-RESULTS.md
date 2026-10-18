@@ -9,7 +9,7 @@ with the reason.
 |---|---|
 | Container | Docker `debian@sha256:a2ca6537…6850` (the same pinned arm64 trixie-slim image the app installs), on an Apple Silicon Mac |
 | Emulator | `Pixel_8_API_35`: Android 15, arm64, **16 KB pages**, 6 GB RAM, 5.8 GB data partition, software GPU, no Android Auto app |
-| Phone | Xiaomi 13T Pro (`corot`, 23078PND5G). Connected at the start, **disconnected from adb before any install**, so not used |
+| Phone | Xiaomi 13T Pro (`corot`, 23078PND5G), HyperOS 3 / Android 16, 4 KB pages, 11 GB RAM, Android Auto with DHU 2.0 (720-hidpi, 1080-hidpi, portrait 1080×1920, Ford 800×1280 configs) |
 
 ## Results
 
@@ -41,13 +41,19 @@ with the reason.
 | 24 | Storage per browser + runtime | PASS | program / profile / cache sizes shown and refreshed |
 | 25 | Child-process limit warning | PASS | shown on Android 15, with Developer options + adb command |
 | 26 | Chrome: Terms of Service gate | PASS | dialog appears before any download. Cancel starts nothing |
-| 27 | Chrome install + startup | PASS (container) / **PENDING (device)** | container: 155.0.8059.84 installs from Google's repo, renders with these flags. On the emulator, the 5.8 GB partition has no room. Accepting Google's terms is the user's step |
+| 27 | Chrome install + startup | PASS (phone) | 155.0.8059.84-1 installed on the phone after Google's terms were accepted in the app on the phone; runs on phone and DHU |
 | 28 | Brave Shields | PASS (visible) | Shields icon and stats card on the NTP. Blocking counts not measured |
-| 29 | Audio | PASS (container) / **PENDING (device)** | PulseAudio export measured at the expected 48 kHz × 4 B/s. The emulator was headless (`-no-audio`) |
+| 29 | Audio | PASS (phone) | YouTube in Brave: the tab shows the speaker icon and AutoBridge holds USAGE_MEDIA audio focus (`dumpsys audio`). Loudness was not heard by the tester |
 | 30 | X11 client: XTEST, keymap, DAMAGE | PASS | integration test against a real Xvfb + Brave |
-| 31 | HTML5 video, fullscreen | **PENDING** | not run (emulator software GPU, no audio) |
-| 32 | DHU / Android Auto | **PENDING** | needs the phone (the emulator has no Android Auto). Steps below |
-| 33 | Regression of the built-in browser | PASS (unit) / **PENDING (DHU)** | built-in browser code untouched, its tests pass |
+| 31 | HTML5 video | PASS (phone) | Big Buck Bunny on YouTube plays in Brave; 27 fps drawn, browser GPU process ~48 % of one core. Fullscreen video not tried |
+| 32 | DHU: entry and full-screen page | PASS | "Desktop Browser" appears in the Android Auto launcher; page fills the screen at 1280×600 (720-hidpi), 1785×1050 (1080-hidpi), 800×400 (Ford) |
+| 34 | DHU: control rail | PASS | touch/mouse/keyboard/settings rail on the left, selected mode blue; mode switch works; settings opens a list (back, forward, reload, new tab, zoom, mode) and "New tab" opened a tab |
+| 35 | DHU: tap accuracy | PASS | tapped the 12 px close button of Chrome's warning bar on a 1280×600 surface; it closed |
+| 36 | DHU: screen-size change | PASS | 720-hidpi → 1080-hidpi restarted the browser at the bigger screen with the session restored |
+| 37 | DHU: portrait (1080×1920, normalizedpi) | **LIMIT** | Android Auto gives the app only a 182×1830 strip in that config; the page fits it but is unusable. A host layout, not something the app can change |
+| 38 | Phone: portrait + landscape full screen | PASS | page fills the screen in both; rotating reflows the page (window resized live), tabs kept |
+| 39 | Phone crash on HyperOS 3 / Android 16 | FIXED | first viewer (SurfaceView + lockHardwareCanvas) aborted in HWUI ("drawRenderNode called on a context with no surface!"); now an ordinary View on the phone and the app's CarSurfaceCanvas guard on the car |
+| 33 | Regression of the built-in browser | PASS (unit) | built-in browser code untouched, its tests pass; not re-checked on the DHU this round |
 
 ## Bugs found by testing, fixed
 
@@ -71,7 +77,11 @@ with the reason.
 | Cold start (tap Open → page) | under 30 s on the loaded emulator. ~2.1 s to first page in the container | screenshots / timing |
 | Runtime memory | 1.1 GB summed RSS with Brave on its NTP (RSS double-counts shared pages) | diagnostics |
 | Rendering | damage-driven, ≤30 fps cap. Idle ≈ 0.7 fps (keep-alive only) | diagnostics |
-| Warm start, CPU %, FPS under video, touch latency | **not measured** | needs the phone |
+| Phone: runtime install (download → apt) | 1 min 34 s | phone |
+| Phone: Brave install | 56 s | phone |
+| Phone: cold start → first paint | 1.5 s (first DAMAGE 1537 ms) | phone diagnostics |
+| Phone: video | 27 fps drawn; runtime RSS 1.5 GB summed; GPU process ~48 % of one core | phone |
+| Touch latency, warm start | **not measured** | |
 
 ## Pending on the phone: exact steps
 

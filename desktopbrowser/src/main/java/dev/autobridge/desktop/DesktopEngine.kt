@@ -188,22 +188,50 @@ object DesktopEngine {
     // --- Sessions ---------------------------------------------------------------------------
 
     /**
-     * Returns the running session for [id], starting one sized [width]×[height] if needed. Only one
-     * browser runs at a time: another browser's session is stopped first.
+     * Returns a running session for [id] shown at [viewWidth]×[viewHeight] display pixels with
+     * device scale [scale], starting one if needed. Only one browser runs at a time.
+     *
+     * An existing session of the same browser is reused and simply re-fitted, unless the new shape
+     * does not fit its X screen or the scale differs a lot (phone → car): then the browser is
+     * restarted with its last session restored, because Chromium cannot change scale or grow its
+     * screen while running.
      */
     @Synchronized
-    fun openSession(id: DesktopBrowserId, width: Int, height: Int, dpi: Int, startUrl: String? = null): DesktopSession {
+    fun openSession(id: DesktopBrowserId, viewWidth: Int, viewHeight: Int, scale: Float, startUrl: String? = null): DesktopSession {
         val existing = _session.value
-        if (existing != null && existing.adapter.id == id && existing.isAliveOrStarting()) return existing
-        existing?.stop()
+        if (existing != null && existing.adapter.id == id && existing.isAliveOrStarting() &&
+            !existing.tooSmallFor(viewWidth, viewHeight) && kotlin.math.abs(existing.scale - scale) < 0.3f
+        ) {
+            existing.fitTo(viewWidth, viewHeight)
+            return existing
+        }
+        val restore = existing != null && existing.adapter.id == id
+        existing?.let { _session.value = null; it.stop() }
         val adapter = DesktopBrowsers.of(id)
         check(state(id).state.installed) { "${adapter.displayName} is not installed" }
-        val session = DesktopSession(appContext, runtime, adapter, evenSize(width), evenSize(height), dpi)
+        val screen = maxOf(MIN_SCREEN, viewWidth, viewHeight).let { (it + 1) and 1.inv() }
+        val session = DesktopSession(appContext, runtime, adapter, screen, scale.coerceIn(1f, 2.5f), restore)
         _session.value = session
         setBrowser(id, state(id).copy(state = InstallState.RUNNING))
-        session.start(startUrl)
+        session.start(startUrl, viewWidth, viewHeight)
         return session
     }
+
+    /**
+     * The phone shows a desktop-sized page: the long side is about [PHONE_LONG_SIDE] display
+     * pixels at scale 1, scaled up to the screen. Portrait gives a tall window, landscape a wide
+     * one; both fill the screen.
+     */
+    fun phoneViewport(surfaceWidth: Int, surfaceHeight: Int): Pair<Int, Int> {
+        val k = (maxOf(surfaceWidth, surfaceHeight) / PHONE_LONG_SIDE.toFloat()).coerceAtLeast(1f)
+        return (surfaceWidth / k).toInt() to (surfaceHeight / k).toInt()
+    }
+
+    /** Car screens are drawn 1:1; the scale comes from the head unit's dpi. */
+    fun carScale(dpi: Int): Float = (dpi / 160f).coerceIn(1f, 2f)
+
+    private const val PHONE_LONG_SIDE = 1600
+    private const val MIN_SCREEN = 1600
 
     /**
      * Surface bookkeeping for the idle stop: a browser nobody has looked at for [IDLE_STOP_MS]
@@ -337,5 +365,4 @@ object DesktopEngine {
         setBrowser(id, ComponentState(if (installed) InstallState.READY else InstallState.FAILED, version = store.version(id), lastError = message))
     }
 
-    private fun evenSize(v: Int) = (v and 1.inv()).coerceIn(320, 2560)
 }

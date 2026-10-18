@@ -9,8 +9,7 @@ import android.os.Bundle
 import android.text.InputType
 import android.view.Gravity
 import android.view.KeyEvent
-import android.view.SurfaceHolder
-import android.view.SurfaceView
+import android.view.MotionEvent
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
@@ -19,13 +18,16 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputMethodManager
 import android.widget.FrameLayout
-import android.widget.LinearLayout
+import android.widget.PopupMenu
 import android.widget.TextView
 import android.widget.Toast
 import dev.autobridge.R
 import dev.autobridge.desktop.DesktopEngine
 import dev.autobridge.desktop.browser.DesktopBrowserId
+import dev.autobridge.desktop.display.DesktopView
+import dev.autobridge.desktop.input.ControlRail
 import dev.autobridge.desktop.input.Keysym
+import dev.autobridge.desktop.input.PointerMode
 import dev.autobridge.desktop.input.TouchGestureMapper
 import dev.autobridge.desktop.session.DesktopSession
 import dev.autobridge.i18n.AppLocale
@@ -36,21 +38,27 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 /**
- * The desktop browser on the phone: the X display drawn into a SurfaceView, with touch turned
- * into mouse input and the phone keyboard into key events. The browser's own toolbar (tabs,
- * address bar, back/forward) is the navigation; the small bar here only adds what a touch
- * screen lacks — a keyboard, back, reload — and a way out.
+ * The desktop browser on the phone, full screen in either orientation.
  *
- * Leaving the screen only detaches the surface; the browser keeps its tabs and is stopped after
+ * The browser window is resized to the screen's own shape (DesktopEngine.phoneViewport), so the
+ * page fills the screen in portrait and in landscape, and rotating the phone reflows the page
+ * instead of letterboxing it. A floating rail on the left (same as on the car) switches between
+ * touch and mouse (trackpad) input, opens the keyboard, and opens a menu with back, forward,
+ * reload, new tab, zoom and close.
+ *
+ * Leaving the screen only detaches the view; the browser keeps its tabs and is stopped after
  * [DesktopEngine.IDLE_STOP_MS] if nobody comes back.
  */
-class DesktopBrowserActivity : Activity(), SurfaceHolder.Callback {
+class DesktopBrowserActivity : Activity() {
     private val scope = MainScope()
     private var session: DesktopSession? = null
-    private lateinit var surfaceView: SurfaceView
+    private lateinit var browserId: DesktopBrowserId
+    private lateinit var desktopView: DesktopView
     private lateinit var keyInput: KeyInputView
     private lateinit var statusText: TextView
     private lateinit var gestures: TouchGestureMapper
+    private lateinit var rail: ControlRail
+    private var imeHeight = 0
 
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(AppLocale.rebase(newBase))
@@ -59,7 +67,7 @@ class DesktopBrowserActivity : Activity(), SurfaceHolder.Callback {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         DesktopEngine.init(this)
-        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_FULL_USER
         val id = DesktopBrowserId.fromKey(intent.getStringExtra(EXTRA_BROWSER))
             ?: DesktopEngine.chosenInstalledBrowser()?.id
         if (id == null || !DesktopEngine.state(id).state.installed) {
@@ -67,23 +75,12 @@ class DesktopBrowserActivity : Activity(), SurfaceHolder.Callback {
             finish()
             return
         }
-        // The phone display is a laptop-sized 1280x720 at scale 1; it is scaled up to the phone.
-        session = try {
-            DesktopEngine.openSession(id, PHONE_WIDTH, PHONE_HEIGHT, 160, intent.getStringExtra(EXTRA_URL))
-        } catch (e: Exception) {
-            Toast.makeText(this, e.message, Toast.LENGTH_LONG).show()
-            finish()
-            return
-        }
-        session?.renderer?.placeholderText = getString(dev.autobridge.desktop.R.string.desktop_starting)
-        gestures = TouchGestureMapper(this, { session?.input }, { session?.renderer?.mapping }) { session?.renderer?.burst() }
+        browserId = id
+        rail = ControlRail(this, resources.displayMetrics.density)
 
         val root = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
-        surfaceView = SurfaceView(this).apply {
-            holder.addCallback(this@DesktopBrowserActivity)
-            setOnTouchListener { _, event -> gestures.onTouchEvent(event) }
-        }
-        root.addView(surfaceView, FrameLayout.LayoutParams(-1, -1))
+        desktopView = DesktopView(this)
+        root.addView(desktopView, FrameLayout.LayoutParams(-1, -1))
         keyInput = KeyInputView(this) { session }
         root.addView(keyInput, FrameLayout.LayoutParams(1, 1))
         statusText = TextView(this).apply {
@@ -93,24 +90,55 @@ class DesktopBrowserActivity : Activity(), SurfaceHolder.Callback {
             setPadding(dp(12), dp(8), dp(12), dp(8))
             visibility = View.GONE
         }
-        root.addView(statusText, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.START).apply { setMargins(dp(12), 0, 0, dp(12)) })
-        toolbar = toolbar()
-        root.addView(toolbar, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = dp(32) })
+        root.addView(statusText, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = dp(16) })
         setContentView(root)
         hideSystemBars()
-        // With the keyboard up, fit the page into the space above it instead of typing blind
-        // under the keyboard; the bar moves up with it.
+
+        gestures = TouchGestureMapper(this, { session?.input }, { session?.renderer?.mapping }, { rail.mode }) { session?.renderer?.burst() }
+        desktopView.setOnTouchListener { _, event -> onPageTouch(event) }
+        desktopView.addOnLayoutChangeListener { _, l, t, r, b, ol, ot, or_, ob ->
+            if (r - l != or_ - ol || b - t != ob - ot) fit()
+        }
+        // The keyboard takes the bottom of the screen: the browser window shrinks to what is left
+        // above it, so the field being typed in stays visible.
         root.setOnApplyWindowInsetsListener { _, insets ->
             val ime = insets.getInsets(WindowInsets.Type.ime()).bottom
             if (ime != imeHeight) {
                 imeHeight = ime
-                placeToolbar()
+                fit()
             }
             insets
         }
+    }
 
+    /** Opens or re-fits the session for the view's current size and keyboard. */
+    private fun fit() {
+        val w = desktopView.width
+        val h = desktopView.height - imeHeight
+        if (w <= 0 || h <= 0) return
+        val (vw, vh) = DesktopEngine.phoneViewport(w, desktopView.height).let { (fw, fh) ->
+            fw to (fh * h / desktopView.height)
+        }
+        val s = session ?: try {
+            DesktopEngine.openSession(browserId, vw, vh, 1f, intent.getStringExtra(EXTRA_URL)).also { attach(it) }
+        } catch (e: Exception) {
+            Toast.makeText(this, e.message, Toast.LENGTH_LONG).show()
+            finish()
+            return
+        }
+        s.fitTo(vw, vh)
+        s.renderer.setArea(android.graphics.Rect(0, 0, w, h))
+        s.renderer.attachView(desktopView, desktopView.width, desktopView.height)
+        DesktopEngine.noteSurfaceAttached()
+    }
+
+    private fun attach(s: DesktopSession) {
+        session = s
+        desktopView.renderer = s.renderer
+        s.renderer.overlay = rail
+        s.renderer.placeholderText = getString(dev.autobridge.desktop.R.string.desktop_starting)
         scope.launch {
-            session?.status?.collect { status ->
+            s.status.collect { status ->
                 when (status.phase) {
                     DesktopSession.Phase.FAILED -> {
                         statusText.visibility = View.VISIBLE
@@ -126,75 +154,78 @@ class DesktopBrowserActivity : Activity(), SurfaceHolder.Callback {
         }
     }
 
-    private lateinit var toolbar: LinearLayout
-
-    /**
-     * The page is letterboxed into the surface (16:9 display), so the bar sits in the spare band:
-     * a rail on the right when the bands are at the sides, a row under the picture when they are
-     * above and below. Decided from the real surface size, not the configuration: a device that
-     * ignores the landscape request (large screens, Android 16, some emulators) still reports
-     * landscape while showing portrait.
-     */
-    private fun placeToolbar(surfaceWidth: Int = surfaceView.width, surfaceHeight: Int = surfaceView.height) {
-        if (surfaceWidth <= 0 || surfaceHeight <= 0) return
-        val sideBands = surfaceWidth.toFloat() / surfaceHeight > PHONE_WIDTH.toFloat() / PHONE_HEIGHT
-        toolbar.orientation = if (sideBands) LinearLayout.VERTICAL else LinearLayout.HORIZONTAL
-        toolbar.layoutParams = if (sideBands) {
-            FrameLayout.LayoutParams(-2, -2, Gravity.END or Gravity.CENTER_VERTICAL).apply { marginEnd = dp(6) }
-        } else {
-            FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = dp(8) + imeHeight }
+    /** Rail buttons first; everything else is the page. */
+    private fun onPageTouch(event: MotionEvent): Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+            val button = rail.hit(event.x, event.y)
+            if (button != null) {
+                railPressed = true
+                onRail(button)
+                return true
+            }
+            railPressed = false
         }
-        applyContentArea(surfaceWidth, surfaceHeight, sideBands)
+        if (railPressed) return true
+        return gestures.onTouchEvent(event)
     }
 
-    private var imeHeight = 0
+    private var railPressed = false
 
-    /**
-     * The page is drawn only in what the bar and the keyboard leave free, so neither ever covers
-     * it — even when the band around the 16:9 picture is thinner than the bar (a window the
-     * system letterboxed, a squarish tablet).
-     */
-    private fun applyContentArea(w: Int, h: Int, sideBands: Boolean) {
-        toolbar.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
-        val gap = dp(14)
-        if (sideBands) {
-            session?.setContentArea(0, 0, (w - toolbar.measuredWidth - gap).coerceAtLeast(w / 2), (h - imeHeight).coerceAtLeast(h / 3))
-        } else {
-            session?.setContentArea(0, 0, w, (h - imeHeight - toolbar.measuredHeight - gap).coerceAtLeast(h / 3))
+    private fun onRail(button: ControlRail.Button) {
+        when (button) {
+            ControlRail.Button.TOUCH -> rail.mode = PointerMode.TOUCH
+            ControlRail.Button.MOUSE -> rail.mode = PointerMode.MOUSE
+            ControlRail.Button.KEYBOARD -> keyInput.toggle()
+            ControlRail.Button.SETTINGS -> showMenu()
+        }
+        session?.renderer?.burst()
+    }
+
+    private fun showMenu() {
+        val anchor = View(this)
+        (desktopView.parent as FrameLayout).addView(anchor, FrameLayout.LayoutParams(1, 1).apply {
+            leftMargin = dp(70); topMargin = desktopView.height / 2
+        })
+        val input = session?.input
+        PopupMenu(this, anchor).apply {
+            menu.add(0, 1, 0, R.string.desktop_viewer_back)
+            menu.add(0, 2, 1, R.string.desktop_menu_forward)
+            menu.add(0, 3, 2, R.string.desktop_viewer_reload)
+            menu.add(0, 4, 3, R.string.desktop_menu_new_tab)
+            menu.add(0, 5, 4, R.string.desktop_menu_zoom_in)
+            menu.add(0, 6, 5, R.string.desktop_menu_zoom_out)
+            menu.add(0, 7, 6, R.string.desktop_viewer_close)
+            setOnMenuItemClickListener { item ->
+                when (item.itemId) {
+                    1 -> input?.back()
+                    2 -> input?.forward()
+                    3 -> input?.reload()
+                    4 -> input?.newTab()
+                    5 -> input?.key('='.code, Keysym.CONTROL_L)
+                    6 -> input?.key('-'.code, Keysym.CONTROL_L)
+                    7 -> finish()
+                }
+                session?.renderer?.burst()
+                true
+            }
+            setOnDismissListener { (anchor.parent as? FrameLayout)?.removeView(anchor) }
+            show()
         }
     }
 
-    private fun toolbar(): LinearLayout = LinearLayout(this).apply {
-        background = AutoBridgeDesign.surface(this@DesktopBrowserActivity, AutoBridgeDesign.tint(AutoBridgeDesign.INK, 0.82f), 22)
-        setPadding(dp(4), dp(4), dp(4), dp(4))
-        alpha = 0.9f
-        fun glyph(text: String, description: Int, action: () -> Unit) = addView(
-            AutoBridgeDesign.glyphButton(this@DesktopBrowserActivity, text, 20f) { action(); session?.renderer?.burst() }.apply {
-                contentDescription = getString(description)
-            },
-            LinearLayout.LayoutParams(dp(44), dp(44))
-        )
-        glyph("⌨", R.string.desktop_viewer_keyboard) { keyInput.toggle() }
-        glyph("‹", R.string.desktop_viewer_back) { session?.input?.back() }
-        glyph("⟳", R.string.desktop_viewer_reload) { session?.input?.reload() }
-        glyph("✕", R.string.desktop_viewer_close) { finish() }
-    }
-
-    override fun surfaceCreated(holder: SurfaceHolder) = Unit
-
-    override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
-        session?.attachSurface(holder.surface, width, height)
-        placeToolbar(width, height)
-        DesktopEngine.noteSurfaceAttached()
-    }
-
-    override fun surfaceDestroyed(holder: SurfaceHolder) {
+    override fun onPause() {
+        super.onPause()
         session?.detachSurface()
         DesktopEngine.noteSurfaceDetached()
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (session != null) fit()
+    }
+
     override fun onBackPressed() {
-        // Back goes to the previous page in the browser; the ✕ button leaves.
+        // Back goes to the previous page in the browser; the menu's Close leaves.
         session?.input?.back() ?: super.onBackPressed()
     }
 
@@ -310,8 +341,6 @@ class DesktopBrowserActivity : Activity(), SurfaceHolder.Callback {
 
         private const val EXTRA_BROWSER = "browser"
         private const val EXTRA_URL = "url"
-        private const val PHONE_WIDTH = 1280
-        private const val PHONE_HEIGHT = 720
 
         fun intent(context: Context, id: DesktopBrowserId, url: String? = null): Intent =
             Intent(context, DesktopBrowserActivity::class.java)

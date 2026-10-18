@@ -113,6 +113,44 @@ class X11Connection private constructor(
         request(body.array(), expectReply = false)
     }
 
+    /** Direct children of [window], bottom to top. */
+    fun queryTree(window: Int = setup.root): List<Int> {
+        val body = buffer(8).apply { put(OP_QUERY_TREE.toByte()); put(0); putShort(2); putInt(window) }
+        val reply = ByteBuffer.wrap(request(body.array(), expectReply = true)!!).order(ByteOrder.LITTLE_ENDIAN)
+        val count = reply.getShort(16).toInt() and 0xffff
+        return List(count) { reply.getInt(32 + it * 4) }
+    }
+
+    data class WindowInfo(val id: Int, val viewable: Boolean, val overrideRedirect: Boolean, val x: Int, val y: Int, val width: Int, val height: Int)
+
+    /** Map state, override-redirect and geometry of [window] (two round trips). */
+    fun windowInfo(window: Int): WindowInfo {
+        val attrs = buffer(8).apply { put(OP_GET_WINDOW_ATTRIBUTES.toByte()); put(0); putShort(2); putInt(window) }
+        val a = request(attrs.array(), expectReply = true)!!
+        val geometry = buffer(8).apply { put(OP_GET_GEOMETRY.toByte()); put(0); putShort(2); putInt(window) }
+        val g = ByteBuffer.wrap(request(geometry.array(), expectReply = true)!!).order(ByteOrder.LITTLE_ENDIAN)
+        return WindowInfo(
+            id = window,
+            viewable = (a[26].toInt() and 0xff) == MAP_STATE_VIEWABLE,
+            overrideRedirect = a[27].toInt() != 0,
+            x = g.getShort(12).toInt(),
+            y = g.getShort(14).toInt(),
+            width = g.getShort(16).toInt() and 0xffff,
+            height = g.getShort(18).toInt() and 0xffff,
+        )
+    }
+
+    /** Moves and resizes [window]. With no window manager running, the server applies it directly. */
+    fun configureWindow(window: Int, x: Int, y: Int, width: Int, height: Int) {
+        val body = buffer(28).apply {
+            put(OP_CONFIGURE_WINDOW.toByte()); put(0); putShort(7)
+            putInt(window)
+            putShort((CW_X or CW_Y or CW_WIDTH or CW_HEIGHT).toShort()); putShort(0)
+            putInt(x); putInt(y); putInt(width); putInt(height)
+        }
+        request(body.array(), expectReply = false)
+    }
+
     /** Pointer position on the root window (diagnostics, and proof that input reached the server). */
     fun queryPointer(): Pair<Int, Int> {
         val body = buffer(8).apply { put(OP_QUERY_POINTER.toByte()); put(0); putShort(2); putInt(setup.root) }
@@ -258,7 +296,16 @@ class X11Connection private constructor(
         const val BUTTON_RELEASE = 5
         const val MOTION_NOTIFY = 6
 
+        private const val OP_GET_WINDOW_ATTRIBUTES = 3
+        private const val OP_CONFIGURE_WINDOW = 12
+        private const val OP_GET_GEOMETRY = 14
+        private const val OP_QUERY_TREE = 15
         private const val OP_QUERY_POINTER = 38
+        private const val MAP_STATE_VIEWABLE = 2
+        private const val CW_X = 1
+        private const val CW_Y = 2
+        private const val CW_WIDTH = 4
+        private const val CW_HEIGHT = 8
         private const val OP_GET_INPUT_FOCUS = 43
         private const val OP_QUERY_EXTENSION = 98
         private const val OP_CHANGE_KEYBOARD_MAPPING = 100

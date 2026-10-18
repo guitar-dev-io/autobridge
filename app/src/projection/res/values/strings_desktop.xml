@@ -54,4 +54,11 @@
     <string name="desktop_settings_child_limit_12">Android 12 and 13 limit how many background processes an app may run, and a desktop browser needs many. Lift the limit once with the adb command below from a computer, or the browser can close by itself.</string>
     <string name="desktop_settings_open_developer_options">Open Developer options</string>
     <string name="desktop_settings_copy_adb">Copy adb command</string>
+    <string name="desktop_menu_forward">Forward</string>
+    <string name="desktop_menu_new_tab">New tab</string>
+    <string name="desktop_menu_zoom_in">Zoom in</string>
+    <string name="desktop_menu_zoom_out">Zoom out</string>
+    <string name="desktop_car_settings_title">Desktop browser</string>
+    <string name="desktop_car_mode_touch">Touch mode: tap clicks, drag scrolls</string>
+    <string name="desktop_car_mode_mouse">Mouse mode: drag moves the cursor, tap clicks it</string>
 </resources>

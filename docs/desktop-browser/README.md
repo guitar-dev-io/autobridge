@@ -4,9 +4,9 @@ Linux Google Chrome and Brave (arm64 desktop builds), run in a shared Debian run
 and shown on the phone and on Android Auto, next to the built-in AutoBridge browser. Personal and
 lab flavors only.
 
-**Status:** implemented. Runtime, Brave install, phone rendering and input are verified on an
-Android 15 arm64 emulator. Chrome is verified in an arm64 container. Android Auto/DHU is pending
-on the phone. See TEST-RESULTS.md.
+**Status:** implemented and verified on a Xiaomi 13T Pro (Android 16) and its DHU: Brave and
+Chrome install, render full screen on the phone (portrait and landscape) and on Android Auto
+(several head-unit sizes), with the floating control rail. See TEST-RESULTS.md.
 
 | Doc | Topic |
 |---|---|
