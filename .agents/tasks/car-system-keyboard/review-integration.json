@@ -1,0 +1,13 @@
+{
+  "approved": true,
+  "findings": [
+    {
+      "label": "Synchronous insets read on AVAILABLE open",
+      "severity": "non-blocking",
+      "confidence": "possible",
+      "status": "carried-over, out of scope",
+      "detail": "On a cached-AVAILABLE open the field-scroll reads ime().bottom before Gboard has animated in, so the first keepFocusedFieldAboveKeyboard may see zero insets and skip; it self-corrects on the next insets callback via onImeVisibilityChanged. Already dispositioned 'no action required' by the logic review; not introduced or altered by this commit."
+    }
+  ],
+  "reviewDoc": "/Users/anuwat.t/Documents/ChatGPT/AutoBridge/.agents/tasks/car-system-keyboard/review-integration.md"
+}
