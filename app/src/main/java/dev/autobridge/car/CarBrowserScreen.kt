@@ -350,6 +350,12 @@ class CarBrowserScreen(carContext: CarContext) :
         screenManager.popToRoot()
     }
 
+    override fun desktopBrowserAvailable(): Boolean = CarExtensions.canOpenWeb(carContext)
+
+    override fun openDesktopBrowser() {
+        CarExtensions.openWeb(carContext, screenManager)
+    }
+
     override fun openExternal(url: String) {
         val safe = dev.autobridge.entertainment.ContentAddress.https(url) ?: url
         val opened = runCatching {

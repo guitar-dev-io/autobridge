@@ -30,6 +30,7 @@ import dev.autobridge.browser.BrowserDefaults
 import dev.autobridge.browser.BrowserGeolocation
 import dev.autobridge.browser.FullscreenVideoController
 import dev.autobridge.core.policy.FeaturePolicy
+import dev.autobridge.design.DesignTokens
 import dev.autobridge.i18n.AppLocale
 import dev.autobridge.media.MediaPlaybackClient
 import dev.autobridge.safety.ParkingStateStore
@@ -103,7 +104,7 @@ class EntertainmentActivity : Activity() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(16, 16, 16, 8)
-            setBackgroundColor(Color.rgb(16, 19, 25))
+            setBackgroundColor(DesignTokens.Phone.ENTERTAINMENT_BACKGROUND)
         }
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
             val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
@@ -257,7 +258,7 @@ YouTube · TV · Web
             }
             textSize = 18f
             gravity = android.view.Gravity.CENTER
-            setTextColor(Color.rgb(160, 178, 205))
+            setTextColor(DesignTokens.Phone.ENTERTAINMENT_CAPTION)
         }
         val content = FrameLayout(this).apply {
             addView(emptyState, FrameLayout.LayoutParams(-1, -1))

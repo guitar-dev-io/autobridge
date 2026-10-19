@@ -1,0 +1,43 @@
+<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Start page sample</title><style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%}
+body{background:radial-gradient(ellipse at 15% 0%,rgba(77,163,255,.16) 0%,transparent 55%),
+radial-gradient(ellipse at 90% 100%,rgba(51,201,214,.10) 0%,transparent 55%),#12151A;background-attachment:fixed;color:#F3F5F7;
+font-family:Roboto,"Noto Sans Thai","Noto Sans",sans-serif;-webkit-font-smoothing:antialiased}
+main{max-width:980px;margin:0 auto;padding:28px 28px 120px}
+header{text-align:center;margin:8px 0 26px}
+h1{font-size:44px;font-weight:800;letter-spacing:-.5px;margin:0 0 8px}
+.sub{font-size:21px;color:#A9B0BA;margin:0;line-height:1.4}
+.search{display:flex;align-items:center;gap:14px;background:#1C2027;border:1px solid #2E343E;border-radius:999px;height:76px;padding:0 10px 0 26px;
+box-shadow:0 8px 28px rgba(0,0,0,.35);margin-bottom:26px}
+.lens{width:32px;height:32px;flex:none}
+.search input{flex:1;min-width:0;border:0;outline:0;background:transparent;font:inherit;font-size:24px;color:#F3F5F7;height:100%}
+.search input::placeholder{color:#A9B0BA}
+.search input::-webkit-search-cancel-button{display:none}
+.search button{flex:none;width:58px;height:58px;border:0;border-radius:50%;background:#4DA3FF;display:flex;align-items:center;justify-content:center;padding:0}
+.search button svg{width:30px;height:30px}
+.card{background:#1C2027;border:1px solid #2E343E;border-radius:30px;padding:24px 26px;margin-bottom:28px}
+.card-head{display:flex;align-items:center;gap:18px;margin-bottom:12px}
+.card-icon{flex:none;width:58px;height:58px;border-radius:18px;background:rgba(77,163,255,.16);display:flex;align-items:center;justify-content:center;font-size:30px}
+.card h2{font-size:25px;font-weight:700;margin:0}
+.card p{font-size:19px;line-height:1.5;color:#A9B0BA;margin:0 0 18px}
+.actions{display:flex;flex-wrap:wrap;gap:12px}
+.pill{display:inline-flex;align-items:center;gap:12px;background:#4DA3FF;color:#12151A;text-decoration:none;font-weight:700;font-size:20px;
+height:58px;padding:0 26px;border-radius:999px}
+.pill svg{width:24px;height:24px}
+.pill.ghost{background:#232831;color:#F3F5F7;border:1px solid #2E343E}
+h3{font-size:16px;font-weight:600;letter-spacing:2px;color:#A9B0BA;margin:0 4px 14px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:16px}
+.tile{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;background:#1C2027;border:1px solid #2E343E;
+border-radius:24px;padding:18px 10px 16px;text-decoration:none;color:inherit;min-width:0}
+.badge{width:64px;height:64px;border-radius:18px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:24px;margin-bottom:6px}
+.tile .t,.tile .h{max-width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.tile .t{font-size:18px;font-weight:600}
+.tile .h{font-size:14px;color:#A9B0BA}
+.back{display:inline-block;color:#4DA3FF;text-decoration:none;font-weight:700;font-size:20px;padding:8px 0}
+.qrs{display:flex;flex-wrap:wrap;gap:18px;justify-content:center}
+.qr{display:flex;flex-direction:column;align-items:center;gap:8px;background:#1C2027;border:1px solid #2E343E;border-radius:26px;padding:18px;width:260px;text-align:center}
+.qr img{width:220px;height:220px;border-radius:12px;background:#fff}
+.qr strong{font-size:20px}
+.qr span{font-size:15px;color:#A9B0BA;word-break:break-all}
+</style></head><body><main><header><h1>AutoBridge Browser</h1><p class="sub">เข้าเว็บที่ใช้บ่อยได้ในแตะเดียว</p></header><form class="search" onsubmit="return false"><svg class="lens" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="#4DA3FF" stroke-width="2.6"/><path d="M15.5 15.5L21 21" stroke="#4DA3FF" stroke-width="2.6" stroke-linecap="round"/></svg><input type="search" placeholder="ค้นหาหรือป้อนที่อยู่เว็บ"><button type="submit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M12.5 6l6 6-6 6" fill="none" stroke="#12151A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button></form><section class="card"><div class="card-head"><div class="card-icon">☕</div><h2>เลี้ยงค่าขนมผู้พัฒนา</h2></div><p>ถ้า AutoBridge ทำให้การขับรถสนุกขึ้น ค่าขนมเล็กๆ น้อยๆ ช่วยให้มีอัปเดตใหม่ๆ ต่อไปได้ ขอบคุณมากครับ ☕✨</p><div class="actions"><a class="pill" href="#">สนับสนุนผู้พัฒนา<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></a><a class="pill ghost" href="#">เปิดเบราว์เซอร์</a></div></section><h3>ลิงก์ด่วน</h3><div class="tiles"><a class="tile" href="#"><span class="badge" style="background:#E0683C">YM</span><span class="t">YouTube Music</span><span class="h">music.youtube.com</span></a><a class="tile" href="#"><span class="badge" style="background:#9A55D6">N</span><span class="t">Netflix</span><span class="h">netflix.com</span></a><a class="tile" href="#"><span class="badge" style="background:#D9475F">YT</span><span class="t">YouTube</span><span class="h">m.youtube.com</span></a><a class="tile" href="#"><span class="badge" style="background:#4F6BE0">G</span><span class="t">Google</span><span class="h">google.com</span></a><a class="tile" href="#"><span class="badge" style="background:#3C9E4F">GM</span><span class="t">Google Maps</span><span class="h">maps.google.com</span></a></div></main></body></html>

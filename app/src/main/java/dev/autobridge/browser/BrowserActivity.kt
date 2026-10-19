@@ -43,6 +43,7 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import dev.autobridge.R
 import dev.autobridge.core.model.Feature
 import dev.autobridge.core.policy.FeaturePolicy
+import dev.autobridge.design.DesignTokens
 import dev.autobridge.entertainment.BrowserLauncher
 import dev.autobridge.entertainment.ContentAddress
 import dev.autobridge.entertainment.WebBookmarkStore
@@ -249,9 +250,9 @@ class BrowserActivity : Activity() {
             contentDescription = getString(R.string.browser_fab_description)
             isFocusable = true
             background = GradientDrawable().apply {
-                setColor(0xE6101113.toInt())
+                setColor(DesignTokens.BrowserDark.FAB_FILL)
                 cornerRadius = sizes.fabSize / 2f
-                setStroke(1.dp(), 0xFF526FA6.toInt())
+                setStroke(1.dp(), DesignTokens.BrowserDark.FAB_EDGE)
             }
             setOnClickListener { runFloatingButtonAction() }
         }
@@ -280,7 +281,7 @@ class BrowserActivity : Activity() {
             contentDescription = "Show browser toolbar"
             gravity = Gravity.CENTER
             setTextColor(BrowserTheme.iconEnabled)
-            setBackgroundColor(Color.argb(90, 20, 22, 26))
+            setBackgroundColor(DesignTokens.BrowserDark.FULLSCREEN_TAB)
             visibility = View.GONE
             setOnClickListener { setFullscreen(false) }
         }

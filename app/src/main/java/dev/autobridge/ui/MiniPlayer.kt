@@ -12,6 +12,7 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import dev.autobridge.design.DesignTokens
 import dev.autobridge.media.MediaPlaybackClient
 import dev.autobridge.ui.AutoBridgeDesign.dp
 
@@ -307,11 +308,11 @@ class MiniPlayer(
     private companion object {
         const val PLAY = "▶"
         const val PAUSE = "❚❚"
-        const val AMBER = 0xFFFFB35C.toInt()
-        const val ON_AMBER = 0xFF2A1A05.toInt()
-        const val WARM_CARD = 0xFF2A2116.toInt()
-        const val WARM_EDGE = 0xFF5A4022.toInt()
-        const val WARM_TEXT = 0xFFFFC985.toInt()
-        const val SOFT_TEXT = 0xFFC9CDD3.toInt()
+        const val AMBER = DesignTokens.Phone.ACCENT_RADIO
+        const val ON_AMBER = DesignTokens.Radio.ON_AMBER
+        const val WARM_CARD = DesignTokens.Radio.WARM_CARD
+        const val WARM_EDGE = DesignTokens.Radio.WARM_EDGE
+        const val WARM_TEXT = DesignTokens.Radio.WARM_TEXT
+        const val SOFT_TEXT = DesignTokens.Radio.SOFT_TEXT
     }
 }

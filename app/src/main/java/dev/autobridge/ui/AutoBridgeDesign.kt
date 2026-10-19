@@ -21,6 +21,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import dev.autobridge.R
+import dev.autobridge.design.DesignTokens
 
 /**
  * AutoBridge's own phone design language, used by every screen the app draws itself.
@@ -39,35 +40,35 @@ object AutoBridgeDesign {
     // ----- Tokens -----
 
     // Matches the car dashboard palette (docs/UI_REDESIGN_TASKS.md "Design tokens").
-    const val INK = 0xFF12151A.toInt()
-    const val SURFACE = 0xFF1C2027.toInt()
-    const val SURFACE_RAISED = 0xFF232831.toInt()
-    const val HAIRLINE = 0xFF2E343E.toInt()
-    const val TEXT = 0xFFF3F5F7.toInt()
-    const val TEXT_MUTED = 0xFFA9B0BA.toInt()
-    const val ACCENT = 0xFF4DA3FF.toInt()
-    const val ACCENT_SOFT = 0xFF33C9D6.toInt()
-    const val DANGER = 0xFFFF9AA8.toInt()
+    const val INK = DesignTokens.Phone.INK
+    const val SURFACE = DesignTokens.Phone.SURFACE
+    const val SURFACE_RAISED = DesignTokens.Phone.SURFACE_RAISED
+    const val HAIRLINE = DesignTokens.Phone.HAIRLINE
+    const val TEXT = DesignTokens.Phone.TEXT
+    const val TEXT_MUTED = DesignTokens.Phone.TEXT_MUTED
+    const val ACCENT = DesignTokens.Phone.ACCENT
+    const val ACCENT_SOFT = DesignTokens.Phone.ACCENT_SOFT
+    const val DANGER = DesignTokens.Phone.DANGER
 
     /** "Parked" / "connected" status colour, shared by Home, Control, Car & Connection and Duo Screen. */
-    const val ACCENT_ONLINE = 0xFF5BE3B4.toInt()
+    const val ACCENT_ONLINE = DesignTokens.Phone.ACCENT_ONLINE
 
     /**
      * Signal colours for a checked channel: green answers, amber answers slowly, and a dead one
      * takes [DANGER]. Green reading as "go" is the one colour convention a driver does not have to
      * learn, and the head unit shows the same three through `CarColor` (see `CarIptvCheck`).
      */
-    const val SIGNAL_GOOD = 0xFF5BD98A.toInt()
-    const val SIGNAL_SLOW = 0xFFFFC65C.toInt()
+    const val SIGNAL_GOOD = DesignTokens.Phone.SIGNAL_GOOD
+    const val SIGNAL_SLOW = DesignTokens.Phone.SIGNAL_SLOW
 
     /** Per-section accents. Kept here so the phone and any future surface agree on them. */
-    const val ACCENT_TV = 0xFF6EA8FF.toInt()
-    const val ACCENT_RADIO = 0xFFFFB35C.toInt()
-    const val ACCENT_WEB = 0xFF7DD3C0.toInt()
-    const val ACCENT_VIDEO = 0xFFFF7A8A.toInt()
-    const val ACCENT_FILES = 0xFF9BE08A.toInt()
-    const val ACCENT_FAVORITE = 0xFFFF8FB1.toInt()
-    const val ACCENT_SYSTEM = 0xFFB39DFF.toInt()
+    const val ACCENT_TV = DesignTokens.Phone.ACCENT_TV
+    const val ACCENT_RADIO = DesignTokens.Phone.ACCENT_RADIO
+    const val ACCENT_WEB = DesignTokens.Phone.ACCENT_WEB
+    const val ACCENT_VIDEO = DesignTokens.Phone.ACCENT_VIDEO
+    const val ACCENT_FILES = DesignTokens.Phone.ACCENT_FILES
+    const val ACCENT_FAVORITE = DesignTokens.Phone.ACCENT_FAVORITE
+    const val ACCENT_SYSTEM = DesignTokens.Phone.ACCENT_SYSTEM
 
     fun Context.dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 

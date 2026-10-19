@@ -27,6 +27,15 @@ import dev.autobridge.projection.desktop.DesktopEngineChoiceCarScreen
  * cannot open. Its entry is unlisted by default and can be listed again from its settings page.
  */
 internal object CarExtensions {
+    /**
+     * Process start: the desktop browsers open on the same start page as the built-in car
+     * browser. Only hands the engine the page builder; nothing is built until a browser launches.
+     */
+    fun install(context: android.content.Context) {
+        val app = context.applicationContext
+        DesktopEngine.startPages = { dev.autobridge.browser.CarStartPage.desktopPages(app) }
+    }
+
     fun moreEntries(carContext: CarContext, screenManager: ScreenManager): List<CarExtensionEntry> {
         // Multi-app's pane picker offers the desktop browser when it is installed.
         dev.autobridge.projection.desktop.DesktopPaneTarget.install(carContext)
@@ -77,8 +86,12 @@ internal object CarExtensions {
         }
     }
 
+    /** Whether [openWeb] has a desktop browser to open: the browser's start page offers it then. */
+    fun canOpenWeb(carContext: CarContext): Boolean =
+        desktopSupported(carContext) && DesktopEngine.chosenInstalledBrowser() != null
+
     fun openWeb(carContext: CarContext, screenManager: ScreenManager): Boolean {
-        if (!desktopSupported(carContext) || DesktopEngine.chosenInstalledBrowser() == null) return false
+        if (!canOpenWeb(carContext)) return false
         CarNavigation.open(screenManager, "DesktopBrowserCarScreen") { DesktopBrowserCarScreen(carContext, embedded = true) }
         return true
     }

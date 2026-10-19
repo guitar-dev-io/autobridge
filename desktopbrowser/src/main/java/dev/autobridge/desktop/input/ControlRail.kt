@@ -10,6 +10,7 @@ import android.os.Handler
 import android.os.Looper
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
+import dev.autobridge.design.DesignTokens
 import dev.autobridge.desktop.R
 import dev.autobridge.desktop.display.FrameRenderer
 import kotlin.math.min
@@ -475,19 +476,19 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
         private const val ROW = 76f
         private const val SEGMENT = 72f
 
-        private val HANDLE = Color.argb(0x52, 0xF3, 0xF5, 0xF7)
-        private val HANDLE_DOT = Color.rgb(0x0B, 0x0D, 0x10)
-        private val PANEL_FILL = Color.argb(0xF0, 0x14, 0x18, 0x1E)
-        private val SHEET_FILL = Color.argb(0xF5, 0x17, 0x1B, 0x21)
-        private val PANEL_EDGE = Color.rgb(0x2E, 0x36, 0x41)
-        private val BUTTON_FILL = Color.rgb(0x23, 0x2A, 0x33)
-        private val STEP_FILL = Color.rgb(0x2E, 0x36, 0x41)
-        private val OUTLINED_FILL = Color.rgb(0x1B, 0x35, 0x50)
-        private val SELECTED = Color.rgb(0x1E, 0x6F, 0xD1)
-        private val ACCENT = Color.rgb(0x4D, 0xA3, 0xFF)
-        private val INK = Color.rgb(0xF3, 0xF5, 0xF7)
-        private val INK_SECONDARY = Color.rgb(0xC9, 0xD0, 0xD8)
-        private val MUTED = Color.rgb(0x8A, 0x95, 0xA3)
+        private val HANDLE = DesignTokens.DesktopRail.HANDLE
+        private val HANDLE_DOT = DesignTokens.DesktopRail.HANDLE_DOT
+        private val PANEL_FILL = DesignTokens.DesktopRail.PANEL_FILL
+        private val SHEET_FILL = DesignTokens.DesktopRail.SHEET_FILL
+        private val PANEL_EDGE = DesignTokens.DesktopRail.PANEL_EDGE
+        private val BUTTON_FILL = DesignTokens.DesktopRail.BUTTON_FILL
+        private val STEP_FILL = DesignTokens.DesktopRail.PANEL_EDGE
+        private val OUTLINED_FILL = DesignTokens.DesktopRail.OUTLINED_FILL
+        private val SELECTED = DesignTokens.DesktopRail.SELECTED
+        private val ACCENT = DesignTokens.Phone.ACCENT
+        private val INK = DesignTokens.Phone.TEXT
+        private val INK_SECONDARY = DesignTokens.DesktopRail.INK_SECONDARY
+        private val MUTED = DesignTokens.DesktopRail.MUTED
     }
 }
 

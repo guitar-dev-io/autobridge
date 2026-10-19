@@ -7,6 +7,7 @@ import android.graphics.Path
 import android.graphics.RectF
 import androidx.car.app.model.CarIcon
 import androidx.core.graphics.drawable.IconCompat
+import dev.autobridge.design.DesignTokens
 
 /** Square artwork for GridTemplate's 128dp image slot. The host owns its size and touch target. */
 internal object DashboardArtwork {
@@ -28,11 +29,11 @@ internal object DashboardArtwork {
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         if (compact) {
-            val card = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF202228.toInt() }
+            val card = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = DesignTokens.DashboardArt.CARD }
             canvas.drawRoundRect(RectF(2f, 2f, 126f, 126f), 12f, 12f, card)
             card.style = Paint.Style.STROKE
             card.strokeWidth = 1.5f
-            card.color = 0xFF50525A.toInt()
+            card.color = DesignTokens.DashboardArt.CARD_EDGE
             canvas.drawRoundRect(RectF(2f, 2f, 126f, 126f), 12f, 12f, card)
         }
         canvas.scale(width / 152f, height / 152f)
@@ -40,21 +41,21 @@ internal object DashboardArtwork {
         val glyphScale = if (compact) 0.85f else 1.25f
         canvas.scale(glyphScale, glyphScale, 160f, 76f)
         val accent = when (kind) {
-            Kind.BROWSER -> 0xFF70ACFF.toInt()
-            Kind.MIRROR -> 0xFFB56DFF.toInt()
-            Kind.MEDIA -> 0xFFAF80F8.toInt()
-            Kind.AGENT -> 0xFF7CE1CB.toInt()
-            Kind.QUICK_LAUNCH -> 0xFF86E3AF.toInt()
-            Kind.TV, Kind.YOUTUBE_MUSIC, Kind.STREAMING -> 0xFFFF7A7A.toInt()
-            Kind.RADIO -> 0xFFFFC46B.toInt()
-            Kind.FOLDERS, Kind.PLAYLISTS -> 0xFF86E3AF.toInt()
-            Kind.FAVORITES -> 0xFFFF8FB1.toInt()
-            Kind.GALLERY -> 0xFF7CE1CB.toInt()
-            Kind.RECENT, Kind.MORE, Kind.YOUTUBE, Kind.SETTINGS -> 0xFFD8E3F7.toInt()
-            Kind.WEATHER -> 0xFF6BC5FF.toInt()
+            Kind.BROWSER -> DesignTokens.DashboardArt.BROWSER
+            Kind.MIRROR -> DesignTokens.DashboardArt.MIRROR
+            Kind.MEDIA -> DesignTokens.DashboardArt.MEDIA
+            Kind.AGENT -> DesignTokens.DashboardArt.TEAL
+            Kind.QUICK_LAUNCH -> DesignTokens.DashboardArt.GREEN
+            Kind.TV, Kind.YOUTUBE_MUSIC, Kind.STREAMING -> DesignTokens.DashboardArt.VIDEO
+            Kind.RADIO -> DesignTokens.DashboardArt.RADIO
+            Kind.FOLDERS, Kind.PLAYLISTS -> DesignTokens.DashboardArt.GREEN
+            Kind.FAVORITES -> DesignTokens.DashboardArt.FAVORITES
+            Kind.GALLERY -> DesignTokens.DashboardArt.TEAL
+            Kind.RECENT, Kind.MORE, Kind.YOUTUBE, Kind.SETTINGS -> DesignTokens.DashboardArt.NEUTRAL
+            Kind.WEATHER -> DesignTokens.DashboardArt.WEATHER
         }
         val pen = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (compact) 0xFFF5F5F7.toInt() else accent
+            color = if (compact) DesignTokens.DashboardArt.GLYPH_COMPACT else accent
             style = Paint.Style.STROKE
             strokeWidth = 6f
             strokeCap = Paint.Cap.ROUND
@@ -64,7 +65,7 @@ internal object DashboardArtwork {
             Kind.YOUTUBE -> {
                 pen.style = Paint.Style.FILL
                 canvas.drawRoundRect(RectF(121f, 49f, 199f, 103f), 12f, 12f, pen)
-                pen.color = 0xFF202228.toInt()
+                pen.color = DesignTokens.DashboardArt.CARD
                 val play = Path().apply {
                     moveTo(152f, 62f); lineTo(152f, 90f); lineTo(176f, 76f); close()
                 }
@@ -133,7 +134,7 @@ internal object DashboardArtwork {
             Kind.YOUTUBE_MUSIC -> {
                 pen.style = Paint.Style.FILL
                 canvas.drawRoundRect(RectF(121f, 49f, 199f, 103f), 12f, 12f, pen)
-                pen.color = 0xFF202228.toInt()
+                pen.color = DesignTokens.DashboardArt.CARD
                 pen.style = Paint.Style.STROKE
                 canvas.drawCircle(152f, 88f, 8f, pen)
                 canvas.drawLine(160f, 88f, 160f, 62f, pen)
@@ -145,7 +146,7 @@ internal object DashboardArtwork {
                 canvas.drawLine(127f, 52f, 193f, 52f, pen)
                 pen.style = Paint.Style.FILL
                 canvas.drawRoundRect(RectF(121f, 62f, 199f, 112f), 10f, 10f, pen)
-                pen.color = 0xFF202228.toInt()
+                pen.color = DesignTokens.DashboardArt.CARD
                 val play = Path().apply {
                     moveTo(152f, 75f); lineTo(152f, 99f); lineTo(172f, 87f); close()
                 }

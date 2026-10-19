@@ -37,11 +37,16 @@ internal object CarHomeNavigator {
                 }
                 CarNavigation.open(screenManager, "CarBrowserScreen") { CarBrowserScreen(carContext) }
             }
-            // The browser's start page first (search, the open page, quick links, support); its
-            // "Open browser" is the Web card's old target: the chosen desktop engine in the
-            // sideload builds when one is installed, the built-in browser otherwise.
-            HomeSection.WEB ->
-                CarNavigation.open(screenManager, "CarBrowserStartScreen") { CarBrowserStartScreen(carContext) }
+            // The browser opens on its own start page, as AABrowser does (search, support, quick
+            // links, and the desktop browser when one is installed); a page already open is
+            // returned to instead, so whatever is playing on it keeps playing.
+            HomeSection.WEB -> {
+                val renderer = dev.autobridge.browser.CarBrowserRuntime.renderer(carContext)
+                if (renderer.livePageUrl?.startsWith("http") != true) {
+                    renderer.load(dev.autobridge.browser.CarStartPage.URL)
+                }
+                CarNavigation.open(screenManager, "CarBrowserScreen") { CarBrowserScreen(carContext) }
+            }
             HomeSection.FOLDERS ->
                 screenManager.push(CarLibraryScreen(carContext, CarLibraryScreen.Mode.FOLDERS))
             HomeSection.PLAYLISTS ->

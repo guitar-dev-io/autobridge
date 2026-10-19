@@ -725,16 +725,19 @@ class BrowserDrawerModelTest {
     }
 
     /**
-     * A widescreen head unit's sheet now takes a large majority of the width — not three tiles
-     * stretched across two feet of dashboard, but no longer a small card in a sea of scrim — and it
-     * stays centred so it is reachable from either side.
+     * The car's sheet spans the width, less its margins, on every head unit; the phone's takes a
+     * large majority of a wide screen, and both stay centred so they are reachable from either side.
      */
-    @Test fun theSheetIsBoundedInWidthAndCentredOnAWideHeadUnit() {
+    @Test fun theCarSheetSpansTheWidthAndThePhoneSheetTakesMostOfIt() {
         val sizes = AutoUiSizes.forCarSurface(160)
+        val wide = BrowserViewport.create(1920, 720, sizes.density)
+        val available = wide.width - sizes.contentGap * 2f
         val model = modelFor(1920, 720, 160)
-        val available1920 = 1920f - sizes.contentGap * 2f
-        assertEquals(available1920 * AutoUiSizes.MENU_SHEET_WIDTH_FRACTION, model.panel.width, 0.5f)
-        assertEquals(960f, model.panel.centerX, 0.5f)
+        assertEquals(available, model.panel.width, 0.5f)
+        assertEquals(wide.left + wide.width / 2f, model.panel.centerX, 0.5f)
+        val phone = modelFor(1920, 720, 160, state = state.copy(surface = MenuSurface.PHONE))
+        assertEquals(available * AutoUiSizes.MENU_SHEET_WIDTH_FRACTION, phone.panel.width, 0.5f)
+        assertEquals(wide.left + wide.width / 2f, phone.panel.centerX, 0.5f)
         // A panel narrower than the cap keeps the whole width it has, less its margins.
         val dense = AutoUiSizes.forCarSurface(240)
         val narrow = modelFor(800, 480, 240)

@@ -140,7 +140,8 @@ class CarWebRenderer(context: Context) {
          */
         const val FULLSCREEN_FAB_IDLE_MS = 3_000L
         const val FULLSCREEN_FAB_FADE_MS = 250L
-        const val DEFAULT_HOME = BrowserDefaults.HOME
+        /** Home and new tabs open the browser's own start page; see [CarStartPage]. */
+        const val DEFAULT_HOME = CarStartPage.URL
 
         /** Per-frame velocity decay for the synthetic fling; ~0.92 reads as a natural glide. */
         const val FLING_DECAY = 0.92f
@@ -236,6 +237,12 @@ class CarWebRenderer(context: Context) {
 
         /** Browser state changed in a way the car template should reflect. */
         fun onBrowserStateChanged()
+
+        /** Whether the start page offers a desktop browser (sideload builds with one installed). */
+        fun desktopBrowserAvailable(): Boolean = false
+
+        /** The start page's desktop browser link. */
+        fun openDesktopBrowser() {}
     }
 
     /** Which full-surface overlay is currently composited over the page. */
@@ -2985,10 +2992,16 @@ class CarWebRenderer(context: Context) {
             override fun shouldInterceptRequest(
                 view: WebView,
                 request: WebResourceRequest,
-            ): WebResourceResponse? = BrowserAdBlock.intercept(appContext, request)
+            ): WebResourceResponse? =
+                CarStartPage.intercept(appContext, request, host?.desktopBrowserAvailable() == true)
+                    ?: BrowserAdBlock.intercept(appContext, request)
 
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val target = request.url.toString()
+                if (CarStartPage.isDesktopLink(target)) {
+                    host?.openDesktopBrowser()
+                    return true
+                }
                 if (BrowserDefaults.isExternalSignInHost(target)) {
                     onExternalSignInRequired?.invoke(target)
                     return true
@@ -3022,7 +3035,7 @@ class CarWebRenderer(context: Context) {
                 tabs = tabs.updateActive(url, view.title)
                 BrowserTabStore.save(appContext, tabs)
                 tracePostLoad()
-                if (loadError == null) WebHistoryStore.record(appContext, view.title, url)
+                if (loadError == null && !CarStartPage.isInternal(url)) WebHistoryStore.record(appContext, view.title, url)
                 youtube.onPageChanged(view, url)
                 webAudio.installPlayTracking()
                 onPageChanged?.invoke(url, view.title)
@@ -3375,10 +3388,16 @@ class CarWebRenderer(context: Context) {
             override fun shouldInterceptRequest(
                 view: WebView,
                 request: WebResourceRequest,
-            ): WebResourceResponse? = BrowserAdBlock.intercept(appContext, request)
+            ): WebResourceResponse? =
+                CarStartPage.intercept(appContext, request, host?.desktopBrowserAvailable() == true)
+                    ?: BrowserAdBlock.intercept(appContext, request)
 
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val target = request.url.toString()
+                if (CarStartPage.isDesktopLink(target)) {
+                    host?.openDesktopBrowser()
+                    return true
+                }
                 if (BrowserDefaults.isExternalSignInHost(target)) {
                     onExternalSignInRequired?.invoke(target)
                     return true
@@ -3401,7 +3420,7 @@ class CarWebRenderer(context: Context) {
                 sideTitle = view.title
                 sideProgress = 100
                 BrowserSplitStore.setSideUrl(appContext, url)
-                WebHistoryStore.record(appContext, view.title, url)
+                if (!CarStartPage.isInternal(url)) WebHistoryStore.record(appContext, view.title, url)
                 sideAudio.installPlayTracking()
                 if (sideActive) onPageChanged?.invoke(url, view.title)
             }
