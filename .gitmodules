@@ -2,3 +2,6 @@
 	path = whisper/third_party/whisper.cpp
 	url = https://github.com/ggml-org/whisper.cpp
 	shallow = true
+[submodule "ios"]
+	path = ios
+	url = https://github.com/guitar-dev-io/autobridge-ios.git
