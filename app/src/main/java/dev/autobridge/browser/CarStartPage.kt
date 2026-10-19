@@ -10,6 +10,7 @@ import dev.autobridge.BuildConfig
 import dev.autobridge.R
 import dev.autobridge.car.CarStationTile
 import dev.autobridge.entertainment.WebBookmarkStore
+import dev.autobridge.entertainment.WebHistoryStore
 import dev.autobridge.support.QrCode
 import dev.autobridge.support.SupportChannels
 import dev.autobridge.ui.AutoBridgeDesign
@@ -36,6 +37,7 @@ object CarStartPage {
     private const val DESKTOP = "$BASE/desktop"
 
     private const val QUICK_LINK_LIMIT = 12
+    private const val RECENT_LIMIT = 4
     private const val QR_PX = 360
 
     fun isStartPage(url: String?): Boolean = url != null && url.substringBefore('?').substringBefore('#') == URL
@@ -46,7 +48,7 @@ object CarStartPage {
     /** The "desktop browser" link: the renderer hands it to the car screen instead of loading it. */
     fun isDesktopLink(url: String): Boolean = url.substringBefore('?') == DESKTOP
 
-    /** A tile on the page: one saved site. */
+    /** A tile on the page: one saved site, or one page visited lately. */
     data class QuickLink(val title: String, val url: String, val host: String, val badge: String, val color: Int)
 
     /** Every text the page shows, read from the app's strings so it follows the app language. */
@@ -60,6 +62,7 @@ object CarStartPage {
         val supportMessage: String,
         val supportAction: String,
         val desktop: String,
+        val recent: String = "",
     )
 
     /**
@@ -71,7 +74,7 @@ object CarStartPage {
         if (url.scheme != "https" || url.host != HOST) return null
         val path = url.toString().substringBefore('?').substringBefore('#')
         return when (path) {
-            URL -> html(startHtml(texts(context), quickLinks(context), desktopAvailable))
+            URL -> html(startHtml(texts(context), quickLinks(context), desktopAvailable, recent = recentPages(context)))
             GO -> html(redirectHtml(target(context, url)))
             SUPPORT -> html(supportHtml(texts(context), supportChannels(context)))
             else -> if (isInternal(path)) html(redirectHtml(URL)) else null
@@ -86,7 +89,8 @@ object CarStartPage {
         val t = texts(context)
         return mapOf(
             "index.html" to startHtml(t, quickLinks(context), desktopAvailable = false,
-                searchPrefix = SearchEngineStore.engine(context).searchUrl(""), supportHref = "support.html"),
+                searchPrefix = SearchEngineStore.engine(context).searchUrl(""), supportHref = "support.html",
+                recent = recentPages(context)),
             "support.html" to supportHtml(t, supportChannels(context), backHref = "index.html"),
         )
     }
@@ -107,6 +111,7 @@ object CarStartPage {
         supportMessage = context.getString(R.string.support_card_message),
         supportAction = context.getString(R.string.car_browser_start_support_caption),
         desktop = context.getString(R.string.car_web_open_browser),
+        recent = context.getString(R.string.browser_start_page_recent),
     )
 
     private fun quickLinks(context: Context): List<QuickLink> =
@@ -119,6 +124,21 @@ object CarStartPage {
                 color = CarStationTile.colorFor(bookmark.title),
             )
         }
+
+    /**
+     * The pages visited lately, newest first, as the phone start page's Recent section shows them:
+     * one tile per address, and never the start page's own.
+     */
+    private fun recentPages(context: Context): List<QuickLink> =
+        WebHistoryStore.list(context).asSequence()
+            .filterNot { isInternal(it.url) }
+            .distinctBy { it.url }
+            .take(RECENT_LIMIT)
+            .map { entry ->
+                val title = entry.title.ifBlank { hostOf(entry.url) }
+                QuickLink(title, entry.url, hostOf(entry.url), CarStationTile.label(title), CarStationTile.colorFor(title))
+            }
+            .toList()
 
     /** Label, line under it, and the QR as a PNG data URI, for each way to support. */
     private fun supportChannels(context: Context): List<Triple<String, String, String>> =
@@ -147,7 +167,6 @@ object CarStartPage {
 
     // ------------------------------------------------------------------ markup
 
-    /** The page itself. Pure, so the markup is testable without a WebView. */
     /**
      * The page itself. Pure, so the markup is testable without a WebView. In the car renderer the
      * search goes to [GO]; a desktop browser has no one answering that address, so there
@@ -159,6 +178,7 @@ object CarStartPage {
         desktopAvailable: Boolean,
         searchPrefix: String? = null,
         supportHref: String = SUPPORT,
+        recent: List<QuickLink> = emptyList(),
     ): String = page(t.title, buildString {
         append("<header><h1>").append(esc(t.title)).append("</h1><p class=\"sub\">").append(esc(t.subtitle)).append("</p></header>")
         append("<form class=\"search\" action=\"").append(GO).append("\" method=\"get\" autocomplete=\"off\"")
@@ -176,9 +196,11 @@ object CarStartPage {
         }
         append("</div></section>")
 
-        if (links.isNotEmpty()) {
-            append("<h3>").append(esc(t.quickLinks)).append("</h3><div class=\"tiles\">")
-            links.forEach { link ->
+        // Recent pages, then the saved sites, as the phone start page orders them.
+        for ((heading, tiles) in listOf(t.recent to recent, t.quickLinks to links)) {
+            if (tiles.isEmpty()) continue
+            append("<h3>").append(esc(heading)).append("</h3><div class=\"tiles\">")
+            tiles.forEach { link ->
                 append("<a class=\"tile\" href=\"").append(esc(link.url)).append("\"><span class=\"badge\" style=\"background:")
                     .append(cssColor(link.color)).append("\">").append(esc(link.badge)).append("</span><span class=\"t\">")
                     .append(esc(link.title)).append("</span><span class=\"h\">").append(esc(link.host)).append("</span></a>")
@@ -276,6 +298,7 @@ height:58px;padding:0 26px;border-radius:999px}
 .pill.ghost{background:$RAISED;color:$TEXT;border:1px solid $HAIRLINE}
 h3{font-size:16px;font-weight:600;letter-spacing:2px;color:$MUTED;margin:0 4px 14px}
 .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:16px}
+.tiles+h3{margin-top:26px}
 .tile{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;background:$SURFACE;border:1px solid $HAIRLINE;
 border-radius:24px;padding:18px 10px 16px;text-decoration:none;color:inherit;min-width:0}
 .badge{width:64px;height:64px;border-radius:18px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:24px;margin-bottom:6px}

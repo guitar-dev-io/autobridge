@@ -62,6 +62,16 @@ class CarStartPageTest {
         assertTrue(support.contains("href=\"index.html\""))
     }
 
+    @Test fun recentPagesComeBeforeTheSavedSites() {
+        val recent = CarStartPage.QuickLink("Wikipedia", "https://th.wikipedia.org/wiki/x", "th.wikipedia.org", "W", 0x4F6BE0)
+        val saved = CarStartPage.QuickLink("YouTube", "https://m.youtube.com/", "m.youtube.com", "YT", 0xD9475F)
+        val html = CarStartPage.startHtml(texts.copy(recent = "Recent"), listOf(saved), desktopAvailable = false, recent = listOf(recent))
+        assertTrue(html.indexOf("Recent") in 0 until html.indexOf("Quick Links"))
+        assertTrue(html.indexOf("th.wikipedia.org/wiki/x") < html.indexOf("m.youtube.com/"))
+        // Nothing visited yet: no empty Recent heading.
+        assertFalse(CarStartPage.startHtml(texts.copy(recent = "Recent"), listOf(saved), desktopAvailable = false).contains("<h3>Recent"))
+    }
+
     @Test fun onlyThePagesOwnAddressesAreInternal() {
         assertTrue(CarStartPage.isStartPage(CarStartPage.URL))
         assertTrue(CarStartPage.isStartPage(CarStartPage.URL + "?x=1"))

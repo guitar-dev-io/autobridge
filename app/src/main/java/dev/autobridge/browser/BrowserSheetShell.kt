@@ -36,6 +36,15 @@ internal class BrowserSheetShell(
 ) {
     private var dialog: Dialog? = null
 
+    private companion object {
+        /**
+         * Phone sheets stop at 90% of the screen height so they never butt against the top edge,
+         * leaving a visible scrim gap above that still dismisses on tap. Inner content scrolls
+         * (via the shell's ScrollView) once it exceeds this ceiling.
+         */
+        const val SHEET_MAX_HEIGHT_FRACTION = 0.90f
+    }
+
     private val fontScale = AutoUiSizes.clampFontScale(activity.resources.configuration.fontScale)
 
     /** Text size in sp for a dp token, with the accessibility scale already capped. */
@@ -55,14 +64,21 @@ internal class BrowserSheetShell(
         cornerRadius = radius
     }
 
-    /** The decorative drag pill at the top of every sheet. Not a tap target. */
-    fun grip(): View = View(activity).apply {
+    /**
+     * The drag pill at the top of every sheet — still the same decorative-looking pill, but now
+     * the handle that drags the sheet down to dismiss. A single instance is cached and re-added
+     * across [render]-style rebuilds so the drag listener wired in [show] survives
+     * `removeAllViews()` + re-add.
+     */
+    private var cachedGrip: View? = null
+
+    fun grip(): View = cachedGrip ?: View(activity).apply {
         background = rounded(BrowserTheme.outline, sizes.dp(2f))
         layoutParams = LinearLayout.LayoutParams(sizes.dpInt(40f), sizes.dpInt(4f)).apply {
             gravity = Gravity.CENTER_HORIZONTAL
             bottomMargin = gap()
         }
-    }
+    }.also { cachedGrip = it }
 
     /**
      * The circular, icon-only close button in a sheet header — 48dp per the mockup, no "Close"
@@ -116,6 +132,23 @@ internal class BrowserSheetShell(
         val margin = sizes.dpInt(AutoUiSizes.SHEET_SIDE_MARGIN_DP)
         // Round all four corners of the actual panel now that it floats off every edge.
         (content.background as? GradientDrawable)?.cornerRadius = cornerRadius()
+        // The phone sheets add a grip() as their drag handle; the car menu does not (it wires its
+        // own drag-to-close on its header), so it keeps its existing behaviour untouched.
+        val handle = cachedGrip
+        if (handle != null) {
+            // Drag the grip down to dismiss; the content column follows the finger and the inner
+            // ScrollView is told to let the drag through (see CarMenuList.dragToClose).
+            CarMenuList.dragToClose(handle, content) { dismiss() }
+            // Cap the panel at 90% of the screen so a scrim gap is always left above it; the
+            // outer ScrollView takes the overflow when the content is taller than the ceiling.
+            content.addOnLayoutChangeListener { _, _, top, _, bottom, _, _, _, _ ->
+                val max = (activity.resources.displayMetrics.heightPixels * SHEET_MAX_HEIGHT_FRACTION).toInt()
+                if (bottom - top > max && content.layoutParams.height != max) {
+                    content.layoutParams.height = max
+                    content.requestLayout()
+                }
+            }
+        }
         dialog = Dialog(activity, android.R.style.Theme_Translucent_NoTitleBar).apply {
             requestWindowFeature(Window.FEATURE_NO_TITLE)
             setContentView(ScrollView(activity).apply {

@@ -13,6 +13,7 @@ import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -27,6 +28,7 @@ import androidx.annotation.VisibleForTesting
 import androidx.core.content.ContextCompat
 import android.view.View
 import android.view.ViewGroup
+import android.view.inputmethod.InputMethodManager
 import android.webkit.CookieManager
 import android.webkit.GeolocationPermissions
 import android.webkit.WebChromeClient
@@ -167,6 +169,13 @@ class CarWebRenderer(context: Context) {
 
         /** How long after a tap on the page its focused field is read; see [offerFieldInput]. */
         const val FIELD_FOCUS_DELAY_MS = 300L
+
+        /**
+         * How long the lazy IME probe waits for the real keyboard to actually raise (its `ime()`
+         * insets to turn visible) before giving up and falling back to the canvas keyboard. The IME
+         * animates in on a later frame, so this is never read synchronously after showSoftInput.
+         */
+        const val IME_PROBE_TIMEOUT_MS = 700L
 
         /**
          * The seam control: a slim capsule on the divider, [SEAM_CAPSULE_THICK_DP] across and
@@ -409,7 +418,45 @@ class CarWebRenderer(context: Context) {
 
     /** Told whenever the keyboard opens or closes, so the screen can route the car's Back to it. */
     var onKeyboardChanged: ((open: Boolean) -> Unit)? = null
-    val keyboardOpen: Boolean get() = keyboard != null
+
+    // ------------------------------------------------------------------ real system keyboard (IME)
+
+    /**
+     * The real-system-keyboard (Gboard-over-projection) route, chosen at runtime per keyboard-open
+     * when the host supports it (HARDWARE mode, plus a runtime IME-visibility probe on any version),
+     * falling back to [CarSurfaceKeyboard] otherwise. See [CarImeCapability] / `design.md`.
+     */
+    private class ImeSession(
+        val target: CarSurfaceKeyboard.Target,
+        val mode: BrowserKeyboardMode,
+        seed: String,
+    ) {
+        /** The address bar starts with the whole URL selected, so typing replaces it (same as canvas). */
+        val buffer = BrowserTextBuffer(
+            seed,
+            selectAll = target == CarSurfaceKeyboard.Target.ADDRESS && seed.isNotEmpty(),
+        )
+    }
+
+    /** Runtime probe outcome, cached per session; reset on LEGACY_CANVAS fallback / window recreate. */
+    private var imeProbe: ImeProbeState = ImeProbeState.UNKNOWN
+
+    /** The live IME keyboard session, or null when the IME route is not up. */
+    private var imeSession: ImeSession? = null
+
+    /** The focused editor hosting the IME's InputConnection while an IME session is up (or probing). */
+    private var imeInputView: CarImeInputView? = null
+
+    /** True while a lazy probe is in flight, so a late insets callback and the timeout do not double-resolve. */
+    private var imeProbing = false
+
+    /** How long a lazy probe waits for the IME to actually raise before falling back to canvas. */
+    private val imeProbeTimeout = Runnable { resolveImeProbe(available = false) }
+
+    /** A keyboard — canvas OR the real IME — is up. The single-keyboard invariant reads this. */
+    private val anyKeyboardOpen: Boolean get() = keyboard != null || imeSession != null
+
+    val keyboardOpen: Boolean get() = keyboard != null || imeSession != null
     private var drawer: BrowserDrawerModel? = null
     private var drawerScroll = 0f
 
@@ -1416,12 +1463,14 @@ class CarWebRenderer(context: Context) {
         val view = focusedView
         val clean = text.trim()
         if (view == null) {
-            // No live WebView: nothing focused, so treat as a search/address load.
-            if (clean.isNotEmpty()) load(clean)
+            // No live WebView. A submit (Go) treats the text as a search/address load; a live
+            // mirror (autoSubmit = false) has nothing to type into and must not navigate mid-key.
+            if (clean.isNotEmpty() && autoSubmit) load(clean)
             return@runOnMain
         }
-        if (clean.isEmpty()) {
-            // Empty text is a "focus the search box" request → open a fresh search page context.
+        if (clean.isEmpty() && autoSubmit) {
+            // Empty text on submit is a "focus the search box" request → open a fresh search page
+            // context. An empty LIVE write falls through so backspace-to-empty clears the page field.
             return@runOnMain
         }
         val jsValue = jsEscape(clean)
@@ -1439,29 +1488,17 @@ class CarWebRenderer(context: Context) {
         """.trimIndent()
         view.evaluateJavascript(script) { result ->
             val ok = result?.contains("OK") == true
-            if (!ok) {
-                // Fallback: no focused field → address/search load (auto-submits by nature).
+            if (!ok && autoSubmit) {
+                // Fallback: no focused field on a submit → address/search load (auto-submits by
+                // nature). A live mirror (autoSubmit = false) that finds no focus is ignored: the
+                // page simply has nothing focused yet, which is not a request to navigate.
                 load(clean)
             }
         }
     }
 
     /** Escapes a string for safe embedding inside a single-quoted JS string literal. */
-    private fun jsEscape(input: String): String = buildString {
-        for (c in input) {
-            when (c) {
-                '\\' -> append("\\\\")
-                '\'' -> append("\\'")
-                '"' -> append("\\\"")
-                '\n' -> append("\\n")
-                '\r' -> append("\\r")
-                ' ' -> append("\\u2028")
-                ' ' -> append("\\u2029")
-                '<' -> append("\\x3C")
-                else -> append(c)
-            }
-        }
-    }
+    private fun jsEscape(input: String): String = CarJsEscape.singleQuoted(input)
 
     // ------------------------------------------------------------------ input
 
@@ -1839,9 +1876,11 @@ class CarWebRenderer(context: Context) {
     /** When [page] has a text field focused, opens the keyboard on it. */
     private fun offerFieldInput(page: WebView) {
         if (page !== webView && page !== sideView) return
-        if (overlay != Overlay.NONE || keyboard != null) return
+        // A live IME session counts as "a keyboard is up": without anyKeyboardOpen a page field
+        // gaining focus in the IME-only state (keyboard == null) would open a canvas tray over Gboard.
+        if (overlay != Overlay.NONE || anyKeyboardOpen) return
         readFocusedField(page) { info ->
-            if (info != null && overlay == Overlay.NONE && keyboard == null) openFieldKeyboard(info)
+            if (info != null && overlay == Overlay.NONE && !anyKeyboardOpen) openFieldKeyboard(info)
         }
     }
 
@@ -1880,28 +1919,272 @@ class CarWebRenderer(context: Context) {
     /** Opens the keyboard on the address bar, the current address selected so typing replaces it. */
     fun openAddressKeyboard(clear: Boolean = false) = runOnMain {
         if (drawerOpen || overlay == Overlay.TABS) closeDrawer()
-        showKeyboard(
-            CarSurfaceKeyboard(
-                appContext, CarSurfaceKeyboard.Target.ADDRESS,
-                seed = if (clear) "" else livePageUrl.orEmpty(),
-                mode = BrowserKeyboardMode.URL,
-                hint = appContext.getString(R.string.car_keyboard_hint),
-            )
+        val seed = if (clear) "" else livePageUrl.orEmpty()
+        openKeyboardFor(
+            target = CarSurfaceKeyboard.Target.ADDRESS,
+            mode = BrowserKeyboardMode.URL,
+            seed = seed,
+            hint = appContext.getString(R.string.car_keyboard_hint),
+            scrollFieldIntoView = false,
         )
     }
 
     private fun openFieldKeyboard(info: org.json.JSONObject) {
         val type = info.optString("type", "text")
         val label = info.optString("label").ifBlank { appContext.getString(R.string.car_field_hint_text) }
-        showKeyboard(
-            CarSurfaceKeyboard(
-                appContext, CarSurfaceKeyboard.Target.FIELD,
-                seed = info.optString("value"),
-                mode = if (type == "url") BrowserKeyboardMode.URL else BrowserKeyboardMode.SEARCH,
-                hint = label,
-            )
+        openKeyboardFor(
+            target = CarSurfaceKeyboard.Target.FIELD,
+            mode = if (type == "url") BrowserKeyboardMode.URL else BrowserKeyboardMode.SEARCH,
+            seed = info.optString("value"),
+            hint = label,
+            scrollFieldIntoView = true,
         )
-        keepFocusedFieldAboveKeyboard()
+    }
+
+    /**
+     * The single branch point for every keyboard open: decide the real IME vs the canvas keyboard
+     * once, before anything is shown, so the user sees exactly one. If the gate passes and the probe
+     * says AVAILABLE, open the IME; if UNAVAILABLE or the gate fails, open the canvas keyboard; if
+     * UNKNOWN (gate passes, not yet probed), run the lazy probe. Inconclusive always falls back to
+     * the canvas keyboard — the user is never left without a keyboard.
+     */
+    private fun openKeyboardFor(
+        target: CarSurfaceKeyboard.Target,
+        mode: BrowserKeyboardMode,
+        seed: String,
+        hint: String,
+        scrollFieldIntoView: Boolean,
+    ) {
+        // Exactly one keyboard: a chrome ADDRESS tap (onSurfaceClick only guards the canvas tray, so
+        // it falls through to chrome hit-testing in the IME-only state) must not re-enter here and
+        // double-open over a live IME session or an already-drawn canvas tray.
+        if (anyKeyboardOpen) return
+        val gatePasses = CarImeCapability.gate(hardwareMode) && hardwareWindow != null
+        if (gatePasses) {
+            when (imeProbe) {
+                ImeProbeState.AVAILABLE -> {
+                    if (openImeKeyboard(target, mode, seed, scrollFieldIntoView, probing = false)) return
+                }
+                ImeProbeState.UNKNOWN -> {
+                    if (openImeKeyboard(target, mode, seed, scrollFieldIntoView, probing = true)) return
+                }
+                ImeProbeState.UNAVAILABLE -> Unit // fall through to the canvas keyboard
+            }
+        }
+        showKeyboard(CarSurfaceKeyboard(appContext, target, seed, mode, hint))
+        if (scrollFieldIntoView) keepFocusedFieldAboveKeyboard(canvasOccludedTop())
+    }
+
+    /** The surface-pixel Y of the top edge of the canvas tray; used to scroll the field above it. */
+    private fun canvasOccludedTop(): Float? =
+        keyboard?.geometry(keyboardArea(), sizes.dp(1f))?.tray?.top
+
+    /**
+     * Opens (or begins probing for) the real-IME route. Returns false when the window/IMM is not
+     * available so the caller falls back to the canvas keyboard. On [probing] true this runs the
+     * lazy probe: the editor is constructed seeded from the session buffer and REUSED on AVAILABLE
+     * (no detach/re-attach, so the just-raised Gboard is never dropped), or detached on UNAVAILABLE.
+     */
+    private fun openImeKeyboard(
+        target: CarSurfaceKeyboard.Target,
+        mode: BrowserKeyboardMode,
+        seed: String,
+        scrollFieldIntoView: Boolean,
+        probing: Boolean,
+    ): Boolean {
+        val window = hardwareWindow ?: return false
+        // Defense in depth for the single-keyboard invariant: never overwrite a live editor
+        // reference. Overwriting imeSession/imeInputView would orphan the prior CarImeInputView
+        // (still attached to contentLayer) and drop its decor insets listener. openKeyboardFor
+        // already guards on anyKeyboardOpen; this keeps a bypassing caller from leaking a view.
+        if (imeSession != null) return true
+        val imm = appContext.getSystemService(InputMethodManager::class.java) ?: run {
+            imeProbe = ImeProbeState.UNAVAILABLE
+            return false
+        }
+        if (drawerOpen || overlay == Overlay.TABS) closeDrawer()
+        val session = ImeSession(target, mode, seed)
+        val view = CarImeInputView(
+            context = appContext,
+            textBeforeCursor = { session.buffer.text.substring(0, session.buffer.cursor) },
+            textAfterCursor = { session.buffer.text.substring(session.buffer.cursor) },
+            selectionStart = { session.buffer.selectionStart },
+            selectionEnd = { session.buffer.selectionEnd },
+            onCommit = ::onImeCommit,
+            onDeleteBefore = ::onImeDeleteBefore,
+            onAction = ::onImeAction,
+            onImeVisibilityChanged = ::onImeVisibilityChanged,
+        )
+        return try {
+            window.attachImeInput(view)
+            imeSession = session
+            imeInputView = view
+            imeScrollFieldIntoView = scrollFieldIntoView
+            view.observeImeInsets(window.windowView)
+            view.requestFocus()
+            imm.showSoftInput(view, 0)
+            if (probing) {
+                imeProbing = true
+                mainHandler.postDelayed(imeProbeTimeout, IME_PROBE_TIMEOUT_MS)
+            } else if (scrollFieldIntoView) {
+                keepFocusedFieldAboveKeyboard(imeOccludedTop())
+            }
+            stopFling()
+            if (dividerGrabbed) releaseDivider()
+            visibility.onInteraction(SystemClock.uptimeMillis())
+            requestFullRate()
+            onKeyboardChanged?.invoke(true)
+            true
+        } catch (error: RuntimeException) {
+            AutoBridgeVideoLog.w("IME keyboard open refused (sdk=${Build.VERSION.SDK_INT}); canvas fallback", error)
+            tearDownImeEditor(view)
+            imeSession = null
+            imeInputView = null
+            imeProbing = false
+            mainHandler.removeCallbacks(imeProbeTimeout)
+            imeProbe = ImeProbeState.UNAVAILABLE
+            false
+        }
+    }
+
+    /** Whether the open IME session must keep its focused field scrolled above Gboard. */
+    private var imeScrollFieldIntoView = false
+
+    /** Last observed `WindowInsets.Type.ime()` visibility while an IME session/probe is live. */
+    private var imeInsetsVisible = false
+
+    /**
+     * Reports `WindowInsets.Type.ime()` visibility back from [CarImeInputView]. Resolves a pending
+     * lazy probe when the IME first appears, keeps the field above Gboard, and — finding 1 — closes
+     * the session when the user dismisses Gboard directly (insets drop to not-visible).
+     */
+    private fun onImeVisibilityChanged(visible: Boolean): Unit = runOnMain {
+        imeInsetsVisible = visible
+        if (imeProbing && visible) {
+            resolveImeProbe(available = true)
+            return@runOnMain
+        }
+        if (imeSession != null && !imeProbing) {
+            if (visible) {
+                if (imeScrollFieldIntoView) keepFocusedFieldAboveKeyboard(imeOccludedTop())
+            } else if (shouldCloseImeOnInsets(imeSessionActive = true, imeVisible = false)) {
+                closeImeKeyboard()
+            }
+        }
+    }
+
+    /**
+     * Resolves the lazy probe exactly once. On [available] cache AVAILABLE and keep the editor for
+     * the session; otherwise cache UNAVAILABLE, tear the editor down, and open the canvas keyboard
+     * with the same seed so the user still gets a keyboard. Inconclusive = safe canvas.
+     */
+    private fun resolveImeProbe(available: Boolean): Unit = runOnMain {
+        if (!imeProbing) return@runOnMain
+        imeProbing = false
+        mainHandler.removeCallbacks(imeProbeTimeout)
+        val session = imeSession
+        if (available) {
+            imeProbe = ImeProbeState.AVAILABLE
+            if (session != null && imeScrollFieldIntoView) keepFocusedFieldAboveKeyboard(imeOccludedTop())
+            return@runOnMain
+        }
+        imeProbe = ImeProbeState.UNAVAILABLE
+        val view = imeInputView
+        if (view != null) tearDownImeEditor(view)
+        imeInputView = null
+        imeSession = null
+        onKeyboardChanged?.invoke(false)
+        if (session != null) {
+            val hint = if (session.target == CarSurfaceKeyboard.Target.ADDRESS) {
+                appContext.getString(R.string.car_keyboard_hint)
+            } else {
+                appContext.getString(R.string.car_field_hint_text)
+            }
+            showKeyboard(CarSurfaceKeyboard(appContext, session.target, session.buffer.text, session.mode, hint))
+            if (imeScrollFieldIntoView) keepFocusedFieldAboveKeyboard(canvasOccludedTop())
+        }
+    }
+
+    /** One IME key commit (printable / commitText / setComposingText): fold into the buffer, then mirror. */
+    private fun onImeCommit(text: String): Unit = runOnMain {
+        val session = imeSession ?: return@runOnMain
+        applyImeEdit(session.buffer, ImeEdit.Commit(text))
+        dispatchImeRoute(routeImeEdit(session.target, session.buffer.text, ImeKeyKind.EDIT))
+    }
+
+    /** One IME delete-before (backspace / deleteSurroundingText): fold into the buffer, then mirror. */
+    private fun onImeDeleteBefore(count: Int): Unit = runOnMain {
+        val session = imeSession ?: return@runOnMain
+        applyImeEdit(session.buffer, ImeEdit.DeleteBefore(count))
+        dispatchImeRoute(routeImeEdit(session.target, session.buffer.text, ImeKeyKind.EDIT))
+    }
+
+    /** IME Go / Enter: route the committed buffer, then close the IME. */
+    private fun onImeAction(): Unit = runOnMain {
+        val session = imeSession ?: return@runOnMain
+        dispatchImeRoute(routeImeEdit(session.target, session.buffer.text, ImeKeyKind.GO))
+        closeImeKeyboard()
+    }
+
+    /**
+     * Executes the mapper result from [routeImeEdit] — the renderer dispatches on this single result
+     * (finding 3), with no parallel inline copy, so [CarImeTargetRoutingTest] guards the live path.
+     */
+    private fun dispatchImeRoute(route: CarImeRoute) {
+        when (route) {
+            is CarImeRoute.MirrorLive -> submitText(route.text, autoSubmit = false)
+            is CarImeRoute.CommitAddress -> load(
+                if (WebVideoDiagnostics.isSentinel(route.text)) route.text
+                else BrowserInputResolver.resolveTyped(route.text, SearchEngineStore.engine(appContext))
+            )
+            is CarImeRoute.CommitFieldSubmit -> submitText(route.text, autoSubmit = true)
+            CarImeRoute.Ignore -> Unit
+        }
+    }
+
+    /** Hides Gboard, detaches the editor, clears the session, and fires onKeyboardChanged(false). */
+    private fun closeImeKeyboard() {
+        val view = imeInputView
+        imeProbing = false
+        mainHandler.removeCallbacks(imeProbeTimeout)
+        if (view != null) tearDownImeEditor(view)
+        imeInputView = null
+        val hadSession = imeSession != null
+        imeSession = null
+        if (hadSession) onKeyboardChanged?.invoke(false)
+    }
+
+    /** Stops insets observation, hides the IME, and removes the editor from the window. */
+    private fun tearDownImeEditor(view: CarImeInputView) {
+        val window = hardwareWindow
+        view.stopObservingImeInsets(window?.windowView)
+        runCatching {
+            appContext.getSystemService(InputMethodManager::class.java)
+                ?.hideSoftInputFromWindow(view.windowToken, 0)
+        }
+        window?.detachImeInput(view)
+    }
+
+    /** The surface-pixel Y of the top edge of Gboard, from the IME insets; null when unavailable. */
+    private fun imeOccludedTop(): Float? {
+        val window = hardwareWindow?.windowView ?: return null
+        val imeBottom = androidx.core.view.ViewCompat.getRootWindowInsets(window)
+            ?.getInsets(androidx.core.view.WindowInsetsCompat.Type.ime())?.bottom ?: return null
+        if (imeBottom <= 0) return null
+        return surfaceHeight - imeBottom.toFloat()
+    }
+
+    /** Resets the IME probe + editor when the IME route can no longer apply (LEGACY_CANVAS / window recreate). */
+    private fun resetImeState() {
+        val view = imeInputView
+        imeProbing = false
+        mainHandler.removeCallbacks(imeProbeTimeout)
+        if (view != null) tearDownImeEditor(view)
+        imeInputView = null
+        val hadSession = imeSession != null
+        imeSession = null
+        imeProbe = ImeProbeState.UNKNOWN
+        if (hadSession) onKeyboardChanged?.invoke(false)
     }
 
     /** The tray as drawn (same geometry and surface-pixel space as [drawChrome]); null when closed. */
@@ -1919,6 +2202,11 @@ class CarWebRenderer(context: Context) {
 
     /** Closes the keyboard without doing anything with what was typed (hide, Back, a tap outside). */
     fun closeKeyboard() = runOnMain {
+        // The car Back and the keyboard-icon toggle both call here; close whichever keyboard is up.
+        if (imeSession != null) {
+            closeImeKeyboard()
+            return@runOnMain
+        }
         if (keyboard == null) return@runOnMain
         keyboard = null
         onKeyboardChanged?.invoke(false)
@@ -1937,7 +2225,13 @@ class CarWebRenderer(context: Context) {
         }
         when (result) {
             // A keystroke repaints only the tray, right here: no queued pump frame, no page draw.
-            is CarSurfaceKeyboard.Result.Changed -> if (draw) drawKeyboardNow(board, started)
+            // The live mirror runs OUTSIDE the draw guard: a replayed double tap passes draw=false
+            // for both keystrokes, so gating it on draw would skip the page write on a double tap.
+            is CarSurfaceKeyboard.Result.Changed -> {
+                if (draw) drawKeyboardNow(board, started)
+                CarKeyboardMirror.liveWrite(result.pageMutated, board.target, board.buffer.text)
+                    ?.let { submitText(it, autoSubmit = false) }
+            }
             // The tray going away uncovers the page, which needs a whole frame; drawn at once.
             is CarSurfaceKeyboard.Result.Close -> { closeKeyboard(); requestFrameNow() }
             is CarSurfaceKeyboard.Result.Commit -> { commitKeyboard(board, result.text); requestFrameNow() }
@@ -2036,12 +2330,14 @@ class CarWebRenderer(context: Context) {
      * The keyboard covers the bottom of the page, and the field being typed into may be under it.
      * Scrolls the page (never re-lays it out) until the field sits above the tray.
      */
-    private fun keepFocusedFieldAboveKeyboard() {
-        val board = keyboard ?: return
+    private fun keepFocusedFieldAboveKeyboard(occludedTop: Float?) {
+        // [occludedTop] is the surface-pixel Y of the top edge of whatever covers the bottom of the
+        // page — the canvas tray top, or (surfaceHeight - ime().bottom) on the IME route. Null (no
+        // tray / no IME insets yet) means there is nothing to scroll above, so skip (non-fatal).
+        if (occludedTop == null) return
         val page = focusedView ?: return
         val pane = (if (sideActive) sideViewport else mainViewport) ?: return
-        val trayTop = board.geometry(keyboardArea(), sizes.dp(1f)).tray.top
-        val visible = ((trayTop - pane.top) / pane.height.toFloat()).coerceIn(0.2f, 1f)
+        val visible = ((occludedTop - pane.top) / pane.height.toFloat()).coerceIn(0.2f, 1f)
         page.evaluateJavascript(
             """
             (function(){
@@ -2101,7 +2397,10 @@ class CarWebRenderer(context: Context) {
     fun scrollBy(distanceX: Float, distanceY: Float) = runOnMain {
         val now = SystemClock.uptimeMillis()
         lastInputMs = now
-        if (!CarKeyboardGestures.pageReceives(CarSurfaceGesture.SCROLL, null, null, keyboardTray())) {
+        // A live IME session has no canvas tray (keyboardTray() == null) but still owns the bottom
+        // of the surface; swallow the scroll so the page can't move under Gboard, as the canvas
+        // route does via its tray geometry.
+        if (anyKeyboardOpen || !CarKeyboardGestures.pageReceives(CarSurfaceGesture.SCROLL, null, null, keyboardTray())) {
             stopFling()
             if (ViewportDebug.enabled) Log.i(TAG, "kbd swallow gesture=SCROLL d=$distanceX,$distanceY")
             return@runOnMain
@@ -2149,8 +2448,8 @@ class CarWebRenderer(context: Context) {
 
     /** Advances an in-flight fling by one frame. Returns true while the page is still moving. */
     private fun stepFling(): Boolean {
-        // No glide moves the page under an open keyboard.
-        if (keyboard != null) {
+        // No glide moves the page under an open keyboard (canvas or the real IME).
+        if (anyKeyboardOpen) {
             stopFling()
             return false
         }
@@ -2192,8 +2491,13 @@ class CarWebRenderer(context: Context) {
                 // Both keystrokes go out in one keyboard frame rather than two back to back.
                 if (taps > 1 && keyboard === board) {
                     val second = handleKeyboardTap(board, focusX, focusY, draw = false)
-                    val changed = CarSurfaceKeyboard.Result.Changed
-                    if (keyboard === board && (first == changed || second == changed)) {
+                    // Changed is now a data class, so object-equality no longer works; a type check
+                    // is what decides whether either replayed tap left a tray to paint. The mirror
+                    // for each tap already fired inside handleKeyboardTap (idempotent full-value
+                    // write), so scaleBy only paints here and adds no mirror of its own.
+                    val firstChanged = first is CarSurfaceKeyboard.Result.Changed
+                    val secondChanged = second is CarSurfaceKeyboard.Result.Changed
+                    if (keyboard === board && (firstChanged || secondChanged)) {
                         drawKeyboardNow(board, SystemClock.uptimeMillis())
                     }
                 }
@@ -2203,6 +2507,10 @@ class CarWebRenderer(context: Context) {
             return@runOnMain
         }
         if (overlay != Overlay.NONE) return@runOnMain
+        // No page zoom while a keyboard is up. The canvas double-tap replay is handled above keyed
+        // on the canvas `board`; in the IME-only state there is no tray to replay taps on, but the
+        // page must still not zoom under Gboard (same behaviour as under the canvas tray).
+        if (anyKeyboardOpen) return@runOnMain
         if (!factor.isFinite() || factor <= 0f) return@runOnMain
         lastInputMs = SystemClock.uptimeMillis()
         focusedView?.let { PageZoom.zoomBy(it, factor.coerceIn(0.8f, 1.25f)) }
@@ -2262,7 +2570,7 @@ class CarWebRenderer(context: Context) {
 
     /** Whether the floating button is drawn right now; hit testing asks the same question. */
     private fun fabVisible(nowMs: Long): Boolean =
-        overlay == Overlay.NONE && keyboard == null && fabAlpha(nowMs) > 0.01f
+        overlay == Overlay.NONE && !anyKeyboardOpen && fabAlpha(nowMs) > 0.01f
 
     /**
      * The floating button's opacity. Outside fullscreen it is always lit (the default) or follows
@@ -3191,6 +3499,8 @@ class CarWebRenderer(context: Context) {
         }
         if (existing != null) {
             AutoBridgeVideoLog.i("car surface size changed ${existing.width}x${existing.height} -> ${width}x$height; recreating window")
+            // The editor lives in the window being replaced; drop the IME session + re-probe next open.
+            resetImeState()
             existing.release()
             hardwareWindow = null
         }
@@ -3222,6 +3532,8 @@ class CarWebRenderer(context: Context) {
             )
             activeMode = CarBrowserRenderMode.LEGACY_CANVAS
             view.settings.setOffscreenPreRaster(true)
+            // No window means no IME route for this session; any in-flight probe/session is void.
+            resetImeState()
             false
         }
     }
@@ -3240,6 +3552,8 @@ class CarWebRenderer(context: Context) {
     /** The platform dismissed the window (e.g. display metrics changed); rebuild it on the live surface. */
     private fun recoverHardwareWindow() {
         val dismissed = hardwareWindow ?: return
+        // The editor lives in the window being torn down; drop the IME session + re-probe next open.
+        resetImeState()
         dismissed.release()
         hardwareWindow = null
         val activeSurface = surface

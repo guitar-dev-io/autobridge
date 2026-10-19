@@ -19,6 +19,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import dev.autobridge.R
+import dev.autobridge.entertainment.WebHistoryStore
 
 /**
  * One shortcut tile on the start page: a popular site, shown as a glyph chip plus a label.
@@ -38,6 +39,22 @@ val DEFAULT_START_PAGE_SHORTCUTS = listOf(
     StartPageShortcut("Facebook", "https://m.facebook.com/", "f", Color.rgb(0x18, 0x77, 0xF2)),
     StartPageShortcut("X", "https://x.com/", "X", Color.rgb(0x33, 0x37, 0x3C)),
     StartPageShortcut("Instagram", "https://www.instagram.com/", "IG", Color.rgb(0xE1, 0x30, 0x6C)),
+)
+
+/**
+ * One rendered link card, independent of its source. Quick Links map a [StartPageShortcut] to a
+ * spec carrying its brand [chipBg]/white [chipText] and a [slot] badge number; Recent maps a
+ * visited page to a spec with a neutral theme-role chip and [slot] = null (no badge). One spec,
+ * one card renderer, one visual language across both sections.
+ */
+private data class CardSpec(
+    val label: String,
+    val host: String,
+    val glyph: String,
+    val chipBg: Int,
+    val chipText: Int,
+    val slot: Int?,
+    val url: String,
 )
 
 /**
@@ -62,6 +79,31 @@ object BrowserStartPage {
      */
     fun build(context: Context, sizes: AutoUiSizes, onSupport: (() -> Unit)? = null, onSubmit: (String) -> Unit): View {
         val grid = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+        val recentGrid = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+
+        val recent = WebHistoryStore.list(context).take(RECENT_COUNT)
+        val recentSpecs = recent.map { entry ->
+            CardSpec(
+                label = entry.title,
+                host = hostOf(entry.url),
+                glyph = firstGlyph(entry.title, entry.url),
+                chipBg = BrowserTheme.addressPillBackground,
+                chipText = BrowserTheme.textPrimary,
+                slot = null,
+                url = entry.url,
+            )
+        }
+        val shortcutSpecs = DEFAULT_START_PAGE_SHORTCUTS.mapIndexed { index, shortcut ->
+            CardSpec(
+                label = shortcut.label,
+                host = hostOf(shortcut.url),
+                glyph = shortcut.glyph,
+                chipBg = shortcut.tint,
+                chipText = Color.WHITE,
+                slot = index + 1,
+                url = shortcut.url,
+            )
+        }
 
         val column = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
@@ -89,14 +131,14 @@ object BrowserStartPage {
                 gravity = Gravity.CENTER
             },
             LinearLayout.LayoutParams(-1, -2).apply {
-                bottomMargin = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP * 2.5f)
+                bottomMargin = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP * 2f)
             }
         )
 
         column.addView(
             searchBar(context, sizes, onSubmit),
             LinearLayout.LayoutParams(-1, sizes.dpInt(SEARCH_HEIGHT_DP)).apply {
-                bottomMargin = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP * 3)
+                bottomMargin = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP * 2.5f)
             }
         )
 
@@ -107,8 +149,29 @@ object BrowserStartPage {
                 card.visibility = View.GONE
             }
             column.addView(card, LinearLayout.LayoutParams(-1, -2).apply {
-                bottomMargin = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP * 3)
+                bottomMargin = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP * 2.5f)
             })
+        }
+
+        if (recent.isNotEmpty()) {
+            column.addView(
+                TextView(context).apply {
+                    text = context.getString(R.string.browser_start_page_recent)
+                    setTextColor(BrowserTheme.textPrimary)
+                    textSize = spFor(context, SECTION_TEXT_DP)
+                    setTypeface(typeface, Typeface.BOLD)
+                    setPadding(sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP / 2f), 0, 0, 0)
+                },
+                LinearLayout.LayoutParams(-1, -2).apply {
+                    bottomMargin = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP)
+                }
+            )
+            column.addView(
+                recentGrid,
+                LinearLayout.LayoutParams(-1, -2).apply {
+                    bottomMargin = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP * 2.5f)
+                }
+            )
         }
 
         column.addView(
@@ -140,7 +203,8 @@ object BrowserStartPage {
             sidePadding = side
             columns = fit
             column.setPadding(side, column.paddingTop, side, column.paddingBottom)
-            fillGrid(grid, context, sizes, fit, onSubmit)
+            fillGrid(grid, context, sizes, fit, shortcutSpecs, onSubmit)
+            if (recent.isNotEmpty()) fillGrid(recentGrid, context, sizes, fit, recentSpecs, onSubmit)
         }
         column.setPadding(0, sizes.dpInt(TOP_PADDING_DP), 0, sizes.dpInt(SIDE_PADDING_DP))
         apply(context.resources.displayMetrics.widthPixels)
@@ -183,16 +247,16 @@ object BrowserStartPage {
         context: Context,
         sizes: AutoUiSizes,
         columns: Int,
+        specs: List<CardSpec>,
         onSubmit: (String) -> Unit,
     ) {
         grid.removeAllViews()
         val gap = sizes.dpInt(CARD_GAP_DP)
-        DEFAULT_START_PAGE_SHORTCUTS.chunked(columns).forEachIndexed { rowIndex, items ->
+        specs.chunked(columns).forEachIndexed { rowIndex, items ->
             val row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
             for (index in 0 until columns) {
-                val slot = rowIndex * columns + index + 1
                 val cell = items.getOrNull(index)
-                    ?.let { shortcut -> linkCard(context, sizes, shortcut, slot) { onSubmit(shortcut.url) } }
+                    ?.let { spec -> linkCard(context, sizes, spec) { onSubmit(spec.url) } }
                     ?: View(context)
                 row.addView(
                     cell,
@@ -217,7 +281,7 @@ object BrowserStartPage {
         return LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(sizes.dpInt(AutoUiSizes.HORIZONTAL_PADDING_DP * 1.5f), 0, inset, 0)
+            setPadding(sizes.dpInt(AutoUiSizes.HORIZONTAL_PADDING_DP * 1.25f), 0, inset, 0)
             background = GradientDrawable().apply {
                 setColor(BrowserTheme.addressPillBackground)
                 cornerRadius = height / 2f
@@ -243,7 +307,7 @@ object BrowserStartPage {
                     isClickable = true
                     isFocusable = true
                     background = RippleDrawable(
-                        ColorStateList.valueOf(withAlpha(BrowserTheme.accent, 0.3f)),
+                        ColorStateList.valueOf(withAlpha(BrowserTheme.accent, 0.22f)),
                         GradientDrawable().apply {
                             shape = GradientDrawable.OVAL
                             setColor(BrowserTheme.fabContainer)
@@ -277,30 +341,33 @@ object BrowserStartPage {
             }
         }
 
-    /** A quick link: brand chip, name over address, and its slot number at the end. */
+    /**
+     * One link card: chip, name over address, and — only for a numbered [CardSpec.slot] — its slot
+     * badge at the end. Quick Links carry a brand chip and a slot; Recent cards carry a neutral
+     * theme-role chip and no badge, so an omitted slot simply lets the texts fill the row width.
+     */
     private fun linkCard(
         context: Context,
         sizes: AutoUiSizes,
-        shortcut: StartPageShortcut,
-        slot: Int,
+        spec: CardSpec,
         onTap: () -> Unit,
     ): View {
         val chipSize = sizes.dpInt(CHIP_DP)
         val chip = TextView(context).apply {
-            text = shortcut.glyph
+            text = spec.glyph
             gravity = Gravity.CENTER
-            setTextColor(Color.WHITE)
+            setTextColor(spec.chipText)
             textSize = spFor(context, CHIP_TEXT_DP)
             setTypeface(typeface, Typeface.BOLD)
             background = GradientDrawable().apply {
-                cornerRadius = chipSize * 0.28f
-                setColor(shortcut.tint)
+                cornerRadius = chipSize * 0.3f
+                setColor(spec.chipBg)
             }
         }
         val texts = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             addView(TextView(context).apply {
-                text = shortcut.label
+                text = spec.label
                 setTextColor(BrowserTheme.textPrimary)
                 textSize = spFor(context, LABEL_TEXT_DP)
                 setTypeface(typeface, Typeface.BOLD)
@@ -308,23 +375,26 @@ object BrowserStartPage {
                 ellipsize = TextUtils.TruncateAt.END
             })
             addView(TextView(context).apply {
-                text = hostOf(shortcut.url)
+                text = spec.host
                 setTextColor(BrowserTheme.textSecondary)
                 textSize = spFor(context, HOST_TEXT_DP)
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
+                setPadding(0, sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP * 0.25f), 0, 0)
             })
         }
-        val badge = TextView(context).apply {
-            text = context.getString(R.string.browser_start_page_slot, slot)
-            setTextColor(BrowserTheme.textSecondary)
-            textSize = spFor(context, BADGE_TEXT_DP)
-            val padH = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP * 0.75f)
-            val padV = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP * 0.25f)
-            setPadding(padH, padV, padH, padV)
-            background = GradientDrawable().apply {
-                setColor(BrowserTheme.addressPillBackground)
-                cornerRadius = sizes.dp(BADGE_CORNER_DP)
+        val badge = spec.slot?.let { slot ->
+            TextView(context).apply {
+                text = context.getString(R.string.browser_start_page_slot, slot)
+                setTextColor(BrowserTheme.textSecondary)
+                textSize = spFor(context, BADGE_TEXT_DP)
+                val padH = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP * 0.6f)
+                val padV = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP * 0.25f)
+                setPadding(padH, padV, padH, padV)
+                background = GradientDrawable().apply {
+                    setColor(BrowserTheme.addressPillBackground)
+                    cornerRadius = sizes.dp(BADGE_CORNER_DP)
+                }
             }
         }
         val face = GradientDrawable().apply {
@@ -338,14 +408,16 @@ object BrowserStartPage {
             gravity = Gravity.CENTER_VERTICAL
             isClickable = true
             isFocusable = true
-            contentDescription = shortcut.label
+            contentDescription = spec.label
             setPadding(gap * 3 / 2, 0, gap * 3 / 2, 0)
             background = RippleDrawable(
                 ColorStateList.valueOf(withAlpha(BrowserTheme.accent, 0.22f)), face, null
             )
             addView(chip, LinearLayout.LayoutParams(chipSize, chipSize).apply { marginEnd = gap * 3 / 2 })
-            addView(texts, LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = gap })
-            addView(badge, LinearLayout.LayoutParams(-2, -2).apply { gravity = Gravity.TOP })
+            addView(texts, LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = if (badge != null) gap else 0 })
+            if (badge != null) {
+                addView(badge, LinearLayout.LayoutParams(-2, -2).apply { gravity = Gravity.TOP })
+            }
             setOnClickListener { onTap() }
         }
     }
@@ -407,7 +479,7 @@ object BrowserStartPage {
             isClickable = true
             isFocusable = true
             background = RippleDrawable(
-                ColorStateList.valueOf(withAlpha(BrowserTheme.accent, 0.3f)),
+                ColorStateList.valueOf(withAlpha(BrowserTheme.accent, 0.22f)),
                 GradientDrawable().apply {
                     setColor(BrowserTheme.fabContainer)
                     cornerRadius = sizes.dp(24f)
@@ -433,6 +505,15 @@ object BrowserStartPage {
     internal fun hostOf(url: String): String =
         url.substringAfter("://").substringBefore('/').substringBefore('?').ifEmpty { url }
 
+    /**
+     * The chip glyph for a Recent card: the first letter of the page title, or of its host when the
+     * title is blank, uppercased; "•" when both are empty, so the chip is never blank.
+     */
+    private fun firstGlyph(title: String, url: String): String {
+        val source = title.trim().ifEmpty { hostOf(url).trim() }
+        return source.firstOrNull()?.uppercase() ?: "•"
+    }
+
     private fun withAlpha(color: Int, alpha: Float): Int =
         Color.argb((alpha * 255).toInt().coerceIn(0, 255), Color.red(color), Color.green(color), Color.blue(color))
 
@@ -450,25 +531,28 @@ object BrowserStartPage {
     /** A ✕ on the support card hides it for a week. */
     private const val SUPPORT_SNOOZE_MS = 7L * 24 * 60 * 60 * 1000
 
+    /** How many most-recent pages the Recent section shows. */
+    private const val RECENT_COUNT = 4
+
     /** Ceiling on the page's content width, so a wide display centres it rather than stretching it. */
     private const val CONTENT_MAX_WIDTH_DP = 900f
     private const val TOP_PADDING_DP = 28f
     private const val SIDE_PADDING_DP = 20f
     private const val SEARCH_HEIGHT_DP = 56f
-    private const val SEARCH_INSET_DP = 6f
+    private const val SEARCH_INSET_DP = 8f
     private const val SEARCH_ICON_DP = 24f
     private const val CARD_MIN_WIDTH_DP = 300f
     private const val CARD_HEIGHT_DP = 76f
     private const val CARD_GAP_DP = 10f
     private const val CARD_CORNER_DP = 22f
     private const val CHIP_DP = 46f
-    private const val BADGE_CORNER_DP = 10f
+    private const val BADGE_CORNER_DP = 8f
     private const val TITLE_TEXT_DP = 30f
-    private const val SUBTITLE_TEXT_DP = 15f
+    private const val SUBTITLE_TEXT_DP = 14f
     private const val SECTION_TEXT_DP = 18f
     private const val SEARCH_TEXT_DP = 16f
     private const val CHIP_TEXT_DP = 18f
     private const val LABEL_TEXT_DP = 16f
-    private const val HOST_TEXT_DP = 13f
+    private const val HOST_TEXT_DP = 12f
     private const val BADGE_TEXT_DP = 12f
 }

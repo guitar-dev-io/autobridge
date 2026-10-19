@@ -18,6 +18,7 @@ import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import dev.autobridge.browser.CarMenuList
 import dev.autobridge.ui.AutoBridgeDesign.dp
 import java.text.DateFormat
 import java.util.Calendar
@@ -288,10 +289,11 @@ class CarToolForm(
                 cornerRadii = floatArrayOf(r, r, r, r, 0f, 0f, 0f, 0f)
             }
         }
-        // The grab handle says "this is a sheet"; it is not draggable.
-        sheet.addView(View(activity).apply {
+        // The grab handle says "this is a sheet"; drag it down to dismiss the form.
+        val grabHandle = View(activity).apply {
             background = AutoBridgeDesign.surface(activity, AutoBridgeDesign.HAIRLINE, 3, Color.TRANSPARENT)
-        }, LinearLayout.LayoutParams(activity.dp(40), activity.dp(5)).apply {
+        }
+        sheet.addView(grabHandle, LinearLayout.LayoutParams(activity.dp(40), activity.dp(5)).apply {
             gravity = Gravity.CENTER_HORIZONTAL
             bottomMargin = activity.dp(14)
         })
@@ -342,6 +344,19 @@ class CarToolForm(
             setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
             setDimAmount(0.6f)
         }
+        // Drag the grab handle down to dismiss; the whole sheet follows the finger. Reused from the
+        // browser package (same :app module) so every sheet dismisses with the same feel.
+        CarMenuList.dragToClose(grabHandle, sheet) { d.dismiss() }
+        // Cap the sheet at 90% of the screen so a scrim gap is always left above it; the fields
+        // ScrollView (weight 1f) absorbs the overflow, so the pill row and danger action stay
+        // visible. WRAP_CONTENT keeps SOFT_INPUT_ADJUST_RESIZE shrinking the sheet for the keyboard.
+        sheet.addOnLayoutChangeListener { _, _, top, _, bottom, _, _, _, _ ->
+            val max = (activity.resources.displayMetrics.heightPixels * SHEET_MAX_HEIGHT_FRACTION).toInt()
+            if (bottom - top > max && sheet.layoutParams.height != max) {
+                sheet.layoutParams.height = max
+                sheet.requestLayout()
+            }
+        }
         dialog = d
         d.show()
     }
@@ -371,4 +386,9 @@ class CarToolForm(
 
     private fun boxBackground(focused: Boolean) =
         AutoBridgeDesign.surface(activity, AutoBridgeDesign.SURFACE_RAISED, 12, if (focused) accent else AutoBridgeDesign.HAIRLINE)
+
+    private companion object {
+        /** Stop the sheet at 90% of the screen height so it leaves a scrim gap at the top. */
+        const val SHEET_MAX_HEIGHT_FRACTION = 0.90f
+    }
 }

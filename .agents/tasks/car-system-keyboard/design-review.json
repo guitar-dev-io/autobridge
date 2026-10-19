@@ -1,0 +1,54 @@
+{
+  "verdict": "CHANGES_REQUESTED",
+  "reviewDoc": "/Users/anuwat.t/Documents/ChatGPT/AutoBridge/.agents/tasks/car-system-keyboard/design-review.md",
+  "findings": [
+    {
+      "id": 1,
+      "severity": "HIGH",
+      "title": "offerFieldInput can open a canvas keyboard on top of a live IME session; keyboard-state audit is incomplete",
+      "where": "design 'Fallback switching -> keyboardOpen readers audited' and 'Invariants'; CarWebRenderer.kt:1825,1827 (also 2142,2169,2259)",
+      "problem": "The audit scoped itself to the string 'keyboardOpen' (4 readers) but the single-keyboard invariant is enforced throughout by direct 'keyboard' field reads. In the IME-only state keyboard==null, so offerFieldInput's guard (keyboard != null) does not fire and it calls openFieldKeyboard -> showKeyboard while an IME session is already open, producing keyboard!=null AND imeSession!=null simultaneously. This breaks the design's top 'exactly one keyboard' invariant.",
+      "fix": "Add 'private val anyKeyboardOpen get() = keyboard != null || imeSession != null' and use it in offerFieldInput (both the early-return guard and the inner re-check). Re-audit and decide IME-state behavior for the other keyboard-field gates: fling (2142), scaleBy/zoom (2169), FAB visibility (2259). The design's audit section must enumerate these 'keyboard'-field sites, not only the 'keyboardOpen' string readers."
+    },
+    {
+      "id": 2,
+      "severity": "MEDIUM",
+      "title": "keepFocusedFieldAboveKeyboard reparameterization is ambiguous and its null-guard blocks the IME route",
+      "where": "design 'Field focus and scroll-into-view'; CarWebRenderer.kt:2028-2046",
+      "problem": "The method begins 'val board = keyboard ?: return', so it exits immediately when keyboard==null (the IME route). 'Pass the IME inset height instead of the tray top' conflates an absolute surface-space Y coordinate (trayTop) with a bottom-anchored height (IME inset); substituting one for the other with no conversion is incorrect.",
+      "fix": "Give the method an explicit occludedTop parameter in surface-pixel-Y space: keepFocusedFieldAboveKeyboard(occludedTop: Float) computing 'visible = ((occludedTop - pane.top)/pane.height).coerceIn(0.2,1)'. Canvas call passes tray.top; IME call converts the inset: occludedTop = surfaceHeight - ime().bottom, skipping the scroll (non-fatal) when insets are null/zero."
+    },
+    {
+      "id": 3,
+      "severity": "MEDIUM",
+      "title": "Tested CarImeTarget mapper is not shown to be the executed path; test/production drift risk",
+      "where": "design 'Files to add' (CarImeInput.kt CarImeTarget mapper) and 'Testability' (CarImeTargetRoutingTest) vs 'Target-routing wiring' (inline liveWrite + inline commitKeyboard body)",
+      "problem": "The pure CarImeTarget mapper exists to guarantee parity with the canvas route, but the wiring section routes keystrokes via inline CarKeyboardMirror.liveWrite and reimplements commitKeyboard's ADDRESS/FIELD body inline (it cannot call commitKeyboard(board,text) with no board). So the test can pass while the live inline path drifts.",
+      "fix": "Define a single CarImeRoute result type and one pure entry point routeImeEdit(target, bufferText, kind) in CarImeInput.kt; have the renderer dispatch on its result (MirrorLive -> submitText(false); CommitAddress -> load(resolve/sentinel); CommitFieldSubmit -> submitText(true); Ignore -> {}). State that the renderer executes the mapper's result so CarImeTargetRoutingTest guards the real path."
+    },
+    {
+      "id": 4,
+      "severity": "MEDIUM",
+      "title": "Eager probe raises Gboard on screen (~700ms flash) at surface-attach, unprompted",
+      "where": "design 'The runtime probe', 'Fallback switching' (eager probe), 'Capability detection'",
+      "problem": "showSoftInput raises the real IME window (Gboard), not just the 1x1 editor. The eager probe runs at first hardware-window attach and resolves AVAILABLE precisely when Gboard becomes visible, so on capable Android 15 head units Gboard visibly appears over the projection for up to PROBE_TIMEOUT_MS (700ms) at browser open before being hidden. The design implies the probe is invisible ('invisible 1x1 editor'); the editor is invisible, the IME it summons is not.",
+      "fix": "Pick and specify one: (a) drop the eager probe and accept a one-time <=700ms latency on first open (lazy probe already exists); (b) only probe eagerly with a reliable IME-visibility suppression on the target hosts, and if none exists say so; (c) probe eagerly only when not driver-foregrounded. Stop describing the eager probe as invisible and state the user-visible behavior."
+    },
+    {
+      "id": 5,
+      "severity": "NIT",
+      "title": "Probe treats null rootWindowInsets as not-visible, diverging from the cited KeyInputView pattern without noting it",
+      "where": "design 'runtime probe' / 'Input validation'; DesktopBrowserActivity.kt:320-321",
+      "problem": "The cited imeVisible() is 'rootWindowInsets?.isVisible(ime()) ?: shown' (falls back to a remembered flag on null insets). The probe maps null insets -> not-visible -> UNAVAILABLE. Defensible (inconclusive=safe) but presented as 'the same signal' without noting the difference.",
+      "fix": "Add one sentence: the probe intentionally does not adopt KeyInputView's '?: shown' fallback because its purpose is to observe real insets; a remembered flag would defeat it."
+    },
+    {
+      "id": 6,
+      "severity": "NIT",
+      "title": "deleteSurroundingText(after) dropped: justification does not cover the pre-first-commit selected ADDRESS state",
+      "where": "design 'IME <-> BrowserTextBuffer reconciliation', deleteSurroundingText bullet",
+      "problem": "The 'after is always 0 because the cursor is at field end with a collapsed selection' argument holds for append typing but not for the ADDRESS seed state (selectAll=true -> a non-collapsed selection with text after selection start).",
+      "fix": "Note that in the selected (pre-first-commit) state the connection reports the selection via initialSelStart/End, and an IME deleting the selection does so via commitText(empty)/delete-before, both handled by applyImeEdit (insert(\"\")/backspace()); dropping 'after' remains correct."
+    }
+  ]
+}

@@ -932,6 +932,7 @@ class DuoScreenController(
             gripGrabbed = active.divider != null,
             pressed = pressedChrome,
             currentPreset = DuoScreenStore.preset(context),
+            paneCount = DuoScreenStore.paneCount(context),
             titles = titles,
             shares = shares,
             apps = apps,

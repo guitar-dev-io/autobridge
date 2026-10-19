@@ -61,6 +61,16 @@ class AutoUiSizes private constructor(
         const val MENU_SHEET_MAX_WIDTH_DP = 560f
 
         /**
+         * Share of the available width a wide head unit's sheet may take, floored by
+         * [MENU_SHEET_MAX_WIDTH_DP]. On a wide display the flat 560dp ceiling left big empty
+         * gutters; taking a large majority of the width here fills most of the display while 88%
+         * keeps a comfortable, balanced side margin so the panel still reads as a sheet over a
+         * scrim rather than a full-screen takeover. Narrow units are unaffected because their full
+         * available width stays below this fraction's floor.
+         */
+        const val MENU_SHEET_WIDTH_FRACTION = 0.88f
+
+        /**
          * Floor under the sheet's footer band. It carries the version text and two pills, so it
          * compresses further than a tile row before the sheet gives up and scrolls.
          */

@@ -1,0 +1,27 @@
+{
+  "approved": true,
+  "findings": [
+    {
+      "label": "Synchronous insets read on AVAILABLE open",
+      "source": "logic",
+      "confidence": "confirmed",
+      "blocking": false,
+      "detail": "openImeKeyboard(probing=false) reads imeOccludedTop() right after showSoftInput, before ime() insets apply, so the first scroll-into-view is skipped. Self-corrects via the session-lifetime insets listener. No action required. Unchanged from prior pass, not in this commit's scope."
+    },
+    {
+      "label": "Probe-in-flight blank window up to 700ms",
+      "source": "logic",
+      "confidence": "confirmed",
+      "blocking": false,
+      "detail": "During the lazy probe imeSession is non-null and onKeyboardChanged(true) has fired while nothing is drawn. Back/toggle route to closeImeKeyboard and a resolved-UNAVAILABLE rebuilds the canvas keyboard. Acceptable. No action required."
+    },
+    {
+      "label": "Whitespace-only ADDRESS Go parity nuance",
+      "source": "logic",
+      "confidence": "possible",
+      "blocking": false,
+      "detail": "routeImeEdit ADDRESS Go uses isNotBlank() while canvas commitKeyboard guards on isEmpty(); both receive trimmed text upstream so the divergence is unreachable in practice. No action required."
+    }
+  ],
+  "reviewDoc": "/Users/anuwat.t/Documents/ChatGPT/AutoBridge/.agents/tasks/car-system-keyboard/review-logic.md"
+}

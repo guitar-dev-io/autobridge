@@ -11,6 +11,7 @@ import android.text.StaticLayout
 import android.text.TextPaint
 import android.text.TextUtils
 import dev.autobridge.design.DesignTokens
+import dev.autobridge.duoscreen.layout.DuoScreenLayout.Bounds
 import dev.autobridge.duoscreen.layout.DuoScreenLayout.Rect
 import dev.autobridge.duoscreen.layout.DuoScreenPreset
 
@@ -46,6 +47,8 @@ data class ChromeFrame(
     val gripGrabbed: Boolean,
     val pressed: ChromeTarget?,
     val currentPreset: DuoScreenPreset,
+    /** How many panes the surface is split into (2 or 3); drives the preset chip glyphs. */
+    val paneCount: Int,
     /** Pane id to its card title ("Pane 1 · Maps") and share line ("56% of the height"). */
     val titles: Map<Int, String>,
     val shares: Map<Int, String>,
@@ -399,7 +402,7 @@ class DuoScreenChromeRenderer {
             }
             val glyphLeft = box.left + s.CHIP_PADDING * d
             val glyphTop = box.centerY() - s.CHIP_GLYPH_HEIGHT * d / 2f
-            chipGlyph(canvas, preset, glyphLeft, glyphTop, s.CHIP_GLYPH_WIDTH * d, s.CHIP_GLYPH_HEIGHT * d, selected, d)
+            chipGlyph(canvas, preset, frame.paneCount, glyphLeft, glyphTop, s.CHIP_GLYPH_WIDTH * d, s.CHIP_GLYPH_HEIGHT * d, selected, d)
             if (!frame.chrome.chipsIconOnly) {
                 text.textSize = s.CHIP_TEXT * d
                 text.color = if (selected) CHIP_TEXT_SELECTED else CHIP_TEXT
@@ -411,34 +414,46 @@ class DuoScreenChromeRenderer {
         }
     }
 
-    /** The preset's shape in miniature: two columns, a 56/44 stack, or a tile over a pane. */
-    private fun chipGlyph(canvas: Canvas, preset: DuoScreenPreset, left: Float, top: Float, w: Float, h: Float, on: Boolean, d: Float) {
+    /**
+     * The preset's shape in miniature, for the selected [paneCount], positioned from the same
+     * geometry the real surface uses ([DuoScreenPreset.rects]) so two- and three-pane splits read
+     * correctly for every preset. Pane 0 takes the [main] colour; the remaining tiles take
+     * [second]. For picture-in-picture the floating tiles (rect index ≥ 1) are drawn on top in the
+     * light accent fill, as before.
+     */
+    private fun chipGlyph(
+        canvas: Canvas,
+        preset: DuoScreenPreset,
+        paneCount: Int,
+        left: Float,
+        top: Float,
+        w: Float,
+        h: Float,
+        on: Boolean,
+        d: Float
+    ) {
         val main = if (on) ACCENT else CHIP_GLYPH
         val second = if (on) DesignTokens.MultiApp.CHIP_GLYPH_ON else CHIP_GLYPH
+        val pip = if (on) ON_ACCENT else DesignTokens.MultiApp.CHIP_GLYPH_FILL
         val gap = 3f * d
         val r = 3f * d
-        when (preset) {
-            DuoScreenPreset.EVEN_COLUMNS -> {
-                val half = (w - gap) / 2f
-                fill.color = main
-                rect.set(left, top, left + half, top + h); canvas.drawRoundRect(rect, r, r, fill)
-                fill.color = second
-                rect.set(left + half + gap, top, left + w, top + h); canvas.drawRoundRect(rect, r, r, fill)
+        // Map int rects over the float glyph box, insetting each by a thin gap so tiles read apart.
+        val rects = preset.rects(paneCount, Bounds(w.toInt(), h.toInt()))
+        rects.forEachIndexed { index, pane ->
+            val isPip = preset == DuoScreenPreset.PICTURE_IN_PICTURE && index >= 1
+            fill.color = when {
+                isPip -> pip
+                index == 0 -> main
+                else -> second
             }
-            DuoScreenPreset.PICTURE_IN_PICTURE -> {
-                fill.color = main
-                rect.set(left, top, left + w, top + h); canvas.drawRoundRect(rect, r, r, fill)
-                fill.color = if (on) ON_ACCENT else DesignTokens.MultiApp.CHIP_GLYPH_FILL
-                rect.set(left + w - 3 * d - 13 * d, top + h - 3 * d - 10 * d, left + w - 3 * d, top + h - 3 * d)
-                canvas.drawRoundRect(rect, 2 * d, 2 * d, fill)
-            }
-            else -> {
-                val upper = (h - gap) * 0.56f
-                fill.color = main
-                rect.set(left, top, left + w, top + upper); canvas.drawRoundRect(rect, r, r, fill)
-                fill.color = second
-                rect.set(left, top + upper + gap, left + w, top + h); canvas.drawRoundRect(rect, r, r, fill)
-            }
+            val l = left + pane.left + gap / 2f
+            val t = top + pane.top + gap / 2f
+            val rr = left + pane.right - gap / 2f
+            val bb = top + pane.bottom - gap / 2f
+            if (rr <= l || bb <= t) return@forEachIndexed
+            rect.set(l, t, rr, bb)
+            val radius = if (isPip) 2f * d else r
+            canvas.drawRoundRect(rect, radius, radius, fill)
         }
     }
 
