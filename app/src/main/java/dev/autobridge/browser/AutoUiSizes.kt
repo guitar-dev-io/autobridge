@@ -50,7 +50,8 @@ class AutoUiSizes private constructor(
         const val MENU_COLUMNS_MAX = 5
 
         /**
-         * Ceiling on the menu sheet's width.
+         * Ceiling on the phone menu sheet's width. The car's sheet spans the browser instead, with
+         * its buttons in fixed lines of four, so it is not bound by this.
          *
          * The sheet is authored against a phone's proportions — a header, a full-width address row
          * and three tiles across. Letting it take the full width of a 1920px head unit would stretch

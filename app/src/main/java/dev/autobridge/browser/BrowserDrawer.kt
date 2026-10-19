@@ -243,7 +243,9 @@ data class BrowserMenuState(
  * 1. **The sheet starts below the toolbar, never under it**, so the toolbar can never paint over
  *    the header or swallow taps meant for it.
  *
- * 2. **The sheet is bounded in width and centred** ([AutoUiSizes.MENU_SHEET_MAX_WIDTH_DP]).
+ * 2. **On the phone the sheet is bounded in width and centred** ([AutoUiSizes.MENU_SHEET_MAX_WIDTH_DP]).
+ *    On the car it spans the browser's whole width, less its margins, so the buttons and switches
+ *    use the screen a driver is reaching across instead of a column in the middle of it.
  *
  * 3. **Bands are sized from the box, not authored and hoped for.** Every band declares a preferred
  *    and a minimum height and [distribute] shrinks them together toward those minimums, so the
@@ -690,7 +692,7 @@ class BrowserDrawerModel private constructor(
             val top = viewport.top + sizes.toolbarHeight(viewport.height)
             val bottom = (viewport.top + viewport.height - gap).coerceAtLeast(top + 1f)
             val available = (viewport.width - gap * 2f).coerceAtLeast(1f)
-            val width = available.coerceAtMost(sizes.menuSheetMaxWidth)
+            val width = if (state.surface == MenuSurface.CAR) available else available.coerceAtMost(sizes.menuSheetMaxWidth)
             val left = viewport.left + (viewport.width - width) / 2f
             val panel = Box(left, top, left + width, bottom)
 
