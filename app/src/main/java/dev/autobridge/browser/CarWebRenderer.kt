@@ -424,7 +424,7 @@ class CarWebRenderer(context: Context) {
 
     /**
      * The real-system-keyboard (Gboard-over-projection) route, chosen at runtime per keyboard-open
-     * when the host supports it (Android 15+, HARDWARE mode, plus a runtime IME-visibility probe),
+     * when the host supports it (HARDWARE mode, plus a runtime IME-visibility probe on any version),
      * falling back to [CarSurfaceKeyboard] otherwise. See [CarImeCapability] / `design.md`.
      */
     private class ImeSession(
@@ -1960,7 +1960,7 @@ class CarWebRenderer(context: Context) {
         // it falls through to chrome hit-testing in the IME-only state) must not re-enter here and
         // double-open over a live IME session or an already-drawn canvas tray.
         if (anyKeyboardOpen) return
-        val gatePasses = CarImeCapability.gate(Build.VERSION.SDK_INT, hardwareMode) && hardwareWindow != null
+        val gatePasses = CarImeCapability.gate(hardwareMode) && hardwareWindow != null
         if (gatePasses) {
             when (imeProbe) {
                 ImeProbeState.AVAILABLE -> {

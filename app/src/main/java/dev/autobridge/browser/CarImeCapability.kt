@@ -13,17 +13,19 @@ package dev.autobridge.browser
  */
 internal object CarImeCapability {
     /**
-     * The necessary preconditions, evaluated without a live window so they unit-test on the JVM.
-     * All must hold before the probe is even attempted; any false forces the canvas keyboard.
+     * The necessary precondition, evaluated without a live window so it unit-tests on the JVM. When
+     * it is false the probe is not attempted and the canvas keyboard opens.
      *
-     *  - [sdkInt] >= 35 (Build.VERSION_CODES.VANILLA_ICE_CREAM, Android 15): below this the platform
-     *    does not surface an IME over a virtual display it does not own, regardless of host.
      *  - [hardwareMode]: only the HARDWARE render path has a real window to host a focused editor;
      *    LEGACY_CANVAS has no window and can never show an IME. The caller passes
      *    `activeMode == CarBrowserRenderMode.HARDWARE` (the live value, not the requested one).
+     *
+     * There is no Android version floor. It used to require Android 15, which could keep a phone on
+     * the canvas keyboard even where AABrowser shows Gboard over Android Auto on it, so the runtime
+     * probe decides on every version: Gboard stays where the IME appears, and the canvas keyboard
+     * opens where it does not.
      */
-    fun gate(sdkInt: Int, hardwareMode: Boolean): Boolean =
-        sdkInt >= 35 && hardwareMode // Build.VERSION_CODES.VANILLA_ICE_CREAM
+    fun gate(hardwareMode: Boolean): Boolean = hardwareMode
 }
 
 /**
