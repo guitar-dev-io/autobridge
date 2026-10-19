@@ -60,7 +60,6 @@ object DesktopEngine {
 
     @Volatile private var initialized = false
 
-    @Synchronized
     /**
      * The browsers' start page as file name to markup, set by the app (the page is built from its
      * saved sites and strings, which this module cannot see). Read before every launch; null or
@@ -68,6 +67,7 @@ object DesktopEngine {
      */
     @Volatile var startPages: (() -> Map<String, String>)? = null
 
+    @Synchronized
     fun init(context: Context) {
         if (initialized) return
         appContext = context.applicationContext
