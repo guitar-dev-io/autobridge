@@ -233,6 +233,8 @@ object BrowserDefaults {
         .getSharedPreferences("autobridge_browser", Context.MODE_PRIVATE).contains("last_url")
 
     fun remember(context: Context, url: String) {
+        // The car's start page only exists inside the car renderer; the phone could not open it.
+        if (CarStartPage.isInternal(url)) return
         val valid = ContentAddress.https(url) ?: return
         context.getSharedPreferences("autobridge_browser", Context.MODE_PRIVATE)
             .edit().putString("last_url", valid).apply()

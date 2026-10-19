@@ -19,4 +19,8 @@ internal object CarExtensions {
     /** False: the Web card opens [CarBrowserScreen]. */
     @Suppress("UNUSED_PARAMETER")
     fun openWeb(carContext: CarContext, screenManager: ScreenManager): Boolean = false
+
+    /** False: no desktop browser to offer on the browser's start page. */
+    @Suppress("UNUSED_PARAMETER")
+    fun canOpenWeb(carContext: CarContext): Boolean = false
 }

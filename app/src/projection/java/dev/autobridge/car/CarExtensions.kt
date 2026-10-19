@@ -77,8 +77,12 @@ internal object CarExtensions {
         }
     }
 
+    /** Whether [openWeb] has a desktop browser to open: the browser's start page offers it then. */
+    fun canOpenWeb(carContext: CarContext): Boolean =
+        desktopSupported(carContext) && DesktopEngine.chosenInstalledBrowser() != null
+
     fun openWeb(carContext: CarContext, screenManager: ScreenManager): Boolean {
-        if (!desktopSupported(carContext) || DesktopEngine.chosenInstalledBrowser() == null) return false
+        if (!canOpenWeb(carContext)) return false
         CarNavigation.open(screenManager, "DesktopBrowserCarScreen") { DesktopBrowserCarScreen(carContext, embedded = true) }
         return true
     }
