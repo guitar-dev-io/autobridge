@@ -690,7 +690,9 @@ class BrowserDrawerModel private constructor(
             val top = viewport.top + sizes.toolbarHeight(viewport.height)
             val bottom = (viewport.top + viewport.height - gap).coerceAtLeast(top + 1f)
             val available = (viewport.width - gap * 2f).coerceAtLeast(1f)
-            val width = available.coerceAtMost(sizes.menuSheetMaxWidth)
+            val width = available.coerceAtMost(
+                maxOf(sizes.menuSheetMaxWidth, available * AutoUiSizes.MENU_SHEET_WIDTH_FRACTION)
+            )
             val left = viewport.left + (viewport.width - width) / 2f
             val panel = Box(left, top, left + width, bottom)
 
