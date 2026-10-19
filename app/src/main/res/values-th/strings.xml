@@ -428,6 +428,7 @@
     <string name="browser_start_page_subtitle">เข้าเว็บที่ใช้บ่อยได้ในแตะเดียว</string>
     <string name="browser_start_page_go">ไป</string>
     <string name="browser_start_page_slot">ช่อง %1$d</string>
+    <string name="browser_start_page_recent">ล่าสุด</string>
     <string name="car_browser_entry_label">AutoBridge Browser</string>
     <string name="car_browser_start_continue">ดูต่อ</string>
     <string name="car_browser_start_support_caption">สนับสนุนผู้พัฒนา</string>
