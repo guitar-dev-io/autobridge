@@ -19,6 +19,7 @@ import android.widget.SeekBar
 import android.widget.Switch
 import android.widget.TextView
 import dev.autobridge.R
+import dev.autobridge.browser.CarMenuList
 import dev.autobridge.media.AudioEffectsService
 import dev.autobridge.media.AudioEq
 import dev.autobridge.media.EffectScope
@@ -60,6 +61,16 @@ class AudioEffectsSheet(private val context: Context) {
             setGravity(Gravity.BOTTOM)
             setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
         }
+        // Cap the sheet at 90% of the screen so a scrim gap is always left above it; the outer
+        // ScrollView takes the overflow so the band sliders stay reachable. Attached once here
+        // (not in render(), which runs on every preset tap) to avoid stacking duplicate clamps.
+        content.addOnLayoutChangeListener { _, _, top, _, bottom, _, _, _, _ ->
+            val max = (context.resources.displayMetrics.heightPixels * SHEET_MAX_HEIGHT_FRACTION).toInt()
+            if (bottom - top > max && content.layoutParams.height != max) {
+                content.layoutParams.height = max
+                content.requestLayout()
+            }
+        }
         render()
         dialog.show()
     }
@@ -68,10 +79,11 @@ class AudioEffectsSheet(private val context: Context) {
         content.removeAllViews()
         val settings = AudioEq.settings(context)
 
-        // Grab handle, then the title with the on switch.
-        content.addView(View(context).apply {
+        // Grab handle, then the title with the on switch. Drag the handle down to dismiss.
+        val grabHandle = View(context).apply {
             background = AutoBridgeDesign.surface(context, HANDLE, 3, Color.TRANSPARENT)
-        }, LinearLayout.LayoutParams(context.dp(40), context.dp(5)).apply {
+        }
+        content.addView(grabHandle, LinearLayout.LayoutParams(context.dp(40), context.dp(5)).apply {
             gravity = Gravity.CENTER_HORIZONTAL
             bottomMargin = context.dp(14)
         })
@@ -196,6 +208,12 @@ class AudioEffectsSheet(private val context: Context) {
             textSize = 13f
             setTextColor(AutoBridgeDesign.TEXT_MUTED)
         })
+
+        // The grab handle is rebuilt on every render(); re-wire the drag on the fresh handle, with
+        // the stable content column as the panel. Reused from the browser package (same :app
+        // module): its requestDisallowInterceptTouchEvent is what stops the outer ScrollView from
+        // stealing the vertical drag. setOnTouchListener just replaces the previous binding.
+        CarMenuList.dragToClose(grabHandle, content) { dialog.dismiss() }
     }
 
     /** The design's chip: amber with dark bold text when on, an outline when off. */
@@ -325,6 +343,8 @@ class AudioEffectsSheet(private val context: Context) {
     }
 
     private companion object {
+        /** Stop the sheet at 90% of the screen height so it leaves a scrim gap at the top. */
+        const val SHEET_MAX_HEIGHT_FRACTION = 0.90f
         // The radio design's EQ sheet palette.
         const val SHEET = 0xFF1A1E25.toInt()
         const val HANDLE = 0xFF3A404A.toInt()
