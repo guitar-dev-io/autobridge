@@ -111,9 +111,18 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
     private val text = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
     private val leftText = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.LEFT }
 
-    /** The last target size drawn at; taps are laid out against the same geometry. */
+    /** The last area drawn in; taps are laid out against the same geometry. */
     @Volatile private var lastWidth = 0
     @Volatile private var lastHeight = 0
+    @Volatile private var originX = 0f
+    @Volatile private var originY = 0f
+
+    /**
+     * The part of the target the page is shown in (the renderer's mapping), so the rail sits on
+     * the page: above the phone keyboard when it is open, and beside — not under — Android Auto's
+     * widgets on its split home screen. Null uses the whole target.
+     */
+    @Volatile var area: () -> RectF? = { null }
 
     // --- Geometry ---
 
@@ -313,8 +322,10 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
      * What a tap at ([x], [y]) in target pixels means. Collapsed, only the handle's strip is the
      * rail's; open, a tap outside the panel and sheet closes them without reaching the page.
      */
-    fun onTap(x: Float, y: Float): Tap {
+    fun onTap(targetX: Float, targetY: Float): Tap {
         if (!visible || lastWidth <= 0 || lastHeight <= 0) return Tap.PassThrough
+        val x = targetX - originX
+        val y = targetY - originY
         val g = geometry(lastWidth, lastHeight)
         if (state == State.COLLAPSED) {
             val slop = HANDLE_SLOP * density
@@ -352,10 +363,16 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
     // --- Drawing ---
 
     override fun draw(canvas: Canvas, width: Int, height: Int) {
-        lastWidth = width
-        lastHeight = height
+        val a = area() ?: RectF(0f, 0f, width.toFloat(), height.toFloat())
+        originX = a.left
+        originY = a.top
+        lastWidth = a.width().toInt()
+        lastHeight = a.height().toInt()
         if (!visible) return
-        geometry(width, height).draw.forEach { it(canvas) }
+        canvas.save()
+        canvas.translate(a.left, a.top)
+        geometry(lastWidth, lastHeight).draw.forEach { it(canvas) }
+        canvas.restore()
     }
 
     private fun drawHandle(c: Canvas, r: RectF) {

@@ -344,6 +344,7 @@ class DesktopBrowserCarScreen(
     private fun bind(s: DesktopSession) {
         session = s
         s.renderer.placeholderText = carContext.getString(dev.autobridge.desktop.R.string.desktop_starting)
+        rail.area = { s.renderer.mapping?.let { m -> android.graphics.RectF(m.offsetX, m.offsetY, m.offsetX + m.drawWidth, m.offsetY + m.drawHeight) } }
         s.renderer.overlay = overlay
         rail.onAutoHide = { session?.renderer?.requestFrame() }
         rail.dragHeld = false

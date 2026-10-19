@@ -148,6 +148,7 @@ class DesktopBrowserActivity : Activity() {
         session = s
         rail.dragHeld = false
         desktopView.renderer = s.renderer
+        rail.area = { s.renderer.mapping?.let { m -> android.graphics.RectF(m.offsetX, m.offsetY, m.offsetX + m.drawWidth, m.offsetY + m.drawHeight) } }
         s.renderer.overlay = rail
         rail.onAutoHide = { session?.renderer?.requestFrame() }
         s.renderer.placeholderText = getString(dev.autobridge.desktop.R.string.desktop_starting)
@@ -223,7 +224,7 @@ class DesktopBrowserActivity : Activity() {
             // The phone's own keyboard types into the address bar once Ctrl+L has focused it.
             ControlRail.Action.ADDRESS -> {
                 input?.focusAddressBar()
-                keyInput.toggle()
+                keyInput.show()
             }
             ControlRail.Action.KEYBOARD -> keyInput.toggle()
             ControlRail.Action.CLOSE -> finish()
@@ -280,16 +281,28 @@ class DesktopBrowserActivity : Activity() {
             isFocusableInTouchMode = true
         }
 
-        fun toggle() {
-            val imm = context.getSystemService(InputMethodManager::class.java)
-            shown = !shown
-            if (shown) {
-                requestFocus()
-                imm.showSoftInput(this, 0)
-            } else {
-                imm.hideSoftInputFromWindow(windowToken, 0)
-            }
+        /**
+         * Shows the keyboard, or hides it when it really is on screen. The keyboard's own state is
+         * read from the window insets, not remembered: closing it with Back or the keyboard's own
+         * button left a remembered flag saying "shown", so the next tap hid nothing and the
+         * keyboard never came back.
+         */
+        fun toggle() = if (imeVisible()) hide() else show()
+
+        /** Always brings the keyboard up (Address and Type buttons). */
+        fun show() {
+            shown = true
+            requestFocus()
+            context.getSystemService(InputMethodManager::class.java).showSoftInput(this, 0)
         }
+
+        fun hide() {
+            shown = false
+            context.getSystemService(InputMethodManager::class.java).hideSoftInputFromWindow(windowToken, 0)
+        }
+
+        private fun imeVisible(): Boolean =
+            rootWindowInsets?.isVisible(android.view.WindowInsets.Type.ime()) ?: shown
 
         override fun onCheckIsTextEditor(): Boolean = true
 
