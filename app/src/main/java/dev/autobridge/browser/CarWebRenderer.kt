@@ -28,7 +28,6 @@ import androidx.annotation.VisibleForTesting
 import androidx.core.content.ContextCompat
 import android.view.View
 import android.view.ViewGroup
-import android.view.WindowInsets
 import android.view.inputmethod.InputMethodManager
 import android.webkit.CookieManager
 import android.webkit.GeolocationPermissions
@@ -2168,8 +2167,9 @@ class CarWebRenderer(context: Context) {
 
     /** The surface-pixel Y of the top edge of Gboard, from the IME insets; null when unavailable. */
     private fun imeOccludedTop(): Float? {
-        val imeBottom = hardwareWindow?.windowView?.rootWindowInsets
-            ?.getInsets(WindowInsets.Type.ime())?.bottom ?: return null
+        val window = hardwareWindow?.windowView ?: return null
+        val imeBottom = androidx.core.view.ViewCompat.getRootWindowInsets(window)
+            ?.getInsets(androidx.core.view.WindowInsetsCompat.Type.ime())?.bottom ?: return null
         if (imeBottom <= 0) return null
         return surfaceHeight - imeBottom.toFloat()
     }

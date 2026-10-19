@@ -4,10 +4,10 @@ import android.content.Context
 import android.text.InputType
 import android.view.KeyEvent
 import android.view.View
-import android.view.WindowInsets
 import android.view.inputmethod.BaseInputConnection
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
+import androidx.core.view.WindowInsetsCompat
 
 /**
  * The invisible, focused editable View that owns a real [InputConnection] inside the existing
@@ -47,8 +47,9 @@ internal class CarImeInputView(
     }
 
     /** Registered on the window decor view for the life of this view; drives probe + dismiss detection. */
-    private val insetsListener = OnApplyWindowInsetsListener { _, insets ->
-        onImeVisibilityChanged(insets.isVisible(WindowInsets.Type.ime()))
+    // WindowInsetsCompat: the platform's ime() visibility is API 30, and the app runs from API 29.
+    private val insetsListener = OnApplyWindowInsetsListener { view, insets ->
+        onImeVisibilityChanged(WindowInsetsCompat.toWindowInsetsCompat(insets, view).isVisible(WindowInsetsCompat.Type.ime()))
         insets
     }
 
