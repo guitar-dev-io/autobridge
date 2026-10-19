@@ -22,8 +22,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          # :whisper builds whisper.cpp from the submodule at whisper/third_party/whisper.cpp.
-          submodules: recursive
+          # The private `ios` submodule is deliberately skipped: CI's GITHUB_TOKEN can't read the
+          # autobridge-ios repo, and the Android build doesn't need it. whisper.cpp is initialized
+          # explicitly in the next step instead.
+          submodules: false
+
+      # :whisper builds whisper.cpp from the submodule at whisper/third_party/whisper.cpp.
+      - name: Init whisper submodule
+        run: git submodule update --init --depth=1 whisper/third_party/whisper.cpp
 
       # Fails fast if the committed gradle-wrapper.jar was tampered with.
       - name: Validate Gradle wrapper
@@ -107,8 +113,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          # :whisper builds whisper.cpp from the submodule at whisper/third_party/whisper.cpp.
-          submodules: recursive
+          # The private `ios` submodule is deliberately skipped: CI's GITHUB_TOKEN can't read the
+          # autobridge-ios repo, and the Android build doesn't need it. whisper.cpp is initialized
+          # explicitly in the next step instead.
+          submodules: false
+
+      # :whisper builds whisper.cpp from the submodule at whisper/third_party/whisper.cpp.
+      - name: Init whisper submodule
+        run: git submodule update --init --depth=1 whisper/third_party/whisper.cpp
 
       - name: Validate Gradle wrapper
         uses: gradle/actions/wrapper-validation@v4
