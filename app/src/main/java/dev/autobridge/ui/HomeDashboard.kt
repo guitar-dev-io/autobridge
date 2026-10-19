@@ -355,25 +355,34 @@ private fun CardActionButton(label: String, icon: Int, primary: Boolean, onClick
 
 @Composable
 private fun QuickLaunchTile(tile: HomeTileUi, modifier: Modifier) {
+    // The design's tile: the icon in a tinted, edged box over a regular-weight label, centred.
     val accent = Color(tile.accent)
     Surface(
         onClick = tile.onClick,
         shape = RoundedCornerShape(20.dp),
         color = ComposeTokens.Surface,
-        modifier = modifier.height(100.dp).semantics { contentDescription = tile.title }
+        modifier = modifier.height(108.dp).semantics { contentDescription = tile.title }
     ) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.SpaceBetween) {
+        Column(
+            Modifier.fillMaxSize().padding(horizontal = 8.dp, vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
             Box(
-                Modifier.size(40.dp).background(accent.copy(alpha = 0.16f), RoundedCornerShape(12.dp)),
+                Modifier
+                    .size(48.dp)
+                    .background(accent.copy(alpha = 0.14f), RoundedCornerShape(14.dp))
+                    .border(1.dp, accent.copy(alpha = 0.28f), RoundedCornerShape(14.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(painterResource(tile.icon), contentDescription = null, tint = accent, modifier = Modifier.size(22.dp))
+                Icon(painterResource(tile.icon), contentDescription = null, tint = accent, modifier = Modifier.size(24.dp))
             }
+            Spacer(Modifier.height(10.dp))
             Text(
                 tile.title,
                 color = ComposeTokens.Text,
                 fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.Normal,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )

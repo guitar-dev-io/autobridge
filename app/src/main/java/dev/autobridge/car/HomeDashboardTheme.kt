@@ -55,7 +55,8 @@ internal object HomeDashboardTheme {
 
     // --- Feature accents (icon glyph colour; the tile behind it is a dark tint of the same) ---
     const val ACCENT_TV = 0xFF7FA9F5.toInt()
-    const val ACCENT_RADIO = 0xFFF2A66E.toInt()
+    // The radio design's amber, the same as AutoBridgeDesign.ACCENT_RADIO on the phone.
+    const val ACCENT_RADIO = 0xFFFFB35C.toInt()
 
     /**
      * Electric blue for the radio tuner's active control (play button, selected preset), equal to

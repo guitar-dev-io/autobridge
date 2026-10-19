@@ -22,6 +22,9 @@ import dev.autobridge.ui.AutoBridgeDesign.dp
  * own, so whatever started the audio — a radio channel, a local track, or the car — is what the
  * bar shows. It hides itself whenever the session has nothing loaded, and polls on a one-second
  * tick, which is cheap and avoids wiring a listener through every screen that embeds it.
+ *
+ * [radioStyle] turns it into the radio design's bar on the Radio page: warm amber card, a big
+ * cover, the station over the song and artist, a large amber play button and a favourite star.
  */
 class MiniPlayer(
     private val context: Context,
@@ -71,6 +74,43 @@ class MiniPlayer(
         maxLines = 1
         ellipsize = TextUtils.TruncateAt.END
     }
+    /** Radio style: the "on air" bars and the station name above the song. */
+    private val stationName = TextView(context).apply {
+        textSize = 13f
+        setTextColor(WARM_TEXT)
+        typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+        maxLines = 1
+        ellipsize = TextUtils.TruncateAt.END
+    }
+    private val stationLine = LinearLayout(context).apply {
+        gravity = Gravity.CENTER_VERTICAL
+        visibility = View.GONE
+        val bars = LinearLayout(context).apply { gravity = Gravity.BOTTOM }
+        intArrayOf(6, 12, 8).forEach { h ->
+            bars.addView(View(context).apply { setBackgroundColor(AMBER) },
+                LinearLayout.LayoutParams(context.dp(3), context.dp(h)).apply { marginEnd = context.dp(2) })
+        }
+        addView(bars, LinearLayout.LayoutParams(-2, context.dp(12)).apply { marginEnd = context.dp(4) })
+        addView(stationName, LinearLayout.LayoutParams(0, -2, 1f))
+    }
+    private val favorite = AutoBridgeDesign.glyphButton(context, "☆", 22f, tint = AMBER) {
+        currentStation()?.let { dev.autobridge.radio.RadioRepository.RadioHistory.toggleFavorite(context, it) }
+        render()
+    }.apply {
+        visibility = View.GONE
+        contentDescription = context.getString(dev.autobridge.R.string.radio_favorite_add)
+    }
+    private lateinit var nextButton: View
+
+    /** The radio design's bar, for the Radio page; set before or after [start]. */
+    var radioStyle: Boolean = false
+        set(value) {
+            if (field == value) return
+            field = value
+            applyStyle()
+            render()
+        }
+
     private val toggle = AutoBridgeDesign.glyphButton(context, PLAY, 16f, filled = true) {
         val wasPlaying = playback.isPlayRequested
         if (wasPlaying) playback.pause() else playback.resume()
@@ -104,14 +144,14 @@ class MiniPlayer(
             orientation = LinearLayout.VERTICAL
             setPadding(context.dp(12), 0, context.dp(8), 0)
         }
+        text.addView(stationLine)
         text.addView(title)
         text.addView(subtitle)
         row.addView(text, LinearLayout.LayoutParams(0, -2, 1f))
-        row.addView(
-            AutoBridgeDesign.glyphButton(context, "⏭", 15f) { playback.next() },
-            LinearLayout.LayoutParams(context.dp(38), context.dp(38))
-        )
+        nextButton = AutoBridgeDesign.glyphButton(context, "⏭", 15f) { playback.next() }
+        row.addView(nextButton, LinearLayout.LayoutParams(context.dp(38), context.dp(38)))
         row.addView(toggle, LinearLayout.LayoutParams(context.dp(40), context.dp(40)))
+        row.addView(favorite, LinearLayout.LayoutParams(context.dp(40), context.dp(56)))
         // Pausing leaves the channel loaded and this bar up; closing unloads it, and the bar hides.
         row.addView(
             AutoBridgeDesign.glyphButton(context, "✕", 15f) {
@@ -119,6 +159,61 @@ class MiniPlayer(
                 render()
             }.apply { contentDescription = context.getString(dev.autobridge.R.string.player_close) },
             LinearLayout.LayoutParams(context.dp(38), context.dp(38))
+        )
+    }
+
+    /** Switches between the shared bar and the radio design's warm one. */
+    private fun applyStyle() {
+        val row = view as LinearLayout
+        if (radioStyle) {
+            row.background = AutoBridgeDesign.surface(context, WARM_CARD, 22, WARM_EDGE)
+            row.setPadding(context.dp(10), context.dp(10), context.dp(6), context.dp(10))
+            artworkFrame.layoutParams = LinearLayout.LayoutParams(context.dp(64), context.dp(64))
+            artworkFrame.background = AutoBridgeDesign.surface(context, AutoBridgeDesign.tint(AMBER, 0.16f), 14, android.graphics.Color.TRANSPARENT)
+            artworkFrame.clipToOutline = true
+            glyph.setTextColor(AMBER)
+            title.textSize = 16f
+            title.typeface = Typeface.create("sans-serif", Typeface.BOLD)
+            subtitle.textSize = 13f
+            subtitle.setTextColor(SOFT_TEXT)
+            stationLine.visibility = View.VISIBLE
+            nextButton.visibility = View.GONE
+            favorite.visibility = View.VISIBLE
+            toggle.layoutParams = LinearLayout.LayoutParams(context.dp(56), context.dp(56))
+            toggle.background = AutoBridgeDesign.surface(context, AMBER, 28, android.graphics.Color.TRANSPARENT)
+            toggle.setTextColor(ON_AMBER)
+        } else {
+            row.background = AutoBridgeDesign.surface(context, AutoBridgeDesign.SURFACE_RAISED, 18, AutoBridgeDesign.HAIRLINE)
+            row.setPadding(context.dp(10), context.dp(10), context.dp(8), context.dp(10))
+            artworkFrame.layoutParams = LinearLayout.LayoutParams(context.dp(40), context.dp(40))
+            artworkFrame.background = AutoBridgeDesign.surface(
+                context, AutoBridgeDesign.tint(AutoBridgeDesign.ACCENT_SOFT, 0.16f), 12,
+                AutoBridgeDesign.tint(AutoBridgeDesign.ACCENT_SOFT, 0.3f)
+            )
+            glyph.setTextColor(AutoBridgeDesign.ACCENT_SOFT)
+            title.textSize = 14f
+            title.typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            subtitle.textSize = 12f
+            subtitle.setTextColor(AutoBridgeDesign.TEXT_MUTED)
+            stationLine.visibility = View.GONE
+            nextButton.visibility = View.VISIBLE
+            favorite.visibility = View.GONE
+            toggle.layoutParams = LinearLayout.LayoutParams(context.dp(40), context.dp(40))
+            toggle.background = defaultToggleBackground
+            toggle.setTextColor(defaultToggleInk)
+        }
+    }
+
+    private val defaultToggleBackground = toggle.background
+    private val defaultToggleInk = toggle.currentTextColor
+
+    /** The station playing now as the radio store knows stations, for the favourite star. */
+    private fun currentStation(): dev.autobridge.radio.RadioStation? {
+        val url = playback.currentUri?.takeIf { it.isNotBlank() } ?: return null
+        val name = playback.currentItemTitle ?: playback.currentTitle ?: return null
+        return dev.autobridge.radio.RadioStation(
+            dev.autobridge.radio.RadioSourceType.INTERNET_RADIO, id = url, title = name, streamUrl = url,
+            logo = playback.currentArtworkUri.orEmpty()
         )
     }
 
@@ -149,8 +244,18 @@ class MiniPlayer(
         // A radio stream that names its song shows the song, with the artist and the station
         // under it; anything else reads exactly as before (its title, then its artist).
         val now = dev.autobridge.radio.RadioNowPlaying.of(playback.currentItemTitle, name, playback.currentArtist)
-        title.text = now.song ?: name
-        subtitle.text = listOfNotNull(
+        if (radioStyle) {
+            stationName.text = now.station ?: playback.currentItemTitle ?: name
+            title.text = now.song ?: name
+            subtitle.text = now.artist ?: when {
+                playback.isPlaying -> "Playing"
+                playback.isPlayRequested -> "Loading…"
+                else -> "Paused"
+            }
+            val fav = playback.currentUri?.let { dev.autobridge.iptv.IptvHistoryStore.isFavorite(context, it) } == true
+            favorite.text = if (fav) "★" else "☆"
+        } else title.text = now.song ?: name
+        if (!radioStyle) subtitle.text = listOfNotNull(
             now.artist,
             now.station.takeIf { now.song != null },
             when {
@@ -202,5 +307,11 @@ class MiniPlayer(
     private companion object {
         const val PLAY = "▶"
         const val PAUSE = "❚❚"
+        const val AMBER = 0xFFFFB35C.toInt()
+        const val ON_AMBER = 0xFF2A1A05.toInt()
+        const val WARM_CARD = 0xFF2A2116.toInt()
+        const val WARM_EDGE = 0xFF5A4022.toInt()
+        const val WARM_TEXT = 0xFFFFC985.toInt()
+        const val SOFT_TEXT = 0xFFC9CDD3.toInt()
     }
 }

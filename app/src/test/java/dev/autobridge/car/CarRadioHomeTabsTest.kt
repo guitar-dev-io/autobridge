@@ -1,19 +1,22 @@
 package dev.autobridge.car
 
 import dev.autobridge.iptv.RadioCategory
-import org.junit.Assert.assertTrue
+import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * A host refuses a TabTemplate with more than four tabs ("There cannot be more than 4 tabs added,
- * found 5") by throwing from build(), which took the whole app down when Radio opened on the car.
+ * The car radio grid draws its own tabs (it used to be a TabTemplate, which a host caps at four),
+ * so every category, Podcasts included, is a tab of its own again, in the radio design's order.
  */
 class CarRadioHomeTabsTest {
-    @Test fun noMoreThanFourTabs() = assertTrue(CarRadioHomeScreen.TABS.size <= 4)
+    @Test fun everyCategoryHasATab() =
+        assertEquals(RadioCategory.values().toSet(), CarRadioHomeScreen.TABS.toSet())
 
-    @Test fun everyCategoryIsStillReachable() {
-        // The one without a tab is the Podcasts cell inside In Country.
-        val missing = RadioCategory.values().toSet() - CarRadioHomeScreen.TABS.toSet()
-        assertTrue("Without a tab: $missing", missing == setOf(RadioCategory.PODCASTS))
-    }
+    @Test fun tabsFollowTheDesignOrder() = assertEquals(
+        listOf(
+            RadioCategory.IN_COUNTRY, RadioCategory.LOCAL, RadioCategory.WORLD,
+            RadioCategory.PODCASTS, RadioCategory.FAVORITES,
+        ),
+        CarRadioHomeScreen.TABS,
+    )
 }

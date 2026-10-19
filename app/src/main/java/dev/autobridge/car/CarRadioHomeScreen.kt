@@ -1,28 +1,23 @@
 package dev.autobridge.car
 
+import android.graphics.Rect
+import android.os.Handler
+import android.os.Looper
+import android.view.Surface
 import androidx.annotation.DrawableRes
-import androidx.annotation.OptIn
+import androidx.car.app.AppManager
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
-import androidx.car.app.annotations.ExperimentalCarApi
-import androidx.car.app.annotations.RequiresCarApi
-import androidx.car.app.constraints.ConstraintManager
+import androidx.car.app.SurfaceCallback
+import androidx.car.app.SurfaceContainer
 import androidx.car.app.model.Action
-import androidx.car.app.model.CarColor
-import androidx.car.app.model.CarIcon
-import androidx.car.app.model.GridItem
-import androidx.car.app.model.GridTemplate
-import androidx.car.app.model.ItemList
-import androidx.car.app.model.MessageTemplate
-import androidx.car.app.model.Tab
-import androidx.car.app.model.TabContents
-import androidx.car.app.model.TabTemplate
+import androidx.car.app.model.ActionStrip
 import androidx.car.app.model.Template
-import androidx.core.graphics.drawable.IconCompat
+import androidx.car.app.navigation.model.NavigationTemplate
 import androidx.lifecycle.DefaultLifecycleObserver
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import dev.autobridge.R
+import dev.autobridge.display.CarSurfaceCanvas
 import dev.autobridge.iptv.IptvChannelQueue
 import dev.autobridge.iptv.IptvEntry
 import dev.autobridge.iptv.IptvHistoryStore
@@ -33,38 +28,45 @@ import dev.autobridge.iptv.RadioBrowserBrowse
 import dev.autobridge.iptv.RadioCategory
 import dev.autobridge.iptv.RadioProvinceRepository
 import dev.autobridge.media.MediaPlaybackClient
+import dev.autobridge.mirror.MirrorSurfaceOwnership
 import dev.autobridge.radio.InternetRadioSource
 import dev.autobridge.radio.RadioRepository
+import dev.autobridge.ui.ImageLoader
 
 /**
- * Radio on the car, the way the phone has it: the five [RadioCategory]s as tabs along the top and
- * each one's stations as a grid of logos, a tap on a logo playing it. Needs a host at Car API 6
- * ([TabTemplate]); [open] sends an older one to the list landing ([CarIptvSourcesScreen]) instead.
+ * Radio on the car, after the radio design's car screen: a round back button, the five
+ * [RadioCategory]s as pills along the top and a search button, and under them each category's
+ * stations as a scrolling grid of logo cards, [CarRadioGridLayout.COLUMNS] across. A tap on a card
+ * plays it; the station on the air is the warm card with the amber ring.
  *
- * Each network tab fetches through [RadioBrowserBrowse] when it is first shown and drops a stale
- * answer by key, like [CarRadioCategoryScreen]. A grid holds as many cells as the host allows, so
- * a longer category ends in an "All stations" cell that opens that category's paged list. In
- * Country also carries the search, and the driver's own lists when there are any, so nothing the
- * old landing offered is out of reach.
+ * It draws on the host surface like [CarRadioNowPlayingScreen] (NavigationTemplate +
+ * [CarSurfaceCanvas], [MirrorSurfaceOwnership] for the one surface callback), which is what lets it
+ * have the back button, five tabs and the column count the host-drawn TabTemplate did not allow.
+ * A host below Car API 5 delivers no surface taps, so [open] gives it the list landing instead.
+ *
+ * Each network tab fetches through [RadioBrowserBrowse] when first shown and drops a stale answer by
+ * key. A category longer than [MAX_STATIONS] ends in an "All stations" card that opens its paged
+ * list; In Country also ends in the driver's own lists when there are any.
  */
-// TabTemplate and its parts were experimental before car-app 1.7; the opt-in keeps lint quiet
-// whichever way this version marks them.
-@OptIn(ExperimentalCarApi::class)
-@RequiresCarApi(6)
-class CarRadioHomeScreen(carContext: CarContext) : Screen(carContext) {
+class CarRadioHomeScreen(carContext: CarContext) : Screen(carContext), SurfaceCallback {
     companion object {
-        /** Radio's landing for this host: the tabbed grid from Car API 6, the list before it. */
+        /** Radio's landing for this host: the drawn grid from Car API 5, the list before it. */
         fun open(carContext: CarContext): Screen =
-            if (carContext.carAppApiLevel >= 6) CarRadioHomeScreen(carContext)
+            if (carContext.carAppApiLevel >= 5) CarRadioHomeScreen(carContext)
             else CarIptvSourcesScreen(carContext, IptvKind.RADIO)
 
-        private const val FALLBACK_GRID_LIMIT = 6
+        /** Every category is a tab: the surface has room for five pills, the template had four. */
+        val TABS = listOf(
+            RadioCategory.IN_COUNTRY, RadioCategory.LOCAL, RadioCategory.WORLD,
+            RadioCategory.PODCASTS, RadioCategory.FAVORITES,
+        )
 
-        /**
-         * The tabs: a host takes at most four ("There cannot be more than 4 tabs"), so Podcasts,
-         * the least used, is a cell inside In Country instead of a tab of its own.
-         */
-        val TABS = listOf(RadioCategory.IN_COUNTRY, RadioCategory.LOCAL, RadioCategory.WORLD, RadioCategory.FAVORITES)
+        /** Cards drawn per category before the "All stations" card takes over. */
+        const val MAX_STATIONS = 60
+
+        private const val BASELINE_DPI = 160
+        /** A fling travels this share of its velocity (px/s) in one step. */
+        private const val FLING_SHARE = 0.35f
     }
 
     private sealed interface State {
@@ -73,26 +75,82 @@ class CarRadioHomeScreen(carContext: CarContext) : Screen(carContext) {
         data class Failed(val message: String) : State
     }
 
+    /** What is on screen now: the drawing model and what each card does. */
+    private class Model(val content: CarRadioGridRenderer.Content, val actions: List<() -> Unit>, val messageAction: (() -> Unit)?)
+
+    private val appManager = carContext.getCarService(AppManager::class.java)
     private val mediaPlayback = MediaPlaybackClient(carContext)
-    private val logos = CarChannelLogos(carContext) { repaint() }
+    private val renderer by lazy { CarRadioGridRenderer(carContext) }
+    private val handler = Handler(Looper.getMainLooper())
     private var selected = RadioCategory.IN_COUNTRY
     private val states = mutableMapOf<String, State>()
 
+    private var surface: Surface? = null
+    private var surfaceWidth = 0
+    private var surfaceHeight = 0
+    private var surfaceDpi = 0
+    private var stableArea: Rect? = null
+    private var visibleArea: Rect? = null
+    private var active = false
+    private var pressed: CarRadioGridRegion? = null
+    private var scroll = 0f
+    private var layout: CarRadioGridLayout? = null
+    private var model: Model? = null
+
+    private var sessionPlayer: androidx.media3.common.Player? = null
+    private val sessionListener = object : androidx.media3.common.Player.Listener {
+        override fun onEvents(player: androidx.media3.common.Player, events: androidx.media3.common.Player.Events) {
+            if (active) render()
+        }
+    }
+
+    private val logos = CarRadioGridRenderer.Logos { url ->
+        if (url.isNullOrBlank()) null else ImageLoader.bitmap(carContext, url) { handler.post { if (active) render() } }
+    }
+
     init {
-        mediaPlayback.connect(onConnected = { invalidate() }, onError = { invalidate() })
         lifecycle.addObserver(object : DefaultLifecycleObserver {
-            override fun onStart(owner: LifecycleOwner) = load(selected)
+            override fun onStart(owner: LifecycleOwner) {
+                active = true
+                pressed = null
+                MirrorSurfaceOwnership.claim(this@CarRadioHomeScreen)
+                appManager.setSurfaceCallback(this@CarRadioHomeScreen)
+                watchSession()
+                load(selected)
+                render()
+            }
+
+            override fun onStop(owner: LifecycleOwner) {
+                active = false
+                handler.removeCallbacksAndMessages(null)
+                unwatchSession()
+                releaseSurface()
+                if (MirrorSurfaceOwnership.release(this@CarRadioHomeScreen)) appManager.setSurfaceCallback(null)
+            }
 
             override fun onDestroy(owner: LifecycleOwner) {
-                logos.stop()
                 mediaPlayback.disconnect()
             }
         })
     }
 
-    private fun repaint() {
-        if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) invalidate()
-    }
+    override fun onGetTemplate(): Template =
+        // NavigationTemplate needs a non-empty strip; an icon-only Home action fills it (never
+        // Action.APP_ICON in a strip: see CarBrowserScreen). The drawn back button is the main way out.
+        NavigationTemplate.Builder()
+            .setActionStrip(
+                ActionStrip.Builder()
+                    .addAction(
+                        Action.Builder()
+                            .setIcon(CarIcons.of(carContext, R.drawable.ic_car_home))
+                            .setOnClickListener { screenManager.popToRoot() }
+                            .build()
+                    )
+                    .build()
+            )
+            .build()
+
+    // --- Data ---------------------------------------------------------------------------------
 
     private fun province(): String? = RadioProvinceRepository.selected(carContext).takeIf { it.isNotBlank() }
 
@@ -108,113 +166,86 @@ class CarRadioHomeScreen(carContext: CarContext) : Screen(carContext) {
                 is RadioBrowserBrowse.Result.Ready -> State.Ready(result.entries)
                 is RadioBrowserBrowse.Result.Failed -> State.Failed(result.message)
             }
-            repaint()
+            handler.post { if (active) render() }
         }
     }
 
-    override fun onGetTemplate(): Template {
-        logos.beginTemplate()
-        val builder = TabTemplate.Builder(object : TabTemplate.TabCallback {
-            override fun onTabSelected(tabContentId: String) {
-                val category = TABS.firstOrNull { it.name == tabContentId } ?: return
-                selected = category
-                load(category)
-                invalidate()
-            }
-        }).setHeaderAction(Action.APP_ICON)
-        TABS.forEach { category ->
-            builder.addTab(
-                Tab.Builder()
-                    .setTitle(carContext.getString(category.labelRes))
-                    .setIcon(icon(tabIcon(category)))
-                    .setContentId(category.name)
-                    .build()
-            )
-        }
-        return builder
-            .setTabContents(TabContents.Builder(content(selected)).build())
-            .setActiveTabContentId(selected.name)
-            .build()
-    }
+    private fun buildModel(): Model {
+        val tabs = TABS.map { CarRadioGridRenderer.Tab(carContext.getString(tabLabel(it)), tabIcon(it)) }
+        val selectedIndex = TABS.indexOf(selected)
+        fun message(text: String, action: String? = null, onAction: (() -> Unit)? = null) = Model(
+            CarRadioGridRenderer.Content(tabs, selectedIndex, emptyList(), text, action), emptyList(), onAction
+        )
 
-    /** The selected tab's body: a station grid, or the one thing standing in its way. */
-    private fun content(category: RadioCategory): Template {
-        if (category == RadioCategory.FAVORITES) {
+        if (selected == RadioCategory.FAVORITES) {
             val favorites = IptvHistoryStore.favorites(carContext, IptvKind.RADIO).filter { it.url.isNotBlank() }
             if (favorites.isEmpty()) return message(carContext.getString(R.string.radio_browse_empty))
-            val items = ItemList.Builder()
             val logoByUrl = favorites.associate { it.url to it.logo }
-            favorites.take(gridLimit()).forEach { item ->
-                items.addItem(stationCell(item.title, item.logo, item.url) {
+            val cells = favorites.map { stationCell(it.title, it.logo, it.url) }
+            val actions = favorites.map { item ->
+                {
                     RadioRepository.recordPlayback(carContext, RadioRepository.RadioHistory.toRadioStation(item))
                     CarIptvPlayback.play(
                         this, carContext, mediaPlayback, item.title, item.url, IptvKind.RADIO, item.playback,
                         IptvChannelQueue.aroundItems(favorites, item, CarIptvCheck::isDead),
                         logoFor = { logoByUrl[it] }
                     )
+                }
+            }
+            return Model(CarRadioGridRenderer.Content(tabs, selectedIndex, cells), actions, null)
+        }
+        if (selected == RadioCategory.LOCAL && province() == null) {
+            return message(
+                carContext.getString(R.string.radio_local_pick_title),
+                carContext.getString(R.string.radio_local_pick_cta)
+            ) {
+                screenManager.push(CarRadioProvinceScreen(carContext) {
+                    load(RadioCategory.LOCAL)
+                    render()
                 })
             }
-            return GridTemplate.Builder().setSingleList(items.build()).build()
         }
-        if (category == RadioCategory.LOCAL && province() == null) {
-            return MessageTemplate.Builder(carContext.getString(R.string.radio_local_pick_title))
-                .addAction(
-                    Action.Builder()
-                        .setTitle(carContext.getString(R.string.radio_local_pick_cta))
-                        .setOnClickListener {
-                            screenManager.push(CarRadioProvinceScreen(carContext) {
-                                load(RadioCategory.LOCAL)
-                                repaint()
-                            })
-                        }
-                        .build()
-                )
-                .build()
-        }
-        val key = category.cacheKey(province())
+        val key = selected.cacheKey(province())
         return when (val state = key?.let { states[it] } ?: State.Loading) {
-            State.Loading -> GridTemplate.Builder().setLoading(true).build()
+            State.Loading -> message(carContext.getString(R.string.radio_browse_loading))
             is State.Failed -> message(state.message)
-            is State.Ready -> stationGrid(category, state.entries)
+            is State.Ready -> {
+                // The directory lists some stations twice (one per stream); the grid shows each once.
+                val stations = state.entries.filterNot { CarIptvCheck.isDead(it.url) || it.url.isBlank() }
+                    .distinctBy { it.title.trim().lowercase() }
+                val shown = stations.take(MAX_STATIONS)
+                val logoByUrl = stations.associate { it.url to it.logo }
+                val cells = shown.map { stationCell(it.title, it.logo, it.url) }.toMutableList()
+                val actions = shown.map<IptvEntry, () -> Unit> { entry -> { play(entry, stations, logoByUrl) } }.toMutableList()
+                val category = selected
+                if (stations.size > shown.size) {
+                    cells += CarRadioGridRenderer.Cell(carContext.getString(R.string.radio_all_stations), icon = R.drawable.ic_tile_radio)
+                    actions += { screenManager.push(CarRadioCategoryScreen(carContext, category)) }
+                }
+                if (category == RadioCategory.IN_COUNTRY && IptvSourceStore.list(carContext, IptvKind.RADIO).isNotEmpty()) {
+                    // The driver's own radio lists (M3U, Xtream) still live on the list landing.
+                    cells += CarRadioGridRenderer.Cell(carContext.getString(R.string.radio_browse_my_stations), icon = R.drawable.ic_radio_list)
+                    actions += { screenManager.push(CarIptvSourcesScreen(carContext, IptvKind.RADIO)) }
+                }
+                if (cells.isEmpty()) message(carContext.getString(R.string.radio_browse_empty))
+                else Model(CarRadioGridRenderer.Content(tabs, selectedIndex, cells), actions, null)
+            }
         }
     }
 
-    private fun stationGrid(category: RadioCategory, entries: List<IptvEntry>): Template {
-        // The directory lists some stations twice (one per stream); the grid shows each name once.
-        val stations = entries.filterNot { CarIptvCheck.isDead(it.url) || it.url.isBlank() }
-            .distinctBy { it.title.trim().lowercase() }
-        val extras = mutableListOf<GridItem>()
-        if (category == RadioCategory.IN_COUNTRY) {
-            extras += actionCell(carContext.getString(R.string.radio_search), CarIcons.SEARCH) {
-                screenManager.push(CarRadioSearchScreen(carContext))
-            }
-            extras += actionCell(carContext.getString(RadioCategory.PODCASTS.labelRes), R.drawable.ic_car_mic) {
-                screenManager.push(CarRadioCategoryScreen(carContext, RadioCategory.PODCASTS))
-            }
-        }
-        val limit = gridLimit()
-        // Room for the extras, and for "All stations" when the category does not fit.
-        var room = (limit - extras.size).coerceAtLeast(1)
-        val overflow = stations.size > room
-        if (overflow) room = (room - 1).coerceAtLeast(1)
-        val items = ItemList.Builder()
-        extras.forEach(items::addItem)
-        val logoByUrl = stations.associate { it.url to it.logo }
-        stations.take(room).forEach { entry ->
-            items.addItem(stationCell(entry.title, entry.logo, entry.url) { play(entry, stations, logoByUrl) })
-        }
-        if (overflow) {
-            items.addItem(actionCell(carContext.getString(R.string.radio_all_stations), R.drawable.ic_tile_radio) {
-                screenManager.push(CarRadioCategoryScreen(carContext, category))
-            })
-        } else if (category == RadioCategory.IN_COUNTRY && IptvSourceStore.list(carContext, IptvKind.RADIO).isNotEmpty()) {
-            // The driver's own radio lists (M3U, Xtream) still live on the list landing.
-            items.addItem(actionCell(carContext.getString(R.string.radio_browse_my_stations), CarIcons.LIBRARY) {
-                screenManager.push(CarIptvSourcesScreen(carContext, IptvKind.RADIO))
-            })
-        }
-        if (stations.isEmpty() && extras.isEmpty()) return message(carContext.getString(R.string.radio_browse_empty))
-        return GridTemplate.Builder().setSingleList(items.build()).build()
+    /**
+     * A station card. The one on the air is matched by its stream address, or by its name when the
+     * session reports the address differently (a redirect, a resolved playlist).
+     */
+    private fun stationCell(title: String, logo: String?, url: String): CarRadioGridRenderer.Cell {
+        val current = mediaPlayback.currentUri
+        val currentName = mediaPlayback.currentItemTitle
+        val onAir = (current != null && current == url) ||
+            (currentName != null && currentName.trim().equals(title.trim(), ignoreCase = true))
+        val status = if (!onAir) null else carContext.getString(
+            if (mediaPlayback.isPlaying) R.string.car_lib_playing else R.string.car_lib_paused
+        )
+        return CarRadioGridRenderer.Cell(title, logo, onAir = onAir, status = status)
     }
 
     private fun play(entry: IptvEntry, stations: List<IptvEntry>, logoByUrl: Map<String, String>) {
@@ -226,51 +257,148 @@ class CarRadioHomeScreen(carContext: CarContext) : Screen(carContext) {
         )
     }
 
-    /**
-     * A station: its logo on a card, or its coloured name card ([CarStationTile]); the radio mark
-     * only past the image budget. The station on the air says so under its name.
-     */
-    private fun stationCell(title: String, logo: String?, url: String, onClick: () -> Unit): GridItem {
-        val onAir = url == mediaPlayback.currentUri
-        val cell = GridItem.Builder()
-            .setTitle(title)
-            .setImage(logos.tile(logo, title, onAir) ?: radioMark(), GridItem.IMAGE_TYPE_LARGE)
-            .setOnClickListener(onClick)
-        if (onAir) {
-            cell.setText(carContext.getString(if (mediaPlayback.isPlaying) R.string.car_lib_playing else R.string.car_lib_paused))
-        }
-        return cell.build()
+    private fun select(category: RadioCategory) {
+        if (category == selected) return
+        selected = category
+        scroll = 0f
+        load(category)
     }
 
-    /** Search, podcasts, all stations: a dark card like the stations', not a bare icon. */
-    private fun actionCell(title: String, @DrawableRes iconRes: Int, onClick: () -> Unit): GridItem {
-        val card = actionCards.getOrPut(iconRes) {
-            androidx.core.content.ContextCompat.getDrawable(carContext, iconRes)?.let { glyph ->
-                CarIcon.Builder(IconCompat.createWithBitmap(CarStationTile.action(glyph))).build()
-            } ?: icon(iconRes)
+    // --- Session ------------------------------------------------------------------------------
+
+    private fun watchSession() {
+        if (mediaPlayback.isConnected) {
+            attachSessionListener()
+        } else {
+            mediaPlayback.connect(onConnected = {
+                if (active) {
+                    attachSessionListener()
+                    render()
+                }
+            }, onError = { if (active) render() })
         }
-        return GridItem.Builder()
-            .setTitle(title)
-            .setImage(card, GridItem.IMAGE_TYPE_LARGE)
-            .setOnClickListener(onClick)
-            .build()
     }
 
-    private val actionCards = mutableMapOf<Int, CarIcon>()
+    private fun attachSessionListener() {
+        val player = mediaPlayback.player ?: return
+        if (sessionPlayer === player) return
+        sessionPlayer?.removeListener(sessionListener)
+        player.addListener(sessionListener)
+        sessionPlayer = player
+    }
 
-    private fun message(text: String): Template = MessageTemplate.Builder(text).build()
+    private fun unwatchSession() {
+        sessionPlayer?.removeListener(sessionListener)
+        sessionPlayer = null
+    }
 
-    private fun gridLimit(): Int = runCatching {
-        carContext.getCarService(ConstraintManager::class.java)
-            .getContentLimit(ConstraintManager.CONTENT_LIMIT_TYPE_GRID)
-    }.getOrDefault(FALLBACK_GRID_LIMIT).coerceIn(FALLBACK_GRID_LIMIT, 100)
+    // --- Surface callbacks --------------------------------------------------------------------
 
-    private fun icon(@DrawableRes resourceId: Int): CarIcon = CarIcons.of(carContext, resourceId)
+    override fun onSurfaceAvailable(surfaceContainer: SurfaceContainer) {
+        if (!active || !MirrorSurfaceOwnership.isOwner(this)) return
+        val next = surfaceContainer.surface ?: return
+        if (next !== surface) releaseSurface()
+        surface = next
+        surfaceWidth = surfaceContainer.width
+        surfaceHeight = surfaceContainer.height
+        surfaceDpi = surfaceContainer.dpi
+        CarDisplayInfo.record(surfaceWidth, surfaceHeight, surfaceDpi, source = "radio-grid")
+        render()
+    }
 
-    private fun radioMark(): CarIcon =
-        CarIcon.Builder(IconCompat.createWithResource(carContext, R.drawable.ic_tile_radio))
-            .setTint(CarColor.createCustom(HomeDashboardTheme.ACCENT_RADIO, HomeDashboardTheme.ACCENT_RADIO))
-            .build()
+    override fun onSurfaceDestroyed(surfaceContainer: SurfaceContainer) {
+        if (!MirrorSurfaceOwnership.isOwner(this)) return
+        releaseSurface()
+    }
+
+    override fun onStableAreaChanged(stableArea: Rect) {
+        if (!active || !MirrorSurfaceOwnership.isOwner(this)) return
+        this.stableArea = Rect(stableArea)
+        render()
+    }
+
+    override fun onVisibleAreaChanged(visibleArea: Rect) {
+        if (!active || !MirrorSurfaceOwnership.isOwner(this)) return
+        this.visibleArea = Rect(visibleArea)
+        render()
+    }
+
+    override fun onScroll(distanceX: Float, distanceY: Float) {
+        if (!active || !MirrorSurfaceOwnership.isOwner(this)) return
+        scrollBy(distanceY)
+    }
+
+    override fun onFling(velocityX: Float, velocityY: Float) {
+        if (!active || !MirrorSurfaceOwnership.isOwner(this)) return
+        scrollBy(-velocityY * FLING_SHARE)
+    }
+
+    private fun scrollBy(dy: Float) {
+        val max = layout?.maxScroll ?: return
+        val next = (scroll + dy).coerceIn(0f, max)
+        if (next == scroll) return
+        scroll = next
+        render()
+    }
+
+    override fun onClick(x: Float, y: Float) {
+        if (!active || !MirrorSurfaceOwnership.isOwner(this) || pressed != null) return
+        val current = model ?: return
+        val hit = layout?.hit(x, y, scroll, current.messageAction != null) ?: return
+        pressed = hit
+        render()
+        handler.postDelayed({
+            pressed = null
+            if (!active) return@postDelayed
+            actOn(hit, current)
+            if (active) render()
+        }, HomeDashboardTheme.PRESS_FEEDBACK_MS)
+    }
+
+    private fun actOn(region: CarRadioGridRegion, current: Model) {
+        when (region) {
+            CarRadioGridRegion.Back -> screenManager.pop()
+            CarRadioGridRegion.Search -> screenManager.push(CarRadioSearchScreen(carContext))
+            is CarRadioGridRegion.Tab -> TABS.getOrNull(region.index)?.let(::select)
+            is CarRadioGridRegion.Cell -> current.actions.getOrNull(region.index)?.invoke()
+            CarRadioGridRegion.MessageAction -> current.messageAction?.invoke()
+        }
+    }
+
+    // --- Drawing ------------------------------------------------------------------------------
+
+    private fun render() {
+        val target = surface ?: return
+        if (!active || !MirrorSurfaceOwnership.isOwner(this) || !target.isValid) return
+        if (surfaceWidth <= 0 || surfaceHeight <= 0) return
+        val density = (if (surfaceDpi > 0) surfaceDpi else BASELINE_DPI) / BASELINE_DPI.toFloat()
+        val built = buildModel().also { model = it }
+        val computed = CarRadioGridLayout.compute(
+            safeArea(), density, renderer.measureTabLabels(built.content.tabs, density), built.content.cells.size
+        ).also { layout = it }
+        scroll = scroll.coerceIn(0f, computed.maxScroll)
+        CarSurfaceCanvas.draw(carContext, target) { canvas ->
+            renderer.draw(canvas, computed, built.content, scroll, pressed, logos)
+        }
+    }
+
+    private fun safeArea(): CarRadioBox {
+        val full = Rect(0, 0, surfaceWidth, surfaceHeight)
+        val inset = listOfNotNull(stableArea, visibleArea)
+            .firstOrNull {
+                !it.isEmpty && full.contains(it) && it.width() > surfaceWidth / 2 && it.height() > surfaceHeight / 2
+            } ?: full
+        return CarRadioBox(inset.left.toFloat(), inset.top.toFloat(), inset.right.toFloat(), inset.bottom.toFloat())
+    }
+
+    private fun releaseSurface() {
+        surface?.let { runCatching { it.release() } }
+        surface = null
+    }
+
+    /** The design's short tab names; Favourites is "โปรด" on a pill. */
+    private fun tabLabel(category: RadioCategory): Int =
+        if (category == RadioCategory.FAVORITES) R.string.radio_tab_favorites else category.labelRes
 
     @DrawableRes
     private fun tabIcon(category: RadioCategory): Int = when (category) {
