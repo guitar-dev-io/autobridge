@@ -17,6 +17,7 @@ import dev.autobridge.browser.BrowserSiteEntry
 import dev.autobridge.browser.CarBrowserRuntime
 import dev.autobridge.browser.SearchEngineStore
 import dev.autobridge.entertainment.WebBookmarkStore
+import dev.autobridge.entertainment.WebHistoryStore
 
 /**
  * The car browser's start page, the step between the Web card and a page, like AABrowser's: search,
@@ -55,8 +56,21 @@ class CarBrowserStartScreen(carContext: CarContext) : Screen(carContext) {
         ) { screenManager.push(CarSupportScreen(carContext)) }
         fixed.forEach(items::addItem)
 
-        val room = (gridLimit() - 1 - fixed.size).coerceAtLeast(0)
-        WebBookmarkStore.list(carContext).take(room).forEach { bookmark ->
+        // Recent pages first (newest, de-duped against the live page), then bookmarks fill the rest,
+        // so the flat grid never exceeds the host's content limit. Empty history adds no recent tile.
+        val layout = CarBrowserStartLayout.compute(
+            limit = gridLimit(),
+            fixedCount = fixed.size,
+            liveUrl = open,
+            history = WebHistoryStore.list(carContext),
+            bookmarks = WebBookmarkStore.list(carContext)
+        )
+        layout.recent.forEach { entry ->
+            val title = entry.title.ifBlank { host(entry.url) }
+            val tile = CarIcon.Builder(IconCompat.createWithBitmap(CarStationTile.placeholder(title))).build()
+            items.addItem(cell(title, tile, host(entry.url)) { load(entry.url) })
+        }
+        layout.bookmarks.forEach { bookmark ->
             val tile = CarIcon.Builder(IconCompat.createWithBitmap(CarStationTile.placeholder(bookmark.title))).build()
             items.addItem(cell(bookmark.title, tile, host(bookmark.url)) { load(bookmark.url) })
         }
