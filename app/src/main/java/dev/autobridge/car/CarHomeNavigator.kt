@@ -16,17 +16,21 @@ internal object CarHomeNavigator {
         requestSafety: () -> Unit
     ) {
         dev.autobridge.logging.StructuredLog.i("CarHome", "tapped -> ${section.name}")
-        val url = section.webUrl
-        when {
-            section == HomeSection.TV ->
+        // Exhaustive over HomeSection with no `else`: under Kotlin 2 (K2) a `when (section)`
+        // statement that omits any enum constant is a compile error, so a new section can never
+        // silently fall through to Settings — the compiler forces a branch to be added here.
+        when (section) {
+            HomeSection.TV ->
                 screenManager.push(CarIptvSourcesScreen(carContext, dev.autobridge.iptv.IptvKind.TV))
             // Tabs and a logo grid from Car API 6; the list landing on an older host.
-            section == HomeSection.RADIO ->
+            HomeSection.RADIO ->
                 screenManager.push(CarRadioHomeScreen.open(carContext))
-            url != null -> {
-                // Tapping a site tile that is already open means "take me back to it", not "start
-                // over": loading the root again would throw the page away and restart whatever is
-                // playing on it. See [dev.autobridge.browser.BrowserSiteEntry].
+            // The two web-video sections are just a website (HomeSection.webUrl is non-null for
+            // exactly these two). Tapping a site tile that is already open means "take me back to
+            // it", not "start over": loading the root again would throw the page away and restart
+            // whatever is playing on it. See [dev.autobridge.browser.BrowserSiteEntry].
+            HomeSection.YOUTUBE, HomeSection.YOUTUBE_MUSIC -> {
+                val url = section.webUrl!!
                 val renderer = dev.autobridge.browser.CarBrowserRuntime.renderer(carContext)
                 if (!dev.autobridge.browser.BrowserSiteEntry.resumes(renderer.livePageUrl, url)) {
                     renderer.load(url)
@@ -36,25 +40,33 @@ internal object CarHomeNavigator {
             // The browser's start page first (search, the open page, quick links, support); its
             // "Open browser" is the Web card's old target: the chosen desktop engine in the
             // sideload builds when one is installed, the built-in browser otherwise.
-            section == HomeSection.WEB ->
+            HomeSection.WEB ->
                 CarNavigation.open(screenManager, "CarBrowserStartScreen") { CarBrowserStartScreen(carContext) }
-            section == HomeSection.FOLDERS ->
+            HomeSection.FOLDERS ->
                 screenManager.push(CarLibraryScreen(carContext, CarLibraryScreen.Mode.FOLDERS))
-            section == HomeSection.PLAYLISTS ->
+            HomeSection.PLAYLISTS ->
                 screenManager.push(CarLibraryScreen(carContext, CarLibraryScreen.Mode.PLAYLISTS))
-            section == HomeSection.GALLERY ->
+            HomeSection.GALLERY ->
                 screenManager.push(CarLibraryScreen(carContext, CarLibraryScreen.Mode.GALLERY))
-            section == HomeSection.FAVORITES ->
+            HomeSection.FAVORITES ->
                 screenManager.push(CarFavoritesScreen(carContext))
-            section == HomeSection.STREAMING ->
+            HomeSection.STREAMING ->
                 screenManager.push(CarStreamingScreen(carContext))
-            section == HomeSection.WEATHER ->
+            HomeSection.WEATHER ->
                 screenManager.push(CarWeatherScreen(carContext))
-            section == HomeSection.MIRROR ->
+            HomeSection.MIRROR ->
                 screenManager.push(CarMirrorIntroScreen(carContext))
-            section == HomeSection.APPS ->
+            HomeSection.APPS ->
                 CarNavigation.open(screenManager, "CarQuickLaunchScreen") { CarQuickLaunchScreen(carContext) }
-            else -> CarNavigation.open(screenManager, "CarSettingsScreen") { CarSettingsScreen(carContext, requestSafety) }
+            // The Agent is the car's remote-control surface ("control the car screen"); the same
+            // "CarAgentScreen" marker is used by the More menu's Agent row and the driving-mode
+            // tile, so routing REMOTE here returns to that instance instead of stacking a copy.
+            HomeSection.REMOTE ->
+                CarNavigation.open(screenManager, "CarAgentScreen") { CarAgentScreen(carContext) }
+            // Explicit branch (was previously reached only via the removed `else`); the voice
+            // "open settings" path (VoiceScreen.SETTINGS) relies on this.
+            HomeSection.SETTINGS ->
+                CarNavigation.open(screenManager, "CarSettingsScreen") { CarSettingsScreen(carContext, requestSafety) }
         }
     }
 }
