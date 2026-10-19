@@ -1,5 +1,6 @@
 package dev.autobridge.ui
 
+import android.app.Activity
 import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Color
@@ -12,6 +13,7 @@ import android.text.TextWatcher
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewTreeObserver
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageView
@@ -19,6 +21,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import dev.autobridge.R
+import dev.autobridge.design.DesignTokens
 
 /**
  * AutoBridge's own phone design language, used by every screen the app draws itself.
@@ -37,35 +40,35 @@ object AutoBridgeDesign {
     // ----- Tokens -----
 
     // Matches the car dashboard palette (docs/UI_REDESIGN_TASKS.md "Design tokens").
-    const val INK = 0xFF12151A.toInt()
-    const val SURFACE = 0xFF1C2027.toInt()
-    const val SURFACE_RAISED = 0xFF232831.toInt()
-    const val HAIRLINE = 0xFF2E343E.toInt()
-    const val TEXT = 0xFFF3F5F7.toInt()
-    const val TEXT_MUTED = 0xFFA9B0BA.toInt()
-    const val ACCENT = 0xFF4DA3FF.toInt()
-    const val ACCENT_SOFT = 0xFF33C9D6.toInt()
-    const val DANGER = 0xFFFF9AA8.toInt()
+    const val INK = DesignTokens.Phone.INK
+    const val SURFACE = DesignTokens.Phone.SURFACE
+    const val SURFACE_RAISED = DesignTokens.Phone.SURFACE_RAISED
+    const val HAIRLINE = DesignTokens.Phone.HAIRLINE
+    const val TEXT = DesignTokens.Phone.TEXT
+    const val TEXT_MUTED = DesignTokens.Phone.TEXT_MUTED
+    const val ACCENT = DesignTokens.Phone.ACCENT
+    const val ACCENT_SOFT = DesignTokens.Phone.ACCENT_SOFT
+    const val DANGER = DesignTokens.Phone.DANGER
 
     /** "Parked" / "connected" status colour, shared by Home, Control, Car & Connection and Duo Screen. */
-    const val ACCENT_ONLINE = 0xFF5BE3B4.toInt()
+    const val ACCENT_ONLINE = DesignTokens.Phone.ACCENT_ONLINE
 
     /**
      * Signal colours for a checked channel: green answers, amber answers slowly, and a dead one
      * takes [DANGER]. Green reading as "go" is the one colour convention a driver does not have to
      * learn, and the head unit shows the same three through `CarColor` (see `CarIptvCheck`).
      */
-    const val SIGNAL_GOOD = 0xFF5BD98A.toInt()
-    const val SIGNAL_SLOW = 0xFFFFC65C.toInt()
+    const val SIGNAL_GOOD = DesignTokens.Phone.SIGNAL_GOOD
+    const val SIGNAL_SLOW = DesignTokens.Phone.SIGNAL_SLOW
 
     /** Per-section accents. Kept here so the phone and any future surface agree on them. */
-    const val ACCENT_TV = 0xFF6EA8FF.toInt()
-    const val ACCENT_RADIO = 0xFFFFB35C.toInt()
-    const val ACCENT_WEB = 0xFF7DD3C0.toInt()
-    const val ACCENT_VIDEO = 0xFFFF7A8A.toInt()
-    const val ACCENT_FILES = 0xFF9BE08A.toInt()
-    const val ACCENT_FAVORITE = 0xFFFF8FB1.toInt()
-    const val ACCENT_SYSTEM = 0xFFB39DFF.toInt()
+    const val ACCENT_TV = DesignTokens.Phone.ACCENT_TV
+    const val ACCENT_RADIO = DesignTokens.Phone.ACCENT_RADIO
+    const val ACCENT_WEB = DesignTokens.Phone.ACCENT_WEB
+    const val ACCENT_VIDEO = DesignTokens.Phone.ACCENT_VIDEO
+    const val ACCENT_FILES = DesignTokens.Phone.ACCENT_FILES
+    const val ACCENT_FAVORITE = DesignTokens.Phone.ACCENT_FAVORITE
+    const val ACCENT_SYSTEM = DesignTokens.Phone.ACCENT_SYSTEM
 
     fun Context.dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
@@ -671,7 +674,7 @@ object AutoBridgeDesign {
         applyInsets: Boolean = true,
         overlay: View? = null
     ): View {
-        val root = FrameLayout(context).apply { setBackgroundColor(INK) }
+        val root = FrameLayout(context).apply { setBackgroundColor(INK); setTag(R.id.autobridge_page_root, applyInsets) }
         val column = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
         // targetSdk 36 means edge-to-edge on Android 15+, so the page owns its own bar insets;
         // without this the header would sit under the status bar and the bottom bar under the
@@ -708,6 +711,33 @@ object AutoBridgeDesign {
         if (bottomBar != null) column.addView(bottomBar, LinearLayout.LayoutParams(-1, -2))
         root.addView(column, FrameLayout.LayoutParams(-1, -1))
         return root
+    }
+
+    /**
+     * Shows [page] (built by [page]) as [activity]'s content in place of the page already there.
+     * Pages are rebuilt whole when their state changes, and a bare setContentView drew the new one
+     * scrolled to the top (restoring the position in a posted callback came a frame late) and
+     * without the system-bar padding until its insets arrived, so every rebuild flashed. This
+     * carries the padding over and, with [keepScroll], restores the scroll position before the
+     * first frame is drawn. Pass keepScroll = false when the rebuild shows different content.
+     */
+    fun showPage(activity: Activity, page: View, keepScroll: Boolean = true) {
+        val previous = activity.findViewById<ViewGroup>(android.R.id.content)?.getChildAt(0)
+        val replacing = previous != null && previous !== page && previous.getTag(R.id.autobridge_page_root) != null
+        if (replacing && previous!!.getTag(R.id.autobridge_page_root) == true && page.getTag(R.id.autobridge_page_root) == true) {
+            page.setPadding(previous.paddingLeft, previous.paddingTop, previous.paddingRight, previous.paddingBottom)
+        }
+        val y = if (replacing && keepScroll) pageScroll(previous!!)?.scrollY ?: 0 else 0
+        activity.setContentView(page)
+        val scroll = pageScroll(page) ?: return
+        if (y <= 0) return
+        scroll.viewTreeObserver.addOnPreDrawListener(object : ViewTreeObserver.OnPreDrawListener {
+            override fun onPreDraw(): Boolean {
+                scroll.viewTreeObserver.removeOnPreDrawListener(this)
+                scroll.scrollTo(0, y)
+                return true
+            }
+        })
     }
 
     /** The scroll view [page] built around its body, so a caller can scroll to a position in it. */

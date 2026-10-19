@@ -11,4 +11,7 @@
          scroll the page programmatically (a letter index, say) can find it after the page is
          built — see AutoBridgeDesign.pageScroll. -->
     <item name="autobridge_page_scroll" type="id" />
+    <!-- Tags the root AutoBridgeDesign.page() builds (value: whether it applies the bar insets),
+         so AutoBridgeDesign.showPage can tell it is replacing one page with another. -->
+    <item name="autobridge_page_root" type="id" />
 </resources>

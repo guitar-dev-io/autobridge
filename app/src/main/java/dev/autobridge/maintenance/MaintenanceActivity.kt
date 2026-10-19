@@ -74,7 +74,8 @@ class MaintenanceActivity : Activity() {
 
         if (odometer == null) body.stack(CarToolViews.footnote(this, getString(R.string.maint_odometer_unknown)), gap = 2)
 
-        setContentView(
+        AutoBridgeDesign.showPage(
+            this,
             AutoBridgeDesign.page(
                 context = this,
                 header = AutoBridgeDesign.header(

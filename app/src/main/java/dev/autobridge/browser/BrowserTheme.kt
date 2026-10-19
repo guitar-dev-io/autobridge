@@ -1,6 +1,7 @@
 package dev.autobridge.browser
 
 import android.graphics.Color
+import dev.autobridge.design.DesignTokens
 
 /**
  * One complete colour scheme for the browser, in Material 3 role names.
@@ -117,28 +118,28 @@ object BrowserTheme {
 
     /** The dark scheme: the one the car always draws, and the phone's default. */
     val dark = BrowserColors(
-        primary = Color.rgb(0xAA, 0xC7, 0xFF),
-        onPrimary = Color.rgb(0x0A, 0x30, 0x5F),
-        primaryContainer = Color.rgb(0x28, 0x47, 0x77),
-        onPrimaryContainer = Color.rgb(0xD6, 0xE3, 0xFF),
-        secondaryContainer = Color.rgb(0x3E, 0x47, 0x59),
-        onSecondaryContainer = Color.rgb(0xDA, 0xE2, 0xF9),
-        surface = Color.rgb(0x11, 0x13, 0x18),
-        surfaceContainerLowest = Color.rgb(0x0C, 0x0E, 0x13),
-        surfaceContainerLow = Color.rgb(0x19, 0x1C, 0x20),
-        surfaceContainer = Color.rgb(0x1D, 0x20, 0x24),
-        surfaceContainerHigh = Color.rgb(0x28, 0x2A, 0x2F),
-        surfaceContainerHighest = Color.rgb(0x33, 0x35, 0x3A),
-        onSurface = Color.rgb(0xE2, 0xE2, 0xE9),
-        onSurfaceVariant = Color.rgb(0xC4, 0xC6, 0xD0),
-        outline = Color.rgb(0x8E, 0x90, 0x99),
-        outlineVariant = Color.rgb(0x44, 0x47, 0x4E),
-        error = Color.rgb(0xFF, 0xB4, 0xAB),
-        iconDisabled = Color.rgb(0x68, 0x6A, 0x6F),
-        secureBadge = Color.rgb(0x9C, 0xD6, 0x7D),
-        insecureBadge = Color.rgb(0xF3, 0xBD, 0x6E),
-        tileDisabledBackground = Color.rgb(0x3E, 0x40, 0x45),
-        tileIconChip = Color.rgb(0x55, 0x5F, 0x73),
+        primary = DesignTokens.BrowserDark.PRIMARY,
+        onPrimary = DesignTokens.BrowserDark.ON_PRIMARY,
+        primaryContainer = DesignTokens.BrowserDark.PRIMARY_CONTAINER,
+        onPrimaryContainer = DesignTokens.BrowserDark.ON_PRIMARY_CONTAINER,
+        secondaryContainer = DesignTokens.BrowserDark.SECONDARY_CONTAINER,
+        onSecondaryContainer = DesignTokens.BrowserDark.ON_SECONDARY_CONTAINER,
+        surface = DesignTokens.BrowserDark.SURFACE,
+        surfaceContainerLowest = DesignTokens.BrowserDark.SURFACE_CONTAINER_LOWEST,
+        surfaceContainerLow = DesignTokens.BrowserDark.SURFACE_CONTAINER_LOW,
+        surfaceContainer = DesignTokens.BrowserDark.SURFACE_CONTAINER,
+        surfaceContainerHigh = DesignTokens.BrowserDark.SURFACE_CONTAINER_HIGH,
+        surfaceContainerHighest = DesignTokens.BrowserDark.SURFACE_CONTAINER_HIGHEST,
+        onSurface = DesignTokens.BrowserDark.ON_SURFACE,
+        onSurfaceVariant = DesignTokens.BrowserDark.ON_SURFACE_VARIANT,
+        outline = DesignTokens.BrowserDark.OUTLINE,
+        outlineVariant = DesignTokens.BrowserDark.OUTLINE_VARIANT,
+        error = DesignTokens.BrowserDark.ERROR,
+        iconDisabled = DesignTokens.BrowserDark.ICON_DISABLED,
+        secureBadge = DesignTokens.BrowserDark.SECURE_BADGE,
+        insecureBadge = DesignTokens.BrowserDark.INSECURE_BADGE,
+        tileDisabledBackground = DesignTokens.BrowserDark.TILE_DISABLED_BACKGROUND,
+        tileIconChip = DesignTokens.BrowserDark.TILE_ICON_CHIP,
     )
 
     /**
@@ -147,29 +148,29 @@ object BrowserTheme {
      * the chrome has to know which scheme it is drawing.
      */
     val light = BrowserColors(
-        primary = Color.rgb(0x41, 0x5F, 0x91),
-        onPrimary = Color.rgb(0xFF, 0xFF, 0xFF),
-        primaryContainer = Color.rgb(0xD6, 0xE3, 0xFF),
-        onPrimaryContainer = Color.rgb(0x28, 0x47, 0x77),
-        secondaryContainer = Color.rgb(0xDA, 0xE2, 0xF9),
-        onSecondaryContainer = Color.rgb(0x3E, 0x47, 0x59),
-        surface = Color.rgb(0xF9, 0xF9, 0xFF),
-        surfaceContainerLowest = Color.rgb(0xFF, 0xFF, 0xFF),
-        surfaceContainerLow = Color.rgb(0xF3, 0xF3, 0xFA),
-        surfaceContainer = Color.rgb(0xED, 0xED, 0xF4),
-        surfaceContainerHigh = Color.rgb(0xE7, 0xE8, 0xEE),
-        surfaceContainerHighest = Color.rgb(0xE2, 0xE2, 0xE9),
-        onSurface = Color.rgb(0x19, 0x1C, 0x20),
-        onSurfaceVariant = Color.rgb(0x44, 0x47, 0x4E),
-        outline = Color.rgb(0x74, 0x77, 0x7F),
-        outlineVariant = Color.rgb(0xC4, 0xC6, 0xD0),
-        error = Color.rgb(0xBA, 0x1A, 0x1A),
+        primary = DesignTokens.BrowserLight.PRIMARY,
+        onPrimary = DesignTokens.BrowserLight.ON_PRIMARY,
+        primaryContainer = DesignTokens.BrowserLight.PRIMARY_CONTAINER,
+        onPrimaryContainer = DesignTokens.BrowserLight.ON_PRIMARY_CONTAINER,
+        secondaryContainer = DesignTokens.BrowserLight.SECONDARY_CONTAINER,
+        onSecondaryContainer = DesignTokens.BrowserLight.ON_SECONDARY_CONTAINER,
+        surface = DesignTokens.BrowserLight.SURFACE,
+        surfaceContainerLowest = DesignTokens.BrowserLight.ON_PRIMARY,
+        surfaceContainerLow = DesignTokens.BrowserLight.SURFACE_CONTAINER_LOW,
+        surfaceContainer = DesignTokens.BrowserLight.SURFACE_CONTAINER,
+        surfaceContainerHigh = DesignTokens.BrowserLight.SURFACE_CONTAINER_HIGH,
+        surfaceContainerHighest = DesignTokens.BrowserLight.SURFACE_CONTAINER_HIGHEST,
+        onSurface = DesignTokens.BrowserLight.ON_SURFACE,
+        onSurfaceVariant = DesignTokens.BrowserLight.ON_SURFACE_VARIANT,
+        outline = DesignTokens.BrowserLight.OUTLINE,
+        outlineVariant = DesignTokens.BrowserLight.OUTLINE_VARIANT,
+        error = DesignTokens.BrowserLight.ERROR,
         // onSurface at 38% over surfaceContainer, and at 12% over the card, pre-blended.
-        iconDisabled = Color.rgb(0x9C, 0x9D, 0xA3),
-        secureBadge = Color.rgb(0x3F, 0x6A, 0x32),
-        insecureBadge = Color.rgb(0x7A, 0x59, 0x00),
-        tileDisabledBackground = Color.rgb(0xCE, 0xCF, 0xD5),
-        tileIconChip = Color.rgb(0xC6, 0xCF, 0xE6),
+        iconDisabled = DesignTokens.BrowserLight.ICON_DISABLED,
+        secureBadge = DesignTokens.BrowserLight.SECURE_BADGE,
+        insecureBadge = DesignTokens.BrowserLight.INSECURE_BADGE,
+        tileDisabledBackground = DesignTokens.BrowserLight.TILE_DISABLED_BACKGROUND,
+        tileIconChip = DesignTokens.BrowserLight.TILE_ICON_CHIP,
     )
 
     /**

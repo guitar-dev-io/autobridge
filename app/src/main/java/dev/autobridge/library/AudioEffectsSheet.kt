@@ -19,6 +19,7 @@ import android.widget.SeekBar
 import android.widget.Switch
 import android.widget.TextView
 import dev.autobridge.R
+import dev.autobridge.design.DesignTokens
 import dev.autobridge.media.AudioEffectsService
 import dev.autobridge.media.AudioEq
 import dev.autobridge.media.EffectScope
@@ -326,19 +327,19 @@ class AudioEffectsSheet(private val context: Context) {
 
     private companion object {
         // The radio design's EQ sheet palette.
-        const val SHEET = 0xFF1A1E25.toInt()
-        const val HANDLE = 0xFF3A404A.toInt()
-        const val PANEL = 0xFF12151A.toInt()
-        const val AMBER = 0xFFFFB35C.toInt()
-        const val AMBER_TRACK = 0x80FFB35C.toInt()
-        const val ON_AMBER = 0xFF2A1A05.toInt()
-        const val WARM_TEXT = 0xFFFFC985.toInt()
-        const val OUTLINE = 0xFF343A44.toInt()
-        const val CHIP_TEXT = 0xFFE3E6EA.toInt()
-        const val SOFT = 0xFFC9CDD3.toInt()
-        const val MUTED = 0xFFA9AFB8.toInt()
-        const val KNOB_OFF = 0xFFC9CDD3.toInt()
-        const val TRACK_OFF = 0xFF3A404A.toInt()
+        const val SHEET = DesignTokens.Radio.SHEET
+        const val HANDLE = DesignTokens.Radio.HANDLE
+        const val PANEL = DesignTokens.Phone.INK
+        const val AMBER = DesignTokens.Phone.ACCENT_RADIO
+        const val AMBER_TRACK = DesignTokens.Radio.AMBER_TRACK
+        const val ON_AMBER = DesignTokens.Radio.ON_AMBER
+        const val WARM_TEXT = DesignTokens.Radio.WARM_TEXT
+        const val OUTLINE = DesignTokens.Radio.CONTROL_PRESSED
+        const val CHIP_TEXT = DesignTokens.Radio.TEXT_CONTROL
+        const val SOFT = DesignTokens.Radio.SOFT_TEXT
+        const val MUTED = DesignTokens.Radio.TEXT_HINT
+        const val KNOB_OFF = DesignTokens.Radio.SOFT_TEXT
+        const val TRACK_OFF = DesignTokens.Radio.HANDLE
         const val BAND_HEIGHT_DP = 150
     }
 }

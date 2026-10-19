@@ -1,5 +1,7 @@
 package dev.autobridge.browser
 
+import dev.autobridge.design.DesignTokens
+
 /**
  * How the browser keyboard looks, shared by the car surface ([CarSurfaceKeyboard]) and the Duo
  * pane ([BrowserKeyboardView]) so the two cannot drift.
@@ -10,20 +12,20 @@ package dev.autobridge.browser
  * piece of chrome that should look the same in every theme.
  */
 object BrowserKeyboardStyle {
-    const val TRAY = 0xFF0D1626.toInt()
-    const val TRAY_EDGE = 0xFF1E2A3E.toInt()
-    const val LETTER_CAP = 0xFF2C374B.toInt()
-    const val FUNCTION_CAP = 0xFF1C2638.toInt()
-    const val CAP_SHADOW = 0xFF05090F.toInt()
-    const val SHIFT_ON_CAP = 0xFFE9EEF7.toInt()
-    const val SHIFT_ON_INK = 0xFF0D1626.toInt()
-    const val GO_CAP = 0xFF1A73FF.toInt()
-    const val INK = 0xFFFFFFFF.toInt()
-    const val INK_SECONDARY = 0xFF9AA7BA.toInt()
-    const val FIELD = 0xFF1C2638.toInt()
-    const val FIELD_EDGE = 0xFF33415A.toInt()
-    const val CURSOR = 0xFF4C9BFF.toInt()
-    const val SELECTION = 0x664C9BFF
+    const val TRAY = DesignTokens.Keyboard.TRAY
+    const val TRAY_EDGE = DesignTokens.Keyboard.TRAY_EDGE
+    const val LETTER_CAP = DesignTokens.Keyboard.LETTER_CAP
+    const val FUNCTION_CAP = DesignTokens.Keyboard.FUNCTION_CAP
+    const val CAP_SHADOW = DesignTokens.Keyboard.CAP_SHADOW
+    const val SHIFT_ON_CAP = DesignTokens.Keyboard.SHIFT_ON_CAP
+    const val SHIFT_ON_INK = DesignTokens.Keyboard.TRAY
+    const val GO_CAP = DesignTokens.Keyboard.GO_CAP
+    const val INK = DesignTokens.Keyboard.INK
+    const val INK_SECONDARY = DesignTokens.Keyboard.INK_SECONDARY
+    const val FIELD = DesignTokens.Keyboard.FUNCTION_CAP
+    const val FIELD_EDGE = DesignTokens.Keyboard.FIELD_EDGE
+    const val CURSOR = DesignTokens.Keyboard.CURSOR
+    const val SELECTION = DesignTokens.Keyboard.SELECTION
 
     /** Corner radius of a key, in dp: rounder than Material, as on iOS. */
     const val KEY_RADIUS_DP = 10f
@@ -41,8 +43,8 @@ object BrowserKeyboardStyle {
     }
 
     /** A key cap while it is drawn pressed: a step lighter than any resting cap. */
-    const val PRESSED_CAP = 0xFF55657F.toInt()
-    const val GO_PRESSED_CAP = 0xFF5C9DFF.toInt()
+    const val PRESSED_CAP = DesignTokens.Keyboard.PRESSED_CAP
+    const val GO_PRESSED_CAP = DesignTokens.Keyboard.GO_PRESSED_CAP
 
     /** The cap for [key] on the frame drawn for the tap that hit it (the car host reports no press/release). */
     fun pressedCap(key: BrowserKey): Int = if (key is BrowserKey.Go) GO_PRESSED_CAP else PRESSED_CAP

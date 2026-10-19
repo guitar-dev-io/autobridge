@@ -53,6 +53,8 @@ class AutoBridgeApplication : Application() {
         // render. Starting it here (idempotent) means the first screen to read RadioRepository.state
         // already has a connected coordinator; see dev.autobridge.radio.RadioRepository.
         dev.autobridge.radio.RadioRepository.init(this)
+        // Sideload builds: the desktop browsers open on the car browser's start page.
+        dev.autobridge.car.CarExtensions.install(this)
     }
 
     /**

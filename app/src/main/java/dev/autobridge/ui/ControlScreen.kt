@@ -66,6 +66,7 @@ import dev.autobridge.browser.BrowserInputResolver
 import dev.autobridge.browser.BrowserResumePoint
 import dev.autobridge.browser.SearchEngineStore
 import dev.autobridge.core.state.RuntimeContextStore
+import dev.autobridge.design.DesignTokens
 import dev.autobridge.entertainment.WebBookmarkStore
 import dev.autobridge.remote.AutoBridgeCommand
 import dev.autobridge.remote.AutoBridgeCommandBus
@@ -636,9 +637,9 @@ fun AndroidAutoStatusCard(
 }
 
 /** Home's reading of [AndroidAutoStatusCard]: a blue-tinted card, the one hero block on Home. */
-private val HomeCardColor = Color(0xFF16243A)
-private val HomeCardIconChip = Color(0xFF1E3A66)
-private val HomeCardCaption = Color(0xFFA9C3E3)
+private val HomeCardColor = Color(DesignTokens.Phone.HOME_CARD)
+private val HomeCardIconChip = Color(DesignTokens.Phone.HOME_CARD_ICON_CHIP)
+private val HomeCardCaption = Color(DesignTokens.Phone.HOME_CARD_CAPTION)
 
 /** A small accent dot plus one word — [AndroidAutoStatusCard]'s Home-only connection pill. */
 @Composable
@@ -1074,7 +1075,7 @@ private fun SegmentChip(label: String, selected: Boolean, modifier: Modifier = M
 }
 
 /** The selected half of a segmented capsule: deep blue under white text, readable at a glance. */
-private val SelectedSegment = Color(0xFF22344F)
+private val SelectedSegment = Color(DesignTokens.Phone.SELECTED_FILL)
 
 /**
  * A plain-text tab with a 2dp accent underline when selected — the Queue/Recent/Favorites group.

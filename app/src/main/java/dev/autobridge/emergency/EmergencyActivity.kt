@@ -17,6 +17,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import dev.autobridge.R
+import dev.autobridge.design.DesignTokens
 import dev.autobridge.i18n.AppLocale
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.stack
@@ -100,7 +101,8 @@ class EmergencyActivity : Activity() {
             gap = 12
         )
 
-        setContentView(
+        AutoBridgeDesign.showPage(
+            this,
             AutoBridgeDesign.page(
                 context = this,
                 header = AutoBridgeDesign.header(
@@ -116,11 +118,11 @@ class EmergencyActivity : Activity() {
 
     /** Each public line in a colour of its own, so the right one is found at a glance. */
     private fun lineColor(number: String): Int = when (number) {
-        "191" -> 0xFF6EA8FF.toInt()  // police
-        "1669" -> 0xFFFF7A8A.toInt() // medical
-        "1193" -> 0xFF5BD98A.toInt() // highway police
-        "199" -> 0xFFFFB35C.toInt()  // fire
-        "1155" -> 0xFFB39DFF.toInt() // tourist police
+        "191" -> DesignTokens.Phone.ACCENT_TV  // police
+        "1669" -> DesignTokens.Phone.ACCENT_VIDEO // medical
+        "1193" -> DesignTokens.Phone.SIGNAL_GOOD // highway police
+        "199" -> DesignTokens.Phone.ACCENT_RADIO  // fire
+        "1155" -> DesignTokens.Phone.ACCENT_SYSTEM // tourist police
         else -> accent
     }
 

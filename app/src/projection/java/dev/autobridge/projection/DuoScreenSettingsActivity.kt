@@ -19,6 +19,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import dev.autobridge.design.DesignTokens
 import dev.autobridge.duoscreen.DuoScreenHost
 import dev.autobridge.duoscreen.R
 import dev.autobridge.duoscreen.layout.DuoScreenLayout
@@ -125,7 +126,8 @@ class DuoScreenSettingsActivity : Activity() {
             getString(R.string.duo_screen_end_session_hint)
         ) { confirmEndSession() })
 
-        setContentView(
+        AutoBridgeDesign.showPage(
+            this,
             AutoBridgeDesign.page(
                 context = this,
                 header = AutoBridgeDesign.header(
@@ -351,7 +353,7 @@ class DuoScreenSettingsActivity : Activity() {
     private fun layoutPreview(preset: DuoScreenPreset, paneCount: Int, packages: List<String?>): View {
         val frame = FrameLayout(this).apply {
             background = AutoBridgeDesign.surface(
-                this@DuoScreenSettingsActivity, 0xFF0B0D10.toInt(), 20, AutoBridgeDesign.HAIRLINE
+                this@DuoScreenSettingsActivity, DesignTokens.MultiApp.SURFACE, 20, AutoBridgeDesign.HAIRLINE
             )
             setPadding(dp(6), dp(6), dp(6), dp(6))
         }

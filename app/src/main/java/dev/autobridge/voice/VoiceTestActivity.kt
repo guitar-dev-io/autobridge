@@ -151,7 +151,8 @@ class VoiceTestActivity : Activity() {
         replayOut = monospace()
         body.stack(replayOut, gap = 12)
 
-        setContentView(
+        AutoBridgeDesign.showPage(
+            this,
             AutoBridgeDesign.page(
                 context = this,
                 header = AutoBridgeDesign.header(

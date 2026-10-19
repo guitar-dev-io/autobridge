@@ -5,6 +5,7 @@ import android.net.LocalSocket
 import android.net.LocalSocketAddress
 import android.os.SystemClock
 import android.view.Surface
+import dev.autobridge.desktop.DesktopEngine
 import dev.autobridge.desktop.DesktopLog
 import dev.autobridge.desktop.audio.BrowserAudioBridge
 import dev.autobridge.desktop.browser.DesktopBrowserAdapter
@@ -176,7 +177,9 @@ class DesktopSession internal constructor(
 
     /** Starts the browser on this session's display; the process is the PRoot tree's root. */
     private fun launchBrowser(startUrl: String?, restore: Boolean): Process {
-        val args = adapter.launchArgs(LaunchSpec(width, height, scale, startUrl)) +
+        // A fresh window opens on the start page; a restored one keeps the tabs it had.
+        val url = startUrl ?: RuntimeLayout.START_URL.takeIf { hasStartPage && !restore }
+        val args = adapter.launchArgs(LaunchSpec(width, height, scale, url)) +
             if (restore) listOf("--restore-last-session") else emptyList()
         val pidFile = "${RuntimeLayout.GUEST_RUN_DIR}/${adapter.id.key}.pid"
         return runtime.start(
@@ -276,6 +279,28 @@ class DesktopSession internal constructor(
         layout.host(adapter.profileDir()).let { profile ->
             listOf("SingletonLock", "SingletonSocket", "SingletonCookie").forEach { File(profile, it).delete() }
         }
+        hasStartPage = runCatching { writeStartPage() }
+            .onFailure { DesktopLog.w("start page not written", it) }
+            .getOrDefault(false)
+    }
+
+    private var hasStartPage = false
+
+    /**
+     * Rewrites the start page (so sites saved since the last launch are on it) and the policy that
+     * makes it the browser's home and new tab. The policy is rewritten without it when there is no
+     * page, so a browser never points at a missing file. True when the page is in place.
+     */
+    private fun writeStartPage(): Boolean {
+        val pages = DesktopEngine.startPages?.invoke().orEmpty()
+        if (pages.isNotEmpty()) {
+            val dir = layout.host(RuntimeLayout.GUEST_START_DIR).apply { mkdirs() }
+            pages.forEach { (name, html) -> File(dir, name).writeText(html) }
+        }
+        val policy = layout.host("${adapter.policyDir}/autobridge.json")
+        policy.parentFile?.mkdirs()
+        policy.writeText(adapter.managedPolicy(RuntimeLayout.START_URL.takeIf { pages.isNotEmpty() }).toString(2))
+        return pages.isNotEmpty()
     }
 
     private fun connectX(timeoutMs: Long): X11Connection {

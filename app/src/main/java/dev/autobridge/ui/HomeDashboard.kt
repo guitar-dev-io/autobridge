@@ -42,6 +42,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.autobridge.R
+import dev.autobridge.design.DesignTokens
 import dev.autobridge.remote.AutoBridgeCommand
 import dev.autobridge.remote.AutoBridgeCommandBus
 import dev.autobridge.remote.CommandHistoryStore
@@ -187,9 +188,9 @@ fun HomeDashboard(
  */
 @Composable
 private fun ResumeRadioCard(resume: ResumeRadioUi, onOpen: () -> Unit, onToggle: () -> Unit) {
-    val accent = Color(0xFFFFB35C)
-    val warm = Color(0xFF2A2116)
-    val edge = Color(0xFF5A4022)
+    val accent = Color(DesignTokens.Phone.ACCENT_RADIO)
+    val warm = Color(DesignTokens.Radio.WARM_CARD)
+    val edge = Color(DesignTokens.Radio.WARM_EDGE)
     val toggleDescription = stringResource(if (resume.playing) R.string.radio_pause else R.string.radio_play)
     Surface(
         onClick = onOpen,
@@ -223,7 +224,7 @@ private fun ResumeRadioCard(resume: ResumeRadioUi, onOpen: () -> Unit, onToggle:
             Column(Modifier.padding(start = 12.dp).weight(1f)) {
                 Text(
                     stringResource(if (resume.live) R.string.home_radio_live else R.string.home_resume_radio),
-                    color = Color(0xFFFFC985),
+                    color = Color(DesignTokens.Radio.WARM_TEXT),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -237,7 +238,7 @@ private fun ResumeRadioCard(resume: ResumeRadioUi, onOpen: () -> Unit, onToggle:
                 )
                 Text(
                     resume.song ?: stringResource(if (resume.live) R.string.home_radio_open else R.string.home_resume_tap),
-                    color = Color(0xFFC9CDD3),
+                    color = Color(DesignTokens.Radio.SOFT_TEXT),
                     fontSize = 13.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -252,7 +253,7 @@ private fun ResumeRadioCard(resume: ResumeRadioUi, onOpen: () -> Unit, onToggle:
                 Box(contentAlignment = Alignment.Center) {
                     Text(
                         if (resume.playing) "❚❚" else "▶",
-                        color = Color(0xFF2A1A05),
+                        color = Color(DesignTokens.Radio.ON_AMBER),
                         fontSize = if (resume.playing) 16.sp else 20.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -322,9 +323,9 @@ private fun RecentChip(recent: PhoneHomeLayout.RecentSend) {
     }
 }
 
-private val RecentChipText = Color(0xFFD5DAE0)
-private val DuoButtonColor = Color(0xFF22344F)
-private val DuoButtonText = Color(0xFFDCEBFF)
+private val RecentChipText = Color(DesignTokens.Phone.CHIP_TEXT)
+private val DuoButtonColor = Color(DesignTokens.Phone.SELECTED_FILL)
+private val DuoButtonText = Color(DesignTokens.Phone.ON_SELECTED_FILL)
 
 /** Mirror / Bridge Duo button on the Home Android Auto card. [primary] fills with the accent. */
 @Composable

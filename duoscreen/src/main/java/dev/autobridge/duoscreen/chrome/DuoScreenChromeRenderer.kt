@@ -10,6 +10,7 @@ import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
 import android.text.TextUtils
+import dev.autobridge.design.DesignTokens
 import dev.autobridge.duoscreen.layout.DuoScreenLayout.Rect
 import dev.autobridge.duoscreen.layout.DuoScreenPreset
 
@@ -65,32 +66,32 @@ data class ChromeFrame(
  */
 class DuoScreenChromeRenderer {
     private companion object {
-        const val SURFACE = 0xFF0B0D10.toInt()
-        const val BUTTON = 0xFF262A31.toInt()
-        const val BUTTON_PRESSED = 0xFF343A43.toInt()
-        const val ICON = 0xFFD5DAE0.toInt()
-        const val GRIP = 0xFF4A5260.toInt()
-        const val ACCENT = 0xFFB3C7F5.toInt()
-        const val ON_ACCENT = 0xFF142540.toInt()
-        const val DIM = 0xB80B0D10.toInt()
-        const val CHIP = 0xFF2C3036.toInt()
-        const val CHIP_SELECTED = 0xFF16213A.toInt()
-        const val CHIP_TEXT = 0xFFD5DAE0.toInt()
-        const val CHIP_TEXT_SELECTED = 0xFFDCE6FF.toInt()
-        const val CHIP_GLYPH = 0xFF6B7380.toInt()
-        const val SWAP = 0xFF2D4470.toInt()
-        const val SWAP_TARGET = 0xB82D4470.toInt()
-        const val TEXT = 0xFFF1F3F5.toInt()
-        const val TEXT_MUTED = 0xFFC7CCD2.toInt()
-        const val CARD_BUTTON = 0xFFF1F3F5.toInt()
-        const val CARD_BUTTON_TEXT = 0xFF0F1114.toInt()
-        const val TILE = 0xFF1C2330.toInt()
+        const val SURFACE = DesignTokens.MultiApp.SURFACE
+        const val BUTTON = DesignTokens.MultiApp.BUTTON
+        const val BUTTON_PRESSED = DesignTokens.MultiApp.BUTTON_PRESSED
+        const val ICON = DesignTokens.MultiApp.ICON
+        const val GRIP = DesignTokens.MultiApp.GRIP
+        const val ACCENT = DesignTokens.MultiApp.ACCENT
+        const val ON_ACCENT = DesignTokens.MultiApp.ON_ACCENT
+        const val DIM = DesignTokens.MultiApp.DIM
+        const val CHIP = DesignTokens.MultiApp.CHIP
+        const val CHIP_SELECTED = DesignTokens.MultiApp.CHIP_SELECTED
+        const val CHIP_TEXT = DesignTokens.MultiApp.ICON
+        const val CHIP_TEXT_SELECTED = DesignTokens.MultiApp.CHIP_TEXT_SELECTED
+        const val CHIP_GLYPH = DesignTokens.MultiApp.CHIP_GLYPH
+        const val SWAP = DesignTokens.MultiApp.SWAP
+        const val SWAP_TARGET = DesignTokens.MultiApp.SWAP_TARGET
+        const val TEXT = DesignTokens.MultiApp.TEXT
+        const val TEXT_MUTED = DesignTokens.MultiApp.TEXT_MUTED
+        const val CARD_BUTTON = DesignTokens.MultiApp.TEXT
+        const val CARD_BUTTON_TEXT = DesignTokens.MultiApp.CARD_BUTTON_TEXT
+        const val TILE = DesignTokens.MultiApp.TILE
         /** The floating toolbar over the seam: nearly opaque, with a soft drop below it. */
-        const val TOOLBAR = 0xF21C1F25.toInt()
-        const val TOOLBAR_SHADOW = 0x66000000
+        const val TOOLBAR = DesignTokens.MultiApp.TOOLBAR
+        const val TOOLBAR_SHADOW = DesignTokens.MultiApp.TOOLBAR_SHADOW
         /** The setup card's hairline edge and the soft accent disc behind its lock. */
-        const val CARD_EDGE = 0x1FFFFFFF
-        const val ACCENT_SOFT = 0x2EB3C7F5
+        const val CARD_EDGE = DesignTokens.MultiApp.CARD_EDGE
+        const val ACCENT_SOFT = DesignTokens.MultiApp.ACCENT_SOFT
     }
 
     private enum class Glyph { LAYOUT_STACKED, LAYOUT_COLUMNS, SWAP, RELOAD, ARRANGE, DONE, KEYBOARD }
@@ -413,7 +414,7 @@ class DuoScreenChromeRenderer {
     /** The preset's shape in miniature: two columns, a 56/44 stack, or a tile over a pane. */
     private fun chipGlyph(canvas: Canvas, preset: DuoScreenPreset, left: Float, top: Float, w: Float, h: Float, on: Boolean, d: Float) {
         val main = if (on) ACCENT else CHIP_GLYPH
-        val second = if (on) 0xFFC7D3EC.toInt() else CHIP_GLYPH
+        val second = if (on) DesignTokens.MultiApp.CHIP_GLYPH_ON else CHIP_GLYPH
         val gap = 3f * d
         val r = 3f * d
         when (preset) {
@@ -427,7 +428,7 @@ class DuoScreenChromeRenderer {
             DuoScreenPreset.PICTURE_IN_PICTURE -> {
                 fill.color = main
                 rect.set(left, top, left + w, top + h); canvas.drawRoundRect(rect, r, r, fill)
-                fill.color = if (on) ON_ACCENT else 0xFFC2C8D0.toInt()
+                fill.color = if (on) ON_ACCENT else DesignTokens.MultiApp.CHIP_GLYPH_FILL
                 rect.set(left + w - 3 * d - 13 * d, top + h - 3 * d - 10 * d, left + w - 3 * d, top + h - 3 * d)
                 canvas.drawRoundRect(rect, 2 * d, 2 * d, fill)
             }
@@ -483,7 +484,7 @@ class DuoScreenChromeRenderer {
 
             val pressed = frame.pressed == ChromeTarget.ChangeApp(card.paneId)
             rect.set(card.button.toRectF())
-            fill.color = if (pressed) 0xFFC9CED6.toInt() else CARD_BUTTON
+            fill.color = if (pressed) DesignTokens.MultiApp.CARD_BUTTON_PRESSED else CARD_BUTTON
             val br = card.button.height / 2f
             canvas.drawRoundRect(rect, br, br, fill)
             text.textSize = s.CARD_BUTTON_TEXT * d

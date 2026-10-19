@@ -60,12 +60,21 @@ interface DesktopBrowserAdapter {
      * Managed policy written at install. Keys a browser does not know are ignored by it, so the
      * shared ones can sit next to vendor-specific ones.
      */
-    fun managedPolicy(): JSONObject = JSONObject()
+    fun managedPolicy(startPage: String? = null): JSONObject = JSONObject()
         .put("PasswordManagerEnabled", false)
         .put("DefaultBrowserSettingEnabled", false)
         .put("MetricsReportingEnabled", false)
         .put("BackgroundModeEnabled", false)
         .put("PromotionsEnabled", false)
+        .apply {
+            // AutoBridge's start page as home and new tab, like the built-in car browser's.
+            if (startPage != null) {
+                put("HomepageLocation", startPage)
+                put("HomepageIsNewTabPage", false)
+                put("ShowHomeButton", true)
+                put("NewTabPageLocation", startPage)
+            }
+        }
 
     /**
      * Command line. Every flag here was checked against the real binary (see
@@ -172,7 +181,7 @@ object BraveAdapter : DesktopBrowserAdapter {
     """.trimIndent() + "\n"
 
     // Brave's extras that make no sense on a car screen. Shields (ad/tracker blocking) stay on.
-    override fun managedPolicy(): JSONObject = super.managedPolicy()
+    override fun managedPolicy(startPage: String?): JSONObject = super.managedPolicy(startPage)
         .put("BraveRewardsDisabled", true)
         .put("BraveWalletDisabled", true)
         .put("BraveVPNDisabled", true)
