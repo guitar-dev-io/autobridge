@@ -434,10 +434,18 @@
     <string name="action_retry">Try again</string>
 
     <!-- Phone browser ([BrowserActivity]): page chrome, confirmations and dialogs. -->
-    <string name="browser_start_page_title">AutoBridge</string>
+    <string name="browser_start_page_title">AutoBridge Browser</string>
     <string name="browser_start_page_search_hint">Search or enter address</string>
     <string name="browser_start_page_label">Browser start page</string>
-    <string name="browser_start_page_shortcuts">Favourites</string>
+    <string name="browser_start_page_shortcuts">Quick Links</string>
+    <string name="browser_start_page_subtitle">Quick access to the sites you use most.</string>
+    <string name="browser_start_page_go">Go</string>
+    <string name="browser_start_page_slot">Slot %1$d</string>
+    <string name="car_browser_entry_label">AutoBridge Browser</string>
+    <string name="car_browser_start_continue">Continue</string>
+    <string name="car_browser_start_support_caption">Support the developer</string>
+    <string name="projection_setup_browser_title">List AutoBridge Browser on Android Auto</string>
+    <string name="projection_setup_browser_caption">On by default: the browser as its own Android Auto app, opening on the start page and typing with your phone\'s keyboard (Gboard), like AABrowser. Needs Android 15 or later and Unknown sources in Android Auto\'s developer settings. Reconnect Android Auto after changing.</string>
     <string name="browser_error_no_internet">No internet connection</string>
     <string name="browser_error_host_not_found">Can\'t find this website\nCheck the address and try again</string>
     <string name="browser_error_blocked">This page can\'t be opened right now</string>
@@ -1604,13 +1612,15 @@
     <string name="radio_cat_world">World</string>
     <string name="radio_cat_podcasts">Podcasts</string>
     <string name="radio_cat_favorites">Favorites</string>
+    <string name="radio_tab_favorites">Favourites</string>
     <string name="radio_browse_loading">Loading…</string>
     <string name="radio_browse_empty">No stations here yet</string>
-    <string name="radio_browse_search_hint">Search stations or podcasts</string>
+    <string name="radio_browse_search_hint">Search stations or frequency, e.g. 93</string>
     <string name="radio_section_popular">Popular stations</string>
     <string name="radio_play_now">Play now</string>
     <string name="radio_browse_open">Browse stations</string>
     <string name="radio_browse_my_stations">My stations</string>
+    <string name="radio_manage_lists">Manage station lists</string>
     <string name="radio_podcasts_note">Talk &amp; news stations, not episodes</string>
     <string name="radio_local_pick_title">Pick a province</string>
     <string name="radio_local_pick_cta">Choose province</string>
@@ -1649,6 +1659,7 @@
     <string name="eq_bass">Bass boost</string>
     <string name="eq_virtualizer">Virtualizer (wider sound)</string>
     <string name="eq_boost">Volume boost</string>
+    <string name="eq_normalize">Same loudness on every station</string>
     <string name="eq_scope">Applies to</string>
     <string name="eq_scope_app">AutoBridge</string>
     <string name="eq_scope_music_apps">+ Music apps</string>
@@ -1800,7 +1811,7 @@
         <item quantity="other">%1$d maintenance items need attention</item>
     </plurals>
     <string name="youtube_sponsorblock_caveat">This may not work, or may be incomplete. The segments come from volunteers, so new or little-watched videos often have none and a marked segment can be a little off. Skipping needs the internet and works only in AutoBridge\'s own YouTube page; if YouTube changes its site, it can stop working until the app is updated.</string>
-    <string name="home_donate">☕ Buy me a coffee</string>
+    <string name="home_donate">☕ Support the developer</string>
     <string name="maint_compulsory_insurance">Compulsory insurance (Por.Ror.Bor.)</string>
     <string name="car_more_group_utilities">Utilities</string>
     <string name="fuel_edit">Edit</string>

@@ -404,7 +404,7 @@ class DesktopBrowserCarScreen(
     }
 
     override fun onScroll(distanceX: Float, distanceY: Float) {
-        if (!allowed()) return
+        if (!allowed() || rail.consumesScroll()) return
         val s = session ?: return
         val map = s.renderer.mapping ?: return
         if (rail.mode == PointerMode.MOUSE) {
@@ -418,7 +418,7 @@ class DesktopBrowserCarScreen(
     }
 
     override fun onFling(velocityX: Float, velocityY: Float) {
-        if (!allowed() || rail.mode == PointerMode.MOUSE) return
+        if (!allowed() || rail.consumesScroll() || rail.mode == PointerMode.MOUSE) return
         val s = session ?: return
         val map = s.renderer.mapping ?: return
         val (cx, cy) = map.toDisplay(surfaceWidth / 2f, surfaceHeight / 2f)

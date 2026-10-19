@@ -25,9 +25,12 @@ import kotlin.math.min
  *    back, address, type, the touch ⇄ mouse switch (one button that shows the current mode) and
  *    more. In mouse mode a Drag button joins them: it holds the left button down so the next pan
  *    drags (select text, move a slider), and the next tap on the page drops it — the click-drag a
- *    car screen cannot otherwise do, because the host reports no touch-down or touch-up. It collapses after any action, or [hideDelayMs] after the last touch.
+ *    car screen cannot otherwise do, because the host reports no touch-down or touch-up. It
+ *    collapses after any action (Drag included, so its pan reaches the page), or [hideDelayMs]
+ *    after the last touch; a scroll while it is open keeps it up instead of moving the page under it.
  *  - **More**: a second sheet beside the panel for what is used less: forward, reload, new tab,
  *    zoom, the keyboard choice (car only), how soon the panel collapses, and close (phone only).
+ *    It never collapses by itself: it closes on a choice that leaves it or a tap outside.
  *
  * The host only reports taps, so every control is a tap target sized for a car, and the whole
  * thing scales down to fit a short screen. [onTap] decides what a tap means and returns the
@@ -354,10 +357,24 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
         return Tap.Perform(action)
     }
 
-    /** Restarts the collapse countdown. */
+    /**
+     * Restarts the collapse countdown. Only the bare panel counts down: with the More sheet open
+     * the driver is reading or choosing, so it stays until a choice or a tap outside closes it.
+     */
     private fun touched() {
         handler.removeCallbacks(collapse)
-        if (hideDelayMs > 0) handler.postDelayed(collapse, hideDelayMs)
+        if (hideDelayMs > 0 && state == State.OPEN) handler.postDelayed(collapse, hideDelayMs)
+    }
+
+    /**
+     * A scroll or fling while the panel is open: the host gives no position for it, and the finger
+     * is almost always on the panel, so it belongs to the rail (it keeps the panel up) rather than
+     * scrolling the page underneath. Returns true when the rail took it.
+     */
+    fun consumesScroll(): Boolean {
+        if (!visible || state == State.COLLAPSED) return false
+        touched()
+        return true
     }
 
     // --- Drawing ---

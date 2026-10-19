@@ -17,7 +17,8 @@ object SupportChannels {
     const val GITHUB_SPONSORS_URL = "https://github.com/sponsors/guitar-dev-io"
     const val KO_FI_URL = ""
 
-    enum class Kind { BUY_ME_A_COFFEE, GITHUB_SPONSORS, KO_FI, PROMPTPAY }
+    /** Tab order; the first one offered is the tab the card opens on (GitHub Sponsors). */
+    enum class Kind { GITHUB_SPONSORS, BUY_ME_A_COFFEE, KO_FI, PROMPTPAY }
 
     /** One tab. [url] is null for PromptPay, which is shown as its bundled QR instead. */
     data class Channel(val kind: Kind, val label: String, val url: String?) {
@@ -31,7 +32,7 @@ object SupportChannels {
         Kind.KO_FI to KO_FI_URL,
     )
 
-    /** The channels to offer, in tab order. Never empty while [BUY_ME_A_COFFEE_URL] is set. */
+    /** The channels to offer, in tab order. Never empty while [GITHUB_SPONSORS_URL] or [BUY_ME_A_COFFEE_URL] is set. */
     fun available(safeBuild: Boolean, urls: Map<Kind, String> = defaultUrls): List<Channel> = buildList {
         Kind.entries.forEach { kind ->
             when (kind) {

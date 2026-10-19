@@ -146,7 +146,9 @@
                  declares a CAR_LAUNCHER activity together with the
                  com.google.android.gms.car.application meta-data. The meta-data is what makes
                  AutoBridgeCarAppService (the Android Auto route) visible, so that one stays and
-                 the activity is no longer advertised to the car launcher. -->
+                 the activity is no longer advertised to the car launcher here. The sideload
+                 flavors list it again under its own name, AutoBridge Browser (an activity-alias
+                 in src/projection/AndroidManifest.xml). -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.DEFAULT" />

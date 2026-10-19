@@ -53,6 +53,7 @@ class RadioPlayerActivity : Activity() {
         private val WARM_SURFACE = 0xFF2A2116.toInt()
         private val WARM_TEXT = 0xFFFFC985.toInt()
         private val WARM_INK = 0xFF2A1A05.toInt()
+        private val CONTROL_FILL = 0xFF1C2027.toInt()
         private val SOFT_TEXT = 0xFFC9CDD3.toInt()
         private val HINT_TEXT = 0xFF8A919B.toInt()
 
@@ -70,7 +71,7 @@ class RadioPlayerActivity : Activity() {
     private lateinit var song: TextView
     private lateinit var artist: TextView
     private lateinit var stationLine: TextView
-    private lateinit var playToggle: TextView
+    private lateinit var playToggle: ImageView
     private lateinit var favorite: ActionButton
     private lateinit var sleep: FrameLayout
     private lateinit var sleepIcon: View
@@ -161,7 +162,7 @@ class RadioPlayerActivity : Activity() {
             visibility = View.GONE
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
-        art.addView(badge, FrameLayout.LayoutParams(dp(80), dp(80), Gravity.END or Gravity.BOTTOM))
+        art.addView(badge, FrameLayout.LayoutParams(dp(72), dp(72), Gravity.END or Gravity.BOTTOM))
         body.addView(art, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(8) })
 
         // "● Live": the red dot says on air, the pill says radio.
@@ -187,15 +188,14 @@ class RadioPlayerActivity : Activity() {
         // Previous, play/pause, next, spread across the width.
         val transport = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         transport.addView(
-            AutoBridgeDesign.glyphButton(this, "⏮", 22f) { playback.previous() }
-                .apply { contentDescription = getString(R.string.radio_previous_station) },
+            transportButton(R.drawable.ic_radio_prev, getString(R.string.radio_previous_station)) { playback.previous() },
             LinearLayout.LayoutParams(dp(64), dp(64))
         )
         transport.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
-        playToggle = TextView(this).apply {
-            textSize = 30f
-            gravity = Gravity.CENTER
-            setTextColor(WARM_INK)
+        playToggle = ImageView(this).apply {
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
+            setPadding(dp(27), dp(27), dp(27), dp(27))
+            imageTintList = ColorStateList.valueOf(WARM_INK)
             isClickable = true
             isFocusable = true
             background = RippleDrawable(
@@ -215,8 +215,7 @@ class RadioPlayerActivity : Activity() {
         transport.addView(playToggle, LinearLayout.LayoutParams(dp(92), dp(92)))
         transport.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
         transport.addView(
-            AutoBridgeDesign.glyphButton(this, "⏭", 22f) { playback.next() }
-                .apply { contentDescription = getString(R.string.radio_next_station) },
+            transportButton(R.drawable.ic_radio_next, getString(R.string.radio_next_station)) { playback.next() },
             LinearLayout.LayoutParams(dp(64), dp(64))
         )
         body.addView(transport, LinearLayout.LayoutParams(-1, -2).apply {
@@ -410,8 +409,25 @@ class RadioPlayerActivity : Activity() {
         update()
     }
 
+    /** Previous / next: the design's 28dp icon on a round control fill. */
+    private fun transportButton(icon: Int, description: String, onClick: () -> Unit): View = ImageView(this).apply {
+        setImageResource(icon)
+        imageTintList = ColorStateList.valueOf(AutoBridgeDesign.TEXT)
+        scaleType = ImageView.ScaleType.CENTER_INSIDE
+        setPadding(dp(18), dp(18), dp(18), dp(18))
+        contentDescription = description
+        isClickable = true
+        isFocusable = true
+        background = RippleDrawable(
+            ColorStateList.valueOf(AutoBridgeDesign.tint(Color.WHITE, 0.16f)),
+            GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(CONTROL_FILL) },
+            null
+        )
+        setOnClickListener { onClick() }
+    }
+
     private fun showPlaying(playing: Boolean) {
-        playToggle.text = if (playing) "❚❚" else "▶"
+        playToggle.setImageResource(if (playing) R.drawable.ic_radio_pause else R.drawable.ic_radio_play)
         playToggle.contentDescription = getString(if (playing) R.string.radio_pause else R.string.radio_play)
     }
 

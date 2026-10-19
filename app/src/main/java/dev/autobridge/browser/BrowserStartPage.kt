@@ -14,6 +14,7 @@ import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -55,7 +56,11 @@ val DEFAULT_START_PAGE_SHORTCUTS = listOf(
  * six tiles stretched across it.
  */
 object BrowserStartPage {
-    fun build(context: Context, sizes: AutoUiSizes, onSubmit: (String) -> Unit): View {
+    /**
+     * [onSupport], when given, adds the "support the developer" card under the search bar, the
+     * way AABrowser's start page carries its own card; its ✕ hides it for [SUPPORT_SNOOZE_MS].
+     */
+    fun build(context: Context, sizes: AutoUiSizes, onSupport: (() -> Unit)? = null, onSubmit: (String) -> Unit): View {
         val grid = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
 
         val column = LinearLayout(context).apply {
@@ -72,23 +77,45 @@ object BrowserStartPage {
                 gravity = Gravity.CENTER
             },
             LinearLayout.LayoutParams(-1, -2).apply {
-                bottomMargin = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP * 2.5f)
-            }
-        )
-
-        column.addView(
-            searchField(context, sizes, onSubmit),
-            LinearLayout.LayoutParams(-1, sizes.dpInt(SEARCH_HEIGHT_DP)).apply {
-                bottomMargin = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP * 3)
+                bottomMargin = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP / 2f)
             }
         )
 
         column.addView(
             TextView(context).apply {
-                text = context.getString(R.string.browser_start_page_shortcuts)
+                text = context.getString(R.string.browser_start_page_subtitle)
                 setTextColor(BrowserTheme.textSecondary)
+                textSize = spFor(context, SUBTITLE_TEXT_DP)
+                gravity = Gravity.CENTER
+            },
+            LinearLayout.LayoutParams(-1, -2).apply {
+                bottomMargin = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP * 2.5f)
+            }
+        )
+
+        column.addView(
+            searchBar(context, sizes, onSubmit),
+            LinearLayout.LayoutParams(-1, sizes.dpInt(SEARCH_HEIGHT_DP)).apply {
+                bottomMargin = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP * 3)
+            }
+        )
+
+        if (onSupport != null && !supportSnoozed(context)) {
+            lateinit var card: View
+            card = supportCard(context, sizes, onSupport) {
+                snoozeSupport(context)
+                card.visibility = View.GONE
+            }
+            column.addView(card, LinearLayout.LayoutParams(-1, -2).apply {
+                bottomMargin = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP * 3)
+            })
+        }
+
+        column.addView(
+            TextView(context).apply {
+                text = context.getString(R.string.browser_start_page_shortcuts)
+                setTextColor(BrowserTheme.textPrimary)
                 textSize = spFor(context, SECTION_TEXT_DP)
-                letterSpacing = 0.06f
                 setTypeface(typeface, Typeface.BOLD)
                 setPadding(sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP / 2f), 0, 0, 0)
             },
@@ -100,7 +127,7 @@ object BrowserStartPage {
         column.addView(grid, LinearLayout.LayoutParams(-1, -2))
 
         // Laid out once from the display so the first frame is already right, then re-flowed below
-        // against the width the page is really given (split pane, rotation, a car surface).
+        // against the width the page is really given (split pane, rotation, a car display).
         var columns = -1
         var sidePadding = -1
         var lastWidth = -1
@@ -115,13 +142,13 @@ object BrowserStartPage {
             column.setPadding(side, column.paddingTop, side, column.paddingBottom)
             fillGrid(grid, context, sizes, fit, onSubmit)
         }
-        column.setPadding(0, sizes.dpInt(SIDE_PADDING_DP), 0, sizes.dpInt(SIDE_PADDING_DP))
+        column.setPadding(0, sizes.dpInt(TOP_PADDING_DP), 0, sizes.dpInt(SIDE_PADDING_DP))
         apply(context.resources.displayMetrics.widthPixels)
 
         val scroller = ScrollView(context).apply {
             isFillViewport = true
             addView(
-                FrameLayout(context).apply { addView(column, FrameLayout.LayoutParams(-1, -2, Gravity.CENTER)) },
+                FrameLayout(context).apply { addView(column, FrameLayout.LayoutParams(-1, -2, Gravity.TOP)) },
                 ViewGroup.LayoutParams(-1, -1)
             )
         }
@@ -138,17 +165,18 @@ object BrowserStartPage {
         }
     }
 
-    /** How many tiles fit across [width] px, bounded both ways so a tile is never a sliver. */
+    /**
+     * One column of link cards on a phone, two side by side once a card can keep
+     * [CARD_MIN_WIDTH_DP] (a car display, a tablet, a landscape phone).
+     */
     private fun columnsFor(sizes: AutoUiSizes, width: Float): Int {
-        if (width <= 0f) return COLUMNS_MIN
-        val gap = sizes.dp(TILE_GAP_DP)
-        val fit = ((width + gap) / (sizes.dp(TILE_MIN_WIDTH_DP) + gap)).toInt()
-        return fit.coerceIn(COLUMNS_MIN, COLUMNS_MAX)
+        val gap = sizes.dp(CARD_GAP_DP)
+        return if (width >= sizes.dp(CARD_MIN_WIDTH_DP) * 2 + gap) 2 else 1
     }
 
     /**
-     * Rebuilds the grid as rows of weighted tiles. A short last row is padded with empty views so
-     * its tiles keep the width of the rows above instead of stretching to fill it.
+     * Rebuilds the list as rows of weighted cards. A short last row is padded with an empty view
+     * so its card keeps the width of the rows above instead of stretching to fill it.
      */
     private fun fillGrid(
         grid: LinearLayout,
@@ -158,17 +186,17 @@ object BrowserStartPage {
         onSubmit: (String) -> Unit,
     ) {
         grid.removeAllViews()
-        val gap = sizes.dpInt(TILE_GAP_DP)
+        val gap = sizes.dpInt(CARD_GAP_DP)
         DEFAULT_START_PAGE_SHORTCUTS.chunked(columns).forEachIndexed { rowIndex, items ->
             val row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
             for (index in 0 until columns) {
-                val shortcut = items.getOrNull(index)
-                val cell = shortcut
-                    ?.let { tile(context, sizes, it) { onSubmit(it.url) } }
+                val slot = rowIndex * columns + index + 1
+                val cell = items.getOrNull(index)
+                    ?.let { shortcut -> linkCard(context, sizes, shortcut, slot) { onSubmit(shortcut.url) } }
                     ?: View(context)
                 row.addView(
                     cell,
-                    LinearLayout.LayoutParams(0, sizes.dpInt(TILE_HEIGHT_DP), 1f).apply {
+                    LinearLayout.LayoutParams(0, sizes.dpInt(CARD_HEIGHT_DP), 1f).apply {
                         if (index > 0) marginStart = gap
                     }
                 )
@@ -176,6 +204,55 @@ object BrowserStartPage {
             grid.addView(
                 row,
                 LinearLayout.LayoutParams(-1, -2).apply { if (rowIndex > 0) topMargin = gap }
+            )
+        }
+    }
+
+    /** The search pill: a magnifier, the field, and a round Go button at the end. */
+    private fun searchBar(context: Context, sizes: AutoUiSizes, onSubmit: (String) -> Unit): View {
+        val height = sizes.dpInt(SEARCH_HEIGHT_DP)
+        val field = searchField(context, sizes, onSubmit)
+        val inset = sizes.dpInt(SEARCH_INSET_DP)
+        val goSize = height - inset * 2
+        return LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(sizes.dpInt(AutoUiSizes.HORIZONTAL_PADDING_DP * 1.5f), 0, inset, 0)
+            background = GradientDrawable().apply {
+                setColor(BrowserTheme.addressPillBackground)
+                cornerRadius = height / 2f
+                setStroke(sizes.dpInt(1f).coerceAtLeast(1), BrowserTheme.outlineVariant)
+            }
+            addView(
+                ImageView(context).apply {
+                    setImageResource(R.drawable.ic_browser_search)
+                    setColorFilter(BrowserTheme.accent)
+                    importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                },
+                LinearLayout.LayoutParams(sizes.dpInt(SEARCH_ICON_DP), sizes.dpInt(SEARCH_ICON_DP))
+            )
+            addView(field, LinearLayout.LayoutParams(0, -1, 1f))
+            addView(
+                ImageView(context).apply {
+                    setImageResource(R.drawable.ic_browser_forward)
+                    setColorFilter(BrowserTheme.onFabContainer)
+                    scaleType = ImageView.ScaleType.CENTER_INSIDE
+                    val pad = goSize / 4
+                    setPadding(pad, pad, pad, pad)
+                    contentDescription = context.getString(R.string.browser_start_page_go)
+                    isClickable = true
+                    isFocusable = true
+                    background = RippleDrawable(
+                        ColorStateList.valueOf(withAlpha(BrowserTheme.accent, 0.3f)),
+                        GradientDrawable().apply {
+                            shape = GradientDrawable.OVAL
+                            setColor(BrowserTheme.fabContainer)
+                        },
+                        null
+                    )
+                    setOnClickListener { if (field.text.isNotBlank()) onSubmit(field.text.toString()) }
+                },
+                LinearLayout.LayoutParams(goSize, goSize)
             )
         }
     }
@@ -188,16 +265,10 @@ object BrowserStartPage {
             textSize = spFor(context, SEARCH_TEXT_DP)
             setSingleLine()
             gravity = Gravity.CENTER_VERTICAL
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
             imeOptions = EditorInfo.IME_ACTION_GO
-            setPadding(
-                sizes.dpInt(AutoUiSizes.HORIZONTAL_PADDING_DP * 1.5f), 0,
-                sizes.dpInt(AutoUiSizes.HORIZONTAL_PADDING_DP * 1.5f), 0
-            )
-            background = GradientDrawable().apply {
-                setColor(BrowserTheme.addressPillBackground)
-                cornerRadius = sizes.dp(SEARCH_HEIGHT_DP) / 2f
-                setStroke(sizes.dpInt(1f).coerceAtLeast(1), BrowserTheme.outlineVariant)
-            }
+            setPadding(sizes.dpInt(AutoUiSizes.HORIZONTAL_PADDING_DP), 0, sizes.dpInt(AutoUiSizes.HORIZONTAL_PADDING_DP), 0)
+            background = null
             setOnEditorActionListener { _, action, event ->
                 val go = action == EditorInfo.IME_ACTION_GO ||
                     (event?.keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_UP)
@@ -206,7 +277,14 @@ object BrowserStartPage {
             }
         }
 
-    private fun tile(context: Context, sizes: AutoUiSizes, shortcut: StartPageShortcut, onTap: () -> Unit): View {
+    /** A quick link: brand chip, name over address, and its slot number at the end. */
+    private fun linkCard(
+        context: Context,
+        sizes: AutoUiSizes,
+        shortcut: StartPageShortcut,
+        slot: Int,
+        onTap: () -> Unit,
+    ): View {
         val chipSize = sizes.dpInt(CHIP_DP)
         val chip = TextView(context).apply {
             text = shortcut.glyph
@@ -215,70 +293,182 @@ object BrowserStartPage {
             textSize = spFor(context, CHIP_TEXT_DP)
             setTypeface(typeface, Typeface.BOLD)
             background = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
+                cornerRadius = chipSize * 0.28f
                 setColor(shortcut.tint)
             }
         }
-        val label = TextView(context).apply {
-            text = shortcut.label
-            gravity = Gravity.CENTER
-            setTextColor(BrowserTheme.textPrimary)
-            textSize = spFor(context, LABEL_TEXT_DP)
-            maxLines = 1
-            ellipsize = TextUtils.TruncateAt.END
+        val texts = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(TextView(context).apply {
+                text = shortcut.label
+                setTextColor(BrowserTheme.textPrimary)
+                textSize = spFor(context, LABEL_TEXT_DP)
+                setTypeface(typeface, Typeface.BOLD)
+                maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
+            })
+            addView(TextView(context).apply {
+                text = hostOf(shortcut.url)
+                setTextColor(BrowserTheme.textSecondary)
+                textSize = spFor(context, HOST_TEXT_DP)
+                maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
+            })
+        }
+        val badge = TextView(context).apply {
+            text = context.getString(R.string.browser_start_page_slot, slot)
+            setTextColor(BrowserTheme.textSecondary)
+            textSize = spFor(context, BADGE_TEXT_DP)
+            val padH = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP * 0.75f)
+            val padV = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP * 0.25f)
+            setPadding(padH, padV, padH, padV)
+            background = GradientDrawable().apply {
+                setColor(BrowserTheme.addressPillBackground)
+                cornerRadius = sizes.dp(BADGE_CORNER_DP)
+            }
         }
         val face = GradientDrawable().apply {
             setColor(BrowserTheme.sheetCardBackground)
-            cornerRadius = sizes.dp(TILE_CORNER_DP)
+            cornerRadius = sizes.dp(CARD_CORNER_DP)
             setStroke(sizes.dpInt(1f).coerceAtLeast(1), BrowserTheme.outlineVariant)
         }
+        val gap = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP)
         return LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
             isClickable = true
             isFocusable = true
             contentDescription = shortcut.label
-            setPadding(
-                sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP / 2f), 0,
-                sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP / 2f), 0
-            )
+            setPadding(gap * 3 / 2, 0, gap * 3 / 2, 0)
             background = RippleDrawable(
                 ColorStateList.valueOf(withAlpha(BrowserTheme.accent, 0.22f)), face, null
             )
-            addView(chip, LinearLayout.LayoutParams(chipSize, chipSize).apply {
-                bottomMargin = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP)
-            })
-            addView(label, LinearLayout.LayoutParams(-1, -2))
+            addView(chip, LinearLayout.LayoutParams(chipSize, chipSize).apply { marginEnd = gap * 3 / 2 })
+            addView(texts, LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = gap })
+            addView(badge, LinearLayout.LayoutParams(-2, -2).apply { gravity = Gravity.TOP })
             setOnClickListener { onTap() }
         }
     }
+
+    /** The support card: heart chip, title and line, a "Support" button, and ✕ to snooze it. */
+    private fun supportCard(context: Context, sizes: AutoUiSizes, onSupport: () -> Unit, onClose: () -> Unit): View {
+        val gap = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP)
+        val card = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(gap * 2, gap * 2, gap, gap * 2)
+            background = GradientDrawable().apply {
+                setColor(BrowserTheme.sheetCardBackground)
+                cornerRadius = sizes.dp(CARD_CORNER_DP)
+                setStroke(sizes.dpInt(1f).coerceAtLeast(1), BrowserTheme.outlineVariant)
+            }
+        }
+        val head = LinearLayout(context).apply { gravity = Gravity.CENTER_VERTICAL }
+        head.addView(ImageView(context).apply {
+            setImageResource(R.drawable.ic_browser_support)
+            setColorFilter(BrowserTheme.onFabContainer)
+            val pad = sizes.dpInt(10f)
+            setPadding(pad, pad, pad, pad)
+            background = GradientDrawable().apply {
+                setColor(BrowserTheme.fabContainer)
+                cornerRadius = sizes.dp(14f)
+            }
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }, LinearLayout.LayoutParams(sizes.dpInt(CHIP_DP), sizes.dpInt(CHIP_DP)).apply { marginEnd = gap * 3 / 2 })
+        head.addView(TextView(context).apply {
+            text = context.getString(R.string.support_card_title)
+            setTextColor(BrowserTheme.textPrimary)
+            textSize = spFor(context, LABEL_TEXT_DP + 1f)
+            setTypeface(typeface, Typeface.BOLD)
+        }, LinearLayout.LayoutParams(0, -2, 1f))
+        head.addView(TextView(context).apply {
+            text = "✕"
+            textSize = spFor(context, LABEL_TEXT_DP)
+            gravity = Gravity.CENTER
+            setTextColor(BrowserTheme.textSecondary)
+            contentDescription = context.getString(R.string.player_close)
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { onClose() }
+        }, LinearLayout.LayoutParams(sizes.dpInt(44f), sizes.dpInt(44f)))
+        card.addView(head)
+        card.addView(TextView(context).apply {
+            text = context.getString(R.string.support_card_message)
+            setTextColor(BrowserTheme.textSecondary)
+            textSize = spFor(context, HOST_TEXT_DP + 1f)
+            setPadding(0, gap, gap, gap * 3 / 2)
+        })
+        card.addView(TextView(context).apply {
+            text = context.getString(R.string.home_donate)
+            setTextColor(BrowserTheme.onFabContainer)
+            textSize = spFor(context, LABEL_TEXT_DP - 1f)
+            setTypeface(typeface, Typeface.BOLD)
+            gravity = Gravity.CENTER
+            setPadding(gap * 2, 0, gap * 2, 0)
+            isClickable = true
+            isFocusable = true
+            background = RippleDrawable(
+                ColorStateList.valueOf(withAlpha(BrowserTheme.accent, 0.3f)),
+                GradientDrawable().apply {
+                    setColor(BrowserTheme.fabContainer)
+                    cornerRadius = sizes.dp(24f)
+                },
+                null
+            )
+            setOnClickListener { onSupport() }
+        }, LinearLayout.LayoutParams(-2, sizes.dpInt(48f)))
+        return card
+    }
+
+    private fun supportSnoozed(context: Context): Boolean {
+        val until = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getLong(KEY_SUPPORT_SNOOZED, 0L)
+        return System.currentTimeMillis() < until
+    }
+
+    private fun snoozeSupport(context: Context) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putLong(KEY_SUPPORT_SNOOZED, System.currentTimeMillis() + SUPPORT_SNOOZE_MS).apply()
+    }
+
+    /** "www.google.com" for "https://www.google.com/": the address a link card shows under its name. */
+    internal fun hostOf(url: String): String =
+        url.substringAfter("://").substringBefore('/').substringBefore('?').ifEmpty { url }
 
     private fun withAlpha(color: Int, alpha: Float): Int =
         Color.argb((alpha * 255).toInt().coerceIn(0, 255), Color.red(color), Color.green(color), Color.blue(color))
 
     /**
      * A dp token as an sp value, with the accessibility font scale already capped the way
-     * [BrowserSheetShell] caps it — a tile label has one line to fit and may not grow without bound.
+     * [BrowserSheetShell] caps it — a card label has one line to fit and may not grow without bound.
      */
     private fun spFor(context: Context, dp: Float): Float {
         val actual = context.resources.configuration.fontScale.coerceAtLeast(0.01f)
         return dp * (AutoUiSizes.clampFontScale(actual) / actual)
     }
 
-    /** Ceiling on the page's content width, so a wide pane centres it rather than stretching it. */
-    private const val CONTENT_MAX_WIDTH_DP = 420f
+    private const val PREFS = "autobridge_browser"
+    private const val KEY_SUPPORT_SNOOZED = "start_support_snoozed_until"
+    /** A ✕ on the support card hides it for a week. */
+    private const val SUPPORT_SNOOZE_MS = 7L * 24 * 60 * 60 * 1000
+
+    /** Ceiling on the page's content width, so a wide display centres it rather than stretching it. */
+    private const val CONTENT_MAX_WIDTH_DP = 900f
+    private const val TOP_PADDING_DP = 28f
     private const val SIDE_PADDING_DP = 20f
-    private const val SEARCH_HEIGHT_DP = 52f
-    private const val TILE_MIN_WIDTH_DP = 96f
-    private const val TILE_HEIGHT_DP = 94f
-    private const val TILE_GAP_DP = 10f
-    private const val TILE_CORNER_DP = 18f
-    private const val CHIP_DP = 42f
-    private const val COLUMNS_MIN = 2
-    private const val COLUMNS_MAX = 4
-    private const val TITLE_TEXT_DP = 26f
-    private const val SECTION_TEXT_DP = 12f
-    private const val SEARCH_TEXT_DP = 15f
-    private const val CHIP_TEXT_DP = 17f
-    private const val LABEL_TEXT_DP = 13f
+    private const val SEARCH_HEIGHT_DP = 56f
+    private const val SEARCH_INSET_DP = 6f
+    private const val SEARCH_ICON_DP = 24f
+    private const val CARD_MIN_WIDTH_DP = 300f
+    private const val CARD_HEIGHT_DP = 76f
+    private const val CARD_GAP_DP = 10f
+    private const val CARD_CORNER_DP = 22f
+    private const val CHIP_DP = 46f
+    private const val BADGE_CORNER_DP = 10f
+    private const val TITLE_TEXT_DP = 30f
+    private const val SUBTITLE_TEXT_DP = 15f
+    private const val SECTION_TEXT_DP = 18f
+    private const val SEARCH_TEXT_DP = 16f
+    private const val CHIP_TEXT_DP = 18f
+    private const val LABEL_TEXT_DP = 16f
+    private const val HOST_TEXT_DP = 13f
+    private const val BADGE_TEXT_DP = 12f
 }

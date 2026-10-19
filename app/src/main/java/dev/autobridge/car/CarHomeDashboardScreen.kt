@@ -301,6 +301,10 @@ class CarHomeDashboardScreen(
                 // instead of restarting it; audio opens the session's own Now Playing screen.
                 if (mediaPlayback.hasVideo && uri != null) {
                     CarVideoLauncher.open(screenManager, carContext, uri, title)
+                } else if (sessionIsLiveAudio()) {
+                    // Radio (a live stream with no length): the car's radio Now Playing, the same
+                    // screen a station tap in the radio grid opens.
+                    CarNavigation.open(screenManager, "CarRadioNowPlayingScreen") { CarRadioNowPlayingScreen(carContext) }
                 } else {
                     CarNavigation.open(screenManager, "CarNowPlayingScreen") { CarNowPlayingScreen(carContext) }
                 }
@@ -308,7 +312,10 @@ class CarHomeDashboardScreen(
         }
         HomeRegion.CONTROL_PLAY -> {
             {
-                if (mediaPlayback.isPlaying) mediaPlayback.pause() else mediaPlayback.resume()
+                // isPlayRequested, not isPlaying: a stream still buffering is "on", and pausing it
+                // is what the tap means; isPlaying read false there and the tap started it again.
+                if (mediaPlayback.isPlayRequested) mediaPlayback.pause() else mediaPlayback.resume()
+                renderMenu()
             }
         }
         HomeRegion.CONTROL_PREVIOUS -> if (!mediaPlayback.hasPrevious) null else {
@@ -363,6 +370,12 @@ class CarHomeDashboardScreen(
         return NowPlayingChoice.sessionActive(player.isPlaying, player.mediaItemCount, player.playbackState)
     }
 
+    /** A live stream (no length) with no picture: the radio, as far as the card is concerned. */
+    private fun sessionIsLiveAudio(): Boolean {
+        val player = mediaPlayback.player ?: return false
+        return !mediaPlayback.hasVideo && (player.isCurrentMediaItemLive || player.duration <= 0L)
+    }
+
     private fun sessionUri(): String? = mediaPlayback.currentIndex?.let { mediaPlayback.currentQueueUris().getOrNull(it) }
         ?.takeIf { it.isNotBlank() }
 
@@ -381,7 +394,9 @@ class CarHomeDashboardScreen(
             ?: uri.takeIf { it.isNotBlank() }?.let { BridgeSource(it).displayHost }
             ?: return null
         val source = BridgeSource(uri, title)
-        val artworkUri = player.mediaMetadata.artworkUri?.toString()?.takeIf { it.startsWith("http") }
+        // The station logo it was queued with counts too, so the radio shows its logo, not a globe.
+        val artworkUri = (player.mediaMetadata.artworkUri?.toString() ?: mediaPlayback.currentArtworkUri)
+            ?.takeIf { it.startsWith("http") }
         val artwork = HomeDashboardSource.artwork(uri).let { if (artworkUri != null) it.copy(thumbnailUrl = artworkUri) else it }
         val duration = player.duration.takeIf { it > 0L } ?: 0L
         val position = player.currentPosition.coerceAtLeast(0L)
@@ -389,7 +404,8 @@ class CarHomeDashboardScreen(
             source = source,
             snapshot = BridgeStore.Snapshot(source, EngineKind.NATIVE, position, System.currentTimeMillis(), duration),
             title = title,
-            sourceLabel = mediaPlayback.currentArtist ?: HomeDashboardSource.label(carContext, uri),
+            sourceLabel = mediaPlayback.currentArtist
+                ?: if (sessionIsLiveAudio()) carContext.getString(R.string.car_iptv_radio) else HomeDashboardSource.label(carContext, uri),
             artwork = artwork,
             positionMs = position,
             durationMs = duration
@@ -660,12 +676,23 @@ class CarHomeDashboardScreen(
             val focused = menuItems.indexOfFirst { it.section != null && it.section == focusedSection }
             val webNow = webPlaying()
             val live = webNow == null && content.continueWatching?.let { isLive(it) } == true
-            val playing = webNow?.status?.playing ?: (live && AutoBridgeSessionManager.current.isPlaying)
-            val paused = if (webNow != null) !webNow.status.playing
-            else live && AutoBridgeSessionManager.current.playback == BridgePlaybackState.PAUSED
+            // The card shows the media session (radio, TV, playlists): its buttons and their state
+            // are the session's, not the bridge's, which had the play button read ▶ while it played.
+            val session = webNow == null && nowPlayingSource() == NowPlayingChoice.Source.SESSION
+            val playing = when {
+                webNow != null -> webNow.status.playing
+                session -> mediaPlayback.isPlayRequested
+                else -> live && AutoBridgeSessionManager.current.isPlaying
+            }
+            val paused = when {
+                webNow != null -> !webNow.status.playing
+                session -> !mediaPlayback.isPlayRequested
+                else -> live && AutoBridgeSessionManager.current.playback == BridgePlaybackState.PAUSED
+            }
+            val nextEnabled = if (session) mediaPlayback.hasNext else content.hasQueue
             dashboardRenderer.draw(
                 canvas, layout, menuItems, shown,
-                HomeDashboardRenderer.State(focused, pressed, scroll, playing, paused, nextEnabled = content.hasQueue),
+                HomeDashboardRenderer.State(focused, pressed, scroll, playing, paused, nextEnabled = nextEnabled),
                 thumbnails
             )
         }
