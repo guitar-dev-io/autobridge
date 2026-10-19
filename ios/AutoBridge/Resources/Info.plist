@@ -55,6 +55,15 @@
 					<string>$(PRODUCT_MODULE_NAME).CarPlaySceneDelegate</string>
 				</dict>
 			</array>
+			<key>UIWindowSceneSessionRoleCarPlay</key>
+			<array>
+				<dict>
+					<key>UISceneConfigurationName</key>
+					<string>AutoBridge CarPlay drawn</string>
+					<key>UISceneDelegateClassName</key>
+					<string>$(PRODUCT_MODULE_NAME).CarPlayWindowSceneDelegate</string>
+				</dict>
+			</array>
 			<key>UIWindowSceneSessionRoleExternalDisplayNonInteractive</key>
 			<array>
 				<dict>
