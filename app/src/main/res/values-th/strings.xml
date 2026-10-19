@@ -429,6 +429,8 @@
     <string name="browser_start_page_go">ไป</string>
     <string name="browser_start_page_slot">ช่อง %1$d</string>
     <string name="car_browser_entry_label">AutoBridge Browser</string>
+    <string name="car_browser_start_continue">ดูต่อ</string>
+    <string name="car_browser_start_support_caption">สนับสนุนผู้พัฒนา</string>
     <string name="projection_setup_browser_title">แสดง AutoBridge Browser บน Android Auto</string>
     <string name="projection_setup_browser_caption">เปิดไว้ตามค่าเริ่มต้น: เบราว์เซอร์เป็นแอปแยกบน Android Auto เปิดมาที่หน้าแรก และพิมพ์ด้วยคีย์บอร์ดของมือถือ (Gboard) แบบ AABrowser ต้องใช้ Android 15 ขึ้นไป และเปิด Unknown sources ในตั้งค่านักพัฒนาของ Android Auto เปลี่ยนแล้วให้เชื่อมต่อ Android Auto ใหม่</string>
     <string name="browser_error_no_internet">ไม่มีการเชื่อมต่ออินเทอร์เน็ต</string>
@@ -1778,7 +1780,7 @@
         <item quantity="other">มีรายการบำรุงรักษาที่ต้องดู %1$d รายการ</item>
     </plurals>
     <string name="youtube_sponsorblock_caveat">ฟีเจอร์นี้อาจไม่ทำงาน หรือทำงานไม่สมบูรณ์ ข้อมูลช่วงสปอนเซอร์มาจากอาสาสมัคร วิดีโอใหม่หรือที่คนดูน้อยมักไม่มีข้อมูล และช่วงที่ทำเครื่องหมายไว้อาจคลาดเคลื่อนเล็กน้อย การข้ามต้องใช้อินเทอร์เน็ต และทำงานเฉพาะในหน้า YouTube ของ AutoBridge เอง ถ้า YouTube เปลี่ยนเว็บไซต์ อาจใช้ไม่ได้จนกว่าจะอัปเดตแอป</string>
-    <string name="home_donate">☕ ค่าขนมกาแฟ</string>
+    <string name="home_donate">☕ เลี้ยงค่าขนมผู้พัฒนา</string>
     <string name="maint_compulsory_insurance">พ.ร.บ.</string>
     <string name="car_more_group_utilities">อรรถประโยชน์</string>
     <string name="fuel_edit">แก้ไข</string>

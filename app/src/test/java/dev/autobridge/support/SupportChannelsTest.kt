@@ -18,9 +18,14 @@ class SupportChannelsTest {
             )
         )
         assertEquals(
-            listOf(Kind.BUY_ME_A_COFFEE, Kind.GITHUB_SPONSORS, Kind.KO_FI, Kind.PROMPTPAY),
+            listOf(Kind.GITHUB_SPONSORS, Kind.BUY_ME_A_COFFEE, Kind.KO_FI, Kind.PROMPTPAY),
             channels.map { it.kind }
         )
+    }
+
+    @Test
+    fun `GitHub Sponsors is the tab the card opens on`() {
+        assertEquals(Kind.GITHUB_SPONSORS, SupportChannels.available(safeBuild = false).first().kind)
     }
 
     @Test

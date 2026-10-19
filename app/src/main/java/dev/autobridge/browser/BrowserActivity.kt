@@ -236,7 +236,8 @@ class BrowserActivity : Activity() {
         content.addView(swipeRefresh, FrameLayout.LayoutParams(-1, -1))
         content.addView(blocked, FrameLayout.LayoutParams(-1, -1))
         content.addView(loadError, FrameLayout.LayoutParams(-1, -1))
-        startPage = BrowserStartPage.build(this, sizes) { navigate(it) }.apply { visibility = View.GONE }
+        startPage = BrowserStartPage.build(this, sizes, onSupport = { showSupport() }) { navigate(it) }
+            .apply { visibility = View.GONE }
         content.addView(startPage, FrameLayout.LayoutParams(-1, -1))
 
         menuButton = ImageView(this).apply {
@@ -337,6 +338,27 @@ class BrowserActivity : Activity() {
         ParkingStateStore.addListener(parkingListener)
         // Settings > Browser launches us with this extra so the settings sheet opens straight away.
         if (savedInstanceState == null) maybeOpenSettingsSheet(intent)
+    }
+
+    /**
+     * The support channels from the start page's card: the same card as the phone's Home, its
+     * links opened right here in the browser (on the car, the QR is for a passenger's phone).
+     */
+    private fun showSupport() {
+        lateinit var dialog: android.app.AlertDialog
+        val card = dev.autobridge.ui.SupportCard.view(
+            context = this,
+            channels = dev.autobridge.support.SupportChannels.available(safeBuild = dev.autobridge.BuildConfig.AUTOBRIDGE_MODE == "SAFE"),
+            framed = true
+        ) { url ->
+            dialog.dismiss()
+            navigate(url)
+        }
+        dialog = android.app.AlertDialog.Builder(this)
+            .setView(ScrollView(this).apply { addView(card) })
+            .setPositiveButton(getString(R.string.about_promptpay_close), null)
+            .create()
+        dialog.show()
     }
 
     /**

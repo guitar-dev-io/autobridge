@@ -56,7 +56,11 @@ val DEFAULT_START_PAGE_SHORTCUTS = listOf(
  * six tiles stretched across it.
  */
 object BrowserStartPage {
-    fun build(context: Context, sizes: AutoUiSizes, onSubmit: (String) -> Unit): View {
+    /**
+     * [onSupport], when given, adds the "support the developer" card under the search bar, the
+     * way AABrowser's start page carries its own card; its ✕ hides it for [SUPPORT_SNOOZE_MS].
+     */
+    fun build(context: Context, sizes: AutoUiSizes, onSupport: (() -> Unit)? = null, onSubmit: (String) -> Unit): View {
         val grid = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
 
         val column = LinearLayout(context).apply {
@@ -95,6 +99,17 @@ object BrowserStartPage {
                 bottomMargin = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP * 3)
             }
         )
+
+        if (onSupport != null && !supportSnoozed(context)) {
+            lateinit var card: View
+            card = supportCard(context, sizes, onSupport) {
+                snoozeSupport(context)
+                card.visibility = View.GONE
+            }
+            column.addView(card, LinearLayout.LayoutParams(-1, -2).apply {
+                bottomMargin = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP * 3)
+            })
+        }
 
         column.addView(
             TextView(context).apply {
@@ -335,6 +350,85 @@ object BrowserStartPage {
         }
     }
 
+    /** The support card: heart chip, title and line, a "Support" button, and ✕ to snooze it. */
+    private fun supportCard(context: Context, sizes: AutoUiSizes, onSupport: () -> Unit, onClose: () -> Unit): View {
+        val gap = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP)
+        val card = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(gap * 2, gap * 2, gap, gap * 2)
+            background = GradientDrawable().apply {
+                setColor(BrowserTheme.sheetCardBackground)
+                cornerRadius = sizes.dp(CARD_CORNER_DP)
+                setStroke(sizes.dpInt(1f).coerceAtLeast(1), BrowserTheme.outlineVariant)
+            }
+        }
+        val head = LinearLayout(context).apply { gravity = Gravity.CENTER_VERTICAL }
+        head.addView(ImageView(context).apply {
+            setImageResource(R.drawable.ic_browser_support)
+            setColorFilter(BrowserTheme.onFabContainer)
+            val pad = sizes.dpInt(10f)
+            setPadding(pad, pad, pad, pad)
+            background = GradientDrawable().apply {
+                setColor(BrowserTheme.fabContainer)
+                cornerRadius = sizes.dp(14f)
+            }
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }, LinearLayout.LayoutParams(sizes.dpInt(CHIP_DP), sizes.dpInt(CHIP_DP)).apply { marginEnd = gap * 3 / 2 })
+        head.addView(TextView(context).apply {
+            text = context.getString(R.string.support_card_title)
+            setTextColor(BrowserTheme.textPrimary)
+            textSize = spFor(context, LABEL_TEXT_DP + 1f)
+            setTypeface(typeface, Typeface.BOLD)
+        }, LinearLayout.LayoutParams(0, -2, 1f))
+        head.addView(TextView(context).apply {
+            text = "✕"
+            textSize = spFor(context, LABEL_TEXT_DP)
+            gravity = Gravity.CENTER
+            setTextColor(BrowserTheme.textSecondary)
+            contentDescription = context.getString(R.string.player_close)
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { onClose() }
+        }, LinearLayout.LayoutParams(sizes.dpInt(44f), sizes.dpInt(44f)))
+        card.addView(head)
+        card.addView(TextView(context).apply {
+            text = context.getString(R.string.support_card_message)
+            setTextColor(BrowserTheme.textSecondary)
+            textSize = spFor(context, HOST_TEXT_DP + 1f)
+            setPadding(0, gap, gap, gap * 3 / 2)
+        })
+        card.addView(TextView(context).apply {
+            text = context.getString(R.string.home_donate)
+            setTextColor(BrowserTheme.onFabContainer)
+            textSize = spFor(context, LABEL_TEXT_DP - 1f)
+            setTypeface(typeface, Typeface.BOLD)
+            gravity = Gravity.CENTER
+            setPadding(gap * 2, 0, gap * 2, 0)
+            isClickable = true
+            isFocusable = true
+            background = RippleDrawable(
+                ColorStateList.valueOf(withAlpha(BrowserTheme.accent, 0.3f)),
+                GradientDrawable().apply {
+                    setColor(BrowserTheme.fabContainer)
+                    cornerRadius = sizes.dp(24f)
+                },
+                null
+            )
+            setOnClickListener { onSupport() }
+        }, LinearLayout.LayoutParams(-2, sizes.dpInt(48f)))
+        return card
+    }
+
+    private fun supportSnoozed(context: Context): Boolean {
+        val until = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getLong(KEY_SUPPORT_SNOOZED, 0L)
+        return System.currentTimeMillis() < until
+    }
+
+    private fun snoozeSupport(context: Context) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putLong(KEY_SUPPORT_SNOOZED, System.currentTimeMillis() + SUPPORT_SNOOZE_MS).apply()
+    }
+
     /** "www.google.com" for "https://www.google.com/": the address a link card shows under its name. */
     internal fun hostOf(url: String): String =
         url.substringAfter("://").substringBefore('/').substringBefore('?').ifEmpty { url }
@@ -350,6 +444,11 @@ object BrowserStartPage {
         val actual = context.resources.configuration.fontScale.coerceAtLeast(0.01f)
         return dp * (AutoUiSizes.clampFontScale(actual) / actual)
     }
+
+    private const val PREFS = "autobridge_browser"
+    private const val KEY_SUPPORT_SNOOZED = "start_support_snoozed_until"
+    /** A ✕ on the support card hides it for a week. */
+    private const val SUPPORT_SNOOZE_MS = 7L * 24 * 60 * 60 * 1000
 
     /** Ceiling on the page's content width, so a wide display centres it rather than stretching it. */
     private const val CONTENT_MAX_WIDTH_DP = 900f
