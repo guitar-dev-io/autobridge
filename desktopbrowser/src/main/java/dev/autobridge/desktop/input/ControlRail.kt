@@ -26,8 +26,8 @@ import kotlin.math.min
  *    more. In mouse mode a Drag button joins them: it holds the left button down so the next pan
  *    drags (select text, move a slider), and the next tap on the page drops it — the click-drag a
  *    car screen cannot otherwise do, because the host reports no touch-down or touch-up. It
- *    collapses after any action, or [hideDelayMs] after the last touch; a scroll while it is open
- *    keeps it up instead of moving the page under it.
+ *    collapses after any action (Drag included, so its pan reaches the page), or [hideDelayMs]
+ *    after the last touch; a scroll while it is open keeps it up instead of moving the page under it.
  *  - **More**: a second sheet beside the panel for what is used less: forward, reload, new tab,
  *    zoom, the keyboard choice (car only), how soon the panel collapses, and close (phone only).
  *    It never collapses by itself: it closes on a choice that leaves it or a tap outside.
