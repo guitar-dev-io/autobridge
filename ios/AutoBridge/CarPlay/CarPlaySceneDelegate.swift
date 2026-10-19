@@ -35,10 +35,20 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
     /// long category is paged with a "More" row rather than truncated silently.
     private var pageSize: Int { min(CPListTemplate.maximumItemCount, 100) }
 
+    override init() {
+        super.init()
+        CarPlaySceneLog.note("CarPlaySceneDelegate init")
+    }
+
+    func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
+        CarPlaySceneLog.note("CarPlaySceneDelegate willConnectTo: \(CarPlaySceneLog.describe(scene))")
+    }
+
     func templateApplicationScene(
         _ templateApplicationScene: CPTemplateApplicationScene,
         didConnect interfaceController: CPInterfaceController
     ) {
+        CarPlaySceneLog.note("didConnect interfaceController (template, no window)")
         self.interfaceController = interfaceController
         startSession()
         subscriptions.removeAll()
@@ -55,6 +65,7 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
         _ templateApplicationScene: CPTemplateApplicationScene,
         didDisconnectInterfaceController interfaceController: CPInterfaceController
     ) {
+        CarPlaySceneLog.note("didDisconnect interfaceController (template, no window)")
         self.interfaceController = nil
         subscriptions.removeAll()
         endSession()
@@ -507,7 +518,7 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
     private func startSession() {
         session = CPSessionConfiguration(delegate: self)
         if #available(iOS 26.4, *) {
-            NSLog("AutoBridge CarPlay: supportsVideoPlayback=%d", session?.supportsVideoPlayback == true ? 1 : 0)
+            CarPlaySceneLog.note("supportsVideoPlayback=\(session?.supportsVideoPlayback == true ? 1 : 0)")
         }
         // A video-capable car routes video to its system player (PlaybackController).
         stores.playback.carPlayVideoAllowed = carPresentsVideo
@@ -608,6 +619,7 @@ extension CarPlaySceneDelegate: CPMapTemplateDelegate, CPSearchTemplateDelegate 
         didConnect interfaceController: CPInterfaceController,
         to window: CPWindow
     ) {
+        CarPlaySceneLog.note("didConnect interfaceController to window \(NSCoder.string(for: window.bounds.size))")
         self.interfaceController = interfaceController
         subscriptions.removeAll()
         let screen = CarScreenViewController()
@@ -628,6 +640,7 @@ extension CarPlaySceneDelegate: CPMapTemplateDelegate, CPSearchTemplateDelegate 
         didDisconnect interfaceController: CPInterfaceController,
         from window: CPWindow
     ) {
+        CarPlaySceneLog.note("didDisconnect interfaceController from window")
         CarWebScreen.shared.detach(.carPlay)
         carWindow = nil
         carScreen = nil

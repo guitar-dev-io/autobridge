@@ -14,6 +14,10 @@ struct AutoBridgeApp: App {
     @StateObject private var weather = AutoBridgeStores.shared.weather
     @Environment(\.scenePhase) private var scenePhase
 
+    init() {
+        CarPlaySceneLog.startWatching()
+    }
+
     var body: some Scene {
         WindowGroup {
             HomeView()
