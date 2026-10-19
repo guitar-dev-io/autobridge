@@ -12,6 +12,10 @@ import androidx.car.app.ScreenManager
  * src/translate and src/notranslate split the subtitle engines.
  */
 internal object CarExtensions {
+    /** Nothing to set up: this build has no desktop browsers. */
+    @Suppress("UNUSED_PARAMETER")
+    fun install(context: android.content.Context) = Unit
+
     @Suppress("UNUSED_PARAMETER")
     fun moreEntries(carContext: CarContext, screenManager: ScreenManager): List<CarExtensionEntry> =
         emptyList()

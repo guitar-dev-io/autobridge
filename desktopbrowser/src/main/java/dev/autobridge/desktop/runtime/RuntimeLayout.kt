@@ -52,6 +52,10 @@ class RuntimeLayout(val base: File, val nativeLibraryDir: File, val cacheDir: Fi
         const val GUEST_RUN_DIR = "/tmp/autobridge-run"
         const val GUEST_PULSE_CONFIG = "/etc/autobridge/pulse.pa"
 
+        /** The browsers' start page, written by the app before each launch (see DesktopEngine.startPages). */
+        const val GUEST_START_DIR = "/opt/autobridge/start"
+        const val START_URL = "file://$GUEST_START_DIR/index.html"
+
         /** The browsers this engine can install exist for arm64 Linux only. */
         fun deviceSupported(): Boolean = Build.SUPPORTED_64_BIT_ABIS.contains("arm64-v8a")
     }

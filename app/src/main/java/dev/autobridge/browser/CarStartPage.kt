@@ -78,6 +78,19 @@ object CarStartPage {
         }
     }
 
+    /**
+     * The same page for the desktop browsers (Chrome, Brave), as files their Linux system holds:
+     * file name to markup. The two pages link to each other by name.
+     */
+    fun desktopPages(context: Context): Map<String, String> {
+        val t = texts(context)
+        return mapOf(
+            "index.html" to startHtml(t, quickLinks(context), desktopAvailable = false,
+                searchPrefix = SearchEngineStore.engine(context).searchUrl(""), supportHref = "support.html"),
+            "support.html" to supportHtml(t, supportChannels(context), backHref = "index.html"),
+        )
+    }
+
     private fun target(context: Context, url: Uri): String {
         val query = url.getQueryParameter("q")?.trim().orEmpty()
         if (query.isEmpty()) return URL
@@ -135,16 +148,29 @@ object CarStartPage {
     // ------------------------------------------------------------------ markup
 
     /** The page itself. Pure, so the markup is testable without a WebView. */
-    fun startHtml(t: Texts, links: List<QuickLink>, desktopAvailable: Boolean): String = page(t.title, buildString {
+    /**
+     * The page itself. Pure, so the markup is testable without a WebView. In the car renderer the
+     * search goes to [GO]; a desktop browser has no one answering that address, so there
+     * [searchPrefix] (the engine's results address, the query appended) is used from the page.
+     */
+    fun startHtml(
+        t: Texts,
+        links: List<QuickLink>,
+        desktopAvailable: Boolean,
+        searchPrefix: String? = null,
+        supportHref: String = SUPPORT,
+    ): String = page(t.title, buildString {
         append("<header><h1>").append(esc(t.title)).append("</h1><p class=\"sub\">").append(esc(t.subtitle)).append("</p></header>")
-        append("<form class=\"search\" action=\"").append(GO).append("\" method=\"get\" autocomplete=\"off\">")
+        append("<form class=\"search\" action=\"").append(GO).append("\" method=\"get\" autocomplete=\"off\"")
+        if (searchPrefix != null) append(" onsubmit=\"return go(this)\"")
+        append(">")
         append(SEARCH_ICON)
         append("<input name=\"q\" type=\"search\" enterkeyhint=\"go\" placeholder=\"").append(esc(t.searchHint)).append("\" aria-label=\"").append(esc(t.searchHint)).append("\">")
         append("<button type=\"submit\" aria-label=\"").append(esc(t.go)).append("\">").append(ARROW_ICON).append("</button></form>")
 
         append("<section class=\"card\"><div class=\"card-head\"><div class=\"card-icon\">☕</div><h2>")
             .append(esc(t.supportTitle)).append("</h2></div><p>").append(esc(t.supportMessage)).append("</p>")
-        append("<div class=\"actions\"><a class=\"pill\" href=\"").append(SUPPORT).append("\">").append(esc(t.supportAction)).append(EXTERNAL_ICON).append("</a>")
+        append("<div class=\"actions\"><a class=\"pill\" href=\"").append(esc(supportHref)).append("\">").append(esc(t.supportAction)).append(EXTERNAL_ICON).append("</a>")
         if (desktopAvailable) {
             append("<a class=\"pill ghost\" href=\"").append(DESKTOP).append("\">").append(esc(t.desktop)).append("</a>")
         }
@@ -159,11 +185,17 @@ object CarStartPage {
             }
             append("</div>")
         }
+        if (searchPrefix != null) {
+            // An address goes straight to its site, anything else to the engine, as the car does.
+            append("<script>function go(f){var q=f.q.value.trim();if(q){location.href=")
+            append("/^[a-z][a-z0-9+.-]*:\\/\\//i.test(q)?q:/^[^\\s\\/]+\\.[a-z]{2,}(\\/\\S*)?$/i.test(q)?'https://'+q:")
+            append(org.json.JSONObject.quote(searchPrefix)).append("+encodeURIComponent(q)}return false}</script>")
+        }
     })
 
     /** The support channels' QR codes, for a passenger to scan from the head unit. */
-    fun supportHtml(t: Texts, channels: List<Triple<String, String, String>>): String = page(t.supportTitle, buildString {
-        append("<a class=\"back\" href=\"").append(URL).append("\">‹ ").append(esc(t.title)).append("</a>")
+    fun supportHtml(t: Texts, channels: List<Triple<String, String, String>>, backHref: String = URL): String = page(t.supportTitle, buildString {
+        append("<a class=\"back\" href=\"").append(esc(backHref)).append("\">‹ ").append(esc(t.title)).append("</a>")
         append("<header><h1>").append(esc(t.supportTitle)).append("</h1><p class=\"sub\">").append(esc(t.supportMessage)).append("</p></header>")
         append("<div class=\"qrs\">")
         channels.forEach { (label, line, qr) ->

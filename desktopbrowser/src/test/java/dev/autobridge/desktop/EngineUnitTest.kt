@@ -105,6 +105,11 @@ class EngineUnitTest {
         assertTrue(BraveAdapter.sourcesFile().contains("URIs: https://brave-browser-apt-release.s3.brave.com/"))
         assertTrue(BraveAdapter.managedPolicy().getBoolean("BraveRewardsDisabled"))
         assertFalse(ChromeAdapter.managedPolicy().has("BraveRewardsDisabled"))
+        assertFalse(ChromeAdapter.managedPolicy().has("NewTabPageLocation"))
+        val withStart = BraveAdapter.managedPolicy("file:///opt/autobridge/start/index.html")
+        assertEquals("file:///opt/autobridge/start/index.html", withStart.getString("NewTabPageLocation"))
+        assertEquals("file:///opt/autobridge/start/index.html", withStart.getString("HomepageLocation"))
+        assertTrue(withStart.getBoolean("BraveRewardsDisabled"))
     }
 
     @Test fun displayMappingLetterboxesAndInverts() {

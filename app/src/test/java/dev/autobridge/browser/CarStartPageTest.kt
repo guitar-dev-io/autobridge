@@ -52,6 +52,16 @@ class CarStartPageTest {
         assertTrue(html.contains("location.replace("))
     }
 
+    @Test fun theDesktopPageSearchesFromThePageAndLinksBySiblingName() {
+        val html = CarStartPage.startHtml(texts, emptyList(), desktopAvailable = false,
+            searchPrefix = "https://www.google.com/search?q=", supportHref = "support.html")
+        assertTrue(html.contains("onsubmit=\"return go(this)\""))
+        assertTrue(html.contains("encodeURIComponent(q)"))
+        assertTrue(html.contains("href=\"support.html\""))
+        val support = CarStartPage.supportHtml(texts, emptyList(), backHref = "index.html")
+        assertTrue(support.contains("href=\"index.html\""))
+    }
+
     @Test fun onlyThePagesOwnAddressesAreInternal() {
         assertTrue(CarStartPage.isStartPage(CarStartPage.URL))
         assertTrue(CarStartPage.isStartPage(CarStartPage.URL + "?x=1"))
