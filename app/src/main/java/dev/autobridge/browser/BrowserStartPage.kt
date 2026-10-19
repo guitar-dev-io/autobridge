@@ -89,14 +89,14 @@ object BrowserStartPage {
                 gravity = Gravity.CENTER
             },
             LinearLayout.LayoutParams(-1, -2).apply {
-                bottomMargin = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP * 2.5f)
+                bottomMargin = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP * 2f)
             }
         )
 
         column.addView(
             searchBar(context, sizes, onSubmit),
             LinearLayout.LayoutParams(-1, sizes.dpInt(SEARCH_HEIGHT_DP)).apply {
-                bottomMargin = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP * 3)
+                bottomMargin = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP * 2.5f)
             }
         )
 
@@ -107,7 +107,7 @@ object BrowserStartPage {
                 card.visibility = View.GONE
             }
             column.addView(card, LinearLayout.LayoutParams(-1, -2).apply {
-                bottomMargin = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP * 3)
+                bottomMargin = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP * 2.5f)
             })
         }
 
@@ -217,7 +217,7 @@ object BrowserStartPage {
         return LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(sizes.dpInt(AutoUiSizes.HORIZONTAL_PADDING_DP * 1.5f), 0, inset, 0)
+            setPadding(sizes.dpInt(AutoUiSizes.HORIZONTAL_PADDING_DP * 1.25f), 0, inset, 0)
             background = GradientDrawable().apply {
                 setColor(BrowserTheme.addressPillBackground)
                 cornerRadius = height / 2f
@@ -243,7 +243,7 @@ object BrowserStartPage {
                     isClickable = true
                     isFocusable = true
                     background = RippleDrawable(
-                        ColorStateList.valueOf(withAlpha(BrowserTheme.accent, 0.3f)),
+                        ColorStateList.valueOf(withAlpha(BrowserTheme.accent, 0.22f)),
                         GradientDrawable().apply {
                             shape = GradientDrawable.OVAL
                             setColor(BrowserTheme.fabContainer)
@@ -293,7 +293,7 @@ object BrowserStartPage {
             textSize = spFor(context, CHIP_TEXT_DP)
             setTypeface(typeface, Typeface.BOLD)
             background = GradientDrawable().apply {
-                cornerRadius = chipSize * 0.28f
+                cornerRadius = chipSize * 0.3f
                 setColor(shortcut.tint)
             }
         }
@@ -313,13 +313,14 @@ object BrowserStartPage {
                 textSize = spFor(context, HOST_TEXT_DP)
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
+                setPadding(0, sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP * 0.25f), 0, 0)
             })
         }
         val badge = TextView(context).apply {
             text = context.getString(R.string.browser_start_page_slot, slot)
             setTextColor(BrowserTheme.textSecondary)
             textSize = spFor(context, BADGE_TEXT_DP)
-            val padH = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP * 0.75f)
+            val padH = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP * 0.6f)
             val padV = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP * 0.25f)
             setPadding(padH, padV, padH, padV)
             background = GradientDrawable().apply {
@@ -407,7 +408,7 @@ object BrowserStartPage {
             isClickable = true
             isFocusable = true
             background = RippleDrawable(
-                ColorStateList.valueOf(withAlpha(BrowserTheme.accent, 0.3f)),
+                ColorStateList.valueOf(withAlpha(BrowserTheme.accent, 0.22f)),
                 GradientDrawable().apply {
                     setColor(BrowserTheme.fabContainer)
                     cornerRadius = sizes.dp(24f)
@@ -455,20 +456,20 @@ object BrowserStartPage {
     private const val TOP_PADDING_DP = 28f
     private const val SIDE_PADDING_DP = 20f
     private const val SEARCH_HEIGHT_DP = 56f
-    private const val SEARCH_INSET_DP = 6f
+    private const val SEARCH_INSET_DP = 8f
     private const val SEARCH_ICON_DP = 24f
     private const val CARD_MIN_WIDTH_DP = 300f
     private const val CARD_HEIGHT_DP = 76f
     private const val CARD_GAP_DP = 10f
     private const val CARD_CORNER_DP = 22f
     private const val CHIP_DP = 46f
-    private const val BADGE_CORNER_DP = 10f
+    private const val BADGE_CORNER_DP = 8f
     private const val TITLE_TEXT_DP = 30f
-    private const val SUBTITLE_TEXT_DP = 15f
+    private const val SUBTITLE_TEXT_DP = 14f
     private const val SECTION_TEXT_DP = 18f
     private const val SEARCH_TEXT_DP = 16f
     private const val CHIP_TEXT_DP = 18f
     private const val LABEL_TEXT_DP = 16f
-    private const val HOST_TEXT_DP = 13f
+    private const val HOST_TEXT_DP = 12f
     private const val BADGE_TEXT_DP = 12f
 }
