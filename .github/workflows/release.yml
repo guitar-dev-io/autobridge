@@ -29,8 +29,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          # :whisper builds whisper.cpp from the submodule at whisper/third_party/whisper.cpp.
-          submodules: recursive
+          # The `ios` submodule lives in a PRIVATE repo the workflow token cannot read, so a
+          # recursive checkout fails on it. Skip all submodules here and init only the one the
+          # build needs (whisper) in the next step.
+          submodules: false
+
+      # :whisper builds whisper.cpp from the submodule at whisper/third_party/whisper.cpp.
+      - name: Init whisper submodule
+        run: git submodule update --init --depth=1 whisper/third_party/whisper.cpp
 
       - name: Validate Gradle wrapper
         uses: gradle/actions/wrapper-validation@v4

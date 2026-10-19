@@ -33,8 +33,10 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
-          # :whisper builds whisper.cpp from the submodule at whisper/third_party/whisper.cpp.
-          submodules: recursive
+          # The `ios` submodule lives in a PRIVATE repo the workflow token cannot read, so a
+          # recursive checkout fails on it. This job only tags/reads version.properties and does
+          # not build, so no submodules are needed here at all.
+          submodules: false
 
       - name: Read the version
         id: version
