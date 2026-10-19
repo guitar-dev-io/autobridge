@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
+import dev.autobridge.design.DesignTokens
 
 /**
  * The radio grid's cell art on the car: every station on the same rounded card, so a page of
@@ -25,10 +26,7 @@ import android.graphics.Typeface
 internal object CarStationTile {
     const val SIZE_PX = 64
 
-    private val palette = intArrayOf(
-        0xFFE0683C.toInt(), 0xFFD9475F.toInt(), 0xFF9A55D6.toInt(), 0xFF4F6BE0.toInt(),
-        0xFF2B8FD6.toInt(), 0xFF199E8E.toInt(), 0xFF3C9E4F.toInt(), 0xFFC2852A.toInt()
-    )
+    private val palette = DesignTokens.Radio.TILE_PALETTE
 
     private val frequency = Regex("""\b(\d{2,3}(?:[.,]\d{1,2})?)\b""")
 
@@ -83,7 +81,7 @@ internal object CarStationTile {
     fun framed(logo: Bitmap, playing: Boolean = false): Bitmap {
         val bitmap = Bitmap.createBitmap(SIZE_PX, SIZE_PX, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
-        val card = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFF4F5F7.toInt() }
+        val card = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = DesignTokens.Radio.LOGO_CARD }
         canvas.drawRoundRect(cardRect(), RADIUS, RADIUS, card)
         val aspect = logo.width / logo.height.toFloat()
         val square = aspect in 0.8f..1.25f
@@ -109,12 +107,12 @@ internal object CarStationTile {
     fun action(glyph: android.graphics.drawable.Drawable): Bitmap {
         val bitmap = Bitmap.createBitmap(SIZE_PX, SIZE_PX, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
-        val card = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF262A31.toInt() }
+        val card = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = DesignTokens.Radio.ACTION_CARD }
         canvas.drawRoundRect(cardRect(), RADIUS, RADIUS, card)
         val size = (SIZE_PX * 0.44f).toInt()
         val start = (SIZE_PX - size) / 2
         val icon = glyph.mutate()
-        icon.setTint(0xFFF3F5F7.toInt())
+        icon.setTint(DesignTokens.Phone.TEXT)
         icon.setBounds(start, start, start + size, start + size)
         icon.draw(canvas)
         return bitmap
@@ -138,5 +136,5 @@ internal object CarStationTile {
     private const val RADIUS = 14f
     private const val PADDING = 7
     private const val RING = 4f
-    private const val ACCENT_RADIO = 0xFFFFB35C.toInt()
+    private const val ACCENT_RADIO = DesignTokens.Phone.ACCENT_RADIO
 }

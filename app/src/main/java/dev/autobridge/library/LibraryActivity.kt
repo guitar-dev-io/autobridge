@@ -24,6 +24,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.annotation.StringRes
 import dev.autobridge.R
+import dev.autobridge.design.DesignTokens
 import dev.autobridge.entertainment.ContentKind
 import dev.autobridge.entertainment.EntertainmentActivity
 import dev.autobridge.entertainment.WebBookmarkStore
@@ -132,16 +133,16 @@ class LibraryActivity : Activity() {
         private const val RADIO_GRID_COLUMNS = 4
 
         // The radio design's phone palette.
-        private const val RADIO_CARD = 0xFF1C2027.toInt()
-        private const val RADIO_WARM_CARD = 0xFF2A2116.toInt()
-        private const val RADIO_FIELD = 0xFF1A1E25.toInt()
-        private const val RADIO_OUTLINE = 0xFF343A44.toInt()
-        private const val RADIO_MUTED = 0xFFA9AFB8.toInt()
-        private const val RADIO_CHIP_TEXT = 0xFFE3E6EA.toInt()
-        private const val RADIO_ON_AMBER = 0xFF2A1A05.toInt()
-        private const val RADIO_TAB_BAR = 0xFF0E1014.toInt()
-        private const val RADIO_TAB_EDGE = 0xFF22262E.toInt()
-        private const val RADIO_TAB_PILL = 0xFF3A2C1A.toInt()
+        private const val RADIO_CARD = DesignTokens.Phone.SURFACE
+        private const val RADIO_WARM_CARD = DesignTokens.Radio.WARM_CARD
+        private const val RADIO_FIELD = DesignTokens.Radio.SHEET
+        private const val RADIO_OUTLINE = DesignTokens.Radio.CONTROL_PRESSED
+        private const val RADIO_MUTED = DesignTokens.Radio.TEXT_HINT
+        private const val RADIO_CHIP_TEXT = DesignTokens.Radio.TEXT_CONTROL
+        private const val RADIO_ON_AMBER = DesignTokens.Radio.ON_AMBER
+        private const val RADIO_TAB_BAR = DesignTokens.Radio.TAB_BAR
+        private const val RADIO_TAB_EDGE = DesignTokens.Radio.TAB_EDGE
+        private const val RADIO_TAB_PILL = DesignTokens.Radio.TAB_PILL
         private const val RADIO_NOW_WATCH_MS = 1_000L
 
         fun intent(context: android.content.Context, section: Section): Intent =

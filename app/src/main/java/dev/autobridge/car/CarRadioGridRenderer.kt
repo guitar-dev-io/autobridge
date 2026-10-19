@@ -12,6 +12,7 @@ import android.text.TextPaint
 import android.text.TextUtils
 import androidx.annotation.DrawableRes
 import androidx.core.content.ContextCompat
+import dev.autobridge.design.DesignTokens
 
 /**
  * Paints the car radio grid ([CarRadioHomeScreen]) after the radio design's car screen: dark
@@ -302,19 +303,19 @@ internal class CarRadioGridRenderer(private val context: Context) {
 
     companion object {
         /** The radio design's car palette. */
-        const val BACKGROUND = 0xFF0B0D10.toInt()
-        const val CHIP = 0xFF1C2027.toInt()
-        const val CHIP_PRESSED = 0xFF2A3038.toInt()
-        const val ACTION_CARD = 0xFF262A31.toInt()
-        const val LOGO_CARD = 0xFFF4F5F7.toInt()
-        const val ON_AIR_CARD = 0xFF2A2116.toInt()
-        const val ACCENT = 0xFFFFB35C.toInt()
-        const val ACCENT_PRESSED = 0xFFE89E48.toInt()
-        const val ON_ACCENT = 0xFF2A1A05.toInt()
-        const val INK = 0xFFF3F5F7.toInt()
-        const val TAB_INK = 0xFFE3E6EA.toInt()
-        const val MUTED = 0xFFA9AFB8.toInt()
-        const val SCROLL = 0x66F3F5F7
+        const val BACKGROUND = DesignTokens.Radio.BACKGROUND
+        const val CHIP = DesignTokens.Phone.SURFACE
+        const val CHIP_PRESSED = DesignTokens.Radio.CHIP_PRESSED
+        const val ACTION_CARD = DesignTokens.Radio.ACTION_CARD
+        const val LOGO_CARD = DesignTokens.Radio.LOGO_CARD
+        const val ON_AIR_CARD = DesignTokens.Radio.WARM_CARD
+        const val ACCENT = DesignTokens.Phone.ACCENT_RADIO
+        const val ACCENT_PRESSED = DesignTokens.Radio.ACCENT_PRESSED
+        const val ON_ACCENT = DesignTokens.Radio.ON_AMBER
+        const val INK = DesignTokens.Phone.TEXT
+        const val TAB_INK = DesignTokens.Radio.TEXT_CONTROL
+        const val MUTED = DesignTokens.Radio.TEXT_HINT
+        const val SCROLL = DesignTokens.Radio.SCROLL
 
         const val TAB_TEXT_DP = 19f
         const val NAME_TEXT_DP = 18f

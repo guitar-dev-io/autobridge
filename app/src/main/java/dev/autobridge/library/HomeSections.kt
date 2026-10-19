@@ -3,6 +3,7 @@ package dev.autobridge.library
 import android.content.Context
 import androidx.annotation.StringRes
 import dev.autobridge.R
+import dev.autobridge.design.DesignTokens
 
 /**
  * The single home-grid definition, shared by the phone launcher and the Android Auto dashboard.
@@ -70,14 +71,14 @@ enum class HomeSection(
      * can be read by the car screens as well.
      */
     private object Accents {
-        const val TV = 0xFF6EA8FF.toInt()
-        const val RADIO = 0xFFFFB35C.toInt()
-        const val WEB = 0xFF7DD3C0.toInt()
-        const val VIDEO = 0xFFFF7A8A.toInt()
-        const val FILES = 0xFF9BE08A.toInt()
-        const val FAVORITE = 0xFFFF8FB1.toInt()
-        const val SYSTEM = 0xFFB39DFF.toInt()
-        const val WEATHER = 0xFF6BC5FF.toInt()
+        const val TV = DesignTokens.Phone.ACCENT_TV
+        const val RADIO = DesignTokens.Phone.ACCENT_RADIO
+        const val WEB = DesignTokens.Phone.ACCENT_WEB
+        const val VIDEO = DesignTokens.Phone.ACCENT_VIDEO
+        const val FILES = DesignTokens.Phone.ACCENT_FILES
+        const val FAVORITE = DesignTokens.Phone.ACCENT_FAVORITE
+        const val SYSTEM = DesignTokens.Phone.ACCENT_SYSTEM
+        const val WEATHER = DesignTokens.Phone.WEATHER
     }
 
     companion object {

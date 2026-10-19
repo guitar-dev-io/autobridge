@@ -21,6 +21,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import dev.autobridge.R
+import dev.autobridge.design.DesignTokens
 import dev.autobridge.i18n.AppLocale
 import dev.autobridge.iptv.IptvHistoryStore
 import dev.autobridge.media.MediaPlaybackClient
@@ -49,13 +50,13 @@ class RadioPlayerActivity : Activity() {
         fun intent(context: Context): Intent = Intent(context, RadioPlayerActivity::class.java)
 
         // The radio design's warm palette.
-        private val LIVE_RED = 0xFFFF5C5C.toInt()
-        private val WARM_SURFACE = 0xFF2A2116.toInt()
-        private val WARM_TEXT = 0xFFFFC985.toInt()
-        private val WARM_INK = 0xFF2A1A05.toInt()
-        private val CONTROL_FILL = 0xFF1C2027.toInt()
-        private val SOFT_TEXT = 0xFFC9CDD3.toInt()
-        private val HINT_TEXT = 0xFF8A919B.toInt()
+        private val LIVE_RED = DesignTokens.Radio.LIVE_RED
+        private val WARM_SURFACE = DesignTokens.Radio.WARM_CARD
+        private val WARM_TEXT = DesignTokens.Radio.WARM_TEXT
+        private val WARM_INK = DesignTokens.Radio.ON_AMBER
+        private val CONTROL_FILL = DesignTokens.Phone.SURFACE
+        private val SOFT_TEXT = DesignTokens.Radio.SOFT_TEXT
+        private val HINT_TEXT = DesignTokens.Radio.HINT_TEXT
 
         /** Never a real address: forces the logo to be placed again on the next update. */
         private const val LOGO_UNSET = "\u0000"

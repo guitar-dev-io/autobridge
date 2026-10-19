@@ -26,6 +26,7 @@ import androidx.car.app.navigation.model.NavigationTemplate
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import dev.autobridge.R
+import dev.autobridge.design.DesignTokens
 import dev.autobridge.display.CarSurfaceCanvas
 import dev.autobridge.iptv.IptvHistoryStore
 import dev.autobridge.media.AudioEq
@@ -773,18 +774,18 @@ internal class CarRadioNowPlayingRenderer(private val context: CarContext) {
 
     private companion object {
         // The radio design's car palette.
-        val BACKGROUND = 0xFF0B0D10.toInt()
-        val CONTROL = 0xFF1C2027.toInt()
-        val CONTROL_PRESSED = 0xFF343A44.toInt()
-        val WARM = 0xFF2A2116.toInt()
-        val ACCENT = 0xFFFFB35C.toInt()
-        val ON_ACCENT = 0xFF2A1A05.toInt()
-        val WARM_TEXT = 0xFFFFC985.toInt()
-        val LIVE_RED = 0xFFFF5C5C.toInt()
-        val TEXT_PRIMARY = 0xFFF3F5F7.toInt()
-        val TEXT_SOFT = 0xFFC9CDD3.toInt()
-        val TEXT_CONTROL = 0xFFE3E6EA.toInt()
-        val TEXT_HINT = 0xFFA9AFB8.toInt()
-        val TEXT_DISABLED = 0xFF5A616B.toInt()
+        val BACKGROUND = DesignTokens.Radio.BACKGROUND
+        val CONTROL = DesignTokens.Phone.SURFACE
+        val CONTROL_PRESSED = DesignTokens.Radio.CONTROL_PRESSED
+        val WARM = DesignTokens.Radio.WARM_CARD
+        val ACCENT = DesignTokens.Phone.ACCENT_RADIO
+        val ON_ACCENT = DesignTokens.Radio.ON_AMBER
+        val WARM_TEXT = DesignTokens.Radio.WARM_TEXT
+        val LIVE_RED = DesignTokens.Radio.LIVE_RED
+        val TEXT_PRIMARY = DesignTokens.Phone.TEXT
+        val TEXT_SOFT = DesignTokens.Radio.SOFT_TEXT
+        val TEXT_CONTROL = DesignTokens.Radio.TEXT_CONTROL
+        val TEXT_HINT = DesignTokens.Radio.TEXT_HINT
+        val TEXT_DISABLED = DesignTokens.Radio.TEXT_DISABLED
     }
 }

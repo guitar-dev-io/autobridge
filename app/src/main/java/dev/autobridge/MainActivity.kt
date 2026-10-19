@@ -56,6 +56,7 @@ import dev.autobridge.core.model.ScaleMode
 import dev.autobridge.core.model.VehicleState
 import dev.autobridge.core.policy.FeaturePolicy
 import dev.autobridge.core.state.RuntimeContextStore
+import dev.autobridge.design.DesignTokens
 import dev.autobridge.i18n.AppLocale
 import dev.autobridge.ui.AutoBridgePhoneTheme
 import dev.autobridge.remote.RemoteRuntime
@@ -130,16 +131,16 @@ class MainActivity : androidx.activity.ComponentActivity() {
         const val STATE_APPS_QUERY = "apps_query"
 
         // Matches AutoBridgeDesign / ComposeTokens (docs/UI_REDESIGN_TASKS.md "Design tokens").
-        const val COLOR_BACKGROUND = 0xff12151a.toInt()
-        const val COLOR_SURFACE = 0xff1c2027.toInt()
-        const val COLOR_SURFACE_ALT = 0xff232831.toInt()
-        const val COLOR_BORDER = 0xff2e343e.toInt()
-        const val COLOR_ACCENT = 0xff4da3ff.toInt()
-        const val COLOR_ACCENT_DARK = 0xff0b5d96.toInt()
-        const val COLOR_TEXT = 0xfff3f5f7.toInt()
-        const val COLOR_MUTED = 0xffa9b0ba.toInt()
-        const val COLOR_SUCCESS = 0xff2ee879.toInt()
-        const val COLOR_WARNING = 0xffffbf5f.toInt()
+        const val COLOR_BACKGROUND = DesignTokens.Phone.INK
+        const val COLOR_SURFACE = DesignTokens.Phone.SURFACE
+        const val COLOR_SURFACE_ALT = DesignTokens.Phone.SURFACE_RAISED
+        const val COLOR_BORDER = DesignTokens.Phone.HAIRLINE
+        const val COLOR_ACCENT = DesignTokens.Phone.ACCENT
+        const val COLOR_ACCENT_DARK = DesignTokens.Phone.ACCENT_DARK
+        const val COLOR_TEXT = DesignTokens.Phone.TEXT
+        const val COLOR_MUTED = DesignTokens.Phone.TEXT_MUTED
+        const val COLOR_SUCCESS = DesignTokens.Phone.SUCCESS
+        const val COLOR_WARNING = DesignTokens.Phone.WARNING
     }
 
     /** Back stack of the phone shell; see [PhoneNav.BackStack]. */
@@ -2411,7 +2412,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
             typeface = Typeface.DEFAULT_BOLD
             val bg = when {
                 primary -> COLOR_ACCENT
-                destructive -> 0xffd93838.toInt()
+                destructive -> DesignTokens.Phone.DESTRUCTIVE
                 else -> COLOR_SURFACE
             }
             val txtColor = if (primary || destructive) Color.WHITE else COLOR_TEXT

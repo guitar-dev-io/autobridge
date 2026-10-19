@@ -1,5 +1,7 @@
 package dev.autobridge.car
 
+import dev.autobridge.design.DesignTokens
+
 /**
  * Colours, dimensions and timings for the surface-drawn Android Auto home dashboard.
  *
@@ -12,51 +14,51 @@ package dev.autobridge.car
  */
 internal object HomeDashboardTheme {
     // --- Surfaces -------------------------------------------------------------------------
-    const val BACKGROUND = 0xFF121418.toInt()
-    const val CARD = 0xFF1C1F25.toInt()
-    const val CARD_FOCUSED = 0xFF242831.toInt()
-    const val CARD_PRESSED = 0xFF2A2F38.toInt()
+    const val BACKGROUND = DesignTokens.CarHome.BACKGROUND
+    const val CARD = DesignTokens.CarHome.CARD
+    const val CARD_FOCUSED = DesignTokens.CarHome.CARD_FOCUSED
+    const val CARD_PRESSED = DesignTokens.CarHome.CARD_PRESSED
 
     /** Round control buttons on the Now Playing card, and the scroll buttons. */
-    const val CONTROL = 0xFF2C3036.toInt()
-    const val CONTROL_PRESSED = 0xFF3A3F47.toInt()
+    const val CONTROL = DesignTokens.CarHome.CONTROL
+    const val CONTROL_PRESSED = DesignTokens.CarHome.CONTROL_PRESSED
 
     /** The queue button, and its label and chevron. */
-    const val QUEUE_PILL = 0xFF23304A.toInt()
-    const val QUEUE_PILL_PRESSED = 0xFF2E3E5F.toInt()
-    const val QUEUE_PILL_TEXT = 0xFFC7D3EC.toInt()
-    const val QUEUE_PILL_CHEVRON = 0xFF8FA6D6.toInt()
+    const val QUEUE_PILL = DesignTokens.CarHome.QUEUE_PILL
+    const val QUEUE_PILL_PRESSED = DesignTokens.CarHome.QUEUE_PILL_PRESSED
+    const val QUEUE_PILL_TEXT = DesignTokens.CarHome.QUEUE_PILL_TEXT
+    const val QUEUE_PILL_CHEVRON = DesignTokens.CarHome.QUEUE_PILL_CHEVRON
 
     /** Dashed outline of an empty state: no session yet, nothing sent, an empty queue. */
-    const val EMPTY_OUTLINE = 0xFF2F343C.toInt()
-    const val EMPTY_PILL_OUTLINE = 0xFF3A3F47.toInt()
-    const val TEXT_DISABLED = 0xFF7A8089.toInt()
+    const val EMPTY_OUTLINE = DesignTokens.CarHome.EMPTY_OUTLINE
+    const val EMPTY_PILL_OUTLINE = DesignTokens.CarHome.CONTROL_PRESSED
+    const val TEXT_DISABLED = DesignTokens.CarHome.TEXT_DISABLED
     /** A control that has nothing to act on (Next with an empty queue). */
-    const val CONTROL_DISABLED_GLYPH = 0xFF5E646C.toInt()
+    const val CONTROL_DISABLED_GLYPH = DesignTokens.CarHome.CONTROL_DISABLED_GLYPH
 
     /** Unfilled part of a progress bar. */
-    const val PROGRESS_TRACK = 0xFF2C3036.toInt()
+    const val PROGRESS_TRACK = DesignTokens.CarHome.CONTROL
 
     // --- Text -----------------------------------------------------------------------------
-    const val TEXT_PRIMARY = 0xFFF1F3F5.toInt()
-    const val TEXT_SECONDARY = 0xFF9AA1AA.toInt()
+    const val TEXT_PRIMARY = DesignTokens.CarHome.TEXT_PRIMARY
+    const val TEXT_SECONDARY = DesignTokens.CarHome.TEXT_SECONDARY
     /** Section label above the Recently Sent row. */
-    const val TEXT_SECTION = 0xFFC7CCD2.toInt()
+    const val TEXT_SECTION = DesignTokens.CarHome.TEXT_SECTION
     /** Glyph on a round control button. */
-    const val TEXT_CONTROL = 0xFFE3E6EA.toInt()
+    const val TEXT_CONTROL = DesignTokens.CarHome.TEXT_CONTROL
 
     /** The "Bridge" half of the wordmark. */
-    const val ACCENT_WORDMARK = 0xFF7FA9F5.toInt()
+    const val ACCENT_WORDMARK = DesignTokens.CarHome.ACCENT_WORDMARK
 
     /** AutoBridge blue: the play button, progress fill, the queue link and the focus border. */
-    const val ACCENT = 0xFFB3C7F5.toInt()
+    const val ACCENT = DesignTokens.CarHome.ACCENT
     /** Glyph drawn on an [ACCENT] fill. */
-    const val ON_ACCENT = 0xFF142540.toInt()
+    const val ON_ACCENT = DesignTokens.CarHome.ON_ACCENT
 
     // --- Feature accents (icon glyph colour; the tile behind it is a dark tint of the same) ---
-    const val ACCENT_TV = 0xFF7FA9F5.toInt()
+    const val ACCENT_TV = DesignTokens.CarHome.ACCENT_WORDMARK
     // The radio design's amber, the same as AutoBridgeDesign.ACCENT_RADIO on the phone.
-    const val ACCENT_RADIO = 0xFFFFB35C.toInt()
+    const val ACCENT_RADIO = DesignTokens.Phone.ACCENT_RADIO
 
     /**
      * Electric blue for the radio tuner's active control (play button, selected preset), equal to
@@ -64,16 +66,16 @@ internal object HomeDashboardTheme {
      * the same colour. [ACCENT_RADIO] stays the radio section's amber identity badge; this is the
      * "it is on" colour, never the periwinkle [ACCENT] the home's own Now Playing card uses.
      */
-    const val ACCENT_RADIO_ACTIVE = 0xFF4DA3FF.toInt()
+    const val ACCENT_RADIO_ACTIVE = DesignTokens.Phone.ACCENT
     /** Glyph drawn on an [ACCENT_RADIO_ACTIVE] fill. */
-    const val ON_ACCENT_RADIO_ACTIVE = 0xFF08203A.toInt()
-    const val ACCENT_WEB = 0xFFA99BF2.toInt()
-    const val ACCENT_YOUTUBE = 0xFFF0848F.toInt()
-    const val ACCENT_YOUTUBE_MUSIC = 0xFFF28BB0.toInt()
-    const val ACCENT_STREAMING = 0xFFE8C27A.toInt()
+    const val ON_ACCENT_RADIO_ACTIVE = DesignTokens.CarHome.ON_ACCENT_RADIO_ACTIVE
+    const val ACCENT_WEB = DesignTokens.CarHome.ACCENT_WEB
+    const val ACCENT_YOUTUBE = DesignTokens.CarHome.ACCENT_YOUTUBE
+    const val ACCENT_YOUTUBE_MUSIC = DesignTokens.CarHome.ACCENT_YOUTUBE_MUSIC
+    const val ACCENT_STREAMING = DesignTokens.CarHome.ACCENT_STREAMING
     /** The sideload builds' extra home cards (CarExtensions). */
-    const val ACCENT_MULTI_APP = 0xFF7FD6C2.toInt()
-    const val ACCENT_DESKTOP = 0xFF9DC3F7.toInt()
+    const val ACCENT_MULTI_APP = DesignTokens.CarHome.ACCENT_MULTI_APP
+    const val ACCENT_DESKTOP = DesignTokens.CarHome.ACCENT_DESKTOP
 
     /** Share of the accent mixed into [CARD] for an icon tile's fill and its hairline border. */
     const val ICON_TILE_TINT = 0.08f
