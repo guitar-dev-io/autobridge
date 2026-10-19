@@ -1949,6 +1949,10 @@ class CarWebRenderer(context: Context) {
         hint: String,
         scrollFieldIntoView: Boolean,
     ) {
+        // Exactly one keyboard: a chrome ADDRESS tap (onSurfaceClick only guards the canvas tray, so
+        // it falls through to chrome hit-testing in the IME-only state) must not re-enter here and
+        // double-open over a live IME session or an already-drawn canvas tray.
+        if (anyKeyboardOpen) return
         val gatePasses = CarImeCapability.gate(Build.VERSION.SDK_INT, hardwareMode) && hardwareWindow != null
         if (gatePasses) {
             when (imeProbe) {
@@ -1983,6 +1987,11 @@ class CarWebRenderer(context: Context) {
         probing: Boolean,
     ): Boolean {
         val window = hardwareWindow ?: return false
+        // Defense in depth for the single-keyboard invariant: never overwrite a live editor
+        // reference. Overwriting imeSession/imeInputView would orphan the prior CarImeInputView
+        // (still attached to contentLayer) and drop its decor insets listener. openKeyboardFor
+        // already guards on anyKeyboardOpen; this keeps a bypassing caller from leaking a view.
+        if (imeSession != null) return true
         val imm = appContext.getSystemService(InputMethodManager::class.java) ?: run {
             imeProbe = ImeProbeState.UNAVAILABLE
             return false
@@ -2381,7 +2390,10 @@ class CarWebRenderer(context: Context) {
     fun scrollBy(distanceX: Float, distanceY: Float) = runOnMain {
         val now = SystemClock.uptimeMillis()
         lastInputMs = now
-        if (!CarKeyboardGestures.pageReceives(CarSurfaceGesture.SCROLL, null, null, keyboardTray())) {
+        // A live IME session has no canvas tray (keyboardTray() == null) but still owns the bottom
+        // of the surface; swallow the scroll so the page can't move under Gboard, as the canvas
+        // route does via its tray geometry.
+        if (anyKeyboardOpen || !CarKeyboardGestures.pageReceives(CarSurfaceGesture.SCROLL, null, null, keyboardTray())) {
             stopFling()
             if (ViewportDebug.enabled) Log.i(TAG, "kbd swallow gesture=SCROLL d=$distanceX,$distanceY")
             return@runOnMain
