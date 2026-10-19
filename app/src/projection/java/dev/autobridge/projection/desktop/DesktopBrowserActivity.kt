@@ -107,7 +107,9 @@ class DesktopBrowserActivity : Activity() {
         // A zoom change in Settings restarts the browser; follow it to the new session.
         scope.launch {
             DesktopEngine.session.collect { s ->
-                if (s != null && s !== session && session != null && s.adapter.id == browserId) {
+                // Only while on screen: a viewer left in the background must not pull a session
+                // the car just opened onto the phone (it took the car's frames on the DHU).
+                if (resumed && s != null && s !== session && session != null && s.adapter.id == browserId) {
                     attach(s)
                     fit()
                 }
@@ -118,6 +120,10 @@ class DesktopBrowserActivity : Activity() {
             if (ime != imeHeight) {
                 imeHeight = ime
                 fit()
+                if (ime > 0 && refocusAddressAfterResize) {
+                    refocusAddressAfterResize = false
+                    desktopView.postDelayed({ session?.input?.focusAddressBar() }, 350)
+                }
             }
             insets
         }
@@ -207,6 +213,7 @@ class DesktopBrowserActivity : Activity() {
     }
 
     private var railPressed = false
+    private var refocusAddressAfterResize = false
     private var heldDownX = 0f
     private var heldDownY = 0f
     private val tapSlop by lazy { android.view.ViewConfiguration.get(this).scaledTouchSlop.toFloat() }
@@ -225,6 +232,9 @@ class DesktopBrowserActivity : Activity() {
             ControlRail.Action.ADDRESS -> {
                 input?.focusAddressBar()
                 keyInput.show()
+                // Opening the keyboard shrinks the browser window, and Chromium drops the
+                // address bar's focus on that resize; focus it again once the resize is done.
+                refocusAddressAfterResize = true
             }
             ControlRail.Action.KEYBOARD -> keyInput.toggle()
             ControlRail.Action.CLOSE -> finish()
@@ -241,14 +251,20 @@ class DesktopBrowserActivity : Activity() {
         }
     }
 
+    private var resumed = false
+
     override fun onPause() {
         super.onPause()
+        resumed = false
         session?.detachSurface()
         DesktopEngine.noteSurfaceDetached()
     }
 
     override fun onResume() {
         super.onResume()
+        resumed = true
+        // The engine may have moved on (the car restarted the browser) while this was away.
+        DesktopEngine.session.value?.let { s -> if (s !== session && s.adapter.id == browserId && session != null) attach(s) }
         if (session != null) fit()
     }
 
