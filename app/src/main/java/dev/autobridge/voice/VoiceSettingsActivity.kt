@@ -101,7 +101,6 @@ class VoiceSettingsActivity : Activity() {
         val downloads = store.downloads.value
         renderedSignature = signatureOf(downloads)
         progressViews.clear()
-        val scrollY = page?.let { AutoBridgeDesign.pageScroll(it)?.scrollY } ?: 0
 
         val body = AutoBridgeDesign.body(this)
         val supported = VoiceRuntime.isSupported(this)
@@ -148,8 +147,7 @@ class VoiceSettingsActivity : Activity() {
             body = body
         )
         page = built
-        setContentView(built)
-        AutoBridgeDesign.pageScroll(built)?.post { AutoBridgeDesign.pageScroll(built)?.scrollTo(0, scrollY) }
+        AutoBridgeDesign.showPage(this, built)
     }
 
     private fun settingsGroup(selected: WhisperModelInfo?, installed: List<WhisperModelInfo>): View {

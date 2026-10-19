@@ -105,7 +105,8 @@ class CostsActivity : Activity() {
         }
         body.stack(AutoBridgeDesign.pill(this, getString(R.string.costs_add), primary = true, accent = accent) { showAddDialog() }, gap = 8)
 
-        setContentView(
+        AutoBridgeDesign.showPage(
+            this,
             AutoBridgeDesign.page(
                 context = this,
                 header = AutoBridgeDesign.header(

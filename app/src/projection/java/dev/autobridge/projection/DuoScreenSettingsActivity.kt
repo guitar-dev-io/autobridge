@@ -125,7 +125,8 @@ class DuoScreenSettingsActivity : Activity() {
             getString(R.string.duo_screen_end_session_hint)
         ) { confirmEndSession() })
 
-        setContentView(
+        AutoBridgeDesign.showPage(
+            this,
             AutoBridgeDesign.page(
                 context = this,
                 header = AutoBridgeDesign.header(

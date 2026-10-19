@@ -125,13 +125,15 @@ class DesktopBrowserSettingsActivity : Activity() {
     }
 
     private var page: View? = null
+    private var pageBody: LinearLayout? = null
 
     private fun build(s: Snapshot) {
-        // Rebuilding replaces the page; keep the reader where they were (a stepper tap rebuilt it
-        // and jumped to the top, so pressing + twice needed a scroll in between).
-        val keepScroll = page?.let { AutoBridgeDesign.pageScroll(it)?.scrollY } ?: 0
+        // Rebuild inside the page already on screen: replacing the whole page with setContentView
+        // drew one frame scrolled to the top before the saved position was restored, so every
+        // state change made the page flash. Swapping the body's children keeps the window, header
+        // and scroll position, and the new content lands in a single layout pass.
         progressViews.clear()
-        val body = AutoBridgeDesign.body(this)
+        val body = pageBody?.apply { removeAllViews() } ?: AutoBridgeDesign.body(this)
         if (!DesktopEngine.supported) {
             body.stack(notice(getString(R.string.desktop_settings_unsupported), AutoBridgeDesign.SIGNAL_SLOW))
         }
@@ -159,6 +161,7 @@ class DesktopBrowserSettingsActivity : Activity() {
         body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.desktop_settings_diagnostics_section)), gap = 2)
         body.stack(diagnosticsCard(s))
 
+        if (page != null) return
         val built = AutoBridgeDesign.page(
             context = this,
             header = AutoBridgeDesign.header(
@@ -170,8 +173,8 @@ class DesktopBrowserSettingsActivity : Activity() {
             body = body
         )
         page = built
+        pageBody = body
         setContentView(built)
-        AutoBridgeDesign.pageScroll(built)?.let { scroll -> scroll.post { scroll.scrollTo(0, keepScroll) } }
     }
 
     // ── Cards ───────────────────────────────────────────────────────────────

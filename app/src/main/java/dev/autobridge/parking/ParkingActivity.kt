@@ -108,7 +108,8 @@ class ParkingActivity : Activity() {
             )), gap = 12)
         }
         body.stack(CarToolViews.footnote(this, getString(R.string.parking_privacy_short)))
-        setContentView(
+        AutoBridgeDesign.showPage(
+            this,
             AutoBridgeDesign.page(
                 context = this,
                 header = AutoBridgeDesign.header(

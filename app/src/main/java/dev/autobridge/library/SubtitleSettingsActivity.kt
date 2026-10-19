@@ -80,7 +80,7 @@ class SubtitleSettingsActivity : Activity() {
                         "play as they are."
                 )
             )
-            setContentView(page(body))
+            AutoBridgeDesign.showPage(this, page(body))
             return
         }
 
@@ -97,7 +97,7 @@ class SubtitleSettingsActivity : Activity() {
         )
 
         if (!enabled) {
-            setContentView(page(body))
+            AutoBridgeDesign.showPage(this, page(body))
             return
         }
 
@@ -152,7 +152,7 @@ class SubtitleSettingsActivity : Activity() {
         // Services and has nothing for this screen to download or free.
         if (engine == TranslationEngine.OPUS_MT) renderOpusMtModels(body)
 
-        setContentView(page(body))
+        AutoBridgeDesign.showPage(this, page(body))
     }
 
     private fun renderOpusMtModels(body: LinearLayout) {

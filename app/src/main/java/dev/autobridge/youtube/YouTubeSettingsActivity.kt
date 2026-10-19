@@ -140,7 +140,8 @@ class YouTubeSettingsActivity : Activity() {
             gap = 16
         )
 
-        setContentView(
+        AutoBridgeDesign.showPage(
+            this,
             AutoBridgeDesign.page(
                 context = this,
                 header = AutoBridgeDesign.header(

@@ -100,7 +100,8 @@ class EmergencyActivity : Activity() {
             gap = 12
         )
 
-        setContentView(
+        AutoBridgeDesign.showPage(
+            this,
             AutoBridgeDesign.page(
                 context = this,
                 header = AutoBridgeDesign.header(
