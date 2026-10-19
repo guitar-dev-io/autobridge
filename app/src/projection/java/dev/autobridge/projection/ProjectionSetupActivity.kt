@@ -155,7 +155,8 @@ class ProjectionSetupActivity : Activity() {
             setPadding(dp(4), 0, dp(4), 0)
         })
 
-        setContentView(
+        AutoBridgeDesign.showPage(
+            this,
             AutoBridgeDesign.page(
                 context = this,
                 header = AutoBridgeDesign.header(

@@ -394,7 +394,8 @@ class LibraryActivity : Activity() {
             bottomBar = bottom,
             overlay = overlay
         )
-        setContentView(page)
+        // A new page (another tab or folder) starts at the top; Library restores its own lists.
+        AutoBridgeDesign.showPage(this, page, keepScroll = false)
         if (typing) searchField?.requestFocus()
         return page
     }

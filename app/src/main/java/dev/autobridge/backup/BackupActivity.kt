@@ -55,7 +55,8 @@ class BackupActivity : Activity() {
                 badgeText = "📥",
             ) { pick() }
         )
-        setContentView(
+        AutoBridgeDesign.showPage(
+            this,
             AutoBridgeDesign.page(
                 context = this,
                 header = AutoBridgeDesign.header(

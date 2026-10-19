@@ -120,7 +120,8 @@ class FuelLogActivity : Activity() {
         )
         body.stack(CarToolViews.footnote(this, unit(R.string.fuel_subtitle, R.string.fuel_subtitle_ev)))
 
-        setContentView(
+        AutoBridgeDesign.showPage(
+            this,
             AutoBridgeDesign.page(
                 context = this,
                 header = CarToolViews.headerChip(

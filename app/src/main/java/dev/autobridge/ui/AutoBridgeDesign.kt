@@ -1,5 +1,6 @@
 package dev.autobridge.ui
 
+import android.app.Activity
 import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Color
@@ -12,6 +13,7 @@ import android.text.TextWatcher
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewTreeObserver
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageView
@@ -671,7 +673,7 @@ object AutoBridgeDesign {
         applyInsets: Boolean = true,
         overlay: View? = null
     ): View {
-        val root = FrameLayout(context).apply { setBackgroundColor(INK) }
+        val root = FrameLayout(context).apply { setBackgroundColor(INK); setTag(R.id.autobridge_page_root, applyInsets) }
         val column = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
         // targetSdk 36 means edge-to-edge on Android 15+, so the page owns its own bar insets;
         // without this the header would sit under the status bar and the bottom bar under the
@@ -708,6 +710,33 @@ object AutoBridgeDesign {
         if (bottomBar != null) column.addView(bottomBar, LinearLayout.LayoutParams(-1, -2))
         root.addView(column, FrameLayout.LayoutParams(-1, -1))
         return root
+    }
+
+    /**
+     * Shows [page] (built by [page]) as [activity]'s content in place of the page already there.
+     * Pages are rebuilt whole when their state changes, and a bare setContentView drew the new one
+     * scrolled to the top (restoring the position in a posted callback came a frame late) and
+     * without the system-bar padding until its insets arrived, so every rebuild flashed. This
+     * carries the padding over and, with [keepScroll], restores the scroll position before the
+     * first frame is drawn. Pass keepScroll = false when the rebuild shows different content.
+     */
+    fun showPage(activity: Activity, page: View, keepScroll: Boolean = true) {
+        val previous = activity.findViewById<ViewGroup>(android.R.id.content)?.getChildAt(0)
+        val replacing = previous != null && previous !== page && previous.getTag(R.id.autobridge_page_root) != null
+        if (replacing && previous!!.getTag(R.id.autobridge_page_root) == true && page.getTag(R.id.autobridge_page_root) == true) {
+            page.setPadding(previous.paddingLeft, previous.paddingTop, previous.paddingRight, previous.paddingBottom)
+        }
+        val y = if (replacing && keepScroll) pageScroll(previous!!)?.scrollY ?: 0 else 0
+        activity.setContentView(page)
+        val scroll = pageScroll(page) ?: return
+        if (y <= 0) return
+        scroll.viewTreeObserver.addOnPreDrawListener(object : ViewTreeObserver.OnPreDrawListener {
+            override fun onPreDraw(): Boolean {
+                scroll.viewTreeObserver.removeOnPreDrawListener(this)
+                scroll.scrollTo(0, y)
+                return true
+            }
+        })
     }
 
     /** The scroll view [page] built around its body, so a caller can scroll to a position in it. */

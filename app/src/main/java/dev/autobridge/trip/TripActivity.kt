@@ -91,7 +91,8 @@ class TripActivity : Activity() {
             }
         }
 
-        setContentView(
+        AutoBridgeDesign.showPage(
+            this,
             AutoBridgeDesign.page(
                 context = this,
                 header = AutoBridgeDesign.header(
