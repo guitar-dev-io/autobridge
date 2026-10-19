@@ -1409,12 +1409,14 @@ class CarWebRenderer(context: Context) {
         val view = focusedView
         val clean = text.trim()
         if (view == null) {
-            // No live WebView: nothing focused, so treat as a search/address load.
-            if (clean.isNotEmpty()) load(clean)
+            // No live WebView. A submit (Go) treats the text as a search/address load; a live
+            // mirror (autoSubmit = false) has nothing to type into and must not navigate mid-key.
+            if (clean.isNotEmpty() && autoSubmit) load(clean)
             return@runOnMain
         }
-        if (clean.isEmpty()) {
-            // Empty text is a "focus the search box" request → open a fresh search page context.
+        if (clean.isEmpty() && autoSubmit) {
+            // Empty text on submit is a "focus the search box" request → open a fresh search page
+            // context. An empty LIVE write falls through so backspace-to-empty clears the page field.
             return@runOnMain
         }
         val jsValue = jsEscape(clean)
@@ -1432,29 +1434,17 @@ class CarWebRenderer(context: Context) {
         """.trimIndent()
         view.evaluateJavascript(script) { result ->
             val ok = result?.contains("OK") == true
-            if (!ok) {
-                // Fallback: no focused field → address/search load (auto-submits by nature).
+            if (!ok && autoSubmit) {
+                // Fallback: no focused field on a submit → address/search load (auto-submits by
+                // nature). A live mirror (autoSubmit = false) that finds no focus is ignored: the
+                // page simply has nothing focused yet, which is not a request to navigate.
                 load(clean)
             }
         }
     }
 
     /** Escapes a string for safe embedding inside a single-quoted JS string literal. */
-    private fun jsEscape(input: String): String = buildString {
-        for (c in input) {
-            when (c) {
-                '\\' -> append("\\\\")
-                '\'' -> append("\\'")
-                '"' -> append("\\\"")
-                '\n' -> append("\\n")
-                '\r' -> append("\\r")
-                ' ' -> append("\\u2028")
-                ' ' -> append("\\u2029")
-                '<' -> append("\\x3C")
-                else -> append(c)
-            }
-        }
-    }
+    private fun jsEscape(input: String): String = CarJsEscape.singleQuoted(input)
 
     // ------------------------------------------------------------------ input
 
@@ -1930,7 +1920,13 @@ class CarWebRenderer(context: Context) {
         }
         when (result) {
             // A keystroke repaints only the tray, right here: no queued pump frame, no page draw.
-            is CarSurfaceKeyboard.Result.Changed -> if (draw) drawKeyboardNow(board, started)
+            // The live mirror runs OUTSIDE the draw guard: a replayed double tap passes draw=false
+            // for both keystrokes, so gating it on draw would skip the page write on a double tap.
+            is CarSurfaceKeyboard.Result.Changed -> {
+                if (draw) drawKeyboardNow(board, started)
+                CarKeyboardMirror.liveWrite(result.pageMutated, board.target, board.buffer.text)
+                    ?.let { submitText(it, autoSubmit = false) }
+            }
             // The tray going away uncovers the page, which needs a whole frame; drawn at once.
             is CarSurfaceKeyboard.Result.Close -> { closeKeyboard(); requestFrameNow() }
             is CarSurfaceKeyboard.Result.Commit -> { commitKeyboard(board, result.text); requestFrameNow() }
@@ -2185,8 +2181,13 @@ class CarWebRenderer(context: Context) {
                 // Both keystrokes go out in one keyboard frame rather than two back to back.
                 if (taps > 1 && keyboard === board) {
                     val second = handleKeyboardTap(board, focusX, focusY, draw = false)
-                    val changed = CarSurfaceKeyboard.Result.Changed
-                    if (keyboard === board && (first == changed || second == changed)) {
+                    // Changed is now a data class, so object-equality no longer works; a type check
+                    // is what decides whether either replayed tap left a tray to paint. The mirror
+                    // for each tap already fired inside handleKeyboardTap (idempotent full-value
+                    // write), so scaleBy only paints here and adds no mirror of its own.
+                    val firstChanged = first is CarSurfaceKeyboard.Result.Changed
+                    val secondChanged = second is CarSurfaceKeyboard.Result.Changed
+                    if (keyboard === board && (firstChanged || secondChanged)) {
                         drawKeyboardNow(board, SystemClock.uptimeMillis())
                     }
                 }

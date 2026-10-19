@@ -30,7 +30,15 @@ internal class CarSurfaceKeyboard(
     sealed class Result {
         /** Swallowed by the tray; nothing changed. */
         object None : Result()
-        object Changed : Result()
+
+        /**
+         * The tray changed and must repaint. [pageMutated] is true only when the page-relevant text
+         * changed (a key inserted/deleted a character, or the field was cleared), so the renderer
+         * mirrors the buffer into the focused page field. It is false for layer and cursor changes
+         * (Shift, Language, cursor keys, a cursor-only field tap), which repaint the tray but must
+         * not write to the page or fire a spurious `input` event.
+         */
+        data class Changed(val pageMutated: Boolean) : Result()
         data class Commit(val text: String) : Result()
         /** The hide button, or a tap outside the tray. */
         object Close : Result()
@@ -100,7 +108,7 @@ internal class CarSurfaceKeyboard(
         if (g.hide.contains(x, y)) return Result.Close
         if (buffer.text.isNotEmpty() && g.clear.contains(x, y)) {
             buffer.clear()
-            return Result.Changed
+            return Result.Changed(pageMutated = true)
         }
         if (g.field.contains(x, y)) {
             fieldText.textSize = g.keyHeight * FIELD_TEXT
@@ -108,29 +116,48 @@ internal class CarSurfaceKeyboard(
             val advance = (x - start + textScroll).coerceAtLeast(0f)
             val text = buffer.text
             buffer.setCursor(fieldText.getOffsetForAdvance(text, 0, text.length, 0, text.length, false, advance))
-            return Result.Changed
+            // A field tap only repositions the cursor: the text did not change, so no page mirror.
+            return Result.Changed(pageMutated = false)
         }
         val key = g.keyAt(x, y) ?: return Result.None
         pressed = key
         pressedUntilMs = nowMs + PRESSED_MS
-        when (key) {
+        // pageMutated is true only when the text changed (Text/Space/Backspace); layer and cursor
+        // keys repaint the tray but must not mirror into the page (see CarKeyboardMirror).
+        return when (key) {
             is BrowserKey.Text -> {
                 buffer.insert(BrowserKeyboardLayouts.typed(key, shift))
                 shift = shift.afterType()
+                Result.Changed(pageMutated = true)
             }
-            is BrowserKey.Space -> buffer.insert(" ")
-            is BrowserKey.Backspace -> buffer.backspace()
-            is BrowserKey.CursorLeft -> buffer.moveCursor(-1)
-            is BrowserKey.CursorRight -> buffer.moveCursor(1)
-            is BrowserKey.Shift -> shift = shift.next()
+            is BrowserKey.Space -> {
+                buffer.insert(" ")
+                Result.Changed(pageMutated = true)
+            }
+            is BrowserKey.Backspace -> {
+                buffer.backspace()
+                Result.Changed(pageMutated = true)
+            }
+            is BrowserKey.CursorLeft -> {
+                buffer.moveCursor(-1)
+                Result.Changed(pageMutated = false)
+            }
+            is BrowserKey.CursorRight -> {
+                buffer.moveCursor(1)
+                Result.Changed(pageMutated = false)
+            }
+            is BrowserKey.Shift -> {
+                shift = shift.next()
+                Result.Changed(pageMutated = false)
+            }
             is BrowserKey.Language -> {
                 language = if (language == CarKeyboardLanguage.THAI) CarKeyboardLanguage.LATIN else CarKeyboardLanguage.THAI
                 CarKeyboardStore.setLanguage(context, language)
                 shift = ShiftState.OFF
+                Result.Changed(pageMutated = false)
             }
-            is BrowserKey.Go -> return Result.Commit(buffer.text.trim())
+            is BrowserKey.Go -> Result.Commit(buffer.text.trim())
         }
-        return Result.Changed
     }
 
     /** Whether a key is still drawn pressed at [nowMs]; the renderer keeps redrawing until it is not. */

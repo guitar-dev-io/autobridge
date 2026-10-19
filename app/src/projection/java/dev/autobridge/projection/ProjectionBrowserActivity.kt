@@ -80,6 +80,7 @@ import dev.autobridge.browser.SplitPanes
 import dev.autobridge.browser.WebViewTimerGate
 import dev.autobridge.core.model.Feature
 import dev.autobridge.core.policy.FeaturePolicy
+import dev.autobridge.display.PerformanceMode
 import dev.autobridge.logging.StructuredLog
 import dev.autobridge.entertainment.ContentAddress
 import dev.autobridge.media.WebMediaHub
@@ -318,10 +319,13 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
 
     // ---------------------------------------------------------------- on-screen keyboard
     //
-    // See [CarKeyboardLayouts] for why the app draws one at all. What is typed accumulates here
-    // rather than going into the page keystroke by keystroke: a car keyboard is used at arm's
-    // length with glances, and a per-key round trip into the page would make every typo a page
-    // event. The whole string is committed once, through the same path the phone's remote uses.
+    // See [CarKeyboardLayouts] for why the app draws one at all. The authoritative buffer is
+    // [typed]; every text-mutating key mirrors the whole buffer into the page's focused field live
+    // (see [onKey]'s autoSubmit = false write) so the driver sees characters land in the box as
+    // they type. That per-key write is coalesced by one frame ([mirrorRunnable]) so a fast burst
+    // costs one JS round trip per frame, not one per key; the local preview still updates per key.
+    // Go commits the whole string once ([commitTyped]), through the same path the phone's remote
+    // uses, and cancels any pending mirror first so the submit is the last write.
 
     private var keyboardPanel: View? = null
     private var keyboardRows: LinearLayout? = null
@@ -339,6 +343,14 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
 
     /** Where the typed text goes instead of the page, when the keyboard was opened for something else (Find). */
     private var keyboardCommit: ((String) -> Unit)? = null
+
+    /**
+     * The pending per-key live mirror, coalesced by one frame. Owned by [keyboardTarget]'s handler
+     * (this activity has no handler of its own): posted and cancelled against the same WebView so
+     * the cancel always matches the post. Cancelled before Go/close so a stale non-submit write can
+     * never run after the submit and clobber the field.
+     */
+    private var mirrorRunnable: Runnable? = null
 
     // SDK (com.google.android.apps.auto.sdk.SearchController): the host-serviced search surface.
     // Acquired in onCreate; the callback below is registered BEFORE any box call because
@@ -2340,6 +2352,11 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
 
     private fun closeKeyboard() {
         val panel = keyboardPanel ?: return
+        // Cancel any pending live mirror BEFORE keyboardTarget is nulled — the runnable is posted on
+        // that WebView's handler, so removing it after the null would dereference null and leave a
+        // queued non-submit write to run after close and clobber the field.
+        mirrorRunnable?.let { r -> keyboardTarget?.removeCallbacks(r) }
+        mirrorRunnable = null
         keyboardPanel = null
         keyboardRows = null
         keyboardPreview = null
@@ -2484,8 +2501,17 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         syncKeyboardPreview()
         // Re-send the full authoritative buffer on every mutating key (empty included, so
         // backspace-to-empty clears the page field). autoSubmit = false: live mirror only, never
-        // submit — Go alone commits, via commitTyped() above.
-        if (mutated) typeInto(keyboardTarget, typed.toString(), autoSubmit = false)
+        // submit — Go alone commits, via commitTyped() above. The write is coalesced by one frame:
+        // a fast burst collapses into one full-value JS round trip per frame instead of one per
+        // key, which is lossless because the StringBuilder stays authoritative. The local preview
+        // above already updated per key, so the driver sees each character immediately.
+        if (mutated) {
+            val target = keyboardTarget
+            mirrorRunnable?.let { target?.removeCallbacks(it) }
+            val runnable = Runnable { typeInto(keyboardTarget, typed.toString(), autoSubmit = false) }
+            mirrorRunnable = runnable
+            target?.postDelayed(runnable, PerformanceMode.level.browserFrameMs)
+        }
     }
 
     private fun syncKeyboardPreview() {
@@ -2510,6 +2536,11 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         val value = typed.toString().trim()
         val target = keyboardTarget
         val commit = keyboardCommit
+        // Cancel the pending live mirror against the captured target BEFORE closeKeyboard() nulls
+        // keyboardTarget, so the autoSubmit = true write below is the last thing to touch the field
+        // and no stale non-submit write runs after it.
+        mirrorRunnable?.let { r -> target?.removeCallbacks(r) }
+        mirrorRunnable = null
         closeKeyboard()
         if (value.isEmpty()) return
         if (commit != null) return commit(value)
