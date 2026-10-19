@@ -34,6 +34,8 @@ import androidx.car.app.navigation.model.NavigationTemplate
 import androidx.car.app.validation.HostValidator
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import dev.autobridge.R
 import dev.autobridge.car.CarBrowserSearchScreen
 import dev.autobridge.car.CarIcons
@@ -96,6 +98,7 @@ class DesktopBrowserCarScreen(
     browser: DesktopBrowserAdapter? = null
 ) : Screen(carContext), SurfaceCallback {
     private var session: DesktopSession? = null
+    private var surface: android.view.Surface? = null
     private val adapter: DesktopBrowserAdapter? = DesktopEngine.let { it.init(carContext); browser ?: it.chosenInstalledBrowser() }
     private var surfaceWidth = 0
     private var surfaceHeight = 0
@@ -133,6 +136,12 @@ class DesktopBrowserCarScreen(
     }
 
     init {
+        // A zoom change in Settings restarts the browser; carry on with the new session.
+        lifecycleScope.launch {
+            DesktopEngine.session.collect { s ->
+                if (s != null && s !== session && session != null && s.adapter.id == adapter?.id && surface != null) bind(s)
+            }
+        }
         lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onCreate(owner: LifecycleOwner) {
                 ParkingStateStore.addListener(parkingListener)
@@ -144,6 +153,7 @@ class DesktopBrowserCarScreen(
 
             override fun onDestroy(owner: LifecycleOwner) {
                 ParkingStateStore.removeListener(parkingListener)
+                if (rail.dragHeld) session?.input?.releaseAtCursor()
                 session?.detachSurface()
                 DesktopEngine.noteSurfaceDetached()
                 if (MirrorSurfaceOwnership.release(this@DesktopBrowserCarScreen)) {
@@ -225,8 +235,18 @@ class DesktopBrowserCarScreen(
             ControlRail.Action.KEYBOARD -> openKeyboard()
             ControlRail.Action.KEYBOARD_AUTOBRIDGE -> DesktopCarKeyboard.setUseCarKeyboard(carContext, false)
             ControlRail.Action.KEYBOARD_CAR -> DesktopCarKeyboard.setUseCarKeyboard(carContext, true)
+            ControlRail.Action.DRAG_START -> input?.pressAtCursor()
+            ControlRail.Action.DRAG_END -> input?.releaseAtCursor()
+            ControlRail.Action.MODE_CHANGED -> {
+                // Leaving mouse mode never leaves the button held down.
+                if (rail.dragHeld) { input?.releaseAtCursor(); rail.dragHeld = false }
+                // Entering it, the pointer starts in the middle of the page, where it is easy to find.
+                if (rail.mode == PointerMode.MOUSE) {
+                    session?.renderer?.mapping?.let { m -> input?.moveTo(m.displayWidth / 2, m.displayHeight / 2) }
+                }
+            }
             // The car leaves with Home or Back; there is no Close on the car.
-            ControlRail.Action.MODE_CHANGED, ControlRail.Action.CLOSE -> Unit
+            ControlRail.Action.CLOSE -> Unit
         }
     }
 
@@ -306,25 +326,37 @@ class DesktopBrowserCarScreen(
         surfaceDpi = surfaceContainer.dpi
         rail.density = surfaceDpi / 160f
         DesktopLog.i("car surface ${surfaceWidth}x$surfaceHeight dpi=$surfaceDpi")
+        this.surface = surface
         val area = pageArea()
+        val scale = DesktopEngine.carScale(surfaceDpi)
+        // Remembered so "start on launch" opens the browser at this car's size.
+        DesktopEngine.store.setLastCar(area.width(), area.height(), scale)
         val s = try {
-            DesktopEngine.openSession(browser.id, area.width(), area.height(), DesktopEngine.carScale(surfaceDpi))
+            DesktopEngine.openSession(browser.id, area.width(), area.height(), scale)
         } catch (e: Exception) {
             DesktopLog.w("car session failed", e)
             return
         }
+        bind(s)
+    }
+
+    /** Shows [s] on this screen's surface with this screen's rail and drawing guard. */
+    private fun bind(s: DesktopSession) {
         session = s
         s.renderer.placeholderText = carContext.getString(dev.autobridge.desktop.R.string.desktop_starting)
+        rail.area = { s.renderer.mapping?.let { m -> android.graphics.RectF(m.offsetX, m.offsetY, m.offsetX + m.drawWidth, m.offsetY + m.drawHeight) } }
         s.renderer.overlay = overlay
         rail.onAutoHide = { session?.renderer?.requestFrame() }
+        rail.dragHeld = false
         s.renderer.setSurfaceDrawer { target, block -> CarSurfaceCanvas.draw(carContext, target, block) }
         applyGate()
-        s.renderer.attachSurface(surface, surfaceWidth, surfaceHeight)
+        surface?.let { s.renderer.attachSurface(it, surfaceWidth, surfaceHeight) }
         fit()
         DesktopEngine.noteSurfaceAttached()
     }
 
     override fun onSurfaceDestroyed(surfaceContainer: SurfaceContainer) {
+        surface = null
         session?.detachSurface()
         DesktopEngine.noteSurfaceDetached()
     }
@@ -357,7 +389,13 @@ class DesktopBrowserCarScreen(
             ControlRail.Tap.PassThrough -> Unit
         }
         if (rail.mode == PointerMode.MOUSE) {
-            s.input?.clickAtCursor()
+            // A tap ends a drag (drops what was dragged); otherwise it clicks at the pointer.
+            if (rail.dragHeld) {
+                s.input?.releaseAtCursor()
+                rail.dragHeld = false
+            } else {
+                s.input?.clickAtCursor()
+            }
         } else {
             val (dx, dy) = s.renderer.mapping?.toDisplay(x, y) ?: return
             s.input?.click(dx, dy)

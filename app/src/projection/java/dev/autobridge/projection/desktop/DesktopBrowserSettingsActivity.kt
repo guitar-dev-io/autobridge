@@ -124,7 +124,12 @@ class DesktopBrowserSettingsActivity : Activity() {
         }
     }
 
+    private var page: View? = null
+
     private fun build(s: Snapshot) {
+        // Rebuilding replaces the page; keep the reader where they were (a stepper tap rebuilt it
+        // and jumped to the top, so pressing + twice needed a scroll in between).
+        val keepScroll = page?.let { AutoBridgeDesign.pageScroll(it)?.scrollY } ?: 0
         progressViews.clear()
         val body = AutoBridgeDesign.body(this)
         if (!DesktopEngine.supported) {
@@ -142,6 +147,9 @@ class DesktopBrowserSettingsActivity : Activity() {
                 if (installed) getString(R.string.desktop_settings_choice_installed) else getString(R.string.desktop_settings_choice_not_installed), installed))
         }
 
+        body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.desktop_prefs_section)), gap = 2)
+        body.stack(preferencesCard())
+
         body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.desktop_settings_runtime_section)), gap = 2)
         body.stack(runtimeCard(s))
 
@@ -151,18 +159,19 @@ class DesktopBrowserSettingsActivity : Activity() {
         body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.desktop_settings_diagnostics_section)), gap = 2)
         body.stack(diagnosticsCard(s))
 
-        setContentView(
-            AutoBridgeDesign.page(
+        val built = AutoBridgeDesign.page(
+            context = this,
+            header = AutoBridgeDesign.header(
                 context = this,
-                header = AutoBridgeDesign.header(
-                    context = this,
-                    title = getString(dev.autobridge.desktop.R.string.desktop_engine_title),
-                    subtitle = getString(dev.autobridge.desktop.R.string.desktop_engine_subtitle),
-                    onBack = { finish() }
-                ),
-                body = body
-            )
+                title = getString(dev.autobridge.desktop.R.string.desktop_engine_title),
+                subtitle = getString(dev.autobridge.desktop.R.string.desktop_engine_subtitle),
+                onBack = { finish() }
+            ),
+            body = body
         )
+        page = built
+        setContentView(built)
+        AutoBridgeDesign.pageScroll(built)?.let { scroll -> scroll.post { scroll.scrollTo(0, keepScroll) } }
     }
 
     // ── Cards ───────────────────────────────────────────────────────────────
@@ -174,7 +183,13 @@ class DesktopBrowserSettingsActivity : Activity() {
             title = title,
             subtitle = caption,
             accent = if (selected) AutoBridgeDesign.ACCENT_ONLINE else AutoBridgeDesign.ACCENT_WEB,
-            badgeText = if (selected) "✓" else null,
+            // The row's fallback badge is the title's first character, which in Thai is a lone
+            // leading vowel ("เ"); the browser's Latin initial reads right in both languages.
+            badgeText = if (selected) "✓" else when (choice) {
+                EngineChoice.AUTOBRIDGE -> "A"
+                EngineChoice.CHROME -> "G"
+                EngineChoice.BRAVE -> "B"
+            },
             trailing = if (selected) "●" else "○",
         ) {
             if (!enabled) {
@@ -309,6 +324,71 @@ class DesktopBrowserSettingsActivity : Activity() {
                 ?: s.runtime.lastError ?: s.browsers.values.firstNotNullOfOrNull { it.lastError }
             error?.let { append("last error: ").append(it.take(600)) }
         }.trimEnd()
+    }
+
+    /** Start on launch, touch sensitivity and each browser's zoom. */
+    private fun preferencesCard(): View {
+        val store = DesktopEngine.store
+        val card = card()
+        fun refresh() { structureKey = null; currentSnapshot?.let(::render) }
+        fun section(titleText: String, captionText: String) {
+            card.addView(title(titleText).apply { setPadding(0, dp(10), 0, 0); textSize = 15f })
+            card.addView(caption(captionText))
+        }
+
+        section(getString(R.string.desktop_prefs_start_on_launch), getString(R.string.desktop_prefs_start_on_launch_caption))
+        card.addView(choice(listOf(
+            getString(R.string.desktop_prefs_on) to store.startOnLaunch,
+            getString(R.string.desktop_prefs_off) to !store.startOnLaunch,
+        )) { i ->
+            store.startOnLaunch = i == 0
+            if (i == 0) Thread { DesktopEngine.prestartIfEnabled() }.start()
+            refresh()
+        })
+
+        section(getString(R.string.desktop_prefs_sensitivity), getString(R.string.desktop_prefs_sensitivity_caption))
+        val sens = store.touchSensitivity
+        card.addView(stepper("%.2f×".format(java.util.Locale.US, sens),
+            canDown = sens > DesktopEngine.SENSITIVITY_MIN + 0.01f,
+            canUp = sens < DesktopEngine.SENSITIVITY_MAX - 0.01f,
+        ) { delta ->
+            DesktopEngine.setTouchSensitivity(sens + delta * 0.25f)
+            refresh()
+        })
+
+        for (adapter in DesktopBrowsers.all) {
+            section(getString(R.string.desktop_prefs_zoom, adapter.displayName), getString(R.string.desktop_prefs_zoom_caption))
+            val zoom = store.zoom(adapter.id)
+            card.addView(stepper("$zoom%", zoom > DesktopEngine.ZOOM_MIN, zoom < DesktopEngine.ZOOM_MAX) { delta ->
+                DesktopEngine.setZoom(adapter.id, zoom + delta * 10)
+                refresh()
+            })
+        }
+        return card
+    }
+
+    /** Pills where exactly one is selected (filled). */
+    private fun choice(options: List<Pair<String, Boolean>>, onPick: (Int) -> Unit): View {
+        val flow = FlowRow(this, dp(8))
+        options.forEachIndexed { i, (label, selected) ->
+            flow.addView(AutoBridgeDesign.pill(this, (if (selected) "✓ " else "") + label, primary = selected) { onPick(i) })
+        }
+        return flow.apply { setPadding(0, dp(8), 0, 0) }
+    }
+
+    /** − value + . */
+    private fun stepper(value: String, canDown: Boolean, canUp: Boolean, onStep: (Int) -> Unit): View {
+        val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(8), 0, 0) }
+        row.addView(AutoBridgeDesign.pill(this, "−") { if (canDown) onStep(-1) }.apply { alpha = if (canDown) 1f else 0.4f })
+        row.addView(TextView(this).apply {
+            text = value
+            textSize = 16f
+            gravity = Gravity.CENTER
+            setTextColor(AutoBridgeDesign.TEXT)
+            minWidth = dp(84)
+        })
+        row.addView(AutoBridgeDesign.pill(this, "+") { if (canUp) onStep(1) }.apply { alpha = if (canUp) 1f else 0.4f })
+        return row
     }
 
     /** Android 12+ kills app child processes past a small limit; a browser needs many. */

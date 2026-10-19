@@ -26,6 +26,7 @@ import dev.autobridge.desktop.browser.DesktopBrowserId
 import dev.autobridge.desktop.browser.DesktopBrowsers
 import dev.autobridge.desktop.display.DesktopView
 import dev.autobridge.desktop.input.ControlRail
+import dev.autobridge.desktop.input.PointerMode
 import dev.autobridge.desktop.input.Keysym
 import dev.autobridge.desktop.input.TouchGestureMapper
 import dev.autobridge.desktop.session.DesktopSession
@@ -103,11 +104,26 @@ class DesktopBrowserActivity : Activity() {
         }
         // The keyboard takes the bottom of the screen: the browser window shrinks to what is left
         // above it, so the field being typed in stays visible.
+        // A zoom change in Settings restarts the browser; follow it to the new session.
+        scope.launch {
+            DesktopEngine.session.collect { s ->
+                // Only while on screen: a viewer left in the background must not pull a session
+                // the car just opened onto the phone (it took the car's frames on the DHU).
+                if (resumed && s != null && s !== session && session != null && s.adapter.id == browserId) {
+                    attach(s)
+                    fit()
+                }
+            }
+        }
         root.setOnApplyWindowInsetsListener { _, insets ->
             val ime = insets.getInsets(WindowInsets.Type.ime()).bottom
             if (ime != imeHeight) {
                 imeHeight = ime
                 fit()
+                if (ime > 0 && refocusAddressAfterResize) {
+                    refocusAddressAfterResize = false
+                    desktopView.postDelayed({ session?.input?.focusAddressBar() }, 350)
+                }
             }
             insets
         }
@@ -136,7 +152,9 @@ class DesktopBrowserActivity : Activity() {
 
     private fun attach(s: DesktopSession) {
         session = s
+        rail.dragHeld = false
         desktopView.renderer = s.renderer
+        rail.area = { s.renderer.mapping?.let { m -> android.graphics.RectF(m.offsetX, m.offsetY, m.offsetX + m.drawWidth, m.offsetY + m.drawHeight) } }
         s.renderer.overlay = rail
         rail.onAutoHide = { session?.renderer?.requestFrame() }
         s.renderer.placeholderText = getString(dev.autobridge.desktop.R.string.desktop_starting)
@@ -174,10 +192,31 @@ class DesktopBrowserActivity : Activity() {
             }
         }
         if (railPressed) return true
+        // With Drag held (rail), a drag moves the held pointer as usual and a tap drops it.
+        if (rail.dragHeld) {
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> { heldDownX = event.x; heldDownY = event.y }
+                MotionEvent.ACTION_UP -> if (kotlin.math.hypot(event.x - heldDownX, event.y - heldDownY) < tapSlop) {
+                    session?.input?.releaseAtCursor()
+                    rail.dragHeld = false
+                    session?.renderer?.burst()
+                    return true
+                }
+            }
+            if (event.actionMasked == MotionEvent.ACTION_UP) {
+                // A drag that ended: let the mapper see it as a move, not a tap.
+                session?.renderer?.burst()
+                return true
+            }
+        }
         return gestures.onTouchEvent(event)
     }
 
     private var railPressed = false
+    private var refocusAddressAfterResize = false
+    private var heldDownX = 0f
+    private var heldDownY = 0f
+    private val tapSlop by lazy { android.view.ViewConfiguration.get(this).scaledTouchSlop.toFloat() }
 
     /** What the rail asked for; the rail has already changed its own state. */
     private fun onRailAction(action: ControlRail.Action) {
@@ -192,24 +231,40 @@ class DesktopBrowserActivity : Activity() {
             // The phone's own keyboard types into the address bar once Ctrl+L has focused it.
             ControlRail.Action.ADDRESS -> {
                 input?.focusAddressBar()
-                keyInput.toggle()
+                keyInput.show()
+                // Opening the keyboard shrinks the browser window, and Chromium drops the
+                // address bar's focus on that resize; focus it again once the resize is done.
+                refocusAddressAfterResize = true
             }
             ControlRail.Action.KEYBOARD -> keyInput.toggle()
             ControlRail.Action.CLOSE -> finish()
-            ControlRail.Action.MODE_CHANGED,
+            ControlRail.Action.DRAG_START -> input?.pressAtCursor()
+            ControlRail.Action.DRAG_END -> input?.releaseAtCursor()
+            ControlRail.Action.MODE_CHANGED -> {
+                if (rail.dragHeld) { input?.releaseAtCursor(); rail.dragHeld = false }
+                if (rail.mode == PointerMode.MOUSE) {
+                    session?.renderer?.mapping?.let { m -> input?.moveTo(m.displayWidth / 2, m.displayHeight / 2) }
+                }
+            }
             ControlRail.Action.KEYBOARD_AUTOBRIDGE,
             ControlRail.Action.KEYBOARD_CAR -> Unit
         }
     }
 
+    private var resumed = false
+
     override fun onPause() {
         super.onPause()
+        resumed = false
         session?.detachSurface()
         DesktopEngine.noteSurfaceDetached()
     }
 
     override fun onResume() {
         super.onResume()
+        resumed = true
+        // The engine may have moved on (the car restarted the browser) while this was away.
+        DesktopEngine.session.value?.let { s -> if (s !== session && s.adapter.id == browserId && session != null) attach(s) }
         if (session != null) fit()
     }
 
@@ -242,16 +297,28 @@ class DesktopBrowserActivity : Activity() {
             isFocusableInTouchMode = true
         }
 
-        fun toggle() {
-            val imm = context.getSystemService(InputMethodManager::class.java)
-            shown = !shown
-            if (shown) {
-                requestFocus()
-                imm.showSoftInput(this, 0)
-            } else {
-                imm.hideSoftInputFromWindow(windowToken, 0)
-            }
+        /**
+         * Shows the keyboard, or hides it when it really is on screen. The keyboard's own state is
+         * read from the window insets, not remembered: closing it with Back or the keyboard's own
+         * button left a remembered flag saying "shown", so the next tap hid nothing and the
+         * keyboard never came back.
+         */
+        fun toggle() = if (imeVisible()) hide() else show()
+
+        /** Always brings the keyboard up (Address and Type buttons). */
+        fun show() {
+            shown = true
+            requestFocus()
+            context.getSystemService(InputMethodManager::class.java).showSoftInput(this, 0)
         }
+
+        fun hide() {
+            shown = false
+            context.getSystemService(InputMethodManager::class.java).hideSoftInputFromWindow(windowToken, 0)
+        }
+
+        private fun imeVisible(): Boolean =
+            rootWindowInsets?.isVisible(android.view.WindowInsets.Type.ime()) ?: shown
 
         override fun onCheckIsTextEditor(): Boolean = true
 

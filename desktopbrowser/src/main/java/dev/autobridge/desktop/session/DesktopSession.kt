@@ -39,9 +39,12 @@ class DesktopSession internal constructor(
     private val runtime: LinuxRuntime,
     val adapter: DesktopBrowserAdapter,
     val screenSize: Int,
-    /** Chromium's device scale factor, fixed for the life of the browser process. */
+    /** Chromium's device scale factor (car/phone base × browser zoom), fixed for the process. */
     val scale: Float,
     private val restoreLastSession: Boolean,
+    /** The base scale before the browser's zoom setting, so a zoom change can restart alike. */
+    val baseScale: Float = scale,
+    private val sensitivity: Float = 1f,
 ) {
     enum class Phase { STARTING, RUNNING, STOPPED, FAILED }
     data class Status(
@@ -158,7 +161,7 @@ class DesktopSession internal constructor(
                 }
             }
             connection.onClosed = { error -> if (!stopping) fail("X display closed", error) }
-            input = BrowserInput(connection)
+            input = BrowserInput(connection).also { it.sensitivity = sensitivity }
 
             browser = launchBrowser(startUrl, restoreLastSession)
             audio = BrowserAudioBridge(context, layout.pulsePcmSocket).also { it.start() }

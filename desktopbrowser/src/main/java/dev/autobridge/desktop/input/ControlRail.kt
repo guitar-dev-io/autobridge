@@ -23,8 +23,11 @@ import kotlin.math.min
  *    still shows where the controls are, which a rail that disappears completely does not.
  *  - **Open**: a panel slides out with the everyday controls, each a large labelled button:
  *    back, address, type, the touch ⇄ mouse switch (one button that shows the current mode) and
- *    more. It collapses after any action, or [hideDelayMs] after the last touch; a scroll while
- *    it is open keeps it up instead of moving the page under it.
+ *    more. In mouse mode a Drag button joins them: it holds the left button down so the next pan
+ *    drags (select text, move a slider), and the next tap on the page drops it — the click-drag a
+ *    car screen cannot otherwise do, because the host reports no touch-down or touch-up. It
+ *    collapses after any action (Drag included, so its pan reaches the page), or [hideDelayMs]
+ *    after the last touch; a scroll while it is open keeps it up instead of moving the page under it.
  *  - **More**: a second sheet beside the panel for what is used less: forward, reload, new tab,
  *    zoom, the keyboard choice (car only), how soon the panel collapses, and close (phone only).
  *    It never collapses by itself: it closes on a choice that leaves it or a tap outside.
@@ -42,7 +45,11 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
     /** What a tap asked for. Mode switches and the collapse delay are handled inside the rail. */
     enum class Action {
         BACK, ADDRESS, KEYBOARD, FORWARD, RELOAD, NEW_TAB, ZOOM_OUT, ZOOM_IN,
-        KEYBOARD_AUTOBRIDGE, KEYBOARD_CAR, MODE_CHANGED, CLOSE
+        KEYBOARD_AUTOBRIDGE, KEYBOARD_CAR, MODE_CHANGED, CLOSE,
+        /** Mouse mode: hold the left button down ([dragHeld] is now true). */
+        DRAG_START,
+        /** Mouse mode: let it go ([dragHeld] is now false). */
+        DRAG_END
     }
 
     sealed class Tap {
@@ -54,6 +61,12 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
     }
 
     @Volatile var mode: PointerMode = PointerMode.TOUCH
+
+    /** Mouse mode with the left button held: a pan drags. Set by the Drag button, cleared by the owner. */
+    @Volatile var dragHeld = false
+
+    /** Panel buttons: back, address, type, mode, (drag in mouse mode), more. */
+    private fun buttonCount() = if (mode == PointerMode.MOUSE) 6 else 5
 
     /** The owner's gate (parked, a session to control): nothing is drawn or hit while false. */
     @Volatile var visible = true
@@ -101,9 +114,18 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
     private val text = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
     private val leftText = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.LEFT }
 
-    /** The last target size drawn at; taps are laid out against the same geometry. */
+    /** The last area drawn in; taps are laid out against the same geometry. */
     @Volatile private var lastWidth = 0
     @Volatile private var lastHeight = 0
+    @Volatile private var originX = 0f
+    @Volatile private var originY = 0f
+
+    /**
+     * The part of the target the page is shown in (the renderer's mapping), so the rail sits on
+     * the page: above the phone keyboard when it is open, and beside — not under — Android Auto's
+     * widgets on its split home screen. Null uses the whole target.
+     */
+    @Volatile var area: () -> RectF? = { null }
 
     // --- Geometry ---
 
@@ -115,7 +137,7 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
 
     /** Scale that fits the open panel (the tallest part) into the target's height. */
     private fun scaleFor(height: Int): Float {
-        val panelDp = PANEL_PAD * 2 + CHEVRON + GAP + 5 * (BUTTON + GAP) - GAP
+        val panelDp = PANEL_PAD * 2 + CHEVRON + GAP + buttonCount() * (BUTTON + GAP) - GAP
         val sheetDp = sheetHeightDp()
         val needed = maxOf(panelDp, sheetDp) * density
         return min(1f, height * 0.92f / needed).coerceAtLeast(0.45f)
@@ -143,7 +165,7 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
 
         // --- Panel ---
         val panelW = s(PANEL_W, sc)
-        val panelH = s(PANEL_PAD * 2 + CHEVRON + GAP + 5 * (BUTTON + GAP) - GAP, sc)
+        val panelH = s(PANEL_PAD * 2 + CHEVRON + GAP + buttonCount() * (BUTTON + GAP) - GAP, sc)
         val left = s(PANEL_LEFT, sc)
         val top = ((height - panelH) / 2f).coerceAtLeast(0f)
         val panel = RectF(left, top, left + panelW, top + panelH)
@@ -173,6 +195,12 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
             mode = if (mode == PointerMode.TOUCH) PointerMode.MOUSE else PointerMode.TOUCH
             touched()
             Tap.Perform(Action.MODE_CHANGED)
+        }
+        if (mode == PointerMode.MOUSE) {
+            panelButton(R.drawable.ic_rail_drag, context.getString(R.string.desktop_rail_drag), dragHeld, false) {
+                dragHeld = !dragHeld
+                done(if (dragHeld) Action.DRAG_START else Action.DRAG_END)
+            }
         }
         panelButton(R.drawable.ic_rail_more, context.getString(R.string.desktop_rail_more), false, state == State.MORE) {
             state = if (state == State.MORE) State.OPEN else State.MORE
@@ -297,8 +325,10 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
      * What a tap at ([x], [y]) in target pixels means. Collapsed, only the handle's strip is the
      * rail's; open, a tap outside the panel and sheet closes them without reaching the page.
      */
-    fun onTap(x: Float, y: Float): Tap {
+    fun onTap(targetX: Float, targetY: Float): Tap {
         if (!visible || lastWidth <= 0 || lastHeight <= 0) return Tap.PassThrough
+        val x = targetX - originX
+        val y = targetY - originY
         val g = geometry(lastWidth, lastHeight)
         if (state == State.COLLAPSED) {
             val slop = HANDLE_SLOP * density
@@ -350,10 +380,16 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
     // --- Drawing ---
 
     override fun draw(canvas: Canvas, width: Int, height: Int) {
-        lastWidth = width
-        lastHeight = height
+        val a = area() ?: RectF(0f, 0f, width.toFloat(), height.toFloat())
+        originX = a.left
+        originY = a.top
+        lastWidth = a.width().toInt()
+        lastHeight = a.height().toInt()
         if (!visible) return
-        geometry(width, height).draw.forEach { it(canvas) }
+        canvas.save()
+        canvas.translate(a.left, a.top)
+        geometry(lastWidth, lastHeight).draw.forEach { it(canvas) }
+        canvas.restore()
     }
 
     private fun drawHandle(c: Canvas, r: RectF) {

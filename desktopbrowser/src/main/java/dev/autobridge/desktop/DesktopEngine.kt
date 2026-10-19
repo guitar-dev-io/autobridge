@@ -197,10 +197,11 @@ object DesktopEngine {
      * screen while running.
      */
     @Synchronized
-    fun openSession(id: DesktopBrowserId, viewWidth: Int, viewHeight: Int, scale: Float, startUrl: String? = null): DesktopSession {
+    fun openSession(id: DesktopBrowserId, viewWidth: Int, viewHeight: Int, scale: Float, startUrl: String? = null, forceRestart: Boolean = false): DesktopSession {
+        val effective = effectiveScale(id, scale)
         val existing = _session.value
-        if (existing != null && existing.adapter.id == id && existing.isAliveOrStarting() &&
-            !existing.tooSmallFor(viewWidth, viewHeight) && kotlin.math.abs(existing.scale - scale) < 0.3f
+        if (!forceRestart && existing != null && existing.adapter.id == id && existing.isAliveOrStarting() &&
+            !existing.tooSmallFor(viewWidth, viewHeight) && kotlin.math.abs(existing.scale - effective) < 0.1f
         ) {
             existing.fitTo(viewWidth, viewHeight)
             return existing
@@ -210,12 +211,55 @@ object DesktopEngine {
         val adapter = DesktopBrowsers.of(id)
         check(state(id).state.installed) { "${adapter.displayName} is not installed" }
         val screen = maxOf(MIN_SCREEN, viewWidth, viewHeight).let { (it + 1) and 1.inv() }
-        val session = DesktopSession(appContext, runtime, adapter, screen, scale.coerceIn(1f, 2.5f), restore)
+        val session = DesktopSession(appContext, runtime, adapter, screen, effective, restore, scale, store.touchSensitivity)
         _session.value = session
         setBrowser(id, state(id).copy(state = InstallState.RUNNING))
         session.start(startUrl, viewWidth, viewHeight)
         return session
     }
+
+    /** Car/phone base scale × the browser's zoom setting. */
+    private fun effectiveScale(id: DesktopBrowserId, base: Float): Float =
+        (base * store.zoom(id) / 100f).coerceIn(0.5f, 3f)
+
+    /**
+     * Applies a zoom change: the running browser is restarted at the new scale with its tabs
+     * restored. Whoever shows it (car screen, phone viewer) follows [session] and re-attaches.
+     */
+    fun setZoom(id: DesktopBrowserId, percent: Int) {
+        store.setZoom(id, percent.coerceIn(ZOOM_MIN, ZOOM_MAX))
+        val current = _session.value ?: return
+        if (current.adapter.id != id) return
+        Thread({
+            runCatching { openSession(id, current.width, current.height, current.baseScale, forceRestart = true) }
+                .onFailure { DesktopLog.w("zoom restart failed", it) }
+        }, "desktop-zoom-restart").start()
+    }
+
+    /** Applies at once to the running browser and to every later one. */
+    fun setTouchSensitivity(value: Float) {
+        store.touchSensitivity = value.coerceIn(SENSITIVITY_MIN, SENSITIVITY_MAX)
+        _session.value?.input?.sensitivity = store.touchSensitivity
+    }
+
+    /**
+     * "Start on launch": when AutoBridge starts and the setting is on, the chosen browser is
+     * started in the background at the last car page size, so it is already running when the car
+     * (or the phone viewer) opens it. Without a screen it is still stopped after [IDLE_STOP_MS].
+     */
+    fun prestartIfEnabled() {
+        if (!initialized || !store.startOnLaunch || _session.value != null || !runtime.rootfsReady()) return
+        val browser = chosenInstalledBrowser() ?: return
+        val (w, h, scale) = store.lastCar() ?: Triple(1280, 720, 1f)
+        DesktopLog.i("start on launch: ${browser.id.key} ${w}x$h")
+        runCatching { openSession(browser.id, w, h, scale) }.onFailure { DesktopLog.w("start on launch failed", it) }
+        noteSurfaceDetached()
+    }
+
+    const val ZOOM_MIN = 50
+    const val ZOOM_MAX = 200
+    const val SENSITIVITY_MIN = 0.5f
+    const val SENSITIVITY_MAX = 3f
 
     /**
      * The phone shows a desktop-sized page: the long side is about [PHONE_LONG_SIDE] display

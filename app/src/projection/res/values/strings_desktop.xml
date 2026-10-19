@@ -56,4 +56,13 @@
     <string name="car_engine_title">Browser engine</string>
     <string name="car_engine_install_on_phone">Install it on the phone first: Settings › Desktop Browser Engine</string>
     <string name="desktop_car_keyboard_hint">Type, then Search to send it to the page</string>
+    <string name="desktop_prefs_section">Preferences</string>
+    <string name="desktop_prefs_on">On</string>
+    <string name="desktop_prefs_off">Off</string>
+    <string name="desktop_prefs_start_on_launch">Start on launch</string>
+    <string name="desktop_prefs_start_on_launch_caption">Start the chosen browser in the background when AutoBridge starts, so it opens instantly in the car</string>
+    <string name="desktop_prefs_sensitivity">Touch sensitivity</string>
+    <string name="desktop_prefs_sensitivity_caption">How far the page scrolls and the mouse pointer moves for each finger movement</string>
+    <string name="desktop_prefs_zoom">Zoom: %1$s</string>
+    <string name="desktop_prefs_zoom_caption">Size of pages and of the browser toolbar. Changing it restarts the browser and keeps its tabs</string>
 </resources>

@@ -20,7 +20,9 @@ import kotlin.math.hypot
  * - two fingers: pinch zooms the page (Ctrl+wheel), moving them scrolls.
  *
  * In [PointerMode.MOUSE] the screen is a trackpad instead: drag moves the cursor, tap clicks
- * where the cursor is, long press right-clicks there, two fingers still scroll.
+ * where the cursor is, long press right-clicks there, two fingers still scroll. Double-tap and
+ * hold, then drag, is a click-drag at the cursor (select text, drag a slider or scrollbar), the
+ * same gesture a laptop trackpad uses.
  *
  * Coordinates go through the same [DisplayMapping] the renderer drew with, so the click lands on
  * the pixel under the finger.
@@ -34,6 +36,13 @@ class TouchGestureMapper(
 ) {
     private val slop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
     private val longPressMs = ViewConfiguration.getLongPressTimeout().toLong()
+    private val doubleTapMs = ViewConfiguration.getDoubleTapTimeout().toLong()
+    private val doubleTapSlop = ViewConfiguration.get(context).scaledDoubleTapSlop.toFloat()
+    private var lastTapUpAt = 0L
+    private var lastTapX = 0f
+    private var lastTapY = 0f
+    /** Mouse mode: this touch came right after a tap, so moving it drags with the button held. */
+    private var secondTap = false
     private val handler = Handler(Looper.getMainLooper())
     private var downX = 0f
     private var downY = 0f
@@ -65,11 +74,14 @@ class TouchGestureMapper(
                 stopFling()
                 downX = event.x; downY = event.y; lastX = event.x; lastY = event.y
                 moved = false; longPressed = false; dragging = false; multi = false
+                secondTap = mode() == PointerMode.MOUSE && event.eventTime - lastTapUpAt < doubleTapMs &&
+                    hypot(event.x - lastTapX, event.y - lastTapY) < doubleTapSlop
                 handler.postDelayed(longPress, longPressMs)
             }
             MotionEvent.ACTION_POINTER_DOWN -> if (event.pointerCount == 2) {
                 multi = true
                 handler.removeCallbacks(longPress)
+                if (dragging && mode() == PointerMode.MOUSE) { target.releaseAtCursor(); dragging = false }
                 pinchStart = spread(event)
                 pinchApplied = 1f
                 lastX = midX(event); lastY = midY(event)
@@ -91,6 +103,9 @@ class TouchGestureMapper(
                         if (longPressed && mode() == PointerMode.TOUCH) {
                             dragging = true
                             toDisplay(downX, downY)?.let { (dx, dy) -> target.press(dx, dy) }
+                        } else if (secondTap && mode() == PointerMode.MOUSE) {
+                            dragging = true
+                            target.pressAtCursor()
                         }
                     }
                     if (moved && mode() == PointerMode.MOUSE) {
@@ -111,8 +126,12 @@ class TouchGestureMapper(
                 handler.removeCallbacks(longPress)
                 if (!multi && mode() == PointerMode.MOUSE) {
                     when {
+                        dragging -> target.releaseAtCursor()
                         longPressed && !moved -> target.clickAtCursor(BrowserInput.BUTTON_RIGHT)
-                        !moved -> target.clickAtCursor()
+                        !moved -> {
+                            target.clickAtCursor()
+                            lastTapUpAt = event.eventTime; lastTapX = event.x; lastTapY = event.y
+                        }
                     }
                 } else if (!multi) {
                     when {
@@ -125,11 +144,16 @@ class TouchGestureMapper(
                         }
                     }
                 }
+                dragging = false
                 velocity?.recycle(); velocity = null
             }
             MotionEvent.ACTION_CANCEL -> {
                 handler.removeCallbacks(longPress)
-                if (dragging) toDisplay(lastX, lastY)?.let { (dx, dy) -> target.release(dx, dy) }
+                if (dragging) {
+                    if (mode() == PointerMode.MOUSE) target.releaseAtCursor()
+                    else toDisplay(lastX, lastY)?.let { (dx, dy) -> target.release(dx, dy) }
+                }
+                dragging = false
                 velocity?.recycle(); velocity = null
             }
         }
