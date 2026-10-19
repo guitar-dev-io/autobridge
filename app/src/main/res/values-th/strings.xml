@@ -1778,7 +1778,7 @@
         <item quantity="other">มีรายการบำรุงรักษาที่ต้องดู %1$d รายการ</item>
     </plurals>
     <string name="youtube_sponsorblock_caveat">ฟีเจอร์นี้อาจไม่ทำงาน หรือทำงานไม่สมบูรณ์ ข้อมูลช่วงสปอนเซอร์มาจากอาสาสมัคร วิดีโอใหม่หรือที่คนดูน้อยมักไม่มีข้อมูล และช่วงที่ทำเครื่องหมายไว้อาจคลาดเคลื่อนเล็กน้อย การข้ามต้องใช้อินเทอร์เน็ต และทำงานเฉพาะในหน้า YouTube ของ AutoBridge เอง ถ้า YouTube เปลี่ยนเว็บไซต์ อาจใช้ไม่ได้จนกว่าจะอัปเดตแอป</string>
-    <string name="home_donate">☕ ค่าขนมกาแฟ</string>
+    <string name="home_donate">☕ เลี้ยงค่าขนมผู้พัฒนา</string>
     <string name="maint_compulsory_insurance">พ.ร.บ.</string>
     <string name="car_more_group_utilities">อรรถประโยชน์</string>
     <string name="fuel_edit">แก้ไข</string>
