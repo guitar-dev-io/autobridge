@@ -145,6 +145,22 @@ class CarHardwareWebWindow private constructor(
     }
 
     /**
+     * Adds the invisible focused IME editor ([CarImeInputView]) to the content layer so the real
+     * system keyboard can be raised over the projection. 1×1 and effectively invisible — Gboard
+     * floats over the page on its own; this view only owns the focus and the [android.view.inputmethod.InputConnection].
+     */
+    fun attachImeInput(view: View) {
+        if (view.parent === contentLayer) return
+        (view.parent as? ViewGroup)?.removeView(view)
+        contentLayer.addView(view, FrameLayout.LayoutParams(1, 1))
+    }
+
+    /** Removes the IME editor when the keyboard session ends. */
+    fun detachImeInput(view: View) {
+        contentLayer.removeView(view)
+    }
+
+    /**
      * Tears the window down. The page view is removed first so the caller can re-host it in a
      * replacement window instead of destroying it. Safe to call twice.
      */
