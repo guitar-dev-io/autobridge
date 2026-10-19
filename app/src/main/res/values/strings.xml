@@ -442,6 +442,8 @@
     <string name="browser_start_page_go">Go</string>
     <string name="browser_start_page_slot">Slot %1$d</string>
     <string name="car_browser_entry_label">AutoBridge Browser</string>
+    <string name="car_browser_start_continue">Continue</string>
+    <string name="car_browser_start_support_caption">Support the developer</string>
     <string name="projection_setup_browser_title">List AutoBridge Browser on Android Auto</string>
     <string name="projection_setup_browser_caption">On by default: the browser as its own Android Auto app, opening on the start page and typing with your phone\'s keyboard (Gboard), like AABrowser. Needs Android 15 or later and Unknown sources in Android Auto\'s developer settings. Reconnect Android Auto after changing.</string>
     <string name="browser_error_no_internet">No internet connection</string>
