@@ -501,7 +501,7 @@ class DuoScreenSettingsActivity : Activity() {
             }, LinearLayout.LayoutParams(-1, -2))
 
             // 5 preset mini-diagram chips in a row
-            addView(presetChipRow(selectedPreset), LinearLayout.LayoutParams(-1, -2).apply {
+            addView(presetChipRow(paneCount, selectedPreset), LinearLayout.LayoutParams(-1, -2).apply {
                 topMargin = dp(10)
             })
 
@@ -536,14 +536,14 @@ class DuoScreenSettingsActivity : Activity() {
         }
     }
 
-    /** A row of 5 preset mini-diagram chips. */
-    private fun presetChipRow(selected: DuoScreenPreset): View = LinearLayout(this).apply {
+    /** A row of 5 preset mini-diagram chips, each drawn for the current [paneCount]. */
+    private fun presetChipRow(paneCount: Int, selected: DuoScreenPreset): View = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
         DuoScreenPreset.entries.forEachIndexed { index, preset ->
             val active = preset == selected
             addView(
-                presetChip(preset, active),
+                presetChip(paneCount, preset, active),
                 LinearLayout.LayoutParams(0, -2, 1f).apply {
                     if (index > 0) marginStart = dp(6)
                 }
@@ -552,7 +552,7 @@ class DuoScreenSettingsActivity : Activity() {
     }
 
     /** One preset chip: a mini-diagram + label. Active uses accent border, inactive uses hairline. */
-    private fun presetChip(preset: DuoScreenPreset, active: Boolean): View {
+    private fun presetChip(paneCount: Int, preset: DuoScreenPreset, active: Boolean): View {
         val chipAccent = if (active) AutoBridgeDesign.ACCENT else AutoBridgeDesign.HAIRLINE
         val bgFill = if (active) AutoBridgeDesign.tint(AutoBridgeDesign.ACCENT, 0.12f) else AutoBridgeDesign.SURFACE_RAISED
         return LinearLayout(this).apply {
@@ -570,7 +570,7 @@ class DuoScreenSettingsActivity : Activity() {
             }
 
             // Mini diagram
-            addView(miniPresetDiagram(preset, active), LinearLayout.LayoutParams(dp(40), dp(28)))
+            addView(miniPresetDiagram(paneCount, preset, active), LinearLayout.LayoutParams(dp(40), dp(28)))
 
             // Label
             addView(TextView(this@DuoScreenSettingsActivity).apply {
@@ -585,91 +585,56 @@ class DuoScreenSettingsActivity : Activity() {
     }
 
     /**
-     * A small programmatic diagram of the preset's pane arrangement, drawn with nested views.
-     * Active diagrams use ACCENT fill; inactive use SURFACE_RAISED with HAIRLINE stroke.
+     * A small model of the preset's pane arrangement, positioned from the same geometry the car
+     * surface uses: [DuoScreenPreset.rects] for the selected [paneCount], so the diagram shows two
+     * or three tiles to match. Active tiles use ACCENT fill; inactive use SURFACE_RAISED with a
+     * HAIRLINE stroke. For picture-in-picture the floating tiles (rect index ≥ 1) keep the
+     * tinted/hairline accent fill and are drawn over pane 0.
+     *
+     * The rects are only known once the diagram has a measured size, so each tile is placed from a
+     * layout listener, mirroring [layoutPreview].
      */
-    private fun miniPresetDiagram(preset: DuoScreenPreset, active: Boolean): View {
+    private fun miniPresetDiagram(paneCount: Int, preset: DuoScreenPreset, active: Boolean): View {
         val rectFill = if (active) AutoBridgeDesign.ACCENT else AutoBridgeDesign.SURFACE_RAISED
         val rectStroke = if (active) AutoBridgeDesign.ACCENT else AutoBridgeDesign.HAIRLINE
+        val pipFill = if (active) AutoBridgeDesign.tint(AutoBridgeDesign.ACCENT, 0.6f) else AutoBridgeDesign.HAIRLINE
         val gap = dp(2)
-        return when (preset) {
-            DuoScreenPreset.EVEN_COLUMNS -> {
-                // Two equal vertical rectangles side by side
-                LinearLayout(this).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    addView(View(this@DuoScreenSettingsActivity).apply {
-                        background = AutoBridgeDesign.surface(this@DuoScreenSettingsActivity, rectFill, 4, rectStroke)
-                    }, LinearLayout.LayoutParams(0, -1, 1f))
-                    addView(View(this@DuoScreenSettingsActivity).apply {
-                        background = AutoBridgeDesign.surface(this@DuoScreenSettingsActivity, rectFill, 4, rectStroke)
-                    }, LinearLayout.LayoutParams(0, -1, 1f).apply { marginStart = gap })
-                }
-            }
-            DuoScreenPreset.WIDE_LEFT -> {
-                // Left 60%, right 40%
-                LinearLayout(this).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    addView(View(this@DuoScreenSettingsActivity).apply {
-                        background = AutoBridgeDesign.surface(this@DuoScreenSettingsActivity, rectFill, 4, rectStroke)
-                    }, LinearLayout.LayoutParams(0, -1, 3f))
-                    addView(View(this@DuoScreenSettingsActivity).apply {
-                        background = AutoBridgeDesign.surface(this@DuoScreenSettingsActivity, rectFill, 4, rectStroke)
-                    }, LinearLayout.LayoutParams(0, -1, 2f).apply { marginStart = gap })
-                }
-            }
-            DuoScreenPreset.WIDE_RIGHT -> {
-                // Left 40%, right 60%
-                LinearLayout(this).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    addView(View(this@DuoScreenSettingsActivity).apply {
-                        background = AutoBridgeDesign.surface(this@DuoScreenSettingsActivity, rectFill, 4, rectStroke)
-                    }, LinearLayout.LayoutParams(0, -1, 2f))
-                    addView(View(this@DuoScreenSettingsActivity).apply {
-                        background = AutoBridgeDesign.surface(this@DuoScreenSettingsActivity, rectFill, 4, rectStroke)
-                    }, LinearLayout.LayoutParams(0, -1, 3f).apply { marginStart = gap })
-                }
-            }
-            DuoScreenPreset.EVEN_ROWS -> {
-                // Two equal horizontal rectangles stacked
-                LinearLayout(this).apply {
-                    orientation = LinearLayout.VERTICAL
-                    addView(View(this@DuoScreenSettingsActivity).apply {
-                        background = AutoBridgeDesign.surface(this@DuoScreenSettingsActivity, rectFill, 4, rectStroke)
-                    }, LinearLayout.LayoutParams(-1, 0, 1f))
-                    addView(View(this@DuoScreenSettingsActivity).apply {
-                        background = AutoBridgeDesign.surface(this@DuoScreenSettingsActivity, rectFill, 4, rectStroke)
-                    }, LinearLayout.LayoutParams(-1, 0, 1f).apply { topMargin = gap })
-                }
-            }
-            DuoScreenPreset.STACKED_60_40 -> {
-                // Two horizontal rectangles stacked, the top one taller (3:2, which is 60:40)
-                LinearLayout(this).apply {
-                    orientation = LinearLayout.VERTICAL
-                    addView(View(this@DuoScreenSettingsActivity).apply {
-                        background = AutoBridgeDesign.surface(this@DuoScreenSettingsActivity, rectFill, 4, rectStroke)
-                    }, LinearLayout.LayoutParams(-1, 0, 3f))
-                    addView(View(this@DuoScreenSettingsActivity).apply {
-                        background = AutoBridgeDesign.surface(this@DuoScreenSettingsActivity, rectFill, 4, rectStroke)
-                    }, LinearLayout.LayoutParams(-1, 0, 2f).apply { topMargin = gap })
-                }
-            }
-            DuoScreenPreset.PICTURE_IN_PICTURE -> {
-                // Full rect with a small rect in the bottom-right corner
-                FrameLayout(this).apply {
-                    addView(View(this@DuoScreenSettingsActivity).apply {
-                        background = AutoBridgeDesign.surface(this@DuoScreenSettingsActivity, rectFill, 4, rectStroke)
-                    }, FrameLayout.LayoutParams(-1, -1))
-                    // Small PIP tile in the bottom-right
-                    val pipFill = if (active) AutoBridgeDesign.tint(AutoBridgeDesign.ACCENT, 0.6f) else AutoBridgeDesign.HAIRLINE
-                    addView(View(this@DuoScreenSettingsActivity).apply {
-                        background = AutoBridgeDesign.surface(this@DuoScreenSettingsActivity, pipFill, 3, rectStroke)
-                    }, FrameLayout.LayoutParams(dp(14), dp(10), Gravity.BOTTOM or Gravity.END).apply {
-                        marginEnd = dp(2)
-                        bottomMargin = dp(2)
-                    })
-                }
+        val frame = FrameLayout(this)
+        val tiles = List(paneCount) { index ->
+            val isPip = preset == DuoScreenPreset.PICTURE_IN_PICTURE && index >= 1
+            val radius = if (isPip) 3 else 4
+            View(this).apply {
+                background = AutoBridgeDesign.surface(
+                    this@DuoScreenSettingsActivity,
+                    if (isPip) pipFill else rectFill,
+                    radius,
+                    rectStroke
+                )
             }
         }
+        tiles.forEach { frame.addView(it, FrameLayout.LayoutParams(0, 0)) }
+        var placedWidth = -1
+        frame.addOnLayoutChangeListener { view, left, top, right, bottom, _, _, _, _ ->
+            val width = right - left - view.paddingLeft - view.paddingRight
+            val height = bottom - top - view.paddingTop - view.paddingBottom
+            if (width <= 0 || height <= 0 || width == placedWidth) return@addOnLayoutChangeListener
+            placedWidth = width
+            val rects = preset.rects(paneCount, DuoScreenLayout.Bounds(width, height))
+            view.post {
+                rects.forEachIndexed { index, rect ->
+                    tiles.getOrNull(index)?.layoutParams = FrameLayout.LayoutParams(
+                        (rect.width - 2 * gap).coerceAtLeast(1),
+                        (rect.height - 2 * gap).coerceAtLeast(1)
+                    ).apply {
+                        leftMargin = rect.left + gap
+                        topMargin = rect.top + gap
+                    }
+                }
+                // Picture-in-picture tiles sit over pane 0: keep the later panes on top.
+                tiles.drop(1).forEach { it.bringToFront() }
+            }
+        }
+        return frame
     }
 
     /** A row of 4 content-scale percentage chips. */
