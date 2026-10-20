@@ -486,7 +486,6 @@
     <string name="car_history_clear_confirm_message">หน้าที่เข้าชมทั้งหมดจะถูกลบ และย้อนกลับไม่ได้</string>
     <string name="car_recent_clear_confirm_message">กิจกรรมล่าสุดทั้งหมดจะถูกลบ และย้อนกลับไม่ได้</string>
     <string name="car_history_edit">ลบรายการ</string>
-    <string name="car_history_done">เสร็จสิ้น</string>
     <string name="car_start_clear_recent_title">ล้างหน้าล่าสุดหรือไม่</string>
     <string name="history_clear_confirm_message">ล้างคำสั่งล่าสุดทั้งหมดหรือไม่</string>
     <string name="history_remove_entry">ลบ %1$s</string>

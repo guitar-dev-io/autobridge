@@ -472,7 +472,7 @@ fun CommandHistoryScreen(context: android.content.Context, onBack: () -> Unit) {
                             modifier = Modifier.size(48.dp).semantics {
                                 contentDescription = context.getString(R.string.history_remove_entry, entry.label)
                             }
-                        ) { Text("⌫", color = TextMuted, fontSize = 16.sp) }
+                        ) { Text("✕", color = TextMuted, fontSize = 16.sp) }
                     }
                 }
             }
