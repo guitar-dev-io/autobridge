@@ -51,15 +51,18 @@ object RecentActivityStore {
         if (entry.title.isBlank()) return
         val current = list(context).toMutableList()
         // De-duplicate on (kind, data|title) so repeating an action just refreshes its position/time.
-        val dedupeKey = "${entry.kind}:${entry.data ?: entry.title}"
-        current.removeAll { "${it.kind}:${it.data ?: it.title}" == dedupeKey }
+        val key = dedupeKey(entry)
+        current.removeAll { dedupeKey(it) == key }
         current.add(0, entry)
         while (current.size > MAX_ENTRIES) current.removeAt(current.size - 1)
         persist(context, current)
     }
 
-    fun list(context: Context, limit: Int = MAX_ENTRIES): List<Entry> {
-        val raw = prefs(context).getString(KEY_ENTRIES, null) ?: return emptyList()
+    fun list(context: Context, limit: Int = MAX_ENTRIES): List<Entry> =
+        decode(prefs(context).getString(KEY_ENTRIES, null)).take(limit)
+
+    internal fun decode(raw: String?): List<Entry> {
+        if (raw == null) return emptyList()
         return runCatching {
             val array = JSONArray(raw)
             (0 until array.length()).mapNotNull { index ->
@@ -74,8 +77,20 @@ object RecentActivityStore {
                     origin = runCatching { Origin.valueOf(obj.optString("origin")) }.getOrNull()
                 )
             }
-        }.getOrDefault(emptyList()).take(limit)
+        }.getOrDefault(emptyList())
     }
+
+    fun remove(context: Context, entry: Entry) {
+        val remaining = without(list(context), entry)
+        if (remaining.isEmpty()) clear(context) else persist(context, remaining)
+    }
+
+    internal fun without(entries: List<Entry>, entry: Entry): List<Entry> {
+        val key = dedupeKey(entry)
+        return entries.filterNot { dedupeKey(it) == key }
+    }
+
+    private fun dedupeKey(entry: Entry) = "${entry.kind}:${entry.data ?: entry.title}"
 
     fun clear(context: Context) {
         prefs(context).edit { remove(KEY_ENTRIES) }
@@ -123,7 +138,7 @@ object RecentActivityStore {
         }
     }
 
-    private fun persist(context: Context, entries: List<Entry>) {
+    internal fun encode(entries: List<Entry>): String {
         val array = JSONArray()
         entries.forEach { entry ->
             array.put(
@@ -137,7 +152,11 @@ object RecentActivityStore {
                 }
             )
         }
-        prefs(context).edit { putString(KEY_ENTRIES, array.toString()) }
+        return array.toString()
+    }
+
+    private fun persist(context: Context, entries: List<Entry>) {
+        prefs(context).edit { putString(KEY_ENTRIES, encode(entries)) }
     }
 
     private fun prefs(context: Context) =

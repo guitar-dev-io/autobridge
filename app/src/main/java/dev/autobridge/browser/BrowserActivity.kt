@@ -47,6 +47,7 @@ import dev.autobridge.design.DesignTokens
 import dev.autobridge.entertainment.BrowserLauncher
 import dev.autobridge.entertainment.ContentAddress
 import dev.autobridge.entertainment.WebBookmarkStore
+import dev.autobridge.entertainment.WebHistoryEntry
 import dev.autobridge.entertainment.WebHistoryStore
 import dev.autobridge.i18n.AppLocale
 import dev.autobridge.remote.CarScreenController
@@ -1882,6 +1883,8 @@ class BrowserActivity : Activity() {
                 web.clearFormData()
                 web.clearHistory()
                 WebHistoryStore.clear(this)
+                BrowserDefaults.forgetLastUrl(this)
+                BrowserTabStore.clear(this)
                 toast(getString(R.string.browser_data_cleared))
             }
             .setNegativeButton(R.string.action_cancel, null)
@@ -1928,21 +1931,59 @@ class BrowserActivity : Activity() {
     private fun showHistory() {
         val visited = WebHistoryStore.list(this).toMutableList()
         if (visited.isEmpty()) { toast(getString(R.string.browser_no_history)); return }
-        val adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, visited.map { it.title }.toMutableList())
-        val dialog = AlertDialog.Builder(this).setTitle(R.string.browser_history_title)
-            .setAdapter(adapter) { _, i -> navigate(visited[i].url) }
-            .setNeutralButton(R.string.browser_history_clear_all) { _, _ ->
-                WebHistoryStore.clear(this)
-                toast(getString(R.string.browser_history_cleared))
+        lateinit var dialog: AlertDialog
+        lateinit var adapter: ArrayAdapter<WebHistoryEntry>
+        val removeAt = { i: Int ->
+            WebHistoryStore.remove(this, visited[i].url)
+            visited.removeAt(i)
+            adapter.notifyDataSetChanged()
+            if (visited.isEmpty()) dialog.dismiss()
+        }
+        adapter = object : ArrayAdapter<WebHistoryEntry>(this, android.R.layout.simple_list_item_1, visited) {
+            override fun getView(position: Int, convertView: View?, parent: android.view.ViewGroup): View {
+                val row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+                val title = TextView(context).apply {
+                    text = visited[position].title
+                    textSize = 16f
+                    maxLines = 2
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                    setPadding(16.dp(), 12.dp(), 8.dp(), 12.dp())
+                }
+                val remove = TextView(context).apply {
+                    text = "\u2715"
+                    textSize = 18f
+                    gravity = Gravity.CENTER
+                    minWidth = 48.dp()
+                    minHeight = 48.dp()
+                    contentDescription = getString(R.string.action_delete)
+                    setOnClickListener { removeAt(position) }
+                }
+                row.addView(title, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                row.addView(remove, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+                return row
             }
+        }
+        dialog = AlertDialog.Builder(this).setTitle(R.string.browser_history_title)
+            .setAdapter(adapter) { _, i -> navigate(visited[i].url) }
+            .setNeutralButton(R.string.browser_history_clear_all, null)
             .setNegativeButton(R.string.action_close, null)
             .create()
         dialog.show()
+        // Overridden after show() so the confirm sits on top of the list instead of closing it.
+        dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener {
+            AlertDialog.Builder(this)
+                .setTitle(R.string.browser_history_clear_all)
+                .setMessage(R.string.browser_history_clear_confirm)
+                .setPositiveButton(R.string.action_clear) { _, _ ->
+                    WebHistoryStore.clear(this)
+                    toast(getString(R.string.browser_history_cleared))
+                    dialog.dismiss()
+                }
+                .setNegativeButton(R.string.action_cancel, null)
+                .show()
+        }
         dialog.listView.setOnItemLongClickListener { _, _, i, _ ->
-            WebHistoryStore.remove(this, visited[i].url)
-            visited.removeAt(i)
-            adapter.remove(adapter.getItem(i))
-            if (visited.isEmpty()) dialog.dismiss()
+            removeAt(i)
             true
         }
     }

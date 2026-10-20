@@ -35,6 +35,8 @@ object CarStartPage {
     private const val GO = "$BASE/go"
     private const val SUPPORT = "$BASE/support"
     private const val DESKTOP = "$BASE/desktop"
+    private const val FORGET = "$BASE/forget"
+    private const val CLEAR_RECENT = "$BASE/clear-recent"
 
     private const val QUICK_LINK_LIMIT = 12
     private const val RECENT_LIMIT = 4
@@ -63,6 +65,10 @@ object CarStartPage {
         val supportAction: String,
         val desktop: String,
         val recent: String = "",
+        val clear: String = "",
+        val clearRecentTitle: String = "",
+        val cancel: String = "",
+        val remove: String = "",
     )
 
     /**
@@ -77,6 +83,16 @@ object CarStartPage {
             URL -> html(startHtml(texts(context), quickLinks(context), desktopAvailable, recent = recentPages(context)))
             GO -> html(redirectHtml(target(context, url)))
             SUPPORT -> html(supportHtml(texts(context), supportChannels(context)))
+            FORGET -> {
+                url.getQueryParameter("u")?.let { WebHistoryStore.remove(context, it) }
+                html(redirectHtml(URL))
+            }
+            CLEAR_RECENT -> if (url.getQueryParameter("confirm") == "1") {
+                WebHistoryStore.clear(context)
+                html(redirectHtml(URL))
+            } else {
+                html(clearRecentHtml(texts(context)))
+            }
             else -> if (isInternal(path)) html(redirectHtml(URL)) else null
         }
     }
@@ -112,6 +128,10 @@ object CarStartPage {
         supportAction = context.getString(R.string.car_browser_start_support_caption),
         desktop = context.getString(R.string.car_web_open_browser),
         recent = context.getString(R.string.browser_start_page_recent),
+        clear = context.getString(R.string.action_clear),
+        clearRecentTitle = context.getString(R.string.car_start_clear_recent_title),
+        cancel = context.getString(R.string.action_cancel),
+        remove = context.getString(R.string.action_delete),
     )
 
     private fun quickLinks(context: Context): List<QuickLink> =
@@ -197,13 +217,26 @@ object CarStartPage {
         append("</div></section>")
 
         // Recent pages, then the saved sites, as the phone start page orders them.
+        // Only the car renderer can answer the forget / clear routes, so desktop pages get no controls.
+        val editable = searchPrefix == null
         for ((heading, tiles) in listOf(t.recent to recent, t.quickLinks to links)) {
             if (tiles.isEmpty()) continue
-            append("<h3>").append(esc(heading)).append("</h3><div class=\"tiles\">")
+            val isRecent = tiles === recent
+            if (isRecent && editable) {
+                append("<div class=\"h3-row\"><h3>").append(esc(heading)).append("</h3><a class=\"clear\" href=\"")
+                    .append(CLEAR_RECENT).append("\">").append(esc(t.clear)).append("</a></div><div class=\"tiles\">")
+            } else {
+                append("<h3>").append(esc(heading)).append("</h3><div class=\"tiles\">")
+            }
             tiles.forEach { link ->
+                if (isRecent && editable) append("<div class=\"tile-wrap\">")
                 append("<a class=\"tile\" href=\"").append(esc(link.url)).append("\"><span class=\"badge\" style=\"background:")
                     .append(cssColor(link.color)).append("\">").append(esc(link.badge)).append("</span><span class=\"t\">")
                     .append(esc(link.title)).append("</span><span class=\"h\">").append(esc(link.host)).append("</span></a>")
+                if (isRecent && editable) {
+                    append("<a class=\"forget\" href=\"").append(FORGET).append("?u=")
+                        .append(esc(java.net.URLEncoder.encode(link.url, "UTF-8"))).append("\" aria-label=\"").append(esc(t.remove)).append("\">✕</a></div>")
+                }
             }
             append("</div>")
         }
@@ -213,6 +246,14 @@ object CarStartPage {
             append("/^[a-z][a-z0-9+.-]*:\\/\\//i.test(q)?q:/^[^\\s\\/]+\\.[a-z]{2,}(\\/\\S*)?$/i.test(q)?'https://'+q:")
             append(org.json.JSONObject.quote(searchPrefix)).append("+encodeURIComponent(q)}return false}</script>")
         }
+    })
+
+    /** Asks before the Recent pages are wiped; the car WebView has no confirm() handler. */
+    fun clearRecentHtml(t: Texts): String = page(t.clearRecentTitle, buildString {
+        append("<header><h1>").append(esc(t.clearRecentTitle)).append("</h1></header>")
+        append("<div class=\"actions center\"><a class=\"pill\" href=\"").append(CLEAR_RECENT).append("?confirm=1\">")
+            .append(esc(t.clear)).append("</a><a class=\"pill ghost\" href=\"").append(URL).append("\">")
+            .append(esc(t.cancel)).append("</a></div>")
     })
 
     /** The support channels' QR codes, for a passenger to scan from the head unit. */
@@ -298,7 +339,14 @@ height:58px;padding:0 26px;border-radius:999px}
 .pill.ghost{background:$RAISED;color:$TEXT;border:1px solid $HAIRLINE}
 h3{font-size:16px;font-weight:600;letter-spacing:2px;color:$MUTED;margin:0 4px 14px}
 .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:16px}
-.tiles+h3{margin-top:26px}
+.tiles+h3,.tiles+.h3-row{margin-top:26px}
+.h3-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.h3-row h3{margin:0 4px}
+.clear{color:$ACCENT;text-decoration:none;font-weight:700;font-size:18px;min-height:44px;display:inline-flex;align-items:center;padding:0 14px}
+.tile-wrap{position:relative;min-width:0;display:flex}
+.tile-wrap .tile{flex:1}
+.forget{position:absolute;top:4px;right:4px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:$MUTED;text-decoration:none;font-size:20px}
+.actions.center{justify-content:center}
 .tile{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;background:$SURFACE;border:1px solid $HAIRLINE;
 border-radius:24px;padding:18px 10px 16px;text-decoration:none;color:inherit;min-width:0}
 .badge{width:64px;height:64px;border-radius:18px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:24px;margin-bottom:6px}

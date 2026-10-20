@@ -16,6 +16,11 @@ class CarStartPageTest {
         supportMessage = "Thanks",
         supportAction = "Support the developer",
         desktop = "Open browser",
+        recent = "Recent",
+        clear = "Clear",
+        clearRecentTitle = "Clear recent pages?",
+        cancel = "Cancel",
+        remove = "Delete",
     )
 
     @Test fun theStartPageHasTheSearchFormSupportCardAndQuickLinks() {
@@ -79,5 +84,38 @@ class CarStartPageTest {
         assertFalse(CarStartPage.isInternal("https://www.google.com/"))
         assertFalse(CarStartPage.isInternal(null))
         assertEquals("&amp;&lt;&gt;&quot;&#39;", CarStartPage.esc("&<>\"'"))
+    }
+
+    @Test fun recentTilesCarryAForgetLinkAndASectionClearLink() {
+        val recent = CarStartPage.QuickLink("Site", "https://a.example/?q=1&b=2", "a.example", "S", 0)
+        val html = CarStartPage.startHtml(texts, emptyList(), desktopAvailable = false, recent = listOf(recent))
+        assertTrue(html.contains("href=\"https://${CarStartPage.HOST}/autobridge/forget?u=https%3A%2F%2Fa.example%2F%3Fq%3D1%26b%3D2\""))
+        assertTrue(html.contains("href=\"https://${CarStartPage.HOST}/autobridge/clear-recent\""))
+    }
+
+    @Test fun noRecentTilesMeansNoClearLink() {
+        val html = CarStartPage.startHtml(texts, emptyList(), desktopAvailable = false)
+        assertFalse(html.contains("clear-recent"))
+        assertFalse(html.contains("autobridge/forget"))
+    }
+
+    @Test fun theDesktopPageHasNoForgetOrClearLinks() {
+        val recent = CarStartPage.QuickLink("Site", "https://a.example/", "a.example", "S", 0)
+        val html = CarStartPage.startHtml(texts, emptyList(), desktopAvailable = false,
+            searchPrefix = "https://www.google.com/search?q=", recent = listOf(recent))
+        assertFalse(html.contains("clear-recent"))
+        assertFalse(html.contains("autobridge/forget"))
+    }
+
+    @Test fun theClearConfirmationOffersClearAndCancel() {
+        val html = CarStartPage.clearRecentHtml(texts)
+        assertTrue(html.contains("clear-recent?confirm=1"))
+        assertTrue(html.contains(">Clear<"))
+        assertTrue(html.contains(">Cancel<"))
+    }
+
+    @Test fun theNewRoutesAreInternalSoTheyAreNeverRecorded() {
+        assertTrue(CarStartPage.isInternal("https://${CarStartPage.HOST}/autobridge/forget?u=x"))
+        assertTrue(CarStartPage.isInternal("https://${CarStartPage.HOST}/autobridge/clear-recent"))
     }
 }

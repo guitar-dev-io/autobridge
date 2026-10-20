@@ -1137,6 +1137,7 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         glyph: String,
         label: String,
         detail: String? = null,
+        onRemove: (() -> Unit)? = null,
         onClick: () -> Unit,
     ): LinearLayout {
         val text = LinearLayout(this).apply {
@@ -1187,6 +1188,24 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
                 text,
                 LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
             )
+            if (onRemove != null) {
+                // An explicit button: a head unit's touch input has no long-press to rely on.
+                addView(
+                    TextView(this@ProjectionBrowserActivity).apply {
+                        this.text = "\u2715"
+                        setTextColor(scheme.textSecondary)
+                        textSize = 20f
+                        gravity = Gravity.CENTER
+                        minWidth = 48.dp()
+                        minHeight = 48.dp()
+                        contentDescription = getString(R.string.action_delete)
+                        isClickable = true
+                        isFocusable = true
+                        setOnClickListener { onRemove() }
+                    },
+                    LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+                )
+            }
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
             ).apply { topMargin = 6.dp() }
@@ -1372,6 +1391,8 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
             sideView?.clearHistory()
         }
         WebHistoryStore.clear(this)
+        BrowserDefaults.forgetLastUrl(this)
+        BrowserTabStore.clear(this)
         tabStates.clear()
         updateNav()
     }
@@ -1400,12 +1421,30 @@ class ProjectionBrowserActivity : CarActivity(), CarScreenController.BrowserTarg
         val entries = WebHistoryStore.list(this)
         showOverlay(getString(R.string.car_browser_history_title)) {
             if (entries.isEmpty()) addView(emptyRow(R.string.car_browser_history_empty))
+            else addView(menuRow("⌫", getString(R.string.browser_history_clear_all)) { confirmClearHistory() })
             entries.forEach { entry ->
-                addView(menuRow("↺", entry.title.ifBlank { entry.url }, BrowserDisplayUrl.compact(entry.url)) {
+                addView(menuRow(
+                    "↺", entry.title.ifBlank { entry.url }, BrowserDisplayUrl.compact(entry.url),
+                    onRemove = {
+                        WebHistoryStore.remove(this@ProjectionBrowserActivity, entry.url)
+                        openHistory()
+                    }
+                ) {
                     dismissOverlay()
                     webView?.loadUrl(entry.url)
                 })
             }
+        }
+    }
+
+    /** The sheet has no AlertDialog, so the confirmation is a sheet of its own. */
+    private fun confirmClearHistory() {
+        showOverlay(getString(R.string.browser_history_clear_confirm)) {
+            addView(menuRow("⌫", getString(R.string.action_clear)) {
+                WebHistoryStore.clear(this@ProjectionBrowserActivity)
+                openHistory()
+            })
+            addView(menuRow("✕", getString(R.string.action_cancel)) { openHistory() })
         }
     }
 

@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -410,12 +411,34 @@ fun ControlScreen(
 @Composable
 fun CommandHistoryScreen(context: android.content.Context, onBack: () -> Unit) {
     val history by CommandHistoryStore.entries.collectAsState()
+    var confirmClear by remember { mutableStateOf(false) }
+    if (confirmClear) {
+        AlertDialog(
+            onDismissRequest = { confirmClear = false },
+            containerColor = ComposeTokens.Surface,
+            title = { Text(stringResource(R.string.history_clear), color = TextPrimary) },
+            text = { Text(stringResource(R.string.history_clear_confirm_message), color = TextMuted) },
+            confirmButton = {
+                TextButton(onClick = {
+                    CommandHistoryStore.clear(context)
+                    confirmClear = false
+                }) { Text(stringResource(R.string.action_clear), color = ComposeTokens.Danger) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmClear = false }) {
+                    Text(stringResource(R.string.action_cancel), color = ComposeTokens.Accent)
+                }
+            }
+        )
+    }
     Column(Modifier.fillMaxSize().background(ComposeTokens.Ink)) {
         PhoneHeader(
             title = stringResource(R.string.history_title),
             subtitle = stringResource(R.string.history_subtitle),
             onBack = onBack,
-            action = HeaderButton("⌫", stringResource(R.string.history_clear)) { CommandHistoryStore.clear(context) }
+            action = HeaderButton("⌫", stringResource(R.string.history_clear)) {
+                if (history.isNotEmpty()) confirmClear = true
+            }
         )
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState())
@@ -444,6 +467,12 @@ fun CommandHistoryScreen(context: android.content.Context, onBack: () -> Unit) {
                             modifier = Modifier.padding(start = 10.dp).weight(1f)
                         )
                         Text(formatTime(entry.timestamp), color = TextMuted, fontSize = 12.sp)
+                        IconButton(
+                            onClick = { CommandHistoryStore.remove(context, entry) },
+                            modifier = Modifier.size(48.dp).semantics {
+                                contentDescription = context.getString(R.string.history_remove_entry, entry.label)
+                            }
+                        ) { Text("⌫", color = TextMuted, fontSize = 16.sp) }
                     }
                 }
             }

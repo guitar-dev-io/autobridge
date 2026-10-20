@@ -18,6 +18,8 @@ import dev.autobridge.core.state.RecentActivityStore
  * [AgentCommandRouter] for browser URLs / media / mirror), so no business logic is duplicated here.
  */
 class CarRecentScreen(carContext: CarContext) : Screen(carContext) {
+    private var deleteMode = false
+
 
     override fun onGetTemplate(): Template {
         val entries = RecentActivityStore.list(carContext)
@@ -31,14 +33,33 @@ class CarRecentScreen(carContext: CarContext) : Screen(carContext) {
         return ListTemplate.Builder()
             .setHeader(
                 Header.Builder()
-                    .setTitle(carContext.getString(R.string.car_recent_title))
+                    .setTitle(
+                        carContext.getString(if (deleteMode) R.string.car_history_edit else R.string.car_recent_title)
+                    )
                     .setStartHeaderAction(Action.BACK)
+                    .addEndHeaderAction(
+                        Action.Builder()
+                            .setIcon(CarIcons.of(carContext, if (deleteMode) CarIcons.DONE else CarIcons.EDIT))
+                            .setOnClickListener {
+                                deleteMode = !deleteMode
+                                invalidate()
+                            }
+                            .build()
+                    )
                     .addEndHeaderAction(
                         Action.Builder()
                             .setIcon(CarIcons.of(carContext, CarIcons.CLEAR))
                             .setOnClickListener {
-                                RecentActivityStore.clear(carContext)
-                                invalidate()
+                                screenManager.push(
+                                    CarConfirmClearScreen(
+                                        carContext,
+                                        R.string.car_history_clear_confirm_title,
+                                        R.string.car_recent_clear_confirm_message
+                                    ) {
+                                        RecentActivityStore.clear(carContext)
+                                        invalidate()
+                                    }
+                                )
                             }
                             .build()
                     )
@@ -53,7 +74,14 @@ class CarRecentScreen(carContext: CarContext) : Screen(carContext) {
         val subtitle = listOfNotNull(entry.subtitle, age.takeIf { it.isNotBlank() }).joinToString("  •  ")
         val builder = Row.Builder().setTitle(entry.title)
         if (subtitle.isNotBlank()) builder.addText(subtitle)
-        builder.setOnClickListener { resume(entry) }
+        builder.setOnClickListener {
+            if (deleteMode) {
+                RecentActivityStore.remove(carContext, entry)
+                invalidate()
+            } else {
+                resume(entry)
+            }
+        }
         return builder.build()
     }
 

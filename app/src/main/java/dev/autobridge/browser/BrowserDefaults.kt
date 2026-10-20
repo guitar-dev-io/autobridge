@@ -232,6 +232,12 @@ object BrowserDefaults {
     fun hasLastUrl(context: Context): Boolean = context
         .getSharedPreferences("autobridge_browser", Context.MODE_PRIVATE).contains("last_url")
 
+    /** Drops the saved last page, so a cold start falls back to [HOME]. */
+    fun forgetLastUrl(context: Context) {
+        context.getSharedPreferences("autobridge_browser", Context.MODE_PRIVATE)
+            .edit().remove("last_url").apply()
+    }
+
     fun remember(context: Context, url: String) {
         // The car's start page only exists inside the car renderer; the phone could not open it.
         if (CarStartPage.isInternal(url)) return

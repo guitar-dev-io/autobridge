@@ -1,5 +1,6 @@
 package dev.autobridge.browser
 
+import android.app.AlertDialog
 import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Color
@@ -81,8 +82,7 @@ object BrowserStartPage {
         val grid = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
         val recentGrid = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
 
-        val recent = WebHistoryStore.list(context).take(RECENT_COUNT)
-        val recentSpecs = recent.map { entry ->
+        fun recentSpecsNow() = WebHistoryStore.list(context).take(RECENT_COUNT).map { entry ->
             CardSpec(
                 label = entry.title,
                 host = hostOf(entry.url),
@@ -93,6 +93,8 @@ object BrowserStartPage {
                 url = entry.url,
             )
         }
+        var recentSpecs = recentSpecsNow()
+        var recentHeader: View? = null
         val shortcutSpecs = DEFAULT_START_PAGE_SHORTCUTS.mapIndexed { index, shortcut ->
             CardSpec(
                 label = shortcut.label,
@@ -153,8 +155,26 @@ object BrowserStartPage {
             })
         }
 
-        if (recent.isNotEmpty()) {
-            column.addView(
+        var columns = -1
+        fun refillRecent() {
+            recentSpecs = recentSpecsNow()
+            if (recentSpecs.isEmpty()) {
+                recentHeader?.visibility = View.GONE
+                recentGrid.visibility = View.GONE
+                recentGrid.removeAllViews()
+            } else if (columns > 0) {
+                fillGrid(recentGrid, context, sizes, columns, recentSpecs, onSubmit, onDelete = { spec ->
+                    WebHistoryStore.remove(context, spec.url)
+                    refillRecent()
+                })
+            }
+        }
+        if (recentSpecs.isNotEmpty()) {
+            val header = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+            header.addView(
                 TextView(context).apply {
                     text = context.getString(R.string.browser_start_page_recent)
                     setTextColor(BrowserTheme.textPrimary)
@@ -162,6 +182,35 @@ object BrowserStartPage {
                     setTypeface(typeface, Typeface.BOLD)
                     setPadding(sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP / 2f), 0, 0, 0)
                 },
+                LinearLayout.LayoutParams(0, -2, 1f)
+            )
+            header.addView(
+                TextView(context).apply {
+                    text = context.getString(R.string.browser_start_page_recent_clear)
+                    setTextColor(BrowserTheme.accent)
+                    textSize = spFor(context, HOST_TEXT_DP + 2f)
+                    gravity = Gravity.CENTER
+                    minimumHeight = sizes.dpInt(MIN_TOUCH_DP)
+                    minimumWidth = sizes.dpInt(MIN_TOUCH_DP)
+                    isClickable = true
+                    isFocusable = true
+                    setOnClickListener {
+                        AlertDialog.Builder(context)
+                            .setTitle(R.string.browser_history_clear_all)
+                            .setMessage(R.string.browser_history_clear_confirm)
+                            .setPositiveButton(R.string.action_clear) { _, _ ->
+                                WebHistoryStore.clear(context)
+                                refillRecent()
+                            }
+                            .setNegativeButton(R.string.action_cancel, null)
+                            .show()
+                    }
+                },
+                LinearLayout.LayoutParams(-2, -2)
+            )
+            recentHeader = header
+            column.addView(
+                header,
                 LinearLayout.LayoutParams(-1, -2).apply {
                     bottomMargin = sizes.dpInt(AutoUiSizes.CONTENT_GAP_DP)
                 }
@@ -191,7 +240,6 @@ object BrowserStartPage {
 
         // Laid out once from the display so the first frame is already right, then re-flowed below
         // against the width the page is really given (split pane, rotation, a car display).
-        var columns = -1
         var sidePadding = -1
         var lastWidth = -1
         fun apply(width: Int) {
@@ -204,7 +252,7 @@ object BrowserStartPage {
             columns = fit
             column.setPadding(side, column.paddingTop, side, column.paddingBottom)
             fillGrid(grid, context, sizes, fit, shortcutSpecs, onSubmit)
-            if (recent.isNotEmpty()) fillGrid(recentGrid, context, sizes, fit, recentSpecs, onSubmit)
+            refillRecent()
         }
         column.setPadding(0, sizes.dpInt(TOP_PADDING_DP), 0, sizes.dpInt(SIDE_PADDING_DP))
         apply(context.resources.displayMetrics.widthPixels)
@@ -249,6 +297,7 @@ object BrowserStartPage {
         columns: Int,
         specs: List<CardSpec>,
         onSubmit: (String) -> Unit,
+        onDelete: ((CardSpec) -> Unit)? = null,
     ) {
         grid.removeAllViews()
         val gap = sizes.dpInt(CARD_GAP_DP)
@@ -256,7 +305,7 @@ object BrowserStartPage {
             val row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
             for (index in 0 until columns) {
                 val cell = items.getOrNull(index)
-                    ?.let { spec -> linkCard(context, sizes, spec) { onSubmit(spec.url) } }
+                    ?.let { spec -> linkCard(context, sizes, spec, onDelete?.let { delete -> { delete(spec) } }) { onSubmit(spec.url) } }
                     ?: View(context)
                 row.addView(
                     cell,
@@ -350,6 +399,7 @@ object BrowserStartPage {
         context: Context,
         sizes: AutoUiSizes,
         spec: CardSpec,
+        onDelete: (() -> Unit)? = null,
         onTap: () -> Unit,
     ): View {
         val chipSize = sizes.dpInt(CHIP_DP)
@@ -397,6 +447,20 @@ object BrowserStartPage {
                 }
             }
         }
+        val remove = onDelete?.let { delete ->
+            TextView(context).apply {
+                text = "\u2715"
+                setTextColor(BrowserTheme.textSecondary)
+                textSize = spFor(context, LABEL_TEXT_DP)
+                gravity = Gravity.CENTER
+                minimumWidth = sizes.dpInt(MIN_TOUCH_DP)
+                minimumHeight = sizes.dpInt(MIN_TOUCH_DP)
+                isClickable = true
+                isFocusable = true
+                contentDescription = context.getString(R.string.action_delete)
+                setOnClickListener { delete() }
+            }
+        }
         val face = GradientDrawable().apply {
             setColor(BrowserTheme.sheetCardBackground)
             cornerRadius = sizes.dp(CARD_CORNER_DP)
@@ -418,6 +482,7 @@ object BrowserStartPage {
             if (badge != null) {
                 addView(badge, LinearLayout.LayoutParams(-2, -2).apply { gravity = Gravity.TOP })
             }
+            if (remove != null) addView(remove, LinearLayout.LayoutParams(-2, -2))
             setOnClickListener { onTap() }
         }
     }
@@ -533,6 +598,7 @@ object BrowserStartPage {
 
     /** How many most-recent pages the Recent section shows. */
     private const val RECENT_COUNT = 4
+    private const val MIN_TOUCH_DP = 40f
 
     /** Ceiling on the page's content width, so a wide display centres it rather than stretching it. */
     private const val CONTENT_MAX_WIDTH_DP = 900f

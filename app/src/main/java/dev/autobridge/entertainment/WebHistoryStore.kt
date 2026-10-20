@@ -29,8 +29,19 @@ object WebHistoryStore {
         persist(context, current)
     }
 
-    fun list(context: Context): List<WebHistoryEntry> {
-        val raw = prefs(context).getString(KEY_ITEMS, null) ?: return emptyList()
+    fun list(context: Context): List<WebHistoryEntry> =
+        decode(prefs(context).getString(KEY_ITEMS, null))
+
+    fun remove(context: Context, url: String) {
+        persist(context, without(list(context), url))
+    }
+
+    fun clear(context: Context) {
+        prefs(context).edit { remove(KEY_ITEMS) }
+    }
+
+    internal fun decode(raw: String?): List<WebHistoryEntry> {
+        if (raw == null) return emptyList()
         return runCatching {
             val array = JSONArray(raw)
             (0 until array.length()).mapNotNull { index ->
@@ -41,15 +52,7 @@ object WebHistoryStore {
         }.getOrDefault(emptyList())
     }
 
-    fun remove(context: Context, url: String) {
-        persist(context, list(context).filterNot { it.url == url })
-    }
-
-    fun clear(context: Context) {
-        prefs(context).edit { remove(KEY_ITEMS) }
-    }
-
-    private fun persist(context: Context, entries: List<WebHistoryEntry>) {
+    internal fun encode(entries: List<WebHistoryEntry>): String {
         val array = JSONArray()
         entries.forEach { entry ->
             array.put(
@@ -60,7 +63,14 @@ object WebHistoryStore {
                 }
             )
         }
-        prefs(context).edit { putString(KEY_ITEMS, array.toString()) }
+        return array.toString()
+    }
+
+    internal fun without(entries: List<WebHistoryEntry>, url: String): List<WebHistoryEntry> =
+        entries.filterNot { it.url == url }
+
+    private fun persist(context: Context, entries: List<WebHistoryEntry>) {
+        prefs(context).edit { putString(KEY_ITEMS, encode(entries)) }
     }
 
     private fun prefs(context: Context) =

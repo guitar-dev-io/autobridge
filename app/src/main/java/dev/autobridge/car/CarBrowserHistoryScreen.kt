@@ -16,6 +16,7 @@ import dev.autobridge.entertainment.WebHistoryStore
 /** Returns a selection to the browser, paginated the same way as [CarBrowserBookmarksScreen]. */
 class CarBrowserHistoryScreen(carContext: CarContext) : Screen(carContext) {
     private var page = 0
+    private var deleteMode = false
 
     override fun onGetTemplate(): Template {
         val items = ItemList.Builder().setNoItemsMessage(carContext.getString(R.string.car_browser_history_empty))
@@ -36,8 +37,13 @@ class CarBrowserHistoryScreen(carContext: CarContext) : Screen(carContext) {
                         }
                     )
                     .setOnClickListener {
-                        setResult(entry.url)
-                        screenManager.pop()
+                        if (deleteMode) {
+                            WebHistoryStore.remove(carContext, entry.url)
+                            invalidate()
+                        } else {
+                            setResult(entry.url)
+                            screenManager.pop()
+                        }
                     }
                     .build()
             )
@@ -49,15 +55,36 @@ class CarBrowserHistoryScreen(carContext: CarContext) : Screen(carContext) {
         return ListTemplate.Builder()
             .setHeader(
                 Header.Builder()
-                    .setTitle(carContext.getString(R.string.car_browser_history_title))
+                    .setTitle(
+                        carContext.getString(
+                            if (deleteMode) R.string.car_history_edit else R.string.car_browser_history_title
+                        )
+                    )
                     .setStartHeaderAction(Action.BACK)
+                    .addEndHeaderAction(
+                        Action.Builder()
+                            .setIcon(CarIcons.of(carContext, if (deleteMode) CarIcons.DONE else CarIcons.EDIT))
+                            .setOnClickListener {
+                                deleteMode = !deleteMode
+                                invalidate()
+                            }
+                            .build()
+                    )
                     .addEndHeaderAction(
                         Action.Builder()
                             .setIcon(CarIcons.of(carContext, CarIcons.CLEAR))
                             .setOnClickListener {
-                                WebHistoryStore.clear(carContext)
-                                page = 0
-                                invalidate()
+                                screenManager.push(
+                                    CarConfirmClearScreen(
+                                        carContext,
+                                        R.string.car_history_clear_confirm_title,
+                                        R.string.car_history_clear_confirm_message
+                                    ) {
+                                        WebHistoryStore.clear(carContext)
+                                        page = 0
+                                        invalidate()
+                                    }
+                                )
                             }
                             .build()
                     )

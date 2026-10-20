@@ -55,6 +55,18 @@ object CommandHistoryStore {
         prefs(context).edit { remove(KEY_ITEMS) }
     }
 
+    /** Drops one entry (matched on command id + timestamp), leaving the others in order. */
+    fun remove(context: Context, entry: Entry) {
+        val updated = without(_entries.value, entry)
+        _entries.value = updated
+        if (updated.isEmpty()) prefs(context).edit { remove(KEY_ITEMS) } else persist(context, updated)
+    }
+
+    internal fun without(list: List<Entry>, entry: Entry): List<Entry> {
+        val index = list.indexOfFirst { it.commandId == entry.commandId && it.timestamp == entry.timestamp }
+        return if (index < 0) list else list.filterIndexed { i, _ -> i != index }
+    }
+
     private fun labelFor(context: Context, command: AutoBridgeCommand, result: CommandResult): String {
         val res = context.resources
         val base = when (command.type) {
@@ -94,8 +106,10 @@ object CommandHistoryStore {
         return runCatching { android.net.Uri.parse(raw).host ?: raw }.getOrDefault(raw)
     }
 
-    private fun load(context: Context): List<Entry> {
-        val raw = prefs(context).getString(KEY_ITEMS, null) ?: return emptyList()
+    private fun load(context: Context): List<Entry> = decode(prefs(context).getString(KEY_ITEMS, null))
+
+    internal fun decode(raw: String?): List<Entry> {
+        if (raw == null) return emptyList()
         return runCatching {
             val array = JSONArray(raw)
             (0 until array.length()).mapNotNull { index ->
@@ -114,7 +128,7 @@ object CommandHistoryStore {
         }.getOrDefault(emptyList())
     }
 
-    private fun persist(context: Context, items: List<Entry>) {
+    internal fun encode(items: List<Entry>): String {
         val array = JSONArray()
         items.forEach { entry ->
             array.put(
@@ -128,7 +142,11 @@ object CommandHistoryStore {
                 }
             )
         }
-        prefs(context).edit { putString(KEY_ITEMS, array.toString()) }
+        return array.toString()
+    }
+
+    private fun persist(context: Context, items: List<Entry>) {
+        prefs(context).edit { putString(KEY_ITEMS, encode(items)) }
     }
 
     private fun prefs(context: Context) =
