@@ -1448,6 +1448,8 @@ class CarWebRenderer(context: Context) {
             sideView?.clearHistory()
         }
         WebHistoryStore.clear(appContext)
+        BrowserDefaults.forgetLastUrl(appContext)
+        BrowserTabStore.clear(appContext)
         tabStates.clear()
     }
 
