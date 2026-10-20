@@ -19,6 +19,7 @@ import android.widget.SeekBar
 import android.widget.Switch
 import android.widget.TextView
 import dev.autobridge.R
+import dev.autobridge.browser.CappedScrollView
 import dev.autobridge.browser.CarMenuList
 import dev.autobridge.design.DesignTokens
 import dev.autobridge.media.AudioEffectsService
@@ -56,21 +57,11 @@ class AudioEffectsSheet(private val context: Context) {
 
     fun show() {
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
-        dialog.setContentView(ScrollView(context).apply { addView(content) })
+        dialog.setContentView(CappedScrollView(context).apply { addView(content) })
         dialog.window?.apply {
             setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
             setGravity(Gravity.BOTTOM)
             setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-        }
-        // Cap the sheet at 90% of the screen so a scrim gap is always left above it; the outer
-        // ScrollView takes the overflow so the band sliders stay reachable. Attached once here
-        // (not in render(), which runs on every preset tap) to avoid stacking duplicate clamps.
-        content.addOnLayoutChangeListener { _, _, top, _, bottom, _, _, _, _ ->
-            val max = (context.resources.displayMetrics.heightPixels * SHEET_MAX_HEIGHT_FRACTION).toInt()
-            if (bottom - top > max && content.layoutParams.height != max) {
-                content.layoutParams.height = max
-                content.requestLayout()
-            }
         }
         render()
         dialog.show()
@@ -344,8 +335,6 @@ class AudioEffectsSheet(private val context: Context) {
     }
 
     private companion object {
-        /** Stop the sheet at 90% of the screen height so it leaves a scrim gap at the top. */
-        const val SHEET_MAX_HEIGHT_FRACTION = 0.90f
         // The radio design's EQ sheet palette.
         const val SHEET = DesignTokens.Radio.SHEET
         const val HANDLE = DesignTokens.Radio.HANDLE

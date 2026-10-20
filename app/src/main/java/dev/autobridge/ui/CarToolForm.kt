@@ -18,6 +18,7 @@ import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import dev.autobridge.browser.CappedLinearLayout
 import dev.autobridge.browser.CarMenuList
 import dev.autobridge.ui.AutoBridgeDesign.dp
 import java.text.DateFormat
@@ -281,7 +282,7 @@ class CarToolForm(
         build(saveLabel, danger, onSave)
 
     private fun build(saveLabel: String?, danger: Pair<String, () -> Unit>?, onSave: (() -> String?)?) {
-        val sheet = LinearLayout(activity).apply {
+        val sheet = CappedLinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(activity.dp(20), activity.dp(10), activity.dp(20), activity.dp(16))
             background = AutoBridgeDesign.surface(activity, AutoBridgeDesign.SURFACE, 24, Color.TRANSPARENT).apply {
@@ -347,16 +348,6 @@ class CarToolForm(
         // Drag the grab handle down to dismiss; the whole sheet follows the finger. Reused from the
         // browser package (same :app module) so every sheet dismisses with the same feel.
         CarMenuList.dragToClose(grabHandle, sheet) { d.dismiss() }
-        // Cap the sheet at 90% of the screen so a scrim gap is always left above it; the fields
-        // ScrollView (weight 1f) absorbs the overflow, so the pill row and danger action stay
-        // visible. WRAP_CONTENT keeps SOFT_INPUT_ADJUST_RESIZE shrinking the sheet for the keyboard.
-        sheet.addOnLayoutChangeListener { _, _, top, _, bottom, _, _, _, _ ->
-            val max = (activity.resources.displayMetrics.heightPixels * SHEET_MAX_HEIGHT_FRACTION).toInt()
-            if (bottom - top > max && sheet.layoutParams.height != max) {
-                sheet.layoutParams.height = max
-                sheet.requestLayout()
-            }
-        }
         dialog = d
         d.show()
     }
@@ -387,8 +378,4 @@ class CarToolForm(
     private fun boxBackground(focused: Boolean) =
         AutoBridgeDesign.surface(activity, AutoBridgeDesign.SURFACE_RAISED, 12, if (focused) accent else AutoBridgeDesign.HAIRLINE)
 
-    private companion object {
-        /** Stop the sheet at 90% of the screen height so it leaves a scrim gap at the top. */
-        const val SHEET_MAX_HEIGHT_FRACTION = 0.90f
-    }
 }

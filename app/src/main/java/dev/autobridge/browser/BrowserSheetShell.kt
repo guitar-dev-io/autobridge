@@ -36,14 +36,6 @@ internal class BrowserSheetShell(
 ) {
     private var dialog: Dialog? = null
 
-    private companion object {
-        /**
-         * Phone sheets stop at 90% of the screen height so they never butt against the top edge,
-         * leaving a visible scrim gap above that still dismisses on tap. Inner content scrolls
-         * (via the shell's ScrollView) once it exceeds this ceiling.
-         */
-        const val SHEET_MAX_HEIGHT_FRACTION = 0.90f
-    }
 
     private val fontScale = AutoUiSizes.clampFontScale(activity.resources.configuration.fontScale)
 
@@ -139,19 +131,11 @@ internal class BrowserSheetShell(
             // Drag the grip down to dismiss; the content column follows the finger and the inner
             // ScrollView is told to let the drag through (see CarMenuList.dragToClose).
             CarMenuList.dragToClose(handle, content) { dismiss() }
-            // Cap the panel at 90% of the screen so a scrim gap is always left above it; the
-            // outer ScrollView takes the overflow when the content is taller than the ceiling.
-            content.addOnLayoutChangeListener { _, _, top, _, bottom, _, _, _, _ ->
-                val max = (activity.resources.displayMetrics.heightPixels * SHEET_MAX_HEIGHT_FRACTION).toInt()
-                if (bottom - top > max && content.layoutParams.height != max) {
-                    content.layoutParams.height = max
-                    content.requestLayout()
-                }
-            }
         }
         dialog = Dialog(activity, android.R.style.Theme_Translucent_NoTitleBar).apply {
             requestWindowFeature(Window.FEATURE_NO_TITLE)
-            setContentView(ScrollView(activity).apply {
+            // Only the phone sheets (those with a grip) are capped; the car menu keeps its old sizing.
+            setContentView((if (handle != null) CappedScrollView(activity) else ScrollView(activity)).apply {
                 isFillViewport = true
                 setPadding(margin, 0, margin, margin)
                 clipToPadding = false
