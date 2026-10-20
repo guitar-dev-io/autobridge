@@ -84,11 +84,13 @@ object CarStartPage {
             GO -> html(redirectHtml(target(context, url)))
             SUPPORT -> html(supportHtml(texts(context), supportChannels(context)))
             FORGET -> {
-                url.getQueryParameter("u")?.let { WebHistoryStore.remove(context, it) }
+                if (mayMutate(request.isForMainFrame, request.hasGesture())) {
+                    url.getQueryParameter("u")?.let { WebHistoryStore.remove(context, it) }
+                }
                 html(redirectHtml(URL))
             }
             CLEAR_RECENT -> if (url.getQueryParameter("confirm") == "1") {
-                WebHistoryStore.clear(context)
+                if (mayMutate(request.isForMainFrame, request.hasGesture())) WebHistoryStore.clear(context)
                 html(redirectHtml(URL))
             } else {
                 html(clearRecentHtml(texts(context)))
@@ -96,6 +98,13 @@ object CarStartPage {
             else -> if (isInternal(path)) html(redirectHtml(URL)) else null
         }
     }
+
+    /**
+     * Whether a request may change stored history: only a tap on one of the page's own links
+     * (a main-frame navigation with a user gesture). Subresources a loaded site embeds, such as an
+     * image or script pointing at these addresses, are refused so a page cannot clear history itself.
+     */
+    internal fun mayMutate(isMainFrame: Boolean, hasGesture: Boolean): Boolean = isMainFrame && hasGesture
 
     /**
      * The same page for the desktop browsers (Chrome, Brave), as files their Linux system holds:

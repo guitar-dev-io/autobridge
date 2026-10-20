@@ -118,4 +118,12 @@ class CarStartPageTest {
         assertTrue(CarStartPage.isInternal("https://${CarStartPage.HOST}/autobridge/forget?u=x"))
         assertTrue(CarStartPage.isInternal("https://${CarStartPage.HOST}/autobridge/clear-recent"))
     }
+
+    @Test
+    fun historyChangesNeedAMainFrameTapOnTheStartPage() {
+        assertTrue(CarStartPage.mayMutate(isMainFrame = true, hasGesture = true))
+        assertFalse(CarStartPage.mayMutate(isMainFrame = false, hasGesture = true))
+        assertFalse(CarStartPage.mayMutate(isMainFrame = true, hasGesture = false))
+        assertFalse(CarStartPage.mayMutate(isMainFrame = false, hasGesture = false))
+    }
 }
