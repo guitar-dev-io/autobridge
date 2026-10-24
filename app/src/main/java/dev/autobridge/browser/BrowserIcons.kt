@@ -62,4 +62,10 @@ enum class BrowserIcon(@DrawableRes val resId: Int) {
     LOCK(R.drawable.ic_browser_lock),
     WARNING(R.drawable.ic_browser_warning),
     CHEVRON_RIGHT(R.drawable.ic_browser_chevron_right),
+    /** Keyboard keys (Material Symbols, 960 viewport). */
+    KBD_SHIFT(R.drawable.ic_kbd_shift),
+    KBD_BACKSPACE(R.drawable.ic_kbd_backspace),
+    KBD_HIDE(R.drawable.ic_kbd_hide),
+    KBD_CURSOR_LEFT(R.drawable.ic_kbd_cursor_left),
+    KBD_CURSOR_RIGHT(R.drawable.ic_kbd_cursor_right),
 }

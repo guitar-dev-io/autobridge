@@ -148,6 +148,27 @@ class BrowserTextBuffer(initial: String = "", selectAll: Boolean = false) {
         collapseTo(at)
     }
 
+    /**
+     * Moves the cursor one user-perceived character toward [dir] (< 0 left, > 0 right): a Thai
+     * consonant with its vowel and tone mark, or an emoji, is one step, as a desktop caret moves.
+     * With a selection, the move collapses it to the side it moves toward, like [moveCursor].
+     */
+    fun moveCursorByGrapheme(dir: Int) {
+        if (dir == 0) return
+        if (hasSelection) {
+            collapseTo(if (dir < 0) minOf(selectionStart, selectionEnd) else maxOf(selectionStart, selectionEnd))
+            return
+        }
+        val boundaries = java.text.BreakIterator.getCharacterInstance()
+        boundaries.setText(text)
+        val at = when {
+            dir < 0 && cursor > 0 -> boundaries.preceding(cursor)
+            dir > 0 && cursor < text.length -> boundaries.following(cursor)
+            else -> cursor
+        }
+        collapseTo(if (at == java.text.BreakIterator.DONE) cursor else at)
+    }
+
     /** Puts the cursor at [index] (a tap in the field), snapped off the middle of a surrogate pair. */
     fun setCursor(index: Int) {
         var at = index.coerceIn(0, text.length)

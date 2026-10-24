@@ -89,7 +89,7 @@ class EngineStore(context: Context) {
 
     /** Scroll and trackpad speed multiplier. */
     var touchSensitivity: Float
-        get() = prefs.getFloat("touch_sensitivity", 1f)
+        get() = prefs.getFloat("touch_sensitivity", 1f).coerceAtMost(1f)
         set(value) { prefs.edit().putFloat("touch_sensitivity", value).apply() }
 
     /** The last car page size and scale, so a start on launch opens at the car's size. */

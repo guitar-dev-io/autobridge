@@ -135,6 +135,26 @@ class FrameRenderer {
         done.await(1, TimeUnit.SECONDS)
     }
 
+    /**
+     * Detaches only if [v] is still the target, so a viewer that was paused after the car screen
+     * took the renderer over does not blank the car's surface. Returns whether it detached.
+     */
+    fun detachView(v: DesktopView): Boolean {
+        val done = CountDownLatch(1)
+        var detached = false
+        handler.post {
+            if (view === v) {
+                surface = null
+                view = null
+                mapping = null
+                detached = true
+            }
+            done.countDown()
+        }
+        done.await(1, TimeUnit.SECONDS)
+        return detached
+    }
+
     fun requestFrame() {
         handler.post {
             if (framePending) return@post

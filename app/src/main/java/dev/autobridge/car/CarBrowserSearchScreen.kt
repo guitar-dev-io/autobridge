@@ -23,6 +23,11 @@ class CarBrowserSearchScreen(
     carContext: CarContext,
     private val initialQuery: String,
     private val field: Field? = null,
+    /**
+     * Called with the whole text after every change, while the user types: the desktop browser
+     * types it into the page live. Null (the built-in browser) only keeps it for the button.
+     */
+    private val onTextChanged: ((String) -> Unit)? = null,
 ) : Screen(carContext) {
 
     /** The page field being filled: what the page calls it, and its input type. */
@@ -35,6 +40,7 @@ class CarBrowserSearchScreen(
             object : SearchTemplate.SearchCallback {
                 override fun onSearchTextChanged(searchText: String) {
                     pendingText = searchText
+                    onTextChanged?.invoke(searchText)
                 }
 
                 override fun onSearchSubmitted(searchText: String) {

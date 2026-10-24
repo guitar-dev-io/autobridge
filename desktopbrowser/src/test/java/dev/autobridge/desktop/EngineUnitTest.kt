@@ -139,6 +139,17 @@ class EngineUnitTest {
         assertEquals(3_689_632, header.pixelOffset + header.pixelBytes) // the real file's size
     }
 
+    @Test fun carScaleIsWidthAwareAndClamped() {
+        // Portrait ~1576 wide: width factor 1576/1250 = 1.26 beats dpi 190/160 = 1.19.
+        assertEquals(1.26f, DesktopEngine.carScale(190, 1576), 0.01f)
+        // Wide landscape: 1920/1250 = 1.54 beats dpi 160/160 = 1.0.
+        assertEquals(1.54f, DesktopEngine.carScale(160, 1920), 0.01f)
+        // Narrow surface stays at the 1.0 floor.
+        assertEquals(1.0f, DesktopEngine.carScale(160, 800), 0.01f)
+        // High dpi × wide clamps to the 2.0 ceiling.
+        assertEquals(2.0f, DesktopEngine.carScale(400, 1200), 0.01f)
+    }
+
     @Test fun keysymsForText() {
         assertEquals('a'.code, Keysym.forCodePoint('a'.code))
         assertEquals(Keysym.RETURN, Keysym.forCodePoint('\n'.code))

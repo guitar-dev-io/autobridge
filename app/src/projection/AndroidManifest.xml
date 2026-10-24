@@ -123,6 +123,17 @@
             android:label="@string/settings_desktop_browser"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode"
             android:windowSoftInputMode="adjustNothing|stateHidden" />
+        <!-- The phone's keyboard for Chrome on the car (the car rail's "Phone" keyboard choice),
+             opened from a notification. Not exported, no intent filter: only that PendingIntent
+             starts it. Its own task (taskAffinity + singleTask, out of Recents), so Done never
+             resumes a phone viewer left behind, which would take the car's frames. -->
+        <activity android:name="dev.autobridge.projection.desktop.DesktopPhoneKeyboardActivity"
+            android:exported="false"
+            android:label="@string/desktop_keyboard_companion_title"
+            android:taskAffinity="dev.autobridge.desktopkeyboard"
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true"
+            android:windowSoftInputMode="stateAlwaysVisible|adjustResize" />
         <!-- The desktop browser as a Multi-app pane: the same viewer, started on a pane's display by
              the shell user (Shizuku) or root (am start on the pane display). exported so that
              launch can reach it; INTERACT_ACROSS_USERS_FULL so nothing else can, as no ordinary
@@ -132,6 +143,31 @@
             android:targetActivity="dev.autobridge.projection.desktop.DesktopBrowserActivity"
             android:exported="true"
             android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+        <!-- "AutoBridge Chrome": the desktop browser viewer as its own Android Auto launcher entry,
+             like AutoBridge Browser above, so Android Auto runs DesktopBrowserActivity as a real
+             window on the car display and the phone's keyboard (showSoftInput) types into Chrome.
+             Declared disabled: a second default car icon would clutter Android Auto, so Settings >
+             Bridge Web on Android Auto > "List AutoBridge Chrome" enables it at runtime, and
+             scripts/check-car-entries.py fails CI if it is ever listed by default. The activity
+             reads its name (DesktopCarEntry.NAME) to apply the parked-only gate. Separate from the
+             permission-guarded DesktopBrowserPane alias. Sideload flavors only: Play rejects a
+             CAR_LAUNCHER activity beside the car.application meta-data (see the main manifest). -->
+        <activity-alias android:name="dev.autobridge.projection.desktop.DesktopBrowserCarEntry"
+            android:targetActivity="dev.autobridge.projection.desktop.DesktopBrowserActivity"
+            android:enabled="false"
+            android:exported="true"
+            android:label="@string/desktop_car_entry_label"
+            android:icon="@mipmap/ic_browser_launcher">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.CAR_LAUNCHER" />
+                <category android:name="androidx.car.app.category.NAVIGATION" />
+                <category android:name="android.intent.category.APP_MAPS" />
+            </intent-filter>
+            <meta-data android:name="distractionOptimized" android:value="true" />
+            <meta-data android:name="android.max_aspect" android:value="5.0" />
+        </activity-alias>
         <service android:name="dev.autobridge.projection.desktop.DesktopBrowserCarAppService"
             android:enabled="false"
             android:exported="true"

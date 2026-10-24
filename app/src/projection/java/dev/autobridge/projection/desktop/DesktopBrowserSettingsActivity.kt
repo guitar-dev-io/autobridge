@@ -351,7 +351,7 @@ class DesktopBrowserSettingsActivity : Activity() {
 
         section(getString(R.string.desktop_prefs_sensitivity), getString(R.string.desktop_prefs_sensitivity_caption))
         val sens = store.touchSensitivity
-        card.addView(stepper("%.2f×".format(java.util.Locale.US, sens),
+        card.addView(stepper("${Math.round(sens * 100)}%",
             canDown = sens > DesktopEngine.SENSITIVITY_MIN + 0.01f,
             canUp = sens < DesktopEngine.SENSITIVITY_MAX - 0.01f,
         ) { delta ->

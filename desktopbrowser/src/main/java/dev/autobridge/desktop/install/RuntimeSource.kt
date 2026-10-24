@@ -33,12 +33,20 @@ object RuntimeSource {
      * Packages every browser shares, installed once with the runtime. Xvfb is the display server,
      * PulseAudio the audio bridge's source; Thai fonts because the UI and most of this app's users
      * read Thai. Everything else a browser needs comes in as that browser's own dependencies.
+     *
+     * Noto core + CJK + color emoji so pages in other scripts (Japanese, Chinese, Korean, Arabic,
+     * Devanagari…) and emoji do not render as boxes: 75 MB download, 142 MB installed. The full
+     * `fonts-noto*` set is 302 MB / 791 MB and 2,530 faces for the same visible result on common
+     * pages, and slowed Chrome's start more (measured on a phone, 2026-10-20).
      */
-    val BASE_PACKAGES = listOf("xvfb", "pulseaudio", "ca-certificates", "fonts-thai-tlwg", "fonts-liberation")
+    val BASE_PACKAGES = listOf(
+        "xvfb", "pulseaudio", "ca-certificates", "fonts-thai-tlwg", "fonts-liberation",
+        "fonts-noto-core", "fonts-noto-cjk", "fonts-noto-color-emoji",
+    )
 
-    /** Measured in an arm64 container from this exact image: rootfs + base packages = 538 MB. */
-    const val ESTIMATED_INSTALLED_BYTES = 540L * 1024 * 1024
+    /** Rootfs + base packages: 538 MB measured in an arm64 container, plus 142 MB of Noto fonts. */
+    const val ESTIMATED_INSTALLED_BYTES = 685L * 1024 * 1024
 
     /** Free space required before starting: installed size plus room for apt's archive cache. */
-    const val REQUIRED_FREE_BYTES = 900L * 1024 * 1024
+    const val REQUIRED_FREE_BYTES = 1100L * 1024 * 1024
 }

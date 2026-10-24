@@ -16,6 +16,8 @@ import dev.autobridge.desktop.install.RuntimeInstaller
 import dev.autobridge.desktop.install.RuntimeSource
 import dev.autobridge.desktop.install.SafeFiles
 import dev.autobridge.desktop.install.VerifiedDownloader
+import dev.autobridge.desktop.keyboard.KeyboardInputBridge
+import dev.autobridge.desktop.runtime.GuestDnsWatcher
 import dev.autobridge.desktop.runtime.LinuxRuntime
 import dev.autobridge.desktop.runtime.RuntimeLayout
 import dev.autobridge.desktop.session.DesktopSession
@@ -59,6 +61,9 @@ object DesktopEngine {
     val session: StateFlow<DesktopSession?> = _session
 
     @Volatile private var initialized = false
+
+    /** Rewrites the guest's resolv.conf on default-network changes while a session exists. */
+    private val dnsWatcher by lazy { GuestDnsWatcher(appContext, layout.rootfs) }
 
     /**
      * The browsers' start page as file name to markup, set by the app (the page is built from its
@@ -211,6 +216,7 @@ object DesktopEngine {
             !existing.tooSmallFor(viewWidth, viewHeight) && kotlin.math.abs(existing.scale - effective) < 0.1f
         ) {
             existing.fitTo(viewWidth, viewHeight)
+            dnsWatcher.start()
             return existing
         }
         val restore = existing != null && existing.adapter.id == id
@@ -220,8 +226,10 @@ object DesktopEngine {
         val screen = maxOf(MIN_SCREEN, viewWidth, viewHeight).let { (it + 1) and 1.inv() }
         val session = DesktopSession(appContext, runtime, adapter, screen, effective, restore, scale, store.touchSensitivity)
         _session.value = session
+        KeyboardInputBridge.fireReset()
         setBrowser(id, state(id).copy(state = InstallState.RUNNING))
         session.start(startUrl, viewWidth, viewHeight)
+        dnsWatcher.start()
         return session
     }
 
@@ -266,7 +274,7 @@ object DesktopEngine {
     const val ZOOM_MIN = 50
     const val ZOOM_MAX = 200
     const val SENSITIVITY_MIN = 0.5f
-    const val SENSITIVITY_MAX = 3f
+    const val SENSITIVITY_MAX = 1f
 
     /**
      * The phone shows a desktop-sized page: the long side is about [PHONE_LONG_SIDE] display
@@ -278,9 +286,17 @@ object DesktopEngine {
         return (surfaceWidth / k).toInt() to (surfaceHeight / k).toInt()
     }
 
-    /** Car screens are drawn 1:1; the scale comes from the head unit's dpi. */
-    fun carScale(dpi: Int): Float = (dpi / 160f).coerceIn(1f, 2f)
+    /**
+     * Car screens are drawn 1:1; the base scale comes from the head unit's dpi, but a wide (or
+     * tall-portrait) surface also needs a bigger scale so the page lays out near [TARGET_CSS_WIDTH]
+     * CSS pixels instead of a cramped ~1500+ px desktop width with tiny text. CSS layout width =
+     * [surfaceWidth] / scale, so the larger of the two factors wins. Landscape only ever gets a
+     * larger scale than dpi alone, so it never gets worse. Clamped to a sane desktop range.
+     */
+    fun carScale(dpi: Int, surfaceWidth: Int): Float =
+        maxOf(dpi / 160f, surfaceWidth / TARGET_CSS_WIDTH).coerceIn(1f, 2f)
 
+    private const val TARGET_CSS_WIDTH = 1250f
     private const val PHONE_LONG_SIDE = 1600
     private const val MIN_SCREEN = 1600
 
@@ -308,6 +324,8 @@ object DesktopEngine {
     fun stopSession() {
         val current = _session.value ?: return
         _session.value = null
+        KeyboardInputBridge.fireReset()
+        dnsWatcher.stop()
         current.stop()
         setBrowser(current.adapter.id, state(current.adapter.id).copy(state = InstallState.READY))
     }

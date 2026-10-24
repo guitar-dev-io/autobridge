@@ -31,6 +31,7 @@
     <string name="desktop_rail_reload">Reload</string>
     <string name="desktop_rail_new_tab">New tab</string>
     <string name="desktop_rail_zoom">Page zoom</string>
+    <string name="desktop_rail_zoom_reset">Reset</string>
     <string name="desktop_rail_keyboard">Keyboard</string>
     <string name="desktop_rail_keyboard_autobridge">AutoBridge</string>
     <string name="desktop_rail_keyboard_car">Car\'s</string>
@@ -40,4 +41,11 @@
     <string name="desktop_rail_hide_never">Stay open</string>
     <string name="desktop_rail_close">Close the browser</string>
     <string name="desktop_rail_drag">Drag</string>
+    <string name="desktop_rail_text">Text</string>
+    <string name="desktop_rail_tab">Tab</string>
+    <string name="desktop_rail_esc">Esc</string>
+    <string name="desktop_rail_select_all">All</string>
+    <string name="desktop_rail_copy">Copy</string>
+    <string name="desktop_rail_paste">Paste</string>
+    <string name="desktop_rail_keyboard_phone">Phone\'s</string>
 </resources>

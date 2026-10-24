@@ -65,4 +65,17 @@
     <string name="desktop_prefs_sensitivity_caption">ระยะที่หน้าเว็บเลื่อนและเคอร์เซอร์เมาส์ขยับต่อการลากนิ้ว</string>
     <string name="desktop_prefs_zoom">ขนาดการแสดงผล: %1$s</string>
     <string name="desktop_prefs_zoom_caption">ขนาดหน้าเว็บและแถบเครื่องมือของเบราว์เซอร์ เปลี่ยนแล้วเบราว์เซอร์จะเริ่มใหม่โดยเก็บแท็บไว้</string>
+    <string name="desktop_car_entry_label">AutoBridge Chrome</string>
+    <string name="projection_setup_desktop_title">แสดง AutoBridge Chrome บน Android Auto</string>
+    <string name="projection_setup_desktop_caption">ปิดไว้ตามค่าเริ่มต้น: Chrome เดสก์ท็อปเป็นแอปแยกบน Android Auto ให้คีย์บอร์ดของมือถือขึ้นที่หน้าจอรถและพิมพ์ลงใน Chrome ได้ ใช้ได้ตอนจอดเท่านั้น ต้องใช้ Android 15 ขึ้นไป และเปิด Unknown sources ในการตั้งค่านักพัฒนาของ Android Auto เปลี่ยนแล้วให้เชื่อมต่อ Android Auto ใหม่</string>
+    <string name="desktop_keyboard_no_vehicle_state">ต้องเปิด AutoBridge บนจอรถเพื่อยืนยันว่าจอดอยู่ก่อนจึงจะพิมพ์ได้</string>
+    <string name="desktop_keyboard_no_session">เบราว์เซอร์เดสก์ท็อปไม่ได้เปิดอยู่บนจอรถ</string>
+    <string name="desktop_keyboard_paste_too_long">ข้อความยาวเกินกว่าจะวางได้</string>
+    <string name="desktop_keyboard_phone_open_notification">เปิดการแจ้งเตือนบนมือถือเพื่อพิมพ์</string>
+    <string name="desktop_keyboard_phone_notifications_off">เปิดการแจ้งเตือนของ AutoBridge บนมือถือก่อนจึงจะพิมพ์ด้วยคีย์บอร์ดของมือถือได้</string>
+    <string name="desktop_keyboard_companion_title">พิมพ์ลง Chrome บนจอรถ</string>
+    <string name="desktop_keyboard_companion_done">เสร็จ</string>
+    <string name="desktop_keyboard_channel">การพิมพ์บนจอรถ</string>
+    <string name="desktop_keyboard_notification_text">แตะเพื่อพิมพ์ลง Chrome บนจอรถด้วยคีย์บอร์ดของมือถือนี้</string>
+    <string name="desktop_keyboard_input_description">ช่องรับการพิมพ์ของเบราว์เซอร์เดสก์ท็อป</string>
 </resources>

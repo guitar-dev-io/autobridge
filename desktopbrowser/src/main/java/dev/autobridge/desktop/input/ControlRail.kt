@@ -30,7 +30,8 @@ import kotlin.math.min
  *    collapses after any action (Drag included, so its pan reaches the page), or [hideDelayMs]
  *    after the last touch; a scroll while it is open keeps it up instead of moving the page under it.
  *  - **More**: a second sheet beside the panel for what is used less: forward, reload, new tab,
- *    zoom, the keyboard choice (car only), how soon the panel collapses, and close (phone only).
+ *    zoom, the Text row (Tab, Esc, select all, copy, paste), the keyboard choice (car only), how
+ *    soon the panel collapses, and close (phone only).
  *    It never collapses by itself: it closes on a choice that leaves it or a tap outside.
  *
  * The host only reports taps, so every control is a tap target sized for a car, and the whole
@@ -45,8 +46,10 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
 
     /** What a tap asked for. Mode switches and the collapse delay are handled inside the rail. */
     enum class Action {
-        BACK, ADDRESS, KEYBOARD, FORWARD, RELOAD, NEW_TAB, ZOOM_OUT, ZOOM_IN,
-        KEYBOARD_AUTOBRIDGE, KEYBOARD_CAR, MODE_CHANGED, CLOSE,
+        BACK, ADDRESS, KEYBOARD, FORWARD, RELOAD, NEW_TAB, ZOOM_OUT, ZOOM_IN, RESET_ZOOM,
+        KEYBOARD_AUTOBRIDGE, KEYBOARD_CAR, KEYBOARD_PHONE, MODE_CHANGED, CLOSE,
+        /** The More sheet's Text row: keys and clipboard shortcuts for the focused field. */
+        TAB, ESCAPE, SELECT_ALL, COPY, PASTE,
         /** Mouse mode: hold the left button down ([dragHeld] is now true). */
         DRAG_START,
         /** Mouse mode: let it go ([dragHeld] is now false). */
@@ -76,9 +79,10 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
             if (!value) state = State.COLLAPSED
         }
 
-    /** Car only: the keyboard row in More (AutoBridge's keyboard or the car's). */
+    /** Car only: the keyboard row in More (AutoBridge's keyboard, the car's or the phone's). */
     @Volatile var showKeyboardChoice = false
-    @Volatile var useCarKeyboard = false
+    /** The selected keyboard segment: 0 AutoBridge, 1 the car's, 2 the phone's. */
+    @Volatile var keyboardChoice = 0
 
     /** Phone only: a Close button in More, as the old menu had. */
     @Volatile var showClose = false
@@ -115,6 +119,19 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
     private val text = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
     private val leftText = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.LEFT }
 
+    // Labels of the Text row and the keyboard choice, resolved once (not per draw).
+    private val textHeaderLabel = context.getString(R.string.desktop_rail_text)
+    private val textCells = arrayOf(
+        context.getString(R.string.desktop_rail_tab) to Action.TAB,
+        context.getString(R.string.desktop_rail_esc) to Action.ESCAPE,
+        context.getString(R.string.desktop_rail_select_all) to Action.SELECT_ALL,
+        context.getString(R.string.desktop_rail_copy) to Action.COPY,
+        context.getString(R.string.desktop_rail_paste) to Action.PASTE,
+    )
+    private val keyboardAutoBridgeLabel = context.getString(R.string.desktop_rail_keyboard_autobridge)
+    private val keyboardCarLabel = context.getString(R.string.desktop_rail_keyboard_car)
+    private val keyboardPhoneLabel = context.getString(R.string.desktop_rail_keyboard_phone)
+
     /** The last area drawn in; taps are laid out against the same geometry. */
     @Volatile private var lastWidth = 0
     @Volatile private var lastHeight = 0
@@ -138,17 +155,18 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
 
     /** Scale that fits the open panel (the tallest part) into the target's height. */
     private fun scaleFor(height: Int): Float {
-        val panelDp = PANEL_PAD * 2 + CHEVRON + GAP + buttonCount() * (BUTTON + GAP) - GAP
+        val panelDp = PANEL_PAD * 2 + CHEVRON + GAP + buttonCount() * (CONTROL_H + GAP) - GAP
         val sheetDp = sheetHeightDp()
         val needed = maxOf(panelDp, sheetDp) * density
         return min(1f, height * 0.92f / needed).coerceAtLeast(0.45f)
     }
 
     private fun sheetHeightDp(): Float {
-        var h = SHEET_PAD * 2 + HEADER + GAP + GRID_ROW + GAP + ROW
-        if (showKeyboardChoice) h += GAP + HEADER + GAP + SEGMENT
-        h += GAP + HEADER + GAP + SEGMENT
-        if (showClose) h += GAP + ROW
+        var h = SHEET_PAD * 2 + HEADER + GAP + CONTROL_H + GAP + CONTROL_H
+        h += GAP + HEADER + GAP + CONTROL_H // Text row
+        if (showKeyboardChoice) h += GAP + HEADER + GAP + CONTROL_H
+        h += GAP + HEADER + GAP + CONTROL_H
+        if (showClose) h += GAP + CONTROL_H
         return h
     }
 
@@ -166,22 +184,22 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
 
         // --- Panel ---
         val panelW = s(PANEL_W, sc)
-        val panelH = s(PANEL_PAD * 2 + CHEVRON + GAP + buttonCount() * (BUTTON + GAP) - GAP, sc)
+        val panelH = s(PANEL_PAD * 2 + CHEVRON + GAP + buttonCount() * (CONTROL_H + GAP) - GAP, sc)
         val left = s(PANEL_LEFT, sc)
         val top = ((height - panelH) / 2f).coerceAtLeast(0f)
         val panel = RectF(left, top, left + panelW, top + panelH)
-        draws += { c -> panelBackground(c, panel, s(PANEL_RADIUS, sc)) }
+        draws += { c -> panelBackground(c, panel, s(RADIUS_CONTAINER, sc)) }
         val inner = s(PANEL_PAD, sc)
         var y = top + inner
         val chevron = RectF(panel.left + inner, y, panel.right - inner, y + s(CHEVRON, sc))
         items += Item(chevron) { state = State.COLLAPSED; Tap.Consumed }
-        draws += { c -> drawIcon(c, R.drawable.ic_rail_collapse, chevron, s(26f, sc), MUTED) }
+        draws += { c -> drawIcon(c, R.drawable.ic_rail_collapse, chevron, s(ICON_CHEVRON, sc), MUTED) }
         y = chevron.bottom + s(GAP, sc)
 
         fun panelButton(iconId: Int, label: String, selected: Boolean, outlined: Boolean, onTap: () -> Tap) {
-            val r = RectF(panel.left + inner, y, panel.right - inner, y + s(BUTTON, sc))
+            val r = RectF(panel.left + inner, y, panel.right - inner, y + s(CONTROL_H, sc))
             items += Item(r, onTap)
-            draws += { c -> drawButton(c, r, iconId, label, selected, outlined, s(BUTTON_RADIUS, sc), s(32f, sc), s(15f, sc)) }
+            draws += { c -> drawButton(c, r, iconId, label, selected, outlined, s(RADIUS_CONTROL, sc), s(ICON, sc), s(TEXT_LABEL, sc)) }
             y = r.bottom + s(GAP, sc)
         }
         panelButton(R.drawable.ic_rail_back, context.getString(R.string.desktop_rail_back), false, false) { done(Action.BACK) }
@@ -215,9 +233,9 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
         val sheetW = s(SHEET_W, sc).coerceAtMost(width - panel.right - s(16f, sc) - s(8f, sc))
         val sheetH = s(sheetHeightDp(), sc)
         val sheetLeft = panel.right + s(16f, sc)
-        val sheetTop = top.coerceAtMost((height - sheetH).coerceAtLeast(0f))
+        val sheetTop = (panel.centerY() - sheetH / 2f).coerceIn(0f, (height - sheetH).coerceAtLeast(0f))
         val sheet = RectF(sheetLeft, sheetTop, sheetLeft + sheetW, sheetTop + sheetH)
-        draws += { c -> panelBackground(c, sheet, s(SHEET_RADIUS, sc), SHEET_FILL) }
+        draws += { c -> panelBackground(c, sheet, s(RADIUS_CONTAINER, sc), SHEET_FILL) }
         val pad = s(SHEET_PAD, sc)
         val gap = s(GAP, sc)
         y = sheet.top + pad
@@ -226,7 +244,7 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
 
         fun header(label: String) {
             val baseline = y + s(HEADER, sc) * 0.72f
-            draws += { c -> drawLeftText(c, label, x0 + s(6f, sc), baseline, s(15f, sc), MUTED) }
+            draws += { c -> drawLeftText(c, label, x0 + s(6f, sc), baseline, s(TEXT_HEADER, sc), MUTED) }
             y += s(HEADER, sc) + gap
         }
 
@@ -238,43 +256,64 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
             Triple(R.drawable.ic_rail_new_tab, R.string.desktop_rail_new_tab, Action.NEW_TAB),
         ).forEachIndexed { i, (iconId, labelId, action) ->
             val l = x0 + i * (cellW + gap)
-            val r = RectF(l, y, l + cellW, y + s(GRID_ROW, sc))
+            val r = RectF(l, y, l + cellW, y + s(CONTROL_H, sc))
             val label = context.getString(labelId)
             items += Item(r) { done(action) }
-            draws += { c -> drawButton(c, r, iconId, label, false, false, s(18f, sc), s(28f, sc), s(15f, sc)) }
+            draws += { c -> drawButton(c, r, iconId, label, false, false, s(RADIUS_CONTROL, sc), s(ICON, sc), s(TEXT_LABEL, sc)) }
         }
-        y += s(GRID_ROW, sc) + gap
+        y += s(CONTROL_H, sc) + gap
 
         // Zoom: label on the left, − and + on the right; the sheet stays open between steps.
-        val zoomRow = RectF(x0, y, x1, y + s(ROW, sc))
-        val step = s(56f, sc)
-        val plus = RectF(zoomRow.right - s(10f, sc) - step, zoomRow.centerY() - step / 2, zoomRow.right - s(10f, sc), zoomRow.centerY() + step / 2)
-        val minus = RectF(plus.left - s(12f, sc) - step, plus.top, plus.left - s(12f, sc), plus.bottom)
+        val zoomRow = RectF(x0, y, x1, y + s(CONTROL_H, sc))
+        val step = s(STEP_BUTTON, sc)
+        val plus = RectF(zoomRow.right - gap - step, zoomRow.centerY() - step / 2, zoomRow.right - gap, zoomRow.centerY() + step / 2)
+        val minus = RectF(plus.left - gap - step, plus.top, plus.left - gap, plus.bottom)
+        // Reset (Ctrl+0) sits left of −, so the familiar −/+ pair keeps its place on the right.
+        val reset = RectF(minus.left - gap - step, minus.top, minus.left - gap, minus.bottom)
+        val zoomLabelLeft = zoomRow.left + s(16f, sc)
         val zoomLabel = context.getString(R.string.desktop_rail_zoom)
+        val resetLabel = context.getString(R.string.desktop_rail_zoom_reset)
         draws += { c ->
-            roundRect(c, zoomRow, s(18f, sc), BUTTON_FILL)
-            drawLeftText(c, zoomLabel, zoomRow.left + s(20f, sc), zoomRow.centerY() + s(6f, sc), s(17f, sc), INK)
-            roundRect(c, minus, s(16f, sc), STEP_FILL)
-            roundRect(c, plus, s(16f, sc), STEP_FILL)
+            roundRect(c, zoomRow, s(RADIUS_CONTROL, sc), BUTTON_FILL)
+            drawFittedLeftText(c, zoomLabel, zoomLabelLeft, zoomRow.centerY(), reset.left - gap - zoomLabelLeft, s(TEXT_LABEL, sc), INK)
+            roundRect(c, reset, s(RADIUS_INNER, sc), STEP_FILL)
+            roundRect(c, minus, s(RADIUS_INNER, sc), STEP_FILL)
+            roundRect(c, plus, s(RADIUS_INNER, sc), STEP_FILL)
+            drawCenteredText(c, resetLabel, reset, s(TEXT_LABEL, sc), INK)
             drawCenteredText(c, "−", minus, s(28f, sc), INK)
             drawCenteredText(c, "+", plus, s(28f, sc), INK)
         }
+        items += Item(reset) { touched(); Tap.Perform(Action.RESET_ZOOM) }
         items += Item(minus) { touched(); Tap.Perform(Action.ZOOM_OUT) }
         items += Item(plus) { touched(); Tap.Perform(Action.ZOOM_IN) }
         y = zoomRow.bottom + gap
 
+        // Text: keys a car or phone keyboard lacks, and the clipboard, for the focused field.
+        header(textHeaderLabel)
+        val textW = (x1 - x0 - gap * (textCells.size - 1)) / textCells.size
+        textCells.forEachIndexed { i, (label, action) ->
+            val l = x0 + i * (textW + gap)
+            val r = RectF(l, y, l + textW, y + s(CONTROL_H, sc))
+            items += Item(r) { done(action) }
+            draws += { c ->
+                roundRect(c, r, s(RADIUS_CONTROL, sc), BUTTON_FILL)
+                drawCenteredText(c, label, r, s(TEXT_LABEL, sc), INK)
+            }
+        }
+        y += s(CONTROL_H, sc) + gap
+
         fun segments(options: List<Pair<String, Boolean>>, onPick: (Int) -> Tap) {
-            val row = RectF(x0, y, x1, y + s(SEGMENT, sc))
-            draws += { c -> roundRect(c, row, s(18f, sc), BUTTON_FILL) }
-            val inset = s(6f, sc)
+            val row = RectF(x0, y, x1, y + s(CONTROL_H, sc))
+            draws += { c -> roundRect(c, row, s(RADIUS_CONTROL, sc), BUTTON_FILL) }
+            val inset = s(SEGMENT_INSET, sc)
             val segW = (row.width() - inset * (options.size + 1)) / options.size
             options.forEachIndexed { i, (label, selected) ->
                 val l = row.left + inset + i * (segW + inset)
                 val r = RectF(l, row.top + inset, l + segW, row.bottom - inset)
                 items += Item(r) { onPick(i) }
                 draws += { c ->
-                    if (selected) roundRect(c, r, s(14f, sc), SELECTED)
-                    drawCenteredText(c, label, r, s(16f, sc), if (selected) Color.WHITE else INK_SECONDARY)
+                    if (selected) roundRect(c, r, s(RADIUS_INNER, sc), SELECTED)
+                    drawCenteredText(c, label, r, s(TEXT_LABEL, sc), if (selected) Color.WHITE else INK_SECONDARY)
                 }
             }
             y = row.bottom + gap
@@ -282,15 +321,23 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
 
         if (showKeyboardChoice) {
             header(context.getString(R.string.desktop_rail_keyboard))
+            val choice = keyboardChoice
             segments(
                 listOf(
-                    context.getString(R.string.desktop_rail_keyboard_autobridge) to !useCarKeyboard,
-                    context.getString(R.string.desktop_rail_keyboard_car) to useCarKeyboard,
+                    keyboardAutoBridgeLabel to (choice == 0),
+                    keyboardCarLabel to (choice == 1),
+                    keyboardPhoneLabel to (choice == 2),
                 )
             ) { i ->
-                useCarKeyboard = i == 1
+                keyboardChoice = i
                 touched()
-                Tap.Perform(if (i == 1) Action.KEYBOARD_CAR else Action.KEYBOARD_AUTOBRIDGE)
+                Tap.Perform(
+                    when (i) {
+                        1 -> Action.KEYBOARD_CAR
+                        2 -> Action.KEYBOARD_PHONE
+                        else -> Action.KEYBOARD_AUTOBRIDGE
+                    }
+                )
             }
         }
 
@@ -309,12 +356,12 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
         }
 
         if (showClose) {
-            val r = RectF(x0, y, x1, y + s(ROW, sc))
+            val r = RectF(x0, y, x1, y + s(CONTROL_H, sc))
             val label = context.getString(R.string.desktop_rail_close)
             items += Item(r) { done(Action.CLOSE) }
             draws += { c ->
-                roundRect(c, r, s(18f, sc), BUTTON_FILL)
-                drawCenteredText(c, label, r, s(17f, sc), INK)
+                roundRect(c, r, s(RADIUS_CONTROL, sc), BUTTON_FILL)
+                drawCenteredText(c, label, r, s(TEXT_LABEL, sc), INK)
             }
         }
         return Geometry(handle, panel, sheet, items, draws)
@@ -425,9 +472,9 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
         val block = iconSize + gap + textSize
         val iconTop = r.centerY() - block / 2f
         drawIcon(c, iconId, RectF(r.left, iconTop, r.right, iconTop + iconSize), iconSize, if (selected) Color.WHITE else INK)
-        text.textSize = textSize
         text.color = if (selected) Color.WHITE else INK
-        c.drawText(label, r.centerX(), iconTop + iconSize + gap + textSize * 0.85f, text)
+        val shown = fitText(text, label, r.width() - textSize, textSize)
+        c.drawText(shown, r.centerX(), iconTop + iconSize + gap + textSize * 0.85f, text)
     }
 
     private fun drawIcon(c: Canvas, iconId: Int, box: RectF, size: Float, color: Int) {
@@ -440,9 +487,26 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
     }
 
     private fun drawCenteredText(c: Canvas, value: String, r: RectF, size: Float, color: Int) {
-        text.textSize = size
         text.color = color
-        c.drawText(value, r.centerX(), r.centerY() - (text.descent() + text.ascent()) / 2f, text)
+        val shown = if (value.length > 1) fitText(text, value, r.width() - size, size) else value.also { text.textSize = size }
+        c.drawText(shown, r.centerX(), r.centerY() - (text.descent() + text.ascent()) / 2f, text)
+    }
+
+    /** Sets [paint]'s size to fit [value] in [maxWidth] (down to 80%), then ellipsizes; returns what to draw. */
+    private fun fitText(paint: Paint, value: String, maxWidth: Float, size: Float): String {
+        paint.textSize = size
+        val fitted = fittedTextSize(paint.measureText(value), maxWidth, size)
+        paint.textSize = fitted
+        if (paint.measureText(value) <= maxWidth) return value
+        val room = (maxWidth - paint.measureText("…")).coerceAtLeast(0f)
+        val n = paint.breakText(value, true, room, null)
+        return value.substring(0, n).trimEnd() + "…"
+    }
+
+    private fun drawFittedLeftText(c: Canvas, value: String, x: Float, centerY: Float, maxWidth: Float, size: Float, color: Int) {
+        leftText.color = color
+        val shown = fitText(leftText, value, maxWidth, size)
+        c.drawText(shown, x, centerY - (leftText.descent() + leftText.ascent()) / 2f, leftText)
     }
 
     private fun drawLeftText(c: Canvas, value: String, x: Float, baseline: Float, size: Float, color: Int) {
@@ -463,18 +527,23 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
         private const val PANEL_LEFT = 16f
         private const val PANEL_W = 116f
         private const val PANEL_PAD = 10f
-        private const val PANEL_RADIUS = 30f
         private const val CHEVRON = 40f
-        private const val BUTTON = 88f
-        private const val BUTTON_RADIUS = 22f
         private const val GAP = 8f
         private const val SHEET_W = 440f
-        private const val SHEET_PAD = 18f
-        private const val SHEET_RADIUS = 26f
+        private const val SHEET_PAD = 16f
         private const val HEADER = 24f
-        private const val GRID_ROW = 84f
-        private const val ROW = 76f
-        private const val SEGMENT = 72f
+
+        // One scale shared by the rail and the sheet: every control is the same height.
+        private const val CONTROL_H = 80f
+        private const val RADIUS_CONTROL = 20f
+        private const val RADIUS_INNER = 16f
+        private const val RADIUS_CONTAINER = 28f
+        private const val ICON = 30f
+        private const val ICON_CHEVRON = 26f
+        private const val TEXT_LABEL = 16f
+        private const val TEXT_HEADER = 14f
+        private const val STEP_BUTTON = 64f
+        private const val SEGMENT_INSET = 8f
 
         private val HANDLE = DesignTokens.DesktopRail.HANDLE
         private val HANDLE_DOT = DesignTokens.DesktopRail.HANDLE_DOT
@@ -499,3 +568,7 @@ enum class PointerMode {
     /** Trackpad: drag moves the cursor, tap clicks where the cursor is. For small targets. */
     MOUSE,
 }
+
+/** Text size that fits [maxWidth]: [size] if it already does, else scaled down but not below 80%. */
+internal fun fittedTextSize(measured: Float, maxWidth: Float, size: Float): Float =
+    if (measured <= maxWidth || measured <= 0f) size else maxOf(size * maxWidth / measured, size * 0.8f)

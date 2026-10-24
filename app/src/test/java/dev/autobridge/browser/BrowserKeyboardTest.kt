@@ -132,14 +132,37 @@ class BrowserKeyboardTest {
     }
 
     @Test
-    fun `ios style colours each kind of key`() {
+    fun `material style colours each kind of key`() {
         val style = BrowserKeyboardStyle
-        assertEquals(style.GO_CAP to style.INK, style.colours(BrowserKey.Go, ShiftState.OFF))
+        assertEquals(style.GO_CAP to style.ON_GO_CAP, style.colours(BrowserKey.Go, ShiftState.OFF))
         assertEquals(style.LETTER_CAP, style.colours(BrowserKey.Text("q", "Q"), ShiftState.OFF).first)
         assertEquals(style.FUNCTION_CAP, style.colours(BrowserKey.Text(".com"), ShiftState.OFF).first)
         assertEquals(style.FUNCTION_CAP, style.colours(BrowserKey.Shift, ShiftState.OFF).first)
         assertEquals(style.SHIFT_ON_CAP, style.colours(BrowserKey.Shift, ShiftState.LOCKED).first)
         assertEquals("Go ›", style.goLabel("Go"))
+        assertEquals(style.ON_FUNCTION_CAP, style.colours(BrowserKey.Backspace, ShiftState.OFF).second)
+        assertEquals(style.SHIFT_ON_INK, style.colours(BrowserKey.Shift, ShiftState.ONCE).second)
+    }
+
+    @Test
+    fun `material tokens keep contrast, flat keys and visible pressed state`() {
+        val style = BrowserKeyboardStyle
+        fun lum(c: Int): Double {
+            fun ch(v: Int): Double { val x = v / 255.0; return if (x <= 0.03928) x / 12.92 else Math.pow((x + 0.055) / 1.055, 2.4) }
+            return 0.2126 * ch((c shr 16) and 255) + 0.7152 * ch((c shr 8) and 255) + 0.0722 * ch(c and 255)
+        }
+        fun ratio(a: Int, b: Int): Double { val x = lum(a); val y = lum(b); return (maxOf(x, y) + 0.05) / (minOf(x, y) + 0.05) }
+        assertTrue(ratio(style.INK, style.LETTER_CAP) >= 4.5)
+        assertTrue(ratio(style.ON_FUNCTION_CAP, style.FUNCTION_CAP) >= 4.5)
+        assertTrue(ratio(style.ON_GO_CAP, style.GO_CAP) >= 4.5)
+        assertTrue(ratio(style.SHIFT_ON_INK, style.SHIFT_ON_CAP) >= 4.5)
+        assertTrue(ratio(style.INK_SECONDARY, style.TRAY) >= 4.5)
+        assertTrue(ratio(style.LETTER_CAP, style.TRAY) >= 1.1)
+        assertTrue(style.pressedCap(BrowserKey.Go) != style.GO_CAP)
+        assertTrue(style.pressedCap(BrowserKey.Text("q", "Q")) != style.LETTER_CAP)
+        assertTrue(style.pressedCap(BrowserKey.Backspace) != style.FUNCTION_CAP)
+        assertEquals(0f, style.SHADOW_DP)
+        assertEquals(12f, style.KEY_RADIUS_DP)
     }
 
     // ---------------------------------------------------------------- go

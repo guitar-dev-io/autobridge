@@ -65,4 +65,17 @@
     <string name="desktop_prefs_sensitivity_caption">How far the page scrolls and the mouse pointer moves for each finger movement</string>
     <string name="desktop_prefs_zoom">Zoom: %1$s</string>
     <string name="desktop_prefs_zoom_caption">Size of pages and of the browser toolbar. Changing it restarts the browser and keeps its tabs</string>
+    <string name="desktop_car_entry_label">AutoBridge Chrome</string>
+    <string name="projection_setup_desktop_title">List AutoBridge Chrome on Android Auto</string>
+    <string name="projection_setup_desktop_caption">Off by default: Chrome desktop as its own Android Auto app, so your phone\'s keyboard appears on the car screen and types into it. Parked only. Needs Android 15 or later and Unknown sources in Android Auto\'s developer settings. Reconnect Android Auto after changing.</string>
+    <string name="desktop_keyboard_no_vehicle_state">Typing needs AutoBridge open on the car to confirm you are parked</string>
+    <string name="desktop_keyboard_no_session">The desktop browser is not running on the car</string>
+    <string name="desktop_keyboard_paste_too_long">Too much text to paste</string>
+    <string name="desktop_keyboard_phone_open_notification">Open the notification on your phone to type</string>
+    <string name="desktop_keyboard_phone_notifications_off">Turn on AutoBridge notifications on the phone to type with its keyboard</string>
+    <string name="desktop_keyboard_companion_title">Typing into Chrome on the car</string>
+    <string name="desktop_keyboard_companion_done">Done</string>
+    <string name="desktop_keyboard_channel">Typing on the car</string>
+    <string name="desktop_keyboard_notification_text">Tap to type into Chrome on the car with this phone\'s keyboard</string>
+    <string name="desktop_keyboard_input_description">Keyboard input for the desktop browser</string>
 </resources>

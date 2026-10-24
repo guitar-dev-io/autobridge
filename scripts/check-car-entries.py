@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Guard that AutoBridge (plus, on the sideload flavors, AutoBridge Browser) is the only Android
-Auto entry this project lists.
+Auto entry this project lists (AutoBridge Chrome, a second sideload-only alias, is declared but
+disabled).
 
 Android Auto lists one launcher entry per enabled car component: every CarAppService, every
 CATEGORY_PROJECTION service (the unofficial SDK's CarActivityService), and every activity with the
@@ -15,6 +16,9 @@ safe; main + src/projection + :duoscreen for personal and lab). Given paths to m
 (app/build/intermediates/merged_manifests/<variant>/process<Variant>Manifest/AndroidManifest.xml),
 it checks those instead, which is what the user actually installs.
 
+AutoBridge Chrome (dev.autobridge.projection.desktop.DesktopBrowserCarEntry, an activity-alias of
+DesktopBrowserActivity) must be declared android:enabled="false" in the sideload flavors (Settings
+lists it at runtime) and must not exist at all in the safe (Play) flavor.
 The one other entry allowed to be listed is AutoBridge Browser (an activity-alias of BrowserActivity
 in src/projection): the browser as its own car app, the way AABrowser is listed, because only a real
 window on the car display gets the phone's keyboard. It is optional (the safe flavor has none).
@@ -30,6 +34,9 @@ ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
 
 REQUIRED = {"dev.autobridge.car.AutoBridgeCarAppService"}
 ALLOWED = REQUIRED | {"dev.autobridge.browser.CarBrowserEntry"}
+# Declared (disabled) in personal and lab, absent from safe. Not in ALLOWED, so listing it by
+# default is an error.
+SIDELOAD_ONLY_OFF = {"dev.autobridge.projection.desktop.DesktopBrowserCarEntry"}
 CAR_APP_ACTION = "androidx.car.app.CarAppService"
 PROJECTION_CATEGORY = "com.google.android.gms.car.category.CATEGORY_PROJECTION"
 CAR_LAUNCHER_CATEGORY = "android.intent.category.CAR_LAUNCHER"
@@ -79,6 +86,12 @@ def check(label, paths):
     print(f"{label}: car components {len(declared)}, listed by default: {', '.join(listed) or 'none'}")
     problems = [f"{label}: {name} is listed on Android Auto by default; declare it android:enabled=\"false\"" for name in extra]
     problems += [f"{label}: {name} (the AutoBridge entry) is not listed" for name in missing]
+    play = "safe" in label.lower() and "personal" not in label.lower() and "lab" not in label.lower()
+    for name in sorted(SIDELOAD_ONLY_OFF):
+        if play and name in declared:
+            problems.append(f"{label}: {name} must not be declared in the safe (Play) flavor")
+        elif not play and name not in declared:
+            problems.append(f"{label}: {name} must be declared (android:enabled=\"false\")")
     return problems
 
 

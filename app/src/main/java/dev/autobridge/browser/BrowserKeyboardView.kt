@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
-import android.graphics.drawable.LayerDrawable
 import android.graphics.drawable.RippleDrawable
 import android.os.Handler
 import android.os.Looper
@@ -68,7 +67,7 @@ class BrowserKeyboardView(
             contentDescription = context.getString(R.string.car_keyboard_hide)
             textSize = 22f
             gravity = Gravity.CENTER
-            setTextColor(BrowserKeyboardStyle.INK)
+            setTextColor(BrowserKeyboardStyle.ON_FUNCTION_CAP)
             background = keyCap(BrowserKeyboardStyle.FUNCTION_CAP)
             isFocusable = false
             setOnClickListener { onHide() }
@@ -145,23 +144,14 @@ class BrowserKeyboardView(
         }
     }
 
-    /** A raised key, as on the car surface: a shadow just below the cap, and a ripple on press. */
+    /** A flat Material key: the cap, and a 12% state-layer ripple on press. */
     private fun keyCap(fill: Int): RippleDrawable {
-        val radius = dp(BrowserKeyboardStyle.KEY_RADIUS_DP)
-        val shadow = GradientDrawable().apply {
-            cornerRadius = radius
-            setColor(BrowserKeyboardStyle.CAP_SHADOW)
-        }
         val cap = GradientDrawable().apply {
-            cornerRadius = radius
+            cornerRadius = dp(BrowserKeyboardStyle.KEY_RADIUS_DP)
             setColor(fill)
         }
-        val layers = LayerDrawable(arrayOf(shadow, cap)).apply {
-            val drop = dp(BrowserKeyboardStyle.SHADOW_DP).toInt().coerceAtLeast(1)
-            setLayerInset(0, 0, drop, 0, 0)
-            setLayerInset(1, 0, 0, 0, drop)
-        }
-        return RippleDrawable(ColorStateList.valueOf(BrowserKeyboardStyle.INK_SECONDARY), layers, null)
+        val ripple = (BrowserKeyboardStyle.INK_SECONDARY and 0x00FFFFFF) or (0x1F shl 24)
+        return RippleDrawable(ColorStateList.valueOf(ripple), cap, null)
     }
 
     private fun label(key: BrowserKey): String = when (key) {

@@ -3,8 +3,8 @@ package dev.autobridge.browser
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
-import android.graphics.Path
 import android.graphics.RectF
+import android.graphics.Typeface
 import dev.autobridge.R
 
 /**
@@ -24,8 +24,30 @@ internal class CarSurfaceKeyboard(
     seed: String,
     val mode: BrowserKeyboardMode,
     private val hint: String,
+    /**
+     * Each key goes to the page as it is tapped (the desktop browser), rather than the buffer being
+     * mirrored or sent on Go (the built-in browser, false). The page may hold text this buffer never
+     * saw, so in live mode every key reports what it did as [lastEdit], even at the buffer's ends.
+     */
+    private val live: Boolean = false,
 ) {
     enum class Target { ADDRESS, FIELD }
+
+    /** What a live-mode key did, for the page to repeat. */
+    sealed class Edit {
+        data class Inserted(val text: String) : Edit()
+        object DeletedBack : Edit()
+        /** One character left (-1) or right (+1). */
+        data class Cursor(val dir: Int) : Edit()
+        /** The ✕ in the field: everything goes. */
+        object Cleared : Edit()
+    }
+
+    private var pendingEdit: Edit? = null
+
+    /** What the last [onTap] did in live mode; read once (reading clears it). Always null when not live. */
+    val lastEdit: Edit?
+        get() = pendingEdit.also { pendingEdit = null }
 
     sealed class Result {
         /** Swallowed by the tray; nothing changed. */
@@ -66,9 +88,10 @@ internal class CarSurfaceKeyboard(
     private var pressedUntilMs = 0L
 
     // Labels that never change while this keyboard is up, resolved once instead of every frame.
-    private val spaceLabel = context.getString(R.string.car_keyboard_space)
+    // Through resources (same strings) so a JVM test can supply them: Context.getString is final.
+    private val spaceLabel = context.resources.getString(R.string.car_keyboard_space)
     private val goLabel = BrowserKeyboardStyle.goLabel(
-        context.getString(if (mode == BrowserKeyboardMode.URL) R.string.car_keyboard_go else R.string.car_keyboard_search)
+        context.resources.getString(if (mode == BrowserKeyboardMode.URL) R.string.car_keyboard_go else R.string.car_keyboard_search)
     )
     private val hintPaint = android.text.TextPaint(Paint.ANTI_ALIAS_FLAG)
     private var fittedHint: String? = null
@@ -76,15 +99,19 @@ internal class CarSurfaceKeyboard(
     private var fittedHintSize = -1f
 
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val label = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
-    private val fieldText = Paint(Paint.ANTI_ALIAS_FLAG)
+    // Roboto Medium for Latin, the system Thai fallback for ไทย; created once.
+    private val keyFace = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+    private val label = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textAlign = Paint.Align.CENTER
+        typeface = keyFace
+    }
+    private val fieldText = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = keyFace }
     private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
     }
     private val rect = RectF()
-    private val path = Path()
 
     fun geometry(area: Box, density: Float): BrowserKeyboardGeometry {
         if (cachedArea != area || cachedDensity != density || cachedLanguage != language) {
@@ -104,12 +131,16 @@ internal class CarSurfaceKeyboard(
     fun onTap(x: Float, y: Float, area: Box, density: Float, nowMs: Long): Result {
         val g = geometry(area, density)
         pressed = null
+        pendingEdit = null
         if (!CarKeyboardGestures.inKeyboardArea(x, y, g.tray)) return Result.Close
         if (g.hide.contains(x, y)) return Result.Close
         if (buffer.text.isNotEmpty() && g.clear.contains(x, y)) {
             buffer.clear()
+            if (live) pendingEdit = Edit.Cleared
             return Result.Changed(pageMutated = true)
         }
+        // Live: the page's caret cannot follow a tap in this echo field, so the tap does nothing.
+        if (live && g.field.contains(x, y)) return Result.None
         if (g.field.contains(x, y)) {
             fieldText.textSize = g.keyHeight * FIELD_TEXT
             val start = textLeft(g)
@@ -122,6 +153,7 @@ internal class CarSurfaceKeyboard(
         val key = g.keyAt(x, y) ?: return Result.None
         pressed = key
         pressedUntilMs = nowMs + PRESSED_MS
+        if (live) liveKey(key)?.let { return it }
         // pageMutated is true only when the text changed (Text/Space/Backspace); layer and cursor
         // keys repaint the tray but must not mirror into the page (see CarKeyboardMirror).
         return when (key) {
@@ -160,6 +192,39 @@ internal class CarSurfaceKeyboard(
         }
     }
 
+    /**
+     * A live-mode key that edits: [lastEdit] comes from the key itself, not from what the buffer
+     * did (Backspace at the start, or a cursor key at an end, still acts on the page), and the
+     * buffer follows as far as it can as feedback. Null for the keys that work as in non-live mode.
+     */
+    private fun liveKey(key: BrowserKey): Result? {
+        pendingEdit = when (key) {
+            is BrowserKey.Text -> BrowserKeyboardLayouts.typed(key, shift).let { typed ->
+                buffer.insert(typed)
+                shift = shift.afterType()
+                Edit.Inserted(typed)
+            }
+            is BrowserKey.Space -> {
+                buffer.insert(" ")
+                Edit.Inserted(" ")
+            }
+            is BrowserKey.Backspace -> {
+                buffer.backspace()
+                Edit.DeletedBack
+            }
+            is BrowserKey.CursorLeft -> {
+                buffer.moveCursorByGrapheme(-1)
+                Edit.Cursor(-1)
+            }
+            is BrowserKey.CursorRight -> {
+                buffer.moveCursorByGrapheme(1)
+                Edit.Cursor(1)
+            }
+            else -> return null
+        }
+        return Result.Changed(pageMutated = true)
+    }
+
     /** Whether a key is still drawn pressed at [nowMs]; the renderer keeps redrawing until it is not. */
     fun pressedAt(nowMs: Long): Boolean = pressed != null && nowMs < pressedUntilMs
 
@@ -182,26 +247,21 @@ internal class CarSurfaceKeyboard(
 
         drawField(canvas, g, density, drawIcon)
 
-        // Hide: a raised function key with a chevron pointing down.
         drawCap(canvas, g.hide, style.FUNCTION_CAP, radius, density)
-        stroke.color = style.INK
-        stroke.strokeWidth = 2.5f * density
-        val half = g.hide.width * 0.16f
-        path.rewind()
-        path.moveTo(g.hide.centerX - half, g.hide.centerY - half / 2f)
-        path.lineTo(g.hide.centerX, g.hide.centerY + half / 2f)
-        path.lineTo(g.hide.centerX + half, g.hide.centerY - half / 2f)
-        canvas.drawPath(path, stroke)
-
+        drawIcon(canvas, BrowserIcon.KBD_HIDE, g.hide.centerX, g.hide.centerY, g.keyHeight * HIDE_ICON, style.ON_FUNCTION_CAP)
         g.keys.forEach { (key, box) ->
             val (cap, ink) = style.colours(key, shift)
-            drawCap(canvas, box, if (key == lit) style.pressedCap(key) else cap, radius, density)
-            val text = keyLabel(key)
-            label.color = ink
-            label.textSize = g.keyHeight * (if (key is BrowserKey.Text && text.length <= 2) LETTER_TEXT else WORD_TEXT)
-            label.isFakeBoldText = key is BrowserKey.Go
-            val baseline = box.centerY - (label.descent() + label.ascent()) / 2f
-            canvas.drawText(text, box.centerX, baseline, label)
+            drawCap(canvas, box, if (key == lit) style.pressedCap(key, shift) else cap, radius, density)
+            val icon = keyIcon(key)
+            if (icon != null) {
+                drawIcon(canvas, icon, box.centerX, box.centerY, g.keyHeight * KEY_ICON, ink)
+            } else {
+                val text = keyLabel(key)
+                label.color = ink
+                label.textSize = g.keyHeight * (if (key is BrowserKey.Text && text.length <= 2) LETTER_TEXT else WORD_TEXT)
+                val baseline = box.centerY - (label.descent() + label.ascent()) / 2f
+                canvas.drawText(text, box.centerX, baseline, label)
+            }
             if (key is BrowserKey.Shift && shift == ShiftState.LOCKED) {
                 fill.color = ink
                 val w = box.width * 0.3f
@@ -210,12 +270,8 @@ internal class CarSurfaceKeyboard(
         }
     }
 
-    /** A raised key: a dark shadow just below, then the cap over it. */
+    /** A flat Material key: one rounded cap. */
     private fun drawCap(canvas: Canvas, box: Box, cap: Int, radius: Float, density: Float) {
-        val drop = BrowserKeyboardStyle.SHADOW_DP * density
-        fill.color = BrowserKeyboardStyle.CAP_SHADOW
-        rect.set(box.left, box.top + drop, box.right, box.bottom + drop)
-        canvas.drawRoundRect(rect, radius, radius, fill)
         fill.color = cap
         rect.set(box.left, box.top, box.right, box.bottom)
         canvas.drawRoundRect(rect, radius, radius, fill)
@@ -235,8 +291,9 @@ internal class CarSurfaceKeyboard(
         fill.color = style.FIELD
         rect.set(field.left, field.top, field.right, field.bottom)
         canvas.drawRoundRect(rect, corner, corner, fill)
-        stroke.color = style.FIELD_EDGE
-        stroke.strokeWidth = density
+        // The field is always the focused input: a 2dp primary ring, as Material focuses a text field.
+        stroke.color = style.CURSOR
+        stroke.strokeWidth = 2f * density
         canvas.drawRoundRect(rect, corner, corner, stroke)
         drawIcon(canvas, BrowserIcon.SEARCH, field.left + g.keyHeight * 0.45f, field.centerY, g.keyHeight * 0.42f, style.INK_SECONDARY)
 
@@ -295,19 +352,26 @@ internal class CarSurfaceKeyboard(
 
     private fun keyLabel(key: BrowserKey): String = when (key) {
         is BrowserKey.Text -> BrowserKeyboardLayouts.typed(key, shift)
-        is BrowserKey.Shift -> "⇧"
-        is BrowserKey.Backspace -> "⌫"
+        is BrowserKey.Shift, is BrowserKey.Backspace, is BrowserKey.CursorLeft, is BrowserKey.CursorRight -> ""
         is BrowserKey.Space -> spaceLabel
         is BrowserKey.Go -> goLabel
         is BrowserKey.Language -> if (language == CarKeyboardLanguage.THAI) "EN" else "ไทย"
-        is BrowserKey.CursorLeft -> "◀"
-        is BrowserKey.CursorRight -> "▶"
+    }
+
+    private fun keyIcon(key: BrowserKey): BrowserIcon? = when (key) {
+        is BrowserKey.Shift -> BrowserIcon.KBD_SHIFT
+        is BrowserKey.Backspace -> BrowserIcon.KBD_BACKSPACE
+        is BrowserKey.CursorLeft -> BrowserIcon.KBD_CURSOR_LEFT
+        is BrowserKey.CursorRight -> BrowserIcon.KBD_CURSOR_RIGHT
+        else -> null
     }
 
     private companion object {
         const val LETTER_TEXT = 0.44f
         const val WORD_TEXT = 0.32f
         const val FIELD_TEXT = 0.42f
+        const val KEY_ICON = 0.5f
+        const val HIDE_ICON = 0.55f
 
         /** How long a tapped key stays lit: long enough to see on a head unit, short enough not to lag the next tap. */
         const val PRESSED_MS = 120L

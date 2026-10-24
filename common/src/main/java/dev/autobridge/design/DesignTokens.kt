@@ -202,20 +202,30 @@ object DesignTokens {
 
     /** The car browser keyboard. */
     object Keyboard {
-        const val TRAY = 0xFF0D1626.toInt()
-        const val TRAY_EDGE = 0xFF1E2A3E.toInt()
-        const val LETTER_CAP = 0xFF2C374B.toInt()
-        const val FUNCTION_CAP = 0xFF1C2638.toInt()
+        // Material 3 dark tonal roles, the same palette as BrowserDark.
+        const val TRAY = 0xFF1D2024.toInt()
+        const val TRAY_EDGE = 0xFF44474E.toInt()
+        const val LETTER_CAP = 0xFF33353A.toInt()
+        const val FUNCTION_CAP = 0xFF3E4759.toInt()
+        const val ON_FUNCTION_CAP = 0xFFDAE2F9.toInt()
+        const val FIELD_FILL = 0xFF0C0E13.toInt()
         const val CAP_SHADOW = 0xFF05090F.toInt()
-        const val SHIFT_ON_CAP = 0xFFE9EEF7.toInt()
-        const val GO_CAP = 0xFF1A73FF.toInt()
-        const val INK = 0xFFFFFFFF.toInt()
-        const val INK_SECONDARY = 0xFF9AA7BA.toInt()
-        const val FIELD_EDGE = 0xFF33415A.toInt()
-        const val CURSOR = 0xFF4C9BFF.toInt()
-        const val SELECTION = 0x664C9BFF
-        const val PRESSED_CAP = 0xFF55657F.toInt()
-        const val GO_PRESSED_CAP = 0xFF5C9DFF.toInt()
+        const val SHIFT_ON_CAP = 0xFF284777.toInt()
+        const val SHIFT_ON_INK = 0xFFD6E3FF.toInt()
+        const val GO_CAP = 0xFFAAC7FF.toInt()
+        const val ON_GO_CAP = 0xFF0A305F.toInt()
+        const val INK = 0xFFE2E2E9.toInt()
+        const val INK_SECONDARY = 0xFFC4C6D0.toInt()
+        const val FIELD_EDGE = 0xFF8E9099.toInt()
+        const val CURSOR = 0xFFAAC7FF.toInt()
+        const val SELECTION = 0x66AAC7FF
+        // Pressed = resting cap + 12% of its on-colour (the M3 pressed state layer), per channel, rounded.
+        const val LETTER_PRESSED = 0xFF484A4F.toInt()
+        const val FUNCTION_PRESSED = 0xFF515A6C.toInt()
+        const val GO_PRESSED = 0xFF97B5EC.toInt()
+        const val SHIFT_ON_PRESSED = 0xFF3D5A87.toInt()
+        const val PRESSED_CAP = LETTER_PRESSED
+        const val GO_PRESSED_CAP = GO_PRESSED
     }
 
     /** Multi-app (Duo Screen) chrome on the car. */

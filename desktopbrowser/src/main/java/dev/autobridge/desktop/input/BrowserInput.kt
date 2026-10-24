@@ -2,6 +2,9 @@ package dev.autobridge.desktop.input
 
 import dev.autobridge.desktop.DesktopLog
 import dev.autobridge.desktop.display.X11Connection
+import dev.autobridge.desktop.keyboard.ClipboardSync
+import dev.autobridge.desktop.keyboard.KeyboardInputBridge
+import dev.autobridge.desktop.keyboard.X11Clipboard
 import java.util.concurrent.Executors
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -14,9 +17,19 @@ import kotlin.math.roundToInt
  * wheel clicks: one click per [PIXELS_PER_NOTCH] display pixels of finger travel, with the
  * remainder carried over so slow drags still scroll.
  */
-class BrowserInput(private val x: X11Connection) {
+class BrowserInput(private val x: X11Connection, private val clipboard: X11Clipboard? = null) {
     private val executor = Executors.newSingleThreadExecutor { r -> Thread(r, "desktop-input").apply { isDaemon = true } }
-    private val keyboard by lazy { X11Keyboard(x) }
+    private val keys by lazy { X11Keyboard(x) }
+
+    /** Clipboard bridge to Android; its CLIPBOARD ownership runs on this input thread. */
+    @Volatile var clipboardSync: ClipboardSync? = null
+        set(value) {
+            field = value
+            value?.post = ::postInput
+        }
+
+    /** All keyboard input (text, composition, keys, shortcuts, paste), in order with clicks. */
+    val keyboard: KeyboardInputBridge = KeyboardInputBridge({ keys }, ::post, x, { clipboard }, { clipboardSync })
     private var carryX = 0f
     private var carryY = 0f
     @Volatile var lastEventAt = 0L
@@ -54,16 +67,22 @@ class BrowserInput(private val x: X11Connection) {
 
     fun clickAtCursor(button: Int = BUTTON_LEFT) = click(cursorX.toInt(), cursorY.toInt(), button)
 
-    fun click(dx: Int, dy: Int, button: Int = BUTTON_LEFT) = post {
-        cursorX = dx.toFloat(); cursorY = dy.toFloat()
-        x.fakeInput(X11Connection.MOTION_NOTIFY, 0, dx, dy)
-        x.fakeInput(X11Connection.BUTTON_PRESS, button)
-        x.fakeInput(X11Connection.BUTTON_RELEASE, button)
+    fun click(dx: Int, dy: Int, button: Int = BUTTON_LEFT) {
+        post {
+            cursorX = dx.toFloat(); cursorY = dy.toFloat()
+            x.fakeInput(X11Connection.MOTION_NOTIFY, 0, dx, dy)
+            x.fakeInput(X11Connection.BUTTON_PRESS, button)
+            x.fakeInput(X11Connection.BUTTON_RELEASE, button)
+        }
+        keyboard.noteFocusMayChange()
     }
 
-    fun press(dx: Int, dy: Int, button: Int = BUTTON_LEFT) = post {
-        x.fakeInput(X11Connection.MOTION_NOTIFY, 0, dx, dy)
-        x.fakeInput(X11Connection.BUTTON_PRESS, button)
+    fun press(dx: Int, dy: Int, button: Int = BUTTON_LEFT) {
+        post {
+            x.fakeInput(X11Connection.MOTION_NOTIFY, 0, dx, dy)
+            x.fakeInput(X11Connection.BUTTON_PRESS, button)
+        }
+        keyboard.noteFocusMayChange()
     }
 
     fun release(dx: Int, dy: Int, button: Int = BUTTON_LEFT) = post {
@@ -97,9 +116,13 @@ class BrowserInput(private val x: X11Connection) {
         }
     }
 
-    fun typeText(text: String) = post { keyboard.typeText(text) }
+    /** Hides / shows the X cursor, ordered with clicks and pointer moves. Touch hides it; mouse shows it. */
+    fun hideCursor() = post { x.hideCursor() }
+    fun showCursor() = post { x.showCursor() }
 
-    fun key(keysym: Int, vararg modifiers: Int) = post { keyboard.tapKeysym(keysym, *modifiers) }
+    fun typeText(text: String) = keyboard.commitText(text)
+
+    fun key(keysym: Int, vararg modifiers: Int) = keyboard.key(keysym, *modifiers)
 
     fun back() = key(Keysym.LEFT, Keysym.ALT_L)
     fun forward() = key(Keysym.RIGHT, Keysym.ALT_L)
@@ -120,6 +143,9 @@ class BrowserInput(private val x: X11Connection) {
         keycode?.let { x.fakeInput(X11Connection.KEY_PRESS, it) }
         try { body() } finally { keycode?.let { x.fakeInput(X11Connection.KEY_RELEASE, it) } }
     }
+
+    /** Runs [block] on the input thread, in order with every other input. */
+    internal fun postInput(block: () -> Unit) = post(block)
 
     private fun post(block: () -> Unit) {
         lastEventAt = System.currentTimeMillis()

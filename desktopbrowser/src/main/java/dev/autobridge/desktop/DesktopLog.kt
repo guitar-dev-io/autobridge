@@ -15,6 +15,11 @@ object DesktopLog {
         runCatching { StructuredLog.i(TAG, message) }
     }
 
+    /** Logcat only (high-volume detail such as dropped keyboard input). */
+    fun d(message: String) {
+        Log.d(TAG, message)
+    }
+
     fun w(message: String, error: Throwable? = null) {
         Log.w(TAG, message, error)
         runCatching { StructuredLog.w(TAG, if (error == null) message else "$message: ${describe(error)}") }

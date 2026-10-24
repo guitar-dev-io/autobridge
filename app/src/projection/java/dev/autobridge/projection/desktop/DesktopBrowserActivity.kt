@@ -6,21 +6,17 @@ import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.graphics.Color
 import android.os.Bundle
-import android.text.InputType
 import android.view.Gravity
-import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
-import android.view.inputmethod.BaseInputConnection
-import android.view.inputmethod.EditorInfo
-import android.view.inputmethod.InputConnection
-import android.view.inputmethod.InputMethodManager
 import android.widget.FrameLayout
 import android.widget.TextView
 import android.widget.Toast
 import dev.autobridge.R
+import dev.autobridge.core.model.Feature
+import dev.autobridge.core.policy.FeaturePolicy
 import dev.autobridge.desktop.DesktopEngine
 import dev.autobridge.desktop.browser.DesktopBrowserId
 import dev.autobridge.desktop.browser.DesktopBrowsers
@@ -29,8 +25,14 @@ import dev.autobridge.desktop.input.ControlRail
 import dev.autobridge.desktop.input.PointerMode
 import dev.autobridge.desktop.input.Keysym
 import dev.autobridge.desktop.input.TouchGestureMapper
+import dev.autobridge.desktop.keyboard.ClipboardSync
+import dev.autobridge.desktop.keyboard.Shortcut
+import dev.autobridge.desktop.keyboard.TypingTarget
 import dev.autobridge.desktop.session.DesktopSession
 import dev.autobridge.i18n.AppLocale
+import dev.autobridge.safety.BypassPolicyStore
+import dev.autobridge.safety.ParkingStateStore
+import dev.autobridge.safety.SafetyEnforcement
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.dp
 import kotlinx.coroutines.MainScope
@@ -46,6 +48,15 @@ import kotlinx.coroutines.launch
  * handle; tapped, it opens back, address, type, touch ⇄ mouse and More (forward, reload, new tab,
  * zoom, how soon it collapses, and close).
  *
+ * Started as "AutoBridge Chrome" ([DesktopCarEntry], a CAR_LAUNCHER alias) it is a window on the car
+ * display: the phone's keyboard comes up there, the car's orientation is left alone, and it is
+ * parked-only like the template car screen. The page is sized to the window the car gives it.
+ * Typing there is parked-only too ([KeyboardTypingGate]). Started as the DesktopBrowserPane alias
+ * (a Multi-app pane) it is not the car entry: ungated, like the phone viewer.
+ *
+ * The phone's keyboard ([ChromeKeyInputView]) comes up from the rail's Type and Address, and after
+ * a tap on the page when Chrome shows the text cursor there (a field was tapped).
+ *
  * Leaving the screen only detaches the view; the browser keeps its tabs and is stopped after
  * [DesktopEngine.IDLE_STOP_MS] if nobody comes back.
  */
@@ -54,11 +65,21 @@ class DesktopBrowserActivity : Activity() {
     private var session: DesktopSession? = null
     private lateinit var browserId: DesktopBrowserId
     private lateinit var desktopView: DesktopView
-    private lateinit var keyInput: KeyInputView
+    private lateinit var keyInput: ChromeKeyInputView
     private lateinit var statusText: TextView
     private lateinit var gestures: TouchGestureMapper
     private lateinit var rail: ControlRail
     private var imeHeight = 0
+    /** Started through the CAR_LAUNCHER alias: on the car display, parked-only. */
+    private var carEntry = false
+    private val parkingListener: (ParkingStateStore.State) -> Unit = {
+        if (::desktopView.isInitialized) desktopView.post { applyGate() }
+    }
+    private val bypassListener: (BypassPolicyStore.State) -> Unit = {
+        if (::desktopView.isInitialized) desktopView.post { applyGate() }
+    }
+    /** Android's clipboard follows into the guest while this is on screen. */
+    private var clipWatch: AutoCloseable? = null
 
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(AppLocale.rebase(newBase))
@@ -67,7 +88,9 @@ class DesktopBrowserActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         DesktopEngine.init(this)
-        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_FULL_USER
+        carEntry = DesktopCarEntry.isCarEntry(intent?.component?.className)
+        // The car display has one fixed orientation; only the phone viewer rotates.
+        if (!carEntry) requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_FULL_USER
         // Started by name (the Multi-app pane) there is no extra: the browser chosen for the Web
         // card, else the first one installed, since a pane asks for "the desktop browser".
         val id = DesktopBrowserId.fromKey(intent.getStringExtra(EXTRA_BROWSER))
@@ -84,7 +107,7 @@ class DesktopBrowserActivity : Activity() {
         val root = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
         desktopView = DesktopView(this)
         root.addView(desktopView, FrameLayout.LayoutParams(-1, -1))
-        keyInput = KeyInputView(this) { session }
+        keyInput = ChromeKeyInputView(this, { session }, gated = carEntry)
         root.addView(keyInput, FrameLayout.LayoutParams(1, 1))
         statusText = TextView(this).apply {
             setTextColor(Color.WHITE)
@@ -98,12 +121,17 @@ class DesktopBrowserActivity : Activity() {
         hideSystemBars()
 
         gestures = TouchGestureMapper(this, { session?.input }, { session?.renderer?.mapping }, { rail.mode }) { session?.renderer?.burst() }
+        ParkingStateStore.addListener(parkingListener)
+        BypassPolicyStore.addListener(bypassListener)
+        KeyboardBridgeDebug.register(this)
         desktopView.setOnTouchListener { _, event -> onPageTouch(event) }
         desktopView.addOnLayoutChangeListener { _, l, t, r, b, ol, ot, or_, ob ->
             if (r - l != or_ - ol || b - t != ob - ot) fit()
         }
         // The keyboard takes the bottom of the screen: the browser window shrinks to what is left
-        // above it, so the field being typed in stays visible.
+        // above it, so the field being typed in stays visible. A car window may never report the
+        // ime inset; then imeHeight stays 0, the page keeps the whole window and the keyboard
+        // simply overlays its bottom (adjustNothing), which fit() already handles.
         // A zoom change in Settings restarts the browser; follow it to the new session.
         scope.launch {
             DesktopEngine.session.collect { s ->
@@ -118,6 +146,11 @@ class DesktopBrowserActivity : Activity() {
         root.setOnApplyWindowInsetsListener { _, insets ->
             val ime = insets.getInsets(WindowInsets.Type.ime()).bottom
             if (ime != imeHeight) {
+                // Hidden (Back, the keyboard's own key): composing ends, the IME starts over.
+                if (ime == 0 && imeHeight > 0) {
+                    keyInput.onImeHidden()
+                    refocusAddressAfterResize = false
+                }
                 imeHeight = ime
                 fit()
                 if (ime > 0 && refocusAddressAfterResize) {
@@ -131,6 +164,9 @@ class DesktopBrowserActivity : Activity() {
 
     /** Opens or re-fits the session for the view's current size and keyboard. */
     private fun fit() {
+        // On the car entry a layout change while backgrounded must not take the renderer back
+        // from the template car screen; onResume fits again.
+        if (carEntry && !resumed) return
         val w = desktopView.width
         val h = desktopView.height - imeHeight
         if (w <= 0 || h <= 0) return
@@ -148,6 +184,70 @@ class DesktopBrowserActivity : Activity() {
         s.renderer.setArea(android.graphics.Rect(0, 0, w, h))
         s.renderer.attachView(desktopView, desktopView.width, desktopView.height)
         DesktopEngine.noteSurfaceAttached()
+        applyGate()
+    }
+
+    private fun allowed(): Boolean = !carEntry ||
+        DesktopCarEntry.allowed(SafetyEnforcement.gateParked(ParkingStateStore.isParked), FeaturePolicy.app.isAvailable(Feature.BROWSER))
+
+    /** Car entry only: a notice instead of the page, no rail and no keyboard unless parked. */
+    private fun applyGate() {
+        if (!carEntry || !::keyInput.isInitialized) return
+        val ok = allowed()
+        rail.visible = ok
+        session?.renderer?.blockedMessage = if (ok) null else when {
+            !SafetyEnforcement.gateParked(ParkingStateStore.isParked) -> getString(dev.autobridge.desktop.R.string.desktop_park_to_browse)
+            else -> FeaturePolicy.app.denialMessage(Feature.BROWSER)
+        }
+        if (!ok) {
+            keyInput.hide()
+            if (rail.dragHeld) { session?.input?.releaseAtCursor(); rail.dragHeld = false }
+        } else if (!keyInput.typingAllowed() && keyInput.imeVisible()) {
+            // Typing is parked-only on the car even while browsing is allowed; nothing feeds the
+            // vehicle state into this window unless AutoBridge runs on the car (UNKNOWN).
+            keyInput.hide()
+            showTypingRefusal()
+        }
+    }
+
+    /** Car entry: why the keyboard does not come up (moving, or no vehicle state). */
+    private fun showTypingRefusal() {
+        statusText.text = getString(KeyboardTypingGate.refusalMessage())
+        statusText.visibility = View.VISIBLE
+        statusText.removeCallbacks(hideRefusal)
+        statusText.postDelayed(hideRefusal, REFUSAL_MS)
+    }
+
+    private val hideRefusal = Runnable {
+        val phase = session?.status?.value?.phase
+        if (phase != DesktopSession.Phase.STARTING && phase != DesktopSession.Phase.FAILED) statusText.visibility = View.GONE
+    }
+
+    /** Rail Type/Address: the phone's keyboard for [target], or why it cannot come up. */
+    private fun openKeyboard(target: TypingTarget) {
+        if (target == TypingTarget.FIELD) refocusAddressAfterResize = false
+        if (!keyInput.typingAllowed()) {
+            showTypingRefusal()
+            return
+        }
+        keyInput.show(target)
+    }
+
+    /**
+     * A tap on the page while the keyboard is down: if Chrome now shows the text cursor under the
+     * pointer (a field was tapped), the keyboard comes up for it. Chrome tells nobody that a field
+     * has focus here, so the cursor is the hint; a tap on plain selectable text looks the same.
+     */
+    private fun afterPageTap() {
+        if (!keyInput.typingAllowed() || keyInput.imeVisible()) return
+        desktopView.removeCallbacks(probeTextCursor)
+        desktopView.postDelayed(probeTextCursor, TEXT_CURSOR_PROBE_MS)
+    }
+
+    private val probeTextCursor = Runnable {
+        session?.input?.keyboard?.probeTextCursor { text ->
+            if (text && resumed && allowed() && keyInput.typingAllowed() && !keyInput.imeVisible()) openKeyboard(TypingTarget.FIELD)
+        }
     }
 
     private fun attach(s: DesktopSession) {
@@ -177,6 +277,7 @@ class DesktopBrowserActivity : Activity() {
 
     /** The rail's handle, panel and More sheet first; everything else is the page. */
     private fun onPageTouch(event: MotionEvent): Boolean {
+        if (!allowed()) return true
         if (event.actionMasked == MotionEvent.ACTION_DOWN) {
             railPressed = when (val tap = rail.onTap(event.x, event.y)) {
                 is ControlRail.Tap.Perform -> {
@@ -209,8 +310,30 @@ class DesktopBrowserActivity : Activity() {
                 return true
             }
         }
+        trackTap(event)
         return gestures.onTouchEvent(event)
     }
+
+    /** Spots a plain tap (one finger, no move, not a long press) for [afterPageTap]. */
+    private fun trackTap(event: MotionEvent) {
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                tapCandidate = true
+                tapDownX = event.x
+                tapDownY = event.y
+            }
+            MotionEvent.ACTION_POINTER_DOWN, MotionEvent.ACTION_CANCEL -> tapCandidate = false
+            MotionEvent.ACTION_MOVE -> if (kotlin.math.hypot(event.x - tapDownX, event.y - tapDownY) > tapSlop) tapCandidate = false
+            MotionEvent.ACTION_UP -> {
+                if (tapCandidate && event.eventTime - event.downTime < android.view.ViewConfiguration.getLongPressTimeout()) afterPageTap()
+                tapCandidate = false
+            }
+        }
+    }
+
+    private var tapCandidate = false
+    private var tapDownX = 0f
+    private var tapDownY = 0f
 
     private var railPressed = false
     private var refocusAddressAfterResize = false
@@ -220,6 +343,7 @@ class DesktopBrowserActivity : Activity() {
 
     /** What the rail asked for; the rail has already changed its own state. */
     private fun onRailAction(action: ControlRail.Action) {
+        if (!allowed() && action != ControlRail.Action.CLOSE) return
         val input = session?.input
         when (action) {
             ControlRail.Action.BACK -> input?.back()
@@ -228,15 +352,40 @@ class DesktopBrowserActivity : Activity() {
             ControlRail.Action.NEW_TAB -> input?.newTab()
             ControlRail.Action.ZOOM_IN -> input?.key('='.code, Keysym.CONTROL_L)
             ControlRail.Action.ZOOM_OUT -> input?.key('-'.code, Keysym.CONTROL_L)
-            // The phone's own keyboard types into the address bar once Ctrl+L has focused it.
+            ControlRail.Action.RESET_ZOOM -> input?.key('0'.code, Keysym.CONTROL_L)
+            // The phone's own keyboard types into the address bar once Ctrl+L (show(ADDRESS),
+            // through the bridge) has focused it.
             ControlRail.Action.ADDRESS -> {
-                input?.focusAddressBar()
-                keyInput.show()
                 // Opening the keyboard shrinks the browser window, and Chromium drops the
                 // address bar's focus on that resize; focus it again once the resize is done.
-                refocusAddressAfterResize = true
+                // With the keyboard already up there is no resize, so nothing to wait for.
+                val resizes = !keyInput.imeVisible()
+                openKeyboard(TypingTarget.ADDRESS)
+                if (keyInput.typingAllowed() && resizes) refocusAddressAfterResize = true
             }
-            ControlRail.Action.KEYBOARD -> keyInput.toggle()
+            ControlRail.Action.KEYBOARD -> openKeyboard(TypingTarget.FIELD)
+            ControlRail.Action.TAB,
+            ControlRail.Action.ESCAPE,
+            ControlRail.Action.SELECT_ALL,
+            ControlRail.Action.COPY,
+            ControlRail.Action.PASTE -> {
+                if (!keyInput.typingAllowed()) {
+                    showTypingRefusal()
+                    return
+                }
+                val keys = input?.keyboard ?: return
+                when (action) {
+                    ControlRail.Action.TAB -> keys.key(Keysym.TAB)
+                    ControlRail.Action.ESCAPE -> keys.key(Keysym.ESCAPE)
+                    ControlRail.Action.SELECT_ALL -> keys.shortcut(Shortcut.SELECT_ALL)
+                    ControlRail.Action.COPY -> keys.shortcut(Shortcut.COPY)
+                    else -> {
+                        // Paste what the phone copied: Android's clip goes to the guest first.
+                        session?.clipboard?.pushAndroidClipboard(explicit = true)
+                        keys.shortcut(Shortcut.PASTE)
+                    }
+                }
+            }
             ControlRail.Action.CLOSE -> finish()
             ControlRail.Action.DRAG_START -> input?.pressAtCursor()
             ControlRail.Action.DRAG_END -> input?.releaseAtCursor()
@@ -247,7 +396,8 @@ class DesktopBrowserActivity : Activity() {
                 }
             }
             ControlRail.Action.KEYBOARD_AUTOBRIDGE,
-            ControlRail.Action.KEYBOARD_CAR -> Unit
+            ControlRail.Action.KEYBOARD_CAR,
+            ControlRail.Action.KEYBOARD_PHONE -> Unit
         }
     }
 
@@ -256,8 +406,12 @@ class DesktopBrowserActivity : Activity() {
     override fun onPause() {
         super.onPause()
         resumed = false
-        session?.detachSurface()
-        DesktopEngine.noteSurfaceDetached()
+        clipWatch?.close()
+        clipWatch = null
+        desktopView.removeCallbacks(probeTextCursor)
+        // Detach only if the renderer still draws into this view; the template car screen may
+        // have taken it over (attachSurface), and then its surface must stay.
+        if (session?.renderer?.detachView(desktopView) == true) DesktopEngine.noteSurfaceDetached()
     }
 
     override fun onResume() {
@@ -266,14 +420,34 @@ class DesktopBrowserActivity : Activity() {
         // The engine may have moved on (the car restarted the browser) while this was away.
         DesktopEngine.session.value?.let { s -> if (s !== session && s.adapter.id == browserId && session != null) attach(s) }
         if (session != null) fit()
+        if (clipWatch == null) clipWatch = ClipboardSync.watch(this) { session?.clipboard }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        // Android only lets a focused app read the clipboard: hand what the phone copied to the guest.
+        if (hasFocus) session?.clipboard?.pushAndroidClipboard()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        // An instance started on the phone can be brought to the car under the alias's name.
+        carEntry = DesktopCarEntry.isCarEntry(intent.component?.className)
+        keyInput.gated = carEntry
+        applyGate()
     }
 
     override fun onBackPressed() {
+        // Nothing to go back in while the gate is closed.
+        if (!allowed()) { finish(); return }
         // Back goes to the previous page in the browser; the menu's Close leaves.
         session?.input?.back() ?: super.onBackPressed()
     }
 
     override fun onDestroy() {
+        ParkingStateStore.removeListener(parkingListener)
+        BypassPolicyStore.removeListener(bypassListener)
         scope.cancel()
         super.onDestroy()
     }
@@ -285,116 +459,10 @@ class DesktopBrowserActivity : Activity() {
         }
     }
 
-    /**
-     * An invisible view that owns the soft keyboard. Text is committed straight away (no
-     * composing), so every character goes to the browser as it is typed, Thai included.
-     */
-    private class KeyInputView(context: Context, private val session: () -> DesktopSession?) : View(context) {
-        private var shown = false
-
-        init {
-            isFocusable = true
-            isFocusableInTouchMode = true
-        }
-
-        /**
-         * Shows the keyboard, or hides it when it really is on screen. The keyboard's own state is
-         * read from the window insets, not remembered: closing it with Back or the keyboard's own
-         * button left a remembered flag saying "shown", so the next tap hid nothing and the
-         * keyboard never came back.
-         */
-        fun toggle() = if (imeVisible()) hide() else show()
-
-        /** Always brings the keyboard up (Address and Type buttons). */
-        fun show() {
-            shown = true
-            requestFocus()
-            context.getSystemService(InputMethodManager::class.java).showSoftInput(this, 0)
-        }
-
-        fun hide() {
-            shown = false
-            context.getSystemService(InputMethodManager::class.java).hideSoftInputFromWindow(windowToken, 0)
-        }
-
-        private fun imeVisible(): Boolean =
-            rootWindowInsets?.isVisible(android.view.WindowInsets.Type.ime()) ?: shown
-
-        override fun onCheckIsTextEditor(): Boolean = true
-
-        /** Hardware and Bluetooth keyboards (and `adb shell input`) arrive here, not through the IME. */
-        override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-            val input = session()?.input ?: return super.onKeyDown(keyCode, event)
-            val keysym = keysymFor(keyCode)
-            when {
-                keysym != null -> input.key(keysym)
-                event.unicodeChar != 0 -> input.typeText(String(Character.toChars(event.unicodeChar)))
-                else -> return super.onKeyDown(keyCode, event)
-            }
-            session()?.renderer?.burst()
-            return true
-        }
-
-        override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection {
-            outAttrs.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
-            outAttrs.imeOptions = EditorInfo.IME_FLAG_NO_EXTRACT_UI or EditorInfo.IME_FLAG_NO_FULLSCREEN or EditorInfo.IME_ACTION_GO
-            return object : BaseInputConnection(this, false) {
-                override fun commitText(text: CharSequence, newCursorPosition: Int): Boolean {
-                    session()?.input?.typeText(text.toString())
-                    session()?.renderer?.burst()
-                    return true
-                }
-
-                override fun setComposingText(text: CharSequence, newCursorPosition: Int): Boolean =
-                    commitText(text, newCursorPosition)
-
-                override fun deleteSurroundingText(beforeLength: Int, afterLength: Int): Boolean {
-                    repeat(beforeLength.coerceAtMost(64)) { session()?.input?.key(Keysym.BACKSPACE) }
-                    repeat(afterLength.coerceAtMost(64)) { session()?.input?.key(Keysym.DELETE) }
-                    session()?.renderer?.burst()
-                    return true
-                }
-
-                override fun performEditorAction(actionCode: Int): Boolean {
-                    session()?.input?.key(Keysym.RETURN)
-                    session()?.renderer?.burst()
-                    return true
-                }
-
-                override fun sendKeyEvent(event: KeyEvent): Boolean {
-                    if (event.action != KeyEvent.ACTION_DOWN) return true
-                    val keysym = keysymFor(event.keyCode)
-                    when {
-                        keysym != null -> session()?.input?.key(keysym)
-                        event.unicodeChar != 0 -> session()?.input?.typeText(String(Character.toChars(event.unicodeChar)))
-                        else -> return super.sendKeyEvent(event)
-                    }
-                    session()?.renderer?.burst()
-                    return true
-                }
-            }
-        }
-    }
-
     companion object {
-        private fun keysymFor(keyCode: Int): Int? = when (keyCode) {
-            KeyEvent.KEYCODE_DEL -> Keysym.BACKSPACE
-            KeyEvent.KEYCODE_FORWARD_DEL -> Keysym.DELETE
-            KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER -> Keysym.RETURN
-            KeyEvent.KEYCODE_TAB -> Keysym.TAB
-            KeyEvent.KEYCODE_ESCAPE -> Keysym.ESCAPE
-            KeyEvent.KEYCODE_DPAD_LEFT -> Keysym.LEFT
-            KeyEvent.KEYCODE_DPAD_RIGHT -> Keysym.RIGHT
-            KeyEvent.KEYCODE_DPAD_UP -> Keysym.UP
-            KeyEvent.KEYCODE_DPAD_DOWN -> Keysym.DOWN
-            KeyEvent.KEYCODE_PAGE_UP -> Keysym.PAGE_UP
-            KeyEvent.KEYCODE_PAGE_DOWN -> Keysym.PAGE_DOWN
-            KeyEvent.KEYCODE_MOVE_HOME -> Keysym.HOME
-            KeyEvent.KEYCODE_MOVE_END -> Keysym.END
-            KeyEvent.KEYCODE_F5 -> Keysym.F5
-            else -> null
-        }
-
+        private const val REFUSAL_MS = 4_000L
+        /** After a page tap, how long Chrome gets to update the cursor under the pointer. */
+        private const val TEXT_CURSOR_PROBE_MS = 250L
         private const val EXTRA_BROWSER = "browser"
         private const val EXTRA_URL = "url"
 

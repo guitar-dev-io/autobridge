@@ -14,6 +14,9 @@ import dev.autobridge.desktop.display.FrameRenderer
 import dev.autobridge.desktop.display.X11Connection
 import dev.autobridge.desktop.display.XwdFramebuffer
 import dev.autobridge.desktop.input.BrowserInput
+import dev.autobridge.desktop.keyboard.ClipboardSync
+import dev.autobridge.desktop.keyboard.X11Clipboard
+import dev.autobridge.desktop.runtime.GuestNetworkConfig
 import dev.autobridge.desktop.runtime.LinuxRuntime
 import dev.autobridge.desktop.runtime.RuntimeLayout
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -68,6 +71,9 @@ class DesktopSession internal constructor(
     @Volatile var input: BrowserInput? = null
         private set
     @Volatile var x11Connected = false
+        private set
+    /** Guest CLIPBOARD ⇄ Android clipboard; null when the X side could not be set up. */
+    @Volatile var clipboard: ClipboardSync? = null
         private set
     private var x11: X11Connection? = null
     private var xvfb: Process? = null
@@ -129,6 +135,7 @@ class DesktopSession internal constructor(
     private fun startBlocking(startUrl: String?) {
         startedAt = SystemClock.elapsedRealtime()
         try {
+            GuestNetworkConfig.refresh(context, layout.rootfs)
             prepareDirectories()
             pulse = runtime.start(
                 listOf("pulseaudio", "--daemonize=no", "--exit-idle-time=-1", "--disallow-exit", "-n",
@@ -162,7 +169,14 @@ class DesktopSession internal constructor(
                 }
             }
             connection.onClosed = { error -> if (!stopping) fail("X display closed", error) }
-            input = BrowserInput(connection).also { it.sensitivity = sensitivity }
+            val x11Clipboard = runCatching { X11Clipboard(connection) }
+                .onFailure { DesktopLog.w("clipboard unavailable", it) }
+                .getOrNull()
+            x11Clipboard?.let { c ->
+                connection.addEventListener(c.eventListener)
+                clipboard = ClipboardSync(context.applicationContext, c)
+            }
+            input = BrowserInput(connection, x11Clipboard).also { it.sensitivity = sensitivity; it.clipboardSync = clipboard }
 
             browser = launchBrowser(startUrl, restoreLastSession)
             audio = BrowserAudioBridge(context, layout.pulsePcmSocket).also { it.start() }
@@ -202,6 +216,7 @@ class DesktopSession internal constructor(
         stopping = true
         audio?.stop()
         input?.shutdown()
+        clipboard?.close()
         xThread.shutdownNow()
         // The browser first, with SIGTERM to its own pid so it writes its profile and session.
         val pid = readPid()

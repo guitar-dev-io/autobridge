@@ -5,12 +5,16 @@ import android.content.Intent
 import android.graphics.Canvas
 import android.graphics.Rect
 import android.graphics.drawable.Drawable
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
+import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import dev.autobridge.browser.Box
 import dev.autobridge.browser.BrowserIcon
 import dev.autobridge.browser.BrowserKeyboardMode
+import dev.autobridge.browser.CarKeyboardGestures
 import dev.autobridge.browser.CarSurfaceKeyboard
 import dev.autobridge.desktop.display.FrameRenderer
 import kotlin.math.roundToInt
@@ -36,6 +40,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
+import dev.autobridge.BuildConfig
 import dev.autobridge.R
 import dev.autobridge.car.CarBrowserSearchScreen
 import dev.autobridge.car.CarIcons
@@ -47,12 +52,15 @@ import dev.autobridge.desktop.browser.DesktopBrowserAdapter
 import dev.autobridge.desktop.input.ControlRail
 import dev.autobridge.desktop.input.Keysym
 import dev.autobridge.desktop.input.PointerMode
+import dev.autobridge.desktop.keyboard.Shortcut
+import dev.autobridge.desktop.keyboard.TypingTarget
 import dev.autobridge.display.CarSurfaceCanvas
 import dev.autobridge.desktop.session.DesktopSession
 import dev.autobridge.desktop.browser.DesktopBrowsers
 import dev.autobridge.desktop.install.EngineChoice
 import dev.autobridge.mirror.MirrorSurfaceOwnership
 import androidx.car.app.CarToast
+import dev.autobridge.safety.BypassPolicyStore
 import dev.autobridge.safety.ParkingStateStore
 import dev.autobridge.safety.SafetyEnforcement
 
@@ -106,7 +114,7 @@ class DesktopBrowserCarScreen(
     private var stableArea: Rect? = null
     private val rail = ControlRail(carContext, 1f).apply {
         showKeyboardChoice = true
-        useCarKeyboard = DesktopCarKeyboard.useCarKeyboard(carContext)
+        keyboardChoice = DesktopCarKeyboard.choice(carContext).ordinal
     }
 
     /**
@@ -117,8 +125,57 @@ class DesktopBrowserCarScreen(
      */
     @Volatile private var keyboard: CarSurfaceKeyboard? = null
 
-    /** The open keyboard is typing an address (Ctrl+L, then Enter) rather than into the page. */
-    private var keyboardForAddress = false
+    /** What the open keyboard types into: the focused page field, or the address bar (after Ctrl+L). */
+    private var keyboardTarget = TypingTarget.FIELD
+
+    /** The open keyboard has typed something: hiding it on the address bar then sends Escape (Chrome restores the URL). */
+    private var keyboardEdited = false
+
+    /** The car's search keyboard while it is on top, typing live; popped with rollback if typing stops being allowed. */
+    private var searchKeyboard: CarBrowserSearchScreen? = null
+
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    /** Fast double taps on the drawn keyboard arrive as one onScale; this turns them back into taps. */
+    private val doubleTap = KeyboardDoubleTap(
+        clock = SystemClock::uptimeMillis,
+        schedule = { delay, block ->
+            val task = Runnable(block)
+            mainHandler.postDelayed(task, delay)
+            ({ mainHandler.removeCallbacks(task) })
+        },
+        density = { rail.density },
+        onTray = { x, y ->
+            keyboard?.let { CarKeyboardGestures.inKeyboardArea(x, y, it.geometry(keyboardArea(), rail.density).tray) } == true
+        },
+        replay = { x, y ->
+            val board = keyboard
+            val s = session
+            if (board != null && s != null && allowed()) onKeyboardTap(board, s, x, y)
+        },
+    )
+    /** With no keyboard open, a host double-tap on the page clicks instead of zooming; a real pinch still zooms. */
+    private val pageDoubleTap = PageDoubleTap(
+        clock = SystemClock::uptimeMillis,
+        schedule = { delay, block ->
+            val task = Runnable(block)
+            mainHandler.postDelayed(task, delay)
+            ({ mainHandler.removeCallbacks(task) })
+        },
+        doubleClick = { x, y ->
+            val s = session
+            val (dx, dy) = s?.renderer?.mapping?.toDisplay(x, y) ?: return@PageDoubleTap
+            s.input?.click(dx, dy)
+            s.input?.click(dx, dy)
+            s.renderer.burst()
+        },
+        zoom = { x, y, factor ->
+            val s = session
+            val (dx, dy) = s?.renderer?.mapping?.toDisplay(x, y) ?: return@PageDoubleTap
+            s.input?.zoom(dx, dy, factor)
+            s.renderer.burst()
+        },
+    )
     private val iconCache = HashMap<Int, Drawable>()
 
     /** The rail, then the keyboard over the page when it is open. */
@@ -135,7 +192,14 @@ class DesktopBrowserCarScreen(
         invalidate()
     }
 
+    /** The bypass lifts the typing gate's parked requirement, so turning it off can close the keyboard. */
+    private val bypassListener: (BypassPolicyStore.State) -> Unit = {
+        applyGate()
+        invalidate()
+    }
+
     init {
+        KeyboardBridgeDebug.register(carContext)
         // A zoom change in Settings restarts the browser; carry on with the new session.
         lifecycleScope.launch {
             DesktopEngine.session.collect { s ->
@@ -145,6 +209,7 @@ class DesktopBrowserCarScreen(
         lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onCreate(owner: LifecycleOwner) {
                 ParkingStateStore.addListener(parkingListener)
+                BypassPolicyStore.addListener(bypassListener)
                 if (adapter != null) {
                     MirrorSurfaceOwnership.claim(this@DesktopBrowserCarScreen)
                     carContext.getCarService(AppManager::class.java).setSurfaceCallback(this@DesktopBrowserCarScreen)
@@ -153,6 +218,9 @@ class DesktopBrowserCarScreen(
 
             override fun onDestroy(owner: LifecycleOwner) {
                 ParkingStateStore.removeListener(parkingListener)
+                BypassPolicyStore.removeListener(bypassListener)
+                doubleTap.cancel()
+                pageDoubleTap.cancel()
                 if (rail.dragHeld) session?.input?.releaseAtCursor()
                 session?.detachSurface()
                 DesktopEngine.noteSurfaceDetached()
@@ -191,34 +259,104 @@ class DesktopBrowserCarScreen(
         Action.Builder().setIcon(CarIcons.of(carContext, icon)).setOnClickListener(onClick).build()
 
     /**
-     * The chosen keyboard (AutoBridge's, drawn on the page, or the car's search box). [address]
-     * types into the browser's own address bar: Ctrl+L first, so the text replaces the URL.
+     * The chosen keyboard, parked only ([KeyboardTypingGate]): AutoBridge's, drawn on the page; the
+     * car's search box; or the phone's own keyboard through a notification. The first two type
+     * into the page live, key by key; [TypingTarget.ADDRESS] types into the browser's address bar
+     * (the bridge sends Ctrl+L first, so the text replaces the URL).
      */
-    private fun openKeyboard(address: Boolean = false) {
-        if (!DesktopCarKeyboard.useCarKeyboard(carContext)) {
-            keyboardForAddress = address
-            keyboard = CarSurfaceKeyboard(
-                carContext,
-                if (address) CarSurfaceKeyboard.Target.ADDRESS else CarSurfaceKeyboard.Target.FIELD,
-                seed = "",
-                mode = if (address) BrowserKeyboardMode.URL else BrowserKeyboardMode.SEARCH,
-                hint = carContext.getString(if (address) R.string.car_keyboard_hint else R.string.desktop_car_keyboard_hint),
-            )
-            session?.renderer?.burst()
+    private fun openKeyboard(target: TypingTarget) {
+        if (!allowed()) return
+        if (!KeyboardTypingGate.allowed()) {
+            toast(KeyboardTypingGate.refusalMessage())
             return
         }
-        screenManager.pushForResult(CarBrowserSearchScreen(carContext, "")) { result ->
-            val text = result as? String ?: return@pushForResult
-            sendText(text, address)
+        val address = target == TypingTarget.ADDRESS
+        when (DesktopCarKeyboard.choice(carContext)) {
+            DesktopCarKeyboard.Choice.AUTOBRIDGE -> {
+                val keys = session?.input?.keyboard ?: return
+                keys.prepareForTyping(target)
+                keyboardTarget = target
+                keyboardEdited = false
+                keyboard = CarSurfaceKeyboard(
+                    carContext,
+                    if (address) CarSurfaceKeyboard.Target.ADDRESS else CarSurfaceKeyboard.Target.FIELD,
+                    seed = "",
+                    mode = if (address) BrowserKeyboardMode.URL else BrowserKeyboardMode.SEARCH,
+                    hint = carContext.getString(if (address) R.string.car_keyboard_hint else R.string.desktop_car_keyboard_hint),
+                    live = true,
+                )
+                session?.renderer?.burst()
+            }
+            DesktopCarKeyboard.Choice.CAR -> {
+                val keys = session?.input?.keyboard ?: return
+                keys.prepareForTyping(target)
+                val screen = CarBrowserSearchScreen(
+                    carContext,
+                    "",
+                    field = if (address) null else CarBrowserSearchScreen.Field("", "text"),
+                    onTextChanged = { text ->
+                        // The whole text so far: the bridge types only the difference.
+                        if (KeyboardTypingGate.allowed()) {
+                            session?.input?.keyboard?.setComposingText(text)
+                            session?.renderer?.burst()
+                        }
+                    },
+                )
+                searchKeyboard = screen
+                screenManager.pushForResult(screen) { result ->
+                    searchKeyboard = null
+                    val bridge = session?.input?.keyboard ?: return@pushForResult
+                    if (result != null && KeyboardTypingGate.allowed()) {
+                        // Already typed live: only its non-null-ness matters (it is trimmed).
+                        bridge.finishComposing()
+                        bridge.key(Keysym.RETURN)
+                    } else {
+                        // Back (or typing stopped being allowed): take the live text out again.
+                        bridge.setComposingText("")
+                        if (address) bridge.key(Keysym.ESCAPE)
+                    }
+                    session?.renderer?.burst()
+                }
+            }
+            // The phone companion focuses Chrome itself (once per notification tap).
+            DesktopCarKeyboard.Choice.PHONE -> toast(
+                if (DesktopPhoneKeyboard.request(carContext, target)) {
+                    R.string.desktop_keyboard_phone_open_notification
+                } else {
+                    R.string.desktop_keyboard_phone_notifications_off
+                }
+            )
         }
     }
 
-    private fun sendText(text: String, address: Boolean) {
-        val input = session?.input ?: return
-        if (address) input.focusAddressBar()
-        if (text.isNotEmpty()) input.typeText(text)
-        input.key(Keysym.RETURN)
-        session?.renderer?.burst()
+    private fun toast(message: Int) =
+        CarToast.makeText(carContext, carContext.getString(message), CarToast.LENGTH_LONG).show()
+
+    /**
+     * Hides AutoBridge's keyboard. Nothing is typed by hiding it; on the address bar, edits that
+     * were not sent with Go are undone by Escape (Chrome puts the URL back).
+     */
+    private fun closeKeyboard(submitted: Boolean = false) {
+        if (keyboard == null) return
+        keyboard = null
+        doubleTap.cancel()
+        val keys = session?.input?.keyboard ?: return
+        keys.finishComposing()
+        if (!submitted && keyboardTarget == TypingTarget.ADDRESS && keyboardEdited) keys.key(Keysym.ESCAPE)
+    }
+
+    /** Debug builds: what the host delivers while the keyboard is open, to tune [KeyboardDoubleTap]. */
+    private fun logGesture(kind: String, x: Float, y: Float, f: Float) {
+        if (BuildConfig.DEBUG) Log.d(KB_TEST_TAG, "gesture kind=$kind x=$x y=$y f=$f t=${SystemClock.uptimeMillis()}")
+    }
+
+    /**
+     * Gestures while AutoBridge's keyboard is open never reach the page: pans and flings are
+     * dropped, and a scale is a double tap on a key or nothing (no page zoom while typing).
+     */
+    private fun keyboardGesture(kind: String, x: Float, y: Float, f: Float) {
+        logGesture(kind, x, y, f)
+        if (kind == GESTURE_SCALE && allowed()) doubleTap.onScale(x, y, f)
     }
 
     /** What the rail asked for; the rail has already changed its own state. */
@@ -231,10 +369,32 @@ class DesktopBrowserCarScreen(
             ControlRail.Action.NEW_TAB -> input?.newTab()
             ControlRail.Action.ZOOM_IN -> input?.key('='.code, Keysym.CONTROL_L)
             ControlRail.Action.ZOOM_OUT -> input?.key('-'.code, Keysym.CONTROL_L)
-            ControlRail.Action.ADDRESS -> openKeyboard(address = true)
-            ControlRail.Action.KEYBOARD -> openKeyboard()
-            ControlRail.Action.KEYBOARD_AUTOBRIDGE -> DesktopCarKeyboard.setUseCarKeyboard(carContext, false)
-            ControlRail.Action.KEYBOARD_CAR -> DesktopCarKeyboard.setUseCarKeyboard(carContext, true)
+            ControlRail.Action.RESET_ZOOM -> input?.key('0'.code, Keysym.CONTROL_L)
+            ControlRail.Action.ADDRESS -> openKeyboard(TypingTarget.ADDRESS)
+            ControlRail.Action.KEYBOARD -> openKeyboard(TypingTarget.FIELD)
+            ControlRail.Action.KEYBOARD_AUTOBRIDGE -> DesktopCarKeyboard.setChoice(carContext, DesktopCarKeyboard.Choice.AUTOBRIDGE)
+            ControlRail.Action.KEYBOARD_CAR -> DesktopCarKeyboard.setChoice(carContext, DesktopCarKeyboard.Choice.CAR)
+            ControlRail.Action.KEYBOARD_PHONE -> DesktopCarKeyboard.setChoice(carContext, DesktopCarKeyboard.Choice.PHONE)
+            // The Text row types into the page: parked-only like every keyboard on the car.
+            // Paste here is the guest's own clipboard (what was copied in Chrome).
+            ControlRail.Action.TAB,
+            ControlRail.Action.ESCAPE,
+            ControlRail.Action.SELECT_ALL,
+            ControlRail.Action.COPY,
+            ControlRail.Action.PASTE -> {
+                if (!KeyboardTypingGate.allowed()) {
+                    toast(KeyboardTypingGate.refusalMessage())
+                    return
+                }
+                val keys = input?.keyboard ?: return
+                when (action) {
+                    ControlRail.Action.TAB -> keys.key(Keysym.TAB)
+                    ControlRail.Action.ESCAPE -> keys.key(Keysym.ESCAPE)
+                    ControlRail.Action.SELECT_ALL -> keys.shortcut(Shortcut.SELECT_ALL)
+                    ControlRail.Action.COPY -> keys.shortcut(Shortcut.COPY)
+                    else -> keys.shortcut(Shortcut.PASTE)
+                }
+            }
             ControlRail.Action.DRAG_START -> input?.pressAtCursor()
             ControlRail.Action.DRAG_END -> input?.releaseAtCursor()
             ControlRail.Action.MODE_CHANGED -> {
@@ -244,6 +404,8 @@ class DesktopBrowserCarScreen(
                 if (rail.mode == PointerMode.MOUSE) {
                     session?.renderer?.mapping?.let { m -> input?.moveTo(m.displayWidth / 2, m.displayHeight / 2) }
                 }
+                // Touch mode shows no on-page cursor; mouse/drag show the X arrow.
+                input?.let { if (rail.mode == PointerMode.TOUCH) it.hideCursor() else it.showCursor() }
             }
             // The car leaves with Home or Back; there is no Close on the car.
             ControlRail.Action.CLOSE -> Unit
@@ -267,22 +429,50 @@ class DesktopBrowserCarScreen(
     }
 
     /**
-     * A tap while AutoBridge's keyboard is open belongs to it. Search types the text into the
-     * focused field and presses Enter, as the car keyboard does; a tap above the tray closes it.
+     * A tap while AutoBridge's keyboard is open belongs to it. Each key goes to the page as it is
+     * tapped (live); Search presses Enter (the text is already there); a tap above the tray hides
+     * the keyboard. Parked only: a tap once typing is no longer allowed just closes it.
      */
     private fun onKeyboardTap(board: CarSurfaceKeyboard, s: DesktopSession, x: Float, y: Float) {
-        when (val result = board.onTap(x, y, keyboardArea(), rail.density, SystemClock.uptimeMillis())) {
-            is CarSurfaceKeyboard.Result.Commit -> {
-                keyboard = null
-                sendText(result.text, keyboardForAddress)
+        if (!KeyboardTypingGate.allowed()) {
+            closeKeyboard()
+            s.renderer.burst()
+            return
+        }
+        val result = board.onTap(x, y, keyboardArea(), rail.density, SystemClock.uptimeMillis())
+        val keys = s.input?.keyboard
+        val edit = board.lastEdit
+        if (edit != null) keyboardEdited = true
+        when (edit) {
+            is CarSurfaceKeyboard.Edit.Inserted -> keys?.commitText(edit.text)
+            CarSurfaceKeyboard.Edit.DeletedBack -> keys?.key(Keysym.BACKSPACE)
+            is CarSurfaceKeyboard.Edit.Cursor -> keys?.key(if (edit.dir < 0) Keysym.LEFT else Keysym.RIGHT)
+            CarSurfaceKeyboard.Edit.Cleared -> {
+                keys?.key('a'.code, Keysym.CONTROL_L)
+                keys?.key(Keysym.BACKSPACE)
             }
-            CarSurfaceKeyboard.Result.Close -> keyboard = null
+            null -> Unit
+        }
+        when (result) {
+            is CarSurfaceKeyboard.Result.Commit -> {
+                keys?.key(Keysym.RETURN)
+                closeKeyboard(submitted = true)
+            }
+            CarSurfaceKeyboard.Result.Close -> closeKeyboard()
             else -> Unit
         }
         s.renderer.burst()
     }
 
     private fun applyGate() {
+        // Typing is parked-only even while the browsing gate only reports: close every keyboard.
+        if (!KeyboardTypingGate.allowed()) {
+            closeKeyboard()
+            searchKeyboard?.let { screen ->
+                // Popping it reports no result, which takes its live text out of the page.
+                mainHandler.post { if (searchKeyboard === screen) screenManager.remove(screen) }
+            }
+        }
         // Typing is part of browsing: nothing is left open over the page while moving.
         if (!allowed()) keyboard = null
         session?.renderer?.blockedMessage =
@@ -328,7 +518,7 @@ class DesktopBrowserCarScreen(
         DesktopLog.i("car surface ${surfaceWidth}x$surfaceHeight dpi=$surfaceDpi")
         this.surface = surface
         val area = pageArea()
-        val scale = DesktopEngine.carScale(surfaceDpi)
+        val scale = DesktopEngine.carScale(surfaceDpi, area.width())
         // Remembered so "start on launch" opens the browser at this car's size.
         DesktopEngine.store.setLastCar(area.width(), area.height(), scale)
         val s = try {
@@ -352,6 +542,8 @@ class DesktopBrowserCarScreen(
         applyGate()
         surface?.let { s.renderer.attachSurface(it, surfaceWidth, surfaceHeight) }
         fit()
+        // The rail starts in TOUCH, so hide the X cursor at session start to match the default.
+        if (rail.mode == PointerMode.TOUCH) s.input?.hideCursor() else s.input?.showCursor()
         DesktopEngine.noteSurfaceAttached()
     }
 
@@ -372,6 +564,8 @@ class DesktopBrowserCarScreen(
         if (!allowed()) return
         val s = session ?: return
         keyboard?.let { board ->
+            logGesture("click", x, y, 0f)
+            doubleTap.onClick(x, y)
             onKeyboardTap(board, s, x, y)
             return
         }
@@ -404,13 +598,17 @@ class DesktopBrowserCarScreen(
     }
 
     override fun onScroll(distanceX: Float, distanceY: Float) {
+        if (keyboard != null) return keyboardGesture("scroll", distanceX, distanceY, 0f)
         if (!allowed() || rail.consumesScroll()) return
         val s = session ?: return
         val map = s.renderer.mapping ?: return
-        if (rail.mode == PointerMode.MOUSE) {
-            // Pan moves the cursor with the finger (distance is previous minus current).
+        if (rail.mode == PointerMode.MOUSE && rail.dragHeld) {
+            // Drag armed: move the pointer with the left button already down (pressed by
+            // DRAG_START), so a one-finger drag selects text / drags elements.
             s.input?.moveBy(-map.toDisplayDistance(distanceX), -map.toDisplayDistance(distanceY), map.displayWidth, map.displayHeight)
         } else {
+            // Touch and plain mouse both wheel-scroll the page: a head unit cannot do a two-finger
+            // scroll, so a one-finger drag scrolls. Mouse still places + clicks the cursor on a tap.
             val (cx, cy) = map.toDisplay(surfaceWidth / 2f, surfaceHeight / 2f)
             s.input?.scroll(cx, cy, map.toDisplayDistance(distanceX), map.toDisplayDistance(distanceY))
         }
@@ -418,7 +616,9 @@ class DesktopBrowserCarScreen(
     }
 
     override fun onFling(velocityX: Float, velocityY: Float) {
-        if (!allowed() || rail.consumesScroll() || rail.mode == PointerMode.MOUSE) return
+        if (keyboard != null) return keyboardGesture("fling", velocityX, velocityY, 0f)
+        // Mouse/touch both momentum-scroll; only a drag-held pan (click-drag) must not fling.
+        if (!allowed() || rail.consumesScroll() || (rail.mode == PointerMode.MOUSE && rail.dragHeld)) return
         val s = session ?: return
         val map = s.renderer.mapping ?: return
         val (cx, cy) = map.toDisplay(surfaceWidth / 2f, surfaceHeight / 2f)
@@ -427,11 +627,17 @@ class DesktopBrowserCarScreen(
     }
 
     override fun onScale(focusX: Float, focusY: Float, scaleFactor: Float) {
+        if (keyboard != null) return keyboardGesture(GESTURE_SCALE, focusX, focusY, scaleFactor)
         if (!allowed()) return
-        val s = session ?: return
-        val (dx, dy) = s.renderer.mapping?.toDisplay(focusX, focusY) ?: return
-        s.input?.zoom(dx, dy, scaleFactor)
-        s.renderer.burst()
+        // No keyboard: a host double-tap (one isolated big-factor onScale) double-clicks at the
+        // focus point, mapped the same way onClick maps a TOUCH tap; a real pinch still zooms.
+        pageDoubleTap.onScale(focusX, focusY, scaleFactor)
+    }
+
+    private companion object {
+        /** The debug harness's logcat tag ([KeyboardBridgeDebug]). */
+        const val KB_TEST_TAG = "AutoBridgeKbTest"
+        const val GESTURE_SCALE = "scale"
     }
 }
 
@@ -502,17 +708,36 @@ class DesktopEngineChoiceCarScreen(
 }
 
 /**
- * Which keyboard the rail's keyboard button opens on the car: AutoBridge's own (the default, the
- * same one the built-in browser draws) or the car's search keyboard. Switched from the rail's
- * settings list and remembered.
+ * Which keyboard the rail's keyboard button opens on the car: AutoBridge's own (drawn on the
+ * page, the same one the built-in browser draws), the car's search keyboard, or the phone's own
+ * keyboard (a notification opens it on the phone). Switched from the rail's settings list and
+ * remembered. [Choice.ordinal] is the rail's `keyboardChoice`.
  */
 object DesktopCarKeyboard {
+    enum class Choice { AUTOBRIDGE, CAR, PHONE }
+
     private const val PREFS = "desktop_car"
+    private const val KEY_CHOICE = "keyboard_choice"
+    /** Before the three-way choice: true = the car's keyboard. */
     private const val KEY_USE_CAR_KEYBOARD = "use_car_keyboard"
 
-    fun useCarKeyboard(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_USE_CAR_KEYBOARD, false)
+    /**
+     * The stored choice, else the old two-way setting (true → CAR, false → AUTOBRIDGE), else CAR:
+     * the host's own keyboard is the supported Android Auto input path.
+     */
+    fun resolve(stored: String?, legacy: Boolean?): Choice =
+        Choice.entries.firstOrNull { it.name == stored } ?: when (legacy) {
+            true -> Choice.CAR
+            false -> Choice.AUTOBRIDGE
+            null -> Choice.CAR
+        }
 
-    fun setUseCarKeyboard(context: Context, use: Boolean) =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putBoolean(KEY_USE_CAR_KEYBOARD, use) }
+    fun choice(context: Context): Choice {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val legacy = if (prefs.contains(KEY_USE_CAR_KEYBOARD)) prefs.getBoolean(KEY_USE_CAR_KEYBOARD, false) else null
+        return resolve(prefs.getString(KEY_CHOICE, null), legacy)
+    }
+
+    fun setChoice(context: Context, choice: Choice) =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putString(KEY_CHOICE, choice.name) }
 }

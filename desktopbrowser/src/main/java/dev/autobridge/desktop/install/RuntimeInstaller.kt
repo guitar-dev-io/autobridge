@@ -1,14 +1,13 @@
 package dev.autobridge.desktop.install
 
 import android.content.Context
-import android.net.ConnectivityManager
 import android.os.StatFs
 import dev.autobridge.desktop.DesktopLog
+import dev.autobridge.desktop.runtime.GuestNetworkConfig
 import dev.autobridge.desktop.runtime.LinuxRuntime
 import dev.autobridge.desktop.runtime.RuntimeLayout
 import java.io.File
 import java.io.IOException
-import java.net.Inet4Address
 import java.util.zip.GZIPInputStream
 
 /**
@@ -96,7 +95,7 @@ class RuntimeInstaller(
     fun writeConfiguration() {
         val root = layout.rootfs
         File(root, "etc").mkdirs()
-        File(root, "etc/resolv.conf").apply { delete(); writeText(resolvConf()) }
+        GuestNetworkConfig.refresh(context, root)
         File(root, "etc/hosts").writeText("127.0.0.1 localhost\n::1 localhost ip6-localhost ip6-loopback\n")
         File(root, "etc/apt/apt.conf.d").mkdirs()
         File(root, "etc/apt/apt.conf.d/99autobridge").writeText(
@@ -117,18 +116,6 @@ class RuntimeInstaller(
         }
         layout.host("/tmp").setWritable(true, false)
         layout.host(RuntimeLayout.GUEST_X11_DIR).setWritable(true, false)
-    }
-
-    private fun resolvConf(): String {
-        val servers = runCatching {
-            val cm = context.getSystemService(ConnectivityManager::class.java)
-            cm.getLinkProperties(cm.activeNetwork)?.dnsServers.orEmpty()
-                .filterIsInstance<Inet4Address>()
-                .mapNotNull { it.hostAddress }
-        }.getOrDefault(emptyList())
-        // Android may report only a private-DNS loopback; public resolvers keep apt working then.
-        val usable = servers.filterNot { it.startsWith("127.") }.ifEmpty { listOf("8.8.8.8", "1.1.1.1") }
-        return usable.joinToString("") { "nameserver $it\n" }
     }
 
     private fun ensureFreeSpace(required: Long) {

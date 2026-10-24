@@ -1,15 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Mouse: rounded body outline, split left/right buttons and a scroll wheel. Drawn for AutoBridge;
+<!-- Mouse: classic arrow pointer (tip up-left, short tail down-right). Drawn for AutoBridge;
      tinted by the rail like the other icons. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
-    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="1.8" android:fillColor="#00000000"
+    <path android:fillColor="#FFFFFFFF" android:strokeColor="#FFFFFFFF" android:strokeWidth="1.2"
         android:strokeLineJoin="round"
-        android:pathData="M12,2.5 C15.9,2.5 18.5,5.2 18.5,9.2 L18.5,14.8 C18.5,18.8 15.9,21.5 12,21.5 C8.1,21.5 5.5,18.8 5.5,14.8 L5.5,9.2 C5.5,5.2 8.1,2.5 12,2.5 Z"/>
-    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="1.6" android:strokeLineCap="round"
-        android:pathData="M5.8,10.2 L18.2,10.2"/>
-    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="1.6" android:strokeLineCap="round"
-        android:pathData="M12,2.8 L12,10.2"/>
-    <path android:fillColor="#FFFFFFFF"
-        android:pathData="M11,5.2 a1,1 0 0 1 2,0 L13,7.4 a1,1 0 0 1 -2,0 Z"/>
+        android:pathData="M6,3 L6,18.5 L9.6,15.2 L12.2,20.8 L14.7,19.6 L12.1,14.1 L17,14.1 Z"/>
 </vector>

@@ -13,6 +13,7 @@ car opens from inside it.
 | `projection.ProjectionCarService` ("Bridge Web") | CATEGORY_PROJECTION (unofficial SDK) | yes | disabled; can be listed again in Settings |
 | `projection.ProjectionMirrorCarService` ("Bridge Mirror") | CATEGORY_PROJECTION | no (already off) | unchanged |
 | `browser.CarBrowserEntry` ("AutoBridge Browser", added in 0.4.59-rc7) | CAR_LAUNCHER activity-alias of `BrowserActivity` | – | **yes**; Settings can hide it |
+| `projection.desktop.DesktopBrowserCarEntry` ("AutoBridge Chrome") | CAR_LAUNCHER activity-alias of `DesktopBrowserActivity` | – | disabled; Settings can list it (sideload flavors only) |
 
 The safe (Play) flavor only ever had AutoBridge. Third-party apps (VelvetLauncher, AABrowser) are
 not touched. `scripts/check-car-entries.py` checks this table on every CI run.
@@ -29,6 +30,19 @@ box, Quick Links) and keeps the system keyboard; everywhere else it behaves as b
 Bridge Web on Android Auto › "List AutoBridge Browser on Android Auto" hides it. The Web card
 inside AutoBridge still opens the built-in (template) browser.
 
+## AutoBridge Chrome (opt-in second entry)
+The same idea for the Chrome/Brave desktop viewer: `DesktopBrowserCarEntry` is a `CAR_LAUNCHER`
+alias of `DesktopBrowserActivity`, so Android Auto runs the viewer as a real window on the car
+display and `showSoftInput` can bring up the phone's keyboard (which keyboard is unverified; the
+system picks it). Disabled by default; Settings › "List AutoBridge Chrome on Android Auto" lists it
+(reconnect afterwards). Sideload flavors only; the safe (Play) flavor does not declare it. Parked
+only: started under that name the activity applies `SafetyEnforcement.gateParked` and
+`FeaturePolicy` like the template car screen, shows the park notice and ignores input while moving.
+Typing there is also parked-only (`KeyboardTypingGate`), and the entry has no vehicle-state source
+of its own: it types only while an AutoBridge car screen holds the vehicle-state lease; otherwise it
+shows "Typing needs AutoBridge open on the car…" and refuses (fail closed).
+The Web card (template browser), its drawn keyboard and the SearchTemplate keyboard stay as
+fallbacks.
 ## How each feature is reached now
 
 - **Browser** – the Web card. It opens the desktop engine (Linux Chrome or Brave) when one is
@@ -75,3 +89,7 @@ The disabled services are kept, not deleted, so a standalone route can still be 
 6. Send to Car a link and a video: they open in the built-in browser / bridge player as before.
 7. Settings › Bridge Web on Android Auto: switch on, reconnect, Bridge Web is listed; off, gone.
 8. Settings › Send log: the "… listed" rows read "no (default)" for all four services.
+9. Settings › AutoBridge Chrome: switch on, reconnect, "AutoBridge Chrome" is listed; off, gone.
+10. Parked, open AutoBridge Chrome on the car: the page fills the window; Address shows a keyboard
+    and typing (Thai too) reaches Chrome; moving shows the park notice and ignores input; going
+    to the Web card and back keeps one working picture.

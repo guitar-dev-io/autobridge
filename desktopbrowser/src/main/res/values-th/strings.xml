@@ -31,6 +31,7 @@
     <string name="desktop_rail_reload">โหลดใหม่</string>
     <string name="desktop_rail_new_tab">แท็บใหม่</string>
     <string name="desktop_rail_zoom">ซูมหน้าเว็บ</string>
+    <string name="desktop_rail_zoom_reset">รีเซ็ต</string>
     <string name="desktop_rail_keyboard">คีย์บอร์ด</string>
     <string name="desktop_rail_keyboard_autobridge">AutoBridge</string>
     <string name="desktop_rail_keyboard_car">ของรถ</string>
@@ -40,4 +41,11 @@
     <string name="desktop_rail_hide_never">ไม่ซ่อน</string>
     <string name="desktop_rail_close">ปิดเบราว์เซอร์</string>
     <string name="desktop_rail_drag">ลาก</string>
+    <string name="desktop_rail_text">ข้อความ</string>
+    <string name="desktop_rail_tab">Tab</string>
+    <string name="desktop_rail_esc">Esc</string>
+    <string name="desktop_rail_select_all">ทั้งหมด</string>
+    <string name="desktop_rail_copy">คัดลอก</string>
+    <string name="desktop_rail_paste">วาง</string>
+    <string name="desktop_rail_keyboard_phone">มือถือ</string>
 </resources>

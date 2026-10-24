@@ -14,6 +14,7 @@ import android.widget.TextView
 import android.widget.Toast
 import dev.autobridge.R
 import dev.autobridge.browser.BrowserActivity
+import dev.autobridge.projection.desktop.DesktopCarEntry
 import dev.autobridge.i18n.AppLocale
 import dev.autobridge.input.ShizukuInputBackend
 import dev.autobridge.ui.AutoBridgeDesign
@@ -130,6 +131,19 @@ class ProjectionSetupActivity : Activity() {
             ) { setBrowserEntryShown(!browserShown); render() },
         )), gap = 14)
 
+        // AutoBridge Chrome (the desktop browser as its own car entry, with the phone's keyboard) is
+        // off by default; this lists it.
+        val desktopShown = isListed(desktopEntry)
+        body.stack(SettingsUi.group(this, getString(R.string.desktop_car_entry_label), listOf(
+            SettingsUi.switchRow(
+                this,
+                title = getString(R.string.projection_setup_desktop_title),
+                caption = getString(R.string.projection_setup_desktop_caption),
+                icon = R.drawable.ic_tile_web,
+                accent = AutoBridgeDesign.ACCENT,
+                checked = desktopShown,
+            ) { setListed(desktopEntry, !desktopShown); render() },
+        )), gap = 14)
         val mirrorShown = isMirrorShown()
         body.stack(SettingsUi.group(this, "Bridge Mirror", listOf(
             SettingsUi.switchRow(
@@ -243,6 +257,7 @@ class ProjectionSetupActivity : Activity() {
     private val mirrorService get() = ComponentName(this, ProjectionMirrorCarService::class.java)
     private val webService get() = ComponentName(this, ProjectionCarService::class.java)
 
+    private val desktopEntry get() = ComponentName(this, DesktopCarEntry.NAME)
     private val browserEntry get() = ComponentName(this, BrowserActivity.CAR_ENTRY)
 
     /** On unless switched off: unlike the projection services, the manifest declares it enabled. */
