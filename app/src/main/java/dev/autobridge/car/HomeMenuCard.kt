@@ -8,6 +8,7 @@ import android.graphics.RectF
 import android.graphics.Typeface
 import android.text.TextPaint
 import android.text.TextUtils
+import dev.autobridge.design.HomeLayout
 import dev.autobridge.library.HomeSection
 
 /** The glyph drawn inside a card's icon tile. One entry per home menu feature. */
@@ -49,10 +50,13 @@ internal data class HomeMenuItem(
 }
 
 /**
- * The single home menu card component: rounded card, tinted icon tile above a one-line label.
+ * The single home menu card component: a card holding a feature's icon chip and its label.
  *
- * All six cards go through [draw]; only [HomeMenuItem.glyph] and [HomeMenuItem.accent] differ,
- * so tile size, padding, radius and stroke weight are identical by construction.
+ * Every feature card goes through [draw]; only [HomeMenuItem.glyph] and [HomeMenuItem.accent]
+ * differ, so chip size, padding, radius and stroke weight are identical by construction. The shape
+ * follows the layout's home ([HomeDashboardLayout.kind]): a Dashboard card (chip above the label,
+ * aligned to the start), a Classic tile (chip over the label, centred; the label can be hidden)
+ * or a Compact row (chip, label, chevron). Colours, card style and corners come from the look.
  */
 internal class HomeMenuCard {
     enum class State { NORMAL, FOCUSED, PRESSED }
@@ -64,7 +68,6 @@ internal class HomeMenuCard {
         strokeJoin = Paint.Join.ROUND
     }
     val label = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = HomeDashboardTheme.TEXT_PRIMARY
         typeface = Typeface.create("sans-serif", Typeface.BOLD)
         textAlign = Paint.Align.LEFT
     }
@@ -80,59 +83,128 @@ internal class HomeMenuCard {
         layout: HomeDashboardLayout,
         state: State
     ) {
+        val look = layout.look
         val d = layout.density
-        val radius = layout.dp(HomeDashboardTheme.Dp.CARD_RADIUS)
-        rect.set(bounds.left, bounds.top, bounds.right, bounds.bottom)
+        val radius = layout.dp(
+            when (layout.kind) {
+                HomeLayout.DASHBOARD -> look.cardRadius
+                HomeLayout.CLASSIC -> look.tileRadius
+                HomeLayout.COMPACT -> look.buttonRadius
+            }
+        )
+        drawBody(canvas, bounds, radius, look, state, d)
 
-        // Card body: a flat panel; the focus ring only appears when the card is focused or pressed.
-        fill.color = when (state) {
-            State.NORMAL -> HomeDashboardTheme.CARD
-            State.FOCUSED -> HomeDashboardTheme.CARD_FOCUSED
-            State.PRESSED -> HomeDashboardTheme.CARD_PRESSED
-        }
-        canvas.drawRoundRect(rect, radius, radius, fill)
-        if (state != State.NORMAL) {
-            stroke.color = HomeDashboardTheme.withAlpha(HomeDashboardTheme.ACCENT, if (state == State.PRESSED) 0.30f else 0.20f)
-            stroke.strokeWidth = HomeDashboardTheme.Dp.FOCUS_GLOW * d
-            canvas.drawRoundRect(rect, radius, radius, stroke)
-            stroke.color = HomeDashboardTheme.ACCENT
-            stroke.strokeWidth = HomeDashboardTheme.Dp.FOCUS_BORDER * d
-            inset(rect, stroke.strokeWidth / 2f)
-            canvas.drawRoundRect(rect, radius, radius, stroke)
-        }
-
-        // Icon tile on top, label under it, the pair centred vertically and aligned to the start.
+        label.color = look.textPrimary
         label.textSize = layout.labelSize
         val metrics = label.fontMetrics
         val lineHeight = metrics.descent - metrics.ascent
-        val icon = layout.dp(layout.profile.icon)
-        val gap = layout.dp(layout.profile.iconLabelGap)
-        val padding = layout.dp(layout.profile.cardPadding)
-        val blockTop = bounds.centerY - (icon + gap + lineHeight) / 2f
-        val tile = MenuBox(bounds.left + padding, blockTop, bounds.left + padding + icon, blockTop + icon)
-        drawIconTile(canvas, tile, item.glyph, item.accent, layout.dp(layout.profile.iconRadius), d)
+        val icon = layout.chipSize
+        val chip = look.chip(item.accent)
+        val chipRadius = layout.dp(look.chipRadius(icon / layout.unit))
 
-        val textMaxWidth = bounds.width - padding * 2
-        val text = TextUtils.ellipsize(title, label, textMaxWidth, TextUtils.TruncateAt.END)
-        val baseline = tile.bottom + gap - metrics.ascent
-        canvas.drawText(text, 0, text.length, tile.left, baseline, label)
+        when (layout.kind) {
+            HomeLayout.DASHBOARD -> {
+                // Icon chip on top, label under it, the pair centred vertically and aligned to the start.
+                val gap = layout.dp(layout.profile.iconLabelGap)
+                val padding = layout.dp(layout.profile.cardPadding)
+                val blockTop = bounds.centerY - (icon + gap + lineHeight) / 2f
+                val tile = MenuBox(bounds.left + padding, blockTop, bounds.left + padding + icon, blockTop + icon)
+                drawIconTile(canvas, tile, item.glyph, chip, chipRadius, d)
+                drawLabel(canvas, title, tile.left, tile.bottom + gap - metrics.ascent, bounds.width - padding * 2)
+            }
+            HomeLayout.CLASSIC -> {
+                val labelled = look.showTileLabels
+                val gap = if (labelled) layout.dp(HomeDashboardTheme.Dp.CLASSIC_LABEL_GAP) else 0f
+                val block = icon + if (labelled) gap + lineHeight else 0f
+                val top = bounds.centerY - block / 2f
+                val tile = MenuBox(bounds.centerX - icon / 2f, top, bounds.centerX + icon / 2f, top + icon)
+                drawIconTile(canvas, tile, item.glyph, chip, chipRadius, d)
+                if (labelled) {
+                    val maxWidth = bounds.width - layout.dp(HomeDashboardTheme.Dp.CLASSIC_PADDING) * 2
+                    val text = TextUtils.ellipsize(title, label, maxWidth, TextUtils.TruncateAt.END)
+                    val width = label.measureText(text, 0, text.length)
+                    canvas.drawText(text, 0, text.length, bounds.centerX - width / 2f, tile.bottom + gap - metrics.ascent, label)
+                }
+            }
+            HomeLayout.COMPACT -> {
+                val padding = layout.dp(HomeDashboardTheme.Dp.COMPACT_ROW_PADDING)
+                val inner = layout.dp(HomeDashboardTheme.Dp.COMPACT_ROW_GAP_INNER)
+                val tile = MenuBox(bounds.left + padding, bounds.centerY - icon / 2f, bounds.left + padding + icon, bounds.centerY + icon / 2f)
+                drawIconTile(canvas, tile, item.glyph, chip, chipRadius, d)
+                val chevron = layout.dp(HomeDashboardTheme.Dp.COMPACT_CHEVRON)
+                val chevronLeft = bounds.right - padding - chevron
+                val textLeft = tile.right + inner
+                val baseline = bounds.centerY - (metrics.ascent + metrics.descent) / 2f
+                drawLabel(canvas, title, textLeft, baseline, chevronLeft - inner - textLeft)
+                stroke.color = look.textTertiary
+                stroke.strokeWidth = 2f * chevron / 24f
+                stroke.strokeCap = Paint.Cap.ROUND
+                stroke.strokeJoin = Paint.Join.ROUND
+                val k = chevron / 24f
+                val top = bounds.centerY - chevron / 2f
+                path.reset()
+                path.moveTo(chevronLeft + 9f * k, top + 6f * k)
+                path.lineTo(chevronLeft + 15f * k, top + 12f * k)
+                path.lineTo(chevronLeft + 9f * k, top + 18f * k)
+                canvas.drawPath(path, stroke)
+                stroke.strokeCap = Paint.Cap.BUTT
+            }
+        }
+    }
+
+    private fun drawLabel(canvas: Canvas, title: String, left: Float, baseline: Float, maxWidth: Float) {
+        if (maxWidth <= 0f) return
+        val text = TextUtils.ellipsize(title, label, maxWidth, TextUtils.TruncateAt.END)
+        canvas.drawText(text, 0, text.length, left, baseline, label)
     }
 
     /**
-     * A rounded tile tinted with [accent], a hairline of the same, and the glyph at half its size.
-     * The cards and the Recently Sent rows both use it, so the two read as one family.
+     * The card body for [state]: the look's card fill (none for an outlined card at rest), its
+     * edge for outlined and glass cards, and the accent focus ring when focused or pressed.
      */
-    fun drawIconTile(canvas: Canvas, box: MenuBox, kind: HomeMenuGlyph, accent: Int, radius: Float, d: Float) {
-        rect.set(box.left, box.top, box.right, box.bottom)
-        fill.color = HomeDashboardTheme.mix(HomeDashboardTheme.CARD, accent, HomeDashboardTheme.ICON_TILE_TINT)
-        canvas.drawRoundRect(rect, radius, radius, fill)
-        stroke.color = HomeDashboardTheme.mix(HomeDashboardTheme.CARD, accent, HomeDashboardTheme.ICON_TILE_BORDER_TINT)
-        stroke.strokeWidth = d
-        inset(rect, d / 2f)
+    fun drawBody(canvas: Canvas, bounds: MenuBox, radius: Float, look: HomeDashboardLook, state: State, d: Float) {
+        rect.set(bounds.left, bounds.top, bounds.right, bounds.bottom)
+        fill.color = when (state) {
+            State.NORMAL -> look.card
+            State.FOCUSED -> look.cardFocused
+            State.PRESSED -> look.cardPressed
+        }
+        if ((fill.color ushr 24) != 0) canvas.drawRoundRect(rect, radius, radius, fill)
+        if (state == State.NORMAL) {
+            if (look.hasCardEdge) {
+                stroke.color = look.cardEdge
+                stroke.strokeWidth = d
+                inset(rect, d / 2f)
+                canvas.drawRoundRect(rect, radius, radius, stroke)
+            }
+            return
+        }
+        stroke.color = HomeDashboardTheme.withAlpha(look.accent, if (state == State.PRESSED) 0.30f else 0.20f)
+        stroke.strokeWidth = HomeDashboardTheme.Dp.FOCUS_GLOW * d
         canvas.drawRoundRect(rect, radius, radius, stroke)
+        stroke.color = look.accent
+        stroke.strokeWidth = HomeDashboardTheme.Dp.FOCUS_BORDER * d
+        inset(rect, stroke.strokeWidth / 2f)
+        canvas.drawRoundRect(rect, radius, radius, stroke)
+    }
+
+    /**
+     * A rounded chip in [chip]'s fill, a hairline when its style has one, and the glyph. The cards
+     * and the Recently Sent rows both use it, so the two read as one family.
+     */
+    fun drawIconTile(canvas: Canvas, box: MenuBox, kind: HomeMenuGlyph, chip: HomeDashboardLook.Chip, radius: Float, d: Float) {
+        rect.set(box.left, box.top, box.right, box.bottom)
+        fill.color = chip.fill
+        canvas.drawRoundRect(rect, radius, radius, fill)
+        if (chip.hasEdge) {
+            stroke.color = chip.edge
+            stroke.strokeWidth = d
+            inset(rect, d / 2f)
+            canvas.drawRoundRect(rect, radius, radius, stroke)
+        }
 
         // Glyphs are authored on a 100-unit tile with their own padding, so they fill the tile box.
-        drawGlyph(canvas, box, kind, accent)
+        drawGlyph(canvas, box, kind, chip.glyph, chip.cutout)
     }
 
     /**
@@ -142,15 +214,16 @@ internal class HomeMenuCard {
      * no still - is this glyph over a tinted panel, so a card tile and a missing thumbnail are
      * drawn by one piece of code and cannot drift apart.
      */
-    fun drawGlyph(canvas: Canvas, box: MenuBox, kind: HomeMenuGlyph, accent: Int) {
+    fun drawGlyph(canvas: Canvas, box: MenuBox, kind: HomeMenuGlyph, accent: Int, cutout: Int) {
         canvas.save()
         canvas.translate(box.left, box.top)
         canvas.scale(box.width / 100f, box.height / 100f)
-        drawGlyph(canvas, kind, accent)
+        drawGlyph(canvas, kind, accent, cutout)
         canvas.restore()
     }
 
-    private fun drawGlyph(canvas: Canvas, kind: HomeMenuGlyph, accent: Int) {
+    /** [cutout] is the colour of what shows through a filled glyph (YouTube's play mark). */
+    private fun drawGlyph(canvas: Canvas, kind: HomeMenuGlyph, accent: Int, cutout: Int) {
         val strokeWeight = 5.5f
         glyph.color = accent
         glyph.strokeWidth = strokeWeight
@@ -192,13 +265,13 @@ internal class HomeMenuCard {
                 glyph.style = Paint.Style.FILL
                 rect.set(22f, 32f, 78f, 68f)
                 canvas.drawRoundRect(rect, 11f, 11f, glyph)
-                glyph.color = HomeDashboardTheme.TEXT_PRIMARY
+                glyph.color = cutout
                 triangle(canvas, 44f, 41f, 60f)
             }
             HomeMenuGlyph.YOUTUBE_MUSIC -> {
                 glyph.style = Paint.Style.FILL
                 canvas.drawCircle(50f, 50f, 26f, glyph)
-                glyph.color = HomeDashboardTheme.TEXT_PRIMARY
+                glyph.color = cutout
                 glyph.style = Paint.Style.STROKE
                 glyph.strokeWidth = 3.5f
                 canvas.drawCircle(50f, 50f, 15.5f, glyph)
@@ -213,7 +286,7 @@ internal class HomeMenuCard {
                 glyph.style = Paint.Style.FILL
                 rect.set(22f, 42f, 78f, 76f)
                 canvas.drawRoundRect(rect, 9f, 9f, glyph)
-                glyph.color = HomeDashboardTheme.TEXT_PRIMARY
+                glyph.color = cutout
                 path.reset()
                 path.moveTo(45f, 51f)
                 path.lineTo(45f, 67f)
