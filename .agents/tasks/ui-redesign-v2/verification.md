@@ -48,3 +48,8 @@ Known gaps:
 - The page header (View, `AutoBridgeDesign.header`) keeps its existing look; the design's round header buttons on card fill are not applied (not a piece B file).
 - `ControlScreen.kt` keeps its own top-level `private val` colours, read once per process, so Control can show stale colours after a theme change until the process restarts (piece E).
 - Send to Car sits under the layout body (design order) instead of directly under the Android Auto card.
+## Thai section labels (letterSpacing)
+
+- `ScriptTracking` (:common) drops letter spacing for Thai, Lao, Khmer, Myanmar and Arabic text; `AutoBridgeDesign.sectionLabel`, `statusChip` and Compose `SectionLabel` use it. 4 JVM tests.
+- Real phone (Redmi YXEMRCGYAI49S4SS, personalDebug), 2026-10-24: Appearance group labels "ธีม", "ตัวอักษร", "หน้าแรก" render without gaps (screenshots/thai-section-labels-phone.png).
+- Still tracked in their own files (owned by other pieces): `library/PlayerActivity.kt` (E1), `browser/MoreActionsSheet.kt` (E2).

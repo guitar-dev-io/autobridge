@@ -123,3 +123,13 @@ class AppearanceCodecTest {
         assertTrue(decoded.blurBehindCards)
     }
 }
+
+class ScriptTrackingTest {
+    @Test fun latinLabelsKeepTheirTracking() = assertEquals(0.14f, ScriptTracking.letterSpacing("QUICK LAUNCH", 0.14f), 0f)
+
+    @Test fun thaiLabelsGetNone() = assertEquals(0f, ScriptTracking.letterSpacing("ธีม", 0.14f), 0f)
+
+    @Test fun mixedThaiAndLatinGetsNone() = assertFalse(ScriptTracking.allowsTracking("ใช้รูปลักษณ์นี้บน Android Auto"))
+
+    @Test fun numbersAndSymbolsKeepTracking() = assertTrue(ScriptTracking.allowsTracking("93.0 FM · 100%"))
+}
