@@ -270,7 +270,8 @@ object SettingsUi {
             this.progress = progress
             contentDescription = title
             progressTintList = ColorStateList.valueOf(AutoBridgeDesign.ACCENT)
-            thumbTintList = ColorStateList.valueOf(Color.WHITE)
+            // Accent, not white: a white thumb vanishes on the light theme's white cards.
+            thumbTintList = ColorStateList.valueOf(AutoBridgeDesign.ACCENT)
             progressBackgroundTintList = ColorStateList.valueOf(AutoBridgeDesign.HAIRLINE)
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(bar: SeekBar, at: Int, fromUser: Boolean) {
