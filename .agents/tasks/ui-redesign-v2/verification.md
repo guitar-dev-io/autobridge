@@ -16,3 +16,9 @@ Known gaps, left to the pieces (not regressions in dark mode, which is the defau
 - "Android Auto" title wraps to two lines at large text (piece B).
 - Status bar stays dark in light mode (piece A: set light system bars from the palette).
 - Not tried on the real phone or on a head unit.
+
+## Thai section labels (letterSpacing)
+
+- `ScriptTracking` (:common) drops letter spacing for Thai, Lao, Khmer, Myanmar and Arabic text; `AutoBridgeDesign.sectionLabel`, `statusChip` and Compose `SectionLabel` use it. 4 JVM tests.
+- Real phone (Redmi YXEMRCGYAI49S4SS, personalDebug), 2026-10-24: Appearance group labels "ธีม", "ตัวอักษร", "หน้าแรก" render without gaps (screenshots/thai-section-labels-phone.png).
+- Still tracked in their own files (owned by other pieces): `library/PlayerActivity.kt` (E1), `browser/MoreActionsSheet.kt` (E2).

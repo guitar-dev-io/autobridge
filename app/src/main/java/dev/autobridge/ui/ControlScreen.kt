@@ -1358,7 +1358,8 @@ fun SectionLabel(text: String, modifier: Modifier = Modifier) {
         text.uppercase(),
         color = TextMuted,
         fontSize = 11.sp,
-        letterSpacing = 1.5.sp,
+        // Tracked out in Latin only; spacing splits Thai vowels from their consonants.
+        letterSpacing = if (dev.autobridge.design.ScriptTracking.allowsTracking(text)) 1.5.sp else 0.sp,
         fontWeight = FontWeight.Medium,
         modifier = modifier.padding(top = 6.dp, start = 4.dp)
     )

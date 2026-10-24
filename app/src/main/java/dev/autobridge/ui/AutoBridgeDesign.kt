@@ -22,6 +22,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import dev.autobridge.R
 import dev.autobridge.design.DesignTokens
+import dev.autobridge.design.ScriptTracking
 import dev.autobridge.design.ThemeHolder
 
 /**
@@ -206,7 +207,7 @@ object AutoBridgeDesign {
             textSize = 12f
             setTextColor(TEXT)
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-            letterSpacing = 0.06f
+            letterSpacing = ScriptTracking.letterSpacing(label, 0.06f)
         })
     }
 
@@ -241,12 +242,15 @@ object AutoBridgeDesign {
         setOnClickListener { onClick() }
     }
 
-    /** Quiet uppercase divider label between groups of content. */
+    /**
+     * Quiet uppercase divider label between groups of content. Tracked out in Latin only: Thai
+     * gets no letter spacing, which would split its vowels from their consonants ([ScriptTracking]).
+     */
     fun sectionLabel(context: Context, text: String): TextView = TextView(context).apply {
         this.text = text.uppercase()
         textSize = 11f
         setTextColor(TEXT_MUTED)
-        letterSpacing = 0.14f
+        letterSpacing = ScriptTracking.letterSpacing(text, 0.14f)
         typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
         setPadding(context.dp(6), context.dp(18), context.dp(6), context.dp(8))
     }
