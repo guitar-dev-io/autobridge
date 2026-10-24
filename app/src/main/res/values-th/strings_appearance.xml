@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="appearance_title">รูปลักษณ์</string>
+    <string name="appearance_subtitle">ธีม สี ขนาดตัวอักษร และเลย์เอาต์หน้าแรก</string>
+    <string name="appearance_group_theme">ธีม</string>
+    <string name="appearance_group_text">ตัวอักษร</string>
+    <string name="appearance_group_home">หน้าแรก</string>
+    <string name="appearance_mode">โหมด</string>
+    <string name="appearance_mode_system">ตามระบบ</string>
+    <string name="appearance_mode_light">สว่าง</string>
+    <string name="appearance_mode_dark">มืด</string>
+    <string name="appearance_mode_amoled">ดำสนิท (AMOLED)</string>
+    <string name="appearance_mode_auto">ตั้งเวลาอัตโนมัติ</string>
+    <string name="appearance_preset">ชุดธีม</string>
+    <string name="appearance_preset_autobridge">AutoBridge</string>
+    <string name="appearance_preset_graphite">Graphite</string>
+    <string name="appearance_preset_ocean">Ocean</string>
+    <string name="appearance_preset_ember">Ember</string>
+    <string name="appearance_preset_dusk">Dusk</string>
+    <string name="appearance_accent">สีเน้น</string>
+    <string name="appearance_accent_sky">ฟ้า</string>
+    <string name="appearance_accent_teal">เขียวน้ำทะเล</string>
+    <string name="appearance_accent_amber">อำพัน</string>
+    <string name="appearance_accent_violet">ม่วง</string>
+    <string name="appearance_accent_rose">ชมพู</string>
+    <string name="appearance_accent_lime">เขียวมะนาว</string>
+    <string name="appearance_follow_system_text">ใช้ขนาดตัวอักษรตาม Android</string>
+    <string name="appearance_follow_system_text_caption">ใช้ขนาดที่ตั้งไว้ในการตั้งค่าการแสดงผลของ Android</string>
+    <string name="appearance_text_size">ขนาดตัวอักษร</string>
+    <string name="appearance_text_small">เล็ก</string>
+    <string name="appearance_text_default">ปกติ</string>
+    <string name="appearance_text_large">ใหญ่</string>
+    <string name="appearance_text_larger">ใหญ่ขึ้น</string>
+    <string name="appearance_text_huge">ใหญ่มาก</string>
+    <string name="appearance_text_max">สูงสุด</string>
+    <string name="appearance_home_layout">เลย์เอาต์หน้าแรก</string>
+    <string name="appearance_home_classic">ตารางแบบคลาสสิก</string>
+    <string name="appearance_home_dashboard">แดชบอร์ด</string>
+    <string name="appearance_home_compact">แบบกะทัดรัด</string>
+    <string name="appearance_car_same_look">ใช้รูปลักษณ์นี้บน Android Auto</string>
+    <string name="appearance_car_same_look_caption">ถ้าปิด หน้าจอรถจะใช้ธีมเริ่มต้น</string>
+</resources>

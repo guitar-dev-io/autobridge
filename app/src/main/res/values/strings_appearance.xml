@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Settings > Appearance (UI redesign v2). Owned by the appearance screens; see .agents/tasks/ui-redesign-v2/plan.md. -->
+<resources>
+    <string name="appearance_title">Appearance</string>
+    <string name="appearance_subtitle">Theme, colors, text size and home layout</string>
+    <string name="appearance_group_theme">Theme</string>
+    <string name="appearance_group_text">Text</string>
+    <string name="appearance_group_home">Home</string>
+    <string name="appearance_mode">Mode</string>
+    <string name="appearance_mode_system">System default</string>
+    <string name="appearance_mode_light">Light</string>
+    <string name="appearance_mode_dark">Dark</string>
+    <string name="appearance_mode_amoled">AMOLED black</string>
+    <string name="appearance_mode_auto">Auto schedule</string>
+    <string name="appearance_preset">Theme preset</string>
+    <string name="appearance_preset_autobridge">AutoBridge</string>
+    <string name="appearance_preset_graphite">Graphite</string>
+    <string name="appearance_preset_ocean">Ocean</string>
+    <string name="appearance_preset_ember">Ember</string>
+    <string name="appearance_preset_dusk">Dusk</string>
+    <string name="appearance_accent">Accent color</string>
+    <string name="appearance_accent_sky">Sky</string>
+    <string name="appearance_accent_teal">Teal</string>
+    <string name="appearance_accent_amber">Amber</string>
+    <string name="appearance_accent_violet">Violet</string>
+    <string name="appearance_accent_rose">Rose</string>
+    <string name="appearance_accent_lime">Lime</string>
+    <string name="appearance_follow_system_text">Follow Android font size</string>
+    <string name="appearance_follow_system_text_caption">Use the size set in Android\'s display settings</string>
+    <string name="appearance_text_size">Text size</string>
+    <string name="appearance_text_small">Small</string>
+    <string name="appearance_text_default">Default</string>
+    <string name="appearance_text_large">Large</string>
+    <string name="appearance_text_larger">Larger</string>
+    <string name="appearance_text_huge">Huge</string>
+    <string name="appearance_text_max">Max</string>
+    <string name="appearance_home_layout">Home layout</string>
+    <string name="appearance_home_classic">Classic grid</string>
+    <string name="appearance_home_dashboard">Dashboard</string>
+    <string name="appearance_home_compact">Compact</string>
+    <string name="appearance_car_same_look">Use this look on Android Auto</string>
+    <string name="appearance_car_same_look_caption">Off keeps the car on the default theme</string>
+</resources>

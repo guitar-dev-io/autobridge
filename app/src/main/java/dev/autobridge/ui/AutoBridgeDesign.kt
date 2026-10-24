@@ -22,6 +22,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import dev.autobridge.R
 import dev.autobridge.design.DesignTokens
+import dev.autobridge.design.ThemeHolder
 
 /**
  * AutoBridge's own phone design language, used by every screen the app draws itself.
@@ -39,16 +40,18 @@ object AutoBridgeDesign {
 
     // ----- Tokens -----
 
-    // Matches the car dashboard palette (docs/UI_REDESIGN_TASKS.md "Design tokens").
-    const val INK = DesignTokens.Phone.INK
-    const val SURFACE = DesignTokens.Phone.SURFACE
-    const val SURFACE_RAISED = DesignTokens.Phone.SURFACE_RAISED
-    const val HAIRLINE = DesignTokens.Phone.HAIRLINE
-    const val TEXT = DesignTokens.Phone.TEXT
-    const val TEXT_MUTED = DesignTokens.Phone.TEXT_MUTED
-    const val ACCENT = DesignTokens.Phone.ACCENT
+    // The surface, text and accent roles follow Settings > Appearance: they read the palette
+    // ThemeHolder resolved from the user's choices (dev.autobridge.design.ThemeResolver), so they
+    // are getters, not constants. Section accents below stay fixed identity colours.
+    val INK: Int get() = ThemeHolder.palette.background
+    val SURFACE: Int get() = ThemeHolder.palette.surface
+    val SURFACE_RAISED: Int get() = ThemeHolder.palette.raised
+    val HAIRLINE: Int get() = ThemeHolder.palette.hairline
+    val TEXT: Int get() = ThemeHolder.palette.text
+    val TEXT_MUTED: Int get() = ThemeHolder.palette.textSecondary
+    val ACCENT: Int get() = ThemeHolder.palette.accent
     const val ACCENT_SOFT = DesignTokens.Phone.ACCENT_SOFT
-    const val DANGER = DesignTokens.Phone.DANGER
+    val DANGER: Int get() = ThemeHolder.palette.danger
 
     /** "Parked" / "connected" status colour, shared by Home, Control, Car & Connection and Duo Screen. */
     const val ACCENT_ONLINE = DesignTokens.Phone.ACCENT_ONLINE

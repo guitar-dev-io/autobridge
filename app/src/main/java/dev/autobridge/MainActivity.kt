@@ -201,15 +201,18 @@ class MainActivity : androidx.activity.ComponentActivity() {
     }
 
     /**
-     * Applies the Settings &gt; Language choice before any view or string is resolved. A no-op on
-     * API 33+, where the platform has already picked the locale; see [AppLocale.rebase].
+     * Applies the Settings &gt; Language choice before any view or string is resolved (a no-op on
+     * API 33+, where the platform has already picked the locale; see [AppLocale.rebase]), then the
+     * Appearance text size ([dev.autobridge.ui.AppearanceContext]).
      */
     override fun attachBaseContext(newBase: Context) {
-        super.attachBaseContext(AppLocale.rebase(newBase))
+        super.attachBaseContext(dev.autobridge.ui.AppearanceContext.wrap(AppLocale.rebase(newBase)))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // System and Auto modes depend on night mode and the clock, which may have moved on.
+        dev.autobridge.settings.AppearanceStore.refreshPalette(this)
         SettingsStore.restore(this)
         // What maintenance is due, as a notification (once a day at most; nothing without items).
         runCatching { dev.autobridge.maintenance.MaintenanceReminder.check(this) }
@@ -398,6 +401,9 @@ class MainActivity : androidx.activity.ComponentActivity() {
         val screen = when (target) {
             PhoneScreen.HOME -> buildHomeScreen()
             PhoneScreen.SETTINGS -> buildSettingsMenu()
+            // Any change recreates the activity: tokens, Compose schemes and the font scale are all
+            // read while a screen is built, and the saved route brings the user back here.
+            PhoneScreen.APPEARANCE -> dev.autobridge.ui.AppearanceScreen.build(this, onBack = { goBack() }) { recreate() }
             PhoneScreen.CONTROL -> buildControlScreen()
             PhoneScreen.CONTROL_HISTORY -> buildCommandHistoryScreen()
             PhoneScreen.APPS -> buildAppsScreen()
@@ -1132,6 +1138,10 @@ class MainActivity : androidx.activity.ComponentActivity() {
                     ) {
                         startActivity(dev.autobridge.voice.VoiceSettingsActivity.intent(this))
                     },
+                    settingsValueEntry(
+                        getString(R.string.appearance_title),
+                        dev.autobridge.ui.AppearanceScreen.summary(this)
+                    ) { showPhoneScreen(PhoneScreen.APPEARANCE) },
                     settingsValueEntry(
                         getString(R.string.settings_language),
                         getString(AppLocale.selectedOption(this).labelRes)
