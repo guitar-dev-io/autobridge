@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Phone browser start page, UI redesign v2. -->
+    <string name="browser_v2_continue_reading">Continue reading</string>
+    <!-- A history row's second line: the site, then how long ago it was opened. -->
+    <string name="browser_v2_visited">%1$s · %2$s</string>
+    <string name="browser_v2_remove_recent">Remove %1$s from history</string>
+    <string name="browser_v2_forward">Forward</string>
+    <string name="browser_v2_start_page">Start page</string>
+    <string name="browser_v2_menu">Browser menu</string>
+</resources>
