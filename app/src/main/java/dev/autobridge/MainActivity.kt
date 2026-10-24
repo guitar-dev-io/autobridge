@@ -253,6 +253,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
         appsFavoritesOnly = savedInstanceState?.getBoolean(STATE_APPS_FAVORITES, true) ?: true
         appSearchQuery = savedInstanceState?.getString(STATE_APPS_QUERY).orEmpty()
         setContentView(buildUi(restoredScreen))
+        applySystemBarColors()
         onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (!goBack()) { isEnabled = false; onBackPressedDispatcher.onBackPressed(); isEnabled = true }
@@ -349,10 +350,29 @@ class MainActivity : androidx.activity.ComponentActivity() {
         super.onDestroy()
     }
 
+    /**
+     * The system bars follow the Appearance palette: dark icons over a light theme, light over a
+     * dark one. On Android 15+ the window is edge to edge and the shell's root shows through the
+     * bars, which is why [buildUi] paints it with the palette's background; older versions take
+     * the bar colours here.
+     */
+    @Suppress("DEPRECATION")
+    private fun applySystemBarColors() {
+        val palette = dev.autobridge.design.ThemeHolder.palette
+        androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).apply {
+            isAppearanceLightStatusBars = palette.isLight
+            isAppearanceLightNavigationBars = palette.isLight
+        }
+        if (android.os.Build.VERSION.SDK_INT < 35) {
+            window.statusBarColor = palette.background
+            window.navigationBarColor = palette.background
+        }
+    }
+
     private fun buildUi(initial: PhoneScreen = PhoneScreen.HOME): View {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(COLOR_BACKGROUND)
+            setBackgroundColor(dev.autobridge.ui.AutoBridgeDesign.INK)
         }
 
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
@@ -363,7 +383,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
         // No bottom tab bar: Home is the hub and every other destination is a child reached from
         // it, directly or through Settings (see PhoneNav).
         screenContainer = FrameLayout(this).apply {
-            setBackgroundColor(COLOR_BACKGROUND)
+            setBackgroundColor(dev.autobridge.ui.AutoBridgeDesign.INK)
         }
         root.addView(
             screenContainer,
