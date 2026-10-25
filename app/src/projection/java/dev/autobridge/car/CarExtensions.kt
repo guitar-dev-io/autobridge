@@ -4,6 +4,9 @@ import androidx.car.app.CarContext
 import androidx.car.app.ScreenManager
 import dev.autobridge.R
 import dev.autobridge.desktop.DesktopEngine
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import dev.autobridge.desktop.browser.DesktopBrowsers
 import dev.autobridge.duoscreen.car.DuoScreenScreen
 import dev.autobridge.projection.desktop.DesktopBrowserCarScreen
@@ -19,9 +22,10 @@ import dev.autobridge.projection.desktop.DesktopEngineChoiceCarScreen
  *    chosen *and* installed; otherwise it falls through to the built-in browser, unchanged. The
  *    separate "Desktop Browser" car app service is disabled in src/projection/AndroidManifest.xml.
  *  - "Browser engine" (More) sets which browser the Web card opens.
- *  - Multi-app and Desktop browser also get cards of their own on the car home, beside the six
- *    primary ones, so neither is buried in More. The Desktop browser card opens the chosen desktop
- *    browser, or the first installed one, and the browser list when none is installed yet.
+ *  - Multi-app also gets a card of its own on the car home, beside the six primary ones, so it is
+ *    not buried in More. The Desktop browser has none: the Web card opens it once one is chosen and
+ *    installed, and its row in More opens the chosen desktop browser, or the first installed one, or
+ *    the browser list when none is installed yet.
  *
  * Bridge Web, the projection route, has no row: it is a projection activity, which a template app
  * cannot open. Its entry is unlisted by default and can be listed again from its settings page.
@@ -42,11 +46,25 @@ internal object CarExtensions {
                 dev.autobridge.desktop.runtime.GuestFontConfig.DEFAULT_THAI
             }
         }
+        dev.autobridge.library.DesktopLinks.status = { ctx ->
+            when {
+                !desktopSupportedIn(ctx) -> dev.autobridge.library.DesktopLinks.ChromeStatus.UNAVAILABLE
+                DesktopEngine.installedStreamingBrowser() != null -> dev.autobridge.library.DesktopLinks.ChromeStatus.READY
+                else -> dev.autobridge.library.DesktopLinks.ChromeStatus.MISSING
+            }
+        }
+        dev.autobridge.library.DesktopLinks.setup = { ctx ->
+            ctx.startActivity(
+                dev.autobridge.projection.desktop.DesktopChromeSetupActivity.intent(ctx)
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        }
         // The phone's Streaming page sends the sites that may not play in the WebView here.
         dev.autobridge.library.DesktopLinks.opener = { ctx, url ->
-            // Google Chrome for Linux, not whichever browser is chosen for the Web card: these sites
-            // are meant for Chrome. Without it installed the built-in browser opens them.
-            val browser = if (desktopSupportedIn(ctx)) DesktopEngine.installedChrome() else null
+            // Chrome (or Brave when Chrome is not installed), not whichever browser is chosen for the Web
+            // card: these sites are meant for a desktop browser. With neither installed the built-in
+            // browser opens them.
+            val browser = if (desktopSupportedIn(ctx)) DesktopEngine.installedStreamingBrowser() else null
             browser?.let {
                 ctx.startActivity(
                     dev.autobridge.projection.desktop.DesktopBrowserActivity.intent(ctx, it.id, url)
@@ -79,8 +97,6 @@ internal object CarExtensions {
             entries += CarExtensionEntry(
                 carContext.getString(dev.autobridge.desktop.R.string.desktop_engine_car_label),
                 CarExtensionEntry.Placement.FREQUENT,
-                homeGlyph = HomeMenuGlyph.DESKTOP,
-                homeAccent = HomeDashboardTheme.ACCENT_DESKTOP
             ) { openDesktop(carContext, screenManager) }
             val engine = DesktopEngine.chosenInstalledBrowser()?.displayName
                 ?: carContext.getString(R.string.desktop_settings_choice_autobridge)
@@ -124,7 +140,34 @@ internal object CarExtensions {
 
     /** Whether Google Chrome for Linux is installed to open a site in; see [openUrl]. */
     fun canOpenChrome(carContext: CarContext): Boolean =
-        desktopSupported(carContext) && DesktopEngine.installedChrome() != null
+        desktopSupported(carContext) && DesktopEngine.installedStreamingBrowser() != null
+
+    /**
+     * Whether this phone could run Chrome for Linux but does not have it yet: the case where a
+     * protected-video site should send the user to install it rather than open a page that cannot play.
+     */
+    fun canInstallChrome(carContext: CarContext): Boolean =
+        desktopSupported(carContext) && DesktopEngine.installedStreamingBrowser() == null
+
+    /** Posts the "set up Chrome" notification on the phone; false when notifications are off. */
+    fun sendChromeSetupToPhone(carContext: CarContext, siteTitle: String): Boolean =
+        dev.autobridge.projection.desktop.DesktopSetupNotification.post(carContext, siteTitle)
+
+    /**
+     * Calls [onReady] on the main thread once Chrome for Linux is installed (the guided setup on the
+     * phone finishing), so a car screen that sent the user there can carry on by itself. The
+     * returned function stops watching; call it when the screen goes away.
+     */
+    fun watchChromeInstall(carContext: CarContext, onReady: () -> Unit): () -> Unit {
+        if (!desktopSupported(carContext)) return {}
+        val scope = kotlinx.coroutines.MainScope()
+        scope.launch {
+            DesktopEngine.browserStates.first { DesktopEngine.installedStreamingBrowser() != null }
+            dev.autobridge.projection.desktop.DesktopSetupNotification.cancel(carContext)
+            onReady()
+        }
+        return { scope.cancel() }
+    }
 
     /**
      * Opens [url] in Google Chrome for Linux on the car (not whichever browser is chosen for the
@@ -133,7 +176,7 @@ internal object CarExtensions {
      */
     fun openUrl(carContext: CarContext, screenManager: ScreenManager, url: String): Boolean {
         if (!canOpenChrome(carContext)) return false
-        val chrome = DesktopEngine.installedChrome() ?: return false
+        val chrome = DesktopEngine.installedStreamingBrowser() ?: return false
         CarNavigation.open(screenManager, "DesktopBrowserCarScreen") {
             DesktopBrowserCarScreen(carContext, embedded = true, browser = chrome, startUrl = url)
         }

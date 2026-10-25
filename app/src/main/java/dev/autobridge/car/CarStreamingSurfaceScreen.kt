@@ -27,9 +27,9 @@ import dev.autobridge.R
 import dev.autobridge.display.CarSurfaceCanvas
 import dev.autobridge.library.DesktopLinks
 import dev.autobridge.library.StreamingFavoritesStore
-import dev.autobridge.library.StreamingGroup
 import dev.autobridge.library.StreamingIcons
 import dev.autobridge.library.StreamingLinks
+import dev.autobridge.library.labelRes
 import dev.autobridge.mirror.MirrorSurfaceOwnership
 import dev.autobridge.ui.AppFonts
 
@@ -64,6 +64,11 @@ internal class CarStreamingSurfaceScreen(carContext: CarContext) : Screen(carCon
     private var active = false
 
     private var tiles: List<Tile> = emptyList()
+
+    /** The headings and how many tiles each covers, in tile order; the status strip's state. */
+    private var sectionTitles: List<String> = emptyList()
+    private var sectionSizes: List<Int> = emptyList()
+    private var chromeStatus = DesktopLinks.ChromeStatus.UNAVAILABLE
     private var layout: StreamingGridLayout? = null
     private var scroll = 0f
     private var pressed = -1
@@ -115,19 +120,37 @@ internal class CarStreamingSurfaceScreen(carContext: CarContext) : Screen(carCon
         val favorites = StreamingFavoritesStore.list(carContext)
         val favoriteUrls = favorites.map { it.url }.toSet()
         val chrome = CarExtensions.canOpenChrome(carContext)
+        val canInstall = CarExtensions.canInstallChrome(carContext)
+        val chromeBadge = carContext.getString(R.string.streaming_chrome_badge)
+        val needsChrome = carContext.getString(R.string.car_streaming_needs_chrome)
         val maybe = carContext.getString(R.string.car_streaming_maybe)
         val list = ArrayList<Tile>()
+        val titles = ArrayList<String>()
+        val sizes = ArrayList<Int>()
+        // The phone's order and headings: favourites (with the tile that manages them), then each
+        // group of the catalog, the streaming services first.
         favorites.forEach { list += Tile.Site(it.title, it.url, starred = true, note = null) }
-        // The main Video grid first, in its own order; after it, sites that may not play go last.
-        StreamingLinks.all.filterNot { it.url in favoriteUrls }
-            .sortedWith(compareBy({ it.group != StreamingGroup.VIDEO }, { it.group != StreamingGroup.VIDEO && StreamingLinks.mayNotPlay(it) }))
-            .forEach { link ->
-                // No "may not play" where it opens in Chrome: the desktop browser plays them.
-                val note = if (StreamingLinks.mayNotPlay(link) && !chrome) maybe else null
+        list += Tile.Manage
+        titles += carContext.getString(R.string.streaming_favorites)
+        sizes += favorites.size + 1
+        StreamingLinks.grouped().forEach { (group, links) ->
+            val rest = links.filterNot { it.url in favoriteUrls }
+            if (rest.isEmpty()) return@forEach
+            rest.forEach { link ->
+                val note = if (!StreamingLinks.mayNotPlay(link)) null else when {
+                    chrome -> chromeBadge
+                    canInstall -> needsChrome
+                    else -> maybe
+                }
                 list += Tile.Site(link.title, link.url, starred = false, note = note)
             }
-        list += Tile.Manage
+            titles += carContext.getString(group.labelRes())
+            sizes += rest.size
+        }
         tiles = list
+        sectionTitles = titles
+        sectionSizes = sizes
+        chromeStatus = DesktopLinks.chromeStatus(carContext)
         layout = null
         cardImages.clear()
     }
@@ -190,6 +213,7 @@ internal class CarStreamingSurfaceScreen(carContext: CarContext) : Screen(carCon
         when (hit.region) {
             StreamingRegion.SCROLL_UP -> return scrollBy(-current.scrollStep)
             StreamingRegion.SCROLL_DOWN -> return scrollBy(current.scrollStep)
+            StreamingRegion.BANNER -> return openChromeSetup()
             StreamingRegion.CARD -> Unit
         }
         pressed = hit.index
@@ -216,6 +240,15 @@ internal class CarStreamingSurfaceScreen(carContext: CarContext) : Screen(carCon
         render()
     }
 
+    /** The status strip: when Chrome or Brave is missing it opens the screen that says how to get one. */
+    private fun openChromeSetup() {
+        if (chromeStatus != DesktopLinks.ChromeStatus.MISSING) return
+        releaseSurface()
+        val url = StreamingLinks.all.first { StreamingLinks.mayNotPlay(it) }.let { it.url }
+        val title = StreamingLinks.all.first { it.url == url }.title
+        screenManager.push(CarChromeNeededScreen(carContext, title, url) { openBuiltIn(url) })
+    }
+
     private fun activate(tile: Tile) {
         // The browsers attach their own surface producer, which they cannot while this screen is
         // still connected, so it lets go first (as the car home does).
@@ -232,7 +265,19 @@ internal class CarStreamingSurfaceScreen(carContext: CarContext) : Screen(carCon
      * browser. A site already open is returned to, not reloaded.
      */
     private fun open(url: String) {
-        if (DesktopLinks.wantsDesktop(url) && CarExtensions.openUrl(carContext, screenManager, url)) return
+        if (DesktopLinks.wantsDesktop(url)) {
+            if (CarExtensions.openUrl(carContext, screenManager, url)) return
+            // Chrome is what these sites need and it is not installed yet: say so, with the way on.
+            if (CarExtensions.canInstallChrome(carContext)) {
+                val title = StreamingLinks.all.firstOrNull { it.url == url }?.title ?: url
+                screenManager.push(CarChromeNeededScreen(carContext, title, url) { openBuiltIn(url) })
+                return
+            }
+        }
+        openBuiltIn(url)
+    }
+
+    private fun openBuiltIn(url: String) {
         val renderer = dev.autobridge.browser.CarBrowserRuntime.renderer(carContext)
         if (!dev.autobridge.browser.BrowserSiteEntry.resumes(renderer.livePageUrl, url)) {
             renderer.load(url)
@@ -248,7 +293,10 @@ internal class CarStreamingSurfaceScreen(carContext: CarContext) : Screen(carCon
         if (surfaceWidth <= 0 || surfaceHeight <= 0) return
         val density = (if (surfaceDpi > 0) surfaceDpi else BASELINE_DPI) / BASELINE_DPI.toFloat()
         val hasNotes = tiles.any { it is Tile.Site && it.note != null }
-        val current = layout ?: StreamingGridLayout.compute(safeArea(), density, tiles.size, hasNotes).also {
+        val current = layout ?: StreamingGridLayout.compute(
+            safeArea(), density, tiles.size, hasNotes,
+            sections = sectionSizes, banner = chromeStatus != DesktopLinks.ChromeStatus.UNAVAILABLE
+        ).also {
             layout = it
             scroll = scroll.coerceIn(0f, it.maxScroll)
             cardImages.clear()
@@ -273,6 +321,15 @@ internal class CarStreamingSurfaceScreen(carContext: CarContext) : Screen(carCon
         canvas.save()
         canvas.clipRect(layout.viewport.left, layout.viewport.top, layout.viewport.right, layout.viewport.bottom)
         val radius = layout.cards.firstOrNull()?.let { it.width * 0.12f * 0.5f } ?: 0f
+        layout.banner?.let { drawBanner(canvas, it.offset(-scroll), look, medium, d) }
+        layout.headings.forEachIndexed { i, heading ->
+            val box = heading.offset(-scroll)
+            if (box.bottom < layout.viewport.top || box.top > layout.viewport.bottom) return@forEachIndexed
+            textPaint.typeface = bold
+            textPaint.textSize = look.text(19f) * d
+            textPaint.color = look.textSecondary
+            canvas.drawText(sectionTitles.getOrElse(i) { "" }, box.left + 4f * d, baselineIn(textPaint, box), textPaint)
+        }
         tiles.forEachIndexed { index, tile ->
             val card = layout.cards[index].offset(-scroll)
             val label = layout.labels[index].offset(-scroll)
@@ -290,6 +347,32 @@ internal class CarStreamingSurfaceScreen(carContext: CarContext) : Screen(carCon
 
         layout.scrollUp?.let { drawScrollButton(canvas, it, d, up = true, enabled = scroll > 0f, look = look) }
         layout.scrollDown?.let { drawScrollButton(canvas, it, d, up = false, enabled = scroll < layout.maxScroll, look = look) }
+    }
+
+    /** "A desktop browser is ready" or "needs Chrome or Brave" with a Set up pill, in one strip. */
+    private fun drawBanner(canvas: Canvas, box: MenuBox, look: HomeDashboardLook, face: Typeface, d: Float) {
+        val missing = chromeStatus == DesktopLinks.ChromeStatus.MISSING
+        rect.set(box.left, box.top, box.right, box.bottom)
+        fill.color = look.control
+        canvas.drawRoundRect(rect, 12f * d, 12f * d, fill)
+        textPaint.typeface = face
+        textPaint.textSize = look.text(16f) * d
+        var textRight = box.right - 16f * d
+        if (missing) {
+            val label = carContext.getString(R.string.streaming_chrome_install)
+            val pillW = textPaint.measureText(label) + 28f * d
+            val pillH = box.height - 14f * d
+            rect.set(box.right - 10f * d - pillW, box.top + 7f * d, box.right - 10f * d, box.top + 7f * d + pillH)
+            fill.color = look.accent
+            canvas.drawRoundRect(rect, pillH / 2f, pillH / 2f, fill)
+            textPaint.color = look.onAccent
+            canvas.drawText(label, rect.left + 14f * d, baselineIn(textPaint, MenuBox(rect.left, rect.top, rect.right, rect.bottom)), textPaint)
+            textRight = rect.left - 12f * d
+        }
+        textPaint.color = look.textPrimary
+        val message = carContext.getString(if (missing) R.string.streaming_chrome_missing else R.string.streaming_chrome_ready)
+        val shown = TextUtils.ellipsize(message, textPaint, textRight - (box.left + 16f * d), TextUtils.TruncateAt.END).toString()
+        canvas.drawText(shown, box.left + 16f * d, baselineIn(textPaint, box), textPaint)
     }
 
     private fun drawCard(canvas: Canvas, tile: Tile, card: MenuBox) {

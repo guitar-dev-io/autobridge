@@ -1424,7 +1424,6 @@
     <!-- Car "More" list -->
     <string name="car_more_title">เพิ่มเติม</string>
     <string name="car_more_title_paged">เพิ่มเติม · %1$d</string>
-    <string name="car_more_media_center">ศูนย์สื่อ</string>
     <string name="car_more_bookmarks">จัดการบุ๊กมาร์ก</string>
     <string name="car_more_agent">Agent</string>
     <string name="car_more_recent">ล่าสุด</string>
@@ -1792,7 +1791,22 @@
     <string name="youtube_sponsorblock_caveat">ฟีเจอร์นี้อาจไม่ทำงาน หรือทำงานไม่สมบูรณ์ ข้อมูลช่วงสปอนเซอร์มาจากอาสาสมัคร วิดีโอใหม่หรือที่คนดูน้อยมักไม่มีข้อมูล และช่วงที่ทำเครื่องหมายไว้อาจคลาดเคลื่อนเล็กน้อย การข้ามต้องใช้อินเทอร์เน็ต และทำงานเฉพาะในหน้า YouTube ของ AutoBridge เอง ถ้า YouTube เปลี่ยนเว็บไซต์ อาจใช้ไม่ได้จนกว่าจะอัปเดตแอป</string>
     <string name="home_donate">☕ เลี้ยงค่าขนมผู้พัฒนา</string>
     <string name="maint_compulsory_insurance">พ.ร.บ.</string>
-    <string name="car_more_group_utilities">อรรถประโยชน์</string>
+    <string name="car_saved_title">ที่บันทึกไว้</string>
+    <string name="car_chrome_needed_title">ต้องติดตั้ง Chrome หรือ Brave</string>
+    <string name="car_chrome_needed_message">%1$s ต้องใช้ Google Chrome หรือ Brave for Linux และยังไม่ได้ติดตั้งทั้งสองตัว แตะ "ส่งไปที่โทรศัพท์" แล้วแตะการแจ้งเตือนบนโทรศัพท์เพื่อติดตั้ง (ประมาณ 1 GB แนะนำให้ใช้ Wi-Fi) ทำตอนจอดรถ เมื่อเสร็จแล้ว %1$s จะเปิดที่นี่ให้เอง</string>
+    <string name="car_chrome_needed_open_anyway">เปิดแบบเดิม</string>
+    <string name="streaming_group_premium">บริการสตรีมมิง</string>
+    <string name="streaming_chrome_badge">Chrome/Brave</string>
+    <string name="streaming_chrome_ready">เบราว์เซอร์เดสก์ท็อปพร้อมแล้ว Netflix และบริการแบบเดียวกันเล่นได้</string>
+    <string name="streaming_chrome_missing">Netflix และบริการแบบเดียวกันต้องใช้ Chrome หรือ Brave</string>
+    <string name="streaming_chrome_install">ติดตั้ง Chrome หรือ Brave</string>
+    <string name="streaming_chrome_needed_message">%1$s ต้องใช้ Google Chrome หรือ Brave for Linux ซึ่งยังไม่ได้ติดตั้ง ติดตั้งตอนนี้ไหม ขนาดประมาณ 1 GB แนะนำให้ใช้ Wi-Fi</string>
+    <string name="car_streaming_needs_chrome">ต้องใช้ Chrome/Brave</string>
+    <string name="car_chrome_needed_send">ส่งไปที่โทรศัพท์</string>
+    <string name="car_chrome_needed_sent">เปิดการแจ้งเตือนบนโทรศัพท์ของคุณ</string>
+    <string name="car_chrome_needed_not_sent">การแจ้งเตือนบนโทรศัพท์ปิดอยู่ ให้เปิดแอป AutoBridge บนโทรศัพท์แทน</string>
+    <string name="home_v2_caption_streaming">Netflix, YouTube ฯลฯ</string>
+    <string name="car_my_car_title">รถของฉัน</string>
     <string name="fuel_edit">แก้ไข</string>
     <string name="fuel_edit_title">แก้ไขการเติมน้ำมัน</string>
     <string name="fuel_edit_title_ev">แก้ไขการชาร์จ</string>
