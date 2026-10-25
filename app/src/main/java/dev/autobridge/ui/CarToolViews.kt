@@ -20,7 +20,9 @@ object CarToolViews {
     /** The summary card: a raised surface the caller fills top to bottom. */
     fun card(context: Context, build: LinearLayout.() -> Unit): LinearLayout = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
-        background = AutoBridgeDesign.surface(context, AutoBridgeDesign.SURFACE, 16, android.graphics.Color.TRANSPARENT)
+        // The user's card style and corner size, like the cards on Home.
+        val p = dev.autobridge.design.ThemeHolder.palette
+        background = AutoBridgeDesign.surface(context, p.cardFill, p.corners.card, p.cardEdge)
         setPadding(context.dp(16), context.dp(14), context.dp(16), context.dp(16))
         build()
     }

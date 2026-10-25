@@ -138,7 +138,7 @@ class CarToolForm(
         val views = mutableListOf<TextView>()
         fun paint(chosen: String?) = views.forEach { chip ->
             val on = chip.text.toString() == chosen
-            chip.setTextColor(if (on) AutoBridgeDesign.INK else AutoBridgeDesign.TEXT)
+            chip.setTextColor(if (on) AutoBridgeDesign.ON_ACCENT else AutoBridgeDesign.TEXT)
             chip.background = AutoBridgeDesign.surface(activity, if (on) accent else AutoBridgeDesign.SURFACE_RAISED, 18, if (on) accent else AutoBridgeDesign.HAIRLINE)
         }
         options.forEach { option ->
