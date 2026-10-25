@@ -2,31 +2,27 @@ package dev.autobridge.ui.home
 
 import dev.autobridge.design.AppearanceSpec
 import dev.autobridge.design.Wallpaper
+import dev.autobridge.design.WallpaperLook
 import dev.autobridge.design.WallpaperTarget
 
 /**
  * Which wallpaper the phone Home draws behind itself, decided from Settings > Appearance >
- * Wallpaper. Pure so the fallbacks are unit-tested; [WallpaperDrawable] paints the result.
+ * Wallpaper. Pure so the fallbacks are unit-tested; the shared wallpaper painter draws the result.
  */
 object HomeWallpaper {
 
     /**
-     * The wallpaper for the phone: [Wallpaper.NONE] when the user aimed it at the car only, and
-     * when "Your photo" is chosen but [customExists] says the picked photo is gone.
+     * The wallpaper for the phone on a [light] or dark theme: [Wallpaper.NONE] when the user aimed
+     * it at the car only, and when "Your photo" is chosen but [customExists] says the picked photo
+     * is gone.
      */
-    fun forPhone(spec: AppearanceSpec, customExists: Boolean): Wallpaper = when {
+    fun forPhone(spec: AppearanceSpec, customExists: Boolean, light: Boolean = false): Wallpaper = when {
         spec.wallpaperTarget == WallpaperTarget.CAR -> Wallpaper.NONE
-        spec.wallpaper == Wallpaper.CUSTOM && !customExists -> Wallpaper.NONE
-        else -> spec.wallpaper
+        spec.wallpaperLook(light).wallpaper == Wallpaper.CUSTOM && !customExists -> Wallpaper.NONE
+        else -> spec.wallpaperLook(light).wallpaper
     }
 
-    /**
-     * The dim laid over the wallpaper as ARGB: black over a dark theme, white over a light one,
-     * [dim] percent opaque (clamped to 0..[AppearanceSpec.MAX_DIM]). No wallpaper, no dim.
-     */
-    fun dimColor(wallpaper: Wallpaper, dim: Int, light: Boolean): Int {
-        if (wallpaper == Wallpaper.NONE) return 0
-        val alpha = Math.round(dim.coerceIn(0, AppearanceSpec.MAX_DIM) * 255 / 100f)
-        return (alpha shl 24) or (if (light) 0xFFFFFF else 0x000000)
-    }
+    /** The whole look the phone draws: [forPhone]'s wallpaper with that theme's dim, blur, angle and crop. */
+    fun lookForPhone(spec: AppearanceSpec, customExists: Boolean, light: Boolean): WallpaperLook =
+        spec.wallpaperLook(light).copy(wallpaper = forPhone(spec, customExists, light))
 }

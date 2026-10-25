@@ -24,6 +24,9 @@ import dev.autobridge.design.HomeLayout
 import dev.autobridge.design.ThemeHolder
 import dev.autobridge.design.AppearanceSpec
 import dev.autobridge.design.Wallpaper
+import dev.autobridge.ui.appearance.WallDevice
+import dev.autobridge.ui.appearance.WallpaperPainter
+import dev.autobridge.ui.appearance.WallpaperPhoto
 import dev.autobridge.settings.AppearanceStore
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -225,108 +228,27 @@ internal class HomeDashboardRenderer(private val context: Context) {
 
     /**
      * The wallpaper at the surface's size, dim included, painted once and kept until the look or
-     * the size changes: the dashboard repaints on every scroll pixel and must not build gradients
-     * or decode a photo inside a frame. "Your photo" is also redrawn when the file changes.
+     * the size changes: the dashboard repaints on every scroll pixel and must not build gradients,
+     * blur an image or decode a photo inside a frame. "Your photo" is also redrawn when the file
+     * changes.
      */
     private fun wallpaper(width: Int, height: Int): Bitmap? {
         if (width <= 0 || height <= 0) return null
         val photo = if (look.wallpaper == Wallpaper.CUSTOM) AppearanceStore.customWallpaperFile(context) else null
-        val key = "${look.wallpaper}|${look.wallpaperDim}|${look.palette}|$width|$height|${photo?.lastModified()}"
+        val key = "${look.wallpaperLook}|${look.palette}|$width|$height|${photo?.lastModified()}"
         if (key == wallpaperKey) return wallpaperBitmap
         wallpaperKey = key
         wallpaperBitmap?.recycle()
-        wallpaperBitmap = runCatching { paintWallpaper(width, height, photo) }
+        wallpaperBitmap = runCatching {
+            WallpaperPainter.render(
+                width, height, look.wallpaperLook, WallDevice.CAR, look.palette,
+                context.resources.displayMetrics.density.coerceAtLeast(1f),
+                if (look.wallpaper == Wallpaper.CUSTOM) WallpaperPhoto.decode(context, width) else null
+            )
+        }
             .onFailure { android.util.Log.w(TAG, "wallpaper failed: ${it.message}") }
             .getOrNull()
         return wallpaperBitmap
-    }
-
-    private fun paintWallpaper(width: Int, height: Int, photo: java.io.File?): Bitmap {
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-        val w = width.toFloat()
-        val h = height.toFloat()
-        val light = look.palette.isLight
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-        canvas.drawColor(look.background)
-        when (look.wallpaper) {
-            Wallpaper.NONE -> Unit
-            Wallpaper.GLOW -> {
-                // An accent glow from the top-right corner: an ellipse 90% wide and 45% tall,
-                // fading out by 70% of its radius, as the design's radial gradient draws it.
-                val rx = w * 0.9f
-                val ry = h * 0.45f
-                paint.shader = RadialGradient(
-                    0f, 0f, rx,
-                    intArrayOf(HomeDashboardTheme.withAlpha(look.accent, 0x30 / 255f), look.accent and 0x00FFFFFF),
-                    floatArrayOf(0f, 0.7f), Shader.TileMode.CLAMP
-                ).also {
-                    val m = android.graphics.Matrix()
-                    m.setScale(1f, ry / rx)
-                    m.postTranslate(w * 0.9f, 0f)
-                    it.setLocalMatrix(m)
-                }
-                canvas.drawRect(0f, 0f, w, h, paint)
-            }
-            Wallpaper.LINES -> {
-                // Hairlines at 135 degrees, 16dp apart.
-                val d = context.resources.displayMetrics.density.coerceAtLeast(1f)
-                val step = 16f * d
-                paint.color = HomeDashboardTheme.withAlpha(look.palette.hairline, 0.5f)
-                paint.strokeWidth = d
-                var x = -h
-                while (x < w) {
-                    canvas.drawLine(x, 0f, x + h, h, paint)
-                    x += step
-                }
-            }
-            Wallpaper.NIGHT_ROAD -> {
-                paint.shader = LinearGradient(
-                    0f, 0f, 0f, h,
-                    if (light) HomeDashboardLook.NIGHT_ROAD_LIGHT else HomeDashboardLook.NIGHT_ROAD_DARK,
-                    if (light) HomeDashboardLook.NIGHT_ROAD_LIGHT_STOPS else HomeDashboardLook.NIGHT_ROAD_DARK_STOPS,
-                    Shader.TileMode.CLAMP
-                )
-                canvas.drawRect(0f, 0f, w, h, paint)
-            }
-            Wallpaper.SOLID -> canvas.drawColor(if (light) HomeDashboardLook.SOLID_LIGHT else HomeDashboardLook.SOLID_DARK)
-            Wallpaper.CUSTOM -> {
-                val image = photo?.takeIf { it.isFile }?.let { decodeCovering(it, width, height) }
-                if (image != null) {
-                    val scale = maxOf(w / image.width, h / image.height)
-                    val cw = w / scale
-                    val ch = h / scale
-                    source.set(
-                        ((image.width - cw) / 2f).roundToInt(), ((image.height - ch) / 2f).roundToInt(),
-                        ((image.width + cw) / 2f).roundToInt(), ((image.height + ch) / 2f).roundToInt()
-                    )
-                    canvas.drawBitmap(image, source, RectF(0f, 0f, w, h), paint)
-                    image.recycle()
-                } else {
-                    // The diagonal ramp "Your photo" shows in the design until a photo is picked.
-                    paint.shader = LinearGradient(
-                        0f, 0f, w * 0.34f, h,
-                        HomeDashboardLook.CUSTOM_FALLBACK, HomeDashboardLook.CUSTOM_FALLBACK_STOPS, Shader.TileMode.CLAMP
-                    )
-                    canvas.drawRect(0f, 0f, w, h, paint)
-                }
-            }
-        }
-        if (look.wallpaperDim > 0) {
-            val veil = if (light) 0xFFFFFFFF.toInt() else 0xFF000000.toInt()
-            canvas.drawColor(HomeDashboardTheme.withAlpha(veil, look.wallpaperDim / 100f))
-        }
-        return bitmap
-    }
-
-    /** The photo decoded at no more than twice the size it has to cover, so a camera image fits. */
-    private fun decodeCovering(file: java.io.File, width: Int, height: Int): Bitmap? {
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeFile(file.path, bounds)
-        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-        var sample = 1
-        while (bounds.outWidth / (sample * 2) >= width && bounds.outHeight / (sample * 2) >= height) sample *= 2
-        return BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply { inSampleSize = sample })
     }
 
     /** Recently Sent rows: a step rounder than the look's buttons, as the design draws them. */

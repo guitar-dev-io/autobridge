@@ -28,19 +28,26 @@ internal object AppearancePreview {
         Category.TV to Glyphs.TV, Category.MIRROR to Glyphs.MIRROR, Category.MY_CAR to Glyphs.MY_CAR
     )
 
-    fun build(context: Context, spec: AppearanceSpec, summary: String): View {
+    fun build(
+        context: Context,
+        spec: AppearanceSpec,
+        summary: String,
+        /** The palette the phone side draws with; another theme's, to preview the wallpaper set for it. */
+        pal: ThemePalette = p,
+        carPal: ThemePalette = ThemeHolder.carPalette
+    ): View {
         val small = AppearanceModel.smallRadii(spec.corners)
         val root = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            background = AppearanceUi.shape(context, p.raised, p.corners.card)
+            background = AppearanceUi.shape(context, pal.raised, pal.corners.card)
             setPadding(context.dp(12), context.dp(12), context.dp(12), context.dp(12))
         }
         root.addView(LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            addView(AppearanceUi.text(context, context.getString(R.string.appearance_live_preview).uppercase(), 11f, p.textTertiary, bold = true, lines = 1)
+            addView(AppearanceUi.text(context, context.getString(R.string.appearance_live_preview).uppercase(), 11f, pal.textTertiary, bold = true, lines = 1)
                 .apply { letterSpacing = 0.06f }, LinearLayout.LayoutParams(0, -2, 1f))
-            addView(AppearanceUi.text(context, summary, 11f, p.textTertiary, lines = 1).apply { gravity = Gravity.END },
+            addView(AppearanceUi.text(context, summary, 11f, pal.textTertiary, lines = 1).apply { gravity = Gravity.END },
                 LinearLayout.LayoutParams(-2, -2).apply { marginStart = context.dp(8) })
         }, LinearLayout.LayoutParams(-1, -2))
 
@@ -50,23 +57,25 @@ internal object AppearancePreview {
             // would drop below the car.
             gravity = Gravity.TOP
         }
-        row.addView(miniPhone(context, spec, small), LinearLayout.LayoutParams(context.dp(100), context.dp(172)))
-        row.addView(rightColumn(context, spec), LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = context.dp(10) })
+        row.addView(miniPhone(context, spec, small, pal), LinearLayout.LayoutParams(context.dp(100), context.dp(172)))
+        row.addView(rightColumn(context, spec, pal, carPal), LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = context.dp(10) })
         root.addView(row, LinearLayout.LayoutParams(-1, -2).apply { topMargin = context.dp(10) })
         root.contentDescription = context.getString(R.string.appearance_live_preview) + ": " + summary
         return root
     }
 
-    private fun miniPhone(context: Context, spec: AppearanceSpec, small: AppearanceModel.SmallRadii): View {
-        val palette = p
+    private fun miniPhone(context: Context, spec: AppearanceSpec, small: AppearanceModel.SmallRadii, pal: ThemePalette): View {
+        val palette = pal
+        val look = spec.wallpaperLook(palette.isLight)
+        val shown = AppearanceModel.wallpaperOnPhone(spec)
         val frame = FrameLayout(context).apply {
             background = WallpaperDrawable(
-                wallpaper = if (AppearanceModel.wallpaperOnPhone(spec)) spec.wallpaper else Wallpaper.NONE,
+                look = if (shown) look else look.copy(wallpaper = Wallpaper.NONE),
+                device = WallDevice.PHONE,
                 palette = palette,
                 density = context.resources.displayMetrics.density,
                 radiusPx = context.dp(16).toFloat(),
-                dimPercent = if (AppearanceModel.wallpaperOnPhone(spec)) spec.wallpaperDim else 0,
-                photo = if (spec.wallpaper == Wallpaper.CUSTOM) WallpaperPhoto.preview(context) else null
+                photo = if (look.wallpaper == Wallpaper.CUSTOM) WallpaperPhoto.preview(context) else null
             )
             foreground = AppearanceUi.shape(context, Color.TRANSPARENT, 16, palette.hairline)
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
@@ -95,43 +104,44 @@ internal object AppearancePreview {
         return frame
     }
 
-    private fun rightColumn(context: Context, spec: AppearanceSpec): View = LinearLayout(context).apply {
+    private fun rightColumn(context: Context, spec: AppearanceSpec, pal: ThemePalette, carPal: ThemePalette): View = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
-        addView(miniCar(context, spec), LinearLayout.LayoutParams(-1, context.dp(120)))
-        addView(AppearanceUi.text(context, context.getString(R.string.appearance_preview_line), 15f, p.text).apply {
+        addView(miniCar(context, spec, carPal), LinearLayout.LayoutParams(-1, context.dp(120)))
+        addView(AppearanceUi.text(context, context.getString(R.string.appearance_preview_line), 15f, pal.text).apply {
             setLineSpacing(0f, 1.2f)
         }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = context.dp(8) })
         addView(LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
-            addView(previewButton(context, context.getString(R.string.appearance_preview_primary), primary = true))
-            addView(previewButton(context, context.getString(R.string.appearance_preview_secondary), primary = false),
+            addView(previewButton(context, pal, context.getString(R.string.appearance_preview_primary), primary = true))
+            addView(previewButton(context, pal, context.getString(R.string.appearance_preview_secondary), primary = false),
                 LinearLayout.LayoutParams(-2, context.dp(28)).apply { marginStart = context.dp(6) })
         }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = context.dp(8) })
     }
 
-    private fun previewButton(context: Context, label: String, primary: Boolean): View =
-        AppearanceUi.text(context, label, 11f, if (primary) p.onAccent else p.text, bold = true, lines = 1).apply {
+    private fun previewButton(context: Context, pal: ThemePalette, label: String, primary: Boolean): View =
+        AppearanceUi.text(context, label, 11f, if (primary) pal.onAccent else pal.text, bold = true, lines = 1).apply {
             gravity = Gravity.CENTER
             setPadding(context.dp(12), 0, context.dp(12), 0)
-            background = AppearanceUi.shape(context, if (primary) p.accent else Color.TRANSPARENT, p.corners.button,
-                if (primary) Color.TRANSPARENT else p.hairline)
+            background = AppearanceUi.shape(context, if (primary) pal.accent else Color.TRANSPARENT, pal.corners.button,
+                if (primary) Color.TRANSPARENT else pal.hairline)
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
             layoutParams = LinearLayout.LayoutParams(-2, context.dp(28))
         }
 
-    private fun miniCar(context: Context, spec: AppearanceSpec): View {
+    private fun miniCar(context: Context, spec: AppearanceSpec, carPal: ThemePalette): View {
         val carSpec = AppearanceModel.carSpec(spec)
-        val palette: ThemePalette = ThemeHolder.carPalette
+        val palette: ThemePalette = carPal
+        val look = carSpec.wallpaperLook(palette.isLight)
         val small = AppearanceModel.smallRadii(carSpec.corners)
         val showWall = AppearanceModel.wallpaperOnCar(spec) || !spec.carSameLook
         val frame = FrameLayout(context).apply {
             background = WallpaperDrawable(
-                wallpaper = if (showWall) carSpec.wallpaper else Wallpaper.NONE,
+                look = if (showWall) look else look.copy(wallpaper = Wallpaper.NONE),
+                device = WallDevice.CAR,
                 palette = palette,
                 density = context.resources.displayMetrics.density,
                 radiusPx = context.dp(12).toFloat(),
-                dimPercent = if (showWall) carSpec.wallpaperDim else 0,
-                photo = if (carSpec.wallpaper == Wallpaper.CUSTOM) WallpaperPhoto.preview(context) else null
+                photo = if (look.wallpaper == Wallpaper.CUSTOM) WallpaperPhoto.preview(context) else null
             )
             // The head unit's black bezel.
             foreground = AppearanceUi.shape(context, Color.TRANSPARENT, 12, 0xFF05070A.toInt(), strokeDp = 4)

@@ -19,10 +19,20 @@ data class AppearanceSpec(
     /** Use Android's own font size instead of [textStep]. */
     val followSystemText: Boolean = false,
     val homeLayout: HomeLayout = HomeLayout.DASHBOARD,
+    /** The wallpaper for the dark themes, and for the light ones too unless [lightWallpaper] is set. */
     val wallpaper: Wallpaper = Wallpaper.GLOW,
     val wallpaperTarget: WallpaperTarget = WallpaperTarget.BOTH,
     /** 0..70, the share of black (white in light mode) laid over the wallpaper. */
     val wallpaperDim: Int = 20,
+    /** 0..[WallpaperCatalog.MAX_BLUR]: how soft an image or photo is drawn. */
+    val wallpaperBlur: Int = 0,
+    /** Degrees, 0..360 in steps of 15, for the gradients that turn. */
+    val wallpaperAngle: Int = WallpaperCatalog.DEFAULT_ANGLE,
+    /** Which part of an image or photo each screen shows. */
+    val phoneCrop: WallpaperCrop = WallpaperCrop.FULL,
+    val carCrop: WallpaperCrop = WallpaperCrop.FULL,
+    /** The light themes' own wallpaper; null keeps one wallpaper for light and dark. */
+    val lightWallpaper: WallpaperLook? = null,
     val blurBehindCards: Boolean = true,
     val iconStyle: IconStyle = IconStyle.TINTED,
     val cardStyle: CardStyle = CardStyle.ELEVATED,
@@ -37,6 +47,36 @@ data class AppearanceSpec(
     /** ...until this one. */
     val autoDarkTo: Int = 6 * 60 + 30
 ) {
+    /** The wallpaper settings of the dark themes (and of both when there is no [lightWallpaper]). */
+    val darkLook: WallpaperLook
+        get() = WallpaperLook(wallpaper, wallpaperDim, wallpaperBlur, wallpaperAngle, phoneCrop, carCrop)
+
+    val separateWallpapers: Boolean get() = lightWallpaper != null
+
+    /** The wallpaper that applies on a [light] or dark theme. */
+    fun wallpaperLook(light: Boolean): WallpaperLook = if (light) lightWallpaper ?: darkLook else darkLook
+
+    /** [look] stored for a light or dark theme: the light slot only when the wallpapers are separate. */
+    fun withWallpaperLook(light: Boolean, look: WallpaperLook): AppearanceSpec =
+        if (light && lightWallpaper != null) copy(lightWallpaper = look) else copy(
+            wallpaper = look.wallpaper,
+            wallpaperDim = look.dim,
+            wallpaperBlur = look.blur,
+            wallpaperAngle = look.angle,
+            phoneCrop = look.phoneCrop,
+            carCrop = look.carCrop
+        )
+
+    /**
+     * Turns separate light and dark wallpapers [on] or off. On, both start from what is showing.
+     * Off, the one that was being edited ([editingLight]) is kept for both.
+     */
+    fun withSeparateWallpapers(on: Boolean, editingLight: Boolean): AppearanceSpec = when {
+        on == separateWallpapers -> this
+        on -> copy(lightWallpaper = darkLook)
+        else -> (if (editingLight) copy(lightWallpaper = null).withWallpaperLook(false, lightWallpaper ?: darkLook) else copy(lightWallpaper = null))
+    }
+
     companion object {
         val DEFAULT = AppearanceSpec()
         const val MAX_DIM = 70
@@ -86,7 +126,25 @@ enum class TextStep(val scale: Float) {
 
 enum class HomeLayout { CLASSIC, DASHBOARD, COMPACT }
 
-enum class Wallpaper { NONE, GLOW, LINES, NIGHT_ROAD, SOLID, CUSTOM }
+/** What a wallpaper is made of, which decides the tab it sits in and what can be adjusted. */
+enum class WallpaperKind { SOLID, GRADIENT, IMAGE, PHOTO }
+
+/**
+ * Every wallpaper AutoBridge can draw behind its own screens. The first six are the original
+ * choices and keep their names, since the choice is stored by name; [SOLID] is the Slate tint.
+ * Images are drawn in code, so they ship without files and stay sharp at any size.
+ */
+enum class Wallpaper(val kind: WallpaperKind) {
+    NONE(WallpaperKind.SOLID), GLOW(WallpaperKind.GRADIENT), LINES(WallpaperKind.SOLID),
+    NIGHT_ROAD(WallpaperKind.GRADIENT), SOLID(WallpaperKind.SOLID), CUSTOM(WallpaperKind.PHOTO),
+    SOLID_NAVY(WallpaperKind.SOLID), SOLID_FOREST(WallpaperKind.SOLID), SOLID_PLUM(WallpaperKind.SOLID),
+    SOLID_WINE(WallpaperKind.SOLID), SOLID_EMBER(WallpaperKind.SOLID),
+    GRADIENT_AURORA(WallpaperKind.GRADIENT), GRADIENT_SUNSET(WallpaperKind.GRADIENT), GRADIENT_OCEAN(WallpaperKind.GRADIENT),
+    GRADIENT_EMBER(WallpaperKind.GRADIENT), GRADIENT_VIOLET(WallpaperKind.GRADIENT), GRADIENT_MINT(WallpaperKind.GRADIENT),
+    IMAGE_MIDNIGHT_ROAD(WallpaperKind.IMAGE), IMAGE_BLUE_HOUR(WallpaperKind.IMAGE), IMAGE_AMBER_DUSK(WallpaperKind.IMAGE),
+    IMAGE_AURORA(WallpaperKind.IMAGE), IMAGE_CITY_LIGHTS(WallpaperKind.IMAGE), IMAGE_CALM_SEA(WallpaperKind.IMAGE),
+    IMAGE_DUNES(WallpaperKind.IMAGE), IMAGE_MORNING_MIST(WallpaperKind.IMAGE)
+}
 
 enum class WallpaperTarget { PHONE, CAR, BOTH }
 

@@ -19,6 +19,8 @@ object Glyphs {
     const val AMOLED = "M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18M12 3v18M12 7h4M12 11h5M12 15h4"
     const val CLOCK = "M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18M12 7v5l3 2"
     const val CHECK = "M5 12.5l4.5 4.5L19 7.5"
+    const val LOCK = "M6 11h12v9H6zM9 11V8a3 3 0 0 1 6 0v3"
+    const val PLUS = "M12 5v14M5 12h14"
     const val UPLOAD = "M12 16V4M7 9l5-5l5 5M4 16v4h16v-4"
     const val CHEVRON = "M9 5l7 7l-7 7"
     const val PALETTE = "M12 3a9 9 0 1 0 0 18c1.1 0 1.5-.8 1.5-1.5c0-1-.8-1.4-.8-2.3c0-.9.7-1.7 1.7-1.7H17a4 4 0 0 0 4-4c0-4.7-4-8.5-9-8.5M7.5 11.5h.01M10 7.5h.01M15 7.5h.01"

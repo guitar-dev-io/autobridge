@@ -130,7 +130,7 @@
     <string name="appearance_wallpaper_glow">Glow</string>
     <string name="appearance_wallpaper_lines">Lines</string>
     <string name="appearance_wallpaper_night_road">Night road</string>
-    <string name="appearance_wallpaper_solid">Solid</string>
+    <string name="appearance_wallpaper_solid">Slate</string>
     <string name="appearance_wallpaper_custom">Your photo</string>
     <string name="appearance_wallpaper_choose">Choose photo</string>
     <string name="appearance_wallpaper_change">Choose another photo</string>
@@ -158,4 +158,98 @@
     <string name="appearance_corners_sharp">Sharp</string>
     <string name="appearance_tile_labels">Show tile labels</string>
     <string name="appearance_tile_labels_caption">Classic grid only</string>
+
+    <!-- Wallpaper: kinds, images, scope, crop, blur -->
+    <string name="appearance_wallpaper_solid_navy">Navy</string>
+    <string name="appearance_wallpaper_solid_forest">Forest</string>
+    <string name="appearance_wallpaper_solid_plum">Plum</string>
+    <string name="appearance_wallpaper_solid_wine">Wine</string>
+    <string name="appearance_wallpaper_solid_ember">Ember</string>
+    <string name="appearance_wallpaper_gradient_aurora">Aurora</string>
+    <string name="appearance_wallpaper_gradient_sunset">Sunset</string>
+    <string name="appearance_wallpaper_gradient_ocean">Ocean</string>
+    <string name="appearance_wallpaper_gradient_ember">Ember</string>
+    <string name="appearance_wallpaper_gradient_violet">Violet</string>
+    <string name="appearance_wallpaper_gradient_mint">Mint</string>
+    <string name="appearance_wallpaper_image_midnight_road">Midnight road</string>
+    <string name="appearance_wallpaper_image_blue_hour">Blue hour</string>
+    <string name="appearance_wallpaper_image_amber_dusk">Amber dusk</string>
+    <string name="appearance_wallpaper_image_aurora">Aurora</string>
+    <string name="appearance_wallpaper_image_city_lights">City lights</string>
+    <string name="appearance_wallpaper_image_calm_sea">Calm sea</string>
+    <string name="appearance_wallpaper_image_dunes">Dunes</string>
+    <string name="appearance_wallpaper_image_morning_mist">Morning mist</string>
+    <string name="appearance_wallpaper_suits_dark">Best in dark</string>
+    <string name="appearance_wallpaper_suits_light">Best in light</string>
+    <string name="appearance_wallpaper_suits_either">Dark or light</string>
+    <string name="appearance_wallpaper_tab_solid">Solid</string>
+    <string name="appearance_wallpaper_tab_gradient">Gradient</string>
+    <string name="appearance_wallpaper_tab_image">Images</string>
+    <string name="appearance_wallpaper_tab_photo">Photo</string>
+    <string name="appearance_wallpaper_choose_for">Choose · %1$s</string>
+    <string name="appearance_wallpaper_all_themes">%1$s · all themes</string>
+    <string name="appearance_wallpaper_preview_summary">%1$s · %2$s</string>
+
+    <string name="appearance_wallpaper_scope_title">Where wallpaper shows</string>
+    <string name="appearance_wallpaper_scope_changes">Changes</string>
+    <string name="appearance_wallpaper_scope_phone">AutoBridge on the phone</string>
+    <string name="appearance_wallpaper_scope_car">AutoBridge car screen</string>
+    <string name="appearance_wallpaper_scope_never">Never changes</string>
+    <string name="appearance_wallpaper_scope_launcher">Android Auto launcher</string>
+    <string name="appearance_wallpaper_scope_system">Phone system wallpaper</string>
+    <string name="appearance_wallpaper_scope_note">Android Auto draws its own launcher. AutoBridge only styles the screens it owns.</string>
+
+    <string name="appearance_wallpaper_split_title">Separate Light and Dark wallpapers</string>
+    <string name="appearance_wallpaper_split_caption">Switches with your theme · now %1$s</string>
+    <string name="appearance_wallpaper_split_off">One wallpaper is used for both themes. Turn this on to give Light and Dark their own.</string>
+    <string name="appearance_wallpaper_light">Light</string>
+    <string name="appearance_wallpaper_dark">Dark</string>
+    <string name="appearance_wallpaper_editing">Editing</string>
+    <string name="appearance_wallpaper_tap_to_edit">Tap to edit</string>
+    <string name="appearance_wallpaper_showing_now">showing now</string>
+
+    <string name="appearance_wallpaper_angle">Angle</string>
+    <string name="appearance_wallpaper_angle_value">%1$d°</string>
+    <string name="appearance_wallpaper_angle_turns">Turn the gradient from 0° to 360°.</string>
+    <string name="appearance_wallpaper_angle_glow">Accent glow follows your accent color.</string>
+    <string name="appearance_wallpaper_angle_pick">Pick a gradient to change its angle.</string>
+    <string name="appearance_wallpaper_images_note">8 images ship with AutoBridge, so they work offline and need no download. The dark and light notes are only a guide.</string>
+
+    <string name="appearance_wallpaper_photo_title">Use a photo from this phone</string>
+    <string name="appearance_wallpaper_photo_body">AutoBridge copies the photo into its own private storage and resizes it for the screens. Nothing is uploaded.</string>
+    <string name="appearance_wallpaper_photo_stays">Stays on this phone</string>
+    <string name="appearance_wallpaper_photo_replace">Replace</string>
+    <string name="appearance_wallpaper_photo_remove">Remove</string>
+    <string name="appearance_wallpaper_photo_saved">Photo copied into AutoBridge</string>
+    <string name="appearance_wallpaper_photo_removed">Photo removed from AutoBridge</string>
+
+    <string name="appearance_wallpaper_crop_title">Position and crop</string>
+    <string name="appearance_wallpaper_crop_caption">Outline: the part used on the %1$s. Dashed: the %2$s.</string>
+    <string name="appearance_wallpaper_crop_caption_one">Outline: the part used on the %1$s.</string>
+    <string name="appearance_wallpaper_crop_phone">phone</string>
+    <string name="appearance_wallpaper_crop_car">car display</string>
+    <string name="appearance_wallpaper_crop_preview">Crop preview: the whole picture with the visible part outlined</string>
+    <string name="appearance_wallpaper_zoom">Zoom</string>
+    <string name="appearance_wallpaper_pan_x">Left to right</string>
+    <string name="appearance_wallpaper_pan_y">Top to bottom</string>
+    <string name="appearance_wallpaper_crop_reset">Reset position</string>
+
+    <string name="appearance_wallpaper_effects">Blur and dim</string>
+    <string name="appearance_wallpaper_blur">Blur wallpaper</string>
+    <string name="appearance_wallpaper_blur_value">%1$d px</string>
+    <string name="appearance_wallpaper_blur_hint">Softens busy images so cards and text stand out.</string>
+    <string name="appearance_wallpaper_blur_off">Blur applies to images and photos.</string>
+    <string name="appearance_wallpaper_contrast_excellent">Excellent</string>
+    <string name="appearance_wallpaper_contrast_good">Good</string>
+    <string name="appearance_wallpaper_contrast_fair">Fair</string>
+    <string name="appearance_wallpaper_contrast_low">Low</string>
+    <string name="appearance_wallpaper_contrast_ok">Estimated text contrast is fine on this wallpaper.</string>
+    <string name="appearance_wallpaper_contrast_poor">Estimated text contrast is low. Raise dim or add blur.</string>
+    <string name="appearance_wallpaper_car_note">Android Auto keeps the default look, so the car preview ignores this wallpaper.</string>
+    <string name="appearance_wallpaper_car_note_action">Use my look</string>
+
+    <string name="appearance_wallpaper_reset">Reset wallpaper</string>
+    <string name="appearance_wallpaper_reset_title">Reset wallpaper?</string>
+    <string name="appearance_wallpaper_reset_body">Wallpaper, position, blur and dim go back to the defaults for Light and Dark. A photo you imported stays in AutoBridge.</string>
+    <string name="appearance_wallpaper_reset_done">Wallpaper reset</string>
 </resources>

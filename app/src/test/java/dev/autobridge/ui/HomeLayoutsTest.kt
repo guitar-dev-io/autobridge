@@ -106,10 +106,22 @@ class HomeLayoutsTest {
         assertEquals(Wallpaper.CUSTOM, HomeWallpaper.forPhone(custom, customExists = true))
     }
 
-    @Test fun dimIsBlackOnDarkWhiteOnLightAndCapped() {
-        assertEquals(0, HomeWallpaper.dimColor(Wallpaper.NONE, 50, light = false))
-        assertEquals(0x33000000, HomeWallpaper.dimColor(Wallpaper.GLOW, 20, light = false))
-        assertEquals(0x33FFFFFF, HomeWallpaper.dimColor(Wallpaper.GLOW, 20, light = true))
-        assertEquals(HomeWallpaper.dimColor(Wallpaper.GLOW, 70, false), HomeWallpaper.dimColor(Wallpaper.GLOW, 95, false))
+    @Test fun theLightThemeUsesItsOwnWallpaperWhenTheyAreSeparate() {
+        val spec = AppearanceSpec(wallpaper = Wallpaper.IMAGE_AURORA)
+            .withSeparateWallpapers(true, editingLight = false)
+            .let { it.withWallpaperLook(true, it.wallpaperLook(true).copy(wallpaper = Wallpaper.IMAGE_DUNES, dim = 5, blur = 6)) }
+        assertEquals(Wallpaper.IMAGE_AURORA, HomeWallpaper.forPhone(spec, false, light = false))
+        val light = HomeWallpaper.lookForPhone(spec, customExists = false, light = true)
+        assertEquals(Wallpaper.IMAGE_DUNES, light.wallpaper)
+        assertEquals(5, light.dim)
+        assertEquals(6, light.blur)
+    }
+
+    @Test fun theLookKeepsItsSettingsEvenWhenTheWallpaperFallsBack() {
+        val spec = AppearanceSpec(wallpaper = Wallpaper.CUSTOM, wallpaperDim = 40, wallpaperBlur = 10)
+        val look = HomeWallpaper.lookForPhone(spec, customExists = false, light = false)
+        assertEquals(Wallpaper.NONE, look.wallpaper)
+        assertEquals(40, look.dim)
+        assertEquals(Wallpaper.NONE, HomeWallpaper.lookForPhone(AppearanceSpec(wallpaperTarget = WallpaperTarget.CAR), true, false).wallpaper)
     }
 }

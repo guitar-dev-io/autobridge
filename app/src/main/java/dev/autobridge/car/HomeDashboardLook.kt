@@ -13,6 +13,9 @@ import dev.autobridge.design.ThemeHolder
 import dev.autobridge.design.ThemePalette
 import dev.autobridge.design.ThemeResolver
 import dev.autobridge.design.Wallpaper
+import dev.autobridge.design.WallpaperCatalog
+import dev.autobridge.design.WallpaperCrop
+import dev.autobridge.design.WallpaperLook
 import dev.autobridge.design.WallpaperTarget
 
 /**
@@ -45,8 +48,18 @@ internal data class HomeDashboardLook(
     val font: FontChoice = FontChoice.INTER,
     val thai: ThaiStyle = ThaiStyle.SYSTEM,
     /** CPU, memory and temperature in the header. */
-    val systemStatus: Boolean = true
+    val systemStatus: Boolean = true,
+    /** How soft an image or photo wallpaper is drawn, 0..[WallpaperCatalog.MAX_BLUR]. */
+    val wallpaperBlur: Int = 0,
+    /** The angle of a turning gradient wallpaper. */
+    val wallpaperAngle: Int = WallpaperCatalog.DEFAULT_ANGLE,
+    /** Which part of an image or photo the car shows. */
+    val wallpaperCrop: WallpaperCrop = WallpaperCrop.FULL
 ) {
+    /** The wallpaper as one value, which is what the shared painter takes. */
+    val wallpaperLook: WallpaperLook
+        get() = WallpaperLook(wallpaper, wallpaperDim, wallpaperBlur, wallpaperAngle, WallpaperCrop.FULL, wallpaperCrop)
+
     private val light: Boolean get() = palette.isLight
 
     // --- Surfaces ---------------------------------------------------------------------------
@@ -150,17 +163,6 @@ internal data class HomeDashboardLook(
         private const val DESIGN_CHIP = 52f
         private const val LIGHT_HUE_DARKEN = 0.42f
 
-        /** Night road wallpaper ramps and the solid wallpaper colour, as the design draws them. */
-        val NIGHT_ROAD_DARK = intArrayOf(0xFF1B2A3F.toInt(), 0xFF121A26.toInt(), 0xFF0B0F15.toInt())
-        val NIGHT_ROAD_DARK_STOPS = floatArrayOf(0f, 0.45f, 1f)
-        val NIGHT_ROAD_LIGHT = intArrayOf(0xFFD6E2F0.toInt(), 0xFFF2F4F8.toInt(), 0xFFF2F4F8.toInt())
-        val NIGHT_ROAD_LIGHT_STOPS = floatArrayOf(0f, 0.65f, 1f)
-        const val SOLID_DARK = 0xFF151C27.toInt()
-        const val SOLID_LIGHT = 0xFFE3EAF4.toInt()
-        /** "Your photo" while there is no photo to show. */
-        val CUSTOM_FALLBACK = intArrayOf(0xFF3A4E63.toInt(), 0xFF1E2B39.toInt(), 0xFF0E141B.toInt())
-        val CUSTOM_FALLBACK_STOPS = floatArrayOf(0f, 0.55f, 1f)
-
         /**
          * The look for [spec] and the car [palette] resolved from it. [systemFontScale] is
          * Android's own font size, read when the user follows it.
@@ -168,6 +170,7 @@ internal data class HomeDashboardLook(
         fun of(spec: AppearanceSpec, palette: ThemePalette, systemFontScale: Float): HomeDashboardLook {
             val car = if (spec.carSameLook) spec else AppearanceSpec.DEFAULT
             val wallpaperShown = car.wallpaperTarget == WallpaperTarget.CAR || car.wallpaperTarget == WallpaperTarget.BOTH
+            val wall = car.wallpaperLook(palette.isLight)
             return HomeDashboardLook(
                 palette = palette,
                 homeLayout = car.homeLayout,
@@ -175,8 +178,11 @@ internal data class HomeDashboardLook(
                 cardStyle = car.cardStyle,
                 corners = car.corners,
                 showTileLabels = car.showTileLabels,
-                wallpaper = if (wallpaperShown) car.wallpaper else Wallpaper.NONE,
-                wallpaperDim = car.wallpaperDim.coerceIn(0, AppearanceSpec.MAX_DIM),
+                wallpaper = if (wallpaperShown) wall.wallpaper else Wallpaper.NONE,
+                wallpaperDim = wall.dim.coerceIn(0, AppearanceSpec.MAX_DIM),
+                wallpaperBlur = wall.blur,
+                wallpaperAngle = wall.angle,
+                wallpaperCrop = wall.carCrop,
                 textScale = TextScaleCurve.carScale(spec, systemFontScale),
                 font = car.font,
                 thai = car.thai,

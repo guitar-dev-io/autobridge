@@ -44,6 +44,12 @@ internal interface AppearanceActions {
     fun open(page: Page)
     fun pickPhoto()
     fun askReset()
+    /** The Wallpaper page's own state: tab, theme being edited, crop device. */
+    val wallpaperUi: WallpaperUiState
+    /** Draws the page again without changing the spec (a tab or a theme picked on the page). */
+    fun refresh()
+    fun removePhoto()
+    fun askResetWallpaper()
     fun pickTime(minuteOfDay: Int, onPicked: (Int) -> Unit)
 }
 
@@ -59,12 +65,17 @@ internal object AppearancePages {
             orientation = LinearLayout.VERTICAL
             setPadding(context.dp(16), context.dp(8), context.dp(16), context.dp(24))
         }
-        body.addView(AppearancePreview.build(context, actions.spec, previewSummary(context, actions.spec)))
+        if (page == Page.WALLPAPER) {
+            val (phone, car) = WallpaperPage.previewPalettes(actions.spec, actions.wallpaperUi, actions.systemDark)
+            body.addView(AppearancePreview.build(context, actions.spec, WallpaperPage.previewSummary(context, actions.spec, actions.wallpaperUi), phone, car))
+        } else {
+            body.addView(AppearancePreview.build(context, actions.spec, previewSummary(context, actions.spec)))
+        }
         when (page) {
             Page.MAIN -> main(context, body, actions)
             Page.THEME -> theme(context, body, actions)
             Page.TEXT -> text(context, body, actions)
-            Page.WALLPAPER -> wallpaper(context, body, actions)
+            Page.WALLPAPER -> WallpaperPage.build(context, body, actions)
             Page.ICONS -> icons(context, body, actions)
         }
         return body
@@ -125,7 +136,8 @@ internal object AppearancePages {
             ).joinToString(" · "), Page.THEME),
             row(Glyphs.FONT, context.getString(R.string.appearance_row_text), textCaption, Page.TEXT),
             row(Glyphs.IMAGE, context.getString(R.string.appearance_row_wallpaper),
-                context.getString(R.string.appearance_wallpaper_summary, AppearanceLabels.wallpaper(context, spec.wallpaper), spec.wallpaperDim), Page.WALLPAPER),
+                context.getString(R.string.appearance_wallpaper_summary,
+                    AppearanceLabels.wallpaper(context, spec.wallpaperLook(p.isLight).wallpaper), spec.wallpaperLook(p.isLight).dim), Page.WALLPAPER),
             row(Glyphs.SHAPES, context.getString(R.string.appearance_row_icons), context.getString(
                 R.string.appearance_icons_summary,
                 AppearanceLabels.iconStyle(context, spec.iconStyle),
@@ -543,86 +555,6 @@ internal object AppearancePages {
         return AppearanceUi.card(context, rows)
     }
 
-    // ============================================================================= wallpaper
-
-    private fun wallpaper(context: Context, body: LinearLayout, actions: AppearanceActions) {
-        val spec = actions.spec
-        body.add(AppearanceUi.label(context, context.getString(R.string.appearance_background), first = true))
-        val photo = WallpaperPhoto.preview(context)
-        val density = context.resources.displayMetrics.density
-        val tiles = Wallpaper.entries.map { wallpaper ->
-            val on = wallpaper == spec.wallpaper
-            val name = AppearanceLabels.wallpaper(context, wallpaper)
-            val art = FrameLayout(context).apply {
-                background = WallpaperDrawable(wallpaper, p, density, context.dp(p.corners.tile).toFloat(), photo = photo)
-                foreground = AppearanceUi.shape(context, Color.TRANSPARENT, p.corners.tile, if (on) p.accent else p.hairline, strokeDp = 2)
-                if (wallpaper == Wallpaper.CUSTOM && photo == null) addView(LinearLayout(context).apply {
-                    orientation = LinearLayout.VERTICAL
-                    gravity = Gravity.CENTER
-                    addView(AppearanceUi.glyph(context, Glyphs.UPLOAD, CHOOSE_PHOTO_INK, 22))
-                    addView(AppearanceUi.text(context, context.getString(R.string.appearance_wallpaper_choose), 11f, CHOOSE_PHOTO_INK, lines = 2).apply {
-                        gravity = Gravity.CENTER
-                        setPadding(context.dp(4), context.dp(4), context.dp(4), 0)
-                    })
-                }, FrameLayout.LayoutParams(-1, -2, Gravity.CENTER))
-            }
-            LinearLayout(context).apply {
-                orientation = LinearLayout.VERTICAL
-                addView(art, LinearLayout.LayoutParams(-1, context.dp(120)))
-                addView(AppearanceUi.text(context, name, 13f, if (on) p.accent else p.textSecondary, bold = on, lines = 1).apply {
-                    gravity = Gravity.CENTER
-                }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = context.dp(6) })
-                background = AppearanceUi.ripple(AppearanceUi.shape(context, Color.TRANSPARENT, p.corners.tile))
-                AppearanceUi.makeTappable(this, selectedDescription(context, name, on), on) {
-                    when {
-                        // Your photo with nothing saved yet, or tapped again: pick one.
-                        wallpaper == Wallpaper.CUSTOM && (photo == null || on) -> actions.pickPhoto()
-                        !on -> actions.change { it.copy(wallpaper = wallpaper) }
-                    }
-                }
-            }
-        }
-        body.add(AppearanceUi.grid(context, tiles, columns = 3, gapDp = 10))
-        if (spec.wallpaper == Wallpaper.CUSTOM && photo != null) {
-            body.add(AppearanceUi.text(context, context.getString(R.string.appearance_wallpaper_change), 14f, p.accent, bold = true).apply {
-                gravity = Gravity.CENTER
-                minHeight = context.dp(44)
-                background = AppearanceUi.ripple(AppearanceUi.shape(context, Color.TRANSPARENT, p.corners.button))
-                AppearanceUi.makeTappable(this, text.toString()) { actions.pickPhoto() }
-            }, topDp = 6)
-        }
-
-        val dimValue = AppearanceUi.text(context, "${spec.wallpaperDim}%", 13f, p.textSecondary, lines = 1).apply { fontFeatureSettings = "tnum" }
-        body.add(AppearanceUi.paddedCard(context).apply {
-            addView(LinearLayout(context).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                addView(AppearanceUi.text(context, context.getString(R.string.appearance_dim), 15f, p.text, bold = true), LinearLayout.LayoutParams(0, -2, 1f))
-                addView(dimValue)
-            })
-            addView(AppearanceUi.seekBar(
-                context, AppearanceModel.DIM_STEPS, AppearanceModel.dimToProgress(spec.wallpaperDim), context.getString(R.string.appearance_dim),
-                onMove = { at -> dimValue.text = "${AppearanceModel.progressToDim(at)}%" },
-                onRelease = { at -> actions.change { it.copy(wallpaperDim = AppearanceModel.progressToDim(at)) } }
-            ), LinearLayout.LayoutParams(-1, -2).apply { topMargin = context.dp(6) })
-            addView(AppearanceUi.hairline(context), LinearLayout.LayoutParams(-1, maxOf(1, context.dp(1))).apply { topMargin = context.dp(6) })
-            addView(AppearanceUi.toggleRow(
-                context,
-                context.getString(R.string.appearance_blur),
-                context.getString(R.string.appearance_blur_caption),
-                spec.blurBehindCards
-            ) { actions.change { it.copy(blurBehindCards = !it.blurBehindCards) } }.apply { setPadding(0, context.dp(6), 0, 0) })
-        }, topDp = 14)
-
-        body.add(AppearanceUi.label(context, context.getString(R.string.appearance_show_on)))
-        body.add(AppearanceUi.segmented(
-            context, WallpaperTarget.entries.map { it to AppearanceLabels.target(context, it) }, spec.wallpaperTarget
-        ) { target -> actions.change { it.copy(wallpaperTarget = target) } })
-    }
-
-    /** "Choose photo" on the placeholder gradient, which is dark in both modes. */
-    private const val CHOOSE_PHOTO_INK = 0xFFDCE3EC.toInt()
-
     // ================================================================================= icons
 
     private fun icons(context: Context, body: LinearLayout, actions: AppearanceActions) {
@@ -658,7 +590,8 @@ internal object AppearancePages {
 
         body.add(AppearanceUi.label(context, context.getString(R.string.appearance_card_style)))
         val density = context.resources.displayMetrics.density
-        val photo = if (spec.wallpaper == Wallpaper.CUSTOM) WallpaperPhoto.preview(context) else null
+        val shownLook = spec.wallpaperLook(p.isLight)
+        val photo = if (shownLook.wallpaper == Wallpaper.CUSTOM) WallpaperPhoto.preview(context) else null
         body.add(AppearanceUi.grid(context, CardStyle.entries.map { style ->
             val on = style == spec.cardStyle
             val name = AppearanceLabels.cardStyle(context, style)
@@ -668,7 +601,7 @@ internal object AppearancePages {
                 setPadding(context.dp(10), context.dp(10), context.dp(10), context.dp(10))
                 background = AppearanceUi.optionBackground(context, on)
                 addView(FrameLayout(context).apply {
-                    background = WallpaperDrawable(spec.wallpaper, p, density, context.dp(10).toFloat(), photo = photo)
+                    background = WallpaperDrawable(shownLook.copy(dim = 0, blur = 0), WallDevice.CAR, p, density, context.dp(10).toFloat(), photo)
                     setPadding(context.dp(8), context.dp(8), context.dp(8), context.dp(8))
                     addView(View(context).apply { background = AppearanceUi.shape(context, sample.first, 8, sample.second) },
                         FrameLayout.LayoutParams(-1, -1))
