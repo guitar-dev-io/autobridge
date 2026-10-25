@@ -844,6 +844,17 @@
 
     <!-- Settings > Display & Mirror -->
     <string name="mirror_subtitle">ตัวเรนเดอร์ การหมุนจอ และเต็มหน้าจอ</string>
+    <string name="mirror_card_idle_title">ยังไม่ได้มิเรอร์</string>
+    <string name="mirror_card_idle_sub">แสดงหน้าจอโทรศัพท์นี้บนรถ</string>
+    <string name="mirror_card_connecting_title">กำลังเชื่อมต่อ…</string>
+    <string name="mirror_card_connecting_sub">รอรถรับภาพหน้าจอ</string>
+    <string name="mirror_card_live_title">กำลังมิเรอร์ไปที่รถ</string>
+    <string name="mirror_card_live_sub">หน้าจอโทรศัพท์อยู่บนรถตอนนี้</string>
+    <string name="mirror_card_error_title">มิเรอร์หยุดทำงาน</string>
+    <string name="mirror_card_error_sub">มีบางอย่างผิดพลาด ลองเริ่มใหม่อีกครั้ง</string>
+    <string name="mirror_card_start">เริ่มมิเรอร์</string>
+    <string name="mirror_card_connecting">กำลังเชื่อมต่อ…</string>
+    <string name="mirror_card_stop">หยุดมิเรอร์</string>
     <string name="mirror_mirroring">▣   กำลังมิเรอร์</string>
     <string name="mirror_start">▣   เริ่มมิเรอร์</string>
     <string name="mirror_section_display">การแสดงผล</string>

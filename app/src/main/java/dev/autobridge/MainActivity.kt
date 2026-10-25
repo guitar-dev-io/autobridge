@@ -1961,15 +1961,11 @@ class MainActivity : androidx.activity.ComponentActivity() {
         // It used to be the Control Center's START MIRROR button.
         addCard(
             content,
-            actionCard(
-                getString(
-                    if (MirrorCoordinator.isMirroring) R.string.mirror_mirroring
-                    else R.string.mirror_start
-                ),
-                primary = true
-            ) {
-                requestScreenCapture()
-            },
+            dev.autobridge.ui.MirrorStatusCard(
+                this,
+                onStart = { requestScreenCapture() },
+                onStop = { ProjectionService.stop(this, "settings") }
+            ),
             top = 4
         )
 

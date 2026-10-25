@@ -860,6 +860,17 @@
 
     <!-- Settings &gt; Display &amp; Mirror -->
     <string name="mirror_subtitle">RENDERER, ROTATION AND FULLSCREEN</string>
+    <string name="mirror_card_idle_title">Not mirroring</string>
+    <string name="mirror_card_idle_sub">Show this phone\'s screen on the car</string>
+    <string name="mirror_card_connecting_title">Connecting…</string>
+    <string name="mirror_card_connecting_sub">Waiting for the car to take the screen</string>
+    <string name="mirror_card_live_title">Mirroring to the car</string>
+    <string name="mirror_card_live_sub">Your phone screen is on the car now</string>
+    <string name="mirror_card_error_title">Mirroring stopped</string>
+    <string name="mirror_card_error_sub">Something went wrong. Try starting again.</string>
+    <string name="mirror_card_start">Start mirroring</string>
+    <string name="mirror_card_connecting">Connecting…</string>
+    <string name="mirror_card_stop">Stop mirroring</string>
     <string name="mirror_mirroring">▣   MIRRORING</string>
     <string name="mirror_start">▣   START MIRROR</string>
     <string name="mirror_section_display">DISPLAY</string>
