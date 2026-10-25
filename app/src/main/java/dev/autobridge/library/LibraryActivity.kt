@@ -118,6 +118,10 @@ class LibraryActivity : Activity() {
 
         /** The Streaming grid: icons to a row, and the size they are drawn at. */
         private const val STREAM_COLUMNS = 4
+        /** The Video group's brand cards: two to a row on a phone, drawn 8:5. */
+        private const val STREAM_CARD_COLUMNS = 2
+        private const val STREAM_CARD_W_PX = 640
+        private const val STREAM_CARD_H_PX = 400
         private const val STREAM_ICON_PX = 168
 
         /** Below this a search field is clutter; above it, a long list is unusable without one. */
@@ -2595,7 +2599,25 @@ class LibraryActivity : Activity() {
             if (links.any { StreamingLinks.mayNotPlay(it) }) {
                 rows += streamingNote(getString(R.string.streaming_group_may_not_play))
             }
-            rows += streamingGrid(links.map { link -> tile(link.title, link.url, starred = link.url in favoriteUrls) })
+            val tiles = links.map { link -> tile(link.title, link.url, starred = link.url in favoriteUrls) }
+            // The big-name services are large brand cards, like a streaming launcher; the rest stay icons.
+            rows += if (group == StreamingGroup.VIDEO) {
+                streamingCardGrid(links.map { link ->
+                    val starred = link.url in favoriteUrls
+                    StreamingTile(
+                        title = link.title,
+                        icon = StreamingIcons.cardBitmap(StreamingIcons.styleFor(link.title, link.url), STREAM_CARD_W_PX, STREAM_CARD_H_PX, starred),
+                        caption = null,
+                        onClick = { openSite(link.url) },
+                        onLongClick = {
+                            if (starred) StreamingFavoritesStore.remove(this, link.url) else StreamingFavoritesStore.add(this, link.title, link.url)
+                            refresh()
+                        }
+                    )
+                })
+            } else {
+                streamingGrid(tiles)
+            }
         }
         render(
             title = getString(R.string.section_streaming),
@@ -2608,6 +2630,7 @@ class LibraryActivity : Activity() {
     /** A group's name in the UI language; [StreamingGroup.title] is the English one. */
     private fun groupLabel(group: StreamingGroup): Int = when (group) {
         StreamingGroup.VIDEO -> R.string.streaming_group_video
+        StreamingGroup.SOCIAL -> R.string.streaming_group_social
         StreamingGroup.CHINESE -> R.string.streaming_group_chinese
         StreamingGroup.MOVIES -> R.string.streaming_group_movies
         StreamingGroup.MUSIC -> R.string.streaming_group_music
@@ -2682,6 +2705,46 @@ class LibraryActivity : Activity() {
         if (remainder != 0) {
             repeat(STREAM_COLUMNS - remainder) { grid.addView(View(this), streamingCellParams()) }
         }
+        return grid
+    }
+
+    /**
+     * [tiles] as large brand cards, [STREAM_CARD_COLUMNS] to a row, each with its name under it.
+     * The card keeps its shape whatever the width: the cell gives the width and the image the height.
+     */
+    private fun streamingCardGrid(tiles: List<StreamingTile>): View {
+        val density = resources.displayMetrics.density
+        val grid = android.widget.GridLayout(this).apply { columnCount = STREAM_CARD_COLUMNS }
+        tiles.forEach { tile ->
+            val cell = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding((6 * density).toInt(), (6 * density).toInt(), (6 * density).toInt(), (8 * density).toInt())
+                isClickable = true
+                isLongClickable = true
+                contentDescription = tile.title
+                setOnClickListener { tile.onClick() }
+                setOnLongClickListener { tile.onLongClick(); true }
+                addView(
+                    android.widget.ImageView(this@LibraryActivity).apply {
+                        setImageBitmap(tile.icon)
+                        adjustViewBounds = true
+                        scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                    },
+                    LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+                )
+                addView(TextView(this@LibraryActivity).apply {
+                    text = tile.title
+                    textSize = 13f
+                    maxLines = 1
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                    setTextColor(AutoBridgeDesign.TEXT)
+                    setPadding((4 * density).toInt(), (4 * density).toInt(), 0, 0)
+                })
+            }
+            grid.addView(cell, streamingCellParams())
+        }
+        val remainder = tiles.size % STREAM_CARD_COLUMNS
+        if (remainder != 0) repeat(STREAM_CARD_COLUMNS - remainder) { grid.addView(View(this), streamingCellParams()) }
         return grid
     }
 

@@ -15,9 +15,14 @@ import dev.autobridge.ui.AppFonts
  */
 object StreamingIcons {
     /** What an icon shows: the mark (a letter or two, or a character) and its colour. */
-    data class Style(val glyph: String, val color: Int)
+    data class Style(val glyph: String, val color: Int, val onColor: Int = 0xFFFFFFFF.toInt())
 
     private val CATALOG: Map<String, Style> = mapOf(
+        "Netflix" to Style("N", 0xFF141414.toInt(), onColor = 0xFFE50914.toInt()),
+        "Disney+" to Style("D+", 0xFF0B2F6B.toInt()),
+        "Prime Video" to Style("prime", 0xFF1A98FF.toInt()),
+        "HBO Max" to Style("HBO", 0xFF111111.toInt()),
+        "Viu" to Style("viu", 0xFFFFB400.toInt(), onColor = 0xFF1A1A1A.toInt()),
         "YouTube" to Style("▶", 0xFFE62117.toInt()),
         "TikTok" to Style("♪", 0xFF111111.toInt()),
         "Facebook Watch" to Style("f", 0xFF1877F2.toInt()),
@@ -66,42 +71,60 @@ object StreamingIcons {
     }
 
     /** Draws [style] as a square bitmap of [sizePx]; [starred] adds a small gold star in the corner. */
-    fun bitmap(style: Style, sizePx: Int, starred: Boolean = false): Bitmap {
-        val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+    fun bitmap(style: Style, sizePx: Int, starred: Boolean = false): Bitmap =
+        draw(style, sizePx, sizePx, starred, radiusFraction = 0.22f, markFraction = 0.5f, insetFraction = 0.04f)
+
+    /**
+     * Draws [style] as a wide card of [widthPx] x [heightPx], a brand colour with its mark large on
+     * it: the big tiles of the Video group, as in a streaming launcher's grid.
+     */
+    fun cardBitmap(style: Style, widthPx: Int, heightPx: Int, starred: Boolean = false): Bitmap =
+        draw(style, widthPx, heightPx, starred, radiusFraction = 0.12f, markFraction = 0.52f, insetFraction = 0.015f)
+
+    private fun draw(
+        style: Style, widthPx: Int, heightPx: Int, starred: Boolean,
+        radiusFraction: Float, markFraction: Float, insetFraction: Float
+    ): Bitmap {
+        val bitmap = Bitmap.createBitmap(widthPx, heightPx, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
-        val size = sizePx.toFloat()
-        val radius = size * 0.22f
-        val box = RectF(size * 0.04f, size * 0.04f, size * 0.96f, size * 0.96f)
+        val w = widthPx.toFloat()
+        val h = heightPx.toFloat()
+        val short = minOf(w, h)
+        val radius = short * radiusFraction
+        val inset = short * insetFraction
+        val box = RectF(inset, inset, w - inset, h - inset)
         val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = style.color }
         canvas.drawRoundRect(box, radius, radius, fill)
         // A faint rim so a dark icon still reads against a dark screen (and a pale one on Light).
         val rim = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             this.style = Paint.Style.STROKE
-            strokeWidth = size * 0.02f
+            strokeWidth = short * 0.02f
             color = if (ThemeHolder.palette.isLight) 0x26000000 else 0x40FFFFFF
         }
         canvas.drawRoundRect(box, radius, radius, rim)
 
         val text = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = 0xFFFFFFFF.toInt()
+            color = style.onColor
             typeface = AppFonts.bold()
             textAlign = Paint.Align.CENTER
-            textSize = size * 0.5f
+            textSize = short * markFraction
         }
-        // Shrink the mark until it fits inside the square.
-        while (text.measureText(style.glyph) > size * 0.74f && text.textSize > size * 0.12f) text.textSize -= size * 0.02f
-        val baseline = size / 2f - (text.descent() + text.ascent()) / 2f
-        canvas.drawText(style.glyph, size / 2f, baseline, text)
+        // Shrink the mark until it fits inside the shape.
+        while (text.measureText(style.glyph) > w * 0.74f && text.textSize > short * 0.12f) text.textSize -= short * 0.02f
+        val baseline = h / 2f - (text.descent() + text.ascent()) / 2f
+        canvas.drawText(style.glyph, w / 2f, baseline, text)
 
         if (starred) {
+            val cx = w - short * 0.2f
+            val cy = short * 0.2f
             val badge = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = ThemeHolder.palette.background }
-            canvas.drawCircle(size * 0.80f, size * 0.20f, size * 0.17f, badge)
+            canvas.drawCircle(cx, cy, short * 0.17f, badge)
             val star = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = 0xFFFFC107.toInt()
                 textAlign = Paint.Align.CENTER
-                textSize = size * 0.26f
+                textSize = short * 0.26f
             }
-            canvas.drawText("★", size * 0.80f, size * 0.20f - (star.descent() + star.ascent()) / 2f, star)
+            canvas.drawText("★", cx, cy - (star.descent() + star.ascent()) / 2f, star)
         }
         return bitmap
     }

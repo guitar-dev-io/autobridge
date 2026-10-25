@@ -285,3 +285,13 @@ Not checked: View-based `PopupMenu`s and spinners on a device (they take the act
 - Tests: `SystemStatsTest` (CPU share, RAM share, heat thresholds), codec round trip with the new field. All unit tests and compile pass.
 - Checked on the phone + DHU 800x480: the line shows in the header; the 36 °C matches `dumpsys battery` (361 tenths).
 - Not verified: that the figures visibly change between redraws (they stayed the same across screenshots taken minutes apart, which an idle app and a steady battery would also give); the diagnostics rows on the DHU; the line on the 1280x720 profile and at large text; the CPU figure under real load (mirroring).
+
+## Video group as the streaming launcher grid (2026-10-25, phone + DHU 800x480)
+
+Asked for from a photo of another car app's video launcher: large brand cards for Netflix, YouTube, Disney+, Prime Video, HBO Max, Viu, WeTV, iQIYI.
+- Catalog: the `VIDEO` group is now those eight, in that order; TikTok, Facebook Watch, Dailymotion and Vimeo moved to a new `SOCIAL` group ("Short and social video"); `CHINESE` keeps the other six. Netflix, Disney+, Prime Video, HBO Max and Viu are new entries.
+- **Decision reversed on request**: `StreamingLinks` had left those services out because the WebView has no dependable Widevine path (a listed site that shows a black video). They are listed now, as the Chinese group already is: `mayNotPlay` is true for Netflix, Disney+, Prime Video, HBO Max, Viu, WeTV, iQIYI and the Chinese group, and the screens say so ("May not play" under each tile on the car, one note per group on the phone). Whether any of them plays was not tried.
+- Phone Streaming page: the Video group is two-column wide brand cards (`StreamingIcons.cardBitmap`), the rest stay icons. Logos are not the owners' marks (as before): a brand colour with a short mark ("N" red on black, "D+", "prime", "HBO", "viu" dark on yellow).
+- Car: the Video group comes first in its own order as `IMAGE_TYPE_LARGE` grid items; the rest follow, warned sites last. The DHU host drew them as ordinary icons at this size (the host decides).
+- Tests: `StreamingLinksTest` (video group order, social group, warned set), `StreamingIconsTest` (own colours); all unit tests, compile, lint (`lintSafeDebug`) and check-i18n pass.
+- Checked: phone Streaming page (cards, order, note) and the car grid on the DHU. Not checked: tapping a card on the car and on the phone to see whether each site loads or plays; a wide (Coolwalk) head unit; favourites already saved are unchanged (keyed by address).
