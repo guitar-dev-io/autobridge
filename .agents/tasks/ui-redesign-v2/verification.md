@@ -25,8 +25,8 @@ Known gaps, left to the pieces (not regressions in dark mode, which is the defau
 
 ## Piece E1: phone media screens (branch claude/ui-redesign-media-72f07c)
 
-- `:app:compilePersonalDebugKotlin`: pass. `:app:testPersonalDebugUnitTest` for library/entertainment/youtube: NOT run yet (usage limit). No new strings.
-- Not tried on the phone yet (the user asked for a real-phone pass; still owed).
+- `:app:compilePersonalDebugKotlin`: pass. `:app:testPersonalDebugUnitTest --tests dev.autobridge.{library,entertainment,youtube}.*`: pass. No new strings, so check-i18n is not needed.
+- 2026-10-25: built the personalDebug APK and installed it on the phone (YXEMRCGYAI49S4SS), install Success. The screen check was NOT done: the phone sat on its secure lock screen (PIN), which a session cannot unlock. Appearance settings were not touched. Still owed: Radio, the player and the library in Dark and Light.
 
 What changed, per screen:
 - All 9 activities (Library, Player, RadioPlayer, Subtitle/Video/VideoEnhancement/Storage settings, Entertainment, YouTube settings): `AppearanceContext.wrap(AppLocale.rebase(...))` in attachBaseContext, `AppearanceStore.refreshPalette(this)` at the start of onCreate.
