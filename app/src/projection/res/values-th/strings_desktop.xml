@@ -59,6 +59,8 @@
     <string name="desktop_prefs_section">การตั้งค่า</string>
     <string name="desktop_prefs_on">เปิด</string>
     <string name="desktop_prefs_off">ปิด</string>
+    <string name="desktop_prefs_managed">โหมดจัดการ (Managed)</string>
+    <string name="desktop_prefs_managed_caption">ซ่อนคำเตือน --no-sandbox ด้วยนโยบายที่จัดการไว้ ปิดเพื่อรันแบบไม่มีนโยบาย เบราว์เซอร์จะเริ่มใหม่</string>
     <string name="desktop_prefs_start_on_launch">เริ่มเมื่อเปิดแอป</string>
     <string name="desktop_prefs_start_on_launch_caption">เปิดเบราว์เซอร์ที่เลือกไว้เบื้องหลังเมื่อ AutoBridge เริ่มทำงาน เพื่อให้เปิดบนรถได้ทันที</string>
     <string name="desktop_prefs_sensitivity">ความไวการสัมผัส</string>
