@@ -46,7 +46,9 @@ class SubtitleSettingsActivity : Activity() {
         fun intent(context: Context): Intent = Intent(context, SubtitleSettingsActivity::class.java)
     }
 
-    private val accent = AutoBridgeDesign.ACCENT_VIDEO
+    // Every accent use here is a control or its state (ON badges, values, pills), so it takes
+    // the user's accent from Settings > Appearance rather than the video section hue.
+    private val accent get() = AutoBridgeDesign.ACCENT
 
     /** Set while a download is in flight, so a second tap does not start a parallel fetch. */
     @Volatile
@@ -54,10 +56,11 @@ class SubtitleSettingsActivity : Activity() {
 
     /** Applies the Settings &gt; Language choice; see [AppLocale.rebase]. */
     override fun attachBaseContext(newBase: Context) {
-        super.attachBaseContext(AppLocale.rebase(newBase))
+        super.attachBaseContext(dev.autobridge.ui.AppearanceContext.wrap(AppLocale.rebase(newBase)))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        dev.autobridge.settings.AppearanceStore.refreshPalette(this)
         super.onCreate(savedInstanceState)
     }
 

@@ -24,7 +24,6 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.annotation.StringRes
 import dev.autobridge.R
-import dev.autobridge.design.DesignTokens
 import dev.autobridge.entertainment.ContentKind
 import dev.autobridge.entertainment.EntertainmentActivity
 import dev.autobridge.entertainment.WebBookmarkStore
@@ -132,17 +131,15 @@ class LibraryActivity : Activity() {
         /** Station logos across the Radio grid: four, like a radio app's, so a screenful is a dozen. */
         private const val RADIO_GRID_COLUMNS = 4
 
-        // The radio design's phone palette.
-        private const val RADIO_CARD = DesignTokens.Phone.SURFACE
-        private const val RADIO_WARM_CARD = DesignTokens.Radio.WARM_CARD
-        private const val RADIO_FIELD = DesignTokens.Radio.SHEET
-        private const val RADIO_OUTLINE = DesignTokens.Radio.CONTROL_PRESSED
-        private const val RADIO_MUTED = DesignTokens.Radio.TEXT_HINT
-        private const val RADIO_CHIP_TEXT = DesignTokens.Radio.TEXT_CONTROL
-        private const val RADIO_ON_AMBER = DesignTokens.Radio.ON_AMBER
-        private const val RADIO_TAB_BAR = DesignTokens.Radio.TAB_BAR
-        private const val RADIO_TAB_EDGE = DesignTokens.Radio.TAB_EDGE
-        private const val RADIO_TAB_PILL = DesignTokens.Radio.TAB_PILL
+        // The radio page's palette roles, read from Settings > Appearance: controls take the user's
+        // accent, and amber stays on the section's own badge only.
+        private val RADIO_CARD: Int get() = MediaTheme.palette.surface
+        private val RADIO_FIELD: Int get() = MediaTheme.palette.raised
+        private val RADIO_OUTLINE: Int get() = MediaTheme.palette.hairline
+        private val RADIO_MUTED: Int get() = MediaTheme.palette.textTertiary
+        private val RADIO_STATION_TEXT: Int get() = MediaTheme.palette.text
+        private val RADIO_TAB_BAR: Int get() = MediaTheme.palette.background
+        private val RADIO_TAB_EDGE: Int get() = MediaTheme.palette.hairline
         private const val RADIO_NOW_WATCH_MS = 1_000L
 
         fun intent(context: android.content.Context, section: Section): Intent =
@@ -218,10 +215,11 @@ class LibraryActivity : Activity() {
 
     /** Applies the Settings &gt; Language choice; see [AppLocale.rebase]. */
     override fun attachBaseContext(newBase: Context) {
-        super.attachBaseContext(AppLocale.rebase(newBase))
+        super.attachBaseContext(dev.autobridge.ui.AppearanceContext.wrap(AppLocale.rebase(newBase)))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        dev.autobridge.settings.AppearanceStore.refreshPalette(this)
         super.onCreate(savedInstanceState)
         releaseBack = SystemBack.register(this) { goBack() }
         playback = MediaPlaybackClient(this)
@@ -357,7 +355,7 @@ class LibraryActivity : Activity() {
             val row = LinearLayout(this)
             actions.forEachIndexed { index, (label, handler) ->
                 row.addView(
-                    AutoBridgeDesign.pill(this, label, primary = index == 0, accent = accent, onClick = handler),
+                    AutoBridgeDesign.pill(this, label, primary = index == 0, accent = AutoBridgeDesign.ACCENT, onClick = handler),
                     LinearLayout.LayoutParams(0, -2, 1f).apply {
                         marginStart = if (index == 0) 0 else dp(8)
                     }
@@ -446,7 +444,7 @@ class LibraryActivity : Activity() {
                     title = getString(R.string.library_no_source, section.title(this)),
                     message = getString(R.string.library_no_source_message),
                     action = getString(R.string.library_browse_public_lists) to { addFromDirectory() },
-                    accent = accent
+                    accent = AutoBridgeDesign.ACCENT
                 ),
                 headerActions = listOf(AutoBridgeDesign.HeaderAction("+", onClick = { addSourceChooser() })),
                 actions = listOf(
@@ -544,7 +542,7 @@ class LibraryActivity : Activity() {
                         startLoad()
                         draw()
                     },
-                    accent = AutoBridgeDesign.ACCENT_RADIO
+                    accent = AutoBridgeDesign.ACCENT
                 )
                 key != null && readyKey == key -> {
                     if (readyEntries.isEmpty()) {
@@ -552,7 +550,7 @@ class LibraryActivity : Activity() {
                             this,
                             getString(R.string.radio_browse_empty),
                             "",
-                            accent = AutoBridgeDesign.ACCENT_RADIO
+                            accent = AutoBridgeDesign.ACCENT
                         )
                     } else {
                         // The genres these stations actually have, as chips, then a four-across
@@ -575,12 +573,8 @@ class LibraryActivity : Activity() {
                         null
                     }
                 }
-                else -> AutoBridgeDesign.emptyState(
-                    this,
-                    getString(R.string.radio_browse_loading),
-                    "",
-                    accent = AutoBridgeDesign.ACCENT_RADIO
-                )
+                // Loading: skeleton rows where the stations will be, not a spinner or a sentence.
+                else -> MediaTheme.skeletonList(this, 5, getString(R.string.radio_browse_loading))
             }
         }
 
@@ -599,7 +593,7 @@ class LibraryActivity : Activity() {
                             this,
                             getString(R.string.radio_cat_favorites),
                             getString(R.string.radio_browse_empty),
-                            accent = AutoBridgeDesign.ACCENT_RADIO
+                            accent = AutoBridgeDesign.ACCENT
                         )
                     } else {
                         rows += AutoBridgeDesign.grid(
@@ -617,7 +611,7 @@ class LibraryActivity : Activity() {
                             getString(R.string.radio_local_pick_title),
                             getString(R.string.radio_cat_local),
                             getString(R.string.radio_local_pick_cta) to { openProvincePicker { draw(); startLoad() } },
-                            accent = AutoBridgeDesign.ACCENT_RADIO
+                            accent = AutoBridgeDesign.ACCENT
                         )
                     } else {
                         empty = networkBody(rows)
@@ -698,7 +692,7 @@ class LibraryActivity : Activity() {
             imageTintList = android.content.res.ColorStateList.valueOf(AutoBridgeDesign.TEXT)
             scaleType = ImageView.ScaleType.CENTER_INSIDE
             setPadding(dp(13), dp(13), dp(13), dp(13))
-            background = AutoBridgeDesign.tappable(this@LibraryActivity, RADIO_CARD, 16, AutoBridgeDesign.ACCENT_RADIO)
+            background = AutoBridgeDesign.tappable(this@LibraryActivity, RADIO_CARD, 16)
             contentDescription = getString(R.string.radio_manage_lists)
             isClickable = true
             isFocusable = true
@@ -709,7 +703,7 @@ class LibraryActivity : Activity() {
 
     /**
      * The Radio page's bottom tabs, one per [RadioCategory]: an icon over its name, the chosen one
-     * in the radio accent on a soft pill. Bottom tabs rather than a chip row so the five categories
+     * in the accent on a soft pill. Bottom tabs rather than a chip row so the five categories
      * stay put under the thumb while the grid above them scrolls.
      */
     private fun radioTabBar(selected: RadioCategory, onSelect: (RadioCategory) -> Unit): View {
@@ -725,7 +719,7 @@ class LibraryActivity : Activity() {
         }
         RadioCategory.values().forEach { category ->
             val on = category == selected
-            val color = if (on) AutoBridgeDesign.ACCENT_RADIO else AutoBridgeDesign.TEXT_MUTED
+            val color = if (on) AutoBridgeDesign.ACCENT else AutoBridgeDesign.TEXT_MUTED
             val tab = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER_HORIZONTAL
@@ -741,7 +735,7 @@ class LibraryActivity : Activity() {
                 imageTintList = android.content.res.ColorStateList.valueOf(color)
                 setPadding(dp(14), dp(4), dp(14), dp(4))
                 background = if (on) AutoBridgeDesign.surface(
-                    this@LibraryActivity, RADIO_TAB_PILL, 15, android.graphics.Color.TRANSPARENT
+                    this@LibraryActivity, MediaTheme.palette.accentSoft, 15, MediaTheme.palette.accent
                 ) else null
                 importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
             }, LinearLayout.LayoutParams(dp(52), dp(30)))
@@ -750,7 +744,7 @@ class LibraryActivity : Activity() {
                 textSize = 12f
                 gravity = Gravity.CENTER
                 setTextColor(color)
-                if (on) typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+                if (on) typeface = MediaTheme.SEMIBOLD
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
                 setPadding(0, dp(3), 0, 0)
@@ -772,13 +766,13 @@ class LibraryActivity : Activity() {
         RadioCategory.FAVORITES -> R.drawable.ic_browser_star
     }
 
-    /** The genre chips within a category, as the design's chips: amber when chosen, else an outline. */
+    /** The genre chips within a category, as the design's chips: accent outline and soft fill when chosen, else a hairline. */
     private fun radioGenreChips(genres: List<RadioGenre>, selected: RadioGenre, onSelect: (RadioGenre) -> Unit): View {
         val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         genres.forEach { genre ->
             row.addView(
                 radioChip(getString(genre.labelRes), genre == selected) { onSelect(genre) },
-                LinearLayout.LayoutParams(-2, dp(38)).apply { marginEnd = dp(8) }
+                LinearLayout.LayoutParams(-2, dp(44)).apply { marginEnd = dp(8) }
             )
         }
         return HorizontalScrollView(this).apply {
@@ -794,15 +788,8 @@ class LibraryActivity : Activity() {
         gravity = Gravity.CENTER
         maxLines = 1
         setPadding(dp(16), 0, dp(16), 0)
-        setTextColor(if (on) RADIO_ON_AMBER else RADIO_CHIP_TEXT)
-        typeface = Typeface.create("sans-serif", if (on) Typeface.BOLD else Typeface.NORMAL)
-        background = android.graphics.drawable.GradientDrawable().apply {
-            cornerRadius = dp(19).toFloat()
-            if (on) setColor(AutoBridgeDesign.ACCENT_RADIO) else {
-                setColor(android.graphics.Color.TRANSPARENT)
-                setStroke((1.5f * resources.displayMetrics.density).toInt().coerceAtLeast(1), RADIO_OUTLINE)
-            }
-        }
+        MediaTheme.styleChipLabel(this, on)
+        background = MediaTheme.chipBackground(this@LibraryActivity, on, 22f)
         isClickable = true
         isFocusable = true
         isSelected = on
@@ -819,7 +806,7 @@ class LibraryActivity : Activity() {
 
     /**
      * A square FrameLayout that shows a station logo in three states: the grey SURFACE fill is the
-     * loading placeholder; a centred amber initial on an amber-tint square is the no-logo / failed
+     * loading placeholder; a centred amber initial on an amber-tint square (the section badge) is the no-logo / failed
      * fallback; and the real favicon (CENTER_CROP, full-bleed) once [ImageLoader] delivers it. The
      * square clips to its ~14dp rounded outline so a wide logo fills the cell without spilling.
      */
@@ -860,7 +847,7 @@ class LibraryActivity : Activity() {
 
     /**
      * One grid cell: a full-bleed square logo (3 states) with the station name below it, in a card
-     * that takes the radio accent's outline while that station is the one playing.
+     * that takes the accent's outline while that station is the one playing.
      */
     private fun radioLogoCell(entry: IptvEntry, categoryEntries: List<IptvEntry>): View =
         LinearLayout(this).apply {
@@ -881,8 +868,8 @@ class LibraryActivity : Activity() {
             addView(TextView(this@LibraryActivity).apply {
                 text = entry.title
                 textSize = 12f
-                setTextColor(RADIO_CHIP_TEXT)
-                typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+                setTextColor(RADIO_STATION_TEXT)
+                typeface = MediaTheme.SEMIBOLD
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
                 setPadding(dp(2), dp(6), dp(2), 0)
@@ -900,17 +887,9 @@ class LibraryActivity : Activity() {
         return name.isNotEmpty() && name.equals(title.trim(), ignoreCase = true)
     }
 
-    /** A grid cell's card: the design's dark card, or the warm one with an amber ring when on air. */
+    /** A grid cell's card: the plain card, or accentSoft with an accent ring when on air. */
     private fun radioCellBackground(playing: Boolean): android.graphics.drawable.Drawable =
-        android.graphics.drawable.RippleDrawable(
-            android.content.res.ColorStateList.valueOf(AutoBridgeDesign.tint(AutoBridgeDesign.ACCENT_RADIO, 0.22f)),
-            android.graphics.drawable.GradientDrawable().apply {
-                cornerRadius = dp(16).toFloat()
-                setColor(if (playing) RADIO_WARM_CARD else RADIO_CARD)
-                if (playing) setStroke(dp(2), AutoBridgeDesign.ACCENT_RADIO)
-            },
-            null
-        )
+        MediaTheme.cardBackground(this, playing, 16f)
 
     /**
      * The Favorites variant: the same full-bleed logo cell for a stored [item], played through the
@@ -930,7 +909,7 @@ class LibraryActivity : Activity() {
             val square = radioLogoSquare(item.title, item.logo)
             // The ★ toggle sits in the top-trailing corner of the square.
             square.addView(
-                AutoBridgeDesign.glyphButton(this@LibraryActivity, "★", 16f, tint = AutoBridgeDesign.ACCENT_RADIO) {
+                AutoBridgeDesign.glyphButton(this@LibraryActivity, "★", 16f, tint = AutoBridgeDesign.ACCENT) {
                     RadioRepository.RadioHistory.toggleFavorite(
                         this@LibraryActivity,
                         RadioRepository.RadioHistory.toRadioStation(item)
@@ -944,8 +923,8 @@ class LibraryActivity : Activity() {
             addView(TextView(this@LibraryActivity).apply {
                 text = item.title
                 textSize = 12f
-                setTextColor(RADIO_CHIP_TEXT)
-                typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+                setTextColor(RADIO_STATION_TEXT)
+                typeface = MediaTheme.SEMIBOLD
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
                 setPadding(dp(2), dp(6), dp(2), 0)
@@ -1191,15 +1170,11 @@ class LibraryActivity : Activity() {
                     text = chip.title(this@LibraryActivity)
                     textSize = 14f
                     gravity = Gravity.CENTER
-                    setTextColor(if (isSelected) AutoBridgeDesign.INK else AutoBridgeDesign.TEXT)
-                    typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                    MediaTheme.styleChipLabel(this, isSelected)
+                    minHeight = dp(44)
                     setPadding(dp(18), dp(10), dp(18), dp(10))
-                    background = AutoBridgeDesign.surface(
-                        this@LibraryActivity,
-                        if (isSelected) chip.accent else AutoBridgeDesign.SURFACE,
-                        20,
-                        if (isSelected) chip.accent else AutoBridgeDesign.HAIRLINE
-                    )
+                    background = MediaTheme.chipBackground(this@LibraryActivity, isSelected, 22f)
+                    this.isSelected = isSelected
                     isClickable = true
                     isFocusable = true
                     setOnClickListener { if (!isSelected) showSection(chip) }
@@ -1648,7 +1623,7 @@ class LibraryActivity : Activity() {
             val onlineStart = summary.length
             summary.append("●")
             summary.setSpan(
-                android.text.style.ForegroundColorSpan(AutoBridgeDesign.ACCENT_ONLINE),
+                android.text.style.ForegroundColorSpan(MediaTheme.palette.good),
                 onlineStart, summary.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
             )
             summary.append(" ").append(getString(R.string.library_online_count, online)).append("   ")
@@ -1669,7 +1644,7 @@ class LibraryActivity : Activity() {
                     this@LibraryActivity,
                     getString(R.string.library_check_button),
                     primary = false,
-                    accent = accent,
+                    accent = AutoBridgeDesign.ACCENT,
                     onClick = onCheck
                 ),
                 LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(8) }
@@ -1679,7 +1654,7 @@ class LibraryActivity : Activity() {
                     this@LibraryActivity,
                     getString(if (hideOffline) R.string.library_show_all else R.string.library_hide_offline),
                     primary = hideOffline,
-                    accent = accent,
+                    accent = AutoBridgeDesign.ACCENT,
                     onClick = onToggleHide
                 )
             )
@@ -1736,7 +1711,7 @@ class LibraryActivity : Activity() {
 
     /** Wraps an entry tile with the accent border and "ON CAR" pill the currently-sent channel gets. */
     private fun onCarBadge(tile: View): View = FrameLayout(this).apply {
-        background = AutoBridgeDesign.surface(this@LibraryActivity, android.graphics.Color.TRANSPARENT, 18, accent)
+        background = AutoBridgeDesign.surface(this@LibraryActivity, android.graphics.Color.TRANSPARENT, 18, AutoBridgeDesign.ACCENT)
         addView(tile, FrameLayout.LayoutParams(-1, -1).apply {
             val inset = dp(2)
             setMargins(inset, inset, inset, inset)
@@ -1745,10 +1720,10 @@ class LibraryActivity : Activity() {
             TextView(this@LibraryActivity).apply {
                 text = getString(R.string.library_on_car)
                 textSize = 10f
-                setTextColor(AutoBridgeDesign.INK)
-                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                setTextColor(MediaTheme.palette.onAccent)
+                typeface = MediaTheme.SEMIBOLD
                 setPadding(dp(8), dp(3), dp(8), dp(3))
-                background = AutoBridgeDesign.surface(this@LibraryActivity, accent, 10)
+                background = AutoBridgeDesign.surface(this@LibraryActivity, AutoBridgeDesign.ACCENT, 10)
             },
             FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.START).apply {
                 leftMargin = dp(10)
@@ -1759,11 +1734,11 @@ class LibraryActivity : Activity() {
 
     /** A check result as text and the colour it reads in. */
     private fun pingStatus(result: StreamPing.Result): Pair<String, Int> = if (result == StreamPing.Result.Unsupported) {
-        StreamPing.describe(result) to AutoBridgeDesign.SIGNAL_SLOW
+        StreamPing.describe(result) to MediaTheme.palette.warn
     } else when (StreamPing.tone(result)) {
         // A word first, the measurement after it: "Online · 230 ms" reads at a glance, "230 ms" does not.
-        StreamPing.Tone.GOOD -> getString(R.string.library_status_online, StreamPing.describe(result)) to AutoBridgeDesign.SIGNAL_GOOD
-        StreamPing.Tone.SLOW -> getString(R.string.library_status_slow, StreamPing.describe(result)) to AutoBridgeDesign.SIGNAL_SLOW
+        StreamPing.Tone.GOOD -> getString(R.string.library_status_online, StreamPing.describe(result)) to MediaTheme.palette.good
+        StreamPing.Tone.SLOW -> getString(R.string.library_status_slow, StreamPing.describe(result)) to MediaTheme.palette.warn
         StreamPing.Tone.BAD -> getString(R.string.library_status_offline) to AutoBridgeDesign.DANGER
     }
 
@@ -1798,8 +1773,8 @@ class LibraryActivity : Activity() {
             else -> StreamPing.Tone.GOOD
         }
         return when (worst) {
-            StreamPing.Tone.GOOD -> AutoBridgeDesign.SIGNAL_GOOD
-            StreamPing.Tone.SLOW -> AutoBridgeDesign.SIGNAL_SLOW
+            StreamPing.Tone.GOOD -> MediaTheme.palette.good
+            StreamPing.Tone.SLOW -> MediaTheme.palette.warn
             StreamPing.Tone.BAD -> AutoBridgeDesign.DANGER
         }
     }
@@ -2789,7 +2764,7 @@ class LibraryActivity : Activity() {
                 title = getString(R.string.library_needs_media_access),
                 message = getString(R.string.library_media_access_message, title),
                 action = getString(R.string.library_allow_access) to { requestMediaPermission(types) },
-                accent = accent
+                accent = AutoBridgeDesign.ACCENT
             )
         )
     }
