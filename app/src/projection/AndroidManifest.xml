@@ -118,6 +118,9 @@
         <activity android:name="dev.autobridge.projection.desktop.DesktopBrowserSettingsActivity"
             android:exported="false"
             android:label="@string/settings_desktop_browser" />
+        <activity android:name="dev.autobridge.projection.desktop.DesktopChromeSetupActivity"
+            android:exported="false"
+            android:label="@string/chrome_setup_title" />
         <activity android:name="dev.autobridge.projection.desktop.DesktopBrowserActivity"
             android:exported="false"
             android:label="@string/settings_desktop_browser"
