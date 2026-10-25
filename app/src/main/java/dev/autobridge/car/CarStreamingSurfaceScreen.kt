@@ -232,7 +232,19 @@ internal class CarStreamingSurfaceScreen(carContext: CarContext) : Screen(carCon
      * browser. A site already open is returned to, not reloaded.
      */
     private fun open(url: String) {
-        if (DesktopLinks.wantsDesktop(url) && CarExtensions.openUrl(carContext, screenManager, url)) return
+        if (DesktopLinks.wantsDesktop(url)) {
+            if (CarExtensions.openUrl(carContext, screenManager, url)) return
+            // Chrome is what these sites need and it is not installed yet: say so, with the way on.
+            if (CarExtensions.canInstallChrome(carContext)) {
+                val title = StreamingLinks.all.firstOrNull { it.url == url }?.title ?: url
+                screenManager.push(CarChromeNeededScreen(carContext, title) { openBuiltIn(url) })
+                return
+            }
+        }
+        openBuiltIn(url)
+    }
+
+    private fun openBuiltIn(url: String) {
         val renderer = dev.autobridge.browser.CarBrowserRuntime.renderer(carContext)
         if (!dev.autobridge.browser.BrowserSiteEntry.resumes(renderer.livePageUrl, url)) {
             renderer.load(url)

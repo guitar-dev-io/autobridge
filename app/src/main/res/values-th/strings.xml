@@ -1792,6 +1792,10 @@
     <string name="home_donate">☕ เลี้ยงค่าขนมผู้พัฒนา</string>
     <string name="maint_compulsory_insurance">พ.ร.บ.</string>
     <string name="car_saved_title">ที่บันทึกไว้</string>
+    <string name="car_chrome_needed_title">ต้องติดตั้ง Chrome</string>
+    <string name="car_chrome_needed_message">%1$s ต้องใช้ Google Chrome for Linux ซึ่งยังไม่ได้ติดตั้ง บนโทรศัพท์ให้เปิด AutoBridge \u203a ตั้งค่า \u203a Desktop Browser Engine แล้วติดตั้ง Chrome (ประมาณ 1 GB แนะนำให้ใช้ Wi-Fi) ทำตอนจอดรถ</string>
+    <string name="car_chrome_needed_ok">ตกลง</string>
+    <string name="car_chrome_needed_open_anyway">เปิดแบบเดิม</string>
     <string name="car_my_car_title">รถของฉัน</string>
     <string name="fuel_edit">แก้ไข</string>
     <string name="fuel_edit_title">แก้ไขการเติมน้ำมัน</string>

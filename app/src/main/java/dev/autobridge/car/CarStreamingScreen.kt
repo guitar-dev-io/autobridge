@@ -96,7 +96,19 @@ class CarStreamingScreen(carContext: CarContext) : Screen(carContext) {
     private fun open(url: String) {
         // The sites that may not play in the WebView open in Google Chrome for Linux (the desktop
         // engine), where it is installed; everything else, and the case of none installed, is the built-in browser.
-        if (DesktopLinks.wantsDesktop(url) && CarExtensions.openUrl(carContext, screenManager, url)) return
+        if (DesktopLinks.wantsDesktop(url)) {
+            if (CarExtensions.openUrl(carContext, screenManager, url)) return
+            // Chrome is what these sites need and it is not installed yet: say so, with the way on.
+            if (CarExtensions.canInstallChrome(carContext)) {
+                val title = StreamingLinks.all.firstOrNull { it.url == url }?.title ?: url
+                screenManager.push(CarChromeNeededScreen(carContext, title) { openBuiltIn(url) })
+                return
+            }
+        }
+        openBuiltIn(url)
+    }
+
+    private fun openBuiltIn(url: String) {
         val renderer = dev.autobridge.browser.CarBrowserRuntime.renderer(carContext)
         if (!dev.autobridge.browser.BrowserSiteEntry.resumes(renderer.livePageUrl, url)) {
             renderer.load(url)

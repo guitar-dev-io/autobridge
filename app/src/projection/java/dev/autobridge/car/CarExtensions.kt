@@ -127,6 +127,13 @@ internal object CarExtensions {
         desktopSupported(carContext) && DesktopEngine.installedChrome() != null
 
     /**
+     * Whether this phone could run Chrome for Linux but does not have it yet: the case where a
+     * protected-video site should send the user to install it rather than open a page that cannot play.
+     */
+    fun canInstallChrome(carContext: CarContext): Boolean =
+        desktopSupported(carContext) && DesktopEngine.installedChrome() == null
+
+    /**
      * Opens [url] in Google Chrome for Linux on the car (not whichever browser is chosen for the
      * Web card), in a new tab when Chrome is already running. False when it is not installed: the
      * caller opens the built-in browser.

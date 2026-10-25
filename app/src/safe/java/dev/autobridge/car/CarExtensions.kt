@@ -28,6 +28,10 @@ internal object CarExtensions {
     @Suppress("UNUSED_PARAMETER")
     fun canOpenChrome(carContext: CarContext): Boolean = false
 
+    /** False: no desktop browser here, so there is nothing to ask the user to install. */
+    @Suppress("UNUSED_PARAMETER")
+    fun canInstallChrome(carContext: CarContext): Boolean = false
+
     /** False: no desktop browser, so the site opens in the built-in browser. */
     @Suppress("UNUSED_PARAMETER")
     fun openUrl(carContext: CarContext, screenManager: ScreenManager, url: String): Boolean = false
