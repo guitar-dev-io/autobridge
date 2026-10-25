@@ -133,8 +133,8 @@ class LibraryActivity : Activity() {
         /** Radio: the online station search waits for this pause in typing and this many characters. */
         private const val RADIO_ONLINE_DEBOUNCE_MS = 600L
         private const val RADIO_ONLINE_MIN_CHARS = 2
-        /** Station logos across the Radio grid: four, like a radio app's, so a screenful is a dozen. */
-        private const val RADIO_GRID_COLUMNS = 4
+        /** Station logos across the Radio grid: three, so a logo is big enough to read and a name fits on two lines. */
+        private const val RADIO_GRID_COLUMNS = 3
 
         // The radio page's palette roles, read from Settings > Appearance: controls take the user's
         // accent, and amber stays on the section's own badge only.
@@ -874,10 +874,12 @@ class LibraryActivity : Activity() {
             square.post { square.layoutParams = square.layoutParams.apply { height = square.width } }
             addView(TextView(this@LibraryActivity).apply {
                 text = entry.title
-                textSize = 12f
+                textSize = 13f
                 setTextColor(RADIO_STATION_TEXT)
                 typeface = MediaTheme.SEMIBOLD
-                maxLines = 1
+                // Two lines, so "101.5 Chulalongkorn" is not cut to "101.5 Chul..."; the minimum keeps cells level.
+                minLines = 2
+                maxLines = 2
                 ellipsize = TextUtils.TruncateAt.END
                 setPadding(dp(2), dp(6), dp(2), 0)
             }, LinearLayout.LayoutParams(-1, -2))
