@@ -173,7 +173,7 @@ class MoreActionsSheet(
     private fun sectionLabel(@StringRes titleRes: Int): View = TextView(activity).apply {
         text = activity.getString(titleRes).uppercase()
         textSize = shell.sp(AutoUiSizes.ICON_SMALL_DP * 0.68f)
-        letterSpacing = 0.08f
+        letterSpacing = dev.autobridge.design.ScriptTracking.letterSpacing(text, 0.08f)
         setTypeface(typeface, Typeface.BOLD)
         setTextColor(BrowserTheme.textSecondary)
         layoutParams = LinearLayout.LayoutParams(

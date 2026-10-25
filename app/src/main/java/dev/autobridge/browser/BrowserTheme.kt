@@ -2,6 +2,7 @@ package dev.autobridge.browser
 
 import android.graphics.Color
 import dev.autobridge.design.DesignTokens
+import dev.autobridge.design.ThemePalette
 
 /**
  * One complete colour scheme for the browser, in Material 3 role names.
@@ -42,6 +43,14 @@ class BrowserColors(
     val tileDisabledBackground: Int,
     /** The rounded background behind a tile's glyph on an enabled tile. */
     val tileIconChip: Int,
+    /**
+     * The design system's "selected" fill: the accent at 15%, drawn under an accent outline and an
+     * accent label. Translucent on purpose, so it reads on whichever surface it sits on.
+     */
+    val selectedFill: Int = (0x26 shl 24) or (primary and 0x00FFFFFF),
+    /** The floating button: a near-opaque surface with an accent edge. */
+    val fabFill: Int = DesignTokens.BrowserDark.FAB_FILL,
+    val fabEdge: Int = DesignTokens.BrowserDark.FAB_EDGE,
 ) {
     // ---------------------------------------------------------------- browser chrome
     val background = surface
@@ -100,9 +109,10 @@ class BrowserColors(
  * and the car [CarWebRenderer] (Canvas-drawn chrome), so both presentations read as one app the way
  * a Fermata-style browser keeps its toolbar/menu look consistent across screens.
  *
- * Two Material 3 schemes generated from one blue seed (the app's `#4C7DF0` accent): [dark], and
- * [light] at the same tones the car theme's `carColorPrimary` uses. The phone follows the
- * Appearance setting through [active]; the car deliberately reads [dark] directly. A head unit runs
+ * Two fixed Material 3 schemes generated from one blue seed (the app's `#4C7DF0` accent): [dark],
+ * and [light] at the same tones the car theme's `carColorPrimary` uses. The car deliberately reads
+ * [dark] directly. The phone draws with [active], which [BrowserAppearanceStore.syncChrome] builds
+ * from the app's Appearance palette ([fromPalette]). A head unit runs
  * its own UI dark at night and most of the day, and a light page chrome inside a dark dashboard
  * frame reads as a hole in it — so "Light" is a phone choice, not a car one.
  *
@@ -181,6 +191,65 @@ object BrowserTheme {
     @Volatile
     var active: BrowserColors = dark
 
+    /**
+     * The phone chrome's scheme, derived from the app's Settings > Appearance palette so the browser
+     * picks up the same preset, accent and light/dark choice as every other phone screen. The car
+     * never comes through here: it keeps drawing [dark].
+     *
+     * The palette has four surface steps (background, surface, raised, hairline) where Material 3
+     * has a ladder of six, so the missing rungs are blended a few percent toward the text colour.
+     * That keeps the structure the chrome relies on (the sheet a step off the page, a card a step
+     * off the sheet, a tile a step off the card) in every preset, light or dark.
+     */
+    fun fromPalette(palette: ThemePalette): BrowserColors {
+        val ink = palette.text
+        val highest = blend(palette.raised, ink, 0.06f)
+        val tile = blend(palette.raised, ink, 0.10f)
+        val accentContainer = blend(palette.raised, palette.accent, if (palette.isLight) 0.18f else 0.30f)
+        return BrowserColors(
+            primary = palette.accent,
+            onPrimary = palette.onAccent,
+            primaryContainer = accentContainer,
+            onPrimaryContainer = ink,
+            secondaryContainer = tile,
+            onSecondaryContainer = ink,
+            surface = palette.background,
+            surfaceContainerLowest = palette.background,
+            surfaceContainerLow = palette.surface,
+            surfaceContainer = palette.surface,
+            surfaceContainerHigh = palette.raised,
+            surfaceContainerHighest = highest,
+            onSurface = ink,
+            onSurfaceVariant = palette.textSecondary,
+            // A switch's off knob is drawn in [outline], so it takes the tertiary text tone: the
+            // hairline itself would vanish against the off track. Rules use [outlineVariant].
+            outline = palette.textTertiary,
+            outlineVariant = palette.hairline,
+            error = palette.danger,
+            iconDisabled = blend(palette.surface, ink, 0.38f),
+            secureBadge = palette.good,
+            insecureBadge = palette.warn,
+            tileDisabledBackground = blend(palette.raised, ink, 0.12f),
+            tileIconChip = blend(tile, ink, 0.10f),
+            selectedFill = palette.accentSoft,
+            fabFill = (0xE6 shl 24) or (palette.surface and 0x00FFFFFF),
+            fabEdge = palette.accent,
+        )
+    }
+
+    /**
+     * [from] moved [amount] (0..1) of the way to [to], per channel; always opaque. Plain bit
+     * arithmetic rather than [Color], so the JVM tests can call it.
+     */
+    internal fun blend(from: Int, to: Int, amount: Float): Int {
+        fun mix(shift: Int): Int {
+            val a = (from shr shift) and 0xFF
+            val b = (to shr shift) and 0xFF
+            return ((a + (b - a) * amount + 0.5f).toInt().coerceIn(0, 255)) shl shift
+        }
+        return (0xFF shl 24) or mix(16) or mix(8) or mix(0)
+    }
+
     // ---------------------------------------------------------------- M3 roles (active scheme)
     val primary: Int get() = active.primary
     val onPrimary: Int get() = active.onPrimary
@@ -231,4 +300,7 @@ object BrowserTheme {
     val tileIconChip: Int get() = active.tileIconChip
     val primaryCardAccent: Int get() = active.primaryCardAccent
     val primaryTileIconChip: Int get() = active.primaryTileIconChip
+    val selectedFill: Int get() = active.selectedFill
+    val fabFill: Int get() = active.fabFill
+    val fabEdge: Int get() = active.fabEdge
 }
