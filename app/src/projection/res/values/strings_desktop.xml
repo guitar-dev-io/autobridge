@@ -85,7 +85,7 @@
     <string name="chrome_setup_why">Netflix and similar services will not play in the built-in browser. They play in Google Chrome or Brave for Linux, which AutoBridge can install here. Three steps; do them while parked.</string>
     <string name="chrome_setup_step_limit">Let Android keep the browser running</string>
     <string name="chrome_setup_step_limit_done">Done. Android will not stop the browser.</string>
-    <string name="chrome_setup_limit_done">I\'ve done this</string>
+    <string name="chrome_setup_limit_done">Done, next step</string>
     <string name="chrome_setup_step_install">Install Chrome or Brave</string>
     <string name="chrome_setup_step_install_caption">Downloads the Linux runtime and the browser you pick from its publisher, about 1 GB. Chrome is the safer choice for Netflix; you will see Google\'s terms first.</string>
     <string name="chrome_setup_step_install_done">%1$s %2$s is installed.</string>
@@ -108,4 +108,8 @@
     <string name="chrome_setup_notification_text">Tap to set up Chrome or Brave so %1$s can play on the car</string>
     <string name="chrome_setup_install_brave">Install Brave</string>
     <string name="chrome_setup_open_browser">Open %1$s</string>
+    <string name="chrome_setup_progress">Step %1$d of %2$d</string>
+    <string name="chrome_setup_limit_why">Android stops apps that run many background processes, and a desktop browser needs many. Without this switch the browser can close by itself.</string>
+    <string name="chrome_setup_limit_howto_14">1. Tap Open developer options below.\n2. Find \u201cDisable child process restrictions\u201d and turn it on.\n3. Come back to this page. It moves on by itself.</string>
+    <string name="chrome_setup_limit_howto_12">1. On a computer, run the adb command (tap Copy adb command below, then paste it there).\n2. Come back to this page and tap the button below.</string>
 </resources>

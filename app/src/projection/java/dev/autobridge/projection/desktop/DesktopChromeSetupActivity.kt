@@ -159,18 +159,32 @@ class DesktopChromeSetupActivity : Activity() {
                 AutoBridgeDesign.ACCENT
             )
         )
+        val number = when (step) { Step.LIMIT -> 1; Step.INSTALL -> 2; Step.TEST -> 3 }
+        content.stack(TextView(this).apply {
+            text = getString(R.string.chrome_setup_progress, number, 3)
+            textSize = 14f
+            setTextColor(AutoBridgeDesign.ACCENT)
+            typeface = AppFonts.medium()
+            setPadding(dp(4), dp(6), 0, 0)
+        }, gap = 6)
 
         // 1 — background processes
         val limitDone = step != Step.LIMIT
-        content.stack(stepCard(1, getString(R.string.chrome_setup_step_limit), limitDone) { card ->
+        content.stack(stepCard(1, getString(R.string.chrome_setup_step_limit), stateOf(1, step)) { card ->
             if (limitDone) {
                 card.addView(caption(getString(R.string.chrome_setup_step_limit_done)))
             } else {
                 val status = ChildProcessLimit.status(this)
-                card.addView(caption(getString(
-                    if (status == ChildProcessLimit.Status.ACTIVE) R.string.desktop_settings_child_limit_14
-                    else R.string.desktop_settings_child_limit_12
-                )))
+                card.addView(caption(getString(R.string.chrome_setup_limit_why)))
+                card.addView(TextView(this).apply {
+                    text = getString(
+                        if (status == ChildProcessLimit.Status.ACTIVE) R.string.chrome_setup_limit_howto_14
+                        else R.string.chrome_setup_limit_howto_12
+                    )
+                    textSize = 14.5f
+                    setTextColor(AutoBridgeDesign.TEXT)
+                    setPadding(0, dp(10), 0, 0)
+                })
                 val actions = mutableListOf<Pair<String, () -> Unit>>()
                 if (status == ChildProcessLimit.Status.ACTIVE) {
                     actions += getString(R.string.desktop_settings_open_developer_options) to {
@@ -197,7 +211,7 @@ class DesktopChromeSetupActivity : Activity() {
 
         // 2 — install
         val installDone = step == Step.TEST
-        content.stack(stepCard(2, getString(R.string.chrome_setup_step_install), installDone) { card ->
+        content.stack(stepCard(2, getString(R.string.chrome_setup_step_install), stateOf(2, step)) { card ->
             when {
                 installDone -> card.addView(caption(getString(R.string.chrome_setup_step_install_done, focusName(), chrome.version ?: "")))
                 step == Step.LIMIT -> card.addView(caption(getString(R.string.chrome_setup_step_install_waiting)))
@@ -224,7 +238,7 @@ class DesktopChromeSetupActivity : Activity() {
         }, gap = 10)
 
         // 3 — test
-        content.stack(stepCard(3, getString(R.string.chrome_setup_step_test), false) { card ->
+        content.stack(stepCard(3, getString(R.string.chrome_setup_step_test), stateOf(3, step)) { card ->
             if (step == Step.TEST) {
                 card.addView(caption(getString(R.string.chrome_setup_step_test_caption)))
                 card.addView(buttons(listOf(
@@ -295,19 +309,42 @@ class DesktopChromeSetupActivity : Activity() {
 
     // ── Views ───────────────────────────────────────────────────────────────
 
-    private fun stepCard(number: Int, titleText: String, done: Boolean, fill: (LinearLayout) -> Unit): View =
+    private enum class StepState { DONE, CURRENT, PENDING }
+
+    /**
+     * One step of the guide. Only the current step opens up, outlined in the accent, with its
+     * buttons; a finished step is a ticked line and a later one is its title alone, so there is
+     * always exactly one place to tap.
+     */
+    private fun stepCard(number: Int, titleText: String, state: StepState, fill: (LinearLayout) -> Unit): View =
         LinearLayout(this).apply {
+            val palette = dev.autobridge.design.ThemeHolder.palette
             orientation = LinearLayout.VERTICAL
-            background = AutoBridgeDesign.surface(this@DesktopChromeSetupActivity, AutoBridgeDesign.SURFACE, 20)
+            background = AutoBridgeDesign.surface(
+                this@DesktopChromeSetupActivity,
+                AutoBridgeDesign.SURFACE,
+                20,
+                if (state == StepState.CURRENT) AutoBridgeDesign.ACCENT else AutoBridgeDesign.HAIRLINE
+            )
+            alpha = if (state == StepState.PENDING) 0.55f else 1f
             setPadding(dp(16), dp(14), dp(16), dp(12))
             addView(TextView(context).apply {
-                text = (if (done) "✓  " else "$number.  ") + titleText
+                text = (if (state == StepState.DONE) "\u2713  " else "$number.  ") + titleText
                 textSize = 17f
-                setTextColor(if (done) dev.autobridge.design.ThemeHolder.palette.good else AutoBridgeDesign.TEXT)
+                setTextColor(if (state == StepState.DONE) palette.good else AutoBridgeDesign.TEXT)
                 typeface = AppFonts.medium()
             })
-            fill(this)
+            if (state != StepState.PENDING) fill(this)
         }
+
+    private fun stateOf(number: Int, step: Step): StepState {
+        val current = when (step) { Step.LIMIT -> 1; Step.INSTALL -> 2; Step.TEST -> 3 }
+        return when {
+            number < current -> StepState.DONE
+            number == current -> StepState.CURRENT
+            else -> StepState.PENDING
+        }
+    }
 
     private fun caption(text: String) = TextView(this).apply {
         this.text = text

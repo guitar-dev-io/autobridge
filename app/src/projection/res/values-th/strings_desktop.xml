@@ -85,7 +85,7 @@
     <string name="chrome_setup_why">Netflix และบริการแบบเดียวกันเล่นในเบราว์เซอร์ในตัวไม่ได้ แต่เล่นได้ใน Google Chrome หรือ Brave for Linux ซึ่ง AutoBridge ติดตั้งให้ได้ที่นี่ มี 3 ขั้นตอน ทำตอนจอดรถ</string>
     <string name="chrome_setup_step_limit">ให้ Android ปล่อยเบราว์เซอร์ทำงานต่อ</string>
     <string name="chrome_setup_step_limit_done">เรียบร้อย Android จะไม่หยุดเบราว์เซอร์</string>
-    <string name="chrome_setup_limit_done">ทำแล้ว</string>
+    <string name="chrome_setup_limit_done">ทำแล้ว ไปขั้นต่อไป</string>
     <string name="chrome_setup_step_install">ติดตั้ง Chrome หรือ Brave</string>
     <string name="chrome_setup_step_install_caption">ดาวน์โหลดรันไทม์ Linux และเบราว์เซอร์ที่เลือกจากผู้เผยแพร่โดยตรง ประมาณ 1 GB Chrome เป็นตัวเลือกที่ชัวร์กว่าสำหรับ Netflix และจะแสดงเงื่อนไขของ Google ก่อน</string>
     <string name="chrome_setup_step_install_done">ติดตั้ง %1$s %2$s แล้ว</string>
@@ -108,4 +108,8 @@
     <string name="chrome_setup_notification_text">แตะเพื่อติดตั้ง Chrome หรือ Brave ให้ %1$s เล่นบนรถได้</string>
     <string name="chrome_setup_install_brave">ติดตั้ง Brave</string>
     <string name="chrome_setup_open_browser">เปิด %1$s</string>
+    <string name="chrome_setup_progress">ขั้นที่ %1$d จาก %2$d</string>
+    <string name="chrome_setup_limit_why">Android จะหยุดแอปที่เปิดโปรเซสเบื้องหลังจำนวนมาก แต่เบราว์เซอร์เดสก์ท็อปต้องใช้หลายโปรเซส ถ้าไม่เปิดสวิตช์นี้ เบราว์เซอร์อาจปิดไปเอง</string>
+    <string name="chrome_setup_limit_howto_14">1. แตะปุ่ม "เปิดตัวเลือกสำหรับนักพัฒนาแอป" ด้านล่าง\n2. หาข้อ "ปิดใช้ข้อจำกัดของกระบวนการย่อย" (Disable child process restrictions) แล้วเปิดสวิตช์\n3. กลับมาที่หน้านี้ แล้วจะไปขั้นต่อไปเอง</string>
+    <string name="chrome_setup_limit_howto_12">1. บนคอมพิวเตอร์ ให้รันคำสั่ง adb (แตะ "คัดลอกคำสั่ง adb" ด้านล่าง แล้ววางที่นั่น)\n2. กลับมาที่หน้านี้แล้วแตะปุ่มด้านล่าง</string>
 </resources>
