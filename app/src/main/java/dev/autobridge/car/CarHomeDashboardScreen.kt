@@ -30,6 +30,7 @@ import dev.autobridge.media.WebMediaHub
 import dev.autobridge.bridge.EngineKind
 import dev.autobridge.core.state.VehicleStateSession
 import dev.autobridge.logging.StructuredLog
+import dev.autobridge.settings.AppearanceStore
 import dev.autobridge.library.HomeSection
 import dev.autobridge.mirror.MirrorSurfaceOwnership
 import dev.autobridge.mirror.ProjectionService
@@ -135,6 +136,7 @@ class CarHomeDashboardScreen(
     /** Repaints the Now Playing card as the live session plays, pauses and moves on. */
     private val scope = MainScope()
     private var sessionWatch: Job? = null
+    private var appearanceWatch: Job? = null
 
     /**
      * Thumbnails for the hero and the rows.
@@ -162,6 +164,9 @@ class CarHomeDashboardScreen(
                 MirrorSurfaceOwnership.claim(this@CarHomeDashboardScreen)
                 appManager.setSurfaceCallback(this@CarHomeDashboardScreen)
                 sessionWatch = scope.launch { AutoBridgeSessionManager.state.collect { renderMenu() } }
+                // Settings > Appearance can change while the car runs; renderMenu lays out again
+                // when the look it reads differs from the one the layout was built for.
+                appearanceWatch = scope.launch { AppearanceStore.spec.collect { renderMenu() } }
                 WebMediaHub.addStatusListener(webStatusListener)
                 readWeb()
                 watchSession()
@@ -174,6 +179,8 @@ class CarHomeDashboardScreen(
                 active = false
                 sessionWatch?.cancel()
                 sessionWatch = null
+                appearanceWatch?.cancel()
+                appearanceWatch = null
                 WebMediaHub.removeStatusListener(webStatusListener)
                 unwatchSession()
                 handler.removeCallbacksAndMessages(null)
@@ -655,11 +662,14 @@ class CarHomeDashboardScreen(
         // The head unit's dpi, never the phone's: it decides every dp on this screen.
         val density = (if (surfaceDpi > 0) surfaceDpi else BASELINE_DPI) / BASELINE_DPI.toFloat()
         val shown = shownContent()
+        val look = HomeDashboardLook.current()
+        if (dashboardLayout?.look != look) dashboardLayout = null
         val layout = dashboardLayout ?: HomeDashboardLayout.compute(
             safeArea(), density, menuItems.map { it.title(carContext) }, shown,
             dashboardRenderer::measureLabel,
             recentTitle = carContext.getString(R.string.car_home_recent_from_phone),
-            queueLabel = dashboardRenderer.queueLink(content.queueTotal)
+            queueLabel = dashboardRenderer.queueLink(content.queueTotal),
+            look = look
         ).also {
             dashboardLayout = it
             scroll = scroll.coerceIn(0f, it.maxScroll)
@@ -667,7 +677,8 @@ class CarHomeDashboardScreen(
                 TAG,
                 "layout card=${it.cards.first().width.toInt()}x${it.cards.first().height.toInt()}" +
                     " hero=${it.continueCard != null} recent=${it.recentRows.size}" +
-                    " queue=${content.queueTotal} scroll=${it.scrollable}"
+                    " queue=${content.queueTotal} scroll=${it.scrollable}" +
+                    " home=${look.homeLayout} text=${look.textScale}"
             )
         }
         // Not lockHardwareCanvas directly: on some devices it takes the process down a frame

@@ -5,6 +5,10 @@ import dev.autobridge.design.DesignTokens
 /**
  * Colours, dimensions and timings for the surface-drawn Android Auto home dashboard.
  *
+ * The home itself now paints with [HomeDashboardLook], resolved from Settings > Appearance; the
+ * colour constants here are what the car's other surface screens (the radio tuner) and the
+ * features' own hues still read. Dimensions and timings are shared by all of them.
+ *
  * Every value the dashboard paints with lives here so the header, the Now Playing card, the six
  * quick-access cards and the Recently Sent row stay one design system. The numbers are the car
  * home design ("Home v2 · ทาง A" on the design canvas, CarHomeV2Space and its two state boards),
@@ -154,6 +158,33 @@ internal object HomeDashboardTheme {
 
         const val SCROLL_BUTTON = 56f
         const val SCROLL_COLUMN_GAP = 14f
+
+        // Classic grid (Appearance > Home layout): tiles fill two rows under the header.
+        /** Shorter tiles than this and the grid scrolls instead. */
+        const val CLASSIC_TILE_MIN = 120f
+        const val CLASSIC_CHIP = 72f
+        const val CLASSIC_CHIP_MIN = 44f
+        const val CLASSIC_LABEL = 20f
+        const val CLASSIC_LABEL_GAP = 14f
+        const val CLASSIC_PADDING = 16f
+
+        // Compact (Appearance > Home layout): two columns of rows and a now-playing strip.
+        const val COMPACT_ROW_MIN = 64f
+        /** Rows stop growing here; the space left sits between them and the strip. */
+        const val COMPACT_ROW_MAX = 112f
+        const val COMPACT_ROW_GAP = 10f
+        const val COMPACT_COLUMN_GAP = 16f
+        const val COMPACT_ROW_PADDING = 18f
+        /** Between the chip, the name and the chevron. */
+        const val COMPACT_ROW_GAP_INNER = 16f
+        const val COMPACT_CHIP = 48f
+        const val COMPACT_CHEVRON = 22f
+        const val COMPACT_TITLE = 20f
+        const val COMPACT_META = 17f
+        const val COMPACT_STRIP = 76f
+        const val COMPACT_STRIP_GAP = 14f
+        const val COMPACT_STRIP_ART = 52f
+        const val COMPACT_STRIP_PLAY = 60f
 
         /** Widest the column gets; an ultra-wide head unit centres it instead of stretching it. */
         const val MAX_CONTENT_WIDTH = 1400f
