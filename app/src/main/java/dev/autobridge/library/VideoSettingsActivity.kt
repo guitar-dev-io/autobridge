@@ -42,7 +42,9 @@ class VideoSettingsActivity : Activity() {
         fun intent(context: Context): Intent = Intent(context, VideoSettingsActivity::class.java)
     }
 
-    private val accent = AutoBridgeDesign.ACCENT_VIDEO
+    // Every accent use here is a control or its state (ON badges, values, pills), so it takes
+    // the user's accent from Settings > Appearance rather than the video section hue.
+    private val accent get() = AutoBridgeDesign.ACCENT
 
     /** A device without PiP support would show a switch that cannot do anything. */
     private val supportsPip: Boolean
@@ -50,10 +52,11 @@ class VideoSettingsActivity : Activity() {
 
     /** Applies the Settings &gt; Language choice; see [AppLocale.rebase]. */
     override fun attachBaseContext(newBase: Context) {
-        super.attachBaseContext(AppLocale.rebase(newBase))
+        super.attachBaseContext(dev.autobridge.ui.AppearanceContext.wrap(AppLocale.rebase(newBase)))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        dev.autobridge.settings.AppearanceStore.refreshPalette(this)
         super.onCreate(savedInstanceState)
         // The page is built in onResume, which also runs on the way back from the enhancement
         // sub-screen; building here too would just throw the first tree away.

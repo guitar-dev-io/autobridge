@@ -127,3 +127,27 @@ Use the 1280x720 profile first, then the 800x480 one.
   without the piece A UI: `adb shell run-as dev.autobridge` writing
   `shared_prefs/autobridge_appearance.xml` (keys from `AppearanceCodec`, e.g. `home_layout=CLASSIC`),
   then force-stop `dev.autobridge` and reopen AutoBridge on the DHU.
+
+## Piece E1: phone media screens (branch claude/ui-redesign-media-72f07c)
+
+- `:app:compilePersonalDebugKotlin`: pass. `:app:testPersonalDebugUnitTest --tests dev.autobridge.{library,entertainment,youtube}.*`: pass. No new strings, so check-i18n is not needed.
+- 2026-10-25: built the personalDebug APK and installed it on the phone (YXEMRCGYAI49S4SS), install Success. The screen check was NOT done: the phone sat on its secure lock screen (PIN), which a session cannot unlock. Appearance settings were not touched. Still owed: Radio, the player and the library in Dark and Light.
+
+What changed, per screen:
+- All 9 activities (Library, Player, RadioPlayer, Subtitle/Video/VideoEnhancement/Storage settings, Entertainment, YouTube settings): `AppearanceContext.wrap(AppLocale.rebase(...))` in attachBaseContext, `AppearanceStore.refreshPalette(this)` at the start of onCreate.
+- New `library/MediaTheme.kt`: chip/card selected state (accent outline + accentSoft + accent label, weight 600), accent circle, skeleton rows.
+- Radio page (LibraryActivity): search field, list button, bottom tabs, genre chips (now 44dp), station cells and favourite star use palette roles + accent; on-air cell = accentSoft + accent ring. Loading = 5 skeleton rows instead of "Loading" text. Amber stays only on the no-logo station badge.
+- Library chips row: new selected state, 44dp. Pills, empty-state buttons, ON CAR badge use the accent; rows/tiles keep the section hue on their icon chips only. Signal colours read palette good/warn.
+- Radio player: play button, sleep minutes and favourite (selected state) take the accent; prev/next/round icons on `raised`, icons tinted with `text`; Live pill = amber section badge (warn text on amber tint), live dot = danger.
+- EQ sheet (AudioEffectsSheet): surface sheet, accent switch/sliders/checkbox/values, new chip states, Reset 44dp.
+- Player: scrubber, spinner and queue ripple take the accent; artwork glyph keeps the section hue; queue rows 44dp; video stage and fullscreen stay black; Thai-safe letter spacing (ScriptTracking).
+- Settings activities (subtitle/video/enhancement/YouTube): control accent = user accent (was video red). Storage left on its system hue (icon chips only).
+- Entertainment: background, text, buttons, checkbox from the palette.
+- StreamingIcons: rim and star badge follow light/dark. HomeSections: unchanged (identity hues for icon chips, also read by the car).
+
+The device pass must look at:
+- Radio in Dark, Light, AMOLED and a non-blue accent: tabs, chips, on-air ring, the skeleton while a category loads.
+- The Radio mini player still uses the warm amber style: `ui/MiniPlayer.kt` belongs to piece B.
+- ic_radio_eq's knobs become solid when tinted (they had a dark fill); check they read.
+- AlertDialogs, Switch and EditText underlines follow the app theme, not the palette.
+- Entertainment buttons (custom background now) and the light-mode text.

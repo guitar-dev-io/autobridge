@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
+import dev.autobridge.design.ThemeHolder
 
 /**
  * The icons of the Streaming grid, drawn here: a rounded square in the site's colour with a short
@@ -72,11 +73,11 @@ object StreamingIcons {
         val box = RectF(size * 0.04f, size * 0.04f, size * 0.96f, size * 0.96f)
         val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = style.color }
         canvas.drawRoundRect(box, radius, radius, fill)
-        // A faint rim so a dark icon still reads against a dark screen.
+        // A faint rim so a dark icon still reads against a dark screen (and a pale one on Light).
         val rim = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             this.style = Paint.Style.STROKE
             strokeWidth = size * 0.02f
-            color = 0x40FFFFFF
+            color = if (ThemeHolder.palette.isLight) 0x26000000 else 0x40FFFFFF
         }
         canvas.drawRoundRect(box, radius, radius, rim)
 
@@ -92,7 +93,7 @@ object StreamingIcons {
         canvas.drawText(style.glyph, size / 2f, baseline, text)
 
         if (starred) {
-            val badge = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF111111.toInt() }
+            val badge = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = ThemeHolder.palette.background }
             canvas.drawCircle(size * 0.80f, size * 0.20f, size * 0.17f, badge)
             val star = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = 0xFFFFC107.toInt()

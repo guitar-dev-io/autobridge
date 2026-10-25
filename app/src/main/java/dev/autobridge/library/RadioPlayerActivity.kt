@@ -21,7 +21,6 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import dev.autobridge.R
-import dev.autobridge.design.DesignTokens
 import dev.autobridge.i18n.AppLocale
 import dev.autobridge.iptv.IptvHistoryStore
 import dev.autobridge.media.MediaPlaybackClient
@@ -49,14 +48,12 @@ class RadioPlayerActivity : Activity() {
     companion object {
         fun intent(context: Context): Intent = Intent(context, RadioPlayerActivity::class.java)
 
-        // The radio design's warm palette.
-        private val LIVE_RED = DesignTokens.Radio.LIVE_RED
-        private val WARM_SURFACE = DesignTokens.Radio.WARM_CARD
-        private val WARM_TEXT = DesignTokens.Radio.WARM_TEXT
-        private val WARM_INK = DesignTokens.Radio.ON_AMBER
-        private val CONTROL_FILL = DesignTokens.Phone.SURFACE
-        private val SOFT_TEXT = DesignTokens.Radio.SOFT_TEXT
-        private val HINT_TEXT = DesignTokens.Radio.HINT_TEXT
+        // Palette roles from Settings > Appearance. Controls take the user's accent; radio amber
+        // stays on the section's own badge (the Live pill) and the cover.
+        private val LIVE_RED: Int get() = MediaTheme.palette.danger
+        private val CONTROL_FILL: Int get() = MediaTheme.palette.raised
+        private val SOFT_TEXT: Int get() = MediaTheme.palette.textSecondary
+        private val HINT_TEXT: Int get() = MediaTheme.palette.textTertiary
 
         /** Never a real address: forces the logo to be placed again on the next update. */
         private const val LOGO_UNSET = "\u0000"
@@ -91,10 +88,11 @@ class RadioPlayerActivity : Activity() {
     }
 
     override fun attachBaseContext(newBase: Context) {
-        super.attachBaseContext(AppLocale.rebase(newBase))
+        super.attachBaseContext(dev.autobridge.ui.AppearanceContext.wrap(AppLocale.rebase(newBase)))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        dev.autobridge.settings.AppearanceStore.refreshPalette(this)
         super.onCreate(savedInstanceState)
         releaseBack = SystemBack.register(this) { SystemBack.finishFromBack(this) }
         playback = MediaPlaybackClient(this)
@@ -173,9 +171,10 @@ class RadioPlayerActivity : Activity() {
                 setSpan(android.text.style.RelativeSizeSpan(0.8f), 0, 1, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             }
             textSize = 13f
-            setTextColor(WARM_TEXT)
+            // The section badge: radio amber (the palette's warn role, so it reads in Light too).
+            setTextColor(MediaTheme.palette.warn)
             typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
-            background = AutoBridgeDesign.surface(this@RadioPlayerActivity, WARM_SURFACE, 12, Color.TRANSPARENT)
+            background = AutoBridgeDesign.surface(this@RadioPlayerActivity, AutoBridgeDesign.tint(AutoBridgeDesign.ACCENT_RADIO, 0.16f), 12, Color.TRANSPARENT)
             setPadding(dp(12), dp(4), dp(12), dp(4))
         }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(18) })
 
@@ -196,12 +195,12 @@ class RadioPlayerActivity : Activity() {
         playToggle = ImageView(this).apply {
             scaleType = ImageView.ScaleType.CENTER_INSIDE
             setPadding(dp(27), dp(27), dp(27), dp(27))
-            imageTintList = ColorStateList.valueOf(WARM_INK)
+            imageTintList = ColorStateList.valueOf(MediaTheme.palette.onAccent)
             isClickable = true
             isFocusable = true
             background = RippleDrawable(
-                ColorStateList.valueOf(AutoBridgeDesign.tint(Color.WHITE, 0.3f)),
-                GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(AutoBridgeDesign.ACCENT_RADIO) },
+                ColorStateList.valueOf(AutoBridgeDesign.tint(MediaTheme.palette.onAccent, 0.3f)),
+                MediaTheme.accentCircle(),
                 null
             )
             setOnClickListener {
@@ -269,9 +268,9 @@ class RadioPlayerActivity : Activity() {
         sleepMinutes = TextView(this).apply {
             textSize = 13f
             gravity = Gravity.CENTER
-            setTextColor(WARM_INK)
+            setTextColor(MediaTheme.palette.onAccent)
             typeface = Typeface.create("sans-serif", Typeface.BOLD)
-            background = AutoBridgeDesign.surface(this@RadioPlayerActivity, AutoBridgeDesign.ACCENT_RADIO, 22, Color.TRANSPARENT)
+            background = AutoBridgeDesign.surface(this@RadioPlayerActivity, AutoBridgeDesign.ACCENT, 22, Color.TRANSPARENT)
             isClickable = true
             isFocusable = true
             visibility = View.GONE
@@ -287,13 +286,14 @@ class RadioPlayerActivity : Activity() {
 
     private fun roundIcon(icon: Int, description: String, onClick: () -> Unit): View = ImageView(this).apply {
         setImageResource(icon)
+        imageTintList = ColorStateList.valueOf(AutoBridgeDesign.TEXT)
         scaleType = ImageView.ScaleType.CENTER
         contentDescription = description
         isClickable = true
         isFocusable = true
         background = RippleDrawable(
-            ColorStateList.valueOf(AutoBridgeDesign.tint(Color.WHITE, 0.2f)),
-            GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(AutoBridgeDesign.SURFACE) },
+            ColorStateList.valueOf(AutoBridgeDesign.tint(AutoBridgeDesign.TEXT, 0.2f)),
+            GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(CONTROL_FILL) },
             null
         )
         setOnClickListener { onClick() }
@@ -312,6 +312,7 @@ class RadioPlayerActivity : Activity() {
     private fun action(icon: Int, label: String, onClick: () -> Unit): ActionButton {
         val image = ImageView(this).apply {
             setImageResource(icon)
+            setColorFilter(AutoBridgeDesign.TEXT)
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
         val text = TextView(this).apply {
@@ -329,7 +330,7 @@ class RadioPlayerActivity : Activity() {
             isClickable = true
             isFocusable = true
             contentDescription = label
-            background = AutoBridgeDesign.tappable(this@RadioPlayerActivity, AutoBridgeDesign.SURFACE, 16, AutoBridgeDesign.ACCENT_RADIO, Color.TRANSPARENT)
+            background = MediaTheme.cardBackground(this@RadioPlayerActivity, selected = false, radiusDp = 16f)
             setOnClickListener { onClick() }
             addView(image, LinearLayout.LayoutParams(dp(20), dp(20)))
             addView(text, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) })
@@ -337,7 +338,10 @@ class RadioPlayerActivity : Activity() {
         return ActionButton(column, image, text)
     }
 
-    private class ActionButton(val view: LinearLayout, val icon: ImageView, val label: TextView)
+    private class ActionButton(val view: LinearLayout, val icon: ImageView, val label: TextView) {
+        /** The state the background was last drawn for, so the one-second tick does not rebuild it. */
+        var shownSelected = false
+    }
 
     /** The station playing now as the radio store knows stations, for the favourite toggle. */
     private fun currentStation(): RadioStation? {
@@ -420,7 +424,7 @@ class RadioPlayerActivity : Activity() {
         isClickable = true
         isFocusable = true
         background = RippleDrawable(
-            ColorStateList.valueOf(AutoBridgeDesign.tint(Color.WHITE, 0.16f)),
+            ColorStateList.valueOf(AutoBridgeDesign.tint(AutoBridgeDesign.TEXT, 0.16f)),
             GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(CONTROL_FILL) },
             null
         )
@@ -458,12 +462,16 @@ class RadioPlayerActivity : Activity() {
         val url = playback.currentUri
         val isFavorite = !url.isNullOrBlank() && IptvHistoryStore.isFavorite(this, url)
         favorite.label.text = getString(if (isFavorite) R.string.radio_favorite_on else R.string.radio_favorite_add)
-        favorite.label.setTextColor(if (isFavorite) AutoBridgeDesign.ACCENT_RADIO else AutoBridgeDesign.TEXT)
+        // Selected = accent outline, accentSoft fill, accent label at weight 600.
+        favorite.label.setTextColor(if (isFavorite) AutoBridgeDesign.ACCENT else AutoBridgeDesign.TEXT)
+        favorite.label.typeface = if (isFavorite) MediaTheme.SEMIBOLD else Typeface.create("sans-serif-medium", Typeface.BOLD)
         favorite.icon.setImageResource(if (isFavorite) R.drawable.ic_radio_star_filled else R.drawable.ic_radio_star)
-        favorite.icon.setColorFilter(if (isFavorite) AutoBridgeDesign.ACCENT_RADIO else AutoBridgeDesign.TEXT)
-        favorite.view.background = AutoBridgeDesign.tappable(
-            this, if (isFavorite) WARM_SURFACE else AutoBridgeDesign.SURFACE, 16, AutoBridgeDesign.ACCENT_RADIO, Color.TRANSPARENT
-        )
+        favorite.icon.setColorFilter(if (isFavorite) AutoBridgeDesign.ACCENT else AutoBridgeDesign.TEXT)
+        favorite.view.isSelected = isFavorite
+        if (favorite.shownSelected != isFavorite) {
+            favorite.shownSelected = isFavorite
+            favorite.view.background = MediaTheme.cardBackground(this, isFavorite, 16f)
+        }
 
         // The sleep timer's button turns into the minutes left while one runs.
         val left = RadioSleepTimer.remainingMinutes()

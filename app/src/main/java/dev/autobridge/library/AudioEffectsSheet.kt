@@ -21,7 +21,6 @@ import android.widget.TextView
 import dev.autobridge.R
 import dev.autobridge.browser.CappedScrollView
 import dev.autobridge.browser.CarMenuList
-import dev.autobridge.design.DesignTokens
 import dev.autobridge.media.AudioEffectsService
 import dev.autobridge.media.AudioEq
 import dev.autobridge.media.EffectScope
@@ -35,7 +34,7 @@ import dev.autobridge.ui.AutoBridgeDesign.dp
  * player, or Settings: an on switch, the one-tap presets, five bands to set by hand, bass boost,
  * virtualizer, volume boost, and which sound it all reaches ([EffectScope]).
  *
- * Drawn after the radio design's EQ sheet: amber chips and controls on a dark sheet, the five
+ * Drawn after the radio design's EQ sheet, in the redesign's colours: accent chips and controls on the surface sheet, the five
  * bands as vertical sliders side by side (dB above, Hz below), and "same loudness on every
  * station" as a checkbox. Virtualizer, volume boost and the scope stay below, as before.
  *
@@ -91,8 +90,8 @@ class AudioEffectsSheet(private val context: Context) {
             textSize = 14f
             setTextColor(SOFT)
             switchPadding = context.dp(8)
-            thumbTintList = states(AMBER, KNOB_OFF)
-            trackTintList = states(AMBER_TRACK, TRACK_OFF)
+            thumbTintList = states(ACCENT, KNOB_OFF)
+            trackTintList = states(ACCENT_TRACK, TRACK_OFF)
             isChecked = settings.enabled
             setOnCheckedChangeListener { _, on ->
                 AudioEq.setEnabled(context, on)
@@ -124,7 +123,9 @@ class AudioEffectsSheet(private val context: Context) {
         customHeader.addView(TextView(context).apply {
             text = context.getString(R.string.eq_reset)
             textSize = 14f
-            setTextColor(AMBER)
+            setTextColor(ACCENT)
+            gravity = Gravity.CENTER_VERTICAL
+            minHeight = context.dp(44)
             setPadding(context.dp(8), context.dp(8), 0, context.dp(8))
             isClickable = true
             isFocusable = true
@@ -154,7 +155,7 @@ class AudioEffectsSheet(private val context: Context) {
             setPadding(0, context.dp(4), 0, 0)
         }
         val normalize = CheckBox(context).apply {
-            buttonTintList = states(AMBER, OUTLINE)
+            buttonTintList = states(ACCENT, OUTLINE)
             isChecked = settings.normalize
             contentDescription = context.getString(R.string.eq_normalize)
             setOnCheckedChangeListener { _, on ->
@@ -208,22 +209,16 @@ class AudioEffectsSheet(private val context: Context) {
         CarMenuList.dragToClose(grabHandle, content) { dialog.dismiss() }
     }
 
-    /** The design's chip: amber with dark bold text when on, an outline when off. */
+    /** The design's chip: accent outline, accentSoft fill and accent label when on; a hairline when off. */
     private fun chip(text: String, on: Boolean, onClick: () -> Unit): View = TextView(context).apply {
         this.text = text
         textSize = 14f
         gravity = Gravity.CENTER
         maxLines = 1
         ellipsize = android.text.TextUtils.TruncateAt.END
-        setTextColor(if (on) ON_AMBER else CHIP_TEXT)
-        typeface = Typeface.create("sans-serif", if (on) Typeface.BOLD else Typeface.NORMAL)
-        background = GradientDrawable().apply {
-            cornerRadius = context.dp(14).toFloat()
-            if (on) setColor(AMBER) else {
-                setColor(Color.TRANSPARENT)
-                setStroke((1.5f * context.resources.displayMetrics.density).toInt().coerceAtLeast(1), OUTLINE)
-            }
-        }
+        MediaTheme.styleChipLabel(this, on)
+        background = MediaTheme.chipBackground(context, on, 14f)
+        isSelected = on
         minHeight = context.dp(44)
         isClickable = true
         isFocusable = true
@@ -245,7 +240,7 @@ class AudioEffectsSheet(private val context: Context) {
         val value = TextView(context).apply {
             text = format(current)
             textSize = 12f
-            setTextColor(WARM_TEXT)
+            setTextColor(VALUE_TEXT)
         }
         left.addView(value)
         row.addView(left, LinearLayout.LayoutParams(0, -2, 1f))
@@ -253,7 +248,7 @@ class AudioEffectsSheet(private val context: Context) {
             this.max = max
             progress = current
             contentDescription = title
-            tintAmber()
+            tintAccent()
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(bar: SeekBar, at: Int, fromUser: Boolean) {
                     if (!fromUser) return
@@ -279,7 +274,7 @@ class AudioEffectsSheet(private val context: Context) {
             text = context.getString(R.string.eq_band_value, millibels / 100)
             textSize = 12f
             gravity = Gravity.CENTER
-            setTextColor(WARM_TEXT)
+            setTextColor(VALUE_TEXT)
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
         }
         column.addView(value, LinearLayout.LayoutParams(-2, -2).apply { bottomMargin = context.dp(8) })
@@ -290,7 +285,7 @@ class AudioEffectsSheet(private val context: Context) {
             progress = (millibels - EqMath.MIN_MB) / 100
             contentDescription = context.getString(R.string.eq_band_hz, hzText)
             rotation = -90f
-            tintAmber()
+            tintAccent()
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(bar: SeekBar, step: Int, fromUser: Boolean) {
                     if (!fromUser) return
@@ -316,9 +311,9 @@ class AudioEffectsSheet(private val context: Context) {
         return column
     }
 
-    private fun SeekBar.tintAmber() {
-        progressTintList = ColorStateList.valueOf(AMBER)
-        thumbTintList = ColorStateList.valueOf(AMBER)
+    private fun SeekBar.tintAccent() {
+        progressTintList = ColorStateList.valueOf(ACCENT)
+        thumbTintList = ColorStateList.valueOf(ACCENT)
         progressBackgroundTintList = ColorStateList.valueOf(TRACK_OFF)
     }
 
@@ -335,20 +330,18 @@ class AudioEffectsSheet(private val context: Context) {
     }
 
     private companion object {
-        // The radio design's EQ sheet palette.
-        const val SHEET = DesignTokens.Radio.SHEET
-        const val HANDLE = DesignTokens.Radio.HANDLE
-        const val PANEL = DesignTokens.Phone.INK
-        const val AMBER = DesignTokens.Phone.ACCENT_RADIO
-        const val AMBER_TRACK = DesignTokens.Radio.AMBER_TRACK
-        const val ON_AMBER = DesignTokens.Radio.ON_AMBER
-        const val WARM_TEXT = DesignTokens.Radio.WARM_TEXT
-        const val OUTLINE = DesignTokens.Radio.CONTROL_PRESSED
-        const val CHIP_TEXT = DesignTokens.Radio.TEXT_CONTROL
-        const val SOFT = DesignTokens.Radio.SOFT_TEXT
-        const val MUTED = DesignTokens.Radio.TEXT_HINT
-        const val KNOB_OFF = DesignTokens.Radio.SOFT_TEXT
-        const val TRACK_OFF = DesignTokens.Radio.HANDLE
+        // Palette roles from Settings > Appearance: the user's accent on every control.
+        val SHEET: Int get() = MediaTheme.palette.surface
+        val HANDLE: Int get() = MediaTheme.palette.hairline
+        val PANEL: Int get() = MediaTheme.palette.background
+        val ACCENT: Int get() = MediaTheme.palette.accent
+        val ACCENT_TRACK: Int get() = AutoBridgeDesign.tint(MediaTheme.palette.accent, 0.5f)
+        val VALUE_TEXT: Int get() = MediaTheme.palette.accent
+        val OUTLINE: Int get() = MediaTheme.palette.textTertiary
+        val SOFT: Int get() = MediaTheme.palette.textSecondary
+        val MUTED: Int get() = MediaTheme.palette.textTertiary
+        val KNOB_OFF: Int get() = MediaTheme.palette.textSecondary
+        val TRACK_OFF: Int get() = MediaTheme.palette.hairline
         const val BAND_HEIGHT_DP = 150
     }
 }

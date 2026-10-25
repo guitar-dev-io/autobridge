@@ -173,11 +173,15 @@ class PlayerActivity : Activity() {
     /** Guards against queueing a second advance while the first one is still pending. */
     private var autoNextPending = false
 
-    private val accent get() = if (kind == ContentKind.AUDIO) {
+    /** The section hue (radio amber, TV blue): only for the artwork glyph, never on a control. */
+    private val hue get() = if (kind == ContentKind.AUDIO) {
         AutoBridgeDesign.ACCENT_RADIO
     } else {
         AutoBridgeDesign.ACCENT_TV
     }
+
+    /** Controls (the scrubber, the spinner, the queue's ripple) take the user's accent. */
+    private val accent get() = AutoBridgeDesign.ACCENT
 
     /** The settings that decide the shape of the view tree rather than what it displays. */
     private data class LayoutSignature(
@@ -242,10 +246,11 @@ class PlayerActivity : Activity() {
 
     /** Applies the Settings &gt; Language choice; see [AppLocale.rebase]. */
     override fun attachBaseContext(newBase: Context) {
-        super.attachBaseContext(AppLocale.rebase(newBase))
+        super.attachBaseContext(dev.autobridge.ui.AppearanceContext.wrap(AppLocale.rebase(newBase)))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        dev.autobridge.settings.AppearanceStore.refreshPalette(this)
         super.onCreate(savedInstanceState)
         releaseBack = dev.autobridge.ui.SystemBack.register(this) { goBack() }
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -462,7 +467,7 @@ class PlayerActivity : Activity() {
             text = if (kind == ContentKind.AUDIO) "♪" else "▶"
             textSize = 54f
             gravity = Gravity.CENTER
-            setTextColor(AutoBridgeDesign.tint(accent, 0.55f))
+            setTextColor(AutoBridgeDesign.tint(hue, 0.55f))
         }
         artworkImage = ImageView(this).apply {
             scaleType = ImageView.ScaleType.CENTER_CROP
@@ -520,7 +525,7 @@ class PlayerActivity : Activity() {
             textSize = scaledText(11f)
             gravity = Gravity.CENTER
             setTextColor(AutoBridgeDesign.DANGER)
-            letterSpacing = 0.12f
+            letterSpacing = dev.autobridge.design.ScriptTracking.letterSpacing(text, 0.12f)
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             background = AutoBridgeDesign.surface(
                 this@PlayerActivity,
@@ -582,7 +587,7 @@ class PlayerActivity : Activity() {
         column.addView(TextView(this).apply {
             text = "UP NEXT"
             textSize = scaledText(11f)
-            letterSpacing = 0.14f
+            letterSpacing = dev.autobridge.design.ScriptTracking.letterSpacing(text, 0.14f)
             setTextColor(AutoBridgeDesign.TEXT_MUTED)
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             setPadding(dp(4), dp(2), dp(4), dp(6))
@@ -597,6 +602,8 @@ class PlayerActivity : Activity() {
                 ellipsize = android.text.TextUtils.TruncateAt.END
                 setTextColor(AutoBridgeDesign.TEXT)
                 setPadding(dp(6), dp(9), dp(6), dp(9))
+                minHeight = dp(44)
+                gravity = Gravity.CENTER_VERTICAL
                 isClickable = true
                 isFocusable = true
                 background = AutoBridgeDesign.tappable(
