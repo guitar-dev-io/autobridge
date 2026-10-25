@@ -502,6 +502,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
                     dev.autobridge.ui.HomeDashboard(
                         tiles = tiles,
                         onOpenConnection = { showPhoneScreen(PhoneScreen.CAR_CONNECTION) },
+                        onOpenAndroidAuto = { startActivity(dev.autobridge.mirror.MirrorSetupActivity.intent(this@MainActivity)) },
                         onEditQuickLaunch = { appsFavoritesOnly = true; showPhoneScreen(PhoneScreen.APPS) },
                         onOpenController = { showPhoneScreen(PhoneScreen.CONTROL) },
                         onMirror = { requestScreenCapture() },
