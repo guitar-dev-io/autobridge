@@ -165,6 +165,12 @@ android {
 
     buildTypes {
         debug {
+            // -PdebugSuffix installs this build next to the real app (dev.autobridge.debug) with
+            // its own data, so a first-run flow can be tried without touching what is installed.
+            // Off unless asked: the manifest authorities follow ${applicationId}, nothing else changes.
+            if (providers.gradleProperty("debugSuffix").isPresent) {
+                applicationIdSuffix = ".debug"
+            }
             // DHU-only test mode uses the deterministic parked mock; never enabled in release.
             buildConfigField("boolean", "DEV_MODE", "true")
             buildConfigField("boolean", "DHU_TEST_MODE", "true")
