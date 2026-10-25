@@ -34,14 +34,17 @@ class TripActivity : Activity() {
         fun currentBahtPerKm(context: Context): Double? = FuelStats.summarize(FuelLogStore.all(context)).bahtPerKm
     }
 
-    private val accent = AutoBridgeDesign.ACCENT
+    private val accent: Int get() = AutoBridgeDesign.ACCENT
 
     override fun attachBaseContext(newBase: Context) {
-        super.attachBaseContext(AppLocale.rebase(newBase))
+        super.attachBaseContext(dev.autobridge.ui.AppearanceContext.wrap(AppLocale.rebase(newBase)))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // System and Auto modes depend on night mode and the clock, which may have moved on.
+        dev.autobridge.settings.AppearanceStore.refreshPalette(this)
+        dev.autobridge.settings.ScreenAppearance.applyWindow(this)
         render()
     }
 
@@ -139,7 +142,7 @@ class TripActivity : Activity() {
             inputType = InputType.TYPE_CLASS_NUMBER
             setText(odometer?.let { it.roundToLong().toString() }.orEmpty())
         }
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(getString(R.string.trip_start))
             .setView(form(people, start))
             .setNegativeButton(android.R.string.cancel, null)
@@ -160,7 +163,7 @@ class TripActivity : Activity() {
             hint = getString(R.string.trip_field_other)
             inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
         }
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(getString(R.string.trip_end))
             .setView(form(end, other))
             .setNegativeButton(android.R.string.cancel, null)
@@ -177,7 +180,7 @@ class TripActivity : Activity() {
     }
 
     private fun confirmDelete(trip: Trip) {
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(getString(R.string.trip_delete_title))
             .setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(getString(R.string.fuel_delete)) { _, _ ->

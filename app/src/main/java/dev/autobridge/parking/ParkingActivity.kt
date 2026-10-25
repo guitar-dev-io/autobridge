@@ -32,14 +32,17 @@ class ParkingActivity : Activity() {
         private const val REQUEST_PHOTO = 4105
     }
 
-    private val accent = AutoBridgeDesign.ACCENT
+    private val accent: Int get() = AutoBridgeDesign.ACCENT
 
     override fun attachBaseContext(newBase: Context) {
-        super.attachBaseContext(AppLocale.rebase(newBase))
+        super.attachBaseContext(dev.autobridge.ui.AppearanceContext.wrap(AppLocale.rebase(newBase)))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // System and Auto modes depend on night mode and the clock, which may have moved on.
+        dev.autobridge.settings.AppearanceStore.refreshPalette(this)
+        dev.autobridge.settings.ScreenAppearance.applyWindow(this)
         render()
     }
 
@@ -132,7 +135,7 @@ class ParkingActivity : Activity() {
         setPadding(pad, pad, pad, pad)
         isClickable = true
         setOnClickListener { editNote(spot) }
-        addView(CarToolViews.iconChip(context, R.drawable.ic_car_parking, AutoBridgeDesign.ACCENT_TV).apply {
+        addView(CarToolViews.iconChip(context, R.drawable.ic_car_parking, dev.autobridge.settings.ScreenAppearance.readable(AutoBridgeDesign.ACCENT_TV)).apply {
             (layoutParams as LinearLayout.LayoutParams).marginEnd = pad * 3 / 4
             (layoutParams as LinearLayout.LayoutParams).gravity = android.view.Gravity.TOP
         })
@@ -146,7 +149,7 @@ class ParkingActivity : Activity() {
                 AutoBridgeDesign.TEXT_MUTED,
                 top = 2
             ))
-            if (!spot.hasPosition) addView(CarToolViews.text(context, getString(R.string.parking_no_position), 13f, AutoBridgeDesign.ACCENT_RADIO, top = 4))
+            if (!spot.hasPosition) addView(CarToolViews.text(context, getString(R.string.parking_no_position), 13f, dev.autobridge.design.ThemeHolder.palette.warn, top = 4))
             addView(CarToolViews.text(
                 context,
                 spot.note.ifBlank { getString(R.string.parking_no_note) },
@@ -222,7 +225,7 @@ class ParkingActivity : Activity() {
             adjustViewBounds = true
             contentDescription = getString(R.string.parking_photo_view)
         }
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(getString(R.string.parking_title))
             .setView(image)
             .setPositiveButton(android.R.string.ok, null)

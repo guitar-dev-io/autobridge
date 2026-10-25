@@ -56,15 +56,18 @@ class MirrorSetupActivity : Activity() {
         fun intent(context: Context): Intent = Intent(context, MirrorSetupActivity::class.java)
     }
 
-    private val accent = AutoBridgeDesign.ACCENT_SYSTEM
+    private val accent: Int get() = dev.autobridge.settings.ScreenAppearance.readable(AutoBridgeDesign.ACCENT_SYSTEM)
 
     /** Applies the Settings &gt; Language choice; see [AppLocale.rebase]. */
     override fun attachBaseContext(newBase: Context) {
-        super.attachBaseContext(AppLocale.rebase(newBase))
+        super.attachBaseContext(dev.autobridge.ui.AppearanceContext.wrap(AppLocale.rebase(newBase)))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // System and Auto modes depend on night mode and the clock, which may have moved on.
+        dev.autobridge.settings.AppearanceStore.refreshPalette(this)
+        dev.autobridge.settings.ScreenAppearance.applyWindow(this)
         render()
     }
 
@@ -169,10 +172,11 @@ class MirrorSetupActivity : Activity() {
             State.OPTIONAL -> "!"
             State.WAITING -> "…"
         }
+        // Status roles, so done/optional read on a light page too: good, the step's accent, warn.
         val rowAccent = when (item.state) {
-            State.DONE -> AutoBridgeDesign.ACCENT_FILES
+            State.DONE -> dev.autobridge.design.ThemeHolder.palette.good
             State.BLOCKING -> accent
-            State.OPTIONAL -> AutoBridgeDesign.ACCENT_RADIO
+            State.OPTIONAL -> dev.autobridge.design.ThemeHolder.palette.warn
             State.WAITING -> AutoBridgeDesign.TEXT_MUTED
         }
         val fix = item.fix

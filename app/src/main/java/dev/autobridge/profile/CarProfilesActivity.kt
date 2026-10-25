@@ -40,14 +40,17 @@ class CarProfilesActivity : Activity() {
         const val SHARE_DIR = "exports"
     }
 
-    private val accent = AutoBridgeDesign.ACCENT_SYSTEM
+    private val accent: Int get() = dev.autobridge.settings.ScreenAppearance.readable(AutoBridgeDesign.ACCENT_SYSTEM)
 
     override fun attachBaseContext(newBase: Context) {
-        super.attachBaseContext(AppLocale.rebase(newBase))
+        super.attachBaseContext(dev.autobridge.ui.AppearanceContext.wrap(AppLocale.rebase(newBase)))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // System and Auto modes depend on night mode and the clock, which may have moved on.
+        dev.autobridge.settings.AppearanceStore.refreshPalette(this)
+        dev.autobridge.settings.ScreenAppearance.applyWindow(this)
         render()
     }
 
@@ -81,7 +84,7 @@ class CarProfilesActivity : Activity() {
                         if (builtIn.hardwareValidated) R.string.car_profiles_builtin_default
                         else R.string.car_profiles_builtin_unverified
                     ),
-                    accent = if (inUse) AutoBridgeDesign.ACCENT_FILES else AutoBridgeDesign.TEXT_MUTED,
+                    accent = if (inUse) dev.autobridge.design.ThemeHolder.palette.good else AutoBridgeDesign.TEXT_MUTED,
                     badgeText = if (inUse) "✓" else null,
                     subtitleMaxLines = 2,
                     onClick = { useBuiltIn(builtIn) }
@@ -112,7 +115,7 @@ class CarProfilesActivity : Activity() {
                     context = this,
                     title = profile.name,
                     subtitle = describe(profile, profile.matches(connected)),
-                    accent = if (inUse) AutoBridgeDesign.ACCENT_FILES else accent,
+                    accent = if (inUse) dev.autobridge.design.ThemeHolder.palette.good else accent,
                     badgeText = if (inUse) "✓" else null,
                     subtitleMaxLines = 3,
                     onClick = { showOptions(profile) }
@@ -157,7 +160,7 @@ class CarProfilesActivity : Activity() {
             getString(R.string.car_profiles_share),
             getString(R.string.car_profiles_delete)
         )
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(profile.name)
             .setItems(options) { _, which ->
                 when (which) {
@@ -174,7 +177,7 @@ class CarProfilesActivity : Activity() {
     }
 
     private fun confirmDelete(profile: CarProfile) {
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(getString(R.string.car_profiles_delete_title, profile.name))
             .setPositiveButton(R.string.car_profiles_delete) { _, _ ->
                 CarProfileStore.remove(this, profile.id)
@@ -205,7 +208,7 @@ class CarProfilesActivity : Activity() {
             addView(name)
             addView(vehicle)
         }
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(R.string.car_profiles_save_this_car)
             .setMessage(getString(R.string.car_profiles_save_message, fingerprint.surface.let { "${it.width}x${it.height} @ ${it.dpi} dpi" }))
             .setView(form)

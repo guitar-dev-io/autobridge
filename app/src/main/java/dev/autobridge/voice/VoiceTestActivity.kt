@@ -45,7 +45,7 @@ class VoiceTestActivity : Activity() {
         private const val REPLAY_RUNS = 3
     }
 
-    private val accent = AutoBridgeDesign.ACCENT_SYSTEM
+    private val accent: Int get() = dev.autobridge.settings.ScreenAppearance.readable(AutoBridgeDesign.ACCENT_SYSTEM)
     private val scope = MainScope()
     private lateinit var recognizer: VoiceRecognizer
     private val history = mutableListOf<Transcription>()
@@ -63,11 +63,14 @@ class VoiceTestActivity : Activity() {
     private lateinit var button: TextView
 
     override fun attachBaseContext(newBase: Context) {
-        super.attachBaseContext(AppLocale.rebase(newBase))
+        super.attachBaseContext(dev.autobridge.ui.AppearanceContext.wrap(AppLocale.rebase(newBase)))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // System and Auto modes depend on night mode and the clock, which may have moved on.
+        dev.autobridge.settings.AppearanceStore.refreshPalette(this)
+        dev.autobridge.settings.ScreenAppearance.applyWindow(this)
         recognizer = VoiceRecognizer(this, scope, keepAudio = true)
         build()
         scope.launch { recognizer.state.collect(::show) }
@@ -354,7 +357,7 @@ class VoiceTestActivity : Activity() {
     }
 
     private fun chooseModel(installed: List<WhisperModelInfo>, selected: WhisperModelInfo?) {
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(R.string.voice_model_title)
             .setSingleChoiceItems(
                 installed.map { it.displayName }.toTypedArray(),
