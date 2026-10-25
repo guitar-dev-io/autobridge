@@ -174,7 +174,7 @@ class DesktopBrowserActivity : Activity() {
             fw to (fh * h / desktopView.height)
         }
         val s = session ?: try {
-            DesktopEngine.openSession(browserId, vw, vh, 1f, intent.getStringExtra(EXTRA_URL)).also { attach(it) }
+            DesktopEngine.openSession(browserId, vw, vh, 1f, intent.getStringExtra(EXTRA_URL).also { intent.removeExtra(EXTRA_URL) }).also { attach(it) }
         } catch (e: Exception) {
             Toast.makeText(this, e.message, Toast.LENGTH_LONG).show()
             finish()

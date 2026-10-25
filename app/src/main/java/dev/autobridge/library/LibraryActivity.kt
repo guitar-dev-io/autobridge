@@ -2562,11 +2562,16 @@ class LibraryActivity : Activity() {
     private fun showStreaming() = push {
         val rows = mutableListOf<View>()
         // Same intent as the YouTube home tile, so the browser is reused if it is open.
-        fun openSite(url: String) = startActivity(
-            Intent(this, dev.autobridge.browser.BrowserActivity::class.java)
-                .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
-                .setData(Uri.parse(url))
-        )
+        fun openSite(url: String) {
+            // The sites that may not play in the WebView go to the desktop browser (Chrome) where
+            // there is one; otherwise, and for everything else, the built-in browser.
+            if (DesktopLinks.wantsDesktop(url) && DesktopLinks.open(this, url)) return
+            startActivity(
+                Intent(this, dev.autobridge.browser.BrowserActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+                    .setData(Uri.parse(url))
+            )
+        }
 
         // The driver's own favourites on top, then the catalog, as an icon grid like the car's. A tap
         // opens; a long press stars or unstars (favourites are starred, the + tile adds any address).

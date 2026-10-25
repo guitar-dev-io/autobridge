@@ -203,7 +203,8 @@ object DesktopEngine {
      * Returns a running session for [id] shown at [viewWidth]×[viewHeight] display pixels with
      * device scale [scale], starting one if needed. Only one browser runs at a time.
      *
-     * An existing session of the same browser is reused and simply re-fitted, unless the new shape
+     * An existing session of the same browser is reused and simply re-fitted (and, when [startUrl]
+     * is given, sent to it in a new tab: a running browser cannot take a command line), unless the new shape
      * does not fit its X screen or the scale differs a lot (phone → car): then the browser is
      * restarted with its last session restored, because Chromium cannot change scale or grow its
      * screen while running.
@@ -216,6 +217,7 @@ object DesktopEngine {
             !existing.tooSmallFor(viewWidth, viewHeight) && kotlin.math.abs(existing.scale - effective) < 0.1f
         ) {
             existing.fitTo(viewWidth, viewHeight)
+            startUrl?.let { existing.openInNewTab(it) }
             dnsWatcher.start()
             return existing
         }

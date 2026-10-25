@@ -34,7 +34,23 @@ internal object CarExtensions {
     fun install(context: android.content.Context) {
         val app = context.applicationContext
         DesktopEngine.startPages = { dev.autobridge.browser.CarStartPage.desktopPages(app) }
+        // The phone's Streaming page sends the sites that may not play in the WebView here.
+        dev.autobridge.library.DesktopLinks.opener = { ctx, url ->
+            val browser = if (desktopSupportedIn(ctx)) DesktopEngine.chosenInstalledBrowser() else null
+            browser?.let {
+                ctx.startActivity(
+                    dev.autobridge.projection.desktop.DesktopBrowserActivity.intent(ctx, it.id, url)
+                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+                true
+            } ?: false
+        }
     }
+
+    private fun desktopSupportedIn(context: android.content.Context): Boolean = runCatching {
+        DesktopEngine.init(context)
+        DesktopEngine.supported
+    }.getOrDefault(false)
 
     fun moreEntries(carContext: CarContext, screenManager: ScreenManager): List<CarExtensionEntry> {
         // Multi-app's pane picker offers the desktop browser when it is installed.
@@ -93,6 +109,18 @@ internal object CarExtensions {
     fun openWeb(carContext: CarContext, screenManager: ScreenManager): Boolean {
         if (!canOpenWeb(carContext)) return false
         CarNavigation.open(screenManager, "DesktopBrowserCarScreen") { DesktopBrowserCarScreen(carContext, embedded = true) }
+        return true
+    }
+
+    /**
+     * Opens [url] in the chosen desktop browser on the car, in a new tab when it is already
+     * running. False when there is none installed: the caller opens the built-in browser.
+     */
+    fun openUrl(carContext: CarContext, screenManager: ScreenManager, url: String): Boolean {
+        if (!canOpenWeb(carContext)) return false
+        CarNavigation.open(screenManager, "DesktopBrowserCarScreen") {
+            DesktopBrowserCarScreen(carContext, embedded = true, startUrl = url)
+        }
         return true
     }
 

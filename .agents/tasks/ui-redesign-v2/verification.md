@@ -295,3 +295,14 @@ Asked for from a photo of another car app's video launcher: large brand cards fo
 - Car: the Video group comes first in its own order as `IMAGE_TYPE_LARGE` grid items; the rest follow, warned sites last. The DHU host drew them as ordinary icons at this size (the host decides).
 - Tests: `StreamingLinksTest` (video group order, social group, warned set), `StreamingIconsTest` (own colours); all unit tests, compile, lint (`lintSafeDebug`) and check-i18n pass.
 - Checked: phone Streaming page (cards, order, note) and the car grid on the DHU. Not checked: tapping a card on the car and on the phone to see whether each site loads or plays; a wide (Coolwalk) head unit; favourites already saved are unchanged (keyed by address).
+
+## Streaming sites that may not play open in Chrome desktop (2026-10-25, phone)
+
+Asked for: where it can be done, tapping Netflix, Disney+ and the other protected services opens them in the desktop browser (Linux Chrome in the engine) instead of the WebView.
+- Which sites: `DesktopLinks.wantsDesktop(url)` = `StreamingLinks.mayNotPlay` for a catalog site (Netflix, Disney+, Prime Video, HBO Max, Viu, WeTV, iQIYI, and the Chinese group). YouTube, TikTok and the rest keep the built-in browser, as does any address not in the catalog (favourites).
+- Phone: the Streaming page's `openSite` asks `DesktopLinks.open`; the sideload flavors set the opener at process start (`CarExtensions.install`) and start `DesktopBrowserActivity` with the address. The safe flavor sets none, so it opens the built-in browser as before. With no desktop browser installed the opener says no and the built-in browser opens.
+- Car: `CarStreamingScreen.open` calls `CarExtensions.openUrl` first (safe flavor: false) and the tile shows no "May not play" note where Chrome is available.
+- Engine: `DesktopEngine.openSession` ignored a start URL when the browser was already running; it now opens it in a new tab (`DesktopSession.openInNewTab`: Ctrl+T, the address, Return), so the page the driver was on stays one tab away. The car screen and the phone activity use a start URL once (a surface coming back or a rotation does not open it again).
+- Tests: `DesktopLinksTest` (which sites, no opener, an opener). All unit tests, compile of both flavors, `lintSafeDebug` and check-i18n pass.
+- **Checked on the phone (Chrome 156 installed, personalDebug):** tapping Netflix on the Streaming page opened Chrome desktop on netflix.com (Thai front page, "Chrome didn't shut down correctly" bubble from an earlier stop); with Chrome still running, tapping Disney+ opened disneyplus.com in a new tab beside Netflix.
+- **Not checked:** the car path on the DHU (the phone had locked its screen and the DHU cycle could not be started); that a subscribed account actually plays video in Chrome here (only the sites' front pages were shown, nothing was logged in); the safe flavor on a device; the Brave choice; a second tap while the first page is still loading.
