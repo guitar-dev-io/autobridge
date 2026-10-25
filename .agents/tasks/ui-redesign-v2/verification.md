@@ -334,7 +334,24 @@ For each look, check:
 - Mirror: unchanged (host strip only), still mirrors.
 - Repaint without reopening: change accent and mode while each of radio grid, Now Playing, browser and Duo Screen is on screen.
 
-Checked: compile (personal, safe), all unit tests (:app personal, :common, :duoscreen), `lintSafeDebug`, `scripts/check-i18n.sh`. Not checked: anything on the DHU or the real phone (see the report for why).
+Checked: compile (personal, safe), all unit tests (:app personal, :common, :duoscreen, :desktopbrowser), `lintSafeDebug`, `scripts/check-i18n.sh`.
+
+### DHU pass (2026-10-25, real phone YXEMRCGYAI49S4SS, personalDebug, DHU 800x480 `docs/dhu/small.ini`)
+
+Appearance changed on the phone while each car screen stayed open. Screenshots: `screenshots/car-look-*.png`.
+- Radio Now Playing: Dark + Sky (default), then Light + Amber live (light page, dark-amber Play with a white glyph, red Live), then Dark + Teal at 130% text with Manrope (no overlap between title, subtitle and hint; pills fit).
+- Radio grid: Light + Amber (selected tab amber with white label; the on-air card on the tinted fill with the accent ring and name), Outlined + Sharp, Dark + Teal + Glass (translucent cards with their edge), 130% + Manrope (names fit; tab labels are ellipsized more), and the car-same-look switch off (default dark Sky, elevated soft cards while the phone was Light + Amber + Outlined + Sharp). The failed-load message state reads in light.
+- Car browser in Light + Amber: menu sheet (tiles, disabled Back/Forward, secure badge, amber Go), the start page, and the car keyboard (light tray and caps, amber field ring, selection and Go).
+- Duo Screen in Light + Amber and Dark + Teal: setup card, lock disc in the accent, rail; Dark -> Light live while Duo was open; switch off.
+
+Found on the DHU and fixed (commits 80c5698, bad4edc):
+1. Outlined cards hid the art of stations without a logo (the gradient was drawn at the transparent card's alpha; `screenshots/car-look-radio-grid-outlined-bug.png`, fixed in `car-look-radio-grid-outlined-sharp-fixed.png`).
+2. The radio grid (and the browser, same watch) repainted one change late: `CarLookWatch` collected on `Dispatchers.Main.immediate`, so it ran inside `AppearanceStore.update`'s flow assignment, before `ThemeHolder` was re-resolved. Now `Dispatchers.Main`; Amber -> Teal then showed at once.
+3. Duo Screen did not repaint on a look change (its chrome only redraws on its own events) and the band outside the panes was a fixed near-black. The controller now checks the car look once a second and redraws; the compositor clears to the look's page colour.
+
+Also changed after the first commit: the desktop browser's control rail on the car (`ControlRail.followCarLook`, `RailColors`) follows the car look; the phone's desktop browser keeps its fixed rail.
+
+Not checked on the DHU: the desktop browser rail on the car; the browser and keyboard in dark with a non-Sky accent, and the browser's live repaint; Duo's Arrange mode, preset chips and Swap/Done (they need Shizuku running); the template Now Playing button and the video/bridge play/pause tint (no video or bridge session was started); Glass in light mode; the 1280x720 and wide profiles; Sharp corners with a now-playing card. The radio station showed "Paused" on its card once without being paused by hand (not investigated). Appearance was reset to defaults afterwards; the phone had Graphite + Teal + Classic + Auto before this pass.
 
 ## Streaming sites that may not play open in Chrome desktop (2026-10-25, phone)
 
