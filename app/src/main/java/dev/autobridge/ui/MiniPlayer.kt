@@ -90,7 +90,7 @@ class MiniPlayer(
         addView(bars, LinearLayout.LayoutParams(context.dp(14), context.dp(12)).apply { marginEnd = context.dp(6) })
         addView(stationName, LinearLayout.LayoutParams(0, -2, 1f))
     }
-    private val favorite = AutoBridgeDesign.glyphButton(context, "☆", 20f, tint = WARM_TEXT) {
+    private val favorite = AutoBridgeDesign.glyphButton(context, "☆", 18f, tint = WARM_TEXT) {
         currentStation()?.let { dev.autobridge.radio.RadioRepository.RadioHistory.toggleFavorite(context, it) }
         render()
     }.apply {
@@ -148,8 +148,8 @@ class MiniPlayer(
         nextButton = AutoBridgeDesign.glyphButton(context, "⏭", 15f) { playback.next() }
         row.addView(nextButton, LinearLayout.LayoutParams(context.dp(38), context.dp(38)))
         row.addView(toggle, LinearLayout.LayoutParams(context.dp(40), context.dp(40)))
-        // A round 44 dp button like the close one beside it, not the tall pill it was.
-        row.addView(favorite, LinearLayout.LayoutParams(context.dp(44), context.dp(44)))
+        // The same round 38 dp as the close button beside it, not the tall pill it was.
+        row.addView(favorite, LinearLayout.LayoutParams(context.dp(38), context.dp(38)))
         // Pausing leaves the channel loaded and this bar up; closing unloads it, and the bar hides.
         row.addView(
             AutoBridgeDesign.glyphButton(context, "✕", 15f) {
