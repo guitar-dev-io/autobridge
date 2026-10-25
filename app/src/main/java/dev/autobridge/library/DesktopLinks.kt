@@ -14,6 +14,22 @@ object DesktopLinks {
     @Volatile
     var opener: ((Context, String) -> Boolean)? = null
 
+    /** Whether Chrome for Linux can be used here: not in this build, not installed yet, or ready. */
+    enum class ChromeStatus { UNAVAILABLE, MISSING, READY }
+
+    /** Set by the sideload flavors; null (the safe build) means [ChromeStatus.UNAVAILABLE]. */
+    @Volatile
+    var status: ((Context) -> ChromeStatus)? = null
+
+    /** Opens the guided Chrome setup on the phone; set by the sideload flavors. */
+    @Volatile
+    var setup: ((Context) -> Unit)? = null
+
+    fun chromeStatus(context: Context): ChromeStatus = status?.invoke(context) ?: ChromeStatus.UNAVAILABLE
+
+    /** True when the guided setup was opened; false in a build that has none. */
+    fun openSetup(context: Context): Boolean = setup?.let { it(context); true } ?: false
+
     /** True when [url] was handed to the desktop browser; false means open it the usual way. */
     fun open(context: Context, url: String): Boolean = opener?.invoke(context, url) ?: false
 

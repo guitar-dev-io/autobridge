@@ -12,15 +12,32 @@ class StreamingLinksTest {
         assertTrue(StreamingGroup.entries.none { it.name == "CHINESE" })
     }
 
-    @Test fun theVideoGroupIsTheMainGridInItsOwnOrder() {
+    @Test fun theStreamingServicesLeadInTheirOwnOrder() {
+        val titles = StreamingLinks.all.filter { it.group == StreamingGroup.PREMIUM }.map { it.title }
+        assertEquals(listOf("Netflix", "Disney+", "Prime Video", "HBO Max", "Viu", "WeTV", "iQIYI"), titles)
+        assertEquals(StreamingGroup.PREMIUM, StreamingLinks.grouped().first().first)
+    }
+
+    @Test fun everyStreamingServiceIsTheOnesThatNeedChromeAndNothingElseIs() {
+        val premium = StreamingLinks.all.filter { it.group == StreamingGroup.PREMIUM }
+        assertTrue(premium.all { StreamingLinks.mayNotPlay(it) })
+        assertTrue(StreamingLinks.all.filter { it.group != StreamingGroup.PREMIUM }.none { StreamingLinks.mayNotPlay(it) })
+    }
+
+    @Test fun generalVideoPlaysInTheBuiltInBrowserAndComesRightAfter() {
         val titles = StreamingLinks.all.filter { it.group == StreamingGroup.VIDEO }.map { it.title }
-        assertEquals(listOf("Netflix", "YouTube", "Disney+", "Prime Video", "HBO Max", "Viu", "WeTV", "iQIYI"), titles)
-        assertEquals(StreamingGroup.VIDEO, StreamingLinks.grouped().first().first)
+        assertEquals(listOf("YouTube", "Dailymotion", "Vimeo"), titles)
+        assertEquals(StreamingGroup.VIDEO, StreamingLinks.grouped()[1].first)
+    }
+
+    @Test fun largeCardsAreTheServicesAndGeneralVideoOnly() {
+        val large = StreamingLinks.all.filter { StreamingLinks.isFeatured(it) }.map { it.group }.toSet()
+        assertEquals(setOf(StreamingGroup.PREMIUM, StreamingGroup.VIDEO), large)
     }
 
     @Test fun theShortAndSocialSitesAreTheirOwnGroup() {
         val titles = StreamingLinks.all.filter { it.group == StreamingGroup.SOCIAL }.map { it.title }
-        assertEquals(listOf("TikTok", "Facebook Watch", "Dailymotion", "Vimeo"), titles)
+        assertEquals(listOf("TikTok", "Facebook Watch"), titles)
     }
 
     @Test fun theGlobalSitesAreThere() {

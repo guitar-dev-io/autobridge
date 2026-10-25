@@ -14,7 +14,6 @@ import androidx.core.graphics.drawable.IconCompat
 import dev.autobridge.R
 import dev.autobridge.library.DesktopLinks
 import dev.autobridge.library.StreamingFavoritesStore
-import dev.autobridge.library.StreamingGroup
 import dev.autobridge.library.StreamingIcons
 import dev.autobridge.library.StreamingLinks
 
@@ -49,15 +48,19 @@ class CarStreamingScreen(carContext: CarContext) : Screen(carContext) {
             grid.addItem(item(favorite.title, favorite.url, starred = true, note = null))
             room--
         }
-        // The main Video grid first, in its own order, as large tiles. After it, sites that may not
-        // play go last, so a small car grid fills with ones that do.
+        // The large tiles first (the streaming services, then general video), each in its own order,
+        // then the rest: the same order as the phone's Streaming page.
+        val canInstall = CarExtensions.canInstallChrome(carContext)
         StreamingLinks.all.filterNot { it.url in favoriteUrls }
-            .sortedWith(compareBy({ it.group != StreamingGroup.VIDEO }, { it.group != StreamingGroup.VIDEO && StreamingLinks.mayNotPlay(it) }))
+            .sortedBy { !StreamingLinks.isFeatured(it) }
             .forEach { link ->
                 if (room <= 0) return@forEach
-                // No "may not play" where it opens in Chrome: the desktop browser plays them.
-                val note = if (StreamingLinks.mayNotPlay(link) && !desktopBrowser) carContext.getString(R.string.car_streaming_maybe) else null
-                grid.addItem(item(link.title, link.url, starred = false, note = note, large = link.group == StreamingGroup.VIDEO))
+                val note = if (!StreamingLinks.mayNotPlay(link)) null else when {
+                    desktopBrowser -> carContext.getString(R.string.streaming_chrome_badge)
+                    canInstall -> carContext.getString(R.string.car_streaming_needs_chrome)
+                    else -> carContext.getString(R.string.car_streaming_maybe)
+                }
+                grid.addItem(item(link.title, link.url, starred = false, note = note, large = StreamingLinks.isFeatured(link)))
                 room--
             }
         grid.addItem(

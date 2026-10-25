@@ -45,6 +45,19 @@ internal object CarExtensions {
                 dev.autobridge.desktop.runtime.GuestFontConfig.DEFAULT_THAI
             }
         }
+        dev.autobridge.library.DesktopLinks.status = { ctx ->
+            when {
+                !desktopSupportedIn(ctx) -> dev.autobridge.library.DesktopLinks.ChromeStatus.UNAVAILABLE
+                DesktopEngine.installedChrome() != null -> dev.autobridge.library.DesktopLinks.ChromeStatus.READY
+                else -> dev.autobridge.library.DesktopLinks.ChromeStatus.MISSING
+            }
+        }
+        dev.autobridge.library.DesktopLinks.setup = { ctx ->
+            ctx.startActivity(
+                dev.autobridge.projection.desktop.DesktopChromeSetupActivity.intent(ctx)
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        }
         // The phone's Streaming page sends the sites that may not play in the WebView here.
         dev.autobridge.library.DesktopLinks.opener = { ctx, url ->
             // Google Chrome for Linux, not whichever browser is chosen for the Web card: these sites

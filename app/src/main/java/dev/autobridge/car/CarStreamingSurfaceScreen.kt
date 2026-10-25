@@ -27,7 +27,6 @@ import dev.autobridge.R
 import dev.autobridge.display.CarSurfaceCanvas
 import dev.autobridge.library.DesktopLinks
 import dev.autobridge.library.StreamingFavoritesStore
-import dev.autobridge.library.StreamingGroup
 import dev.autobridge.library.StreamingIcons
 import dev.autobridge.library.StreamingLinks
 import dev.autobridge.mirror.MirrorSurfaceOwnership
@@ -118,12 +117,19 @@ internal class CarStreamingSurfaceScreen(carContext: CarContext) : Screen(carCon
         val maybe = carContext.getString(R.string.car_streaming_maybe)
         val list = ArrayList<Tile>()
         favorites.forEach { list += Tile.Site(it.title, it.url, starred = true, note = null) }
-        // The main Video grid first, in its own order; after it, sites that may not play go last.
+        // The large tiles first (the streaming services, then general video), then the rest: the
+        // same order as the phone's Streaming page.
+        val canInstall = CarExtensions.canInstallChrome(carContext)
+        val chromeBadge = carContext.getString(R.string.streaming_chrome_badge)
+        val needsChrome = carContext.getString(R.string.car_streaming_needs_chrome)
         StreamingLinks.all.filterNot { it.url in favoriteUrls }
-            .sortedWith(compareBy({ it.group != StreamingGroup.VIDEO }, { it.group != StreamingGroup.VIDEO && StreamingLinks.mayNotPlay(it) }))
+            .sortedBy { !StreamingLinks.isFeatured(it) }
             .forEach { link ->
-                // No "may not play" where it opens in Chrome: the desktop browser plays them.
-                val note = if (StreamingLinks.mayNotPlay(link) && !chrome) maybe else null
+                val note = if (!StreamingLinks.mayNotPlay(link)) null else when {
+                    chrome -> chromeBadge
+                    canInstall -> needsChrome
+                    else -> maybe
+                }
                 list += Tile.Site(link.title, link.url, starred = false, note = note)
             }
         list += Tile.Manage
