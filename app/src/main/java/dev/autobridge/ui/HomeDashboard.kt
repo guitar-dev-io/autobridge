@@ -89,6 +89,8 @@ data class ResumeRadioUi(
 fun HomeDashboard(
     tiles: List<HomeTileUi>,
     onOpenConnection: () -> Unit,
+    /** The Android Auto card's own destination (car setup); the My Car tile keeps [onOpenConnection]. */
+    onOpenAndroidAuto: () -> Unit = onOpenConnection,
     onEditQuickLaunch: () -> Unit,
     onOpenController: () -> Unit,
     onMirror: () -> Unit,
@@ -121,7 +123,7 @@ fun HomeDashboard(
     ) {
         if (updateVersion != null) UpdateCard(look, updateVersion, onOpenUpdate, onDismissUpdate)
 
-        HomeConnectionCard(look, onOpen = onOpenConnection, onMirror = onMirror, onBridgeDuo = onBridgeDuo)
+        HomeConnectionCard(look, onOpen = onOpenAndroidAuto, onMirror = onMirror, onBridgeDuo = onBridgeDuo)
 
         val quickLaunchLabel = stringResource(R.string.home_quick_launch)
         val editLabel = stringResource(R.string.home_quick_launch_edit)

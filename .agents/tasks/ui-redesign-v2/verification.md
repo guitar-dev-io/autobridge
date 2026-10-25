@@ -325,3 +325,11 @@ The streaming sites that may not play in the WebView open in **Google Chrome for
 - **Car (DHU):** the Streaming grid shows the eight Video tiles with no "May not play" note (Chrome is installed) and no Chinese group (TikTok, Facebook Watch, Dailymotion, Vimeo follow iQIYI); tapping Netflix opened Chrome desktop on the car screen, in a new tab beside the one already open (two Netflix tabs).
 - Earlier on the phone: Disney+ opened in a new tab beside Netflix.
 - Not tested: a car tap when Chrome is not running (the start-URL path on the car; the phone did start Chrome that way); a signed-in account playing video; the safe flavor on a device; typing the address when the address bar autocompletes to a different page.
+
+## Round of fixes (2026-10-25, real phone + DHU 800x480) - branch claude/car-streaming-grid-3col
+- Car streaming grid, 3 columns (83a7c71): on the DHU 3 cards per row, scroll buttons work, tapping Netflix opened Chrome desktop. Not checked: drag scroll, Manage tile, a wide head unit.
+- Car Home button froze the screen (fcd4e2f): after Netflix in Chrome, Home left Chrome's last frame on screen. logcat showed `lockCanvas failed: IllegalArgumentException` every frame from the car home: the desktop browser screen never released its producer connection to the surface. It now releases it on destroy and on surface loss; on the DHU Home returns to the car home with no lockCanvas failures. The photo that came with the report was a head unit, not the DHU; the fix is verified on the DHU only.
+- Desktop browser Thai fonts (b50dfa8): fontconfig rule written at each launch; the AutoBridge start page in Chrome on the car shows round, even Thai (Noto Sans Thai). Not checked: looped style (Noto Looped Thai), Brave.
+- Managed mode switch (b50dfa8): unit-tested only; not toggled on a device.
+- Home Android Auto card opens car setup (44c4919): checked on the phone.
+- Home search field under the keyboard (757b106): checked on the phone; the field scrolls above the keyboard.

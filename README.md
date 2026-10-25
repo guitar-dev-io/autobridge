@@ -1,4 +1,4 @@
-**Version:** `0.4.59-rc13` &nbsp;·&nbsp; **Build (versionCode):** `93`
+**Version:** `0.4.59-rc14` &nbsp;·&nbsp; **Build (versionCode):** `94`
 
 AutoBridge is a personal/development Android project for experimenting with a parked-only phone-to-Android-Auto surface bridge. It is an independent codebase, not a merge of the reference projects tracked in the project's internal `docs/` notes.
 
@@ -268,7 +268,7 @@ Upload this file in Play Console:
 app/build/outputs/bundle/personalRelease/app-personal-release.aab
 ```
 
-The bundle is signed with the AutoBridge release keystore and contains `dev.autobridge`, version `0.4.59-rc13`, and `versionCode 93`. Increment `versionCode` for every later upload with `./scripts/set-version.sh` (see [Setting the version](#setting-the-version)); keep the same keystore for updates. Start with Internal testing/App Sharing before attempting production release. The current Android Auto surface is a development/personal-use POC using a `NavigationTemplate` for mirroring, so Play/Android Auto policy approval is not guaranteed.
+The bundle is signed with the AutoBridge release keystore and contains `dev.autobridge`, version `0.4.59-rc14`, and `versionCode 94`. Increment `versionCode` for every later upload with `./scripts/set-version.sh` (see [Setting the version](#setting-the-version)); keep the same keystore for updates. Start with Internal testing/App Sharing before attempting production release. The current Android Auto surface is a development/personal-use POC using a `NavigationTemplate` for mirroring, so Play/Android Auto policy approval is not guaranteed.
 
 ### Deobfuscation (R8 mapping) files
 
@@ -761,7 +761,7 @@ A separate SwiftUI app lives in [`ios/`](ios/README.md). It is not a port of the
 
 AutoBridge is a personal, non-commercial project. If it is useful to you and you would like to buy the developer a coffee, support is welcome but entirely optional.
 
-- **Buy Me a Coffee:** [buymeacoffee.com/guitar.story](https://buymeacoffee.com/guitar.story)
+- **Ko-fi:** [ko-fi.com/guitardev](https://ko-fi.com/guitardev)
 - **PromptPay (Thailand):** scan the QR below with your banking app
 
 <img src="assets/donate_promptpay_qr.png" alt="PromptPay donate QR" width="260" />

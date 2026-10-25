@@ -72,6 +72,9 @@ object DesktopEngine {
      */
     @Volatile var startPages: (() -> Map<String, String>)? = null
 
+    /** The Thai family the browsers draw Thai in (GuestFontConfig), read at each launch. Null is the default. */
+    @Volatile var thaiFontFamily: (() -> String)? = null
+
     @Synchronized
     fun init(context: Context) {
         if (initialized) return

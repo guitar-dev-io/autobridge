@@ -1,6 +1,13 @@
 package dev.autobridge.ui.home
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.border
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.ui.focus.onFocusEvent
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -53,9 +60,12 @@ import dev.autobridge.ui.submitCommand
  * Home's Send to Car field, palette-drawn so it reads in light mode too. Submits through the one
  * command path ([submitCommand]), exactly like Control's field.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HomeSendField(look: HomeLook, placeholder: String, onSubmitted: (String) -> Unit) {
     var text by remember { mutableStateOf("") }
+    val bringIntoView = remember { BringIntoViewRequester() }
+    val scope = rememberCoroutineScope()
     fun send() {
         val sent = text
         if (submitCommand(sent)) {
@@ -64,7 +74,7 @@ fun HomeSendField(look: HomeLook, placeholder: String, onSubmitted: (String) -> 
         }
     }
     val sendDescription = stringResource(R.string.home_v2_send)
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.bringIntoViewRequester(bringIntoView)) {
         OutlinedTextField(
             value = text,
             onValueChange = { text = it },
@@ -82,7 +92,9 @@ fun HomeSendField(look: HomeLook, placeholder: String, onSubmitted: (String) -> 
                 unfocusedBorderColor = look.hairline,
                 focusedBorderColor = look.accent
             ),
-            modifier = Modifier.weight(1f)
+            // The keyboard takes a moment to slide up and shrink the page; scroll once it has, or
+            // the field stays under it.
+            modifier = Modifier.weight(1f).onFocusEvent { if (it.isFocused) scope.launch { delay(350); bringIntoView.bringIntoView() } }
         )
         Spacer(Modifier.width(8.dp))
         Surface(

@@ -81,6 +81,19 @@ class EngineUnitTest {
         assertEquals("1", slow.environment["PROOT_NO_SECCOMP"])
     }
 
+    @Test fun fontRuleLeadsWithNotoAndTheChosenThaiFamily() {
+        val plain = dev.autobridge.desktop.runtime.GuestFontConfig.render()
+        assertTrue(plain.indexOf("Noto Sans<") < plain.indexOf("Noto Sans Thai<"))
+        assertFalse(plain.contains("Looped"))
+        assertTrue(dev.autobridge.desktop.runtime.GuestFontConfig.render("Noto Looped Thai").contains("<string>Noto Looped Thai</string>"))
+    }
+
+    @Test fun unmanagedLaunchDropsTheWarningSuppression() {
+        val args = ChromeAdapter.launchArgs(LaunchSpec(1280, 720, 1.5f, null, managed = false))
+        assertTrue(args.contains("--no-sandbox"))
+        assertFalse(args.contains("--test-type"))
+    }
+
     @Test fun launchArgsUseVerifiedFlagsAndSeparateProfiles() {
         val spec = LaunchSpec(1280, 720, 1.5f, "https://example.com")
         val chrome = ChromeAdapter.launchArgs(spec)
