@@ -318,3 +318,10 @@ At the driver's request the `CHINESE` group is gone: Tencent Video, Youku, Mango
 The streaming sites that may not play in the WebView open in **Google Chrome for Linux** specifically, not in "the browser chosen for the Web card" (which can be Brave): `DesktopEngine.installedChrome()` is used by the phone opener (`DesktopLinks.opener`) and the car (`CarExtensions.openUrl`, `canOpenChrome`; the safe flavor says no). Chrome not installed means the built-in browser opens the site, as before; if Brave is running it is stopped for Chrome (one desktop browser runs at a time).
 - Compile of both flavors, unit tests, `lintSafeDebug` and check-i18n pass.
 - Not checked on a device: the phone had locked its screen, so neither the phone nor the DHU was run after this change. The earlier phone check (Netflix, then Disney+ in a new tab) ran with Chrome as the chosen browser, so it exercised the same Chrome but not the "chosen is Brave" case.
+
+## Chrome-only and the car path, tested (2026-10-25, phone + DHU 800x480)
+
+- **Brave chosen, Netflix tapped (phone):** with `desktop_engine.xml` set to `choice=BRAVE` (Brave 1.98 and Chrome 156 both installed), tapping Netflix on the Streaming page opened Chrome (Chrome's tab strip and address bar, netflix.com/th-en), not Brave. The setting was put back to CHROME afterwards.
+- **Car (DHU):** the Streaming grid shows the eight Video tiles with no "May not play" note (Chrome is installed) and no Chinese group (TikTok, Facebook Watch, Dailymotion, Vimeo follow iQIYI); tapping Netflix opened Chrome desktop on the car screen, in a new tab beside the one already open (two Netflix tabs).
+- Earlier on the phone: Disney+ opened in a new tab beside Netflix.
+- Not tested: a car tap when Chrome is not running (the start-URL path on the car; the phone did start Chrome that way); a signed-in account playing video; the safe flavor on a device; typing the address when the address bar autocompletes to a different page.
