@@ -3,8 +3,8 @@ package dev.autobridge.library
 import android.content.Context
 
 /**
- * Opens a site in Google Chrome for Linux (the sideload flavors' desktop engine) when it is
- * installed. Chrome specifically: Brave, or whatever the Web card is set to, is not used for these.
+ * Opens a site in a desktop browser (the sideload flavors' engine) when one is installed: Chrome,
+ * else Brave. Whatever the Web card is set to is not used for these.
  *
  * Main code cannot name the engine: it exists only in the sideload flavors. Those set [opener]
  * at process start ([dev.autobridge.car.CarExtensions.install]); the safe flavor leaves it null,
@@ -14,7 +14,7 @@ object DesktopLinks {
     @Volatile
     var opener: ((Context, String) -> Boolean)? = null
 
-    /** Whether Chrome for Linux can be used here: not in this build, not installed yet, or ready. */
+    /** Whether a desktop browser (Chrome or Brave) can be used here: not in this build, not installed yet, or ready. */
     enum class ChromeStatus { UNAVAILABLE, MISSING, READY }
 
     /** Set by the sideload flavors; null (the safe build) means [ChromeStatus.UNAVAILABLE]. */

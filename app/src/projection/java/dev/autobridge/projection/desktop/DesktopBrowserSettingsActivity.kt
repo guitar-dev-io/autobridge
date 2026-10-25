@@ -142,8 +142,8 @@ class DesktopBrowserSettingsActivity : Activity() {
             body.stack(notice(getString(R.string.desktop_settings_unsupported), dev.autobridge.design.ThemeHolder.palette.warn))
         }
 
-        // Chrome not installed yet: the guided setup is the shorter way than the cards below.
-        if (DesktopEngine.supported && !(s.browsers[DesktopBrowserId.CHROME]?.state ?: InstallState.NOT_INSTALLED).installed) {
+        // Neither Chrome nor Brave installed yet: the guided setup is the shorter way than the cards below.
+        if (DesktopEngine.supported && listOf(DesktopBrowserId.CHROME, DesktopBrowserId.BRAVE).none { (s.browsers[it]?.state ?: InstallState.NOT_INSTALLED).installed }) {
             body.stack(card().apply {
                 addView(title(getString(R.string.chrome_setup_entry)))
                 addView(caption(getString(R.string.chrome_setup_entry_caption)))

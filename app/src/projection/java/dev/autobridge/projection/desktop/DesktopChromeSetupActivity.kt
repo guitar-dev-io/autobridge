@@ -86,7 +86,7 @@ class DesktopChromeSetupActivity : Activity() {
         structureKey = null
         collectJob = scope.launch {
             combine(DesktopEngine.runtimeState, DesktopEngine.browserStates) { r, b -> r to b }
-                .collect { (r, b) -> render(r, b[DesktopBrowserId.CHROME] ?: ComponentState(InstallState.NOT_INSTALLED)) }
+                .collect { (r, b) -> render(r, focusState(b)) }
         }
     }
 
@@ -108,6 +108,24 @@ class DesktopChromeSetupActivity : Activity() {
         if (status == ChildProcessLimit.Status.NOT_APPLICABLE || status == ChildProcessLimit.Status.LIFTED) return false
         return !prefs.getBoolean(KEY_LIMIT_CONFIRMED, false)
     }
+
+    private val choices = listOf(DesktopBrowserId.CHROME, DesktopBrowserId.BRAVE)
+
+    /** The browser the page is about: the installed one, else the one installing, else one that failed, else Chrome. */
+    private fun focusId(states: Map<DesktopBrowserId, ComponentState>): DesktopBrowserId =
+        choices.firstOrNull { states[it]?.state?.installed == true }
+            ?: choices.firstOrNull { states[it]?.state?.busy == true }
+            ?: choices.firstOrNull { states[it]?.state == InstallState.FAILED }
+            ?: DesktopBrowserId.CHROME
+
+    private var focus: DesktopBrowserId = DesktopBrowserId.CHROME
+
+    private fun focusState(states: Map<DesktopBrowserId, ComponentState>): ComponentState {
+        focus = focusId(states)
+        return states[focus] ?: ComponentState(InstallState.NOT_INSTALLED)
+    }
+
+    private fun focusName(): String = if (focus == DesktopBrowserId.BRAVE) "Brave" else "Chrome"
 
     private fun currentStep(chrome: ComponentState): Step = when {
         chrome.state.installed -> Step.TEST
@@ -181,7 +199,7 @@ class DesktopChromeSetupActivity : Activity() {
         val installDone = step == Step.TEST
         content.stack(stepCard(2, getString(R.string.chrome_setup_step_install), installDone) { card ->
             when {
-                installDone -> card.addView(caption(getString(R.string.chrome_setup_step_install_done, chrome.version ?: "")))
+                installDone -> card.addView(caption(getString(R.string.chrome_setup_step_install_done, focusName(), chrome.version ?: "")))
                 step == Step.LIMIT -> card.addView(caption(getString(R.string.chrome_setup_step_install_waiting)))
                 chrome.state.busy || runtime.state.busy -> {
                     card.addView(caption(getString(R.string.chrome_setup_installing)))
@@ -197,7 +215,10 @@ class DesktopChromeSetupActivity : Activity() {
                     card.addView(caption(getString(R.string.chrome_setup_step_install_caption)))
                     networkWarning()?.let { card.addView(notice(it, dev.autobridge.design.ThemeHolder.palette.warn).apply { setPadding(dp(12), dp(8), dp(12), dp(8)) }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) }) }
                     (chrome.lastError ?: runtime.lastError)?.let { card.addView(error(it)) }
-                    card.addView(buttons(listOf(getString(R.string.chrome_setup_install) to { install() })))
+                    card.addView(buttons(listOf(
+                        getString(R.string.chrome_setup_install) to { install(DesktopBrowserId.CHROME) },
+                        getString(R.string.chrome_setup_install_brave) to { install(DesktopBrowserId.BRAVE) }
+                    )))
                 }
             }
         }, gap = 10)
@@ -207,8 +228,8 @@ class DesktopChromeSetupActivity : Activity() {
             if (step == Step.TEST) {
                 card.addView(caption(getString(R.string.chrome_setup_step_test_caption)))
                 card.addView(buttons(listOf(
-                    getString(R.string.chrome_setup_open_chrome) to {
-                        startActivity(DesktopBrowserActivity.intent(this, DesktopBrowserId.CHROME))
+                    getString(R.string.chrome_setup_open_browser, focusName()) to {
+                        startActivity(DesktopBrowserActivity.intent(this, focus))
                     },
                     getString(R.string.chrome_setup_finish) to { finish() }
                 )))
@@ -220,10 +241,11 @@ class DesktopChromeSetupActivity : Activity() {
         }, gap = 10)
     }
 
-    private fun install() {
+    private fun install(id: DesktopBrowserId) {
         val engine = DesktopEngine
-        if (engine.store.chromeTermsAcceptedAt != 0L) {
-            engine.installBrowser(DesktopBrowserId.CHROME)
+        // Only Chrome has terms to accept; Brave goes straight to the download.
+        if (id != DesktopBrowserId.CHROME || engine.store.chromeTermsAcceptedAt != 0L) {
+            engine.installBrowser(id)
             return
         }
         AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
@@ -231,7 +253,7 @@ class DesktopChromeSetupActivity : Activity() {
             .setMessage(R.string.desktop_settings_chrome_terms_message)
             .setPositiveButton(R.string.desktop_settings_chrome_terms_accept) { _, _ ->
                 engine.store.chromeTermsAcceptedAt = System.currentTimeMillis()
-                engine.installBrowser(DesktopBrowserId.CHROME)
+                engine.installBrowser(id)
             }
             .setNeutralButton(R.string.desktop_settings_chrome_terms_read) { _, _ ->
                 startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/chrome/terms/")))
@@ -262,7 +284,7 @@ class DesktopChromeSetupActivity : Activity() {
         bar.isIndeterminate = p == null
         if (p != null) bar.progress = (p * 1000).toInt()
         label.text = buildString {
-            append(getString(if (runtime.state.busy) R.string.chrome_setup_phase_runtime else R.string.chrome_setup_phase_chrome))
+            append(if (runtime.state.busy) getString(R.string.chrome_setup_phase_runtime) else focusName())
             if (s.bytesTotal > 0) append(" · ")
                 .append(Formatter.formatShortFileSize(this@DesktopChromeSetupActivity, s.bytesDone))
                 .append(" / ")
