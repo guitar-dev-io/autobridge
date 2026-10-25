@@ -510,6 +510,9 @@ class MainActivity : androidx.activity.ComponentActivity() {
                         onOpenController = { showPhoneScreen(PhoneScreen.CONTROL) },
                         onMirror = { requestScreenCapture() },
                         onBridgeDuo = duoScreenIntent()?.let { intent -> { startActivity(intent) } },
+                        onStreaming = {
+                            startActivity(dev.autobridge.library.LibraryActivity.intent(this@MainActivity, dev.autobridge.library.LibraryActivity.Section.STREAMING))
+                        },
                         updateVersion = homeUpdate?.release?.versionName,
                         onOpenUpdate = { homeUpdate?.let(::showUpdateDialog) },
                         onDismissUpdate = ::dismissHomeUpdate,
@@ -1085,8 +1088,6 @@ class MainActivity : androidx.activity.ComponentActivity() {
                     ) {
                         showPhoneScreen(PhoneScreen.CAR_CONNECTION)
                     })
-                    addAll(duoScreenEntry())
-                    addAll(desktopBrowserEntry())
                     addAll(projectionSetupEntry())
                     add(settingsEntry(
                         getString(R.string.settings_app_profiles),
@@ -1097,6 +1098,10 @@ class MainActivity : androidx.activity.ComponentActivity() {
                         appsFavoritesOnly = true
                         showPhoneScreen(PhoneScreen.APPS)
                     })
+                }),
+                // Everything about what the car screen shows and how it is driven, in one place:
+                // these used to sit in the Car & apps group among the connection rows.
+                SettingsGroup(getString(R.string.settings_group_display), buildList {
                     add(settingsEntry(
                         getString(R.string.settings_display_mirror),
                         getString(R.string.settings_display_mirror_caption),
@@ -1113,6 +1118,8 @@ class MainActivity : androidx.activity.ComponentActivity() {
                     ) {
                         showPhoneScreen(PhoneScreen.INPUT_TOUCH)
                     })
+                    addAll(duoScreenEntry())
+                    addAll(desktopBrowserEntry())
                 }),
                 SettingsGroup(getString(R.string.settings_group_playback_web), listOf(
                     settingsEntry(

@@ -2,7 +2,9 @@ package dev.autobridge.library
 
 /** How the Streaming list is grouped, in display order. */
 enum class StreamingGroup(val title: String) {
-    /** The big-name video services, shown as large cards. */
+    /** The protected-video services (Widevine). They play in Chrome for Linux, so they lead, as large cards. */
+    PREMIUM("Streaming services"),
+    /** General video that plays in the built-in browser, as large cards. */
     VIDEO("Video"),
     SOCIAL("Short and social video"),
     MOVIES("Movies"),
@@ -37,19 +39,20 @@ data class StreamingLink(val title: String, val group: StreamingGroup, val url: 
  */
 object StreamingLinks {
     val all: List<StreamingLink> = listOf(
-        // The main grid, in the order a driver expects it: the big subscription services and YouTube.
-        StreamingLink("Netflix", StreamingGroup.VIDEO, "https://www.netflix.com"),
+        // The protected-video services first, in the order a driver expects them. They need Chrome.
+        StreamingLink("Netflix", StreamingGroup.PREMIUM, "https://www.netflix.com"),
+        StreamingLink("Disney+", StreamingGroup.PREMIUM, "https://www.disneyplus.com"),
+        StreamingLink("Prime Video", StreamingGroup.PREMIUM, "https://www.primevideo.com"),
+        StreamingLink("HBO Max", StreamingGroup.PREMIUM, "https://www.hbomax.com"),
+        StreamingLink("Viu", StreamingGroup.PREMIUM, "https://www.viu.com"),
+        StreamingLink("WeTV", StreamingGroup.PREMIUM, "https://wetv.vip"),
+        StreamingLink("iQIYI", StreamingGroup.PREMIUM, "https://www.iq.com"),
+        // General video: plays in the built-in browser.
         StreamingLink("YouTube", StreamingGroup.VIDEO, "https://m.youtube.com"),
-        StreamingLink("Disney+", StreamingGroup.VIDEO, "https://www.disneyplus.com"),
-        StreamingLink("Prime Video", StreamingGroup.VIDEO, "https://www.primevideo.com"),
-        StreamingLink("HBO Max", StreamingGroup.VIDEO, "https://www.hbomax.com"),
-        StreamingLink("Viu", StreamingGroup.VIDEO, "https://www.viu.com"),
-        StreamingLink("WeTV", StreamingGroup.VIDEO, "https://wetv.vip"),
-        StreamingLink("iQIYI", StreamingGroup.VIDEO, "https://www.iq.com"),
+        StreamingLink("Dailymotion", StreamingGroup.VIDEO, "https://www.dailymotion.com"),
+        StreamingLink("Vimeo", StreamingGroup.VIDEO, "https://vimeo.com"),
         StreamingLink("TikTok", StreamingGroup.SOCIAL, "https://www.tiktok.com"),
         StreamingLink("Facebook Watch", StreamingGroup.SOCIAL, "https://m.facebook.com/watch"),
-        StreamingLink("Dailymotion", StreamingGroup.SOCIAL, "https://www.dailymotion.com"),
-        StreamingLink("Vimeo", StreamingGroup.SOCIAL, "https://vimeo.com"),
         StreamingLink("Internet Archive: Feature Films", StreamingGroup.MOVIES, "https://archive.org/details/feature_films"),
         StreamingLink("YouTube Music", StreamingGroup.MUSIC, "https://music.youtube.com"),
         StreamingLink("SoundCloud", StreamingGroup.MUSIC, "https://m.soundcloud.com"),
@@ -72,6 +75,10 @@ object StreamingLinks {
      * the warning beside them.
      */
     private val PROTECTED = setOf("Netflix", "Disney+", "Prime Video", "HBO Max", "Viu", "WeTV", "iQIYI")
+
+    /** Large cards: the protected services and the general video sites. */
+    fun isFeatured(link: StreamingLink): Boolean =
+        link.group == StreamingGroup.PREMIUM || link.group == StreamingGroup.VIDEO
 
     /** True for a site that may not play here (protected video, or limited by region). */
     fun mayNotPlay(link: StreamingLink): Boolean = link.title in PROTECTED

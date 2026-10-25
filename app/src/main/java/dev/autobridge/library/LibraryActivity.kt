@@ -116,13 +116,10 @@ class LibraryActivity : Activity() {
         const val EXTRA_SECTION = "dev.autobridge.extra.LIBRARY_SECTION"
         private const val REQUEST_MEDIA = 4711
 
-        /** The Streaming grid: icons to a row, and the size they are drawn at. */
-        private const val STREAM_COLUMNS = 4
-        /** The Video group's brand cards: two to a row on a phone, drawn 8:5. */
-        private const val STREAM_CARD_COLUMNS = 2
+        /** The Streaming grid's brand cards: three to a row like the car's, drawn 8:5. */
+        private const val STREAM_CARD_COLUMNS = 3
         private const val STREAM_CARD_W_PX = 640
         private const val STREAM_CARD_H_PX = 400
-        private const val STREAM_ICON_PX = 168
 
         /** Below this a search field is clutter; above it, a long list is unusable without one. */
         private const val SEARCH_THRESHOLD = 12
@@ -2586,19 +2583,26 @@ class LibraryActivity : Activity() {
         fun openSite(url: String) {
             // The sites that may not play in the WebView go to the desktop browser (Chrome) where
             // there is one; otherwise, and for everything else, the built-in browser.
-            if (DesktopLinks.wantsDesktop(url) && DesktopLinks.open(this, url)) return
-            startActivity(
-                Intent(this, dev.autobridge.browser.BrowserActivity::class.java)
-                    .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
-                    .setData(Uri.parse(url))
-            )
+            if (DesktopLinks.wantsDesktop(url)) {
+                if (DesktopLinks.open(this, url)) return
+                // Chrome can be installed here but is not: say so and offer the guide, rather than
+                // opening a page that will not play.
+                if (DesktopLinks.chromeStatus(this) == DesktopLinks.ChromeStatus.MISSING) {
+                    askToInstallChrome(url)
+                    return
+                }
+            }
+            openInBuiltInBrowser(url)
         }
 
         // The driver's own favourites on top, then the catalog, as an icon grid like the car's. A tap
         // opens; a long press stars or unstars (favourites are starred, the + tile adds any address).
+        // Every site is the same brand card as on the car (8:5, name under it), three to a row, so a
+        // group never mixes big cards with small icons and the two surfaces read alike.
+        val chrome = DesktopLinks.chromeStatus(this)
         fun tile(title: String, url: String, starred: Boolean, caption: String? = null) = StreamingTile(
             title = title,
-            icon = StreamingIcons.bitmap(StreamingIcons.styleFor(title, url), STREAM_ICON_PX, starred),
+            icon = StreamingIcons.cardBitmap(StreamingIcons.styleFor(title, url), STREAM_CARD_W_PX, STREAM_CARD_H_PX, starred),
             caption = caption,
             onClick = { openSite(url) },
             onLongClick = {
@@ -2608,11 +2612,12 @@ class LibraryActivity : Activity() {
         )
         val favorites = StreamingFavoritesStore.list(this)
         val favoriteUrls = favorites.map { it.url }.toSet()
+        chromeStatusRow()?.let { rows += it }
         rows += AutoBridgeDesign.sectionLabel(this, getString(R.string.streaming_favorites))
-        rows += streamingGrid(
+        rows += streamingCardGrid(
             favorites.map { tile(it.title, it.url, starred = true) } + StreamingTile(
                 title = getString(R.string.streaming_add_favorite),
-                icon = StreamingIcons.bitmap(StreamingIcons.ADD, STREAM_ICON_PX),
+                icon = StreamingIcons.cardBitmap(StreamingIcons.ADD, STREAM_CARD_W_PX, STREAM_CARD_H_PX),
                 caption = null,
                 onClick = { showAddFavoriteDialog() },
                 onLongClick = {}
@@ -2621,29 +2626,17 @@ class LibraryActivity : Activity() {
         rows += streamingNote(getString(R.string.streaming_long_press_hint))
         StreamingLinks.grouped().forEach { (group, links) ->
             rows += AutoBridgeDesign.sectionLabel(this, getString(groupLabel(group)))
-            // Said once for the group, not under every icon: eight identical captions read as noise.
-            if (links.any { StreamingLinks.mayNotPlay(it) }) {
+            // Said once for the group, not under every card: eight identical captions read as noise.
+            // Only where a desktop browser is not an option: with it, the status line above says what plays.
+            if (chrome == DesktopLinks.ChromeStatus.UNAVAILABLE && links.any { StreamingLinks.mayNotPlay(it) }) {
                 rows += streamingNote(getString(R.string.streaming_group_may_not_play))
             }
-            val tiles = links.map { link -> tile(link.title, link.url, starred = link.url in favoriteUrls) }
-            // The big-name services are large brand cards, like a streaming launcher; the rest stay icons.
-            rows += if (group == StreamingGroup.VIDEO) {
-                streamingCardGrid(links.map { link ->
-                    val starred = link.url in favoriteUrls
-                    StreamingTile(
-                        title = link.title,
-                        icon = StreamingIcons.cardBitmap(StreamingIcons.styleFor(link.title, link.url), STREAM_CARD_W_PX, STREAM_CARD_H_PX, starred),
-                        caption = null,
-                        onClick = { openSite(link.url) },
-                        onLongClick = {
-                            if (starred) StreamingFavoritesStore.remove(this, link.url) else StreamingFavoritesStore.add(this, link.title, link.url)
-                            refresh()
-                        }
-                    )
-                })
-            } else {
-                streamingGrid(tiles)
-            }
+            rows += streamingCardGrid(links.map { link ->
+                tile(
+                    link.title, link.url, starred = link.url in favoriteUrls,
+                    caption = if (StreamingLinks.mayNotPlay(link) && chrome != DesktopLinks.ChromeStatus.UNAVAILABLE) getString(R.string.streaming_chrome_badge) else null
+                )
+            })
         }
         render(
             title = getString(R.string.section_streaming),
@@ -2654,14 +2647,7 @@ class LibraryActivity : Activity() {
     }
 
     /** A group's name in the UI language; [StreamingGroup.title] is the English one. */
-    private fun groupLabel(group: StreamingGroup): Int = when (group) {
-        StreamingGroup.VIDEO -> R.string.streaming_group_video
-        StreamingGroup.SOCIAL -> R.string.streaming_group_social
-        StreamingGroup.MOVIES -> R.string.streaming_group_movies
-        StreamingGroup.MUSIC -> R.string.streaming_group_music
-        StreamingGroup.LIVE -> R.string.streaming_group_live
-        StreamingGroup.ANIME -> R.string.streaming_group_anime
-    }
+    private fun groupLabel(group: StreamingGroup): Int = group.labelRes()
 
     /** A short muted line under a Streaming heading. */
     private fun streamingNote(text: String) = TextView(this).apply {
@@ -2684,54 +2670,6 @@ class LibraryActivity : Activity() {
         android.widget.GridLayout.spec(android.widget.GridLayout.UNDEFINED),
         android.widget.GridLayout.spec(android.widget.GridLayout.UNDEFINED, 1f)
     ).apply { width = 0 }
-
-    /** [tiles] as rows of icons with their names under them, [STREAM_COLUMNS] to a row. */
-    private fun streamingGrid(tiles: List<StreamingTile>): View {
-        val density = resources.displayMetrics.density
-        val grid = android.widget.GridLayout(this).apply { columnCount = STREAM_COLUMNS }
-        tiles.forEach { tile ->
-            val cell = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                gravity = android.view.Gravity.CENTER_HORIZONTAL
-                setPadding((4 * density).toInt(), (8 * density).toInt(), (4 * density).toInt(), (8 * density).toInt())
-                isClickable = true
-                isLongClickable = true
-                contentDescription = tile.title
-                setOnClickListener { tile.onClick() }
-                setOnLongClickListener { tile.onLongClick(); true }
-                addView(
-                    android.widget.ImageView(this@LibraryActivity).apply { setImageBitmap(tile.icon) },
-                    LinearLayout.LayoutParams((56 * density).toInt(), (56 * density).toInt())
-                )
-                addView(TextView(this@LibraryActivity).apply {
-                    text = tile.title
-                    textSize = 12f
-                    maxLines = 2
-                    gravity = android.view.Gravity.CENTER
-                    ellipsize = android.text.TextUtils.TruncateAt.END
-                    setTextColor(AutoBridgeDesign.TEXT)
-                    setPadding(0, (4 * density).toInt(), 0, 0)
-                })
-                tile.caption?.let { caption ->
-                    addView(TextView(this@LibraryActivity).apply {
-                        text = caption
-                        textSize = 10f
-                        maxLines = 2
-                        gravity = android.view.Gravity.CENTER
-                        setTextColor(AutoBridgeDesign.TEXT_MUTED)
-                    })
-                }
-            }
-            grid.addView(cell, streamingCellParams())
-        }
-        // Fill the last row with empty cells, so a short group keeps the same column width as the
-        // rest: two icons alone otherwise spread across the whole width, half a screen apart.
-        val remainder = tiles.size % STREAM_COLUMNS
-        if (remainder != 0) {
-            repeat(STREAM_COLUMNS - remainder) { grid.addView(View(this), streamingCellParams()) }
-        }
-        return grid
-    }
 
     /**
      * [tiles] as large brand cards, [STREAM_CARD_COLUMNS] to a row, each with its name under it.
@@ -2765,12 +2703,65 @@ class LibraryActivity : Activity() {
                     setTextColor(AutoBridgeDesign.TEXT)
                     setPadding((4 * density).toInt(), (4 * density).toInt(), 0, 0)
                 })
+                tile.caption?.let { caption ->
+                    addView(TextView(this@LibraryActivity).apply {
+                        text = caption
+                        textSize = 10.5f
+                        maxLines = 1
+                        setTextColor(AutoBridgeDesign.ACCENT)
+                        setPadding((4 * density).toInt(), 0, 0, 0)
+                    })
+                }
             }
             grid.addView(cell, streamingCellParams())
         }
         val remainder = tiles.size % STREAM_CARD_COLUMNS
         if (remainder != 0) repeat(STREAM_CARD_COLUMNS - remainder) { grid.addView(View(this), streamingCellParams()) }
         return grid
+    }
+
+    private fun openInBuiltInBrowser(url: String) {
+        startActivity(
+            Intent(this, dev.autobridge.browser.BrowserActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+                .setData(Uri.parse(url))
+        )
+    }
+
+    private fun askToInstallChrome(url: String) {
+        val name = StreamingLinks.all.firstOrNull { it.url == url }?.title ?: url
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
+            .setTitle(R.string.car_chrome_needed_title)
+            .setMessage(getString(R.string.streaming_chrome_needed_message, name))
+            .setPositiveButton(R.string.streaming_chrome_install) { _, _ -> DesktopLinks.openSetup(this) }
+            .setNeutralButton(R.string.car_chrome_needed_open_anyway) { _, _ -> openInBuiltInBrowser(url) }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    /** One line at the top of Streaming: whether Netflix and the like will play, and how to fix it. */
+    private fun chromeStatusRow(): View? {
+        val status = DesktopLinks.chromeStatus(this)
+        if (status == DesktopLinks.ChromeStatus.UNAVAILABLE) return null
+        val ready = status == DesktopLinks.ChromeStatus.READY
+        val accent = if (ready) dev.autobridge.design.ThemeHolder.palette.good else dev.autobridge.design.ThemeHolder.palette.warn
+        val density = resources.displayMetrics.density
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            background = AutoBridgeDesign.surface(this@LibraryActivity, AutoBridgeDesign.tint(accent, 0.1f), 16, AutoBridgeDesign.tint(accent, 0.3f))
+            setPadding((14 * density).toInt(), (10 * density).toInt(), (14 * density).toInt(), (10 * density).toInt())
+            addView(TextView(this@LibraryActivity).apply {
+                text = getString(if (ready) R.string.streaming_chrome_ready else R.string.streaming_chrome_missing)
+                textSize = 13.5f
+                setTextColor(AutoBridgeDesign.TEXT)
+            }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            if (!ready) {
+                addView(AutoBridgeDesign.pill(this@LibraryActivity, getString(R.string.streaming_chrome_install), primary = true) {
+                    DesktopLinks.openSetup(this@LibraryActivity)
+                })
+            }
+        }
     }
 
     /** Adds any website to the favourites: a name (optional) and an address. */

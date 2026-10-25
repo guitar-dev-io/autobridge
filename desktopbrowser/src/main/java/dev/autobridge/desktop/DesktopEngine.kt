@@ -104,6 +104,13 @@ object DesktopEngine {
     fun installedChrome(): DesktopBrowserAdapter? =
         DesktopBrowsers.of(DesktopBrowserId.CHROME).takeIf { state(it.id).state.installed }
 
+    /**
+     * The browser that opens protected-video sites (Netflix and the like): Chrome when installed,
+     * else Brave, else null. Chrome first because it bundles Widevine itself.
+     */
+    fun installedStreamingBrowser(): DesktopBrowserAdapter? =
+        installedChrome() ?: DesktopBrowsers.of(DesktopBrowserId.BRAVE).takeIf { state(it.id).state.installed }
+
     fun chosenInstalledBrowser(): DesktopBrowserAdapter? =
         choice.browser?.let(DesktopBrowsers::of)?.takeIf { state(it.id).state.installed }
 
