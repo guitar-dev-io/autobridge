@@ -2152,6 +2152,12 @@
 
     <!-- My Car (ตั้งค่า > รถของฉัน) -->
     <string name="my_car_profile_caption">โปรไฟล์จอ: %1$s</string>
+    <string name="my_car_stat_economy">อัตราสิ้นเปลือง</string>
+    <string name="my_car_stat_economy_ev">การใช้พลังงาน</string>
+    <string name="my_car_stat_odometer">เลขไมล์</string>
+    <string name="my_car_stat_next_service">เซอร์วิสถัดไป</string>
+    <string name="my_car_stat_per_day">ประมาณ %1$s กม. ต่อวัน</string>
+    <string name="my_car_km_value">%1$s กม.</string>
     <string name="my_car_section_tools">เครื่องมือรถ</string>
     <string name="my_car_section_connection">การเชื่อมต่อ</string>
     <string name="my_car_parking_empty">แตะเพื่อบันทึกจุดจอด</string>

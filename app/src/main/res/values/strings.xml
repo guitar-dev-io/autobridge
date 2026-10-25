@@ -2184,6 +2184,12 @@
 
     <!-- My Car (Settings > My Car) -->
     <string name="my_car_profile_caption">Screen profile: %1$s</string>
+    <string name="my_car_stat_economy">Fuel economy</string>
+    <string name="my_car_stat_economy_ev">Energy use</string>
+    <string name="my_car_stat_odometer">Odometer</string>
+    <string name="my_car_stat_next_service">Next service</string>
+    <string name="my_car_stat_per_day">About %1$s km a day</string>
+    <string name="my_car_km_value">%1$s km</string>
     <string name="my_car_section_tools">Car tools</string>
     <string name="my_car_section_connection">Connection</string>
     <string name="my_car_parking_empty">Tap to mark where you parked</string>
