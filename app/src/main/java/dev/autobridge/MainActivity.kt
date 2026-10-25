@@ -510,6 +510,9 @@ class MainActivity : androidx.activity.ComponentActivity() {
                         onOpenController = { showPhoneScreen(PhoneScreen.CONTROL) },
                         onMirror = { requestScreenCapture() },
                         onBridgeDuo = duoScreenIntent()?.let { intent -> { startActivity(intent) } },
+                        onStreaming = {
+                            startActivity(dev.autobridge.library.LibraryActivity.intent(this@MainActivity, dev.autobridge.library.LibraryActivity.Section.STREAMING))
+                        },
                         updateVersion = homeUpdate?.release?.versionName,
                         onOpenUpdate = { homeUpdate?.let(::showUpdateDialog) },
                         onDismissUpdate = ::dismissHomeUpdate,
