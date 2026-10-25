@@ -48,7 +48,9 @@ import dev.autobridge.ui.home.HomeSectionHeader
 import dev.autobridge.ui.home.HomeSendField
 import dev.autobridge.ui.home.HomeWallpaper
 import dev.autobridge.ui.home.QuickLaunchRow
-import dev.autobridge.ui.home.WallpaperDrawable
+import dev.autobridge.ui.appearance.WallDevice
+import dev.autobridge.ui.appearance.WallpaperDrawable
+import dev.autobridge.ui.appearance.WallpaperPhoto
 import dev.autobridge.ui.home.homeCard
 import dev.autobridge.ui.home.rememberHomeLook
 import kotlinx.coroutines.Dispatchers
@@ -213,18 +215,18 @@ private fun HomeWallpaperBehindPage(look: HomeLook) {
     val view = LocalView.current
     val context = LocalContext.current
     LaunchedEffect(look.spec, look.palette) {
-        val file = AppearanceStore.customWallpaperFile(context)
-        var wallpaper = HomeWallpaper.forPhone(look.spec, customExists = file.isFile)
-        val photo = if (wallpaper == Wallpaper.CUSTOM) {
-            withContext(Dispatchers.IO) { WallpaperDrawable.decodePhoto(file, view.resources.displayMetrics.widthPixels) }
+        val wallpaper = HomeWallpaper.lookForPhone(look.spec, customExists = WallpaperPhoto.exists(context), light = look.palette.isLight)
+        var wanted = wallpaper
+        val photo = if (wallpaper.wallpaper == Wallpaper.CUSTOM) {
+            withContext(Dispatchers.IO) { WallpaperPhoto.decode(context, view.resources.displayMetrics.widthPixels) }
         } else null
-        if (wallpaper == Wallpaper.CUSTOM && photo == null) wallpaper = Wallpaper.NONE
+        if (wallpaper.wallpaper == Wallpaper.CUSTOM && photo == null) wanted = wallpaper.copy(wallpaper = Wallpaper.NONE)
         pageRoot(view)?.background = WallpaperDrawable(
-            wallpaper,
-            look.palette,
-            HomeWallpaper.dimColor(wallpaper, look.spec.wallpaperDim, look.palette.isLight),
-            view.resources.displayMetrics.density,
-            photo
+            look = wanted,
+            device = WallDevice.PHONE,
+            palette = look.palette,
+            density = view.resources.displayMetrics.density,
+            photo = photo
         )
     }
 }

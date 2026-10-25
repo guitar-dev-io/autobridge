@@ -119,7 +119,7 @@
     <string name="appearance_wallpaper_glow">แสงเรือง</string>
     <string name="appearance_wallpaper_lines">เส้น</string>
     <string name="appearance_wallpaper_night_road">ถนนยามค่ำ</string>
-    <string name="appearance_wallpaper_solid">สีพื้น</string>
+    <string name="appearance_wallpaper_solid">เทาเข้ม</string>
     <string name="appearance_wallpaper_custom">รูปของคุณ</string>
     <string name="appearance_wallpaper_choose">เลือกรูป</string>
     <string name="appearance_wallpaper_change">เลือกรูปอื่น</string>
@@ -146,4 +146,98 @@
     <string name="appearance_corners_sharp">เหลี่ยม</string>
     <string name="appearance_tile_labels">แสดงชื่อใต้ไอคอน</string>
     <string name="appearance_tile_labels_caption">เฉพาะตารางแบบคลาสสิก</string>
+
+    <!-- Wallpaper: kinds, images, scope, crop, blur -->
+    <string name="appearance_wallpaper_solid_navy">น้ำเงินเข้ม</string>
+    <string name="appearance_wallpaper_solid_forest">เขียวป่า</string>
+    <string name="appearance_wallpaper_solid_plum">ม่วงพลัม</string>
+    <string name="appearance_wallpaper_solid_wine">แดงไวน์</string>
+    <string name="appearance_wallpaper_solid_ember">น้ำตาลถ่าน</string>
+    <string name="appearance_wallpaper_gradient_aurora">แสงเหนือ</string>
+    <string name="appearance_wallpaper_gradient_sunset">อาทิตย์อัสดง</string>
+    <string name="appearance_wallpaper_gradient_ocean">มหาสมุทร</string>
+    <string name="appearance_wallpaper_gradient_ember">ถ่านไฟ</string>
+    <string name="appearance_wallpaper_gradient_violet">ม่วง</string>
+    <string name="appearance_wallpaper_gradient_mint">มินต์</string>
+    <string name="appearance_wallpaper_image_midnight_road">ถนนเที่ยงคืน</string>
+    <string name="appearance_wallpaper_image_blue_hour">ชั่วโมงสีน้ำเงิน</string>
+    <string name="appearance_wallpaper_image_amber_dusk">ค่ำสีอำพัน</string>
+    <string name="appearance_wallpaper_image_aurora">แสงเหนือ</string>
+    <string name="appearance_wallpaper_image_city_lights">แสงไฟเมือง</string>
+    <string name="appearance_wallpaper_image_calm_sea">ทะเลสงบ</string>
+    <string name="appearance_wallpaper_image_dunes">เนินทราย</string>
+    <string name="appearance_wallpaper_image_morning_mist">หมอกยามเช้า</string>
+    <string name="appearance_wallpaper_suits_dark">เหมาะกับโหมดมืด</string>
+    <string name="appearance_wallpaper_suits_light">เหมาะกับโหมดสว่าง</string>
+    <string name="appearance_wallpaper_suits_either">ได้ทั้งสองโหมด</string>
+    <string name="appearance_wallpaper_tab_solid">สีพื้น</string>
+    <string name="appearance_wallpaper_tab_gradient">ไล่สี</string>
+    <string name="appearance_wallpaper_tab_image">รูปภาพ</string>
+    <string name="appearance_wallpaper_tab_photo">รูปถ่าย</string>
+    <string name="appearance_wallpaper_choose_for">เลือก · %1$s</string>
+    <string name="appearance_wallpaper_all_themes">%1$s · ทุกธีม</string>
+    <string name="appearance_wallpaper_preview_summary">%1$s · %2$s</string>
+
+    <string name="appearance_wallpaper_scope_title">วอลเปเปอร์แสดงที่ไหน</string>
+    <string name="appearance_wallpaper_scope_changes">เปลี่ยนที่</string>
+    <string name="appearance_wallpaper_scope_phone">AutoBridge บนโทรศัพท์</string>
+    <string name="appearance_wallpaper_scope_car">หน้าจอ AutoBridge บนรถ</string>
+    <string name="appearance_wallpaper_scope_never">ไม่เปลี่ยนเลย</string>
+    <string name="appearance_wallpaper_scope_launcher">หน้าหลักของ Android Auto</string>
+    <string name="appearance_wallpaper_scope_system">วอลเปเปอร์ของระบบโทรศัพท์</string>
+    <string name="appearance_wallpaper_scope_note">Android Auto วาดหน้าหลักของตัวเอง AutoBridge ปรับแต่งเฉพาะหน้าจอที่เป็นของตัวเองเท่านั้น</string>
+
+    <string name="appearance_wallpaper_split_title">แยกวอลเปเปอร์โหมดสว่างและมืด</string>
+    <string name="appearance_wallpaper_split_caption">สลับตามธีม · ตอนนี้%1$s</string>
+    <string name="appearance_wallpaper_split_off">ใช้วอลเปเปอร์เดียวกับทั้งสองธีม เปิดสวิตช์นี้เพื่อให้โหมดสว่างและมืดมีของตัวเอง</string>
+    <string name="appearance_wallpaper_light">สว่าง</string>
+    <string name="appearance_wallpaper_dark">มืด</string>
+    <string name="appearance_wallpaper_editing">กำลังแก้</string>
+    <string name="appearance_wallpaper_tap_to_edit">แตะเพื่อแก้</string>
+    <string name="appearance_wallpaper_showing_now">แสดงอยู่ตอนนี้</string>
+
+    <string name="appearance_wallpaper_angle">มุม</string>
+    <string name="appearance_wallpaper_angle_value">%1$d°</string>
+    <string name="appearance_wallpaper_angle_turns">หมุนการไล่สีตั้งแต่ 0° ถึง 360°</string>
+    <string name="appearance_wallpaper_angle_glow">แสงเรืองตามสีเน้นของคุณ</string>
+    <string name="appearance_wallpaper_angle_pick">เลือกแบบไล่สีเพื่อปรับมุม</string>
+    <string name="appearance_wallpaper_images_note">AutoBridge มีรูป 8 แบบในตัว ใช้ได้โดยไม่ต้องออนไลน์หรือดาวน์โหลด ป้ายโหมดมืด/สว่างเป็นเพียงคำแนะนำ</string>
+
+    <string name="appearance_wallpaper_photo_title">ใช้รูปจากโทรศัพท์เครื่องนี้</string>
+    <string name="appearance_wallpaper_photo_body">AutoBridge คัดลอกรูปเก็บไว้ในที่เก็บส่วนตัวของแอปและย่อให้พอดีหน้าจอ ไม่มีการอัปโหลดใดๆ</string>
+    <string name="appearance_wallpaper_photo_stays">อยู่ในโทรศัพท์เครื่องนี้เท่านั้น</string>
+    <string name="appearance_wallpaper_photo_replace">เปลี่ยน</string>
+    <string name="appearance_wallpaper_photo_remove">ลบ</string>
+    <string name="appearance_wallpaper_photo_saved">คัดลอกรูปเข้า AutoBridge แล้ว</string>
+    <string name="appearance_wallpaper_photo_removed">ลบรูปออกจาก AutoBridge แล้ว</string>
+
+    <string name="appearance_wallpaper_crop_title">ตำแหน่งและการครอป</string>
+    <string name="appearance_wallpaper_crop_caption">เส้นทึบ: ส่วนที่ใช้บน%1$s เส้นประ: ส่วนที่ใช้บน%2$s</string>
+    <string name="appearance_wallpaper_crop_caption_one">เส้นทึบ: ส่วนที่ใช้บน%1$s</string>
+    <string name="appearance_wallpaper_crop_phone">โทรศัพท์</string>
+    <string name="appearance_wallpaper_crop_car">หน้าจอรถ</string>
+    <string name="appearance_wallpaper_crop_preview">ตัวอย่างการครอป: รูปทั้งภาพ โดยมีกรอบส่วนที่มองเห็น</string>
+    <string name="appearance_wallpaper_zoom">ซูม</string>
+    <string name="appearance_wallpaper_pan_x">ซ้าย–ขวา</string>
+    <string name="appearance_wallpaper_pan_y">บน–ล่าง</string>
+    <string name="appearance_wallpaper_crop_reset">รีเซ็ตตำแหน่ง</string>
+
+    <string name="appearance_wallpaper_effects">เบลอและหรี่</string>
+    <string name="appearance_wallpaper_blur">เบลอวอลเปเปอร์</string>
+    <string name="appearance_wallpaper_blur_value">%1$d px</string>
+    <string name="appearance_wallpaper_blur_hint">ทำให้รูปที่ลายเยอะนุ่มลง การ์ดและตัวอักษรจะเด่นขึ้น</string>
+    <string name="appearance_wallpaper_blur_off">เบลอใช้กับรูปภาพและรูปถ่ายเท่านั้น</string>
+    <string name="appearance_wallpaper_contrast_excellent">ดีมาก</string>
+    <string name="appearance_wallpaper_contrast_good">ดี</string>
+    <string name="appearance_wallpaper_contrast_fair">พอใช้</string>
+    <string name="appearance_wallpaper_contrast_low">ต่ำ</string>
+    <string name="appearance_wallpaper_contrast_ok">คาดว่าตัวอักษรอ่านง่ายบนวอลเปเปอร์นี้</string>
+    <string name="appearance_wallpaper_contrast_poor">คาดว่าตัวอักษรอ่านยาก เพิ่มการหรี่หรือเบลอ</string>
+    <string name="appearance_wallpaper_car_note">Android Auto ใช้หน้าตามาตรฐาน ตัวอย่างบนรถจึงไม่แสดงวอลเปเปอร์นี้</string>
+    <string name="appearance_wallpaper_car_note_action">ใช้หน้าตาของฉัน</string>
+
+    <string name="appearance_wallpaper_reset">รีเซ็ตวอลเปเปอร์</string>
+    <string name="appearance_wallpaper_reset_title">รีเซ็ตวอลเปเปอร์?</string>
+    <string name="appearance_wallpaper_reset_body">วอลเปเปอร์ ตำแหน่ง เบลอ และการหรี่จะกลับเป็นค่าเริ่มต้นทั้งโหมดสว่างและมืด รูปที่นำเข้าไว้ยังอยู่ใน AutoBridge</string>
+    <string name="appearance_wallpaper_reset_done">รีเซ็ตวอลเปเปอร์แล้ว</string>
 </resources>

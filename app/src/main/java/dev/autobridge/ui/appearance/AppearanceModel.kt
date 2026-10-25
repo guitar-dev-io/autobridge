@@ -6,6 +6,7 @@ import dev.autobridge.design.IconStyle
 import dev.autobridge.design.TextScaleCurve
 import dev.autobridge.design.ThemePalette
 import dev.autobridge.design.ThemeResolver
+import dev.autobridge.design.WallpaperCatalog
 import dev.autobridge.design.WallpaperTarget
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -98,6 +99,40 @@ object AppearanceModel {
     fun dimToProgress(dim: Int): Int = (dim.coerceIn(0, AppearanceSpec.MAX_DIM) + DIM_STEP / 2) / DIM_STEP
 
     fun progressToDim(progress: Int): Int = (progress.coerceIn(0, DIM_STEPS) * DIM_STEP)
+
+    /** Blur moves in steps of [WallpaperCatalog.BLUR_STEP] up to [WallpaperCatalog.MAX_BLUR]. */
+    val BLUR_STEPS = WallpaperCatalog.MAX_BLUR / WallpaperCatalog.BLUR_STEP
+    fun blurToProgress(blur: Int): Int = (blur.coerceIn(0, WallpaperCatalog.MAX_BLUR) + WallpaperCatalog.BLUR_STEP / 2) / WallpaperCatalog.BLUR_STEP
+    fun progressToBlur(progress: Int): Int = progress.coerceIn(0, BLUR_STEPS) * WallpaperCatalog.BLUR_STEP
+
+    /** Zoom moves from [WallpaperCatalog.ZOOM_MIN] to [WallpaperCatalog.ZOOM_MAX] in steps of [WallpaperCatalog.ZOOM_STEP] percent. */
+    val ZOOM_STEPS = (WallpaperCatalog.ZOOM_MAX - WallpaperCatalog.ZOOM_MIN) / WallpaperCatalog.ZOOM_STEP
+    fun zoomToProgress(zoom: Int): Int =
+        (zoom.coerceIn(WallpaperCatalog.ZOOM_MIN, WallpaperCatalog.ZOOM_MAX) - WallpaperCatalog.ZOOM_MIN + WallpaperCatalog.ZOOM_STEP / 2) / WallpaperCatalog.ZOOM_STEP
+    fun progressToZoom(progress: Int): Int = WallpaperCatalog.ZOOM_MIN + progress.coerceIn(0, ZOOM_STEPS) * WallpaperCatalog.ZOOM_STEP
+
+    /** The gradient angle turns in steps of [WallpaperCatalog.ANGLE_STEP], 0 to 360. */
+    val ANGLE_STEPS = 360 / WallpaperCatalog.ANGLE_STEP
+    fun angleToProgress(angle: Int): Int = (angle.coerceIn(0, 360) + WallpaperCatalog.ANGLE_STEP / 2) / WallpaperCatalog.ANGLE_STEP
+    fun progressToAngle(progress: Int): Int = progress.coerceIn(0, ANGLE_STEPS) * WallpaperCatalog.ANGLE_STEP
+
+    /**
+     * Which theme the Wallpaper page edits: with separate wallpapers, the one the user picked
+     * ([chosenLight], or the theme on screen until they pick); otherwise whatever is showing, since
+     * the one wallpaper serves both.
+     */
+    fun editedLight(spec: AppearanceSpec, shownLight: Boolean, chosenLight: Boolean?): Boolean =
+        if (spec.separateWallpapers) chosenLight ?: shownLight else shownLight
+
+    /** Which screen's crop the editor shows: the only one the wallpaper is on, or the one picked for Both. */
+    internal fun cropDevice(spec: AppearanceSpec, pickedCar: Boolean): WallDevice = when (spec.wallpaperTarget) {
+        WallpaperTarget.PHONE -> WallDevice.PHONE
+        WallpaperTarget.CAR -> WallDevice.CAR
+        WallpaperTarget.BOTH -> if (pickedCar) WallDevice.CAR else WallDevice.PHONE
+    }
+
+    /** The shape of the car display the crop outline is drawn for (the 1020 x 604 head unit). */
+    const val CAR_ASPECT = 1020f / 604f
 
     fun wallpaperOnPhone(spec: AppearanceSpec): Boolean = spec.wallpaperTarget != WallpaperTarget.CAR
 

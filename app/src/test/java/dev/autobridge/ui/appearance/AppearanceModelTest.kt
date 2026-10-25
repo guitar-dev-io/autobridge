@@ -127,4 +127,34 @@ class AppearanceModelTest {
         assertEquals("23:59", AppearanceModel.clock(24 * 60 - 1))
         assertEquals("00:05", AppearanceModel.clock(24 * 60 + 5))
     }
+
+    @Test fun blurZoomAndAngleSlidersCoverTheirRangesInSteps() {
+        assertEquals(12, AppearanceModel.BLUR_STEPS)
+        assertEquals(0, AppearanceModel.progressToBlur(0))
+        assertEquals(24, AppearanceModel.progressToBlur(99))
+        assertEquals(6, AppearanceModel.blurToProgress(12))
+        assertEquals(100, AppearanceModel.progressToZoom(0))
+        assertEquals(300, AppearanceModel.progressToZoom(AppearanceModel.ZOOM_STEPS))
+        assertEquals(20, AppearanceModel.zoomToProgress(200))
+        assertEquals(24, AppearanceModel.ANGLE_STEPS)
+        assertEquals(165, AppearanceModel.progressToAngle(AppearanceModel.angleToProgress(160)))
+        assertEquals(360, AppearanceModel.progressToAngle(99))
+    }
+
+    @Test fun thePageEditsTheThemeOnScreenUnlessTheWallpapersAreSeparate() {
+        val one = AppearanceSpec()
+        assertTrue(AppearanceModel.editedLight(one, shownLight = true, chosenLight = false))
+        assertFalse(AppearanceModel.editedLight(one, shownLight = false, chosenLight = true))
+        val two = one.withSeparateWallpapers(true, editingLight = false)
+        assertTrue(AppearanceModel.editedLight(two, shownLight = false, chosenLight = true))
+        assertFalse(AppearanceModel.editedLight(two, shownLight = true, chosenLight = false))
+        assertTrue(AppearanceModel.editedLight(two, shownLight = true, chosenLight = null))
+    }
+
+    @Test fun theCropEditorFollowsTheScreenTheWallpaperIsOn() {
+        assertEquals(WallDevice.PHONE, AppearanceModel.cropDevice(AppearanceSpec(wallpaperTarget = WallpaperTarget.PHONE), pickedCar = true))
+        assertEquals(WallDevice.CAR, AppearanceModel.cropDevice(AppearanceSpec(wallpaperTarget = WallpaperTarget.CAR), pickedCar = false))
+        assertEquals(WallDevice.CAR, AppearanceModel.cropDevice(AppearanceSpec(wallpaperTarget = WallpaperTarget.BOTH), pickedCar = true))
+        assertEquals(WallDevice.PHONE, AppearanceModel.cropDevice(AppearanceSpec(wallpaperTarget = WallpaperTarget.BOTH), pickedCar = false))
+    }
 }

@@ -13,6 +13,8 @@ import dev.autobridge.design.ThaiStyle
 import dev.autobridge.design.ThemeMode
 import dev.autobridge.design.ThemePreset
 import dev.autobridge.design.Wallpaper
+import dev.autobridge.design.WallpaperCatalog
+import dev.autobridge.design.WallpaperKind
 import dev.autobridge.design.WallpaperTarget
 import dev.autobridge.ui.appearance.AppearanceModel.TextStyle
 
@@ -150,6 +152,53 @@ object AppearanceLabels {
             Wallpaper.NIGHT_ROAD -> R.string.appearance_wallpaper_night_road
             Wallpaper.SOLID -> R.string.appearance_wallpaper_solid
             Wallpaper.CUSTOM -> R.string.appearance_wallpaper_custom
+            Wallpaper.SOLID_NAVY -> R.string.appearance_wallpaper_solid_navy
+            Wallpaper.SOLID_FOREST -> R.string.appearance_wallpaper_solid_forest
+            Wallpaper.SOLID_PLUM -> R.string.appearance_wallpaper_solid_plum
+            Wallpaper.SOLID_WINE -> R.string.appearance_wallpaper_solid_wine
+            Wallpaper.SOLID_EMBER -> R.string.appearance_wallpaper_solid_ember
+            Wallpaper.GRADIENT_AURORA -> R.string.appearance_wallpaper_gradient_aurora
+            Wallpaper.GRADIENT_SUNSET -> R.string.appearance_wallpaper_gradient_sunset
+            Wallpaper.GRADIENT_OCEAN -> R.string.appearance_wallpaper_gradient_ocean
+            Wallpaper.GRADIENT_EMBER -> R.string.appearance_wallpaper_gradient_ember
+            Wallpaper.GRADIENT_VIOLET -> R.string.appearance_wallpaper_gradient_violet
+            Wallpaper.GRADIENT_MINT -> R.string.appearance_wallpaper_gradient_mint
+            Wallpaper.IMAGE_MIDNIGHT_ROAD -> R.string.appearance_wallpaper_image_midnight_road
+            Wallpaper.IMAGE_BLUE_HOUR -> R.string.appearance_wallpaper_image_blue_hour
+            Wallpaper.IMAGE_AMBER_DUSK -> R.string.appearance_wallpaper_image_amber_dusk
+            Wallpaper.IMAGE_AURORA -> R.string.appearance_wallpaper_image_aurora
+            Wallpaper.IMAGE_CITY_LIGHTS -> R.string.appearance_wallpaper_image_city_lights
+            Wallpaper.IMAGE_CALM_SEA -> R.string.appearance_wallpaper_image_calm_sea
+            Wallpaper.IMAGE_DUNES -> R.string.appearance_wallpaper_image_dunes
+            Wallpaper.IMAGE_MORNING_MIST -> R.string.appearance_wallpaper_image_morning_mist
+        }
+    )
+
+    fun wallpaperKind(context: Context, kind: WallpaperKind): String = context.getString(
+        when (kind) {
+            WallpaperKind.SOLID -> R.string.appearance_wallpaper_tab_solid
+            WallpaperKind.GRADIENT -> R.string.appearance_wallpaper_tab_gradient
+            WallpaperKind.IMAGE -> R.string.appearance_wallpaper_tab_image
+            WallpaperKind.PHOTO -> R.string.appearance_wallpaper_tab_photo
+        }
+    )
+
+    /** The hint under an image tile: which theme it reads best on. */
+    fun suits(context: Context, wallpaper: Wallpaper): String? =
+        if (wallpaper.kind != WallpaperKind.IMAGE) null else context.getString(
+            when (WallpaperCatalog.suits(wallpaper)) {
+                WallpaperCatalog.Suits.DARK -> R.string.appearance_wallpaper_suits_dark
+                WallpaperCatalog.Suits.LIGHT -> R.string.appearance_wallpaper_suits_light
+                WallpaperCatalog.Suits.EITHER -> R.string.appearance_wallpaper_suits_either
+            }
+        )
+
+    fun legibility(context: Context, level: WallpaperCatalog.Legibility): String = context.getString(
+        when (level) {
+            WallpaperCatalog.Legibility.EXCELLENT -> R.string.appearance_wallpaper_contrast_excellent
+            WallpaperCatalog.Legibility.GOOD -> R.string.appearance_wallpaper_contrast_good
+            WallpaperCatalog.Legibility.FAIR -> R.string.appearance_wallpaper_contrast_fair
+            WallpaperCatalog.Legibility.LOW -> R.string.appearance_wallpaper_contrast_low
         }
     )
 

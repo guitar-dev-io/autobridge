@@ -34,6 +34,9 @@ import dev.autobridge.ui.appearance.AppearanceModel.Page
 import dev.autobridge.ui.appearance.AppearancePages
 import dev.autobridge.ui.appearance.AppearanceUi
 import dev.autobridge.ui.appearance.WallpaperPhoto
+import dev.autobridge.ui.appearance.WallpaperUiState
+import dev.autobridge.design.WallpaperLook
+import androidx.annotation.StringRes
 
 /**
  * Settings > Appearance: the page from the redesign, with its four sub-pages (Theme & colors,
@@ -50,6 +53,9 @@ object AppearanceScreen {
     private var page = Page.MAIN
     private var scrollY = 0
 
+    /** The Wallpaper page's own state (tab, theme being edited, crop device); fresh on every visit. */
+    private var wallpaperUi = WallpaperUiState()
+
     /** Set just before `onChanged` recreates the activity, so the next [build] restores the page. */
     private var restoring = false
 
@@ -59,6 +65,7 @@ object AppearanceScreen {
         if (!restoring) {
             page = Page.MAIN
             scrollY = 0
+            wallpaperUi = WallpaperUiState()
         }
         restoring = false
         val host = FrameLayout(context)
@@ -113,7 +120,36 @@ object AppearanceScreen {
                 }
             }
 
-            override fun askReset() = confirmReset(context) { change { AppearanceSpec.DEFAULT } }
+            override fun askReset() = confirmReset(context, R.string.appearance_reset_title, R.string.appearance_reset_body) { change { AppearanceSpec.DEFAULT } }
+
+            override val wallpaperUi: WallpaperUiState get() = this@AppearanceScreen.wallpaperUi
+
+            override fun refresh() = render(AutoBridgeDesign.pageScroll(host)?.scrollY ?: 0)
+
+            override fun removePhoto() {
+                WallpaperPhoto.remove(context)
+                Toast.makeText(context.applicationContext, R.string.appearance_wallpaper_photo_removed, Toast.LENGTH_SHORT).show()
+                val before = AppearanceStore.current()
+                change { spec ->
+                    fun look(l: WallpaperLook) = if (l.wallpaper == Wallpaper.CUSTOM) l.copy(wallpaper = Wallpaper.GLOW) else l
+                    spec.withWallpaperLook(false, look(spec.wallpaperLook(false)))
+                        .let { s -> if (s.separateWallpapers) s.withWallpaperLook(true, look(s.wallpaperLook(true))) else s }
+                }
+                // Nothing in the spec pointed at the photo: still redraw, since it is gone from the page.
+                if (AppearanceStore.current() == before) refresh()
+            }
+
+            override fun askResetWallpaper() = confirmReset(context, R.string.appearance_wallpaper_reset_title, R.string.appearance_wallpaper_reset_body) {
+                Toast.makeText(context.applicationContext, R.string.appearance_wallpaper_reset_done, Toast.LENGTH_SHORT).show()
+                this@AppearanceScreen.wallpaperUi = WallpaperUiState()
+                change { spec ->
+                    val d = AppearanceSpec.DEFAULT
+                    spec.copy(
+                        wallpaper = d.wallpaper, wallpaperDim = d.wallpaperDim, wallpaperBlur = d.wallpaperBlur, wallpaperAngle = d.wallpaperAngle,
+                        phoneCrop = d.phoneCrop, carCrop = d.carCrop, lightWallpaper = null, wallpaperTarget = d.wallpaperTarget
+                    )
+                }
+            }
 
             override fun pickTime(minuteOfDay: Int, onPicked: (Int) -> Unit) {
                 TimePickerDialog(context, { _, hour, minute -> onPicked(hour * 60 + minute) },
@@ -186,15 +222,15 @@ object AppearanceScreen {
     }
 
     /** "Reset appearance?" in the page's own look: title, explanation, Cancel and a danger Reset. */
-    private fun confirmReset(context: Context, onConfirm: () -> Unit) {
+    private fun confirmReset(context: Context, @StringRes title: Int, @StringRes body: Int, onConfirm: () -> Unit) {
         val p = AppearanceUi.p
         val dialog = Dialog(context)
         val content = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             background = AppearanceUi.shape(context, p.surface, p.corners.card)
             setPadding(context.dp(22), context.dp(22), context.dp(22), context.dp(16))
-            addView(AppearanceUi.text(context, context.getString(R.string.appearance_reset_title), 20f, p.text, bold = true))
-            addView(AppearanceUi.text(context, context.getString(R.string.appearance_reset_body), 14f, p.textSecondary).apply {
+            addView(AppearanceUi.text(context, context.getString(title), 20f, p.text, bold = true))
+            addView(AppearanceUi.text(context, context.getString(body), 14f, p.textSecondary).apply {
                 setLineSpacing(0f, 1.4f)
             }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = context.dp(10) })
             addView(LinearLayout(context).apply {

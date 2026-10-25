@@ -14,6 +14,7 @@ import dev.autobridge.design.TextStep
 import dev.autobridge.design.ThemeMode
 import dev.autobridge.design.ThemeResolver
 import dev.autobridge.design.Wallpaper
+import dev.autobridge.design.WallpaperCrop
 import dev.autobridge.design.WallpaperTarget
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -264,6 +265,28 @@ class HomeDashboardAppearanceTest {
         assertEquals(Wallpaper.GLOW, look(AppearanceSpec(wallpaperTarget = WallpaperTarget.BOTH)).wallpaper)
         assertEquals(Wallpaper.GLOW, look(AppearanceSpec(wallpaperTarget = WallpaperTarget.CAR)).wallpaper)
         assertEquals(Wallpaper.NONE, look(AppearanceSpec(wallpaperTarget = WallpaperTarget.PHONE)).wallpaper)
+    }
+
+    @Test
+    fun `the car takes the wallpaper of its own theme and its own crop`() {
+        val base = AppearanceSpec(wallpaper = Wallpaper.IMAGE_AURORA, carCrop = WallpaperCrop(150, 10, 90), wallpaperBlur = 6)
+            .withSeparateWallpapers(true, editingLight = false)
+        val spec = base.withWallpaperLook(true, base.wallpaperLook(true).copy(wallpaper = Wallpaper.IMAGE_DUNES, carCrop = WallpaperCrop(200, 70, 30), dim = 5))
+        val dark = look(spec.copy(mode = ThemeMode.DARK))
+        assertEquals(Wallpaper.IMAGE_AURORA, dark.wallpaper)
+        assertEquals(WallpaperCrop(150, 10, 90), dark.wallpaperCrop)
+        assertEquals(6, dark.wallpaperBlur)
+        val light = look(spec.copy(mode = ThemeMode.LIGHT))
+        assertEquals(Wallpaper.IMAGE_DUNES, light.wallpaper)
+        assertEquals(WallpaperCrop(200, 70, 30), light.wallpaperCrop)
+        assertEquals(5, light.wallpaperDim)
+    }
+
+    @Test
+    fun `a car kept on the default look draws the default wallpaper`() {
+        val custom = AppearanceSpec(wallpaper = Wallpaper.IMAGE_DUNES, wallpaperBlur = 12, carSameLook = false)
+        assertEquals(Wallpaper.GLOW, look(custom).wallpaper)
+        assertEquals(0, look(custom).wallpaperBlur)
     }
 
     @Test
