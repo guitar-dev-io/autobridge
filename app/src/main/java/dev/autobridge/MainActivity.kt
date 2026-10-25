@@ -1961,15 +1961,11 @@ class MainActivity : androidx.activity.ComponentActivity() {
         // It used to be the Control Center's START MIRROR button.
         addCard(
             content,
-            actionCard(
-                getString(
-                    if (MirrorCoordinator.isMirroring) R.string.mirror_mirroring
-                    else R.string.mirror_start
-                ),
-                primary = true
-            ) {
-                requestScreenCapture()
-            },
+            dev.autobridge.ui.MirrorStatusCard(
+                this,
+                onStart = { requestScreenCapture() },
+                onStop = { ProjectionService.stop(this, "settings") }
+            ),
             top = 4
         )
 
@@ -2359,9 +2355,56 @@ class MainActivity : androidx.activity.ComponentActivity() {
         val readiness = dev.autobridge.mirror.MirrorReadinessProbe.read(this)
         val next = dev.autobridge.mirror.MirrorReadiness.nextAction(readiness)
         val battery = registerReceiver(null, android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        val odometer = dev.autobridge.maintenance.MaintenanceStore.currentOdometer(this)
+        val kmPerDay = dev.autobridge.maintenance.MaintenanceStore.kmPerDay(this)
+        val whole = java.text.NumberFormat.getIntegerInstance()
+        val stats = buildList {
+            // Fuel economy and odometer are plain readings, so no bar: neither is a share of anything.
+            add(
+                dev.autobridge.ui.MyCarStat(
+                    getString(if (ev) R.string.my_car_stat_economy_ev else R.string.my_car_stat_economy),
+                    fuel.value, fuel.caption, null, fuel.tone
+                )
+            )
+            add(
+                dev.autobridge.ui.MyCarStat(
+                    getString(R.string.my_car_stat_odometer),
+                    odometer?.let { getString(R.string.my_car_km_value, whole.format(it.toLong())) } ?: "—",
+                    kmPerDay?.let { getString(R.string.my_car_stat_per_day, whole.format(it.toLong())) },
+                    null,
+                    if (odometer == null) dev.autobridge.mycar.MyCarFacts.Tone.EMPTY else dev.autobridge.mycar.MyCarFacts.Tone.NORMAL
+                )
+            )
+            // The bar is how much of the item's interval is used up, the same figure the Maintenance page draws.
+            add(
+                dev.autobridge.ui.MyCarStat(
+                    getString(R.string.my_car_stat_next_service),
+                    headline?.let { dev.autobridge.maintenance.MaintenanceText.standing(this@MainActivity, it) } ?: "—",
+                    headline?.item?.name,
+                    headline?.let { facts.intervalUsed(it) },
+                    facts.maintenanceTone(headline)
+                )
+            )
+            val batteryPercent = battery?.let {
+                val level = it.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1)
+                val scale = it.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1)
+                if (level >= 0 && scale > 0) level * 100 / scale else null
+            }
+            add(
+                dev.autobridge.ui.MyCarStat(
+                    getString(R.string.my_car_phone_battery),
+                    batteryText(battery),
+                    temperatureText(battery).takeIf { it != getString(R.string.my_car_no_reading) },
+                    batteryPercent?.let { it / 100f },
+                    if (batteryPercent != null && batteryPercent < 20) dev.autobridge.mycar.MyCarFacts.Tone.WARN else dev.autobridge.mycar.MyCarFacts.Tone.NORMAL
+                )
+            )
+        }
+
         return dev.autobridge.ui.MyCarState(
             vehicleTitle = dev.autobridge.profile.ActiveCarProfile.custom?.name ?: getString(R.string.car_connection_my_car),
             profileLabel = dev.autobridge.profile.ActiveCarProfile.label,
+            stats = stats,
             tiles = listOf(parking, maintenance, fuel, costs, emergency, breakTile),
             battery = batteryText(battery),
             temperature = temperatureText(battery),

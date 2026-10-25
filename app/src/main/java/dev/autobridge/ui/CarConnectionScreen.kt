@@ -2,6 +2,9 @@ package dev.autobridge.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
+import dev.autobridge.design.ThemeHolder
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -68,6 +71,18 @@ data class MyCarTile(
 )
 
 /**
+ * One figure card above the tools. [progress] draws the bar under the value (0..1) and is null
+ * when nothing real can fill it: a fuel average or an odometer is not a share of anything.
+ */
+data class MyCarStat(
+    val label: String,
+    val value: String,
+    val caption: String?,
+    val progress: Float?,
+    val tone: Tone
+)
+
+/**
  * Everything My Car shows that comes from storage or the phone, read again each time the page
  * resumes, so a fill-up logged in the fuel page is on its tile on the way back. "—" stands for a
  * reading the phone did not give; nothing is estimated.
@@ -75,6 +90,8 @@ data class MyCarTile(
 data class MyCarState(
     val vehicleTitle: String,
     val profileLabel: String,
+    /** The four figures above the tools: only ones the stored data supports. */
+    val stats: List<MyCarStat>,
     val tiles: List<MyCarTile>,
     val battery: String,
     val temperature: String,
@@ -125,8 +142,10 @@ fun CarConnectionScreen(
                 onClick = onOpenProfiles
             )
 
+            StatGrid(state.stats)
+
             SectionLabel(stringResource(R.string.my_car_section_tools))
-            TileGrid(state.tiles)
+            ToolRows(state.tiles)
 
             SectionLabel(stringResource(R.string.my_car_section_connection))
             ConnectionStrip(
@@ -154,19 +173,25 @@ fun CarConnectionScreen(
     }
 }
 
-/** Two columns on a phone, one when very narrow, three in landscape or on a tablet. */
+private fun cardShape(): RoundedCornerShape = RoundedCornerShape(ThemeHolder.palette.corners.card.dp)
+
+private fun toneColor(tone: Tone): Color = when (tone) {
+    Tone.NORMAL -> ComposeTokens.Text
+    Tone.WARN -> ComposeTokens.Warn
+    Tone.ALERT -> ComposeTokens.Danger
+    Tone.EMPTY -> ComposeTokens.TextMuted
+}
+
+/** The figure cards: label, big value, a bar when there is one, and a quiet line. Two across, one when narrow. */
 @Composable
-private fun TileGrid(tiles: List<MyCarTile>) {
+private fun StatGrid(stats: List<MyCarStat>) {
+    if (stats.isEmpty()) return
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val columns = when {
-            maxWidth < 330.dp -> 1
-            maxWidth >= 600.dp -> 3
-            else -> 2
-        }
+        val columns = if (maxWidth < 300.dp) 1 else 2
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            tiles.chunked(columns).forEach { row ->
+            stats.chunked(columns).forEach { row ->
                 Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    row.forEach { ToolTile(it, Modifier.weight(1f).fillMaxHeight()) }
+                    row.forEach { StatCard(it, Modifier.weight(1f).fillMaxHeight()) }
                     repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
                 }
             }
@@ -175,52 +200,93 @@ private fun TileGrid(tiles: List<MyCarTile>) {
 }
 
 @Composable
-private fun ToolTile(tile: MyCarTile, modifier: Modifier) {
-    val valueColor = when (tile.tone) {
-        Tone.NORMAL -> ComposeTokens.Text
+private fun StatCard(stat: MyCarStat, modifier: Modifier) {
+    val p = ThemeHolder.palette
+    val tone = toneColor(stat.tone)
+    val bar = when (stat.tone) {
         Tone.WARN -> ComposeTokens.Warn
         Tone.ALERT -> ComposeTokens.Danger
-        Tone.EMPTY -> ComposeTokens.TextMuted
+        else -> ComposeTokens.Accent
     }
-    Surface(
-        onClick = tile.onClick,
-        color = ComposeTokens.Surface,
-        shape = RoundedCornerShape(16.dp),
-        modifier = modifier.heightIn(min = 112.dp)
-            .semantics { contentDescription = listOfNotNull(tile.title, tile.value, tile.caption).joinToString(", ") }
-    ) {
-        Column(Modifier.padding(14.dp)) {
-            Box(
-                Modifier.size(36.dp).background(tile.accent.copy(alpha = 0.16f), RoundedCornerShape(10.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                androidx.compose.material3.Icon(
-                    painterResource(tile.icon),
-                    contentDescription = null,
-                    tint = tile.accent,
-                    modifier = Modifier.size(20.dp)
-                )
+    Column(
+        modifier
+            .semantics(mergeDescendants = true) {
+                contentDescription = listOfNotNull(stat.label, stat.value, stat.caption).joinToString(", ")
             }
-            Text(
-                tile.title,
-                color = ComposeTokens.Text,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 10.dp)
-            )
-            Text(
-                tile.value,
-                color = valueColor,
-                fontSize = 13.sp,
-                fontWeight = if (tile.tone == Tone.EMPTY) FontWeight.Normal else FontWeight.Medium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 2.dp)
-            )
-            if (!tile.caption.isNullOrBlank()) {
-                Text(tile.caption, color = ComposeTokens.TextMuted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            .background(Color(p.cardFill), cardShape())
+            .border(1.dp, Color(p.cardEdge), cardShape())
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Text(
+            stat.label.uppercase(),
+            color = ComposeTokens.TextMuted,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        // A figure is large; "nothing logged yet" is a quiet line, not a headline.
+        val empty = stat.tone == Tone.EMPTY
+        Text(
+            stat.value,
+            color = tone,
+            fontSize = if (empty) 15.sp else 20.sp,
+            fontWeight = if (empty) FontWeight.Medium else FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        stat.progress?.let { share ->
+            Box(Modifier.fillMaxWidth().height(4.dp).background(ComposeTokens.Hairline, RoundedCornerShape(4.dp))) {
+                Box(Modifier.fillMaxWidth(share.coerceIn(0f, 1f)).height(4.dp).background(bar, RoundedCornerShape(4.dp)))
+            }
+        }
+        if (!stat.caption.isNullOrBlank()) {
+            Text(stat.caption, color = ComposeTokens.TextMuted, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+/** The car tools as one card of rows, each with its icon chip, its figure and a chevron; every row opens the tool. */
+@Composable
+private fun ToolRows(tiles: List<MyCarTile>) {
+    val p = ThemeHolder.palette
+    Column(
+        Modifier.fillMaxWidth()
+            .background(Color(p.cardFill), cardShape())
+            .border(1.dp, Color(p.cardEdge), cardShape())
+            .clip(cardShape())
+    ) {
+        tiles.forEachIndexed { index, tile ->
+            if (index > 0) Box(Modifier.fillMaxWidth().height(1.dp).background(ComposeTokens.Hairline))
+            Row(
+                Modifier.fillMaxWidth().heightIn(min = 64.dp)
+                    .clickable(onClick = tile.onClick)
+                    .padding(horizontal = 14.dp, vertical = 8.dp)
+                    .semantics(mergeDescendants = true) {
+                        contentDescription = listOfNotNull(tile.title, tile.value, tile.caption).joinToString(", ")
+                    },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    Modifier.size(36.dp).background(tile.accent.copy(alpha = 0.16f), RoundedCornerShape(ThemeHolder.palette.corners.chip.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    androidx.compose.material3.Icon(
+                        painterResource(tile.icon), contentDescription = null, tint = tile.accent, modifier = Modifier.size(20.dp)
+                    )
+                }
+                Column(Modifier.weight(1f).padding(start = 14.dp)) {
+                    Text(tile.title, color = ComposeTokens.Text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        listOfNotNull(tile.value, tile.caption?.takeIf { it.isNotBlank() }).joinToString(" · "),
+                        color = toneColor(tile.tone).let { if (tile.tone == Tone.NORMAL) ComposeTokens.TextMuted else it },
+                        fontSize = 13.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Text("›", color = ComposeTokens.TextMuted, fontSize = 22.sp)
             }
         }
     }
