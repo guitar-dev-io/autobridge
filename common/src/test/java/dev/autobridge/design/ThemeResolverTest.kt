@@ -104,7 +104,7 @@ class AppearanceCodecTest {
             mode = ThemeMode.AUTO, preset = ThemePreset.DUSK, accent = AccentColor.LIME, font = FontChoice.IBM_PLEX, thai = ThaiStyle.LOOPED,
             textStep = TextStep.HUGE, followSystemText = true, homeLayout = HomeLayout.COMPACT, wallpaper = Wallpaper.CUSTOM,
             wallpaperTarget = WallpaperTarget.CAR, wallpaperDim = 45, blurBehindCards = false, iconStyle = IconStyle.MONO,
-            cardStyle = CardStyle.GLASS, corners = Corners.SHARP, showTileLabels = false, carSameLook = false,
+            cardStyle = CardStyle.GLASS, corners = Corners.SHARP, showTileLabels = false, carSameLook = false, carSystemStatus = false,
             autoDarkFrom = 20 * 60, autoDarkTo = 5 * 60
         )
         assertEquals(spec, AppearanceCodec.decode(AppearanceCodec.encode(spec)))

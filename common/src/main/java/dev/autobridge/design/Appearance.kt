@@ -30,6 +30,8 @@ data class AppearanceSpec(
     val showTileLabels: Boolean = true,
     /** Android Auto uses this look too; off keeps the car on [AppearanceSpec] defaults. */
     val carSameLook: Boolean = true,
+    /** CPU, memory and temperature in the car home's header. */
+    val carSystemStatus: Boolean = true,
     /** [ThemeMode.AUTO]: dark from this minute of the day... */
     val autoDarkFrom: Int = 18 * 60 + 30,
     /** ...until this one. */

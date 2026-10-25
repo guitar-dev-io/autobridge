@@ -26,6 +26,7 @@ object AppearanceCodec {
         "corners" to spec.corners.name,
         "tile_labels" to spec.showTileLabels.toString(),
         "car_same_look" to spec.carSameLook.toString(),
+        "car_system_status" to spec.carSystemStatus.toString(),
         "auto_dark_from" to spec.autoDarkFrom.toString(),
         "auto_dark_to" to spec.autoDarkTo.toString()
     )
@@ -50,6 +51,7 @@ object AppearanceCodec {
             corners = enumOr(map["corners"], d.corners),
             showTileLabels = map["tile_labels"]?.toBooleanStrictOrNull() ?: d.showTileLabels,
             carSameLook = map["car_same_look"]?.toBooleanStrictOrNull() ?: d.carSameLook,
+            carSystemStatus = map["car_system_status"]?.toBooleanStrictOrNull() ?: d.carSystemStatus,
             autoDarkFrom = minuteOr(map["auto_dark_from"], d.autoDarkFrom),
             autoDarkTo = minuteOr(map["auto_dark_to"], d.autoDarkTo)
         )

@@ -276,3 +276,12 @@ Why: pages drew from the palette, but menus, popups, pickers, switches and `Aler
 
 Checked on the phone: time picker (Auto schedule) in Light + Rose: light dialog, rose header and buttons; the My Car break-reminder sheet in Light + Rose; Appearance in Dark + Rose unchanged. Android's per-app language screen is the system's, not ours.
 Not checked: View-based `PopupMenu`s and spinners on a device (they take the activity theme, so they should follow it); `AlertDialog`s in the library and browser pages; the safe flavor on a device.
+
+## System status on the car (CPU / RAM / temperature), 2026-10-25
+
+- `display/SystemStats` reads what an app may: **RAM** is the system's used share (`ActivityManager.MemoryInfo`); **CPU** is this app's own load (CPU time over wall time, share of all cores), because `/proc/stat` and the load average are blocked for apps on this phone (Android 16, tested with run-as; thermal zones are blocked too); **temperature** is the battery's, with the system thermal status deciding warm/hot (battery 40/45 °C without it). `/proc/meminfo` and `cpufreq/scaling_cur_freq` are readable but not used.
+- Car home header: right-aligned "CPU 0% · RAM 66% · 36°C" (`HomeDashboardRenderer.drawStatus`); CPU then RAM are dropped when the line would meet the wordmark; the temperature turns warm/hot colour. Redraws every 2 s while the home is on screen; readings are cached 1.5 s. Toggle: Settings > Appearance > "System status on Android Auto" (`AppearanceSpec.carSystemStatus`, default on; the car keeps its default when "use this look on Android Auto" is off).
+- Car diagnostics screen: CPU, Memory (with MB) and Temperature (battery + a word for the heat) rows.
+- Tests: `SystemStatsTest` (CPU share, RAM share, heat thresholds), codec round trip with the new field. All unit tests and compile pass.
+- Checked on the phone + DHU 800x480: the line shows in the header; the 36 °C matches `dumpsys battery` (361 tenths).
+- Not verified: that the figures visibly change between redraws (they stayed the same across screenshots taken minutes apart, which an idle app and a steady battery would also give); the diagnostics rows on the DHU; the line on the 1280x720 profile and at large text; the CPU figure under real load (mirroring).

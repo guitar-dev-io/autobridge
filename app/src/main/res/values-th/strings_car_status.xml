@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="car_diag_cpu">CPU (เฉพาะแอปนี้)</string>
+    <string name="car_diag_cpu_value">%1$d%% ของทุกคอร์</string>
+    <string name="car_diag_ram">หน่วยความจำ</string>
+    <string name="car_diag_ram_value">ใช้ %1$d%% · %2$d จาก %3$d MB</string>
+    <string name="car_diag_temperature">อุณหภูมิ</string>
+    <string name="car_diag_temperature_value">%1$s · แบตเตอรี่</string>
+    <string name="car_diag_heat_ok">ปกติ</string>
+    <string name="car_diag_heat_warm">อุ่น</string>
+    <string name="car_diag_heat_hot">ร้อน เครื่องอาจช้าลง</string>
+    <string name="car_diag_unavailable">ไม่มีข้อมูล</string>
+</resources>

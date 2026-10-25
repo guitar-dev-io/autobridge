@@ -140,7 +140,13 @@ internal object AppearancePages {
                 context.getString(R.string.appearance_car_same_look),
                 context.getString(R.string.appearance_car_same_look_caption),
                 spec.carSameLook
-            ) { actions.change { it.copy(carSameLook = !it.carSameLook) } }
+            ) { actions.change { it.copy(carSameLook = !it.carSameLook) } },
+            AppearanceUi.toggleRow(
+                context,
+                context.getString(R.string.appearance_car_system_status),
+                context.getString(R.string.appearance_car_system_status_caption),
+                spec.carSystemStatus
+            ) { actions.change { it.copy(carSystemStatus = !it.carSystemStatus) } }
         )), topDp = 12)
 
         body.add(AppearanceUi.text(context, context.getString(R.string.appearance_reset), 15f, p.danger, bold = true).apply {

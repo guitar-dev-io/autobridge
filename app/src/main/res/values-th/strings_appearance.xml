@@ -71,6 +71,8 @@
     <string name="appearance_home_dashboard">แดชบอร์ด</string>
     <string name="appearance_home_compact">แบบกะทัดรัด</string>
 
+    <string name="appearance_car_system_status">แสดงสถานะเครื่องบน Android Auto</string>
+    <string name="appearance_car_system_status_caption">CPU หน่วยความจำ และอุณหภูมิที่ส่วนหัวหน้าแรกบนรถ</string>
     <string name="appearance_font_family">แบบอักษร</string>
     <string name="appearance_thai_letters">กขดย</string>
     <string name="appearance_thai_style">รูปแบบอักษรไทย</string>

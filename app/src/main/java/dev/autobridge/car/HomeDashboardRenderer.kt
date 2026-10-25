@@ -28,6 +28,9 @@ import dev.autobridge.settings.AppearanceStore
 import kotlin.math.min
 import kotlin.math.roundToInt
 import dev.autobridge.ui.AppFonts
+import dev.autobridge.display.SystemReading
+import dev.autobridge.display.SystemStats
+import java.util.Locale
 
 /**
  * Paints the whole AutoBridge home onto the car surface: background, header, the Now Playing card
@@ -59,7 +62,9 @@ internal class HomeDashboardRenderer(private val context: Context) {
         val scroll: Float = 0f,
         val playing: Boolean = false,
         val paused: Boolean = false,
-        val nextEnabled: Boolean = false
+        val nextEnabled: Boolean = false,
+        /** CPU, memory and temperature for the header; null hides the line. */
+        val status: SystemReading? = null
     )
 
     /** Resolves a thumbnail URL to a decoded bitmap, or null while there is none to draw. */
@@ -78,6 +83,8 @@ internal class HomeDashboardRenderer(private val context: Context) {
     private val caption = TextPaint(Paint.ANTI_ALIAS_FLAG)
     private val title = TextPaint(Paint.ANTI_ALIAS_FLAG)
     private val meta = TextPaint(Paint.ANTI_ALIAS_FLAG)
+    /** The header's system line: figures keep their width as they change, so the line does not shake. */
+    private val statusPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { fontFeatureSettings = "tnum" }
 
     /** The family the paints above were last given; see [syncFonts]. */
     private var fontFace: Typeface? = null
@@ -102,6 +109,7 @@ internal class HomeDashboardRenderer(private val context: Context) {
         val regular = Typeface.create(face, 400, false)
         listOf(wordmark, sectionTitle, pillText, emptyTitle, heroTitle, card.label).forEach { it.typeface = bold }
         title.typeface = medium
+        statusPaint.typeface = medium
         listOf(caption, meta).forEach { it.typeface = regular }
         heroTitleLayout = null
         heroTitleKey = null
@@ -158,6 +166,7 @@ internal class HomeDashboardRenderer(private val context: Context) {
         applyLook(layout.look)
         drawBackground(canvas)
         drawHeader(canvas, layout)
+        state.status?.let { drawStatus(canvas, layout, it) }
 
         canvas.save()
         val viewport = layout.viewport
@@ -338,6 +347,50 @@ internal class HomeDashboardRenderer(private val context: Context) {
         canvas.drawText(WORD_AUTO, layout.titleX, baseline, wordmark)
         wordmark.color = look.accent
         canvas.drawText(WORD_BRIDGE, layout.titleX + wordmark.measureText(WORD_AUTO), baseline, wordmark)
+    }
+
+    /**
+     * "CPU 12% · RAM 61% · 38°C", right-aligned on the header line. The temperature turns warm or
+     * hot with the system's thermal status; when the line would run into the wordmark, CPU then
+     * RAM are dropped so the temperature, the figure that matters on a hot dashboard, stays.
+     */
+    private fun drawStatus(canvas: Canvas, layout: HomeDashboardLayout, reading: SystemReading) {
+        statusPaint.textSize = layout.sp(HomeDashboardTheme.Dp.EMPTY_HINT)
+        val heat = when (reading.heat) {
+            SystemStats.Heat.OK -> look.textSecondary
+            SystemStats.Heat.WARM -> look.palette.warn
+            SystemStats.Heat.HOT -> look.palette.danger
+        }
+        val parts = ArrayList<Pair<String, Int>>(3)
+        reading.cpuPercent?.let { parts += "CPU $it%" to look.textSecondary }
+        parts += "RAM ${reading.ramPercent}%" to look.textSecondary
+        reading.tempC?.let { parts += String.format(Locale.US, "%.0f\u00B0C", it) to heat }
+
+        val separator = "  \u00B7  "
+        val separatorWidth = statusPaint.measureText(separator)
+        fun width(list: List<Pair<String, Int>>) =
+            list.sumOf { statusPaint.measureText(it.first).toDouble() }.toFloat() + separatorWidth * (list.size - 1).coerceAtLeast(0)
+
+        wordmark.textSize = layout.titleSize
+        val titleEnd = layout.titleX + wordmark.measureText(WORD_AUTO + WORD_BRIDGE)
+        val right = layout.viewport.right
+        val room = right - titleEnd - layout.dp(16f)
+        while (parts.size > 1 && width(parts) > room) parts.removeAt(0)
+        if (width(parts) > room) return
+
+        val metrics = statusPaint.fontMetrics
+        val baseline = layout.logo.centerY - (metrics.ascent + metrics.descent) / 2f
+        var x = right - width(parts)
+        parts.forEachIndexed { i, (text, color) ->
+            if (i > 0) {
+                statusPaint.color = look.textSecondary
+                canvas.drawText(separator, x, baseline, statusPaint)
+                x += separatorWidth
+            }
+            statusPaint.color = color
+            canvas.drawText(text, x, baseline, statusPaint)
+            x += statusPaint.measureText(text)
+        }
     }
 
     // ------------------------------------------------------------------------- Now Playing

@@ -43,7 +43,9 @@ internal data class HomeDashboardLook(
     val textScale: Float,
     /** The chosen families. Text widths depend on them, so a change lays the screen out again. */
     val font: FontChoice = FontChoice.INTER,
-    val thai: ThaiStyle = ThaiStyle.SYSTEM
+    val thai: ThaiStyle = ThaiStyle.SYSTEM,
+    /** CPU, memory and temperature in the header. */
+    val systemStatus: Boolean = true
 ) {
     private val light: Boolean get() = palette.isLight
 
@@ -177,7 +179,8 @@ internal data class HomeDashboardLook(
                 wallpaperDim = car.wallpaperDim.coerceIn(0, AppearanceSpec.MAX_DIM),
                 textScale = TextScaleCurve.carScale(spec, systemFontScale),
                 font = car.font,
-                thai = car.thai
+                thai = car.thai,
+                systemStatus = car.carSystemStatus
             )
         }
 
