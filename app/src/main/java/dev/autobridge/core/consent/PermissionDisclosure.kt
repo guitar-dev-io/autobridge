@@ -36,7 +36,7 @@ object PermissionDisclosure {
         onContinue: () -> Unit
     ) {
         if (activity.isFinishing || activity.isDestroyed) return
-        AlertDialog.Builder(activity)
+        AlertDialog.Builder(activity, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(title)
             .setMessage(body)
             .setPositiveButton(R.string.disclosure_continue) { _, _ -> onContinue() }

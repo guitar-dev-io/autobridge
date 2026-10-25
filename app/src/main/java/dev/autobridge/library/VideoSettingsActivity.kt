@@ -335,7 +335,7 @@ class VideoSettingsActivity : Activity() {
             // is doing now even before anything is picked.
             if (option == current) "● " + label(option) else "   " + label(option)
         }
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(title)
             .setItems(labels.toTypedArray()) { _, index ->
                 onPick(options[index])

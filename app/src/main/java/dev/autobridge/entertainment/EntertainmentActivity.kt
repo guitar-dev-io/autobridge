@@ -474,7 +474,7 @@ YouTube · TV · Web
     private fun favorites() {
         val items = prefs.getStringSet("favorites", emptySet()).orEmpty().sorted()
         if (items.isEmpty()) return message(getString(R.string.ent_no_favorites))
-        AlertDialog.Builder(this).setTitle(R.string.ent_favorites_title)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme()).setTitle(R.string.ent_favorites_title)
             .setItems(items.toTypedArray()) { _, index ->
                 val item = items[index]
                 val separator = item.indexOf('|')

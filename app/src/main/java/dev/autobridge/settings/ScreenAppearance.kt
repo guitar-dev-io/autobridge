@@ -12,10 +12,12 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.core.view.WindowCompat
+import dev.autobridge.R
+import dev.autobridge.design.AccentColor
 import dev.autobridge.design.ThemeHolder
 import dev.autobridge.mycar.MyCarFacts
-import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AppFonts
+import dev.autobridge.ui.AutoBridgeDesign
 
 /**
  * The parts of Settings > Appearance a phone screen applies to its own window, for the screens
@@ -47,12 +49,21 @@ object ScreenAppearance {
     }
 
     /**
-     * The alert-dialog theme that matches the page, for `AlertDialog.Builder(context, it)`: the app
-     * theme is dark, so without this a light page opens dark dialogs.
+     * The alert-dialog theme that matches the page, for `AlertDialog.Builder(context, it)`: light or
+     * dark like the page, with the accent the user picked. A style cannot follow a setting, so there
+     * is one per accent and brightness (styles_tools_v2.xml).
      */
-    fun dialogTheme(): Int =
-        if (ThemeHolder.palette.isLight) dev.autobridge.R.style.ToolDialogLight
-        else dev.autobridge.R.style.ToolDialogDark
+    fun dialogTheme(): Int {
+        val light = ThemeHolder.palette.isLight
+        return when (ThemeHolder.spec.accent) {
+            AccentColor.SKY -> if (light) R.style.ToolDialogLight_Sky else R.style.ToolDialogDark_Sky
+            AccentColor.TEAL -> if (light) R.style.ToolDialogLight_Teal else R.style.ToolDialogDark_Teal
+            AccentColor.AMBER -> if (light) R.style.ToolDialogLight_Amber else R.style.ToolDialogDark_Amber
+            AccentColor.VIOLET -> if (light) R.style.ToolDialogLight_Violet else R.style.ToolDialogDark_Violet
+            AccentColor.ROSE -> if (light) R.style.ToolDialogLight_Rose else R.style.ToolDialogDark_Rose
+            AccentColor.LIME -> if (light) R.style.ToolDialogLight_Lime else R.style.ToolDialogDark_Lime
+        }
+    }
 
     /**
      * A section accent (`AutoBridgeDesign.ACCENT_*`, tuned for the dark page) made readable as text

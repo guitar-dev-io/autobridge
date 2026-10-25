@@ -610,7 +610,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
             setPadding(dp(8), dp(8), dp(8), dp(8))
             addView(supportCard(framed = true))
         }
-        android.app.AlertDialog.Builder(this)
+        android.app.AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setView(content)
             .setPositiveButton(getString(R.string.about_promptpay_close), null)
             .show()
@@ -1047,7 +1047,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
             onToggle = {
                 if (!dev.autobridge.safety.BypassPolicyStore.enabled) {
                     // Turning ON: show the same confirmation dialog as before.
-                    android.app.AlertDialog.Builder(this@MainActivity)
+                    android.app.AlertDialog.Builder(this@MainActivity, dev.autobridge.settings.ScreenAppearance.dialogTheme())
                         .setTitle(R.string.bypass_confirm_title)
                         .setMessage(R.string.bypass_confirm_message)
                         .setNegativeButton(R.string.action_cancel) { _, _ ->
@@ -1375,7 +1375,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
 
     /** Settings &gt; About: full attribution for the open-source and third-party sources. */
     private fun showCreditsDialog() {
-        android.app.AlertDialog.Builder(this)
+        android.app.AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(getString(R.string.about_credits_title))
             .setMessage(getString(R.string.about_credits_body))
             .setPositiveButton(getString(R.string.about_credits_close), null)
@@ -1473,7 +1473,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
                 setPadding(dp(16), 0, 0, 0)
             })
         }
-        return android.app.AlertDialog.Builder(this).setView(row).setCancelable(true).show()
+        return android.app.AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme()).setView(row).setCancelable(true).show()
     }
 
     /**
@@ -1524,7 +1524,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
             append(getString(R.string.about_update_message, release.versionName, update.currentVersion))
             if (notes.isNotEmpty()) append("\n\n").append(notes)
         }
-        android.app.AlertDialog.Builder(this)
+        android.app.AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(getString(R.string.about_update_title))
             .setMessage(message)
             .setNeutralButton(getString(R.string.about_update_release_page)) { _, _ ->

@@ -965,7 +965,7 @@ class LibraryActivity : Activity() {
     private fun openProvincePicker(onPicked: () -> Unit) {
         val provinces = ThaiProvinces.all
         val labels = provinces.map { getString(it.labelRes) }.toTypedArray()
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(getString(R.string.radio_local_pick_title))
             .setItems(labels) { _, which ->
                 RadioProvinceRepository.setSelected(this, provinces[which].state)
@@ -1218,7 +1218,7 @@ class LibraryActivity : Activity() {
             addSourceChooser()
             return
         }
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(R.string.library_switch_source)
             .setItems(allSources.map { it.name }.toTypedArray()) { _, index ->
                 val chosen = allSources[index]
@@ -1233,7 +1233,7 @@ class LibraryActivity : Activity() {
     }
 
     private fun addSourceChooser() {
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(R.string.library_add_source)
             .setItems(
                 arrayOf(
@@ -1326,7 +1326,7 @@ class LibraryActivity : Activity() {
         val checked = BooleanArray(categories.size) {
             IptvPinnedCategoryStore.isPinned(this, source.id, categories[it].id)
         }
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(R.string.library_pinned_categories)
             .setMultiChoiceItems(names, checked) { _, which, isChecked ->
                 if (isChecked != IptvPinnedCategoryStore.isPinned(this, source.id, categories[which].id)) {
@@ -1830,7 +1830,7 @@ class LibraryActivity : Activity() {
 
     /** Long-press menu for a TV entry: play here, send it to the car, or check that it answers. */
     private fun sendChannelMenu(source: IptvSource, entry: IptvEntry) {
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(entry.title)
             .setItems(
                 arrayOf(
@@ -1994,7 +1994,7 @@ class LibraryActivity : Activity() {
             showEpisodeList(source, series.title, episodes)
             return
         }
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(series.title)
             .setItems(seasons.toTypedArray()) { _, index ->
                 val season = seasons[index]
@@ -2050,7 +2050,7 @@ class LibraryActivity : Activity() {
     // ----- Source editing -----
 
     private fun sourceMenu(source: IptvSource) {
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(source.name)
             .setItems(
                 arrayOf(
@@ -2078,7 +2078,7 @@ class LibraryActivity : Activity() {
      * confirmed once. Nothing is lost for good: every public list is still in the picker.
      */
     private fun confirmDelete(source: IptvSource) {
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(getString(R.string.library_remove_source_title, source.name))
             .setMessage(
                 if (IptvDirectory.list(iptvKind).any { it.url == source.url }) {
@@ -2113,7 +2113,7 @@ class LibraryActivity : Activity() {
             val note = if (offer.url in existing) getString(R.string.library_already_added, offer.note) else offer.note
             offer.name + "\n" + note
         }
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(R.string.library_free_public_lists)
             .setItems(labels.toTypedArray()) { _, index ->
                 val offer = offers[index]
@@ -2161,7 +2161,7 @@ class LibraryActivity : Activity() {
         // is for the playlist whose header names none, or a dead one.
         val guide = if (xtream) null else field(getString(R.string.guide_url_hint), existing?.guideUrl.orEmpty())
 
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(
                 if (existing == null) getString(if (xtream) R.string.library_add_xtream else R.string.library_add_m3u)
                 else getString(R.string.library_edit_source)
@@ -2699,7 +2699,7 @@ class LibraryActivity : Activity() {
             addView(name)
             addView(address)
         }
-        android.app.AlertDialog.Builder(this)
+        android.app.AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(getString(R.string.streaming_add_favorite))
             .setView(form)
             .setNegativeButton(android.R.string.cancel, null)
@@ -2809,10 +2809,10 @@ class LibraryActivity : Activity() {
     }
 
     private fun progressDialog(message: String): AlertDialog =
-        AlertDialog.Builder(this).setMessage(message).setCancelable(false).show()
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme()).setMessage(message).setCancelable(false).show()
 
     private fun alert(title: String, message: String) {
-        AlertDialog.Builder(this).setTitle(title).setMessage(message)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme()).setTitle(title).setMessage(message)
             .setPositiveButton(android.R.string.ok, null).show()
     }
 

@@ -264,7 +264,7 @@ class SubtitleSettingsActivity : Activity() {
     }
 
     private fun confirmDelete(id: String, label: String) {
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle("Remove $label?")
             .setMessage("The model is deleted from this device and has to be downloaded again to use.")
             .setNegativeButton("Cancel", null)
@@ -400,7 +400,7 @@ class SubtitleSettingsActivity : Activity() {
         val labels = options.map { option ->
             if (option == current) "● " + label(option) else "   " + label(option)
         }
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(title)
             .setItems(labels.toTypedArray()) { _, index ->
                 onPick(options[index])

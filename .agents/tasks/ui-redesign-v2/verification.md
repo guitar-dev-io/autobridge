@@ -265,3 +265,14 @@ Not done / known:
 - `AlertDialog` titles and buttons use the dialog theme's font, not `AppFonts`.
 - Sarabun/Prompt and other Thai families were not added; Looped/Loopless are the two Noto Thai variants.
 - Not checked: About page credits on screen; IBM Plex Sans and Noto Sans Latin rows were built but only Manrope and System were picked in the pass.
+
+## Menus, dialogs and pickers follow the theme (2026-10-25, phone)
+
+Why: pages drew from the palette, but menus, popups, pickers, switches and `AlertDialog`s take their look from the activity's Android theme, which XML fixes as dark. A light page opened dark dialogs, and the accent never reached them.
+- `AppTheming` (an `ActivityLifecycleCallbacks.onActivityPreCreated`, registered in `AutoBridgeApplication`): an activity on `AppTheme` gets `AppThemeLight` (a Material Light twin) when the palette is light, and `AccentOverlay.<accent>.<Dark|Light>` (the user's accent as `colorAccent`) on either. Activities with a theme of their own (browser, translucent share target, licences, car-facing surfaces) are skipped.
+- `AppTheme` / `AppThemeLight` set `colorBackgroundFloating` (menus, popups) and `alertDialogTheme`.
+- `ScreenAppearance.dialogTheme()` now returns a style per accent and brightness (12, `ToolDialog{Dark,Light}.<Accent>`); 31 more `AlertDialog.Builder` calls in 10 files use it (browser dialogs keep the browser's own theme).
+- Test: `ScreenAppearanceTest` covers brightness and accent.
+
+Checked on the phone: time picker (Auto schedule) in Light + Rose: light dialog, rose header and buttons; the My Car break-reminder sheet in Light + Rose; Appearance in Dark + Rose unchanged. Android's per-app language screen is the system's, not ours.
+Not checked: View-based `PopupMenu`s and spinners on a device (they take the activity theme, so they should follow it); `AlertDialog`s in the library and browser pages; the safe flavor on a device.

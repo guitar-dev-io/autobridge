@@ -393,7 +393,7 @@ class RadioPlayerActivity : Activity() {
             if (RadioSleepTimer.isSet) add(getString(R.string.radio_sleep_off))
             minutes.forEach { add(getString(R.string.radio_sleep_minutes, it)) }
         }
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(R.string.radio_sleep_timer)
             .setItems(labels.toTypedArray()) { _, which ->
                 val offset = if (RadioSleepTimer.isSet) 1 else 0

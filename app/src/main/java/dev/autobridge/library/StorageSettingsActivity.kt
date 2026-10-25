@@ -92,7 +92,7 @@ class StorageSettingsActivity : Activity() {
      * happen, then runs. The dialog also lets the freed size be reported back in the toast.
      */
     private fun confirmClearCache() {
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(R.string.storage_clear_cache_confirm_title)
             .setMessage(R.string.storage_clear_cache_confirm_message)
             .setNegativeButton(R.string.action_cancel, null)
@@ -114,7 +114,7 @@ class StorageSettingsActivity : Activity() {
      * the confirming button carries that word rather than a bare "OK".
      */
     private fun confirmClearAll() {
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(R.string.storage_clear_all_confirm_title)
             .setMessage(R.string.storage_clear_all_confirm_message)
             .setNegativeButton(R.string.action_cancel, null)

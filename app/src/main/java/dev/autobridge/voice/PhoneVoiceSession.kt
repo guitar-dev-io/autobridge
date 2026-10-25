@@ -58,7 +58,7 @@ class PhoneVoiceSession(private val activity: Activity, private val actions: Act
     fun start() {
         val store = VoiceRuntime.modelStore(activity)
         if (store.getSelectedModel() == null) {
-            AlertDialog.Builder(activity)
+            AlertDialog.Builder(activity, dev.autobridge.settings.ScreenAppearance.dialogTheme())
                 .setTitle(R.string.voice_model_required_title)
                 .setMessage(R.string.voice_model_required_body)
                 .setNegativeButton(R.string.voice_action_cancel, null)
@@ -311,7 +311,7 @@ class PhoneVoiceSession(private val activity: Activity, private val actions: Act
         }
         content.addView(status)
         content.addView(heard)
-        val built = AlertDialog.Builder(activity)
+        val built = AlertDialog.Builder(activity, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(R.string.voice_test_listening)
             .setView(content)
             .setNegativeButton(R.string.voice_action_cancel) { _, _ -> recognizer.cancel() }

@@ -1,6 +1,7 @@
 package dev.autobridge.settings
 
 import dev.autobridge.R
+import dev.autobridge.design.AccentColor
 import dev.autobridge.design.AppearanceSpec
 import dev.autobridge.design.ThemeHolder
 import dev.autobridge.design.ThemeMode
@@ -31,9 +32,19 @@ class ScreenAppearanceTest {
     @Test
     fun `dialogs follow the page brightness`() {
         use(ThemeMode.LIGHT)
-        assertEquals(R.style.ToolDialogLight, ScreenAppearance.dialogTheme())
+        assertEquals(R.style.ToolDialogLight_Sky, ScreenAppearance.dialogTheme())
         use(ThemeMode.AMOLED)
-        assertEquals(R.style.ToolDialogDark, ScreenAppearance.dialogTheme())
+        assertEquals(R.style.ToolDialogDark_Sky, ScreenAppearance.dialogTheme())
+    }
+
+    @Test
+    fun `dialogs carry the accent the user picked`() {
+        ThemeHolder.update(AppearanceSpec.DEFAULT.copy(accent = AccentColor.ROSE), systemDark = true, minuteOfDay = 720)
+        assertEquals(R.style.ToolDialogDark_Rose, ScreenAppearance.dialogTheme())
+        ThemeHolder.update(
+            AppearanceSpec.DEFAULT.copy(mode = ThemeMode.LIGHT, accent = AccentColor.LIME), systemDark = true, minuteOfDay = 720
+        )
+        assertEquals(R.style.ToolDialogLight_Lime, ScreenAppearance.dialogTheme())
     }
 
     @Test
