@@ -227,6 +227,7 @@ class DesktopBrowserCarScreen(
                 pageDoubleTap.cancel()
                 if (rail.dragHeld) session?.input?.releaseAtCursor()
                 session?.detachSurface()
+                dropSurface()
                 DesktopEngine.noteSurfaceDetached()
                 if (MirrorSurfaceOwnership.release(this@DesktopBrowserCarScreen)) {
                     carContext.getCarService(AppManager::class.java).setSurfaceCallback(null)
@@ -551,9 +552,20 @@ class DesktopBrowserCarScreen(
         DesktopEngine.noteSurfaceAttached()
     }
 
-    override fun onSurfaceDestroyed(surfaceContainer: SurfaceContainer) {
+    /**
+     * Lets go of this screen's producer connection to the car surface. Drawing on it connected the
+     * surface to us, and the screen that takes over (the car home after Home) cannot lock a canvas
+     * on a surface that is still connected: its frames failed, so the car kept showing Chrome's
+     * last frame and looked hung. The host still owns the surface itself.
+     */
+    private fun dropSurface() {
+        surface?.let { runCatching { it.release() } }
         surface = null
+    }
+
+    override fun onSurfaceDestroyed(surfaceContainer: SurfaceContainer) {
         session?.detachSurface()
+        dropSurface()
         DesktopEngine.noteSurfaceDetached()
     }
 
