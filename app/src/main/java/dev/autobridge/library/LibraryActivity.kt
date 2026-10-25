@@ -865,7 +865,7 @@ class LibraryActivity : Activity() {
             isClickable = true
             isFocusable = true
             contentDescription = entry.title
-            val playing = radioOnAir(entry.url, entry.title)
+            val playing = radioOnAir(entry.url, entry.title, categoryEntries.map { it.url })
             isSelected = playing
             setPadding(dp(5), dp(5), dp(5), dp(6))
             background = radioCellBackground(playing)
@@ -875,7 +875,7 @@ class LibraryActivity : Activity() {
             val square = radioLogoSquare(entry.title, entry.logo)
             if (playing) {
                 // The on-air station's logo carries bouncing bars, like a radio app's.
-                val eq = dev.autobridge.ui.EqBarsView(this@LibraryActivity, AutoBridgeDesign.ACCENT_RADIO) { playback.isPlayRequested }
+                val eq = dev.autobridge.ui.EqBarsView(this@LibraryActivity, AutoBridgeDesign.ACCENT_RADIO) { playback.isPlaying }
                 val chip = FrameLayout(this@LibraryActivity).apply {
                     background = AutoBridgeDesign.surface(this@LibraryActivity, android.graphics.Color.argb(170, 0, 0, 0), 10)
                     setPadding(dp(6), dp(5), dp(6), dp(5))
@@ -904,9 +904,12 @@ class LibraryActivity : Activity() {
      * The station on the air, matched by its stream address or, when the session reports the
      * address differently (a redirect, a resolved playlist), by its name.
      */
-    private fun radioOnAir(url: String, title: String): Boolean {
+    private fun radioOnAir(url: String, title: String, shownUrls: List<String> = emptyList()): Boolean {
         val current = playback.currentUri
         if (url.isNotBlank() && current == url) return true
+        // Two stations can share a name (two "Cool fahrenheit"): when the playing address is one of
+        // the cells on screen, that cell alone is on air, and the name never lights up another.
+        if (current != null && current in shownUrls) return false
         val name = playback.currentItemTitle?.trim() ?: return false
         return name.isNotEmpty() && name.equals(title.trim(), ignoreCase = true)
     }
@@ -925,7 +928,7 @@ class LibraryActivity : Activity() {
             isClickable = true
             isFocusable = true
             contentDescription = item.title
-            val playing = radioOnAir(item.url, item.title)
+            val playing = radioOnAir(item.url, item.title, favorites.map { it.url })
             isSelected = playing
             setPadding(dp(5), dp(5), dp(5), dp(6))
             background = radioCellBackground(playing)

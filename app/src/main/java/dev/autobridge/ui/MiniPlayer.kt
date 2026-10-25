@@ -85,12 +85,12 @@ class MiniPlayer(
     private val stationLine = LinearLayout(context).apply {
         gravity = Gravity.CENTER_VERTICAL
         visibility = View.GONE
-        // Bounces while the station is playing and rests when it is paused.
-        val bars = EqBarsView(context, AMBER, barCount = 3) { playback.isPlayRequested }
+        // Bounces while sound is actually playing; rests while paused or still loading.
+        val bars = EqBarsView(context, AMBER, barCount = 3) { playback.isPlaying }
         addView(bars, LinearLayout.LayoutParams(context.dp(14), context.dp(12)).apply { marginEnd = context.dp(6) })
         addView(stationName, LinearLayout.LayoutParams(0, -2, 1f))
     }
-    private val favorite = AutoBridgeDesign.glyphButton(context, "☆", 22f, tint = WARM_TEXT) {
+    private val favorite = AutoBridgeDesign.glyphButton(context, "☆", 20f, tint = WARM_TEXT) {
         currentStation()?.let { dev.autobridge.radio.RadioRepository.RadioHistory.toggleFavorite(context, it) }
         render()
     }.apply {
@@ -148,7 +148,8 @@ class MiniPlayer(
         nextButton = AutoBridgeDesign.glyphButton(context, "⏭", 15f) { playback.next() }
         row.addView(nextButton, LinearLayout.LayoutParams(context.dp(38), context.dp(38)))
         row.addView(toggle, LinearLayout.LayoutParams(context.dp(40), context.dp(40)))
-        row.addView(favorite, LinearLayout.LayoutParams(context.dp(40), context.dp(56)))
+        // A round 44 dp button like the close one beside it, not the tall pill it was.
+        row.addView(favorite, LinearLayout.LayoutParams(context.dp(44), context.dp(44)))
         // Pausing leaves the channel loaded and this bar up; closing unloads it, and the bar hides.
         row.addView(
             AutoBridgeDesign.glyphButton(context, "✕", 15f) {
