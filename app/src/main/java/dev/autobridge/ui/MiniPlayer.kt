@@ -12,7 +12,6 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
-import dev.autobridge.design.DesignTokens
 import dev.autobridge.media.MediaPlaybackClient
 import dev.autobridge.ui.AutoBridgeDesign.dp
 
@@ -94,7 +93,7 @@ class MiniPlayer(
         addView(bars, LinearLayout.LayoutParams(-2, context.dp(12)).apply { marginEnd = context.dp(4) })
         addView(stationName, LinearLayout.LayoutParams(0, -2, 1f))
     }
-    private val favorite = AutoBridgeDesign.glyphButton(context, "☆", 22f, tint = AMBER) {
+    private val favorite = AutoBridgeDesign.glyphButton(context, "☆", 22f, tint = WARM_TEXT) {
         currentStation()?.let { dev.autobridge.radio.RadioRepository.RadioHistory.toggleFavorite(context, it) }
         render()
     }.apply {
@@ -182,7 +181,7 @@ class MiniPlayer(
             nextButton.visibility = View.GONE
             favorite.visibility = View.VISIBLE
             toggle.layoutParams = LinearLayout.LayoutParams(context.dp(56), context.dp(56))
-            toggle.background = AutoBridgeDesign.surface(context, AMBER, 28, android.graphics.Color.TRANSPARENT)
+            toggle.background = AutoBridgeDesign.surface(context, WARM_TEXT, 28, android.graphics.Color.TRANSPARENT)
             toggle.setTextColor(ON_AMBER)
         } else {
             row.background = AutoBridgeDesign.surface(context, AutoBridgeDesign.SURFACE_RAISED, cardRadius(), AutoBridgeDesign.HAIRLINE)
@@ -319,10 +318,12 @@ class MiniPlayer(
         val AMBER: Int get() = PhoneHomeLayout.Item.RADIO.hue(dev.autobridge.design.ThemeHolder.palette.isLight)
         const val PLAY = "▶"
         const val PAUSE = "❚❚"
-        const val ON_AMBER = DesignTokens.Radio.ON_AMBER
-        const val WARM_CARD = DesignTokens.Radio.WARM_CARD
-        const val WARM_EDGE = DesignTokens.Radio.WARM_EDGE
-        const val WARM_TEXT = DesignTokens.Radio.WARM_TEXT
-        const val SOFT_TEXT = DesignTokens.Radio.SOFT_TEXT
+        // The radio bar's controls follow the theme's accent; only the bars and the artwork chip keep
+        // the radio section's hue (AMBER). The names stay from the old warm design.
+        val ON_AMBER: Int get() = dev.autobridge.design.ThemeHolder.palette.onAccent
+        val WARM_CARD: Int get() = dev.autobridge.design.ThemeHolder.palette.raised
+        val WARM_EDGE: Int get() = dev.autobridge.design.ThemeHolder.palette.hairline
+        val WARM_TEXT: Int get() = dev.autobridge.design.ThemeHolder.palette.accent
+        val SOFT_TEXT: Int get() = dev.autobridge.design.ThemeHolder.palette.textSecondary
     }
 }

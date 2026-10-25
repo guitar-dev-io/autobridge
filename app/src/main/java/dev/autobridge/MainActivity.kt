@@ -57,6 +57,7 @@ import dev.autobridge.core.model.VehicleState
 import dev.autobridge.core.policy.FeaturePolicy
 import dev.autobridge.core.state.RuntimeContextStore
 import dev.autobridge.design.DesignTokens
+import dev.autobridge.design.ThemeHolder
 import dev.autobridge.i18n.AppLocale
 import dev.autobridge.ui.AutoBridgePhoneTheme
 import dev.autobridge.remote.RemoteRuntime
@@ -130,17 +131,19 @@ class MainActivity : androidx.activity.ComponentActivity() {
         const val STATE_APPS_FAVORITES = "apps_favorites_only"
         const val STATE_APPS_QUERY = "apps_query"
 
-        // Matches AutoBridgeDesign / ComposeTokens (docs/UI_REDESIGN_TASKS.md "Design tokens").
-        const val COLOR_BACKGROUND = DesignTokens.Phone.INK
-        const val COLOR_SURFACE = DesignTokens.Phone.SURFACE
-        const val COLOR_SURFACE_ALT = DesignTokens.Phone.SURFACE_RAISED
-        const val COLOR_BORDER = DesignTokens.Phone.HAIRLINE
-        const val COLOR_ACCENT = DesignTokens.Phone.ACCENT
+        // Follow Settings > Appearance, like AutoBridgeDesign / ComposeTokens: getters on the palette
+        // ThemeHolder resolved, not compile-time constants, so the pages built from them (Mirror,
+        // Input & touch, Debug, Developer...) change with the theme.
+        val COLOR_BACKGROUND: Int get() = ThemeHolder.palette.background
+        val COLOR_SURFACE: Int get() = ThemeHolder.palette.surface
+        val COLOR_SURFACE_ALT: Int get() = ThemeHolder.palette.raised
+        val COLOR_BORDER: Int get() = ThemeHolder.palette.hairline
+        val COLOR_ACCENT: Int get() = ThemeHolder.palette.accent
         const val COLOR_ACCENT_DARK = DesignTokens.Phone.ACCENT_DARK
-        const val COLOR_TEXT = DesignTokens.Phone.TEXT
-        const val COLOR_MUTED = DesignTokens.Phone.TEXT_MUTED
-        const val COLOR_SUCCESS = DesignTokens.Phone.SUCCESS
-        const val COLOR_WARNING = DesignTokens.Phone.WARNING
+        val COLOR_TEXT: Int get() = ThemeHolder.palette.text
+        val COLOR_MUTED: Int get() = ThemeHolder.palette.textSecondary
+        val COLOR_SUCCESS: Int get() = ThemeHolder.palette.good
+        val COLOR_WARNING: Int get() = ThemeHolder.palette.warn
     }
 
     /** Back stack of the phone shell; see [PhoneNav.BackStack]. */
@@ -2445,7 +2448,11 @@ class MainActivity : androidx.activity.ComponentActivity() {
                 destructive -> DesignTokens.Phone.DESTRUCTIVE
                 else -> COLOR_SURFACE
             }
-            val txtColor = if (primary || destructive) Color.WHITE else COLOR_TEXT
+            val txtColor = when {
+                primary -> ThemeHolder.palette.onAccent
+                destructive -> Color.WHITE
+                else -> COLOR_TEXT
+            }
             setTextColor(txtColor)
             setPadding(dp(16), dp(14), dp(16), dp(14))
             background = roundedBackground(bg, if (primary || destructive) bg else COLOR_BORDER)

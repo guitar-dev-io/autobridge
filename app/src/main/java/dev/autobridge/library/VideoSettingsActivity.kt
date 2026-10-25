@@ -58,6 +58,8 @@ class VideoSettingsActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         dev.autobridge.settings.AppearanceStore.refreshPalette(this)
         super.onCreate(savedInstanceState)
+        // Status and navigation bar colours and icons follow the page (light pages need dark icons).
+        dev.autobridge.settings.ScreenAppearance.applyWindow(this)
         // The page is built in onResume, which also runs on the way back from the enhancement
         // sub-screen; building here too would just throw the first tree away.
     }

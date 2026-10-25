@@ -46,7 +46,9 @@ internal object AppearancePreview {
 
         val row = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.BOTTOM
+            // Top-aligned: at large text the right column wraps and grows, and a bottom-aligned phone
+            // would drop below the car.
+            gravity = Gravity.TOP
         }
         row.addView(miniPhone(context, spec, small), LinearLayout.LayoutParams(context.dp(100), context.dp(172)))
         row.addView(rightColumn(context, spec), LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = context.dp(10) })

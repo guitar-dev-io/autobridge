@@ -231,3 +231,17 @@ Found, not fixed yet:
 3. DHU 800x480, Dashboard: the Now Playing card fills the height and the feature cards start below the fold (scroll), at 100% and at the 130% cap.
 4. Font rows (Inter, Manrope, Plex, Noto, Roboto) all draw in the same face: real fonts are piece D.
 - Environment, not a bug: force-stopping the app while the DHU runs freezes the car surface on its last frame; a full force-stop + head unit server + DHU cycle recovers it (memory: dhu-needs-force-stop-first).
+
+## Bug fixes + remaining pages (2026-10-25, phone, Light + Sky)
+
+Fixed from the "Found, not fixed yet" list above:
+1. Library, radio and the library/YouTube settings pages call `ScreenAppearance.applyWindow` (7 activities): dark status/navigation bar icons on light pages.
+2. Appearance live preview row is top-aligned: the mini phone no longer drops below the car at large text.
+3. Car Dashboard, compact profile, nothing playing, card stacked above the grid (eight features on 800x480, which cannot sit beside a four-column grid, since 2ff4ada): the empty "Nothing playing yet" card gives way, so every feature card is on screen. Test: `HomeDashboardLayoutTest` "a fresh install on the DHU small profile with eight features...". Not a redesign regression, but found in this pass.
+
+Pages that did not follow the theme, now do (checked on the phone in Light):
+- `MainActivity.COLOR_*` were compile-time constants: Display & mirror, Touch & safety, Debug, Developer/Diagnostics pages were dark cards on a light page. Now getters on the palette; primary action text uses `onAccent`.
+- Control screen: selected segment and queue badge (dark navy under dark text), Home card: now accent-soft from the palette.
+- Radio-style mini player: warm amber card and amber play button now palette (accent) like the rest of the radio design; amber stays on the "on air" bars and artwork chip.
+Checked light: Settings, Control, Control history, Apps, Profile, Car connection, Agent & commands, Mirror, Input & touch, Advanced, Debug, Developer, About, More, Streaming, Favorites.
+Not changed on purpose: brand logos (StreamingIcons), QR code, the section hue chips, video player surfaces.

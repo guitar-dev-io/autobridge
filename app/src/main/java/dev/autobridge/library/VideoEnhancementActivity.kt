@@ -47,6 +47,8 @@ class VideoEnhancementActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         dev.autobridge.settings.AppearanceStore.refreshPalette(this)
         super.onCreate(savedInstanceState)
+        // Status and navigation bar colours and icons follow the page (light pages need dark icons).
+        dev.autobridge.settings.ScreenAppearance.applyWindow(this)
         render()
     }
 

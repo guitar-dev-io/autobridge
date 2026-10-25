@@ -219,6 +219,19 @@ class HomeDashboardLayoutTest {
     }
 
     @Test
+    fun `a fresh install on the DHU small profile with eight features keeps every card on screen`() {
+        // What the phone shows before anything was played or sent, with the personal build's eight
+        // features: no Now Playing card yet, so its empty slot must not push the grid off the unit.
+        val eight = labels + listOf("Multi-app", "Desktop browser")
+        val layout = HomeDashboardLayout.compute(
+            MenuBox(12f, 88f, 788f, 388f), 1f, eight, content(), measure, "Recently sent from phone", "Queue empty"
+        )
+        assertNull("the empty Now Playing card gives way on a short unit", layout.emptyHero)
+        assertTrue("every card visible", layout.cards.last().bottom <= layout.viewport.bottom)
+        assertTrue("the header stays on screen", layout.logo.bottom <= layout.cards.first().top)
+    }
+
+    @Test
     fun `a narrow head unit stacks the card above the grid and the sent items too`() {
         val layout = layout(full(), width = 480f, height = 1400f)
         val hero = layout.hero!!.card

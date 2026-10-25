@@ -263,9 +263,16 @@ internal class HomeDashboardLayout private constructor(
             /** Arrangement decided for one scale; the column's height in dp follows from it. */
             data class Arrangement(val heroBeside: Boolean, val rowsAcross: Boolean)
 
+            // Nothing playing, on the compact profile, with the card stacked above the grid: the
+            // placeholder would take a whole screen height of a short unit (eight cards are two
+            // 128 dp rows on their own) and push every card below the fold, so it gives way. It
+            // only says "nothing yet"; the grid is what a driver needs to reach.
+            val stackedHero = if (!hasHero && profile === HomeDashboardTheme.COMPACT) 0f else profile.heroStackedHeight
+            val stackedGap = if (stackedHero > 0f) Dp.GAP else 0f
+
             fun heightDp(a: Arrangement): Float {
                 var h = headerBand
-                h += if (a.heroBeside) gridHeight else profile.heroStackedHeight + Dp.GAP + gridHeight
+                h += if (a.heroBeside) gridHeight else stackedHero + stackedGap + gridHeight
                 h += Dp.GAP + Dp.SECTION_HEADER + Dp.SECTION_TITLE_GAP
                 h += if (a.rowsAcross) Dp.ROW_HEIGHT else rowSlots * Dp.ROW_HEIGHT + (rowSlots - 1) * Dp.GAP
                 return h
@@ -338,12 +345,12 @@ internal class HomeDashboardLayout private constructor(
                 gridLeft = slot.right + gap
                 gridTop = cursor
             } else {
-                slot = MenuBox(left, cursor, right, cursor + profile.heroStackedHeight * u)
+                slot = MenuBox(left, cursor, right, cursor + stackedHero * u)
                 gridLeft = left
-                gridTop = slot.bottom + gap
+                gridTop = slot.bottom + stackedGap * u
             }
             val hero = if (hasHero) heroBoxes(slot, u, profile, look) else null
-            val emptyHero = if (hasHero) null else slot
+            val emptyHero = if (hasHero || stackedHero == 0f && !arrangement.heroBeside) null else slot
             cursor = gridTop + gridHeight * u
 
             val cardWidth = (right - gridLeft - gap * (columns - 1)) / columns
