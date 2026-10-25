@@ -22,9 +22,10 @@ import dev.autobridge.projection.desktop.DesktopEngineChoiceCarScreen
  *    chosen *and* installed; otherwise it falls through to the built-in browser, unchanged. The
  *    separate "Desktop Browser" car app service is disabled in src/projection/AndroidManifest.xml.
  *  - "Browser engine" (More) sets which browser the Web card opens.
- *  - Multi-app and Desktop browser also get cards of their own on the car home, beside the six
- *    primary ones, so neither is buried in More. The Desktop browser card opens the chosen desktop
- *    browser, or the first installed one, and the browser list when none is installed yet.
+ *  - Multi-app also gets a card of its own on the car home, beside the six primary ones, so it is
+ *    not buried in More. The Desktop browser has none: the Web card opens it once one is chosen and
+ *    installed, and its row in More opens the chosen desktop browser, or the first installed one, or
+ *    the browser list when none is installed yet.
  *
  * Bridge Web, the projection route, has no row: it is a projection activity, which a template app
  * cannot open. Its entry is unlisted by default and can be listed again from its settings page.
@@ -96,8 +97,6 @@ internal object CarExtensions {
             entries += CarExtensionEntry(
                 carContext.getString(dev.autobridge.desktop.R.string.desktop_engine_car_label),
                 CarExtensionEntry.Placement.FREQUENT,
-                homeGlyph = HomeMenuGlyph.DESKTOP,
-                homeAccent = HomeDashboardTheme.ACCENT_DESKTOP
             ) { openDesktop(carContext, screenManager) }
             val engine = DesktopEngine.chosenInstalledBrowser()?.displayName
                 ?: carContext.getString(R.string.desktop_settings_choice_autobridge)

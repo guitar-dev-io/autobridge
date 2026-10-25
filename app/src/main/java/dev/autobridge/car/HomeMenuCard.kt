@@ -29,8 +29,13 @@ internal data class HomeMenuItem(
     fun title(context: Context): String = section?.title(context) ?: extension?.title.orEmpty()
 
     companion object {
-        /** The six primary destinations, in reading order (3 columns × 2 rows). */
+        /**
+         * The six primary destinations, in reading order (3 columns × 2 rows). Streaming leads: it is
+         * the card that starts Netflix and the other video services, which is what the app is for,
+         * and TV and Radio follow it.
+         */
         val primary: List<HomeMenuItem> = listOf(
+            HomeMenuItem(HomeSection.STREAMING, HomeMenuGlyph.STREAMING, HomeDashboardTheme.ACCENT_STREAMING),
             HomeMenuItem(HomeSection.TV, HomeMenuGlyph.TV, HomeDashboardTheme.ACCENT_TV),
             HomeMenuItem(HomeSection.RADIO, HomeMenuGlyph.RADIO, HomeDashboardTheme.ACCENT_RADIO),
             HomeMenuItem(HomeSection.WEB, HomeMenuGlyph.GLOBE, HomeDashboardTheme.ACCENT_WEB),
@@ -38,8 +43,7 @@ internal data class HomeMenuItem(
             HomeMenuItem(
                 HomeSection.YOUTUBE_MUSIC, HomeMenuGlyph.YOUTUBE_MUSIC,
                 HomeDashboardTheme.ACCENT_YOUTUBE_MUSIC
-            ),
-            HomeMenuItem(HomeSection.STREAMING, HomeMenuGlyph.STREAMING, HomeDashboardTheme.ACCENT_STREAMING)
+            )
         )
 
         /** The primary cards, then the cards the flavor adds; the Play build adds none. */
