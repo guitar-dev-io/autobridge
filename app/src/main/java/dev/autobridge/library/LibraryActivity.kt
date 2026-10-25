@@ -136,6 +136,9 @@ class LibraryActivity : Activity() {
         /** Station logos across the Radio grid: three, so a logo is big enough to read and a name fits on two lines. */
         private const val RADIO_GRID_COLUMNS = 3
 
+        /** Channel and film tiles across the TV grid. */
+        private const val CHANNEL_GRID_COLUMNS = 3
+
         // The radio page's palette roles, read from Settings > Appearance: controls take the user's
         // accent, and amber stays on the section's own badge only.
         private val RADIO_CARD: Int get() = MediaTheme.palette.surface
@@ -1507,9 +1510,10 @@ class LibraryActivity : Activity() {
                 }
             )
             rows += if (gridView) {
-                // Channels and films carry a logo worth seeing, so the grid is the default; two
-                // columns is what fits a phone at a glance. List trades the logo for density.
-                AutoBridgeDesign.grid(this, shown.map { entryTile(source, it, shown) }, columns = 2, gap = 10)
+                // Channels and films carry a logo worth seeing, so the grid is the default; three
+                // columns keeps a tile from towering over its logo, like the Radio grid. List
+                // trades the logo for density.
+                AutoBridgeDesign.grid(this, shown.map { entryTile(source, it, shown) }, columns = CHANNEL_GRID_COLUMNS, gap = 10)
             } else {
                 shown.map { entryRow(source, it, shown) }
             }
