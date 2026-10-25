@@ -1446,7 +1446,6 @@
     <!-- Car "More" list ([CarHomeMoreScreen]). -->
     <string name="car_more_title">More</string>
     <string name="car_more_title_paged">More · %1$d</string>
-    <string name="car_more_media_center">Media Center</string>
     <string name="car_more_bookmarks">Manage bookmarks</string>
     <string name="car_more_agent">Agent</string>
     <string name="car_more_recent">Recent</string>
@@ -1823,7 +1822,7 @@
     <string name="youtube_sponsorblock_caveat">This may not work, or may be incomplete. The segments come from volunteers, so new or little-watched videos often have none and a marked segment can be a little off. Skipping needs the internet and works only in AutoBridge\'s own YouTube page; if YouTube changes its site, it can stop working until the app is updated.</string>
     <string name="home_donate">☕ Support the developer</string>
     <string name="maint_compulsory_insurance">Compulsory insurance (Por.Ror.Bor.)</string>
-    <string name="car_more_group_utilities">Utilities</string>
+    <string name="car_my_car_title">My Car</string>
     <string name="fuel_edit">Edit</string>
     <string name="fuel_edit_title">Edit fill-up</string>
     <string name="fuel_edit_title_ev">Edit charge</string>
