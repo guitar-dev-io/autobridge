@@ -117,6 +117,8 @@ class DesktopBrowserCarScreen(
     private var surfaceDpi = 160
     private var stableArea: Rect? = null
     private val rail = ControlRail(carContext, 1f).apply {
+        // The car's Appearance; the phone's desktop browser keeps the fixed rail.
+        followCarLook = true
         showKeyboardChoice = true
         keyboardChoice = DesktopCarKeyboard.choice(carContext).ordinal
     }
