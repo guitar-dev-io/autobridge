@@ -103,8 +103,12 @@ class DesktopBrowserCarScreen(
     carContext: CarContext,
     private val embedded: Boolean = false,
     /** The browser to show; null shows the one chosen for the Web card. */
-    browser: DesktopBrowserAdapter? = null
+    browser: DesktopBrowserAdapter? = null,
+    /** A page to open on arrival (a streaming site): a new tab when the browser is already running. */
+    startUrl: String? = null
 ) : Screen(carContext), SurfaceCallback {
+    /** Used once: the surface can come back (and the session be reopened) with no new request. */
+    private var pendingUrl: String? = startUrl
     private var session: DesktopSession? = null
     private var surface: android.view.Surface? = null
     private val adapter: DesktopBrowserAdapter? = DesktopEngine.let { it.init(carContext); browser ?: it.chosenInstalledBrowser() }
@@ -522,7 +526,7 @@ class DesktopBrowserCarScreen(
         // Remembered so "start on launch" opens the browser at this car's size.
         DesktopEngine.store.setLastCar(area.width(), area.height(), scale)
         val s = try {
-            DesktopEngine.openSession(browser.id, area.width(), area.height(), scale)
+            DesktopEngine.openSession(browser.id, area.width(), area.height(), scale, pendingUrl.also { pendingUrl = null })
         } catch (e: Exception) {
             DesktopLog.w("car session failed", e)
             return

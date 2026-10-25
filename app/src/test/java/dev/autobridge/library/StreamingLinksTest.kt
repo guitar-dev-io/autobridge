@@ -6,9 +6,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class StreamingLinksTest {
-    @Test fun theChineseSitesAreThere() {
-        val titles = StreamingLinks.all.filter { it.group == StreamingGroup.CHINESE }.map { it.title }
-        assertTrue(titles.containsAll(listOf("Tencent Video", "Youku", "Mango TV", "CCTV", "Douyin", "Xiaohongshu")))
+    @Test fun theChineseGroupIsGone() {
+        val gone = listOf("Tencent Video", "Youku", "Mango TV", "CCTV", "Douyin", "Xiaohongshu")
+        assertTrue(StreamingLinks.all.none { it.title in gone })
+        assertTrue(StreamingGroup.entries.none { it.name == "CHINESE" })
     }
 
     @Test fun theVideoGroupIsTheMainGridInItsOwnOrder() {
@@ -43,10 +44,9 @@ class StreamingLinksTest {
         assertTrue(StreamingLinks.grouped().all { it.second.isNotEmpty() })
     }
 
-    @Test fun theProtectedAndRegionalSitesAreWarnedAbout() {
+    @Test fun theProtectedSitesAreWarnedAbout() {
         val warned = StreamingLinks.all.filter { StreamingLinks.mayNotPlay(it) }.map { it.title }.toSet()
         assertTrue(warned.containsAll(listOf("Netflix", "Disney+", "Prime Video", "HBO Max", "Viu", "WeTV", "iQIYI")))
-        assertTrue(StreamingLinks.all.filter { it.group == StreamingGroup.CHINESE }.all { it.title in warned })
         // What plays without DRM carries no warning.
         listOf("YouTube", "TikTok", "Vimeo", "SoundCloud", "Twitch").forEach { name ->
             assertFalse("$name should not be warned about", StreamingLinks.mayNotPlay(StreamingLinks.all.first { it.title == name }))

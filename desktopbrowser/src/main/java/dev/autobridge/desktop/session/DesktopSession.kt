@@ -14,6 +14,7 @@ import dev.autobridge.desktop.display.FrameRenderer
 import dev.autobridge.desktop.display.X11Connection
 import dev.autobridge.desktop.display.XwdFramebuffer
 import dev.autobridge.desktop.input.BrowserInput
+import dev.autobridge.desktop.input.Keysym
 import dev.autobridge.desktop.keyboard.ClipboardSync
 import dev.autobridge.desktop.keyboard.X11Clipboard
 import dev.autobridge.desktop.runtime.GuestNetworkConfig
@@ -206,6 +207,18 @@ class DesktopSession internal constructor(
             logFile = layout.logFile(adapter.id.key),
             workingDirectory = RuntimeLayout.GUEST_HOME,
         )
+    }
+
+    /**
+     * Opens [url] in a new tab of the running browser: Ctrl+T, the address, Return. A new tab, not
+     * the current one, so the page the driver was on stays one switch away. Does nothing until the
+     * X side is connected (a session that is still starting takes its URL on the command line).
+     */
+    fun openInNewTab(url: String) {
+        val input = input ?: return
+        input.newTab()
+        input.typeText(url)
+        input.key(Keysym.RETURN)
     }
 
     fun detachSurface() = renderer.detach()
