@@ -63,3 +63,9 @@ Not done, needs another owner:
 - The canvas's Dual Display (front/rear cards, swap, rear app picker, audio route) describes a front/rear display model; `DuoScreenSettingsActivity` is the panes-on-one-car-screen feature, so only the styling was applied, no new features.
 - ui/* items listed in the shared notes (`SettingsUi.segments` white text, `CarToolForm.chips` INK text, `CarToolViews.card` ignoring card style, dark-tuned `ACCENT_ONLINE`/`SIGNAL_*` consts).
 - MainActivity could call `ScreenAppearance.applyWindow` for the foundation's "status bar stays dark in light mode" gap.
+
+E3 phone attempt, 2026-10-25: `:app:assemblePersonalDebug` built (after initialising the whisper.cpp
+submodule in this worktree from the main checkout) and installed on YXEMRCGYAI49S4SS (`Success`), but
+the phone sat on its lock screen with a fingerprint prompt, so no screen was opened and no
+screenshots were taken. Appearance was not changed; lock released. The device checks listed above
+are all still open.
