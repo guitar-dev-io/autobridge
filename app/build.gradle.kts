@@ -297,6 +297,10 @@ kotlin {
 // tests live in src/testVlc and are added to the debug unit-test source set only when the flag is
 // on, so they compile against src/vlc without dragging it into a flag-off test run.
 android.sourceSets {
+    if (providers.gradleProperty("debugSuffix").isPresent) {
+        // Overrides app_name for the side-by-side debug copy so the two icons are told apart.
+        getByName("debug") { res.srcDir("src/sideBySide/res") }
+    }
     getByName("main") {
         java.srcDir(if (subtitleTranslationEnabled) "src/translate/java" else "src/notranslate/java")
         java.srcDir(if (vlcEngineEnabled) "src/vlc/java" else "src/novlc/java")
