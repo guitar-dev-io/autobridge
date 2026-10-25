@@ -381,7 +381,10 @@ class MainActivity : androidx.activity.ComponentActivity() {
 
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
             val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
-            view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            // The keyboard is part of the bottom inset: with edge-to-edge the window no longer
+            // resizes for it, so Home's search field and every other input sat under the keyboard.
+            val ime = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.ime())
+            view.setPadding(bars.left, bars.top, bars.right, maxOf(bars.bottom, ime.bottom))
             insets
         }
         // No bottom tab bar: Home is the hub and every other destination is a child reached from
