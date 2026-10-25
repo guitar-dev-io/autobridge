@@ -36,7 +36,7 @@ class MiniPlayer(
         gravity = Gravity.CENTER_VERTICAL
         visibility = View.GONE
         background = AutoBridgeDesign.surface(
-            context, AutoBridgeDesign.SURFACE_RAISED, 18, AutoBridgeDesign.HAIRLINE
+            context, AutoBridgeDesign.SURFACE_RAISED, dev.autobridge.design.ThemeHolder.palette.corners.card, AutoBridgeDesign.HAIRLINE
         )
         isClickable = true
         isFocusable = true
@@ -139,7 +139,7 @@ class MiniPlayer(
         val row = view as LinearLayout
         artworkFrame.addView(glyph, FrameLayout.LayoutParams(-1, -1))
         artworkFrame.addView(artwork, FrameLayout.LayoutParams(-1, -1))
-        row.addView(artworkFrame, LinearLayout.LayoutParams(context.dp(40), context.dp(40)))
+        row.addView(artworkFrame, LinearLayout.LayoutParams(context.dp(44), context.dp(44)))
 
         val text = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
@@ -161,6 +161,7 @@ class MiniPlayer(
             }.apply { contentDescription = context.getString(dev.autobridge.R.string.player_close) },
             LinearLayout.LayoutParams(context.dp(38), context.dp(38))
         )
+        applyStyle()
     }
 
     /** Switches between the shared bar and the radio design's warm one. */
@@ -184,9 +185,9 @@ class MiniPlayer(
             toggle.background = AutoBridgeDesign.surface(context, AMBER, 28, android.graphics.Color.TRANSPARENT)
             toggle.setTextColor(ON_AMBER)
         } else {
-            row.background = AutoBridgeDesign.surface(context, AutoBridgeDesign.SURFACE_RAISED, 18, AutoBridgeDesign.HAIRLINE)
-            row.setPadding(context.dp(10), context.dp(10), context.dp(8), context.dp(10))
-            artworkFrame.layoutParams = LinearLayout.LayoutParams(context.dp(40), context.dp(40))
+            row.background = AutoBridgeDesign.surface(context, AutoBridgeDesign.SURFACE_RAISED, cardRadius(), AutoBridgeDesign.HAIRLINE)
+            row.setPadding(context.dp(10), context.dp(8), context.dp(8), context.dp(8))
+            artworkFrame.layoutParams = LinearLayout.LayoutParams(context.dp(44), context.dp(44))
             artworkFrame.background = AutoBridgeDesign.surface(
                 context, AutoBridgeDesign.tint(AutoBridgeDesign.ACCENT_SOFT, 0.16f), 12,
                 AutoBridgeDesign.tint(AutoBridgeDesign.ACCENT_SOFT, 0.3f)
@@ -199,14 +200,15 @@ class MiniPlayer(
             stationLine.visibility = View.GONE
             nextButton.visibility = View.VISIBLE
             favorite.visibility = View.GONE
-            toggle.layoutParams = LinearLayout.LayoutParams(context.dp(40), context.dp(40))
-            toggle.background = defaultToggleBackground
-            toggle.setTextColor(defaultToggleInk)
+            toggle.layoutParams = LinearLayout.LayoutParams(context.dp(48), context.dp(48))
+            toggle.background = AutoBridgeDesign.surface(context, palette.accent, 24, android.graphics.Color.TRANSPARENT)
+            toggle.setTextColor(palette.onAccent)
         }
     }
 
-    private val defaultToggleBackground = toggle.background
-    private val defaultToggleInk = toggle.currentTextColor
+    private val palette get() = dev.autobridge.design.ThemeHolder.palette
+
+    private fun cardRadius(): Int = palette.corners.card
 
     /** The station playing now as the radio store knows stations, for the favourite star. */
     private fun currentStation(): dev.autobridge.radio.RadioStation? {
@@ -232,12 +234,19 @@ class MiniPlayer(
      */
     var hideWhen: (() -> Boolean)? = null
 
+    /**
+     * Home only (the one screen that sets [hideWhen]): the Dashboard layout's hero card is the
+     * player there, so the bar would say the same thing twice.
+     */
+    private fun hiddenByHomeLayout(): Boolean =
+        hideWhen != null && !PhoneHomeLayout.showsMiniPlayer(dev.autobridge.settings.AppearanceStore.current().homeLayout)
+
     /** Called on every one-second tick, so a screen can refresh its own now-playing view with it. */
     var onTick: (() -> Unit)? = null
 
     private fun render() {
         val name = playback.currentTitle
-        if (!playback.isConnected || name.isNullOrBlank() || hideWhen?.invoke() == true) {
+        if (!playback.isConnected || name.isNullOrBlank() || hideWhen?.invoke() == true || hiddenByHomeLayout()) {
             view.visibility = View.GONE
             return
         }
@@ -306,9 +315,10 @@ class MiniPlayer(
     private var loadedArtwork: String? = null
 
     private companion object {
+        /** The radio section's hue, as Home's icon chips carry it. */
+        val AMBER: Int get() = PhoneHomeLayout.Item.RADIO.hue(dev.autobridge.design.ThemeHolder.palette.isLight)
         const val PLAY = "▶"
         const val PAUSE = "❚❚"
-        const val AMBER = DesignTokens.Phone.ACCENT_RADIO
         const val ON_AMBER = DesignTokens.Radio.ON_AMBER
         const val WARM_CARD = DesignTokens.Radio.WARM_CARD
         const val WARM_EDGE = DesignTokens.Radio.WARM_EDGE
