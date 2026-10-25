@@ -123,9 +123,6 @@ class DuoScreenCompositor {
             1f, 0f
         )
 
-        /** Behind and between the panes: the design's surface colour (#0B0D10), not black. */
-        val CLEAR_COLOR = floatArrayOf(0x0B / 255f, 0x0D / 255f, 0x10 / 255f, 1f)
-
         /** Tex coords for a triangle strip: bottom-left, bottom-right, top-left, top-right. */
         val TEX_COORDS = floatArrayOf(
             0f, 0f, 0f, 1f,
@@ -446,7 +443,12 @@ class DuoScreenCompositor {
         }
         // Clear clears the whole surface whatever the viewport; drawing then lands in the content area.
         GLES20.glViewport(contentLeft, surfaceHeight - contentTop - outputHeight, outputWidth, outputHeight)
-        GLES20.glClearColor(CLEAR_COLOR[0], CLEAR_COLOR[1], CLEAR_COLOR[2], CLEAR_COLOR[3])
+        // The car look's page colour, as the chrome's gaps are, so the band outside the panes
+        // (under the host's strip) matches them in light mode too.
+        val clear = dev.autobridge.design.CarLook.current().background
+        GLES20.glClearColor(
+            ((clear shr 16) and 0xFF) / 255f, ((clear shr 8) and 0xFF) / 255f, (clear and 0xFF) / 255f, 1f
+        )
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
         GLES20.glUseProgram(program)
 

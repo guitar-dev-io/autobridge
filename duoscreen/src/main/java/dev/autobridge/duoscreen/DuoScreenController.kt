@@ -14,6 +14,7 @@ import android.view.KeyCharacterMap
 import android.view.KeyEvent
 import android.view.Surface
 import dev.autobridge.car.DuoSessionState
+import dev.autobridge.design.CarLook
 import dev.autobridge.logging.StructuredLog
 import dev.autobridge.power.CarScreenPower
 import android.graphics.Bitmap
@@ -64,6 +65,8 @@ class DuoScreenController(
         const val QUIET_PERIOD_MS = 300L
         /** How often the setup card checks whether Shizuku or root has become ready. */
         const val BACKEND_POLL_MS = 2_000L
+        /** How often the chrome checks for a new car look (see [lookPoll]). */
+        const val LOOK_POLL_MS = 1_000L
         /**
          * How long a seam drag must rest before the panes' displays are resized. Longer than
          * [QUIET_PERIOD_MS] because the car host sends no finger-up: a short pause mid-drag would
@@ -408,6 +411,8 @@ class DuoScreenController(
         mainHandler.removeCallbacks(commitPoll)
         mainHandler.removeCallbacks(dropPoll)
         mainHandler.removeCallbacks(backendPoll)
+        mainHandler.removeCallbacks(lookPoll)
+        drawnLook = null
         // Kept alive, unlike in stop(): the session is only detached and resume() carries on with it.
         onInputThread {
             inputHandler?.removeCallbacks(dragIdle)
@@ -881,8 +886,25 @@ class DuoScreenController(
      * Lays the chrome out for the panes as they are now and hands the compositor a painter for it.
      * Everything the painter reads is captured here, because it runs later on the GL thread.
      */
+    /**
+     * Settings > Appearance can change on the phone while the panes are up. :duoscreen cannot
+     * watch the app's store, so the controller reads the car look ([CarLook.current], a few field
+     * reads) once a second and redraws the chrome when it moved; the chrome otherwise only
+     * repaints on its own events.
+     */
+    private var drawnLook: CarLook? = null
+    private val lookPoll = object : Runnable {
+        override fun run() {
+            if (!running) return
+            if (CarLook.current() != drawnLook) refreshChrome()
+            mainHandler.postDelayed(this, LOOK_POLL_MS)
+        }
+    }
+
     private fun refreshChrome() {
         if (!running) return
+        if (drawnLook == null) mainHandler.postDelayed(lookPoll, LOOK_POLL_MS)
+        drawnLook = CarLook.current()
         val active = router ?: return
         val bounds = sessionBounds ?: return
         val labels = ChromeLabels(
@@ -1078,6 +1100,7 @@ class DuoScreenController(
         selectedPaneId = null
         toolbarOpen = false
         mainHandler.removeCallbacksAndMessages(null)
+        drawnLook = null
         chromeRefreshPosted = false
         loggedSeam = null
         debouncer.cancelAll()

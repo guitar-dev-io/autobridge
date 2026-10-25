@@ -236,6 +236,9 @@ internal class CarRadioGridRenderer(private val context: Context) {
     private fun drawPlaceholder(canvas: Canvas, layout: CarRadioGridLayout, box: CarRadioBox, radius: Float, title: String) {
         val color = CarStationTile.colorFor(title)
         rect.set(box.left, box.top, box.right, box.bottom)
+        // A shader is drawn at the paint's alpha, and the card before it may have left the paint
+        // transparent (outlined cards): the station's art is opaque whatever the card style.
+        fill.color = 0xFF000000.toInt()
         fill.shader = android.graphics.LinearGradient(
             box.left, box.top, box.right, box.bottom, lighten(color), darken(color), android.graphics.Shader.TileMode.CLAMP
         )
