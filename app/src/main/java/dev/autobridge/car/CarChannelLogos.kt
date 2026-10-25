@@ -74,13 +74,15 @@ internal class CarChannelLogos(
         if (budget <= 0) return null
         budget--
         val address = url?.trim().orEmpty()
+        // The ring is the car's accent, so a tile drawn before the accent changed is a different key.
+        val ring = dev.autobridge.design.CarLook.current().accent
         val key = (if (address.isEmpty()) "tile:name:${title.trim().lowercase()}" else "tile:$address") +
-            if (playing) ":on" else ""
+            if (playing) ":on:${Integer.toHexString(ring)}" else ""
         icons[key]?.let { return it }
         val logo = address.takeIf { it.isNotEmpty() }?.let { ImageLoader.bitmap(context, it) { scheduleRefresh() } }
         val icon = CarIcon.Builder(
             IconCompat.createWithBitmap(
-                if (logo != null) CarStationTile.framed(logo, playing) else CarStationTile.placeholder(title, playing)
+                if (logo != null) CarStationTile.framed(logo, playing, ring) else CarStationTile.placeholder(title, playing, ring)
             )
         ).build()
         // A name card standing in for a logo still on its way is not kept: the logo replaces it.

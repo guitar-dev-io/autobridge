@@ -2,7 +2,6 @@ package dev.autobridge.desktop.input
 
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.drawable.Drawable
@@ -10,7 +9,9 @@ import android.os.Handler
 import android.os.Looper
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
+import dev.autobridge.design.CarLook
 import dev.autobridge.design.DesignTokens
+import dev.autobridge.design.ThemeResolver
 import dev.autobridge.desktop.R
 import dev.autobridge.desktop.display.FrameRenderer
 import kotlin.math.min
@@ -86,6 +87,41 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
 
     /** Phone only: a Close button in More, as the old menu had. */
     @Volatile var showClose = false
+
+    /**
+     * On the car the rail paints in the car's Appearance ([CarLook]), read each frame; the phone's
+     * desktop browser keeps the fixed rail colours ([RailColors.FIXED]).
+     */
+    @Volatile var followCarLook = false
+    private var railLook: CarLook? = null
+    private var colors: RailColors = RailColors.FIXED
+
+    private val HANDLE get() = colors.handle
+    private val HANDLE_DOT get() = colors.handleDot
+    private val PANEL_FILL get() = colors.panelFill
+    private val SHEET_FILL get() = colors.sheetFill
+    private val PANEL_EDGE get() = colors.panelEdge
+    private val BUTTON_FILL get() = colors.buttonFill
+    private val STEP_FILL get() = colors.stepFill
+    private val OUTLINED_FILL get() = colors.outlinedFill
+    private val SELECTED get() = colors.selected
+    private val ON_SELECTED get() = colors.onSelected
+    private val ACCENT get() = colors.accent
+    private val INK get() = colors.ink
+    private val INK_SECONDARY get() = colors.inkSecondary
+    private val MUTED get() = colors.muted
+
+    private fun syncLook() {
+        if (!followCarLook) {
+            colors = RailColors.FIXED
+            railLook = null
+            return
+        }
+        val next = CarLook.current()
+        if (next == railLook) return
+        railLook = next
+        colors = RailColors.of(next)
+    }
 
     /** Called on the main thread when the panel collapses by itself, to redraw without it. */
     @Volatile var onAutoHide: (() -> Unit)? = null
@@ -313,7 +349,7 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
                 items += Item(r) { onPick(i) }
                 draws += { c ->
                     if (selected) roundRect(c, r, s(RADIUS_INNER, sc), SELECTED)
-                    drawCenteredText(c, label, r, s(TEXT_LABEL, sc), if (selected) Color.WHITE else INK_SECONDARY)
+                    drawCenteredText(c, label, r, s(TEXT_LABEL, sc), if (selected) ON_SELECTED else INK_SECONDARY)
                 }
             }
             y = row.bottom + gap
@@ -434,6 +470,7 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
         lastWidth = a.width().toInt()
         lastHeight = a.height().toInt()
         if (!visible) return
+        syncLook()
         canvas.save()
         canvas.translate(a.left, a.top)
         geometry(lastWidth, lastHeight).draw.forEach { it(canvas) }
@@ -471,8 +508,8 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
         val gap = textSize * 0.4f
         val block = iconSize + gap + textSize
         val iconTop = r.centerY() - block / 2f
-        drawIcon(c, iconId, RectF(r.left, iconTop, r.right, iconTop + iconSize), iconSize, if (selected) Color.WHITE else INK)
-        text.color = if (selected) Color.WHITE else INK
+        drawIcon(c, iconId, RectF(r.left, iconTop, r.right, iconTop + iconSize), iconSize, if (selected) ON_SELECTED else INK)
+        text.color = if (selected) ON_SELECTED else INK
         val shown = fitText(text, label, r.width() - textSize, textSize)
         c.drawText(shown, r.centerX(), iconTop + iconSize + gap + textSize * 0.85f, text)
     }
@@ -545,19 +582,6 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
         private const val STEP_BUTTON = 64f
         private const val SEGMENT_INSET = 8f
 
-        private val HANDLE = DesignTokens.DesktopRail.HANDLE
-        private val HANDLE_DOT = DesignTokens.DesktopRail.HANDLE_DOT
-        private val PANEL_FILL = DesignTokens.DesktopRail.PANEL_FILL
-        private val SHEET_FILL = DesignTokens.DesktopRail.SHEET_FILL
-        private val PANEL_EDGE = DesignTokens.DesktopRail.PANEL_EDGE
-        private val BUTTON_FILL = DesignTokens.DesktopRail.BUTTON_FILL
-        private val STEP_FILL = DesignTokens.DesktopRail.PANEL_EDGE
-        private val OUTLINED_FILL = DesignTokens.DesktopRail.OUTLINED_FILL
-        private val SELECTED = DesignTokens.DesktopRail.SELECTED
-        private val ACCENT = DesignTokens.Phone.ACCENT
-        private val INK = DesignTokens.Phone.TEXT
-        private val INK_SECONDARY = DesignTokens.DesktopRail.INK_SECONDARY
-        private val MUTED = DesignTokens.DesktopRail.MUTED
     }
 }
 
@@ -572,3 +596,61 @@ enum class PointerMode {
 /** Text size that fits [maxWidth]: [size] if it already does, else scaled down but not below 80%. */
 internal fun fittedTextSize(measured: Float, maxWidth: Float, size: Float): Float =
     if (measured <= maxWidth || measured <= 0f) size else maxOf(size * maxWidth / measured, size * 0.8f)
+
+/**
+ * The rail's colours. [FIXED] is the desktop browser's own dark rail; [of] maps the car look onto
+ * the same roles: panels on the card colour, buttons on the raised control, the selected choice
+ * on the accent with its onAccent label.
+ */
+data class RailColors(
+    val handle: Int,
+    val handleDot: Int,
+    val panelFill: Int,
+    val sheetFill: Int,
+    val panelEdge: Int,
+    val buttonFill: Int,
+    val stepFill: Int,
+    val outlinedFill: Int,
+    val selected: Int,
+    val onSelected: Int,
+    val accent: Int,
+    val ink: Int,
+    val inkSecondary: Int,
+    val muted: Int,
+) {
+    companion object {
+        val FIXED = RailColors(
+            handle = DesignTokens.DesktopRail.HANDLE,
+            handleDot = DesignTokens.DesktopRail.HANDLE_DOT,
+            panelFill = DesignTokens.DesktopRail.PANEL_FILL,
+            sheetFill = DesignTokens.DesktopRail.SHEET_FILL,
+            panelEdge = DesignTokens.DesktopRail.PANEL_EDGE,
+            buttonFill = DesignTokens.DesktopRail.BUTTON_FILL,
+            stepFill = DesignTokens.DesktopRail.PANEL_EDGE,
+            outlinedFill = DesignTokens.DesktopRail.OUTLINED_FILL,
+            selected = DesignTokens.DesktopRail.SELECTED,
+            onSelected = 0xFFFFFFFF.toInt(),
+            accent = DesignTokens.Phone.ACCENT,
+            ink = DesignTokens.Phone.TEXT,
+            inkSecondary = DesignTokens.DesktopRail.INK_SECONDARY,
+            muted = DesignTokens.DesktopRail.MUTED,
+        )
+
+        fun of(look: CarLook): RailColors = RailColors(
+            handle = ThemeResolver.withAlpha(look.text, 0x52),
+            handleDot = look.background,
+            panelFill = ThemeResolver.withAlpha(look.surface, 0xF0),
+            sheetFill = ThemeResolver.withAlpha(look.surface, 0xF5),
+            panelEdge = look.hairline,
+            buttonFill = look.control,
+            stepFill = look.hairline,
+            outlinedFill = look.selectedFill,
+            selected = look.accent,
+            onSelected = look.onAccent,
+            accent = look.accent,
+            ink = look.text,
+            inkSecondary = look.textSecondary,
+            muted = look.textTertiary,
+        )
+    }
+}

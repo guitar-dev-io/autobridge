@@ -117,6 +117,8 @@ class DesktopBrowserCarScreen(
     private var surfaceDpi = 160
     private var stableArea: Rect? = null
     private val rail = ControlRail(carContext, 1f).apply {
+        // The car's Appearance; the phone's desktop browser keeps the fixed rail.
+        followCarLook = true
         showKeyboardChoice = true
         keyboardChoice = DesktopCarKeyboard.choice(carContext).ordinal
     }
@@ -185,7 +187,7 @@ class DesktopBrowserCarScreen(
     /** The rail, then the keyboard over the page when it is open. */
     private val overlay = FrameRenderer.Overlay { canvas, width, height ->
         rail.draw(canvas, width, height)
-        keyboard?.draw(canvas, keyboardArea(), rail.density, SystemClock.uptimeMillis(), ::drawIcon)
+        keyboard?.draw(canvas, keyboardArea(), rail.density, SystemClock.uptimeMillis(), drawIcon = ::drawIcon)
     }
 
     private fun allowed(): Boolean =

@@ -9,6 +9,7 @@ import androidx.car.app.SurfaceCallback
 import androidx.car.app.SurfaceContainer
 import androidx.car.app.model.Action
 import androidx.car.app.model.ActionStrip
+import androidx.car.app.model.CarColor
 import androidx.car.app.model.CarIcon
 import androidx.car.app.model.Header
 import androidx.car.app.model.Pane
@@ -154,7 +155,8 @@ class CarBridgePlayerScreen(carContext: CarContext) : Screen(carContext), Surfac
                         control(
                             if (state.isPlaying) android.R.drawable.ic_media_pause
                             else android.R.drawable.ic_media_play,
-                            enabled = allowed()
+                            enabled = allowed(),
+                            tint = dev.autobridge.car.CarAccent.color()
                         ) { AutoBridgeSessionManager.togglePlayPause() }
                     )
                     .addAction(
@@ -236,9 +238,10 @@ class CarBridgePlayerScreen(carContext: CarContext) : Screen(carContext), Surfac
      * real head unit's host even though the client library accepts it. [dev.autobridge.car.CarIcons]
      * records what that cost the first time.
      */
-    private fun control(icon: Int, enabled: Boolean = true, action: () -> Unit): Action =
+    private fun control(icon: Int, enabled: Boolean = true, tint: CarColor? = null, action: () -> Unit): Action =
         Action.Builder()
-            .setIcon(CarIcon.Builder(IconCompat.createWithResource(carContext, icon)).build())
+            // [tint]: play/pause takes the car's accent; the host draws the strip itself.
+            .setIcon(CarIcon.Builder(IconCompat.createWithResource(carContext, icon)).apply { if (tint != null) setTint(tint) }.build())
             .setEnabled(enabled)
             .setOnClickListener { action(); invalidate() }
             .build()

@@ -8,6 +8,7 @@ import androidx.car.app.SurfaceCallback
 import androidx.car.app.SurfaceContainer
 import androidx.car.app.model.Action
 import androidx.car.app.model.ActionStrip
+import androidx.car.app.model.CarColor
 import androidx.car.app.model.CarIcon
 import androidx.car.app.model.Header
 import androidx.car.app.model.Pane
@@ -337,7 +338,7 @@ class CarVideoScreen(
                         if (media.isPlaying) R.string.car_now_pause else R.string.car_now_play
                     ),
                     player?.isCommandAvailable(Player.COMMAND_PLAY_PAUSE) == true,
-                    iconOnly = true
+                    iconOnly = true, tint = CarAccent.color()
                 ) {
                     if (media.isPlaying) media.pause() else if (allowed()) media.resume()
                 })
@@ -411,8 +412,9 @@ class CarVideoScreen(
         player.seekTo((player.currentPosition + delta).coerceIn(0L, upper))
     }
 
-    private fun control(icon: Int, description: String, enabled: Boolean = true, mapAction: Boolean = false, iconOnly: Boolean = false, action: () -> Unit): Action =
+    /** [tint]: the play/pause glyph takes the car's accent; the host draws the strip itself. */
+    private fun control(icon: Int, description: String, enabled: Boolean = true, mapAction: Boolean = false, iconOnly: Boolean = false, tint: CarColor? = null, action: () -> Unit): Action =
         Action.Builder().setIcon(CarIcon.Builder(IconCompat.createWithResource(carContext, icon))
-            .build()).setEnabled(enabled).apply { if (!mapAction && !iconOnly) setTitle(description) }
+            .apply { if (tint != null) setTint(tint) }.build()).setEnabled(enabled).apply { if (!mapAction && !iconOnly) setTitle(description) }
             .setOnClickListener { action(); invalidate() }.build()
 }

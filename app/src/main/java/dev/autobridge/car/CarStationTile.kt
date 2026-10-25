@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
+import dev.autobridge.design.CarLook
 import dev.autobridge.design.DesignTokens
 import dev.autobridge.ui.AppFonts
 
@@ -19,7 +20,8 @@ import dev.autobridge.ui.AppFonts
  *    that, the first letters of its name. The colour comes from the name, so a station keeps its
  *    colour from one visit to the next and neighbours rarely match.
  *
- * The station on the air carries the radio accent as a ring, the design's highlighted cell.
+ * The station on the air carries the car's accent ([CarLook.accent]) as a ring, the design's
+ * selected tile; the station colours and logos are the stations' own and do not follow the theme.
  *
  * Tiles are [SIZE_PX] square: the host scales a grid image up into its own slot, and the binder
  * budget [CarChannelLogos] keeps applies to these bitmaps as much as to bare logos.
@@ -52,7 +54,7 @@ internal object CarStationTile {
 
     fun colorFor(title: String): Int = palette[Math.floorMod(title.trim().lowercase().hashCode(), palette.size)]
 
-    fun placeholder(title: String, playing: Boolean = false): Bitmap {
+    fun placeholder(title: String, playing: Boolean = false, ringColor: Int = CarLook.current().accent): Bitmap {
         val bitmap = Bitmap.createBitmap(SIZE_PX, SIZE_PX, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         val card = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = colorFor(title) }
@@ -74,12 +76,12 @@ internal object CarStationTile {
         }
         val baseline = SIZE_PX / 2f - (pen.descent() + pen.ascent()) / 2f
         canvas.drawText(text, SIZE_PX / 2f, baseline, pen)
-        if (playing) ring(canvas)
+        if (playing) ring(canvas, ringColor)
         return bitmap
     }
 
     /** [logo] filling the card when about square, else fitted on the light card. */
-    fun framed(logo: Bitmap, playing: Boolean = false): Bitmap {
+    fun framed(logo: Bitmap, playing: Boolean = false, ringColor: Int = CarLook.current().accent): Bitmap {
         val bitmap = Bitmap.createBitmap(SIZE_PX, SIZE_PX, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         val card = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = DesignTokens.Radio.LOGO_CARD }
@@ -97,34 +99,34 @@ internal object CarStationTile {
         canvas.clipPath(android.graphics.Path().apply { addRoundRect(cardRect(), RADIUS, RADIUS, android.graphics.Path.Direction.CW) })
         canvas.drawBitmap(logo, null, RectF(left, top, left + w, top + h), Paint(Paint.FILTER_BITMAP_FLAG))
         canvas.restore()
-        if (playing) ring(canvas)
+        if (playing) ring(canvas, ringColor)
         return bitmap
     }
 
     /**
-     * A grid cell that is not a station (search, podcasts, all stations): its [glyph] in white on
-     * a quiet dark card, so it sits in the same set of rounded cards as the stations around it.
+     * A grid cell that is not a station (search, podcasts, all stations): its [glyph] on the car
+     * look's control colour, so it sits in the same set of rounded cards as the stations around it.
      */
-    fun action(glyph: android.graphics.drawable.Drawable): Bitmap {
+    fun action(glyph: android.graphics.drawable.Drawable, look: CarLook = CarLook.current()): Bitmap {
         val bitmap = Bitmap.createBitmap(SIZE_PX, SIZE_PX, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
-        val card = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = DesignTokens.Radio.ACTION_CARD }
+        val card = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = look.control }
         canvas.drawRoundRect(cardRect(), RADIUS, RADIUS, card)
         val size = (SIZE_PX * 0.44f).toInt()
         val start = (SIZE_PX - size) / 2
         val icon = glyph.mutate()
-        icon.setTint(DesignTokens.Phone.TEXT)
+        icon.setTint(look.text)
         icon.setBounds(start, start, start + size, start + size)
         icon.draw(canvas)
         return bitmap
     }
 
-    /** The radio accent ring around the tile of the station on the air. */
-    private fun ring(canvas: Canvas) {
+    /** The accent ring around the tile of the station on the air. */
+    private fun ring(canvas: Canvas, color: Int) {
         val pen = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
             strokeWidth = RING
-            color = ACCENT_RADIO
+            this.color = color
         }
         val inset = RING / 2f
         canvas.drawRoundRect(RectF(inset, inset, SIZE_PX - inset, SIZE_PX - inset), RADIUS - inset, RADIUS - inset, pen)
@@ -137,5 +139,4 @@ internal object CarStationTile {
     private const val RADIUS = 14f
     private const val PADDING = 7
     private const val RING = 4f
-    private const val ACCENT_RADIO = DesignTokens.Phone.ACCENT_RADIO
 }

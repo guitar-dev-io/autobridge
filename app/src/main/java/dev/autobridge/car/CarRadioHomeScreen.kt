@@ -17,6 +17,7 @@ import androidx.car.app.navigation.model.NavigationTemplate
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import dev.autobridge.R
+import dev.autobridge.design.CarLook
 import dev.autobridge.display.CarSurfaceCanvas
 import dev.autobridge.iptv.IptvChannelQueue
 import dev.autobridge.iptv.IptvEntry
@@ -37,7 +38,8 @@ import dev.autobridge.ui.ImageLoader
  * Radio on the car, after the radio design's car screen: a round back button, the five
  * [RadioCategory]s as pills along the top and a search button, and under them each category's
  * stations as a scrolling grid of logo cards, [CarRadioGridLayout.COLUMNS] across. A tap on a card
- * plays it; the station on the air is the warm card with the amber ring.
+ * plays it; the station on the air is the selected card with the accent edge. Colours, cards,
+ * corners and text size follow the car's Appearance ([CarLook]), live.
  *
  * It draws on the host surface like [CarRadioNowPlayingScreen] (NavigationTemplate +
  * [CarSurfaceCanvas], [MirrorSurfaceOwnership] for the one surface callback), which is what lets it
@@ -82,6 +84,8 @@ class CarRadioHomeScreen(carContext: CarContext) : Screen(carContext), SurfaceCa
     private val mediaPlayback = MediaPlaybackClient(carContext)
     private val renderer by lazy { CarRadioGridRenderer(carContext) }
     private val handler = Handler(Looper.getMainLooper())
+    /** Settings > Appearance changed on the phone: repaint in the new look. */
+    private val lookWatch = CarLookWatch { if (active) render() }
     private var selected = RadioCategory.IN_COUNTRY
     private val states = mutableMapOf<String, State>()
 
@@ -116,6 +120,7 @@ class CarRadioHomeScreen(carContext: CarContext) : Screen(carContext), SurfaceCa
                 MirrorSurfaceOwnership.claim(this@CarRadioHomeScreen)
                 appManager.setSurfaceCallback(this@CarRadioHomeScreen)
                 watchSession()
+                lookWatch.start()
                 load(selected)
                 render()
             }
@@ -123,6 +128,7 @@ class CarRadioHomeScreen(carContext: CarContext) : Screen(carContext), SurfaceCa
             override fun onStop(owner: LifecycleOwner) {
                 active = false
                 handler.removeCallbacksAndMessages(null)
+                lookWatch.stop()
                 unwatchSession()
                 releaseSurface()
                 if (MirrorSurfaceOwnership.release(this@CarRadioHomeScreen)) appManager.setSurfaceCallback(null)
@@ -372,6 +378,8 @@ class CarRadioHomeScreen(carContext: CarContext) : Screen(carContext), SurfaceCa
         if (!active || !MirrorSurfaceOwnership.isOwner(this) || !target.isValid) return
         if (surfaceWidth <= 0 || surfaceHeight <= 0) return
         val density = (if (surfaceDpi > 0) surfaceDpi else BASELINE_DPI) / BASELINE_DPI.toFloat()
+        // The layout is computed every frame, so a new look (text size, font) lays out as it lands.
+        renderer.look = CarLook.current()
         val built = buildModel().also { model = it }
         val computed = CarRadioGridLayout.compute(
             safeArea(), density, renderer.measureTabLabels(built.content.tabs, density), built.content.cells.size

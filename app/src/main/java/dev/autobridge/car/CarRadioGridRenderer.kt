@@ -12,14 +12,15 @@ import android.text.TextPaint
 import android.text.TextUtils
 import androidx.annotation.DrawableRes
 import androidx.core.content.ContextCompat
-import dev.autobridge.design.DesignTokens
-import dev.autobridge.ui.AppFonts
+import dev.autobridge.design.CarLook
 
 /**
- * Paints the car radio grid ([CarRadioHomeScreen]) after the radio design's car screen: dark
- * ground, round back and search buttons, the tabs as pills with the selected one amber, and the
- * stations as cards whose logo sits on top of the name. The station on the air gets the design's
- * warm card and amber ring. Paints and paths are built once; a frame only ellipsizes names.
+ * Paints the car radio grid ([CarRadioHomeScreen]) after the redesign's car radio screen, in the
+ * car's Appearance ([CarLook]): the theme's page, round back and search buttons on the raised
+ * control colour, the tabs as pills with the selected one on the accent, and the stations as cards
+ * in the chosen card style and corners whose logo sits on top of the name. The station on the air
+ * gets the selected fill and an accent edge. Station logos and their placeholder colours keep
+ * their own colours. Paints and paths are built once; a frame only ellipsizes names.
  */
 internal class CarRadioGridRenderer(private val context: Context) {
 
@@ -48,8 +49,9 @@ internal class CarRadioGridRenderer(private val context: Context) {
         fun bitmap(url: String?): Bitmap?
     }
 
-    private val bold = AppFonts.bold()
-    private val medium = AppFonts.medium()
+    private val faces = CarTypefaces()
+    private val bold get() = faces.bold
+    private val medium get() = faces.medium
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
     private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val text = TextPaint(Paint.ANTI_ALIAS_FLAG)
@@ -58,10 +60,21 @@ internal class CarRadioGridRenderer(private val context: Context) {
     private val path = Path()
     private val icons = mutableMapOf<Int, Drawable?>()
 
+    /** The look the next frame draws with; set by the screen before measuring or drawing. */
+    var look: CarLook = CarLook.DEFAULT
+        set(value) {
+            field = value
+            faces.update(value)
+        }
+
+    init {
+        faces.update(look)
+    }
+
     /** The tab label paint, so the layout can be computed from the widths it really draws. */
     fun measureTabLabels(tabs: List<Tab>, density: Float): List<Float> {
         text.typeface = bold
-        text.textSize = TAB_TEXT_DP * density
+        text.textSize = look.text(TAB_TEXT_DP) * density
         return tabs.map { text.measureText(it.label) }
     }
 
@@ -73,7 +86,7 @@ internal class CarRadioGridRenderer(private val context: Context) {
         pressed: CarRadioGridRegion?,
         logos: Logos,
     ) {
-        canvas.drawColor(BACKGROUND)
+        canvas.drawColor(look.background)
         drawRound(canvas, layout.back, pressed == CarRadioGridRegion.Back, R_BACK)
         drawRound(canvas, layout.search, pressed == CarRadioGridRegion.Search, R_SEARCH)
         content.tabs.forEachIndexed { index, tab ->
@@ -99,23 +112,23 @@ internal class CarRadioGridRenderer(private val context: Context) {
     }
 
     private fun drawRound(canvas: Canvas, box: CarRadioBox, pressed: Boolean, @DrawableRes icon: Int) {
-        fill.color = if (pressed) CHIP_PRESSED else CHIP
+        fill.color = if (pressed) look.controlPressed else look.control
         canvas.drawCircle(box.centerX, box.centerY, box.width / 2f, fill)
-        drawIcon(canvas, icon, box.centerX, box.centerY, box.width * 0.5f, INK)
+        drawIcon(canvas, icon, box.centerX, box.centerY, box.width * 0.5f, look.text)
     }
 
     private fun drawTab(canvas: Canvas, layout: CarRadioGridLayout, box: CarRadioBox, tab: Tab, selected: Boolean, pressed: Boolean) {
         fill.color = when {
-            selected -> ACCENT
-            pressed -> CHIP_PRESSED
-            else -> CHIP
+            selected -> look.accent
+            pressed -> look.controlPressed
+            else -> look.control
         }
         rect.set(box.left, box.top, box.right, box.bottom)
         canvas.drawRoundRect(rect, box.height / 2f, box.height / 2f, fill)
-        val ink = if (selected) ON_ACCENT else TAB_INK
+        val ink = if (selected) look.onAccent else look.text
         val iconSize = layout.dp(CarRadioGridLayout.TAB_ICON_DP)
         text.typeface = bold
-        text.textSize = layout.dp(TAB_TEXT_DP)
+        text.textSize = layout.dp(look.text(TAB_TEXT_DP))
         text.color = ink
         val room = box.width - iconSize - layout.dp(CarRadioGridLayout.TAB_ICON_GAP_DP) - layout.dp(16f)
         val label = TextUtils.ellipsize(tab.label, text, room.coerceAtLeast(0f), TextUtils.TruncateAt.END).toString()
@@ -129,25 +142,34 @@ internal class CarRadioGridRenderer(private val context: Context) {
     }
 
     private fun drawCell(canvas: Canvas, layout: CarRadioGridLayout, box: CarRadioBox, cell: Cell, pressed: Boolean, logos: Logos) {
-        val radius = layout.dp(20f)
+        val radius = layout.dp(look.tileRadius)
         rect.set(box.left, box.top, box.right, box.bottom)
         fill.color = when {
-            cell.onAir -> ON_AIR_CARD
-            pressed -> CHIP_PRESSED
-            else -> CHIP
+            cell.onAir -> look.selectedFill
+            pressed -> look.cardPressed
+            else -> look.card
         }
         canvas.drawRoundRect(rect, radius, radius, fill)
+        if (!cell.onAir && look.hasCardEdge) {
+            // Outlined and glass cards: the 1dp edge is what shows the card at all.
+            val edge = layout.dp(1f)
+            stroke.strokeWidth = edge
+            stroke.color = look.cardEdge
+            rect.set(box.left + edge / 2f, box.top + edge / 2f, box.right - edge / 2f, box.bottom - edge / 2f)
+            canvas.drawRoundRect(rect, radius - edge / 2f, radius - edge / 2f, stroke)
+        }
 
         val pad = layout.dp(CarRadioGridLayout.CELL_PADDING_DP)
         val image = CarRadioBox(box.left + pad, box.top + pad, box.right - pad, box.top + pad + layout.imageHeight)
-        val imageRadius = layout.dp(16f)
+        // The art sits inside the card with its corner following the card's.
+        val imageRadius = (radius - pad).coerceAtLeast(layout.dp(4f))
         val logo = if (cell.icon == 0) logos.bitmap(cell.logo) else null
         when {
             cell.icon != 0 -> {
                 rect.set(image.left, image.top, image.right, image.bottom)
-                fill.color = ACTION_CARD
+                fill.color = look.control
                 canvas.drawRoundRect(rect, imageRadius, imageRadius, fill)
-                drawIcon(canvas, cell.icon, image.centerX, image.centerY, image.height * 0.42f, INK)
+                drawIcon(canvas, cell.icon, image.centerX, image.centerY, image.height * 0.42f, look.text)
             }
             logo != null -> drawLogo(canvas, image, imageRadius, logo)
             else -> drawPlaceholder(canvas, layout, image, imageRadius, cell.title)
@@ -156,8 +178,8 @@ internal class CarRadioGridRenderer(private val context: Context) {
         // Name, and under the station on the air whether it is playing.
         val nameTop = image.bottom + layout.dp(4f)
         text.typeface = bold
-        text.textSize = layout.dp(NAME_TEXT_DP)
-        text.color = INK
+        text.textSize = layout.dp(look.text(NAME_TEXT_DP))
+        text.color = if (cell.onAir) look.selectedText else look.text
         text.textAlign = Paint.Align.CENTER
         val width = box.width - pad * 2 - layout.dp(8f)
         val status = cell.status
@@ -168,8 +190,8 @@ internal class CarRadioGridRenderer(private val context: Context) {
         )
         if (status != null) {
             text.typeface = medium
-            text.textSize = layout.dp(STATUS_TEXT_DP)
-            text.color = ACCENT
+            text.textSize = layout.dp(look.text(STATUS_TEXT_DP))
+            text.color = look.selectedText
             canvas.drawText(status, box.centerX, baseline(nameTop + layout.dp(30f)), text)
         }
         text.textAlign = Paint.Align.LEFT
@@ -177,7 +199,7 @@ internal class CarRadioGridRenderer(private val context: Context) {
         if (cell.onAir) {
             val ring = layout.dp(3f)
             stroke.strokeWidth = ring
-            stroke.color = ACCENT
+            stroke.color = look.accent
             rect.set(box.left + ring / 2f, box.top + ring / 2f, box.right - ring / 2f, box.bottom - ring / 2f)
             canvas.drawRoundRect(rect, radius - ring / 2f, radius - ring / 2f, stroke)
         }
@@ -214,6 +236,9 @@ internal class CarRadioGridRenderer(private val context: Context) {
     private fun drawPlaceholder(canvas: Canvas, layout: CarRadioGridLayout, box: CarRadioBox, radius: Float, title: String) {
         val color = CarStationTile.colorFor(title)
         rect.set(box.left, box.top, box.right, box.bottom)
+        // A shader is drawn at the paint's alpha, and the card before it may have left the paint
+        // transparent (outlined cards): the station's art is opaque whatever the card style.
+        fill.color = 0xFF000000.toInt()
         fill.shader = android.graphics.LinearGradient(
             box.left, box.top, box.right, box.bottom, lighten(color), darken(color), android.graphics.Shader.TileMode.CLAMP
         )
@@ -251,8 +276,8 @@ internal class CarRadioGridRenderer(private val context: Context) {
     private fun drawMessage(canvas: Canvas, layout: CarRadioGridLayout, message: String, action: String?, pressed: Boolean) {
         val box = layout.message
         text.typeface = medium
-        text.textSize = layout.dp(22f)
-        text.color = MUTED
+        text.textSize = layout.dp(look.text(22f))
+        text.color = look.textSecondary
         text.textAlign = Paint.Align.CENTER
         canvas.drawText(
             TextUtils.ellipsize(message, text, box.width, TextUtils.TruncateAt.END).toString(),
@@ -261,10 +286,10 @@ internal class CarRadioGridRenderer(private val context: Context) {
         if (action != null) {
             val button = layout.messageAction
             rect.set(button.left, button.top, button.right, button.bottom)
-            fill.color = if (pressed) ACCENT_PRESSED else ACCENT
+            fill.color = if (pressed) look.accentPressed else look.accent
             canvas.drawRoundRect(rect, button.height / 2f, button.height / 2f, fill)
             text.typeface = bold
-            text.color = ON_ACCENT
+            text.color = look.onAccent
             canvas.drawText(action, button.centerX, baseline(button.centerY), text)
         }
         text.textAlign = Paint.Align.LEFT
@@ -278,7 +303,7 @@ internal class CarRadioGridRenderer(private val context: Context) {
         val thumb = (track * viewport.height / layout.gridHeight).coerceAtLeast(layout.dp(32f))
         val top = viewport.top + (track - thumb) * (scroll / layout.maxScroll)
         val x = viewport.right + layout.dp(10f)
-        fill.color = SCROLL
+        fill.color = look.scrollThumb
         rect.set(x - layout.dp(2f), top, x + layout.dp(2f), top + thumb)
         canvas.drawRoundRect(rect, layout.dp(2f), layout.dp(2f), fill)
     }
@@ -303,20 +328,8 @@ internal class CarRadioGridRenderer(private val context: Context) {
     }
 
     companion object {
-        /** The radio design's car palette. */
-        const val BACKGROUND = DesignTokens.Radio.BACKGROUND
-        const val CHIP = DesignTokens.Phone.SURFACE
-        const val CHIP_PRESSED = DesignTokens.Radio.CHIP_PRESSED
-        const val ACTION_CARD = DesignTokens.Radio.ACTION_CARD
-        const val LOGO_CARD = DesignTokens.Radio.LOGO_CARD
-        const val ON_AIR_CARD = DesignTokens.Radio.WARM_CARD
-        const val ACCENT = DesignTokens.Phone.ACCENT_RADIO
-        const val ACCENT_PRESSED = DesignTokens.Radio.ACCENT_PRESSED
-        const val ON_ACCENT = DesignTokens.Radio.ON_AMBER
-        const val INK = DesignTokens.Phone.TEXT
-        const val TAB_INK = DesignTokens.Radio.TEXT_CONTROL
-        const val MUTED = DesignTokens.Radio.TEXT_HINT
-        const val SCROLL = DesignTokens.Radio.SCROLL
+        /** The light card a wide or tall logo is fitted on: part of the logo's art, not the theme. */
+        const val LOGO_CARD = dev.autobridge.design.DesignTokens.Radio.LOGO_CARD
 
         const val TAB_TEXT_DP = 19f
         const val NAME_TEXT_DP = 18f

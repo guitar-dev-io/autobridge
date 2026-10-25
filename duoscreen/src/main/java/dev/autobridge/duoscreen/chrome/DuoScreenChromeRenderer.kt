@@ -10,7 +10,7 @@ import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
 import android.text.TextUtils
-import dev.autobridge.design.DesignTokens
+import dev.autobridge.design.CarLook
 import dev.autobridge.duoscreen.layout.DuoScreenLayout.Bounds
 import dev.autobridge.duoscreen.layout.DuoScreenLayout.Rect
 import dev.autobridge.duoscreen.layout.DuoScreenPreset
@@ -68,33 +68,20 @@ data class ChromeFrame(
  * Runs on the compositor's GL thread only, which is why its paints can be reused across frames.
  */
 class DuoScreenChromeRenderer {
-    private companion object {
-        const val SURFACE = DesignTokens.MultiApp.SURFACE
-        const val BUTTON = DesignTokens.MultiApp.BUTTON
-        const val BUTTON_PRESSED = DesignTokens.MultiApp.BUTTON_PRESSED
-        const val ICON = DesignTokens.MultiApp.ICON
-        const val GRIP = DesignTokens.MultiApp.GRIP
-        const val ACCENT = DesignTokens.MultiApp.ACCENT
-        const val ON_ACCENT = DesignTokens.MultiApp.ON_ACCENT
-        const val DIM = DesignTokens.MultiApp.DIM
-        const val CHIP = DesignTokens.MultiApp.CHIP
-        const val CHIP_SELECTED = DesignTokens.MultiApp.CHIP_SELECTED
-        const val CHIP_TEXT = DesignTokens.MultiApp.ICON
-        const val CHIP_TEXT_SELECTED = DesignTokens.MultiApp.CHIP_TEXT_SELECTED
-        const val CHIP_GLYPH = DesignTokens.MultiApp.CHIP_GLYPH
-        const val SWAP = DesignTokens.MultiApp.SWAP
-        const val SWAP_TARGET = DesignTokens.MultiApp.SWAP_TARGET
-        const val TEXT = DesignTokens.MultiApp.TEXT
-        const val TEXT_MUTED = DesignTokens.MultiApp.TEXT_MUTED
-        const val CARD_BUTTON = DesignTokens.MultiApp.TEXT
-        const val CARD_BUTTON_TEXT = DesignTokens.MultiApp.CARD_BUTTON_TEXT
-        const val TILE = DesignTokens.MultiApp.TILE
-        /** The floating toolbar over the seam: nearly opaque, with a soft drop below it. */
-        const val TOOLBAR = DesignTokens.MultiApp.TOOLBAR
-        const val TOOLBAR_SHADOW = DesignTokens.MultiApp.TOOLBAR_SHADOW
-        /** The setup card's hairline edge and the soft accent disc behind its lock. */
-        const val CARD_EDGE = DesignTokens.MultiApp.CARD_EDGE
-        const val ACCENT_SOFT = DesignTokens.MultiApp.ACCENT_SOFT
+    /**
+     * The car look the colours were built from, and those colours: rebuilt only when the look
+     * changes, so a change in Settings > Appearance shows on the next chrome frame.
+     */
+    private var look: CarLook? = null
+    private var colors: DuoChromeColors = DuoChromeColors.of(CarLook.DEFAULT)
+
+    private fun syncLook() {
+        val next = CarLook.current()
+        if (next == look) return
+        look = next
+        colors = DuoChromeColors.of(next)
+        setupTitle.color = colors.text
+        setupBody.color = colors.textMuted
     }
 
     private enum class Glyph { LAYOUT_STACKED, LAYOUT_COLUMNS, SWAP, RELOAD, ARRANGE, DONE, KEYBOARD }
@@ -114,9 +101,9 @@ class DuoScreenChromeRenderer {
     // its own rather than [text], whose size every other element changes.
     private val setupTitle = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        color = TEXT
+        color = colors.text
     }
-    private val setupBody = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = TEXT_MUTED }
+    private val setupBody = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { color = colors.textMuted }
     private val rect = RectF()
     private val path = Path()
     private val scratch = Path()
@@ -129,6 +116,7 @@ class DuoScreenChromeRenderer {
         }.measureText(value)
 
     fun draw(canvas: Canvas, frame: ChromeFrame) {
+        syncLook()
         val c = frame.chrome
         val d = frame.density
         val s = c.spec
@@ -142,7 +130,7 @@ class DuoScreenChromeRenderer {
             scratch.addRoundRect(pane.toRectF(), radius, radius, Path.Direction.CW)
             path.op(scratch, Path.Op.DIFFERENCE)
         }
-        fill.color = SURFACE
+        fill.color = colors.surface
         canvas.drawPath(path, fill)
 
         if (!c.editing) {
@@ -151,7 +139,7 @@ class DuoScreenChromeRenderer {
                 scratch.reset()
                 scratch.addRoundRect(pane.toRectF(), radius, radius, Path.Direction.CW)
                 canvas.clipPath(scratch)
-                fill.color = ACCENT
+                fill.color = colors.accent
                 canvas.drawRect(pane.left.toFloat(), pane.top.toFloat(), pane.right.toFloat(), pane.top + s.FOCUS_EDGE * d, fill)
                 canvas.restore()
             }
@@ -183,11 +171,11 @@ class DuoScreenChromeRenderer {
         rail.tab?.let { tab ->
             rect.set(tab.toRectF())
             val r = tab.width.toFloat()
-            fill.color = TOOLBAR
+            fill.color = colors.toolbar
             // Rounded on the inner side only: the outer corners run off the edge.
             if (rail.side == RailSide.RIGHT) rect.right += r else rect.left -= r
             canvas.drawRoundRect(rect, r, r, fill)
-            stroke.color = ICON
+            stroke.color = colors.icon
             stroke.strokeWidth = 2.5f * d
             val cx = tab.centerX()
             val cy = tab.centerY()
@@ -204,16 +192,16 @@ class DuoScreenChromeRenderer {
         val pr = panel.width / 2f
         rect.set(panel.toRectF())
         rect.offset(0f, 2f * d)
-        fill.color = TOOLBAR_SHADOW
+        fill.color = colors.toolbarShadow
         canvas.drawRoundRect(rect, pr, pr, fill)
         rect.set(panel.toRectF())
-        fill.color = TOOLBAR
+        fill.color = colors.toolbar
         canvas.drawRoundRect(rect, pr, pr, fill)
 
         val corner = s.BUTTON_RADIUS * d
         rail.apps.forEach { (paneId, box) ->
             val pressed = frame.pressed == ChromeTarget.RailApp(paneId)
-            fill.color = if (pressed) BUTTON_PRESSED else BUTTON
+            fill.color = if (pressed) colors.buttonPressed else colors.button
             rect.set(box.toRectF())
             canvas.drawRoundRect(rect, corner, corner, fill)
             val icon = frame.apps[paneId]?.icon
@@ -222,30 +210,30 @@ class DuoScreenChromeRenderer {
                 rect.set(box.left + inset, box.top + inset, box.right - inset, box.bottom - inset)
                 canvas.drawBitmap(icon, null, rect, image)
             } else {
-                text.color = ICON
+                text.color = colors.icon
                 text.textSize = box.height * 0.42f
                 drawCentred(canvas, (paneId + 1).toString(), box, box.width.toFloat())
             }
             if (paneId == frame.focusedPaneId) {
-                stroke.color = ACCENT
+                stroke.color = colors.accent
                 stroke.strokeWidth = 2.5f * d
                 rect.set(box.toRectF())
                 rect.inset(-2f * d, -2f * d)
                 canvas.drawRoundRect(rect, corner + 2f * d, corner + 2f * d, stroke)
             }
         }
-        fill.color = GRIP
+        fill.color = colors.grip
         val inset = panel.width * 0.25f
         canvas.drawRect(panel.left + inset, rail.separatorAt - d / 2, panel.right - inset, rail.separatorAt + d / 2, fill)
         rail.buttons.forEach { (kind, box) ->
             val pressed = frame.pressed == ChromeTarget.Control(kind)
-            fill.color = if (pressed) BUTTON_PRESSED else BUTTON
+            fill.color = if (pressed) colors.buttonPressed else colors.button
             rect.set(box.toRectF())
             canvas.drawRoundRect(rect, corner, corner, fill)
             when (kind) {
                 ChromeTarget.Kind.RAIL_MOVE -> {
                     // Two chevrons pointing at the other edge: "move me there".
-                    stroke.color = ICON
+                    stroke.color = colors.icon
                     stroke.strokeWidth = 2.5f * d
                     val cx = box.centerX()
                     val cy = box.centerY()
@@ -273,7 +261,7 @@ class DuoScreenChromeRenderer {
                     }
                     // The rail's buttons are larger than the toolbar's; the icon grows with them.
                     val iconSize = s.BUTTON_ICON * d * box.width / (s.BUTTON * d)
-                    glyph(canvas, glyph, box.centerX(), box.centerY(), iconSize, ICON)
+                    glyph(canvas, glyph, box.centerX(), box.centerY(), iconSize, colors.icon)
                 }
             }
         }
@@ -286,7 +274,7 @@ class DuoScreenChromeRenderer {
         val d = frame.density
         val s = frame.chrome.spec
         if (c.barOverlapsPanes) {
-            fill.color = SURFACE
+            fill.color = colors.surface
             canvas.drawRect(c.bar.toRectF(), fill)
         }
         if (!c.editing) {
@@ -294,7 +282,7 @@ class DuoScreenChromeRenderer {
             val toolbar = c.toolbar
             if (toolbar == null) {
                 c.handle?.let { handle ->
-                    fill.color = if (frame.gripGrabbed) ACCENT else GRIP
+                    fill.color = if (frame.gripGrabbed) colors.accent else colors.grip
                     rect.set(handle.toRectF())
                     val r = minOf(handle.width, handle.height) / 2f
                     canvas.drawRoundRect(rect, r, r, fill)
@@ -303,15 +291,15 @@ class DuoScreenChromeRenderer {
             }
             rect.set(toolbar.toRectF())
             val tr = minOf(toolbar.width, toolbar.height) / 2f
-            fill.color = TOOLBAR_SHADOW
+            fill.color = colors.toolbarShadow
             rect.offset(0f, 2f * d)
             canvas.drawRoundRect(rect, tr, tr, fill)
             rect.set(toolbar.toRectF())
-            fill.color = TOOLBAR
+            fill.color = colors.toolbar
             canvas.drawRoundRect(rect, tr, tr, fill)
             c.buttons.forEach { (kind, box) ->
                 val pressed = frame.pressed == ChromeTarget.Control(kind)
-                fill.color = if (pressed) BUTTON_PRESSED else BUTTON
+                fill.color = if (pressed) colors.buttonPressed else colors.button
                 rect.set(box.toRectF())
                 canvas.drawRoundRect(rect, s.BUTTON_RADIUS * d, s.BUTTON_RADIUS * d, fill)
                 val glyph = when (kind) {
@@ -324,18 +312,18 @@ class DuoScreenChromeRenderer {
                     ChromeTarget.Kind.RELOAD -> Glyph.RELOAD
                     else -> Glyph.ARRANGE
                 }
-                glyph(canvas, glyph, box.centerX(), box.centerY(), s.BUTTON_ICON * d, ICON)
+                glyph(canvas, glyph, box.centerX(), box.centerY(), s.BUTTON_ICON * d, colors.icon)
             }
             return
         }
 
         // Arrange: the grip pill (three dots), Swap and Done.
         c.grip?.let { grip ->
-            fill.color = if (frame.gripGrabbed) ACCENT else GRIP
+            fill.color = if (frame.gripGrabbed) colors.accent else colors.grip
             rect.set(grip.toRectF())
             val r = minOf(grip.width, grip.height) / 2f
             canvas.drawRoundRect(rect, r, r, fill)
-            fill.color = if (frame.gripGrabbed) ON_ACCENT else ICON
+            fill.color = if (frame.gripGrabbed) colors.onAccent else colors.icon
             val dot = 4f * d
             val step = 16f * d
             for (i in -1..1) {
@@ -343,8 +331,8 @@ class DuoScreenChromeRenderer {
                 else canvas.drawCircle(grip.centerX(), grip.centerY() + i * step, dot, fill)
             }
         }
-        c.swapPill?.let { pill(canvas, frame, it, SWAP, TEXT, Glyph.SWAP, frame.labels.swap, ChromeTarget.Kind.SWAP) }
-        c.donePill?.let { pill(canvas, frame, it, ACCENT, ON_ACCENT, Glyph.DONE, frame.labels.done, ChromeTarget.Kind.DONE) }
+        c.swapPill?.let { pill(canvas, frame, it, colors.swap, colors.text, Glyph.SWAP, frame.labels.swap, ChromeTarget.Kind.SWAP) }
+        c.donePill?.let { pill(canvas, frame, it, colors.accent, colors.onAccent, Glyph.DONE, frame.labels.done, ChromeTarget.Kind.DONE) }
     }
 
     /** A rounded pill with an icon and, when there is room for it, its label. */
@@ -389,13 +377,13 @@ class DuoScreenChromeRenderer {
             rect.set(box.toRectF())
             val r = s.CHIP_RADIUS * d
             fill.color = when {
-                pressed -> BUTTON_PRESSED
-                selected -> CHIP_SELECTED
-                else -> CHIP
+                pressed -> colors.buttonPressed
+                selected -> colors.chipSelected
+                else -> colors.chip
             }
             canvas.drawRoundRect(rect, r, r, fill)
             if (selected) {
-                stroke.color = ACCENT
+                stroke.color = colors.accent
                 stroke.strokeWidth = 3f * d
                 rect.inset(1.5f * d, 1.5f * d)
                 canvas.drawRoundRect(rect, r, r, stroke)
@@ -405,7 +393,7 @@ class DuoScreenChromeRenderer {
             chipGlyph(canvas, preset, frame.paneCount, glyphLeft, glyphTop, s.CHIP_GLYPH_WIDTH * d, s.CHIP_GLYPH_HEIGHT * d, selected, d)
             if (!frame.chrome.chipsIconOnly) {
                 text.textSize = s.CHIP_TEXT * d
-                text.color = if (selected) CHIP_TEXT_SELECTED else CHIP_TEXT
+                text.color = if (selected) colors.chipTextSelected else colors.chipText
                 canvas.drawText(
                     frame.labels.chips[preset].orEmpty(),
                     glyphLeft + (s.CHIP_GLYPH_WIDTH + s.CHIP_GLYPH_GAP) * d, baseline(box), text
@@ -432,9 +420,9 @@ class DuoScreenChromeRenderer {
         on: Boolean,
         d: Float
     ) {
-        val main = if (on) ACCENT else CHIP_GLYPH
-        val second = if (on) DesignTokens.MultiApp.CHIP_GLYPH_ON else CHIP_GLYPH
-        val pip = if (on) ON_ACCENT else DesignTokens.MultiApp.CHIP_GLYPH_FILL
+        val main = if (on) colors.accent else colors.chipGlyph
+        val second = if (on) colors.chipGlyphOn else colors.chipGlyph
+        val pip = if (on) colors.onAccent else colors.chipGlyphFill
         val gap = 3f * d
         val r = 3f * d
         // Map int rects over the float glyph box, insetting each by a thin gap so tiles read apart.
@@ -467,10 +455,10 @@ class DuoScreenChromeRenderer {
             rect.set(card.pane.toRectF())
             // The swap target loses its dimming and takes the Swap colour, so it reads as the
             // place the dragged pane is about to land.
-            fill.color = if (card.paneId == frame.swapTargetId) SWAP_TARGET else DIM
+            fill.color = if (card.paneId == frame.swapTargetId) colors.swapTarget else colors.dim
             canvas.drawRoundRect(rect, radius, radius, fill)
             if (card.paneId == frame.selectedPaneId || card.paneId == frame.swapTargetId) {
-                stroke.color = ACCENT
+                stroke.color = colors.accent
                 stroke.strokeWidth = s.SELECT_OUTLINE * d
                 rect.inset(stroke.strokeWidth / 2f, stroke.strokeWidth / 2f)
                 canvas.drawRoundRect(rect, radius, radius, stroke)
@@ -478,7 +466,7 @@ class DuoScreenChromeRenderer {
 
             card.tile?.let { tile ->
                 rect.set(tile.toRectF())
-                fill.color = TILE
+                fill.color = colors.tile
                 val tr = s.CARD_TILE_RADIUS * d
                 canvas.drawRoundRect(rect, tr, tr, fill)
                 frame.apps[card.paneId]?.icon?.let { icon ->
@@ -489,21 +477,21 @@ class DuoScreenChromeRenderer {
             }
 
             text.textSize = s.CARD_TITLE * d
-            text.color = TEXT
+            text.color = colors.text
             drawCentred(canvas, frame.titles[card.paneId].orEmpty(), card.title, card.pane.width - 2 * s.CARD_GAP * d)
             card.share?.let { share ->
                 text.textSize = s.CARD_SHARE * d
-                text.color = TEXT_MUTED
+                text.color = colors.textMuted
                 drawCentred(canvas, frame.shares[card.paneId].orEmpty(), share, card.pane.width - 2 * s.CARD_GAP * d)
             }
 
             val pressed = frame.pressed == ChromeTarget.ChangeApp(card.paneId)
             rect.set(card.button.toRectF())
-            fill.color = if (pressed) DesignTokens.MultiApp.CARD_BUTTON_PRESSED else CARD_BUTTON
+            fill.color = if (pressed) colors.cardButtonPressed else colors.cardButton
             val br = card.button.height / 2f
             canvas.drawRoundRect(rect, br, br, fill)
             text.textSize = s.CARD_BUTTON_TEXT * d
-            text.color = CARD_BUTTON_TEXT
+            text.color = colors.cardButtonText
             drawCentred(canvas, frame.labels.changeApp, card.button, card.button.width.toFloat())
         }
     }
@@ -520,7 +508,7 @@ class DuoScreenChromeRenderer {
         val s = c.spec
         val compact = s == DuoScreenChromeSpec.COMPACT
         val radius = s.PANE_RADIUS * d
-        fill.color = DIM
+        fill.color = colors.dim
         panesOf(c).forEach { pane ->
             rect.set(pane.toRectF())
             canvas.drawRoundRect(rect, radius, radius, fill)
@@ -547,18 +535,18 @@ class DuoScreenChromeRenderer {
         val cardRadius = s.CARD_TILE_RADIUS * d
         val shadow = 6f * d
         rect.set(left, top + shadow, left + width, top + height + shadow)
-        fill.color = TOOLBAR_SHADOW
+        fill.color = colors.toolbarShadow
         canvas.drawRoundRect(rect, cardRadius, cardRadius, fill)
         rect.set(left, top, left + width, top + height)
-        fill.color = TOOLBAR
+        fill.color = colors.toolbar
         canvas.drawRoundRect(rect, cardRadius, cardRadius, fill)
-        stroke.color = CARD_EDGE
+        stroke.color = colors.cardEdge
         stroke.strokeWidth = 1f * d
         canvas.drawRoundRect(rect, cardRadius, cardRadius, stroke)
 
         val cx = left + width / 2f
         var y = top + pad
-        fill.color = ACCENT_SOFT
+        fill.color = colors.accentSoft
         canvas.drawCircle(cx, y + badge / 2f, badge / 2f, fill)
         drawLock(canvas, cx, y + badge / 2f, badge * 0.5f)
         y += badge + gap
@@ -578,7 +566,7 @@ class DuoScreenChromeRenderer {
             val tr = tile * 0.3f
             apps.forEach { app ->
                 rect.set(x, y, x + tile, y + tile)
-                fill.color = TILE
+                fill.color = colors.tile
                 canvas.drawRoundRect(rect, tr, tr, fill)
                 rect.inset(tile * 0.18f, tile * 0.18f)
                 canvas.drawBitmap(app.icon!!, null, rect, image)
@@ -609,7 +597,7 @@ class DuoScreenChromeRenderer {
         val cx = pane.centerX()
         if (icon != null) {
             rect.set(cx - tile / 2f, y, cx + tile / 2f, y + tile)
-            fill.color = TILE
+            fill.color = colors.tile
             val tr = tile * 0.28f
             canvas.drawRoundRect(rect, tr, tr, fill)
             rect.inset(tile * 0.18f, tile * 0.18f)
@@ -637,7 +625,7 @@ class DuoScreenChromeRenderer {
     private fun drawLock(canvas: Canvas, cx: Float, cy: Float, size: Float) {
         val bodyTop = cy - size * 0.05f
         val shackle = size * 0.2f
-        stroke.color = ACCENT
+        stroke.color = colors.accent
         stroke.strokeWidth = size * 0.1f
         path.reset()
         path.moveTo(cx - shackle, bodyTop)
@@ -645,10 +633,10 @@ class DuoScreenChromeRenderer {
         path.arcTo(RectF(cx - shackle, cy - size * 0.5f + stroke.strokeWidth / 2f, cx + shackle, cy + size * 0.06f), 180f, 180f, false)
         path.lineTo(cx + shackle, bodyTop)
         canvas.drawPath(path, stroke)
-        fill.color = ACCENT
+        fill.color = colors.accent
         rect.set(cx - size * 0.32f, bodyTop, cx + size * 0.32f, cy + size * 0.45f)
         canvas.drawRoundRect(rect, size * 0.1f, size * 0.1f, fill)
-        fill.color = TOOLBAR
+        fill.color = colors.toolbar
         canvas.drawCircle(cx, cy + size * 0.17f, size * 0.06f, fill)
     }
 
