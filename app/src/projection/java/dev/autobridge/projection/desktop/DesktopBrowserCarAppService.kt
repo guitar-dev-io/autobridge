@@ -181,7 +181,7 @@ class DesktopBrowserCarScreen(
     /** The rail, then the keyboard over the page when it is open. */
     private val overlay = FrameRenderer.Overlay { canvas, width, height ->
         rail.draw(canvas, width, height)
-        keyboard?.draw(canvas, keyboardArea(), rail.density, SystemClock.uptimeMillis(), ::drawIcon)
+        keyboard?.draw(canvas, keyboardArea(), rail.density, SystemClock.uptimeMillis(), drawIcon = ::drawIcon)
     }
 
     private fun allowed(): Boolean =

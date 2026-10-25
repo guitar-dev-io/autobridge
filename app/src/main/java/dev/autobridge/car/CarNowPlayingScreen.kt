@@ -7,7 +7,6 @@ import android.os.Looper
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
 import androidx.car.app.model.Action
-import androidx.car.app.model.CarColor
 import androidx.car.app.model.CarIcon
 import androidx.car.app.model.Header
 import androidx.car.app.model.Pane
@@ -76,7 +75,8 @@ class CarNowPlayingScreen(carContext: CarContext) : Screen(carContext) {
                             if (playing) R.string.car_now_pause else R.string.car_now_play
                         )
                     )
-                    .setBackgroundColor(CarColor.PRIMARY)
+                    // The car's accent, both shades: the host draws the pane, the action is ours.
+                    .setBackgroundColor(CarAccent.color())
                     .setEnabled(connected)
                     .setOnClickListener {
                         if (mediaPlayback.isPlaying) {

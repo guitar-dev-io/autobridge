@@ -2,6 +2,7 @@ package dev.autobridge.browser
 
 import android.graphics.Color
 import dev.autobridge.design.DesignTokens
+import dev.autobridge.design.ThemeHolder
 import dev.autobridge.design.ThemePalette
 
 /**
@@ -110,11 +111,11 @@ class BrowserColors(
  * a Fermata-style browser keeps its toolbar/menu look consistent across screens.
  *
  * Two fixed Material 3 schemes generated from one blue seed (the app's `#4C7DF0` accent): [dark],
- * and [light] at the same tones the car theme's `carColorPrimary` uses. The car deliberately reads
- * [dark] directly. The phone draws with [active], which [BrowserAppearanceStore.syncChrome] builds
- * from the app's Appearance palette ([fromPalette]). A head unit runs
- * its own UI dark at night and most of the day, and a light page chrome inside a dark dashboard
- * frame reads as a hole in it — so "Light" is a phone choice, not a car one.
+ * and [light] at the same tones the car theme's `carColorPrimary` uses. The phone draws with
+ * [active], which [BrowserAppearanceStore.syncChrome] builds from the app's Appearance palette
+ * ([fromPalette]). The car draws with [car], built the same way from the car palette
+ * ([ThemeHolder.carPalette]), so the car browser follows Settings > Appearance like every other car
+ * screen, and keeps the default look when "Use this look on Android Auto" is off.
  *
  * Call sites read the role off this object ([BrowserTheme.toolbarBackground]) and get whichever
  * scheme is active at the time they draw, which is why a theme change rebuilds the browser's views
@@ -193,8 +194,8 @@ object BrowserTheme {
 
     /**
      * The phone chrome's scheme, derived from the app's Settings > Appearance palette so the browser
-     * picks up the same preset, accent and light/dark choice as every other phone screen. The car
-     * never comes through here: it keeps drawing [dark].
+     * picks up the same preset, accent and light/dark choice as every other phone screen. [car]
+     * comes through here too, with the car palette.
      *
      * The palette has four surface steps (background, surface, raised, hairline) where Material 3
      * has a ladder of six, so the missing rungs are blended a few percent toward the text colour.
@@ -235,6 +236,18 @@ object BrowserTheme {
             fabFill = (0xE6 shl 24) or (palette.surface and 0x00FFFFFF),
             fabEdge = palette.accent,
         )
+    }
+
+    @Volatile
+    private var carCache: Pair<ThemePalette, BrowserColors>? = null
+
+    /**
+     * The car chrome's scheme: [fromPalette] of the car palette, built once per palette. Read on
+     * every chrome frame, so a change of look on the phone shows on the next frame.
+     */
+    fun car(palette: ThemePalette = ThemeHolder.carPalette): BrowserColors {
+        carCache?.let { (from, colors) -> if (from === palette || from == palette) return colors }
+        return fromPalette(palette).also { carCache = palette to it }
     }
 
     /**

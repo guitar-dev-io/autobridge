@@ -100,8 +100,10 @@ internal class CarSurfaceKeyboard(
     private var fittedHintSize = -1f
 
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
-    // Roboto Medium for Latin, the system Thai fallback for ไทย; created once.
-    private val keyFace = AppFonts.medium()
+    // The car's family (the keyboard is built each time it opens, so a new choice shows next time).
+    private val keyFace: android.graphics.Typeface? = dev.autobridge.design.CarLook.current().let {
+        android.graphics.Typeface.create(AppFonts.forChoice(it.font, it.thai), 500, false)
+    }
     private val label = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
         typeface = keyFace
@@ -234,25 +236,25 @@ internal class CarSurfaceKeyboard(
         area: Box,
         density: Float,
         nowMs: Long,
+        colors: BrowserKeyboardStyle.Colors = BrowserKeyboardStyle.Colors.DARK,
         drawIcon: (Canvas, BrowserIcon, Float, Float, Float, Int) -> Unit,
     ) {
         val g = geometry(area, density)
         val lit = if (pressedAt(nowMs)) pressed else null
-        val style = BrowserKeyboardStyle
-        val radius = style.KEY_RADIUS_DP * density
+        val radius = BrowserKeyboardStyle.KEY_RADIUS_DP * density
 
-        fill.color = style.TRAY
+        fill.color = colors.tray
         canvas.drawRect(g.tray.left, g.tray.top, g.tray.right, g.tray.bottom, fill)
-        fill.color = style.TRAY_EDGE
+        fill.color = colors.trayEdge
         canvas.drawRect(g.tray.left, g.tray.top, g.tray.right, g.tray.top + density, fill)
 
-        drawField(canvas, g, density, drawIcon)
+        drawField(canvas, g, density, colors, drawIcon)
 
-        drawCap(canvas, g.hide, style.FUNCTION_CAP, radius, density)
-        drawIcon(canvas, BrowserIcon.KBD_HIDE, g.hide.centerX, g.hide.centerY, g.keyHeight * HIDE_ICON, style.ON_FUNCTION_CAP)
+        drawCap(canvas, g.hide, colors.functionCap, radius, density)
+        drawIcon(canvas, BrowserIcon.KBD_HIDE, g.hide.centerX, g.hide.centerY, g.keyHeight * HIDE_ICON, colors.onFunctionCap)
         g.keys.forEach { (key, box) ->
-            val (cap, ink) = style.colours(key, shift)
-            drawCap(canvas, box, if (key == lit) style.pressedCap(key, shift) else cap, radius, density)
+            val (cap, ink) = colors.colours(key, shift)
+            drawCap(canvas, box, if (key == lit) colors.pressedCap(key, shift) else cap, radius, density)
             val icon = keyIcon(key)
             if (icon != null) {
                 drawIcon(canvas, icon, box.centerX, box.centerY, g.keyHeight * KEY_ICON, ink)
@@ -284,23 +286,23 @@ internal class CarSurfaceKeyboard(
         canvas: Canvas,
         g: BrowserKeyboardGeometry,
         density: Float,
+        colors: BrowserKeyboardStyle.Colors,
         drawIcon: (Canvas, BrowserIcon, Float, Float, Float, Int) -> Unit,
     ) {
-        val style = BrowserKeyboardStyle
         val field = g.field
-        val corner = style.KEY_RADIUS_DP * density
-        fill.color = style.FIELD
+        val corner = BrowserKeyboardStyle.KEY_RADIUS_DP * density
+        fill.color = colors.field
         rect.set(field.left, field.top, field.right, field.bottom)
         canvas.drawRoundRect(rect, corner, corner, fill)
         // The field is always the focused input: a 2dp primary ring, as Material focuses a text field.
-        stroke.color = style.CURSOR
+        stroke.color = colors.cursor
         stroke.strokeWidth = 2f * density
         canvas.drawRoundRect(rect, corner, corner, stroke)
-        drawIcon(canvas, BrowserIcon.SEARCH, field.left + g.keyHeight * 0.45f, field.centerY, g.keyHeight * 0.42f, style.INK_SECONDARY)
+        drawIcon(canvas, BrowserIcon.SEARCH, field.left + g.keyHeight * 0.45f, field.centerY, g.keyHeight * 0.42f, colors.inkSecondary)
 
         val text = buffer.text
         if (text.isNotEmpty()) {
-            drawIcon(canvas, BrowserIcon.CLOSE, g.clear.centerX, g.clear.centerY, g.keyHeight * 0.38f, style.INK_SECONDARY)
+            drawIcon(canvas, BrowserIcon.CLOSE, g.clear.centerX, g.clear.centerY, g.keyHeight * 0.38f, colors.inkSecondary)
         }
         fieldText.textSize = g.keyHeight * FIELD_TEXT
         val start = textLeft(g)
@@ -309,9 +311,9 @@ internal class CarSurfaceKeyboard(
         val baseline = field.centerY - (fieldText.descent() + fieldText.ascent()) / 2f
 
         if (text.isEmpty()) {
-            fieldText.color = style.INK_SECONDARY
+            fieldText.color = colors.inkSecondary
             canvas.drawText(fitHint(hint, width), start, baseline, fieldText)
-            drawCursor(canvas, start, field, density)
+            drawCursor(canvas, start, field, density, colors.cursor)
             return
         }
         val cursorX = fieldText.measureText(text, 0, buffer.cursor)
@@ -325,17 +327,17 @@ internal class CarSurfaceKeyboard(
         if (buffer.hasSelection) {
             val a = fieldText.measureText(text, 0, minOf(buffer.selectionStart, buffer.selectionEnd))
             val b = fieldText.measureText(text, 0, maxOf(buffer.selectionStart, buffer.selectionEnd))
-            fill.color = style.SELECTION
+            fill.color = colors.selection
             canvas.drawRect(start + a - textScroll, field.top + field.height * 0.18f, start + b - textScroll, field.bottom - field.height * 0.18f, fill)
         }
-        fieldText.color = style.INK
+        fieldText.color = colors.ink
         canvas.drawText(text, start - textScroll, baseline, fieldText)
-        if (!buffer.hasSelection) drawCursor(canvas, start + cursorX - textScroll, field, density)
+        if (!buffer.hasSelection) drawCursor(canvas, start + cursorX - textScroll, field, density, colors.cursor)
         canvas.restore()
     }
 
-    private fun drawCursor(canvas: Canvas, x: Float, field: Box, density: Float) {
-        fill.color = BrowserKeyboardStyle.CURSOR
+    private fun drawCursor(canvas: Canvas, x: Float, field: Box, density: Float, color: Int) {
+        fill.color = color
         canvas.drawRect(x, field.top + field.height * 0.2f, x + 2f * density, field.bottom - field.height * 0.2f, fill)
     }
 

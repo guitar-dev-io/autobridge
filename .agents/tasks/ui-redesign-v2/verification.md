@@ -295,3 +295,43 @@ Asked for from a photo of another car app's video launcher: large brand cards fo
 - Car: the Video group comes first in its own order as `IMAGE_TYPE_LARGE` grid items; the rest follow, warned sites last. The DHU host drew them as ordinary icons at this size (the host decides).
 - Tests: `StreamingLinksTest` (video group order, social group, warned set), `StreamingIconsTest` (own colours); all unit tests, compile, lint (`lintSafeDebug`) and check-i18n pass.
 - Checked: phone Streaming page (cards, order, note) and the car grid on the DHU. Not checked: tapping a card on the car and on the phone to see whether each site loads or plays; a wide (Coolwalk) head unit; favourites already saved are unchanged (keyed by address).
+
+## Car screens besides the home follow Appearance (branch claude/charming-moser-734914, 2026-10-25)
+
+What changed:
+- `CarLook` (:common `dev.autobridge.design`): the car palette (`ThemeHolder.carPalette`) plus card style, corners, capped text scale and font, resolved to roles (page, card in the chosen style, raised round control, accent / onAccent, selected fill + accent edge, live red, radii). `CarLook.current()` is read before each frame; with "Use this look on Android Auto" off it is the default look (palette, cards, corners, font, text scale 1). Text follows the phone up to `TextScaleCurve.CAR_CAP` (130%).
+- Radio grid (`CarRadioGridRenderer`, `CarRadioHomeScreen`): page, round back/search, tab pills (selected = accent + onAccent), station cards in the card style and tile corners (outlined/glass get their 1dp edge), the station on the air on the selected fill with a 3dp accent ring and its name in the accent, message button on the accent. Text sizes and the car font follow the look. A `CarLookWatch` repaints when Appearance changes (this screen has no tick).
+- Radio Now Playing (`CarRadioNowPlayingRenderer`): page, back and pills on the control colour, favourite-on on the selected fill, Play on the accent with an onAccent glyph, "Live" in the theme's red, cover corner follows the corners setting, text scaled. Picks up a change on its 1s tick.
+- Station tiles in template grids (`CarStationTile`, `CarChannelLogos.tile`): the on-air ring is the car accent (cache key includes it); the action tile uses control + text. Station colours, logos and the light logo card are the stations' own.
+- Car browser (`CarWebRenderer`, `BrowserTheme.car()`): the whole chrome (toolbar, address pill, FAB, menu sheet, tab switcher, error page, split divider) reads `BrowserTheme.fromPalette(car palette)` instead of the fixed `BrowserTheme.dark`; title/detail text uses the car font. A `CarLookWatch` asks for a frame on change. Page pixels are the page's own.
+- Car keyboard (`CarSurfaceKeyboard`, `BrowserKeyboardStyle.Colors.fromChrome`): tray, letter and function caps, Go on the accent with its onAccent label, cursor and selection in the accent; the keyboard face is the car font (taken when the keyboard opens). The Duo pane keyboard (`BrowserKeyboardView`) and the desktop browser's car keyboard keep the fixed dark set (`Colors.DARK`).
+- Duo Screen chrome (`DuoScreenChromeRenderer`, `DuoChromeColors`): gaps, bar, rail, buttons, preset chips (selected = selected fill + accent text), Swap/Done pills, the Arrange veil (page colour, so cards read in light mode), setup and blocked-pane cards. App pixels in the panes are untouched. Text there stays `Typeface.DEFAULT` (:duoscreen has no `AppFonts`).
+- Template screens: `CarNowPlayingScreen`'s Play/Pause button and the play/pause icon on the video (`CarVideoScreen`) and bridge (`CarBridgePlayerScreen`) action strips use `CarAccent.color()` = `CarColor.createCustom(accent light shade, accent dark shade)` (the host picks by its own day/night).
+- Tests: `CarLookTest` (roles, outlined/glass, sharp corners, text cap, switch off, contrast of every text role in dark/light/AMOLED x every preset x every accent), `CarBrowserLookTest` (car scheme from car palette, switch off, keyboard Go = accent, key label contrast), `CarAccentTest`, `DuoChromeColorsTest`.
+
+Host-drawn, so only the accent (icon tint / primary action) can follow; background, rows and text are Android Auto's own, in its own day/night colours:
+- ListTemplate: TV/IPTV lists (`CarIptvScreens`), radio categories / category / province, media library, queue, recent, favourites, bookmarks, quick launch, settings, diagnostics, audio diagnostics, log, weather, maintenance, emergency, mirror controls and intro, browser bookmarks/history/downloads/find/settings, More, Media Center lists.
+- GridTemplate: launcher, apps, streaming, driving mode, the home's pre-API-5 grid.
+- PaneTemplate: Now Playing (accent Play button), My Car tools (trip, fuel, costs, parking), support, the browser / video / bridge message panes.
+- MessageTemplate, SearchTemplate, TabTemplate (Media Center), LongMessageTemplate (disclosure).
+- The overlays on video, bridge and mirror are host action strips over our surface (`NavigationTemplate`): only their icon tint can follow; the mirror strip has no primary action, so it is unchanged. Mirror and video pixels and their black letterbox are content.
+- Left on the theme's fixed `CarColor.PRIMARY`: the Continue button of `CarVideoDisclaimerScreen` (a driving-safety disclaimer, not touched). Semantic colours stay: IPTV "Live" red and the stream ping green/yellow/red.
+
+Not built: the canvas's car "front" (driver) and "rear" (passenger) screens describe two car displays. AutoBridge has one car surface; Duo Screen is panes on it. No such model exists, so nothing was made for them.
+
+### DHU steps for these screens (one pass after merge)
+
+Set each look on the phone (Settings > Appearance) while the car screen is open, and confirm it repaints without leaving the screen. Looks: (1) Dark + Sky (default), (2) Light + Sky, (3) Dark + Amber (a non-Sky accent; also try Light + Rose), (4) Outlined cards, (5) Glass cards, (6) Sharp corners, (7) text Max (car caps at 130%), (8) "Use this look on Android Auto" off with Light + Rose + Glass + Sharp set on the phone (the car must show the default dark Sky look, elevated soft cards, 100% text).
+For each look, check:
+- Radio grid (Radio from the car home): page colour; back/search round on the raised colour; selected tab on the accent with a readable label; station cards in the card style (outlined shows only an edge, glass translucent) with the right corners; the station on the air on the tinted fill, accent ring, name in the accent; "All stations" tile; message state (Local without a province: the accent button); scroll thumb. Tab labels and names not clipped at text Max.
+- Radio Now Playing: page; back + EQ / Favourite / All stations pills; favourite on = tinted pill with accent star; Play on the accent with a readable glyph and label, pressed state; "Live" in red; title/subtitle/hint not overlapping at text Max; cover corner sharper with Sharp corners.
+- Radio lists from templates (categories, province, search results): the on-air station tile's ring in the accent.
+- Car browser: toolbar, address pill, secure badge, FAB, menu sheet (cards, tiles, toggles, primary card), tab switcher, error page, split divider; page itself unchanged. In Light: the chrome is light and every label readable.
+- Car keyboard (tap the address bar): tray, letter/function caps, Go on the accent with a readable label, shift on, cursor and selection in the accent; Thai and English labels readable in Light.
+- Duo Screen (personal flavor): gaps and bar, rail, focused pane's accent edge, Arrange: veil over the panes, cards readable, preset chips (selected in accent), Swap and Done pills, setup card when Shizuku is missing.
+- Car Now Playing (template): Play/Pause button in the accent (host's day and night).
+- Video and bridge players: play/pause icon in the accent; the other strip icons unchanged; the video picture unchanged.
+- Mirror: unchanged (host strip only), still mirrors.
+- Repaint without reopening: change accent and mode while each of radio grid, Now Playing, browser and Duo Screen is on screen.
+
+Checked: compile (personal, safe), all unit tests (:app personal, :common, :duoscreen), `lintSafeDebug`, `scripts/check-i18n.sh`. Not checked: anything on the DHU or the real phone (see the report for why).

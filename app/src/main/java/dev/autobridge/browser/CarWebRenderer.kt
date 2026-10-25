@@ -45,7 +45,6 @@ import dev.autobridge.entertainment.ContentAddress
 import dev.autobridge.entertainment.WebHistoryStore
 import kotlin.math.abs
 import kotlin.math.roundToInt
-import dev.autobridge.ui.AppFonts
 
 /**
  * AA-Browser-style native web surface for Android Auto.
@@ -614,8 +613,29 @@ class CarWebRenderer(context: Context) {
 
     private val toolbarPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val addressPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = AppFonts.bold()
+    private val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+    /**
+     * The car's Appearance as the chrome draws it: the scheme ([BrowserTheme.car], from the car
+     * palette), the keyboard's colours from that scheme, and the car's typefaces. Read at the start
+     * of every chrome pass ([syncLook]); [lookWatch] asks for a frame when the look changes while
+     * the page itself is idle.
+     */
+    private var carChrome: BrowserColors = BrowserTheme.car()
+    private var keyboardColors: BrowserKeyboardStyle.Colors = BrowserKeyboardStyle.Colors.fromChrome(carChrome)
+    private val faces = dev.autobridge.car.CarTypefaces()
+    private val lookWatch = dev.autobridge.car.CarLookWatch { if (running) requestFrameNow() }
+
+    private fun syncLook() {
+        val next = BrowserTheme.car()
+        if (next !== carChrome) {
+            carChrome = next
+            keyboardColors = BrowserKeyboardStyle.Colors.fromChrome(next)
+        }
+        faces.update(dev.autobridge.design.CarLook.current())
+        titlePaint.typeface = faces.bold
+        detailPaint.typeface = faces.regular
+        glyphPaint.typeface = faces.bold
     }
     private val detailPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val glyphPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -971,6 +991,7 @@ class CarWebRenderer(context: Context) {
             layoutWebView(width, height, ViewportDebug.Event.SURFACE_AVAILABLE)
             reattachRasterHost()
             running = true
+            lookWatch.start()
             pumpIdle = false
             dev.autobridge.logging.StructuredLog.i("CARWEB", "surface back ${width}x$height")
             // Give the user the full idle window from the moment the browser appears.
@@ -1070,6 +1091,7 @@ class CarWebRenderer(context: Context) {
     fun stop() {
         runOnMain {
             running = false
+            lookWatch.stop()
             // Focus is deliberately NOT dropped here. The surface detaches whenever a car template
             // is pushed over the browser — the drawer's own screens, settings, diagnostics — while
             // the page keeps playing. Abandoning focus then would leave the app audible with no
@@ -1170,6 +1192,7 @@ class CarWebRenderer(context: Context) {
     fun destroy() {
         runOnMain {
             running = false
+            lookWatch.stop()
             // A request that never reached a surface dies with the renderer; the next one restores
             // its tabs rather than opening a page asked for in a previous session.
             pendingStartUrl = null
@@ -2280,7 +2303,8 @@ class CarWebRenderer(context: Context) {
                 canvas.save()
                 canvas.clipRect(keyboardDirty)
                 clipToCard(canvas)
-                board.draw(canvas, keyboardArea(), sizes.dp(1f), nowMs) { c, icon, cx, cy, size, color ->
+                syncLook()
+                board.draw(canvas, keyboardArea(), sizes.dp(1f), nowMs, keyboardColors) { c, icon, cx, cy, size, color ->
                     drawIcon(c, icon, cx, cy, size, color)
                 }
                 canvas.restore()
@@ -3649,7 +3673,8 @@ class CarWebRenderer(context: Context) {
 
     /** LEGACY: one whole frame (page, then chrome) into a locked surface canvas. */
     private fun paintFrame(canvas: Canvas, view: WebView, nowMs: Long) {
-        canvas.drawColor(BrowserTheme.dark.background)
+        syncLook()
+        canvas.drawColor(carChrome.background)
         val cardOuterSave = canvas.save()
         clipToCard(canvas)
 
@@ -3680,7 +3705,7 @@ class CarWebRenderer(context: Context) {
         val stroke = sizes.dp(2f)
         toolbarPaint.style = Paint.Style.STROKE
         toolbarPaint.strokeWidth = stroke
-        toolbarPaint.color = BrowserTheme.dark.accent
+        toolbarPaint.color = carChrome.accent
         toolbarPaint.alpha = 200
         canvas.drawRect(
             pane.left + stroke / 2f, pane.top + stroke / 2f,
@@ -3702,16 +3727,16 @@ class CarWebRenderer(context: Context) {
         val radius = minOf(capsule.width, capsule.height) / 2f
         // The capsule: dark and nearly opaque, so it reads over either page.
         toolbarPaint.style = Paint.Style.FILL
-        toolbarPaint.color = BrowserTheme.dark.surfaceContainerHighest
+        toolbarPaint.color = carChrome.surfaceContainerHighest
         toolbarPaint.alpha = 235
         canvas.drawRoundRect(capsule.left, capsule.top, capsule.right, capsule.bottom, radius, radius, toolbarPaint)
         toolbarPaint.alpha = 255
         // A small ✕ at its end.
         val close = sideCloseBox(panes)
-        drawIcon(canvas, BrowserIcon.CLOSE, close.centerX, close.centerY, sizes.dp(12f), BrowserTheme.dark.iconEnabled)
+        drawIcon(canvas, BrowserIcon.CLOSE, close.centerX, close.centerY, sizes.dp(12f), carChrome.iconEnabled)
         // A hairline between the ✕ and the grip.
         val grip = dividerHandleBox(panes)
-        toolbarPaint.color = BrowserTheme.dark.outlineVariant
+        toolbarPaint.color = carChrome.outlineVariant
         val hair = sizes.dp(1f)
         if (panes.stacked) {
             canvas.drawRect(grip.left, grip.top + sizes.dp(5f), grip.left + hair, grip.bottom - sizes.dp(5f), toolbarPaint)
@@ -3719,7 +3744,7 @@ class CarWebRenderer(context: Context) {
             canvas.drawRect(grip.left + sizes.dp(5f), grip.top, grip.right - sizes.dp(5f), grip.top + hair, toolbarPaint)
         }
         // The grip: two short bars along the seam, lit in the accent while grabbed.
-        toolbarPaint.color = if (dividerGrabbed) BrowserTheme.dark.accent else BrowserTheme.dark.textSecondary
+        toolbarPaint.color = if (dividerGrabbed) carChrome.accent else carChrome.textSecondary
         val bar = sizes.dp(2f)
         val len = sizes.dp(16f) / 2f
         val apart = sizes.dp(3f)
@@ -3736,6 +3761,7 @@ class CarWebRenderer(context: Context) {
 
     /** Toolbar, overlays and FAB — shared by the legacy frame and the hardware chrome layer. */
     private fun drawChrome(canvas: Canvas, nowMs: Long) {
+        syncLook()
         // No grab-handle graphic while chrome is hidden: the page fills the surface with
         // nothing floating over it. The edge-reveal band ([BrowserChromeLayout.edgeReveal])
         // still recalls the toolbar on a swipe/tap; it is simply never drawn.
@@ -3762,7 +3788,7 @@ class CarWebRenderer(context: Context) {
         // toolbar's fade only when the user has asked for that
         // ([BrowserControlsStore.alwaysShowFloatingButton]).
         if (fabVisible(nowMs)) drawFab(canvas, fabAlpha(nowMs))
-        keyboard?.draw(canvas, keyboardArea(), sizes.dp(1f), nowMs) { c, icon, cx, cy, size, color ->
+        keyboard?.draw(canvas, keyboardArea(), sizes.dp(1f), nowMs, keyboardColors) { c, icon, cx, cy, size, color ->
             drawIcon(c, icon, cx, cy, size, color)
         }
     }
@@ -3775,7 +3801,7 @@ class CarWebRenderer(context: Context) {
         // M3 FAB: a rounded square (16dp corners on a 56dp button) in primaryContainer, not a
         // circle in the toolbar colour. The hit box is the same square either way.
         val corner = minOf(box.width, box.height) * FAB_CORNER_FRACTION
-        toolbarPaint.color = BrowserTheme.dark.fabContainer
+        toolbarPaint.color = carChrome.fabContainer
         toolbarPaint.alpha = (245 * opacity).toInt()
         canvas.drawRoundRect(box.left, box.top, box.right, box.bottom, corner, corner, toolbarPaint)
         toolbarPaint.alpha = 255
@@ -3783,7 +3809,7 @@ class CarWebRenderer(context: Context) {
         // claiming to be the menu.
         drawIcon(
             canvas, fabAction.icon, box.centerX, box.centerY,
-            radius * 0.95f, BrowserTheme.dark.onFabContainer, (255 * opacity).toInt()
+            radius * 0.95f, carChrome.onFabContainer, (255 * opacity).toInt()
         )
     }
 
@@ -3798,7 +3824,7 @@ class CarWebRenderer(context: Context) {
     private fun drawToolbar(canvas: Canvas, alpha: Float) {
         val bar = chrome.toolbar
         val opacity = (alpha.coerceIn(0f, 1f) * 255).toInt()
-        toolbarPaint.color = BrowserTheme.dark.toolbarBackground
+        toolbarPaint.color = carChrome.toolbarBackground
         // Fully opaque at rest (only the fade reduces it). At 94% the page underneath bled through
         // the bar — a search-field "+" from the page appeared on top of the back button.
         toolbarPaint.alpha = opacity
@@ -3810,7 +3836,7 @@ class CarWebRenderer(context: Context) {
                 ChromeZone.FORWARD -> canGoForward
                 else -> true
             }
-            val color = if (enabled) BrowserTheme.dark.iconEnabled else BrowserTheme.dark.iconDisabled
+            val color = if (enabled) carChrome.iconEnabled else carChrome.iconDisabled
             val icon = when (slot.zone) {
                 ChromeZone.BACK -> BrowserIcon.BACK
                 ChromeZone.FORWARD -> BrowserIcon.FORWARD
@@ -3830,7 +3856,7 @@ class CarWebRenderer(context: Context) {
         // Address pill: the page's identity, not a second row of controls.
         val pill = chrome.address
         if (pill.width > sizes.touchTarget) {
-            addressPaint.color = BrowserTheme.dark.addressPillBackground
+            addressPaint.color = carChrome.addressPillBackground
             addressPaint.alpha = opacity
             // Fully rounded, like the M3 search bar.
             canvas.drawRoundRect(
@@ -3840,7 +3866,7 @@ class CarWebRenderer(context: Context) {
             val address = runCatching { Uri.parse(url) }.getOrNull()
             val host = address?.host.orEmpty()
             val isHttps = url.startsWith("https://", ignoreCase = true)
-            val badgeColor = if (isHttps) BrowserTheme.dark.secureBadge else BrowserTheme.dark.insecureBadge
+            val badgeColor = if (isHttps) carChrome.secureBadge else carChrome.insecureBadge
             val badgeX = pill.left + sizes.horizontalPadding
             val badgeSize = sizes.iconSmall * 0.8f
             drawIcon(
@@ -3848,7 +3874,7 @@ class CarWebRenderer(context: Context) {
                 badgeX + badgeSize / 2f, pill.centerY, badgeSize, badgeColor, opacity
             )
 
-            titlePaint.color = BrowserTheme.dark.textPrimary
+            titlePaint.color = carChrome.textPrimary
             titlePaint.alpha = opacity
             titlePaint.textSize = sizes.iconSmall * 0.85f
             val labelX = badgeX + sizes.iconSmall + sizes.contentGap
@@ -3862,7 +3888,7 @@ class CarWebRenderer(context: Context) {
         }
 
         if (loadingProgress in 0..99) {
-            toolbarPaint.color = BrowserTheme.dark.accent
+            toolbarPaint.color = carChrome.accent
             toolbarPaint.alpha = opacity
             val lineHeight = sizes.dp(2.5f)
             canvas.drawRect(
@@ -3880,14 +3906,14 @@ class CarWebRenderer(context: Context) {
     /** Slim grab handle shown while chrome is hidden, so it can always be recalled. */
     private fun drawHandle(canvas: Canvas) {
         val handle = chrome.handle
-        toolbarPaint.color = BrowserTheme.dark.surfaceContainer
+        toolbarPaint.color = carChrome.surfaceContainer
         toolbarPaint.alpha = 90
         canvas.drawRoundRect(
             RectF(handle.left, handle.top, handle.right, handle.bottom),
             sizes.cornerRadius, sizes.cornerRadius, toolbarPaint
         )
         toolbarPaint.alpha = 255
-        addressPaint.color = BrowserTheme.dark.onSurfaceVariant
+        addressPaint.color = carChrome.onSurfaceVariant
         addressPaint.alpha = 170
         val barWidth = handle.width * 0.3f
         val barHeight = sizes.dp(3f)
@@ -3900,7 +3926,7 @@ class CarWebRenderer(context: Context) {
         )
         addressPaint.alpha = 255
         if (loadingProgress in 0..99) {
-            toolbarPaint.color = BrowserTheme.dark.accent
+            toolbarPaint.color = carChrome.accent
             canvas.drawRect(
                 viewport.left.toFloat(), viewport.top.toFloat(),
                 viewport.left + viewport.width * (loadingProgress / 100f),
@@ -3923,7 +3949,7 @@ class CarWebRenderer(context: Context) {
         // The phone sheet's generous corner, so the two read as the same panel.
         val radius = sizes.dp(AutoUiSizes.SHEET_CORNER_RADIUS_DP)
         // Scrim over the page so the sheet reads as a layer, without moving anything beneath it.
-        toolbarPaint.color = BrowserTheme.dark.scrim
+        toolbarPaint.color = carChrome.scrim
         canvas.drawRect(
             viewport.left.toFloat(), viewport.top.toFloat(),
             (viewport.left + viewport.width).toFloat(), (viewport.top + viewport.height).toFloat(),
@@ -3931,7 +3957,7 @@ class CarWebRenderer(context: Context) {
         )
 
         val panel = model.panel
-        toolbarPaint.color = BrowserTheme.dark.sheetBackground
+        toolbarPaint.color = carChrome.sheetBackground
         canvas.drawRoundRect(panel.left, panel.top, panel.right, panel.bottom, radius, radius, toolbarPaint)
 
         canvas.save()
@@ -3939,7 +3965,7 @@ class CarWebRenderer(context: Context) {
         model.address?.let { drawSheetAddress(canvas, it) }
         model.primary?.let { drawSheetPrimary(canvas, it) }
         // The phone sheet separates its groups with faint full-width rules, not filled cards.
-        toolbarPaint.color = BrowserTheme.dark.hairline
+        toolbarPaint.color = carChrome.hairline
         model.dividers.forEach { y ->
             canvas.drawRect(model.header.left, y, model.header.right, y + sizes.dp(1f), toolbarPaint)
         }
@@ -4012,7 +4038,7 @@ class CarWebRenderer(context: Context) {
 
     private fun drawSheetHeader(canvas: Canvas, model: BrowserDrawerModel) {
         val grip = model.grip
-        toolbarPaint.color = BrowserTheme.dark.iconDisabled
+        toolbarPaint.color = carChrome.iconDisabled
         canvas.drawRoundRect(
             grip.left, grip.top, grip.right, grip.bottom,
             grip.height / 2f, grip.height / 2f, toolbarPaint
@@ -4028,11 +4054,11 @@ class CarWebRenderer(context: Context) {
         val textLimit = firstButton - textLeft - sizes.contentGap
         val hasSubtitle = model.subtitle.isNotBlank()
         val blockTop = header.centerY - (titleSize + if (hasSubtitle) subSize * 1.4f else 0f) / 2f
-        titlePaint.color = BrowserTheme.dark.textPrimary
+        titlePaint.color = carChrome.textPrimary
         titlePaint.textSize = titleSize
         canvas.drawText(fit(model.title, titlePaint, textLimit), textLeft, blockTop + titleSize * 0.92f, titlePaint)
         if (hasSubtitle) {
-            detailPaint.color = BrowserTheme.dark.textSecondary
+            detailPaint.color = carChrome.textSecondary
             detailPaint.textSize = subSize
             canvas.drawText(
                 fit(model.subtitle, detailPaint, textLimit), textLeft,
@@ -4042,24 +4068,24 @@ class CarWebRenderer(context: Context) {
 
         model.headerLinks.forEach { link ->
             val box = link.bounds
-            toolbarPaint.color = BrowserTheme.dark.sheetCardBackground
+            toolbarPaint.color = carChrome.sheetCardBackground
             canvas.drawRoundRect(
                 box.left, box.top, box.right, box.bottom, box.height / 2f, box.height / 2f, toolbarPaint
             )
             if (link.kind == DrawerKind.ROUND) {
                 val iconSize = sizes.iconLarge.coerceAtMost(box.height * 0.6f)
-                drawIcon(canvas, link.item.icon, box.centerX, box.centerY, iconSize, BrowserTheme.dark.textPrimary)
+                drawIcon(canvas, link.item.icon, box.centerX, box.centerY, iconSize, carChrome.textPrimary)
             } else {
                 // A pill: icon on the left, its label to the right, drawn as one centred block.
                 val iconSize = (sizes.iconSmall * 0.9f).coerceAtMost(box.height * 0.5f)
-                glyphPaint.color = BrowserTheme.dark.textPrimary
+                glyphPaint.color = carChrome.textPrimary
                 glyphPaint.textSize = (sizes.iconSmall * 0.8f).coerceAtMost(box.height * 0.42f)
                 val label = link.item.label(appContext)
                 val gap = sizes.contentGap * 0.5f
                 val labelWidth = glyphPaint.measureText(label)
                 val blockWidth = iconSize + gap + labelWidth
                 val iconCx = box.centerX - blockWidth / 2f + iconSize / 2f
-                drawIcon(canvas, link.item.icon, iconCx, box.centerY, iconSize, BrowserTheme.dark.textPrimary)
+                drawIcon(canvas, link.item.icon, iconCx, box.centerY, iconSize, carChrome.textPrimary)
                 drawCentered(
                     canvas, glyphPaint, label,
                     iconCx + iconSize / 2f + gap + labelWidth / 2f,
@@ -4070,10 +4096,10 @@ class CarWebRenderer(context: Context) {
 
         // The phone's round ✕: a full touch target in a fixed corner, on a tonal circle.
         val close = model.closeButton
-        toolbarPaint.color = BrowserTheme.dark.sheetCardBackground
+        toolbarPaint.color = carChrome.sheetCardBackground
         canvas.drawCircle(close.centerX, close.centerY, minOf(close.width, close.height) / 2f, toolbarPaint)
         val closeSize = sizes.iconSmall.coerceAtMost(close.height * 0.45f)
-        drawIcon(canvas, BrowserIcon.CLOSE, close.centerX, close.centerY, closeSize, BrowserTheme.dark.textSecondary)
+        drawIcon(canvas, BrowserIcon.CLOSE, close.centerX, close.centerY, closeSize, carChrome.textSecondary)
     }
 
     /**
@@ -4084,18 +4110,18 @@ class CarWebRenderer(context: Context) {
     private fun drawSheetAddress(canvas: Canvas, address: DrawerAddress) {
         val box = address.bounds
         val radius = box.height / 2f
-        addressPaint.color = BrowserTheme.dark.addressPillBackground
+        addressPaint.color = carChrome.addressPillBackground
         canvas.drawRoundRect(box.left, box.top, box.right, box.bottom, radius, radius, addressPaint)
 
         val badgeX = box.left + sizes.horizontalPadding
-        val badgeColor = if (address.secure) BrowserTheme.dark.secureBadge else BrowserTheme.dark.insecureBadge
+        val badgeColor = if (address.secure) carChrome.secureBadge else carChrome.insecureBadge
         val badgeSize = sizes.iconSmall * 0.9f
         drawIcon(
             canvas, if (address.secure) BrowserIcon.LOCK else BrowserIcon.WARNING,
             badgeX + badgeSize / 2f, box.centerY, badgeSize, badgeColor
         )
 
-        titlePaint.color = BrowserTheme.dark.textPrimary
+        titlePaint.color = carChrome.textPrimary
         titlePaint.textSize = sizes.iconSmall * 0.9f
         val textLeft = badgeX + sizes.iconSmall + sizes.contentGap
         canvas.drawText(
@@ -4106,11 +4132,11 @@ class CarWebRenderer(context: Context) {
         val clearSize = sizes.iconSmall.coerceAtMost(address.clear.height * 0.5f)
         drawIcon(
             canvas, BrowserIcon.CLOSE, address.clear.centerX, address.clear.centerY,
-            clearSize, BrowserTheme.dark.textSecondary
+            clearSize, carChrome.textSecondary
         )
 
         // The one filled control on the row, because it is the one that commits: M3 filled button.
-        toolbarPaint.color = BrowserTheme.dark.primary
+        toolbarPaint.color = carChrome.primary
         canvas.drawCircle(
             address.go.centerX, address.go.centerY,
             minOf(address.go.width, address.go.height) / 2f, toolbarPaint
@@ -4118,13 +4144,13 @@ class CarWebRenderer(context: Context) {
         val goSize = sizes.iconMedium.coerceAtMost(address.go.height * 0.55f)
         drawIcon(
             canvas, BrowserIcon.SEARCH, address.go.centerX, address.go.centerY,
-            goSize, BrowserTheme.dark.onPrimary
+            goSize, carChrome.onPrimary
         )
     }
 
     /** A "More" group heading: small, muted, left-aligned at the bottom of its band. */
     private fun drawSheetSectionLabel(canvas: Canvas, labelRes: Int, box: Box) {
-        detailPaint.color = BrowserTheme.dark.textSecondary
+        detailPaint.color = carChrome.textSecondary
         detailPaint.textSize = (sizes.iconSmall * 0.72f).coerceAtMost(box.height * 0.6f)
         detailPaint.textAlign = Paint.Align.LEFT
         canvas.drawText(
@@ -4135,12 +4161,12 @@ class CarWebRenderer(context: Context) {
 
     /** A row that only holds buttons (zoom): the card, a search glyph and its label. */
     private fun drawSheetPlate(canvas: Canvas, labelRes: Int, box: Box) {
-        toolbarPaint.color = BrowserTheme.dark.sheetCardBackground
+        toolbarPaint.color = carChrome.sheetCardBackground
         canvas.drawRoundRect(box.left, box.top, box.right, box.bottom, sizes.cornerRadius, sizes.cornerRadius, toolbarPaint)
         val iconSize = sizes.iconMedium.coerceAtMost(box.height * 0.5f)
         val glyphX = box.left + sizes.horizontalPadding + iconSize / 2f
-        drawIcon(canvas, BrowserIcon.SEARCH, glyphX, box.centerY, iconSize, BrowserTheme.dark.textSecondary)
-        titlePaint.color = BrowserTheme.dark.textPrimary
+        drawIcon(canvas, BrowserIcon.SEARCH, glyphX, box.centerY, iconSize, carChrome.textSecondary)
+        titlePaint.color = carChrome.textPrimary
         titlePaint.textSize = (sizes.iconSmall * 0.9f).coerceAtMost(box.height * 0.42f)
         canvas.drawText(
             appContext.getString(labelRes), glyphX + iconSize / 2f + sizes.horizontalPadding,
@@ -4150,7 +4176,7 @@ class CarWebRenderer(context: Context) {
 
     /** The zoom now, centred between the − and + buttons. */
     private fun drawSheetZoomReadout(canvas: Canvas, text: String, box: Box) {
-        titlePaint.color = BrowserTheme.dark.textPrimary
+        titlePaint.color = carChrome.textPrimary
         titlePaint.textSize = (sizes.iconSmall * 0.85f).coerceAtMost(box.height * 0.42f)
         val align = titlePaint.textAlign
         titlePaint.textAlign = Paint.Align.CENTER
@@ -4161,13 +4187,13 @@ class CarWebRenderer(context: Context) {
     /** The zoom stepper's − / + buttons: a tonal rounded square with the glyph. */
     private fun drawSheetStepButton(canvas: Canvas, row: DrawerRow) {
         val box = row.bounds
-        toolbarPaint.color = BrowserTheme.dark.tileBackground
+        toolbarPaint.color = carChrome.tileBackground
         val radius = box.height * 0.3f
         canvas.drawRoundRect(box.left, box.top, box.right, box.bottom, radius, radius, toolbarPaint)
         val iconSize = sizes.iconMedium.coerceAtMost(box.height * 0.55f)
         drawIcon(
             canvas, row.item.icon, box.centerX, box.centerY, iconSize,
-            if (row.item.enabled) BrowserTheme.dark.iconEnabled else BrowserTheme.dark.iconDisabled
+            if (row.item.enabled) carChrome.iconEnabled else carChrome.iconDisabled
         )
     }
 
@@ -4177,19 +4203,19 @@ class CarWebRenderer(context: Context) {
         val enabled = row.item.enabled
         val on = enabled && row.item.on
         val radius = sizes.dp(AutoUiSizes.SHEET_CORNER_RADIUS_DP).coerceAtMost(box.height * 0.3f)
-        toolbarPaint.color = if (enabled) BrowserTheme.dark.tileBackground else BrowserTheme.dark.tileDisabledBackground
+        toolbarPaint.color = if (enabled) carChrome.tileBackground else carChrome.tileDisabledBackground
         canvas.drawRoundRect(box.left, box.top, box.right, box.bottom, radius, radius, toolbarPaint)
 
         val iconSize = sizes.dp(AutoUiSizes.SHEET_ICON_DP).coerceAtMost(box.height * 0.5f)
         val iconCx = box.left + sizes.contentGap + iconSize / 2f
         val iconColor = when {
-            on -> BrowserTheme.dark.accent
-            enabled -> BrowserTheme.dark.iconEnabled
-            else -> BrowserTheme.dark.iconDisabled
+            on -> carChrome.accent
+            enabled -> carChrome.iconEnabled
+            else -> carChrome.iconDisabled
         }
         drawIcon(canvas, row.item.icon, iconCx, box.centerY, iconSize, iconColor)
 
-        detailPaint.color = if (enabled) BrowserTheme.dark.textPrimary else BrowserTheme.dark.iconDisabled
+        detailPaint.color = if (enabled) carChrome.textPrimary else carChrome.iconDisabled
         detailPaint.textSize = (sizes.iconSmall * 0.8f).coerceAtMost(box.height * 0.36f)
         detailPaint.textAlign = Paint.Align.LEFT
         val textLeft = iconCx + iconSize / 2f + sizes.contentGap
@@ -4200,7 +4226,7 @@ class CarWebRenderer(context: Context) {
             textLeft, box.centerY + detailPaint.textSize * 0.35f, detailPaint
         )
         if (valueText.isNotBlank()) {
-            detailPaint.color = BrowserTheme.dark.accent
+            detailPaint.color = carChrome.accent
             canvas.drawText(
                 valueText, box.right - sizes.contentGap - detailPaint.measureText(valueText),
                 box.centerY + detailPaint.textSize * 0.35f, detailPaint
@@ -4217,14 +4243,14 @@ class CarWebRenderer(context: Context) {
         val card = row.bounds
         val layout = row.layout ?: return
         val radius = sizes.dp(AutoUiSizes.SHEET_CORNER_RADIUS_DP).coerceAtMost(card.height * 0.2f)
-        toolbarPaint.color = BrowserTheme.dark.tileBackground
+        toolbarPaint.color = carChrome.tileBackground
         canvas.drawRoundRect(card.left, card.top, card.right, card.bottom, radius, radius, toolbarPaint)
         if (row.item.on) {
             val stroke = sizes.dp(3f)
             val outline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 style = Paint.Style.STROKE
                 strokeWidth = stroke
-                color = BrowserTheme.dark.accent
+                color = carChrome.accent
             }
             canvas.drawRoundRect(
                 card.left + stroke / 2f, card.top + stroke / 2f, card.right - stroke / 2f, card.bottom - stroke / 2f,
@@ -4246,12 +4272,12 @@ class CarWebRenderer(context: Context) {
         val mainLeft = if (sideRight) picLeft else picLeft + sideWidth + gap
         val sideLeft = if (sideRight) picLeft + mainWidth + gap else picLeft
         val corner = sizes.dp(4f)
-        toolbarPaint.color = if (row.item.on) BrowserTheme.dark.accent else BrowserTheme.dark.iconEnabled
+        toolbarPaint.color = if (row.item.on) carChrome.accent else carChrome.iconEnabled
         canvas.drawRoundRect(mainLeft, picTop, mainLeft + mainWidth, picTop + picHeight, corner, corner, toolbarPaint)
-        toolbarPaint.color = BrowserTheme.dark.iconDisabled
+        toolbarPaint.color = carChrome.iconDisabled
         canvas.drawRoundRect(sideLeft, picTop, sideLeft + sideWidth, picTop + picHeight, corner, corner, toolbarPaint)
 
-        detailPaint.color = BrowserTheme.dark.textPrimary
+        detailPaint.color = carChrome.textPrimary
         detailPaint.textSize = labelSize
         val align = detailPaint.textAlign
         detailPaint.textAlign = Paint.Align.CENTER
@@ -4280,9 +4306,9 @@ class CarWebRenderer(context: Context) {
         // The phone sheet's tile: a tonal rounded rectangle, a glyph over a label.
         val radius = sizes.dp(AutoUiSizes.SHEET_CORNER_RADIUS_DP).coerceAtMost(tile.height * 0.3f)
         toolbarPaint.color = when {
-            on -> BrowserTheme.dark.accent
-            enabled -> BrowserTheme.dark.tileBackground
-            else -> BrowserTheme.dark.tileDisabledBackground
+            on -> carChrome.accent
+            enabled -> carChrome.tileBackground
+            else -> carChrome.tileDisabledBackground
         }
         canvas.drawRoundRect(tile.left, tile.top, tile.right, tile.bottom, radius, radius, toolbarPaint)
 
@@ -4293,16 +4319,16 @@ class CarWebRenderer(context: Context) {
         val blockTop = tile.centerY - (glyphSize + spacing + labelSize) / 2f
 
         val tileIconColor = when {
-            on -> BrowserTheme.dark.onPrimary
-            enabled -> BrowserTheme.dark.iconEnabled
-            else -> BrowserTheme.dark.iconDisabled
+            on -> carChrome.onPrimary
+            enabled -> carChrome.iconEnabled
+            else -> carChrome.iconDisabled
         }
         drawIcon(canvas, row.item.icon, tile.centerX, blockTop + glyphSize / 2f, glyphSize, tileIconColor)
 
         detailPaint.color = when {
-            on -> BrowserTheme.dark.onPrimary
-            enabled -> BrowserTheme.dark.textPrimary
-            else -> BrowserTheme.dark.iconDisabled
+            on -> carChrome.onPrimary
+            enabled -> carChrome.textPrimary
+            else -> carChrome.iconDisabled
         }
         detailPaint.textSize = labelSize
         drawCentered(
@@ -4312,7 +4338,7 @@ class CarWebRenderer(context: Context) {
         )
 
         if (row.item.value.isNotBlank()) {
-            detailPaint.color = BrowserTheme.dark.accent
+            detailPaint.color = carChrome.accent
             detailPaint.textSize = sizes.iconSmall * 0.75f
             val width = detailPaint.measureText(row.item.value)
             canvas.drawText(
@@ -4329,25 +4355,25 @@ class CarWebRenderer(context: Context) {
     private fun drawSheetPrimary(canvas: Canvas, row: DrawerRow) {
         val box = row.bounds
         val radius = sizes.dp(AutoUiSizes.SHEET_CORNER_RADIUS_DP).coerceAtMost(box.height * 0.36f)
-        toolbarPaint.color = BrowserTheme.dark.accent
+        toolbarPaint.color = carChrome.accent
         canvas.drawRoundRect(box.left, box.top, box.right, box.bottom, radius, radius, toolbarPaint)
 
         val pad = sizes.horizontalPadding * 1.5f
         val primaryIconSize = (sizes.dp(AutoUiSizes.SHEET_ICON_DP) * 1.1f).coerceAtMost(box.height * 0.5f)
         val iconCx = box.left + pad + primaryIconSize / 2f
-        drawIcon(canvas, row.item.icon, iconCx, box.centerY, primaryIconSize, BrowserTheme.dark.onPrimary)
+        drawIcon(canvas, row.item.icon, iconCx, box.centerY, primaryIconSize, carChrome.onPrimary)
 
         // Chevron, then the optional count badge, from the trailing edge in.
         val chevronSize = sizes.iconLarge.coerceAtMost(box.height * 0.6f)
         val chevronCx = box.right - pad * 0.8f - chevronSize * 0.25f
-        drawIcon(canvas, BrowserIcon.CHEVRON_RIGHT, chevronCx, box.centerY, chevronSize, BrowserTheme.dark.onPrimary)
+        drawIcon(canvas, BrowserIcon.CHEVRON_RIGHT, chevronCx, box.centerY, chevronSize, carChrome.onPrimary)
         var textRight = chevronCx - chevronSize * 0.5f - sizes.contentGap
         if (row.item.value.isNotBlank()) {
             val badge = (sizes.iconMedium * 1.3f).coerceAtMost(box.height * 0.55f)
             val badgeCx = textRight - badge / 2f
-            toolbarPaint.color = BrowserTheme.dark.onPrimary
+            toolbarPaint.color = carChrome.onPrimary
             canvas.drawCircle(badgeCx, box.centerY, badge / 2f, toolbarPaint)
-            glyphPaint.color = BrowserTheme.dark.accent
+            glyphPaint.color = carChrome.accent
             glyphPaint.textSize = badge * 0.5f
             canvas.drawText(row.item.value, badgeCx, box.centerY + glyphPaint.textSize * 0.36f, glyphPaint)
             textRight = badgeCx - badge / 2f - sizes.contentGap
@@ -4360,14 +4386,14 @@ class CarWebRenderer(context: Context) {
         val detail = row.item.detail(appContext)
         val hasDetail = detail.isNotBlank()
         val blockTop = box.centerY - (titleSize + if (hasDetail) subSize * 1.35f else 0f) / 2f
-        titlePaint.color = BrowserTheme.dark.onPrimary
+        titlePaint.color = carChrome.onPrimary
         titlePaint.textSize = titleSize
         canvas.drawText(
             fit(row.item.label(appContext), titlePaint, limit), textLeft,
             blockTop + titleSize * 0.9f, titlePaint
         )
         if (hasDetail) {
-            detailPaint.color = BrowserTheme.dark.onPrimary
+            detailPaint.color = carChrome.onPrimary
             detailPaint.textSize = subSize
             canvas.drawText(
                 fit(detail, detailPaint, limit), textLeft,
@@ -4383,7 +4409,7 @@ class CarWebRenderer(context: Context) {
      */
     private fun drawSheetToggle(canvas: Canvas, row: DrawerRow) {
         val box = row.bounds
-        toolbarPaint.color = BrowserTheme.dark.sheetCardBackground
+        toolbarPaint.color = carChrome.sheetCardBackground
         canvas.drawRoundRect(
             box.left, box.top, box.right, box.bottom,
             sizes.cornerRadius, sizes.cornerRadius, toolbarPaint
@@ -4391,14 +4417,14 @@ class CarWebRenderer(context: Context) {
 
         val toggleIconSize = sizes.iconMedium.coerceAtMost(box.height * 0.5f)
         val glyphX = box.left + sizes.horizontalPadding + toggleIconSize / 2f
-        drawIcon(canvas, row.item.icon, glyphX, box.centerY, toggleIconSize, BrowserTheme.dark.textSecondary)
+        drawIcon(canvas, row.item.icon, glyphX, box.centerY, toggleIconSize, carChrome.textSecondary)
 
         val trackWidth = (sizes.touchTarget * 0.9f).coerceAtMost(box.width * 0.25f)
         val trackHeight = (trackWidth * 0.52f).coerceAtMost(box.height * 0.6f)
         val trackRight = box.right - sizes.horizontalPadding
         val trackLeft = trackRight - trackWidth
 
-        titlePaint.color = BrowserTheme.dark.textPrimary
+        titlePaint.color = carChrome.textPrimary
         titlePaint.textSize = (sizes.iconSmall * 0.9f).coerceAtMost(box.height * 0.42f)
         val labelLeft = glyphX + toggleIconSize / 2f + sizes.horizontalPadding
         canvas.drawText(
@@ -4407,25 +4433,25 @@ class CarWebRenderer(context: Context) {
         )
 
         toolbarPaint.color =
-            if (row.item.on) BrowserTheme.dark.toggleTrackOn else BrowserTheme.dark.toggleTrackOff
+            if (row.item.on) carChrome.toggleTrackOn else carChrome.toggleTrackOff
         canvas.drawRoundRect(
             trackLeft, box.centerY - trackHeight / 2f, trackRight, box.centerY + trackHeight / 2f,
             trackHeight / 2f, trackHeight / 2f, toolbarPaint
         )
         toolbarPaint.color =
-            if (row.item.on) BrowserTheme.dark.toggleKnob else BrowserTheme.dark.toggleKnobOff
+            if (row.item.on) carChrome.toggleKnob else carChrome.toggleKnobOff
         val knobX = if (row.item.on) trackRight - trackHeight / 2f else trackLeft + trackHeight / 2f
         canvas.drawCircle(knobX, box.centerY, trackHeight * 0.4f, toolbarPaint)
     }
 
     private fun drawTabSwitcher(canvas: Canvas) {
-        toolbarPaint.color = BrowserTheme.dark.drawerBackground
+        toolbarPaint.color = carChrome.drawerBackground
         canvas.drawRect(
             viewport.left.toFloat(), viewport.top.toFloat(),
             (viewport.left + viewport.width).toFloat(), (viewport.top + viewport.height).toFloat(),
             toolbarPaint
         )
-        titlePaint.color = BrowserTheme.dark.textPrimary
+        titlePaint.color = carChrome.textPrimary
         titlePaint.textSize = sizes.iconMedium * 0.8f
         canvas.drawText(
             "Tabs  ${tabs.count}/${BrowserTabsState.MAX_TABS}",
@@ -4435,20 +4461,20 @@ class CarWebRenderer(context: Context) {
         // Same fixed close target the drawer uses, drawn in the header's opposite corner from the
         // title so the two overlays share one dismissal pattern instead of each inventing its own.
         val close = tabSwitcherCloseButton()
-        toolbarPaint.color = BrowserTheme.dark.drawerBackground
+        toolbarPaint.color = carChrome.drawerBackground
         canvas.drawRoundRect(
             close.left, close.top, close.right, close.bottom,
             sizes.cornerRadius, sizes.cornerRadius, toolbarPaint
         )
         val tabCloseSize = minOf(close.width, close.height) * 0.5f
-        drawIcon(canvas, BrowserIcon.CLOSE, close.centerX, close.centerY, tabCloseSize, BrowserTheme.dark.iconEnabled)
+        drawIcon(canvas, BrowserIcon.CLOSE, close.centerX, close.centerY, tabCloseSize, carChrome.iconEnabled)
 
         tabCardLayout().forEach { (tab, box, closeBox) ->
             val isActive = tab != null && tab.id == tabs.activeId
             // A solid accent fill used to sit behind the thumbnail itself, so the active card's own
             // preview was tinted and harder to read than every other card's. The active state is now
             // a border around the card instead, which marks it without touching what is drawn inside.
-            toolbarPaint.color = BrowserTheme.dark.addressPillBackground
+            toolbarPaint.color = carChrome.addressPillBackground
             canvas.drawRoundRect(
                 RectF(box.left, box.top, box.right, box.bottom),
                 sizes.cornerRadius, sizes.cornerRadius, toolbarPaint
@@ -4457,7 +4483,7 @@ class CarWebRenderer(context: Context) {
                 val strokeWidth = sizes.dp(2f)
                 toolbarPaint.style = Paint.Style.STROKE
                 toolbarPaint.strokeWidth = strokeWidth
-                toolbarPaint.color = BrowserTheme.dark.accent
+                toolbarPaint.color = carChrome.accent
                 canvas.drawRoundRect(
                     RectF(
                         box.left + strokeWidth / 2f, box.top + strokeWidth / 2f,
@@ -4468,7 +4494,7 @@ class CarWebRenderer(context: Context) {
                 toolbarPaint.style = Paint.Style.FILL
             }
             if (tab == null) {
-                drawIcon(canvas, BrowserIcon.ADD, box.centerX, box.centerY, sizes.iconLarge, BrowserTheme.dark.textPrimary)
+                drawIcon(canvas, BrowserIcon.ADD, box.centerX, box.centerY, sizes.iconLarge, carChrome.textPrimary)
                 return@forEach
             }
             val inset = sizes.dp(3f)
@@ -4481,17 +4507,17 @@ class CarWebRenderer(context: Context) {
                 canvas.drawBitmap(thumbnail, null, thumbRect, null)
                 canvas.restore()
             } else {
-                toolbarPaint.color = BrowserTheme.dark.background
+                toolbarPaint.color = carChrome.background
                 canvas.drawRect(thumbRect, toolbarPaint)
             }
-            titlePaint.color = BrowserTheme.dark.textPrimary
+            titlePaint.color = carChrome.textPrimary
             titlePaint.textSize = sizes.iconSmall * 0.85f
             val label = TextUtils.ellipsize(
                 tab.displayTitle, TextPaint(titlePaint),
                 box.width - sizes.horizontalPadding * 2f, TextUtils.TruncateAt.END
             ).toString()
             canvas.drawText(label, box.left + sizes.horizontalPadding, thumbBottom + sizes.iconSmall, titlePaint)
-            detailPaint.color = BrowserTheme.dark.textSecondary
+            detailPaint.color = carChrome.textSecondary
             detailPaint.textSize = sizes.iconSmall * 0.7f
             canvas.drawText(
                 tab.host, box.left + sizes.horizontalPadding,
@@ -4499,7 +4525,7 @@ class CarWebRenderer(context: Context) {
             )
             drawIcon(
                 canvas, BrowserIcon.CLOSE, closeBox.centerX, closeBox.centerY,
-                sizes.iconSmall, BrowserTheme.dark.textSecondary
+                sizes.iconSmall, carChrome.textSecondary
             )
         }
     }
@@ -4508,12 +4534,12 @@ class CarWebRenderer(context: Context) {
     private fun drawErrorOverlay(canvas: Canvas) {
         val w = mainViewport.width.toFloat()
         val h = mainViewport.height.toFloat()
-        canvas.drawColor(BrowserTheme.dark.errorBackground)
-        titlePaint.color = BrowserTheme.dark.errorAccent
+        canvas.drawColor(carChrome.errorBackground)
+        titlePaint.color = carChrome.errorAccent
         titlePaint.textSize = sizes.iconMedium
         val message = loadError.orEmpty()
         canvas.drawText(message, (w - titlePaint.measureText(message)) / 2f, h / 2f - sizes.contentGap, titlePaint)
-        detailPaint.color = BrowserTheme.dark.textSecondary
+        detailPaint.color = carChrome.textSecondary
         detailPaint.textSize = sizes.iconSmall * 0.9f
         val hint = appContext.getString(R.string.car_tap_to_retry)
         canvas.drawText(hint, (w - detailPaint.measureText(hint)) / 2f, h / 2f + sizes.iconMedium, detailPaint)
