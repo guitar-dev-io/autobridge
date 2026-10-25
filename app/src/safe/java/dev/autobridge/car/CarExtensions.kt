@@ -24,6 +24,14 @@ internal object CarExtensions {
     @Suppress("UNUSED_PARAMETER")
     fun openWeb(carContext: CarContext, screenManager: ScreenManager): Boolean = false
 
+    /** False: no Chrome for Linux in this build. */
+    @Suppress("UNUSED_PARAMETER")
+    fun canOpenChrome(carContext: CarContext): Boolean = false
+
+    /** False: no desktop browser, so the site opens in the built-in browser. */
+    @Suppress("UNUSED_PARAMETER")
+    fun openUrl(carContext: CarContext, screenManager: ScreenManager, url: String): Boolean = false
+
     /** False: no desktop browser to offer on the browser's start page. */
     @Suppress("UNUSED_PARAMETER")
     fun canOpenWeb(carContext: CarContext): Boolean = false

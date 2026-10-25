@@ -6,6 +6,7 @@ import android.os.Bundle
 import dev.autobridge.R
 import dev.autobridge.design.AccentColor
 import dev.autobridge.design.ThemeHolder
+import java.util.WeakHashMap
 
 /**
  * Puts the Appearance choice on each activity's Android theme, before its window exists.
@@ -15,10 +16,18 @@ import dev.autobridge.design.ThemeHolder
  * activity on [R.style.AppTheme] gets the light twin when the palette is light, and the user's
  * accent on top of either. One hook for every activity, instead of themed menus one call at a time.
  *
+ * A page left in the back stack while the look changes is recreated when it comes back to the
+ * front, so Back never lands on the old theme.
+ *
  * An activity with a theme of its own (the browser's two faces, the translucent share target, the
  * licences screen, car-facing surfaces) is left alone.
  */
 object AppTheming : Application.ActivityLifecycleCallbacks {
+
+    /** The look each themed activity was built with: the choices and whether the palette was light. */
+    private val builtWith = WeakHashMap<Activity, Pair<Any, Boolean>>()
+
+    private fun currentLook(): Pair<Any, Boolean> = ThemeHolder.spec to ThemeHolder.palette.isLight
 
     override fun onActivityPreCreated(activity: Activity, savedInstanceState: Bundle?) {
         val onAppTheme = runCatching {
@@ -27,6 +36,7 @@ object AppTheming : Application.ActivityLifecycleCallbacks {
         if (!onAppTheme) return
         AppearanceStore.refreshPalette(activity)
         val light = ThemeHolder.palette.isLight
+        builtWith[activity] = currentLook()
         if (light) activity.setTheme(R.style.AppThemeLight)
         activity.theme.applyStyle(accentOverlay(ThemeHolder.spec.accent, light), true)
     }
@@ -42,9 +52,16 @@ object AppTheming : Application.ActivityLifecycleCallbacks {
 
     override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = Unit
     override fun onActivityStarted(activity: Activity) = Unit
-    override fun onActivityResumed(activity: Activity) = Unit
+    override fun onActivityResumed(activity: Activity) {
+        val built = builtWith[activity] ?: return
+        // System and Auto modes can move on with the clock, so the palette is re-resolved first.
+        AppearanceStore.refreshPalette(activity)
+        if (built != currentLook()) activity.recreate()
+    }
     override fun onActivityPaused(activity: Activity) = Unit
     override fun onActivityStopped(activity: Activity) = Unit
     override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
-    override fun onActivityDestroyed(activity: Activity) = Unit
+    override fun onActivityDestroyed(activity: Activity) {
+        builtWith.remove(activity)
+    }
 }

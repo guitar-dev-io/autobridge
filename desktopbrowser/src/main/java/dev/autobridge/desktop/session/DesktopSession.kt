@@ -14,8 +14,10 @@ import dev.autobridge.desktop.display.FrameRenderer
 import dev.autobridge.desktop.display.X11Connection
 import dev.autobridge.desktop.display.XwdFramebuffer
 import dev.autobridge.desktop.input.BrowserInput
+import dev.autobridge.desktop.input.Keysym
 import dev.autobridge.desktop.keyboard.ClipboardSync
 import dev.autobridge.desktop.keyboard.X11Clipboard
+import dev.autobridge.desktop.runtime.GuestFontConfig
 import dev.autobridge.desktop.runtime.GuestNetworkConfig
 import dev.autobridge.desktop.runtime.LinuxRuntime
 import dev.autobridge.desktop.runtime.RuntimeLayout
@@ -193,7 +195,7 @@ class DesktopSession internal constructor(
     private fun launchBrowser(startUrl: String?, restore: Boolean): Process {
         // A fresh window opens on the start page; a restored one keeps the tabs it had.
         val url = startUrl ?: RuntimeLayout.START_URL.takeIf { hasStartPage && !restore }
-        val args = adapter.launchArgs(LaunchSpec(width, height, scale, url)) +
+        val args = adapter.launchArgs(LaunchSpec(width, height, scale, url, managed = DesktopEngine.store.managedMode)) +
             if (restore) listOf("--restore-last-session") else emptyList()
         val pidFile = "${RuntimeLayout.GUEST_RUN_DIR}/${adapter.id.key}.pid"
         return runtime.start(
@@ -206,6 +208,18 @@ class DesktopSession internal constructor(
             logFile = layout.logFile(adapter.id.key),
             workingDirectory = RuntimeLayout.GUEST_HOME,
         )
+    }
+
+    /**
+     * Opens [url] in a new tab of the running browser: Ctrl+T, the address, Return. A new tab, not
+     * the current one, so the page the driver was on stays one switch away. Does nothing until the
+     * X side is connected (a session that is still starting takes its URL on the command line).
+     */
+    fun openInNewTab(url: String) {
+        val input = input ?: return
+        input.newTab()
+        input.typeText(url)
+        input.key(Keysym.RETURN)
     }
 
     fun detachSurface() = renderer.detach()
@@ -294,6 +308,12 @@ class DesktopSession internal constructor(
         layout.host(adapter.profileDir()).let { profile ->
             listOf("SingletonLock", "SingletonSocket", "SingletonCookie").forEach { File(profile, it).delete() }
         }
+        runCatching {
+            val family = DesktopEngine.thaiFontFamily?.invoke() ?: GuestFontConfig.DEFAULT_THAI
+            val conf = layout.host(GuestFontConfig.FILE)
+            conf.parentFile?.mkdirs()
+            conf.writeText(GuestFontConfig.render(family))
+        }.onFailure { DesktopLog.w("font rule not written", it) }
         hasStartPage = runCatching { writeStartPage() }
             .onFailure { DesktopLog.w("start page not written", it) }
             .getOrDefault(false)
@@ -313,6 +333,11 @@ class DesktopSession internal constructor(
             pages.forEach { (name, html) -> File(dir, name).writeText(html) }
         }
         val policy = layout.host("${adapter.policyDir}/autobridge.json")
+        if (!DesktopEngine.store.managedMode) {
+            // Unmanaged: the browser runs with no AutoBridge policy and shows its own warning bar.
+            policy.delete()
+            return pages.isNotEmpty()
+        }
         policy.parentFile?.mkdirs()
         policy.writeText(adapter.managedPolicy(RuntimeLayout.START_URL.takeIf { pages.isNotEmpty() }).toString(2))
         return pages.isNotEmpty()

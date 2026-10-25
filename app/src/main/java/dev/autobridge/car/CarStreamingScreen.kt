@@ -12,6 +12,7 @@ import androidx.car.app.model.ItemList
 import androidx.car.app.model.Template
 import androidx.core.graphics.drawable.IconCompat
 import dev.autobridge.R
+import dev.autobridge.library.DesktopLinks
 import dev.autobridge.library.StreamingFavoritesStore
 import dev.autobridge.library.StreamingGroup
 import dev.autobridge.library.StreamingIcons
@@ -34,6 +35,7 @@ class CarStreamingScreen(carContext: CarContext) : Screen(carContext) {
 
     override fun onGetTemplate(): Template {
         val favorites = StreamingFavoritesStore.list(carContext)
+        val desktopBrowser = CarExtensions.canOpenChrome(carContext)
         val favoriteUrls = favorites.map { it.url }.toSet()
         val limit = runCatching {
             carContext.getCarService(ConstraintManager::class.java).getContentLimit(ConstraintManager.CONTENT_LIMIT_TYPE_GRID)
@@ -53,7 +55,8 @@ class CarStreamingScreen(carContext: CarContext) : Screen(carContext) {
             .sortedWith(compareBy({ it.group != StreamingGroup.VIDEO }, { it.group != StreamingGroup.VIDEO && StreamingLinks.mayNotPlay(it) }))
             .forEach { link ->
                 if (room <= 0) return@forEach
-                val note = if (StreamingLinks.mayNotPlay(link)) carContext.getString(R.string.car_streaming_maybe) else null
+                // No "may not play" where it opens in Chrome: the desktop browser plays them.
+                val note = if (StreamingLinks.mayNotPlay(link) && !desktopBrowser) carContext.getString(R.string.car_streaming_maybe) else null
                 grid.addItem(item(link.title, link.url, starred = false, note = note, large = link.group == StreamingGroup.VIDEO))
                 room--
             }
@@ -91,6 +94,9 @@ class CarStreamingScreen(carContext: CarContext) : Screen(carContext) {
 
     /** Same entry rule as the home tiles: a site already open is returned to, not reloaded. */
     private fun open(url: String) {
+        // The sites that may not play in the WebView open in Google Chrome for Linux (the desktop
+        // engine), where it is installed; everything else, and the case of none installed, is the built-in browser.
+        if (DesktopLinks.wantsDesktop(url) && CarExtensions.openUrl(carContext, screenManager, url)) return
         val renderer = dev.autobridge.browser.CarBrowserRuntime.renderer(carContext)
         if (!dev.autobridge.browser.BrowserSiteEntry.resumes(renderer.livePageUrl, url)) {
             renderer.load(url)

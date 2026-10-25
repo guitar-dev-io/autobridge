@@ -55,8 +55,12 @@ internal object CarHomeNavigator {
                 screenManager.push(CarLibraryScreen(carContext, CarLibraryScreen.Mode.GALLERY))
             HomeSection.FAVORITES ->
                 screenManager.push(CarFavoritesScreen(carContext))
+            // Drawn by the app, three cards to a row, where the host has a surface to draw on
+            // (Car API 5); below that the host's own grid.
             HomeSection.STREAMING ->
-                screenManager.push(CarStreamingScreen(carContext))
+                screenManager.push(
+                    if (carContext.carAppApiLevel >= 5) CarStreamingSurfaceScreen(carContext) else CarStreamingScreen(carContext)
+                )
             HomeSection.WEATHER ->
                 screenManager.push(CarWeatherScreen(carContext))
             HomeSection.MIRROR ->

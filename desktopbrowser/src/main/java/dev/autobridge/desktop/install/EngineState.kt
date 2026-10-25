@@ -69,6 +69,11 @@ class EngineStore(context: Context) {
         get() = prefs.getBoolean("seccomp", true)
         set(value) { prefs.edit().putBoolean("seccomp", value).apply() }
 
+    /** Managed mode (default on): --test-type plus the managed policy, which hide the --no-sandbox warning bar. */
+    var managedMode: Boolean
+        get() = prefs.getBoolean("managed_mode", true)
+        set(value) { prefs.edit().putBoolean("managed_mode", value).apply() }
+
     fun version(id: DesktopBrowserId): String? = prefs.getString("version_${id.key}", null)
     fun setVersion(id: DesktopBrowserId, value: String?) { prefs.edit().putString("version_${id.key}", value).apply() }
 

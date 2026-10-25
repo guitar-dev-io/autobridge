@@ -103,8 +103,12 @@ class DesktopBrowserCarScreen(
     carContext: CarContext,
     private val embedded: Boolean = false,
     /** The browser to show; null shows the one chosen for the Web card. */
-    browser: DesktopBrowserAdapter? = null
+    browser: DesktopBrowserAdapter? = null,
+    /** A page to open on arrival (a streaming site): a new tab when the browser is already running. */
+    startUrl: String? = null
 ) : Screen(carContext), SurfaceCallback {
+    /** Used once: the surface can come back (and the session be reopened) with no new request. */
+    private var pendingUrl: String? = startUrl
     private var session: DesktopSession? = null
     private var surface: android.view.Surface? = null
     private val adapter: DesktopBrowserAdapter? = DesktopEngine.let { it.init(carContext); browser ?: it.chosenInstalledBrowser() }
@@ -223,6 +227,7 @@ class DesktopBrowserCarScreen(
                 pageDoubleTap.cancel()
                 if (rail.dragHeld) session?.input?.releaseAtCursor()
                 session?.detachSurface()
+                dropSurface()
                 DesktopEngine.noteSurfaceDetached()
                 if (MirrorSurfaceOwnership.release(this@DesktopBrowserCarScreen)) {
                     carContext.getCarService(AppManager::class.java).setSurfaceCallback(null)
@@ -522,7 +527,7 @@ class DesktopBrowserCarScreen(
         // Remembered so "start on launch" opens the browser at this car's size.
         DesktopEngine.store.setLastCar(area.width(), area.height(), scale)
         val s = try {
-            DesktopEngine.openSession(browser.id, area.width(), area.height(), scale)
+            DesktopEngine.openSession(browser.id, area.width(), area.height(), scale, pendingUrl.also { pendingUrl = null })
         } catch (e: Exception) {
             DesktopLog.w("car session failed", e)
             return
@@ -547,9 +552,20 @@ class DesktopBrowserCarScreen(
         DesktopEngine.noteSurfaceAttached()
     }
 
-    override fun onSurfaceDestroyed(surfaceContainer: SurfaceContainer) {
+    /**
+     * Lets go of this screen's producer connection to the car surface. Drawing on it connected the
+     * surface to us, and the screen that takes over (the car home after Home) cannot lock a canvas
+     * on a surface that is still connected: its frames failed, so the car kept showing Chrome's
+     * last frame and looked hung. The host still owns the surface itself.
+     */
+    private fun dropSurface() {
+        surface?.let { runCatching { it.release() } }
         surface = null
+    }
+
+    override fun onSurfaceDestroyed(surfaceContainer: SurfaceContainer) {
         session?.detachSurface()
+        dropSurface()
         DesktopEngine.noteSurfaceDetached()
     }
 

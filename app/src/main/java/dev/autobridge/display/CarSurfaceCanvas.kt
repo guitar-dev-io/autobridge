@@ -88,7 +88,7 @@ object CarSurfaceCanvas {
         var hardware = false
         val canvas = (if (mode == BROKEN) null
         else runCatching { surface.lockHardwareCanvas() }.getOrNull()?.also { hardware = true })
-            ?: runCatching { surface.lockCanvas(null) }.getOrNull()
+            ?: runCatching { surface.lockCanvas(null) }.onFailure { StructuredLog.w(TAG, "lockCanvas failed: $it") }.getOrNull()
             ?: return false
 
         // Armed before the frame, because the frame is what may never return. Re-armed on every

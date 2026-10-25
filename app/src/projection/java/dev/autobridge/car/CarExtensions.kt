@@ -34,7 +34,33 @@ internal object CarExtensions {
     fun install(context: android.content.Context) {
         val app = context.applicationContext
         DesktopEngine.startPages = { dev.autobridge.browser.CarStartPage.desktopPages(app) }
+        // Thai pages follow the Thai letterforms chosen in Appearance (looped or not).
+        DesktopEngine.thaiFontFamily = {
+            if (dev.autobridge.settings.AppearanceStore.current().thai == dev.autobridge.design.ThaiStyle.LOOPED) {
+                dev.autobridge.desktop.runtime.GuestFontConfig.LOOPED_THAI
+            } else {
+                dev.autobridge.desktop.runtime.GuestFontConfig.DEFAULT_THAI
+            }
+        }
+        // The phone's Streaming page sends the sites that may not play in the WebView here.
+        dev.autobridge.library.DesktopLinks.opener = { ctx, url ->
+            // Google Chrome for Linux, not whichever browser is chosen for the Web card: these sites
+            // are meant for Chrome. Without it installed the built-in browser opens them.
+            val browser = if (desktopSupportedIn(ctx)) DesktopEngine.installedChrome() else null
+            browser?.let {
+                ctx.startActivity(
+                    dev.autobridge.projection.desktop.DesktopBrowserActivity.intent(ctx, it.id, url)
+                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+                true
+            } ?: false
+        }
     }
+
+    private fun desktopSupportedIn(context: android.content.Context): Boolean = runCatching {
+        DesktopEngine.init(context)
+        DesktopEngine.supported
+    }.getOrDefault(false)
 
     fun moreEntries(carContext: CarContext, screenManager: ScreenManager): List<CarExtensionEntry> {
         // Multi-app's pane picker offers the desktop browser when it is installed.
@@ -93,6 +119,24 @@ internal object CarExtensions {
     fun openWeb(carContext: CarContext, screenManager: ScreenManager): Boolean {
         if (!canOpenWeb(carContext)) return false
         CarNavigation.open(screenManager, "DesktopBrowserCarScreen") { DesktopBrowserCarScreen(carContext, embedded = true) }
+        return true
+    }
+
+    /** Whether Google Chrome for Linux is installed to open a site in; see [openUrl]. */
+    fun canOpenChrome(carContext: CarContext): Boolean =
+        desktopSupported(carContext) && DesktopEngine.installedChrome() != null
+
+    /**
+     * Opens [url] in Google Chrome for Linux on the car (not whichever browser is chosen for the
+     * Web card), in a new tab when Chrome is already running. False when it is not installed: the
+     * caller opens the built-in browser.
+     */
+    fun openUrl(carContext: CarContext, screenManager: ScreenManager, url: String): Boolean {
+        if (!canOpenChrome(carContext)) return false
+        val chrome = DesktopEngine.installedChrome() ?: return false
+        CarNavigation.open(screenManager, "DesktopBrowserCarScreen") {
+            DesktopBrowserCarScreen(carContext, embedded = true, browser = chrome, startUrl = url)
+        }
         return true
     }
 

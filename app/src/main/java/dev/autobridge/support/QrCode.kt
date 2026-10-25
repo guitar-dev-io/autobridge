@@ -11,12 +11,10 @@ import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 object QrCode {
 
     /**
-     * The channel's own QR artwork when one is bundled (the official Buy Me a Coffee code with its
-     * cup logo, the PromptPay code), else null and the caller draws one with [bitmap]. Bundled, not
+     * The channel's own QR artwork when one is bundled (the PromptPay code), else null and the caller draws one with [bitmap]. Bundled, not
      * fetched, so the code cannot be swapped out from under the user.
      */
     fun bundled(kind: SupportChannels.Kind): Int? = when (kind) {
-        SupportChannels.Kind.BUY_ME_A_COFFEE -> dev.autobridge.R.drawable.bmc_qr
         SupportChannels.Kind.PROMPTPAY -> dev.autobridge.R.drawable.promptpay_qr
         else -> null
     }

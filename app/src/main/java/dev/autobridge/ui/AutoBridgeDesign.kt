@@ -54,16 +54,19 @@ object AutoBridgeDesign {
     const val ACCENT_SOFT = DesignTokens.Phone.ACCENT_SOFT
     val DANGER: Int get() = ThemeHolder.palette.danger
 
-    /** "Parked" / "connected" status colour, shared by Home, Control, Car & Connection and Duo Screen. */
-    const val ACCENT_ONLINE = DesignTokens.Phone.ACCENT_ONLINE
+    /** Text and icons on an [ACCENT] fill: dark on the light accents, white on the deep ones. */
+    val ON_ACCENT: Int get() = ThemeHolder.palette.onAccent
+
+    /** "Parked" / "connected" status colour, shared by Home, Control, Car & Connection and Duo Screen. Follows the palette's good role, so it reads on a light page too. */
+    val ACCENT_ONLINE: Int get() = ThemeHolder.palette.good
 
     /**
      * Signal colours for a checked channel: green answers, amber answers slowly, and a dead one
      * takes [DANGER]. Green reading as "go" is the one colour convention a driver does not have to
      * learn, and the head unit shows the same three through `CarColor` (see `CarIptvCheck`).
      */
-    const val SIGNAL_GOOD = DesignTokens.Phone.SIGNAL_GOOD
-    const val SIGNAL_SLOW = DesignTokens.Phone.SIGNAL_SLOW
+    val SIGNAL_GOOD: Int get() = ThemeHolder.palette.good
+    val SIGNAL_SLOW: Int get() = ThemeHolder.palette.warn
 
     /** Per-section accents. Kept here so the phone and any future surface agree on them. */
     const val ACCENT_TV = DesignTokens.Phone.ACCENT_TV
@@ -479,9 +482,12 @@ object AutoBridgeDesign {
             textSize = 15f
             setTextColor(TEXT)
             typeface = AppFonts.medium()
+            // Always two lines tall: a weighted width is measured twice in a grid row, and a title
+            // sized for the first pass had its second line cut off by the subtitle under it.
+            minLines = 2
             maxLines = 2
             ellipsize = TextUtils.TruncateAt.END
-        }, LinearLayout.LayoutParams(0, -2, 1f))
+        }, LinearLayout.LayoutParams(0, context.dp(46), 1f))
         if (corner != null) titleRow.addView(
             glyphButton(context, corner.first, 16f, tint = if (corner.first == "★") ACCENT_FAVORITE else null, onClick = corner.second),
             LinearLayout.LayoutParams(context.dp(36), context.dp(36)).apply {

@@ -1577,7 +1577,7 @@ class BrowserActivity : Activity() {
             DrawerAction.AGENT ->
                 startActivity(dev.autobridge.MainActivityScreens.intent(this, dev.autobridge.ui.PhoneNav.Route.AGENT_COMMANDS))
             // An in-app browser tab over this one, so the page on screen is kept.
-            DrawerAction.SUPPORT -> openTab("https://buymeacoffee.com/guitar.story")
+            DrawerAction.SUPPORT -> openTab("https://ko-fi.com/guitardev")
             DrawerAction.LICENSES -> showOpenSourceLicenses()
             DrawerAction.GITHUB -> openTab("https://github.com/guitar-dev-io/autobridge")
             // The sheet's own footer pair: leaving the browser is this activity finishing.
