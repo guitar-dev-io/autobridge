@@ -217,7 +217,7 @@ object SettingsUi {
                     maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END
                     contentDescription = if (active) "$label, selected" else label
-                    setTextColor(if (active) Color.WHITE else AutoBridgeDesign.TEXT_MUTED)
+                    setTextColor(if (active) AutoBridgeDesign.ON_ACCENT else AutoBridgeDesign.TEXT_MUTED)
                     if (active) typeface = AppFonts.bold()
                     background =
                         if (active) AutoBridgeDesign.surface(
