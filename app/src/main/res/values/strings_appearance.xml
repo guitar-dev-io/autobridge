@@ -104,7 +104,7 @@
     <string name="appearance_text_larger">Larger</string>
     <string name="appearance_text_huge">Huge</string>
     <string name="appearance_text_max">Max</string>
-    <string name="appearance_text_note">Large sizes switch Home to two columns and let titles wrap to two lines. Car text stops growing at 130% so controls stay on screen.</string>
+    <string name="appearance_text_note" formatted="false">Large sizes switch Home to two columns and let titles wrap to two lines. Car text stops growing at 130% so controls stay on screen.</string>
     <string name="appearance_sample">Sample</string>
     <string name="appearance_sample_title">Night Drive · Mock Artist</string>
     <!-- Kept in Thai in every language: it shows how Thai vowels and tone marks render at this size. -->

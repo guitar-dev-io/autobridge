@@ -95,7 +95,7 @@
     <string name="appearance_text_larger">ใหญ่ขึ้น</string>
     <string name="appearance_text_huge">ใหญ่มาก</string>
     <string name="appearance_text_max">สูงสุด</string>
-    <string name="appearance_text_note">ขนาดใหญ่จะเปลี่ยนหน้าแรกเป็นสองคอลัมน์ และให้ชื่อขึ้นบรรทัดที่สองได้ ตัวอักษรบนรถจะหยุดขยายที่ 130% เพื่อให้ปุ่มยังอยู่บนจอ</string>
+    <string name="appearance_text_note" formatted="false">ขนาดใหญ่จะเปลี่ยนหน้าแรกเป็นสองคอลัมน์ และให้ชื่อขึ้นบรรทัดที่สองได้ ตัวอักษรบนรถจะหยุดขยายที่ 130% เพื่อให้ปุ่มยังอยู่บนจอ</string>
     <string name="appearance_sample">ตัวอย่าง</string>
     <string name="appearance_sample_title">Night Drive · Mock Artist</string>
     <string name="appearance_sample_thai">กำลังเล่นเพลงจากโทรศัพท์ ปรับเสียงได้จากพวงมาลัย สระและวรรณยุกต์ต้องไม่ชนกันทุกขนาด</string>
