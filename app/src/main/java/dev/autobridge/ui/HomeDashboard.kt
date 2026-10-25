@@ -73,7 +73,7 @@ data class ResumeRadioUi(
  * Body of the phone Home (below the AutoBridge header, above the mini player), in the layout
  * chosen under Settings > Appearance > Home layout:
  *
- * - Dashboard: a now-playing hero, 2x2 cards (Radio, TV, My Car, Displays) and a quick-launch row;
+ * - Dashboard: a now-playing hero, 2x2 cards (Streaming, Radio, TV, My Car) and a quick-launch row;
  * - Classic grid: every place as a tile, three columns (two at 130% text and up);
  * - Compact: one card of rows, with the bottom mini player.
  *
@@ -95,6 +95,8 @@ fun HomeDashboard(
     onOpenController: () -> Unit,
     onMirror: () -> Unit,
     onBridgeDuo: (() -> Unit)?,
+    /** The Streaming card: opens the Streaming page. */
+    onStreaming: () -> Unit = {},
     /** A newer release's version name when one was found; null hides the update card. */
     updateVersion: String? = null,
     onOpenUpdate: () -> Unit = {},
@@ -111,7 +113,7 @@ fun HomeDashboard(
     val lastResult = rememberLastCommandResult()
     var lastSubmittedText by remember { mutableStateOf("") }
     val recents = PhoneHomeLayout.recentSends(history)
-    val entries = homeEntries(tiles, resumeRadio, onOpenConnection, onMirror, onBridgeDuo)
+    val entries = homeEntries(tiles, resumeRadio, onOpenConnection, onMirror, onBridgeDuo, onStreaming)
     val displays = onBridgeDuo != null
     val layout = look.spec.homeLayout
 
@@ -177,9 +179,11 @@ private fun homeEntries(
     radio: ResumeRadioUi?,
     onOpenConnection: () -> Unit,
     onMirror: () -> Unit,
-    onBridgeDuo: (() -> Unit)?
+    onBridgeDuo: (() -> Unit)?,
+    onStreaming: () -> Unit
 ): Map<PhoneHomeLayout.Item, HomeEntry> {
     val captions = mapOf(
+        PhoneHomeLayout.Item.STREAMING to stringResource(R.string.home_v2_caption_streaming),
         PhoneHomeLayout.Item.BROWSER to stringResource(R.string.home_v2_caption_browser),
         PhoneHomeLayout.Item.MUSIC to stringResource(R.string.home_v2_caption_music),
         PhoneHomeLayout.Item.RADIO to (radio?.station ?: stringResource(R.string.home_v2_caption_radio)),
@@ -198,6 +202,7 @@ private fun homeEntries(
     fun extra(item: PhoneHomeLayout.Item, title: String, icon: Int, onClick: () -> Unit) {
         map[item] = HomeEntry(item, title, captions.getValue(item), icon, onClick)
     }
+    extra(PhoneHomeLayout.Item.STREAMING, stringResource(R.string.section_streaming), R.drawable.ic_tile_streaming, onStreaming)
     extra(PhoneHomeLayout.Item.MIRROR, stringResource(R.string.home_mirror_action), R.drawable.ic_tile_mirror, onMirror)
     extra(PhoneHomeLayout.Item.MY_CAR, stringResource(R.string.settings_car_connection), R.drawable.ic_tile_car, onOpenConnection)
     extra(PhoneHomeLayout.Item.DISPLAYS, stringResource(R.string.home_v2_tile_displays), R.drawable.ic_browser_split, onBridgeDuo ?: onMirror)

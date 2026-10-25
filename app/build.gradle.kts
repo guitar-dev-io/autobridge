@@ -165,6 +165,12 @@ android {
 
     buildTypes {
         debug {
+            // -PdebugSuffix installs this build next to the real app (dev.autobridge.debug) with
+            // its own data, so a first-run flow can be tried without touching what is installed.
+            // Off unless asked: the manifest authorities follow ${applicationId}, nothing else changes.
+            if (providers.gradleProperty("debugSuffix").isPresent) {
+                applicationIdSuffix = ".debug"
+            }
             // DHU-only test mode uses the deterministic parked mock; never enabled in release.
             buildConfigField("boolean", "DEV_MODE", "true")
             buildConfigField("boolean", "DHU_TEST_MODE", "true")
@@ -291,6 +297,10 @@ kotlin {
 // tests live in src/testVlc and are added to the debug unit-test source set only when the flag is
 // on, so they compile against src/vlc without dragging it into a flag-off test run.
 android.sourceSets {
+    if (providers.gradleProperty("debugSuffix").isPresent) {
+        // Overrides app_name for the side-by-side debug copy so the two icons are told apart.
+        getByName("debug") { res.srcDir("src/sideBySide/res") }
+    }
     getByName("main") {
         java.srcDir(if (subtitleTranslationEnabled) "src/translate/java" else "src/notranslate/java")
         java.srcDir(if (vlcEngineEnabled) "src/vlc/java" else "src/novlc/java")

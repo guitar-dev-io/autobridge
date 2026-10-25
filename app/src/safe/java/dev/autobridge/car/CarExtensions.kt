@@ -28,6 +28,18 @@ internal object CarExtensions {
     @Suppress("UNUSED_PARAMETER")
     fun canOpenChrome(carContext: CarContext): Boolean = false
 
+    /** False: no desktop browser here, so there is nothing to ask the user to install. */
+    @Suppress("UNUSED_PARAMETER")
+    fun canInstallChrome(carContext: CarContext): Boolean = false
+
+    /** False: nothing to send, there is no Chrome setup in this build. */
+    @Suppress("UNUSED_PARAMETER")
+    fun sendChromeSetupToPhone(carContext: CarContext, siteTitle: String): Boolean = false
+
+    /** Nothing to watch: Chrome cannot be installed in this build. Returns a no-op canceller. */
+    @Suppress("UNUSED_PARAMETER")
+    fun watchChromeInstall(carContext: CarContext, onReady: () -> Unit): () -> Unit = {}
+
     /** False: no desktop browser, so the site opens in the built-in browser. */
     @Suppress("UNUSED_PARAMETER")
     fun openUrl(carContext: CarContext, screenManager: ScreenManager, url: String): Boolean = false

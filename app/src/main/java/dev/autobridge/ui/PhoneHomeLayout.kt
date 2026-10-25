@@ -96,6 +96,7 @@ object PhoneHomeLayout {
      * the section colour an icon chip carries in the Tinted icon style.
      */
     enum class Item(val hueDark: Int, val hueLight: Int) {
+        STREAMING(0xFFFF8A8A.toInt(), 0xFFB3282E.toInt()),
         BROWSER(0xFF70ACFF.toInt(), 0xFF1F63C2.toInt()),
         MUSIC(0xFFAF80F8.toInt(), 0xFF6A3FC0.toInt()),
         RADIO(0xFFFFC46B.toInt(), 0xFF8F5800.toInt()),
@@ -123,17 +124,24 @@ object PhoneHomeLayout {
         Item.entries.filter { it != Item.DISPLAYS || displaysAvailable }
 
     /**
-     * Dashboard's 2x2 cards. Without the Duo screen, Mirror takes the Displays card so the grid
-     * stays square; it then leaves [dashboardQuickLaunch].
+     * Dashboard's 2x2 cards: Streaming leads (it starts Netflix and the other video services),
+     * then Radio, TV and My Car. Mirror and Displays (the Duo screen) are in [dashboardQuickLaunch]
+     * and the Android Auto card above the grid, so no card is spent on them.
      */
+    @Suppress("UNUSED_PARAMETER")
     fun dashboardCards(displaysAvailable: Boolean): List<Item> =
-        listOf(Item.RADIO, Item.TV, Item.MY_CAR, if (displaysAvailable) Item.DISPLAYS else Item.MIRROR)
+        listOf(Item.STREAMING, Item.RADIO, Item.TV, Item.MY_CAR)
 
     /** Dashboard's quick-launch row under the cards: what the cards do not already open. */
-    fun dashboardQuickLaunch(displaysAvailable: Boolean): List<Item> {
-        val row = listOf(Item.BROWSER, Item.YOUTUBE, Item.MIRROR, Item.MUSIC, Item.MORE)
-        return row.filterNot { it in dashboardCards(displaysAvailable) }
-    }
+    fun dashboardQuickLaunch(displaysAvailable: Boolean): List<Item> =
+        buildList {
+            add(Item.BROWSER)
+            add(Item.YOUTUBE)
+            add(Item.MIRROR)
+            if (displaysAvailable) add(Item.DISPLAYS)
+            add(Item.MUSIC)
+            add(Item.MORE)
+        }
 
     /** The Android font scale from which the grid drops to two columns and labels truncate. */
     const val LARGE_TEXT_SCALE = 1.3f

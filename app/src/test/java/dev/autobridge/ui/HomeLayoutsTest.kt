@@ -26,23 +26,28 @@ class HomeLayoutsTest {
 
     @Test fun classicAndCompactShowEveryItemInTheDesignOrder() {
         assertEquals(
-            listOf(Item.BROWSER, Item.MUSIC, Item.RADIO, Item.TV, Item.YOUTUBE, Item.MIRROR, Item.MY_CAR, Item.DISPLAYS, Item.MORE),
+            listOf(Item.STREAMING, Item.BROWSER, Item.MUSIC, Item.RADIO, Item.TV, Item.YOUTUBE, Item.MIRROR, Item.MY_CAR, Item.DISPLAYS, Item.MORE),
             PhoneHomeLayout.allItems(displaysAvailable = true)
         )
         assertFalse(Item.DISPLAYS in PhoneHomeLayout.allItems(displaysAvailable = false))
     }
 
-    @Test fun dashboardCardsAreRadioTvMyCarDisplays() {
-        assertEquals(listOf(Item.RADIO, Item.TV, Item.MY_CAR, Item.DISPLAYS), PhoneHomeLayout.dashboardCards(true))
-        assertEquals(listOf(Item.BROWSER, Item.YOUTUBE, Item.MIRROR, Item.MUSIC, Item.MORE), PhoneHomeLayout.dashboardQuickLaunch(true))
+    @Test fun dashboardCardsAreStreamingRadioTvMyCar() {
+        for (displays in listOf(true, false)) {
+            assertEquals(listOf(Item.STREAMING, Item.RADIO, Item.TV, Item.MY_CAR), PhoneHomeLayout.dashboardCards(displays))
+        }
+        assertEquals(
+            listOf(Item.BROWSER, Item.YOUTUBE, Item.MIRROR, Item.DISPLAYS, Item.MUSIC, Item.MORE),
+            PhoneHomeLayout.dashboardQuickLaunch(true)
+        )
     }
 
-    /** Without the Duo screen Mirror fills the fourth card, and is not shown twice. */
-    @Test fun dashboardWithoutDisplaysMovesMirrorIntoTheCards() {
+    /** Without the Duo screen the quick row simply has no Displays entry, and nothing is shown twice. */
+    @Test fun dashboardWithoutDisplaysHasNoDisplaysEntry() {
         val cards = PhoneHomeLayout.dashboardCards(false)
         val quick = PhoneHomeLayout.dashboardQuickLaunch(false)
-        assertEquals(Item.MIRROR, cards.last())
-        assertFalse(Item.MIRROR in quick)
+        assertEquals(listOf(Item.BROWSER, Item.YOUTUBE, Item.MIRROR, Item.MUSIC, Item.MORE), quick)
+        assertFalse(Item.DISPLAYS in cards + quick)
         assertTrue((cards + quick).groupBy { it }.values.all { it.size == 1 })
     }
 
