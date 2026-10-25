@@ -35,9 +35,10 @@ import dev.autobridge.library.HomeSection
  *  - **[frequentGroup]** — what is already playing, the user's own shortcuts, Mirror, Recent and the
  *    Agent. Putting the phone on the screen and picking up where you left off are the two things
  *    done at almost every stop, and the Agent is the only input that is safe while moving.
- *  - **[contentGroup]** — the sections that start something new.
  *  - **[deviceGroup]** — on-device libraries; browsing files is a parked activity.
  *  - **[otherGroup]** — My Car (fuel, maintenance, parking, weather, driving mode) and Settings.
+ *  - **[contentGroup]** — last on purpose: the home cards again, kept only so the rotary controller
+ *    (which cannot focus the surface-drawn cards) can still reach every section.
  *
  * Re-ranking is a one-line move of an entry between those four functions.
  */
@@ -91,8 +92,8 @@ class CarHomeMoreScreen(
             },
             section(HomeSection.MIRROR)
         ) + extensions(CarExtensionEntry.Placement.FREQUENT) + listOf(
-            entry(R.string.car_more_recent) {
-                CarNavigation.open(screenManager, "CarRecentScreen") { CarRecentScreen(carContext) }
+            entry(R.string.car_saved_title) {
+                CarNavigation.open(screenManager, "CarSavedScreen") { CarSavedScreen(carContext, requestSafety) }
             },
             entry(R.string.car_more_agent) {
                 CarNavigation.open(screenManager, "CarAgentScreen") { CarAgentScreen(carContext) }
@@ -102,13 +103,9 @@ class CarHomeMoreScreen(
 
     private fun contentGroup() = Group(
         R.string.car_more_group_content,
-        // The primary six in the order the home cards show them, so the two surfaces read the same,
-        // then the places that collect content rather than being one site.
-        HomeMenuItem.primary.mapNotNull { it.section?.let(::section) } + listOf(
-            entry(R.string.car_more_bookmarks) {
-                CarNavigation.open(screenManager, "CarBookmarksScreen") { CarBookmarksScreen(carContext) }
-            }
-        ) + extensions(CarExtensionEntry.Placement.CONTENT)
+        // The primary six in the order the home cards show them, so the two surfaces read the same.
+        HomeMenuItem.primary.mapNotNull { it.section?.let(::section) } +
+            extensions(CarExtensionEntry.Placement.CONTENT)
     )
 
     /**
@@ -123,7 +120,7 @@ class CarHomeMoreScreen(
 
     private fun deviceGroup() = Group(
         R.string.car_more_group_device,
-        listOf(HomeSection.FOLDERS, HomeSection.PLAYLISTS, HomeSection.GALLERY, HomeSection.FAVORITES)
+        listOf(HomeSection.FOLDERS, HomeSection.PLAYLISTS, HomeSection.GALLERY)
             .map(::section)
     )
 
@@ -146,7 +143,7 @@ class CarHomeMoreScreen(
 
     private fun groups(): List<Group> {
         extensionEntries = CarExtensions.moreEntries(carContext, screenManager)
-        return listOf(frequentGroup(), contentGroup(), deviceGroup(), otherGroup())
+        return listOf(frequentGroup(), deviceGroup(), otherGroup(), contentGroup())
             .filter { it.entries.isNotEmpty() }
     }
 
