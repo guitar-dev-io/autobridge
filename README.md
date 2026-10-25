@@ -761,7 +761,7 @@ A separate SwiftUI app lives in [`ios/`](ios/README.md). It is not a port of the
 
 AutoBridge is a personal, non-commercial project. If it is useful to you and you would like to buy the developer a coffee, support is welcome but entirely optional.
 
-- **Buy Me a Coffee:** [buymeacoffee.com/guitar.story](https://buymeacoffee.com/guitar.story)
+- **Ko-fi:** [ko-fi.com/guitardev](https://ko-fi.com/guitardev)
 - **PromptPay (Thailand):** scan the QR below with your banking app
 
 <img src="assets/donate_promptpay_qr.png" alt="PromptPay donate QR" width="260" />

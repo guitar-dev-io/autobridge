@@ -286,7 +286,7 @@
     <string name="more_downloads">Downloads</string>
     <string name="more_downloads_caption">Downloaded files</string>
     <string name="more_support">Support AutoBridge</string>
-    <string name="more_support_caption">Support the developer (Buy Me a Coffee)</string>
+    <string name="more_support_caption">Support the developer (Ko-fi)</string>
     <string name="more_licenses">Open-source licenses</string>
     <string name="more_licenses_caption">Third-party license notices</string>
     <string name="more_github">GitHub</string>
@@ -319,7 +319,7 @@
          are the sheet's own descriptions and are too long for a trailing column. -->
     <string name="more_history_hint">Pages visited</string>
     <string name="more_downloads_hint">Downloaded files</string>
-    <string name="more_support_hint">Buy Me a Coffee</string>
+    <string name="more_support_hint">Ko-fi</string>
     <string name="more_github_hint">Source code</string>
 
     <!-- Browser menu sheet entries ([BrowserDrawerModel]). Drawn on the car surface by
@@ -742,8 +742,8 @@
     <string name="about_group_support">Support</string>
     <string name="about_group_app">This build</string>
     <string name="about_group_credits">Credits &amp; licenses</string>
-    <string name="about_support_caption">Buy me a coffee</string>
-    <string name="about_promptpay">Buy me a coffee (PromptPay)</string>
+    <string name="about_support_caption">Support the developer</string>
+    <string name="about_promptpay">Support the developer (PromptPay)</string>
     <string name="about_promptpay_caption">Scan the QR to send a little something</string>
     <string name="about_promptpay_title">Thanks for the coffee</string>
     <string name="about_promptpay_message">Scan this PromptPay QR with your banking app.</string>
@@ -2301,7 +2301,7 @@
     <string name="support_qr_description">%1$s QR code</string>
     <string name="support_car_scan_title">Scan from your phone</string>
     <string name="support_car_next">Next: %1$s</string>
-    <string name="support_car_row_caption">QR codes for Buy Me a Coffee and other ways to say thanks</string>
+    <string name="support_car_row_caption">QR codes for Ko-fi and other ways to say thanks</string>
     <!-- One Android Auto app: Multi-app opens inside AutoBridge; Bridge Web is listed only on request. -->
     <string name="car_more_multi_app">Multi-app</string>
     <string name="projection_setup_web_title">List Bridge Web on Android Auto</string>
