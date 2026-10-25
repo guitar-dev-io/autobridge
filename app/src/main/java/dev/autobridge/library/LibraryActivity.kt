@@ -873,6 +873,18 @@ class LibraryActivity : Activity() {
             // The grid gives every cell an equal width; squaring the logo means tying its height to
             // that measured width, which is only known after layout — so post the width as height.
             val square = radioLogoSquare(entry.title, entry.logo)
+            if (playing) {
+                // The on-air station's logo carries bouncing bars, like a radio app's.
+                val eq = dev.autobridge.ui.EqBarsView(this@LibraryActivity, AutoBridgeDesign.ACCENT_RADIO) { playback.isPlayRequested }
+                val chip = FrameLayout(this@LibraryActivity).apply {
+                    background = AutoBridgeDesign.surface(this@LibraryActivity, android.graphics.Color.argb(170, 0, 0, 0), 10)
+                    setPadding(dp(6), dp(5), dp(6), dp(5))
+                    addView(eq, FrameLayout.LayoutParams(dp(16), dp(14)))
+                }
+                square.addView(chip, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.START).apply {
+                    setMargins(dp(6), 0, 0, dp(6))
+                })
+            }
             addView(square, LinearLayout.LayoutParams(-1, -2))
             square.post { square.layoutParams = square.layoutParams.apply { height = square.width } }
             addView(TextView(this@LibraryActivity).apply {

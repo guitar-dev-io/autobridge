@@ -85,12 +85,9 @@ class MiniPlayer(
     private val stationLine = LinearLayout(context).apply {
         gravity = Gravity.CENTER_VERTICAL
         visibility = View.GONE
-        val bars = LinearLayout(context).apply { gravity = Gravity.BOTTOM }
-        intArrayOf(6, 12, 8).forEach { h ->
-            bars.addView(View(context).apply { setBackgroundColor(AMBER) },
-                LinearLayout.LayoutParams(context.dp(3), context.dp(h)).apply { marginEnd = context.dp(2) })
-        }
-        addView(bars, LinearLayout.LayoutParams(-2, context.dp(12)).apply { marginEnd = context.dp(4) })
+        // Bounces while the station is playing and rests when it is paused.
+        val bars = EqBarsView(context, AMBER, barCount = 3) { playback.isPlayRequested }
+        addView(bars, LinearLayout.LayoutParams(context.dp(14), context.dp(12)).apply { marginEnd = context.dp(6) })
         addView(stationName, LinearLayout.LayoutParams(0, -2, 1f))
     }
     private val favorite = AutoBridgeDesign.glyphButton(context, "☆", 22f, tint = WARM_TEXT) {
