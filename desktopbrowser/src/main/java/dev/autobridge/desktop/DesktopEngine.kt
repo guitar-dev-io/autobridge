@@ -97,6 +97,10 @@ object DesktopEngine {
         set(value) { store.choice = value }
 
     /** The browser the Desktop Browser entries open, if one is chosen and installed. */
+    /** Google Chrome for Linux, whichever browser is chosen for the Web card; null when it is not installed. */
+    fun installedChrome(): DesktopBrowserAdapter? =
+        DesktopBrowsers.of(DesktopBrowserId.CHROME).takeIf { state(it.id).state.installed }
+
     fun chosenInstalledBrowser(): DesktopBrowserAdapter? =
         choice.browser?.let(DesktopBrowsers::of)?.takeIf { state(it.id).state.installed }
 

@@ -36,7 +36,9 @@ internal object CarExtensions {
         DesktopEngine.startPages = { dev.autobridge.browser.CarStartPage.desktopPages(app) }
         // The phone's Streaming page sends the sites that may not play in the WebView here.
         dev.autobridge.library.DesktopLinks.opener = { ctx, url ->
-            val browser = if (desktopSupportedIn(ctx)) DesktopEngine.chosenInstalledBrowser() else null
+            // Google Chrome for Linux, not whichever browser is chosen for the Web card: these sites
+            // are meant for Chrome. Without it installed the built-in browser opens them.
+            val browser = if (desktopSupportedIn(ctx)) DesktopEngine.installedChrome() else null
             browser?.let {
                 ctx.startActivity(
                     dev.autobridge.projection.desktop.DesktopBrowserActivity.intent(ctx, it.id, url)
@@ -112,14 +114,20 @@ internal object CarExtensions {
         return true
     }
 
+    /** Whether Google Chrome for Linux is installed to open a site in; see [openUrl]. */
+    fun canOpenChrome(carContext: CarContext): Boolean =
+        desktopSupported(carContext) && DesktopEngine.installedChrome() != null
+
     /**
-     * Opens [url] in the chosen desktop browser on the car, in a new tab when it is already
-     * running. False when there is none installed: the caller opens the built-in browser.
+     * Opens [url] in Google Chrome for Linux on the car (not whichever browser is chosen for the
+     * Web card), in a new tab when Chrome is already running. False when it is not installed: the
+     * caller opens the built-in browser.
      */
     fun openUrl(carContext: CarContext, screenManager: ScreenManager, url: String): Boolean {
-        if (!canOpenWeb(carContext)) return false
+        if (!canOpenChrome(carContext)) return false
+        val chrome = DesktopEngine.installedChrome() ?: return false
         CarNavigation.open(screenManager, "DesktopBrowserCarScreen") {
-            DesktopBrowserCarScreen(carContext, embedded = true, startUrl = url)
+            DesktopBrowserCarScreen(carContext, embedded = true, browser = chrome, startUrl = url)
         }
         return true
     }

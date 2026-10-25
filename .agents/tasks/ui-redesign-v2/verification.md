@@ -312,3 +312,9 @@ Asked for: where it can be done, tapping Netflix, Disney+ and the other protecte
 At the driver's request the `CHINESE` group is gone: Tencent Video, Youku, Mango TV, CCTV, Douyin and Xiaohongshu are out of the catalog, their icon styles, the group label (en + th) and the "Chinese" rule in `mayNotPlay`. Kept on purpose: WeTV and iQIYI (they are in the main Video grid, as in the photo that was the reference) and Bilibili (anime group). Sites a driver already starred stay in their favourites (keyed by address; they draw with the generic initial icon).
 - Tests: `StreamingLinksTest.theChineseGroupIsGone`, warned set without the group, `DesktopLinksTest`; all unit tests, both flavors' compile, `lintSafeDebug` and check-i18n pass.
 - Not checked on a device (the phone's screen was locked): the Streaming page and car grid without the group.
+
+## Always Google Chrome for Linux (2026-10-25)
+
+The streaming sites that may not play in the WebView open in **Google Chrome for Linux** specifically, not in "the browser chosen for the Web card" (which can be Brave): `DesktopEngine.installedChrome()` is used by the phone opener (`DesktopLinks.opener`) and the car (`CarExtensions.openUrl`, `canOpenChrome`; the safe flavor says no). Chrome not installed means the built-in browser opens the site, as before; if Brave is running it is stopped for Chrome (one desktop browser runs at a time).
+- Compile of both flavors, unit tests, `lintSafeDebug` and check-i18n pass.
+- Not checked on a device: the phone had locked its screen, so neither the phone nor the DHU was run after this change. The earlier phone check (Netflix, then Disney+ in a new tab) ran with Chrome as the chosen browser, so it exercised the same Chrome but not the "chosen is Brave" case.

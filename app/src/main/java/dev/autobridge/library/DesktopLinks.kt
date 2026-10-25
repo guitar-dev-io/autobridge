@@ -3,8 +3,8 @@ package dev.autobridge.library
 import android.content.Context
 
 /**
- * Opens a site in the desktop browser (Linux Chrome or Brave, the sideload flavors' engine) when
- * there is one to open it in.
+ * Opens a site in Google Chrome for Linux (the sideload flavors' desktop engine) when it is
+ * installed. Chrome specifically: Brave, or whatever the Web card is set to, is not used for these.
  *
  * Main code cannot name the engine: it exists only in the sideload flavors. Those set [opener]
  * at process start ([dev.autobridge.car.CarExtensions.install]); the safe flavor leaves it null,
