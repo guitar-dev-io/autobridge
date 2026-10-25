@@ -142,6 +142,17 @@ class DesktopBrowserSettingsActivity : Activity() {
             body.stack(notice(getString(R.string.desktop_settings_unsupported), dev.autobridge.design.ThemeHolder.palette.warn))
         }
 
+        // Chrome not installed yet: the guided setup is the shorter way than the cards below.
+        if (DesktopEngine.supported && !(s.browsers[DesktopBrowserId.CHROME]?.state ?: InstallState.NOT_INSTALLED).installed) {
+            body.stack(card().apply {
+                addView(title(getString(R.string.chrome_setup_entry)))
+                addView(caption(getString(R.string.chrome_setup_entry_caption)))
+                addView(buttons(listOf(getString(R.string.chrome_setup_entry) to {
+                    startActivity(DesktopChromeSetupActivity.intent(this@DesktopBrowserSettingsActivity))
+                }), false))
+            }, gap = 10)
+        }
+
         childProcessNotice()?.let { body.stack(it, gap = 10) }
 
         body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.desktop_settings_choice_section)), gap = 2)

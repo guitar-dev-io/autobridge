@@ -4,6 +4,9 @@ import androidx.car.app.CarContext
 import androidx.car.app.ScreenManager
 import dev.autobridge.R
 import dev.autobridge.desktop.DesktopEngine
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import dev.autobridge.desktop.browser.DesktopBrowsers
 import dev.autobridge.duoscreen.car.DuoScreenScreen
 import dev.autobridge.projection.desktop.DesktopBrowserCarScreen
@@ -132,6 +135,21 @@ internal object CarExtensions {
      */
     fun canInstallChrome(carContext: CarContext): Boolean =
         desktopSupported(carContext) && DesktopEngine.installedChrome() == null
+
+    /**
+     * Calls [onReady] on the main thread once Chrome for Linux is installed (the guided setup on the
+     * phone finishing), so a car screen that sent the user there can carry on by itself. The
+     * returned function stops watching; call it when the screen goes away.
+     */
+    fun watchChromeInstall(carContext: CarContext, onReady: () -> Unit): () -> Unit {
+        if (!desktopSupported(carContext)) return {}
+        val scope = kotlinx.coroutines.MainScope()
+        scope.launch {
+            DesktopEngine.browserStates.first { DesktopEngine.installedChrome() != null }
+            onReady()
+        }
+        return { scope.cancel() }
+    }
 
     /**
      * Opens [url] in Google Chrome for Linux on the car (not whichever browser is chosen for the

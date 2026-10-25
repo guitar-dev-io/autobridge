@@ -1824,7 +1824,7 @@
     <string name="maint_compulsory_insurance">Compulsory insurance (Por.Ror.Bor.)</string>
     <string name="car_saved_title">Saved</string>
     <string name="car_chrome_needed_title">Chrome needed</string>
-    <string name="car_chrome_needed_message">%1$s needs Google Chrome for Linux, which is not installed yet. On your phone, open AutoBridge \u203a Settings \u203a Desktop Browser Engine and install Chrome (about 1 GB, Wi-Fi recommended). Do this while parked.</string>
+    <string name="car_chrome_needed_message">%1$s needs Google Chrome for Linux, which is not installed yet. On your phone, open AutoBridge \u203a Settings \u203a Desktop Browser Engine \u203a Guided Chrome setup (about 1 GB, Wi-Fi recommended). Do this while parked. When it finishes, %1$s opens here by itself.</string>
     <string name="car_chrome_needed_ok">OK</string>
     <string name="car_chrome_needed_open_anyway">Open anyway</string>
     <string name="car_my_car_title">My Car</string>

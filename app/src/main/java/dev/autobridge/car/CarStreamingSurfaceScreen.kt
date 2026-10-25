@@ -237,7 +237,7 @@ internal class CarStreamingSurfaceScreen(carContext: CarContext) : Screen(carCon
             // Chrome is what these sites need and it is not installed yet: say so, with the way on.
             if (CarExtensions.canInstallChrome(carContext)) {
                 val title = StreamingLinks.all.firstOrNull { it.url == url }?.title ?: url
-                screenManager.push(CarChromeNeededScreen(carContext, title) { openBuiltIn(url) })
+                screenManager.push(CarChromeNeededScreen(carContext, title, url) { openBuiltIn(url) })
                 return
             }
         }

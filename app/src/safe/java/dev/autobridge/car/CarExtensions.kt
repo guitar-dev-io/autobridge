@@ -32,6 +32,10 @@ internal object CarExtensions {
     @Suppress("UNUSED_PARAMETER")
     fun canInstallChrome(carContext: CarContext): Boolean = false
 
+    /** Nothing to watch: Chrome cannot be installed in this build. Returns a no-op canceller. */
+    @Suppress("UNUSED_PARAMETER")
+    fun watchChromeInstall(carContext: CarContext, onReady: () -> Unit): () -> Unit = {}
+
     /** False: no desktop browser, so the site opens in the built-in browser. */
     @Suppress("UNUSED_PARAMETER")
     fun openUrl(carContext: CarContext, screenManager: ScreenManager, url: String): Boolean = false

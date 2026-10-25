@@ -1793,7 +1793,7 @@
     <string name="maint_compulsory_insurance">พ.ร.บ.</string>
     <string name="car_saved_title">ที่บันทึกไว้</string>
     <string name="car_chrome_needed_title">ต้องติดตั้ง Chrome</string>
-    <string name="car_chrome_needed_message">%1$s ต้องใช้ Google Chrome for Linux ซึ่งยังไม่ได้ติดตั้ง บนโทรศัพท์ให้เปิด AutoBridge \u203a ตั้งค่า \u203a Desktop Browser Engine แล้วติดตั้ง Chrome (ประมาณ 1 GB แนะนำให้ใช้ Wi-Fi) ทำตอนจอดรถ</string>
+    <string name="car_chrome_needed_message">%1$s ต้องใช้ Google Chrome for Linux ซึ่งยังไม่ได้ติดตั้ง บนโทรศัพท์ให้เปิด AutoBridge \u203a ตั้งค่า \u203a Desktop Browser Engine \u203a ติดตั้ง Chrome แบบพาทำ (ประมาณ 1 GB แนะนำให้ใช้ Wi-Fi) ทำตอนจอดรถ เมื่อเสร็จแล้ว %1$s จะเปิดที่นี่ให้เอง</string>
     <string name="car_chrome_needed_ok">ตกลง</string>
     <string name="car_chrome_needed_open_anyway">เปิดแบบเดิม</string>
     <string name="car_my_car_title">รถของฉัน</string>
