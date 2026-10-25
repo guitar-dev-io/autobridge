@@ -1842,7 +1842,6 @@
     <string name="streaming_long_press_hint">Touch and hold an icon to add or remove a favorite.</string>
     <string name="streaming_group_video">Video</string>
     <string name="streaming_group_social">Short and social video</string>
-    <string name="streaming_group_chinese">Chinese video</string>
     <string name="streaming_group_movies">Movies</string>
     <string name="streaming_group_music">Music</string>
     <string name="streaming_group_live">Live and gaming</string>

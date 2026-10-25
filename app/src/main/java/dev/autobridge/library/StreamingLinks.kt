@@ -5,7 +5,6 @@ enum class StreamingGroup(val title: String) {
     /** The big-name video services, shown as large cards. */
     VIDEO("Video"),
     SOCIAL("Short and social video"),
-    CHINESE("Chinese video"),
     MOVIES("Movies"),
     MUSIC("Music"),
     LIVE("Live / Gaming"),
@@ -51,12 +50,6 @@ object StreamingLinks {
         StreamingLink("Facebook Watch", StreamingGroup.SOCIAL, "https://m.facebook.com/watch"),
         StreamingLink("Dailymotion", StreamingGroup.SOCIAL, "https://www.dailymotion.com"),
         StreamingLink("Vimeo", StreamingGroup.SOCIAL, "https://vimeo.com"),
-        StreamingLink("Tencent Video", StreamingGroup.CHINESE, "https://v.qq.com"),
-        StreamingLink("Youku", StreamingGroup.CHINESE, "https://www.youku.com"),
-        StreamingLink("Mango TV", StreamingGroup.CHINESE, "https://www.mgtv.com"),
-        StreamingLink("CCTV", StreamingGroup.CHINESE, "https://tv.cctv.com"),
-        StreamingLink("Douyin", StreamingGroup.CHINESE, "https://www.douyin.com"),
-        StreamingLink("Xiaohongshu", StreamingGroup.CHINESE, "https://www.xiaohongshu.com"),
         StreamingLink("Internet Archive: Feature Films", StreamingGroup.MOVIES, "https://archive.org/details/feature_films"),
         StreamingLink("YouTube Music", StreamingGroup.MUSIC, "https://music.youtube.com"),
         StreamingLink("SoundCloud", StreamingGroup.MUSIC, "https://m.soundcloud.com"),
@@ -76,12 +69,12 @@ object StreamingLinks {
     /**
      * The services in the main grid that stream protected video (Widevine DRM) or are limited by
      * region, so what they show may not play in this WebView. Listed at the driver's request, with
-     * the warning beside them, the way the Chinese group is.
+     * the warning beside them.
      */
     private val PROTECTED = setOf("Netflix", "Disney+", "Prime Video", "HBO Max", "Viu", "WeTV", "iQIYI")
 
     /** True for a site that may not play here (protected video, or limited by region). */
-    fun mayNotPlay(link: StreamingLink): Boolean = link.group == StreamingGroup.CHINESE || link.title in PROTECTED
+    fun mayNotPlay(link: StreamingLink): Boolean = link.title in PROTECTED
 
     /** [all] split by group, in [StreamingGroup] order, skipping empty groups. */
     fun grouped(): List<Pair<StreamingGroup, List<StreamingLink>>> =

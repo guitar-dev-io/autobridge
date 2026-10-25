@@ -306,3 +306,9 @@ Asked for: where it can be done, tapping Netflix, Disney+ and the other protecte
 - Tests: `DesktopLinksTest` (which sites, no opener, an opener). All unit tests, compile of both flavors, `lintSafeDebug` and check-i18n pass.
 - **Checked on the phone (Chrome 156 installed, personalDebug):** tapping Netflix on the Streaming page opened Chrome desktop on netflix.com (Thai front page, "Chrome didn't shut down correctly" bubble from an earlier stop); with Chrome still running, tapping Disney+ opened disneyplus.com in a new tab beside Netflix.
 - **Not checked:** the car path on the DHU (the phone had locked its screen and the DHU cycle could not be started); that a subscribed account actually plays video in Chrome here (only the sites' front pages were shown, nothing was logged in); the safe flavor on a device; the Brave choice; a second tap while the first page is still loading.
+
+## Chinese streaming group removed (2026-10-25)
+
+At the driver's request the `CHINESE` group is gone: Tencent Video, Youku, Mango TV, CCTV, Douyin and Xiaohongshu are out of the catalog, their icon styles, the group label (en + th) and the "Chinese" rule in `mayNotPlay`. Kept on purpose: WeTV and iQIYI (they are in the main Video grid, as in the photo that was the reference) and Bilibili (anime group). Sites a driver already starred stay in their favourites (keyed by address; they draw with the generic initial icon).
+- Tests: `StreamingLinksTest.theChineseGroupIsGone`, warned set without the group, `DesktopLinksTest`; all unit tests, both flavors' compile, `lintSafeDebug` and check-i18n pass.
+- Not checked on a device (the phone's screen was locked): the Streaming page and car grid without the group.

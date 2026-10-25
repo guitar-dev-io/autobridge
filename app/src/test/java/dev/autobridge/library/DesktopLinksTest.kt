@@ -17,7 +17,7 @@ class DesktopLinksTest {
     private fun url(title: String) = StreamingLinks.all.first { it.title == title }.url
 
     @Test fun theSitesThatMayNotPlayGoToTheDesktopBrowser() {
-        listOf("Netflix", "Disney+", "Prime Video", "HBO Max", "Viu", "WeTV", "iQIYI", "Tencent Video").forEach {
+        listOf("Netflix", "Disney+", "Prime Video", "HBO Max", "Viu", "WeTV", "iQIYI").forEach {
             assertTrue("$it should go to the desktop browser", DesktopLinks.wantsDesktop(url(it)))
         }
     }

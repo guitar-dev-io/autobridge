@@ -2636,7 +2636,6 @@ class LibraryActivity : Activity() {
     private fun groupLabel(group: StreamingGroup): Int = when (group) {
         StreamingGroup.VIDEO -> R.string.streaming_group_video
         StreamingGroup.SOCIAL -> R.string.streaming_group_social
-        StreamingGroup.CHINESE -> R.string.streaming_group_chinese
         StreamingGroup.MOVIES -> R.string.streaming_group_movies
         StreamingGroup.MUSIC -> R.string.streaming_group_music
         StreamingGroup.LIVE -> R.string.streaming_group_live

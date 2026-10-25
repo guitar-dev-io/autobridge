@@ -1811,7 +1811,6 @@
     <string name="streaming_long_press_hint">แตะค้างที่ไอคอนเพื่อเพิ่มหรือเอาออกจากรายการโปรด</string>
     <string name="streaming_group_video">วิดีโอ</string>
     <string name="streaming_group_social">วิดีโอสั้นและโซเชียล</string>
-    <string name="streaming_group_chinese">วิดีโอจีน</string>
     <string name="streaming_group_movies">ภาพยนตร์</string>
     <string name="streaming_group_music">เพลง</string>
     <string name="streaming_group_live">ไลฟ์และเกม</string>
