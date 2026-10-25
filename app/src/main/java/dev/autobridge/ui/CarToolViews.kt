@@ -36,7 +36,7 @@ object CarToolViews {
         text = value
         textSize = size
         setTextColor(color)
-        if (bold) typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        if (bold) typeface = AppFonts.medium()
         fontFeatureSettings = "tnum"
         setPadding(0, context.dp(top), 0, 0)
     }

@@ -28,6 +28,7 @@ import dev.autobridge.media.EqMath
 import dev.autobridge.media.EqPreset
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.dp
+import dev.autobridge.ui.AppFonts
 
 /**
  * The sound effects, as a sheet from the bottom of the screen — the radio player, the video
@@ -83,7 +84,7 @@ class AudioEffectsSheet(private val context: Context) {
             text = context.getString(R.string.eq_title)
             textSize = 22f
             setTextColor(AutoBridgeDesign.TEXT)
-            typeface = Typeface.create("sans-serif", Typeface.BOLD)
+            typeface = AppFonts.bold()
         }, LinearLayout.LayoutParams(0, -2, 1f))
         titleRow.addView(Switch(context).apply {
             text = context.getString(R.string.eq_enabled)
@@ -275,7 +276,7 @@ class AudioEffectsSheet(private val context: Context) {
             textSize = 12f
             gravity = Gravity.CENTER
             setTextColor(VALUE_TEXT)
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            typeface = AppFonts.medium()
         }
         column.addView(value, LinearLayout.LayoutParams(-2, -2).apply { bottomMargin = context.dp(8) })
         val height = context.dp(BAND_HEIGHT_DP)

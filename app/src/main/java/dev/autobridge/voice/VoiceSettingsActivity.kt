@@ -29,6 +29,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import dev.autobridge.ui.AppFonts
 
 /**
  * Settings &gt; Voice Recognition: the switches for voice commands, and the Whisper models -
@@ -619,7 +620,7 @@ class VoiceSettingsActivity : Activity() {
         text = value
         textSize = size
         setTextColor(color)
-        if (bold) typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        if (bold) typeface = AppFonts.medium()
     }
 
     private fun hint(value: String) = text(value, 13f, AutoBridgeDesign.DANGER).apply {

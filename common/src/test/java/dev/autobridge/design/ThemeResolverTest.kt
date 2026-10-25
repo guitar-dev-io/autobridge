@@ -101,7 +101,7 @@ class TextScaleCurveTest {
 class AppearanceCodecTest {
     @Test fun roundTripsEveryField() {
         val spec = AppearanceSpec(
-            mode = ThemeMode.AUTO, preset = ThemePreset.DUSK, accent = AccentColor.LIME, font = FontChoice.IBM_PLEX,
+            mode = ThemeMode.AUTO, preset = ThemePreset.DUSK, accent = AccentColor.LIME, font = FontChoice.IBM_PLEX, thai = ThaiStyle.LOOPED,
             textStep = TextStep.HUGE, followSystemText = true, homeLayout = HomeLayout.COMPACT, wallpaper = Wallpaper.CUSTOM,
             wallpaperTarget = WallpaperTarget.CAR, wallpaperDim = 45, blurBehindCards = false, iconStyle = IconStyle.MONO,
             cardStyle = CardStyle.GLASS, corners = Corners.SHARP, showTileLabels = false, carSameLook = false,
@@ -109,6 +109,9 @@ class AppearanceCodecTest {
         )
         assertEquals(spec, AppearanceCodec.decode(AppearanceCodec.encode(spec)))
     }
+
+    @Test fun anUnknownThaiStyleFallsBackToTheSystem() =
+        assertEquals(ThaiStyle.SYSTEM, AppearanceCodec.decode(mapOf("thai" to "CALLIGRAPHY")).thai)
 
     @Test fun emptyMapIsTheDefault() = assertEquals(AppearanceSpec.DEFAULT, AppearanceCodec.decode(emptyMap()))
 

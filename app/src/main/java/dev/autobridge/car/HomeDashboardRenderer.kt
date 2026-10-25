@@ -21,10 +21,13 @@ import android.text.TextUtils
 import androidx.core.content.ContextCompat
 import dev.autobridge.R
 import dev.autobridge.design.HomeLayout
+import dev.autobridge.design.ThemeHolder
+import dev.autobridge.design.AppearanceSpec
 import dev.autobridge.design.Wallpaper
 import dev.autobridge.settings.AppearanceStore
 import kotlin.math.min
 import kotlin.math.roundToInt
+import dev.autobridge.ui.AppFonts
 
 /**
  * Paints the whole AutoBridge home onto the car surface: background, header, the Now Playing card
@@ -67,18 +70,42 @@ internal class HomeDashboardRenderer(private val context: Context) {
     private val logo: Drawable? = ContextCompat.getDrawable(context, R.drawable.ic_autobridge_launcher)
     private val card = HomeMenuCard()
 
-    private val bold = Typeface.create("sans-serif", Typeface.BOLD)
-    private val medium = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-    private val regular = Typeface.create("sans-serif", Typeface.NORMAL)
+    private val wordmark = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val sectionTitle = TextPaint(Paint.ANTI_ALIAS_FLAG)
+    private val pillText = TextPaint(Paint.ANTI_ALIAS_FLAG)
+    private val emptyTitle = TextPaint(Paint.ANTI_ALIAS_FLAG)
+    private val heroTitle = TextPaint(Paint.ANTI_ALIAS_FLAG)
+    private val caption = TextPaint(Paint.ANTI_ALIAS_FLAG)
+    private val title = TextPaint(Paint.ANTI_ALIAS_FLAG)
+    private val meta = TextPaint(Paint.ANTI_ALIAS_FLAG)
 
-    private val wordmark = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = bold }
-    private val sectionTitle = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { typeface = bold }
-    private val pillText = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { typeface = bold }
-    private val emptyTitle = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { typeface = bold }
-    private val heroTitle = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { typeface = bold }
-    private val caption = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { typeface = regular }
-    private val title = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { typeface = medium }
-    private val meta = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { typeface = regular }
+    /** The family the paints above were last given; see [syncFonts]. */
+    private var fontFace: Typeface? = null
+
+    init {
+        syncFonts()
+    }
+
+    /**
+     * Gives the text paints the car's font: the Appearance family and Thai style, or the defaults
+     * when "Use this look on Android Auto" is off. Cheap when nothing changed (one lookup), so it
+     * runs before every measure and draw, and a font picked on the phone shows on the next frame.
+     */
+    private fun syncFonts() {
+        val spec = ThemeHolder.spec
+        val car = if (spec.carSameLook) spec else AppearanceSpec.DEFAULT
+        val face = AppFonts.forChoice(car.font, car.thai)
+        if (face === fontFace && face != null) return
+        fontFace = face
+        val bold = Typeface.create(face, 700, false)
+        val medium = Typeface.create(face, 500, false)
+        val regular = Typeface.create(face, 400, false)
+        listOf(wordmark, sectionTitle, pillText, emptyTitle, heroTitle, card.label).forEach { it.typeface = bold }
+        title.typeface = medium
+        listOf(caption, meta).forEach { it.typeface = regular }
+        heroTitleLayout = null
+        heroTitleKey = null
+    }
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
     private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
@@ -114,6 +141,7 @@ internal class HomeDashboardRenderer(private val context: Context) {
 
     /** Card label width at a text size, measured with the exact paint the cards draw with. */
     fun measureLabel(text: String, size: Float): Float {
+        syncFonts()
         card.label.textSize = size
         return card.label.measureText(text)
     }
@@ -126,6 +154,7 @@ internal class HomeDashboardRenderer(private val context: Context) {
         state: State,
         thumbnails: Thumbnails
     ) {
+        syncFonts()
         applyLook(layout.look)
         drawBackground(canvas)
         drawHeader(canvas, layout)

@@ -72,6 +72,14 @@
     <string name="appearance_home_compact">แบบกะทัดรัด</string>
 
     <string name="appearance_font_family">แบบอักษร</string>
+    <string name="appearance_thai_letters">กขดย</string>
+    <string name="appearance_thai_style">รูปแบบอักษรไทย</string>
+    <string name="appearance_thai_system">ฟอนต์ไทยของเครื่อง</string>
+    <string name="appearance_thai_system_desc">ใช้ฟอนต์ที่เครื่องของคุณแสดงภาษาไทย</string>
+    <string name="appearance_thai_looped">มีหัว</string>
+    <string name="appearance_thai_looped_desc">ตัวอักษรแบบดั้งเดิม อ่านข้อความยาวสบายตา</string>
+    <string name="appearance_thai_loopless">ไม่มีหัว</string>
+    <string name="appearance_thai_loopless_desc">รูปทรงเปิดแบบทันสมัย ดูผ่านตาได้ชัด</string>
     <string name="appearance_font_system">Roboto (ของระบบ)</string>
     <string name="appearance_font_inter_desc">เรียบ กะทัดรัด · ค่าเริ่มต้น</string>
     <string name="appearance_font_manrope_desc">ทรงมน ดูเป็นมิตร</string>

@@ -6,6 +6,7 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
 import dev.autobridge.design.DesignTokens
+import dev.autobridge.ui.AppFonts
 
 /**
  * The radio grid's cell art on the car: every station on the same rounded card, so a page of
@@ -63,7 +64,7 @@ internal object CarStationTile {
         val text = label(title)
         val pen = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = 0xFFFFFFFF.toInt()
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            typeface = AppFonts.bold()
             textAlign = Paint.Align.CENTER
             textSize = when {
                 text.length <= 2 -> SIZE_PX * 0.42f

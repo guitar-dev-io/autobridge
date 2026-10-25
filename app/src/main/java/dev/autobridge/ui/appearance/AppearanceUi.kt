@@ -17,6 +17,7 @@ import dev.autobridge.design.ThemeHolder
 import dev.autobridge.design.ThemePalette
 import dev.autobridge.design.ThemeResolver
 import dev.autobridge.ui.AutoBridgeDesign.dp
+import dev.autobridge.ui.AppFonts
 
 /**
  * The building blocks of the Appearance pages, drawn to the redesign's component states: the
@@ -30,7 +31,7 @@ internal object AppearanceUi {
 
     val p: ThemePalette get() = ThemeHolder.palette
 
-    private val medium: Typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+    private val medium: Typeface? get() = AppFonts.medium()
 
     fun text(
         context: Context,

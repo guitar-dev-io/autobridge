@@ -24,6 +24,7 @@ import dev.autobridge.settings.VideoSettings
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.dp
 import dev.autobridge.ui.AutoBridgeDesign.stack
+import dev.autobridge.ui.AppFonts
 
 /**
  * The Video section of settings: how the phone player decodes, lays out and hands over a picture.
@@ -308,7 +309,7 @@ class VideoSettingsActivity : Activity() {
             setTextColor(accent)
             gravity = Gravity.END
             maxLines = 1
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            typeface = AppFonts.medium()
             setPadding(dp(8), 0, dp(6), 0)
         }, LinearLayout.LayoutParams(-2, -2))
         addView(TextView(this@VideoSettingsActivity).apply {

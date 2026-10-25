@@ -38,6 +38,7 @@ import dev.autobridge.radio.RadioRepository
 import dev.autobridge.radio.RadioSourceType
 import dev.autobridge.radio.RadioStation
 import dev.autobridge.ui.ImageLoader
+import dev.autobridge.ui.AppFonts
 
 /**
  * The car radio Now Playing surface: the shared MediaSession's selected station drawn large, with
@@ -465,9 +466,9 @@ internal class CarRadioNowPlayingRenderer(private val context: CarContext) {
         val favorite: Boolean = false,
     )
 
-    private val bold = Typeface.create("sans-serif", Typeface.BOLD)
-    private val medium = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-    private val regular = Typeface.create("sans-serif", Typeface.NORMAL)
+    private val bold = AppFonts.bold()
+    private val medium = AppFonts.medium()
+    private val regular = AppFonts.regular()
 
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
     private val text = TextPaint(Paint.ANTI_ALIAS_FLAG)

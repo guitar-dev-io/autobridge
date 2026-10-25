@@ -21,6 +21,7 @@ import dev.autobridge.ui.SettingsUi
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import dev.autobridge.ui.AppFonts
 
 /**
  * Settings &gt; Voice Recognition &gt; Test Voice Recognition.
@@ -396,7 +397,7 @@ class VoiceTestActivity : Activity() {
         text = value
         textSize = size
         setTextColor(color)
-        if (bold) typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        if (bold) typeface = AppFonts.medium()
     }
 }
 

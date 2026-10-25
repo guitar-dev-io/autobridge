@@ -64,7 +64,7 @@ class MiniPlayer(
     private val title = TextView(context).apply {
         textSize = 14f
         setTextColor(AutoBridgeDesign.TEXT)
-        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        typeface = AppFonts.medium()
         maxLines = 1
         ellipsize = TextUtils.TruncateAt.END
     }
@@ -78,7 +78,7 @@ class MiniPlayer(
     private val stationName = TextView(context).apply {
         textSize = 13f
         setTextColor(WARM_TEXT)
-        typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+        typeface = AppFonts.bold()
         maxLines = 1
         ellipsize = TextUtils.TruncateAt.END
     }
@@ -174,7 +174,7 @@ class MiniPlayer(
             artworkFrame.clipToOutline = true
             glyph.setTextColor(AMBER)
             title.textSize = 16f
-            title.typeface = Typeface.create("sans-serif", Typeface.BOLD)
+            title.typeface = AppFonts.bold()
             subtitle.textSize = 13f
             subtitle.setTextColor(SOFT_TEXT)
             stationLine.visibility = View.VISIBLE
@@ -193,7 +193,7 @@ class MiniPlayer(
             )
             glyph.setTextColor(AutoBridgeDesign.ACCENT_SOFT)
             title.textSize = 14f
-            title.typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            title.typeface = AppFonts.medium()
             subtitle.textSize = 12f
             subtitle.setTextColor(AutoBridgeDesign.TEXT_MUTED)
             stationLine.visibility = View.GONE

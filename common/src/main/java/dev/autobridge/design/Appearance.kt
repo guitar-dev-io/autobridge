@@ -13,6 +13,8 @@ data class AppearanceSpec(
     val preset: ThemePreset = ThemePreset.AUTOBRIDGE,
     val accent: AccentColor = AccentColor.SKY,
     val font: FontChoice = FontChoice.INTER,
+    /** The Thai letterforms, whichever [font] draws the Latin. */
+    val thai: ThaiStyle = ThaiStyle.SYSTEM,
     val textStep: TextStep = TextStep.DEFAULT,
     /** Use Android's own font size instead of [textStep]. */
     val followSystemText: Boolean = false,
@@ -67,6 +69,13 @@ enum class AccentColor(val onDark: Int, val onLight: Int) {
 }
 
 enum class FontChoice { INTER, MANROPE, IBM_PLEX, NOTO, SYSTEM }
+
+/**
+ * Which Thai letterforms the app draws. Inter, Manrope and Plex have no Thai, so without a choice
+ * the phone's own Thai font fills in. [LOOPED] has the traditional head loops (easier to read in
+ * running text), [LOOPLESS] is the modern open form (cleaner at a glance, as on a head unit).
+ */
+enum class ThaiStyle { SYSTEM, LOOPED, LOOPLESS }
 
 /** Manual text size steps. [scale] is the Android fontScale it stands for. */
 enum class TextStep(val scale: Float) {

@@ -81,6 +81,14 @@
 
     <!-- Text page -->
     <string name="appearance_font_family">Font family</string>
+    <string name="appearance_thai_letters" translatable="false">กขดย</string>
+    <string name="appearance_thai_style">Thai letterforms</string>
+    <string name="appearance_thai_system">Phone\'s Thai font</string>
+    <string name="appearance_thai_system_desc">Whatever your phone draws Thai in</string>
+    <string name="appearance_thai_looped">With loops</string>
+    <string name="appearance_thai_looped_desc">Traditional heads, easier in long text</string>
+    <string name="appearance_thai_loopless">Loopless</string>
+    <string name="appearance_thai_loopless_desc">Modern open shapes, clean at a glance</string>
     <string name="appearance_font_system">Roboto (system)</string>
     <string name="appearance_font_inter_desc">Neutral and compact · default</string>
     <string name="appearance_font_manrope_desc">Rounded, friendly geometry</string>

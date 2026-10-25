@@ -6,6 +6,7 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
 import dev.autobridge.design.ThemeHolder
+import dev.autobridge.ui.AppFonts
 
 /**
  * The icons of the Streaming grid, drawn here: a rounded square in the site's colour with a short
@@ -83,7 +84,7 @@ object StreamingIcons {
 
         val text = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = 0xFFFFFFFF.toInt()
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            typeface = AppFonts.bold()
             textAlign = Paint.Align.CENTER
             textSize = size * 0.5f
         }

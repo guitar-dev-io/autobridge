@@ -26,6 +26,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import rikka.shizuku.Shizuku
+import dev.autobridge.ui.AppFonts
 
 /**
  * Walks the user through making the projection browser visible on Android Auto. Projection-flavor
@@ -204,7 +205,7 @@ class ProjectionSetupActivity : Activity() {
             textSize = 15f
             gravity = Gravity.CENTER
             setTextColor(AutoBridgeDesign.ACCENT)
-            typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+            typeface = AppFonts.bold()
             background = AutoBridgeDesign.surface(
                 this@ProjectionSetupActivity, AutoBridgeDesign.tint(AutoBridgeDesign.ACCENT, 0.16f), 12,
                 AutoBridgeDesign.tint(AutoBridgeDesign.ACCENT, 0.3f)

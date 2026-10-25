@@ -245,3 +245,23 @@ Pages that did not follow the theme, now do (checked on the phone in Light):
 - Radio-style mini player: warm amber card and amber play button now palette (accent) like the rest of the radio design; amber stays on the "on air" bars and artwork chip.
 Checked light: Settings, Control, Control history, Apps, Profile, Car connection, Agent & commands, Mirror, Input & touch, Advanced, Debug, Developer, About, More, Streaming, Favorites.
 Not changed on purpose: brand logos (StreamingIcons), QR code, the section hue chips, video player surfaces.
+
+## Pieces D and F: fonts and Thai letterforms (2026-10-25, phone + DHU 800x480)
+
+What it is: `AppFonts` builds the app's typeface from `AppearanceSpec.font` (Inter, Manrope, IBM Plex Sans, Noto Sans: variable fonts in `res/font`, one file each, the `wght` axis cut into 400/500/600/700; Roboto/System = the phone's own) and `AppearanceSpec.thai` (System, Looped = Noto Sans Thai Looped, Loopless = Noto Sans Thai), Latin first, Thai second, system fallback last. 3.9 MB of fonts (debug APK 96 -> 100 MB); SIL OFL texts in `assets/licenses`, credit in About (en + th).
+- About 90 `Typeface.create("sans-serif...")` / `DEFAULT_BOLD` calls in 33 files now go through `AppFonts` (regular/medium/bold/weight). Left alone: `Typeface.MONOSPACE`, and `Typeface.create(otherTypeface, BOLD)` derivations.
+- Compose: `AutoBridgePhoneTheme` Typography uses one Compose `AndroidFont` per weight, each wrapping the typeface for that weight. A bare `FontFamily(Typeface)` made Compose ignore every `fontWeight` (found on the phone: card titles lost their bold) and a per-weight font also carries the chosen Thai.
+- Car home: `HomeDashboardRenderer.syncFonts` re-fits the paints when the car's font changes (car follows the phone's font unless "use this look on Android Auto" is off); `HomeDashboardLook` carries `font`/`thai`, so a change lays out again (text widths differ).
+- Text page: each family row draws "Aa" in its own face; new "Thai letterforms" group (phone's, with loops, loopless) with a sample in each.
+- `ThaiStyle` in `:common` + codec + tests (unknown value falls back to System).
+
+Checked on the phone: Text page rows in their own faces; Manrope + Looped, Manrope + Loopless, Roboto + Loopless on Home (Latin and Thai both change; semibold titles on Home cards and Control restored); no crash in logcat. DHU: car home follows the phone's Thai style live (Loopless then Looped) without a restart. Defaults restored afterwards (Inter, System Thai, Dark, Sky).
+Tests: `:common`, `:app:testPersonalDebugUnitTest` pass; safe flavor compiles; check-i18n OK.
+
+Not done / known:
+- Thai line height is not overridden: Noto Sans Thai's own metrics are used (no clipping seen on Home at 150%); the 1.6 leading in the Text page sample stays as A set it. A per-script line-height rule was not added.
+- Typefaces cached at construction by the car radio screens (`CarRadioNowPlayingScreen`, `CarRadioGridRenderer`, `CarSurfaceKeyboard`) take a new font the next time those screens open, not live.
+- Car template screens (ListTemplate etc.) are drawn by the host and keep its font.
+- `AlertDialog` titles and buttons use the dialog theme's font, not `AppFonts`.
+- Sarabun/Prompt and other Thai families were not added; Looped/Loopless are the two Noto Thai variants.
+- Not checked: About page credits on screen; IBM Plex Sans and Noto Sans Latin rows were built but only Manrope and System were picked in the pass.

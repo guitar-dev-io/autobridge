@@ -52,7 +52,7 @@ object SupportCard {
                 textSize = 20f
                 gravity = Gravity.CENTER
                 setTextColor(AutoBridgeDesign.TEXT)
-                typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+                typeface = AppFonts.bold()
             }, LinearLayout.LayoutParams(-1, -2))
             if (channels.size > 1) {
                 card.addView(
@@ -101,7 +101,7 @@ object SupportCard {
                     textSize = 15f
                     gravity = Gravity.CENTER
                     setTextColor(Color.WHITE)
-                    typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+                    typeface = AppFonts.bold()
                     background = AutoBridgeDesign.tappable(
                         context, AutoBridgeDesign.ACCENT_FAVORITE, 24, Color.WHITE, Color.TRANSPARENT
                     )

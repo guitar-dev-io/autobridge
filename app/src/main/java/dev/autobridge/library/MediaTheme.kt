@@ -12,6 +12,7 @@ import android.widget.TextView
 import dev.autobridge.design.ThemeHolder
 import dev.autobridge.design.ThemePalette
 import dev.autobridge.design.ThemeResolver
+import dev.autobridge.ui.AppFonts
 
 /**
  * The redesign's component states for the phone media screens (Radio, Music, TV, the player
@@ -25,8 +26,8 @@ internal object MediaTheme {
     val palette: ThemePalette get() = ThemeHolder.palette
 
     /** Weight 600, the redesign's selected-label weight. */
-    val SEMIBOLD: Typeface get() = Typeface.create(Typeface.DEFAULT, 600, false)
-    val REGULAR: Typeface get() = Typeface.create(Typeface.DEFAULT, 500, false)
+    val SEMIBOLD: Typeface? get() = AppFonts.weight(600)
+    val REGULAR: Typeface? get() = AppFonts.weight(500)
 
     private fun Context.px(dp: Float): Int = (dp * resources.displayMetrics.density).toInt().coerceAtLeast(1)
 

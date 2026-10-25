@@ -35,6 +35,7 @@ class AutoBridgeApplication : Application() {
         CrashReportStore.install(this)
         // Appearance before anything draws: the design tokens and the font scale read it.
         dev.autobridge.settings.AppearanceStore.restore(this)
+        dev.autobridge.ui.AppFonts.init(this)
         // Load the persisted safety-bypass flag before any screen or policy read, and start the
         // notification that reflects it.
         BypassPolicyStore.init(this)

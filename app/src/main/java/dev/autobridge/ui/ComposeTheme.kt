@@ -1,10 +1,20 @@
 package dev.autobridge.ui
 
+import android.content.Context
+import android.graphics.Typeface
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.ExperimentalTextApi
+import androidx.compose.ui.text.font.AndroidFont
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontLoadingStrategy
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontVariation
+import androidx.compose.ui.text.font.FontWeight
 import dev.autobridge.design.ThemeHolder
 
 /*
@@ -42,7 +52,54 @@ fun AutoBridgePhoneTheme(content: @Composable () -> Unit) {
             outline = ComposeTokens.Hairline,
             outlineVariant = ComposeTokens.Hairline
         ),
+        typography = appTypography(),
         content = content
+    )
+}
+
+/**
+ * One weight of the app's typeface as a Compose font. Handing Compose a bare [Typeface] makes it
+ * ignore every `fontWeight`; one font per weight lets it pick the right one, and each carries the
+ * Thai letterforms chosen in Appearance, which Compose cannot attach to a family itself.
+ */
+@OptIn(ExperimentalTextApi::class)
+private class FaceFont(override val weight: FontWeight, val face: Typeface) :
+    AndroidFont(FontLoadingStrategy.Blocking, FaceLoader, FontVariation.Settings()) {
+    override val style: FontStyle = FontStyle.Normal
+}
+
+@OptIn(ExperimentalTextApi::class)
+private object FaceLoader : AndroidFont.TypefaceLoader {
+    override fun loadBlocking(context: Context, font: AndroidFont): Typeface? = (font as FaceFont).face
+    override suspend fun awaitLoad(context: Context, font: AndroidFont): Typeface? = (font as FaceFont).face
+}
+
+/**
+ * Material's type scale in the app's chosen family ([AppFonts]), so Text without an explicit family
+ * draws in the Appearance font, Latin and Thai. Only the family changes: sizes stay as written at
+ * each call site, and the platform scales them by the font scale.
+ */
+@Composable
+private fun appTypography(): Typography {
+    val base = AppFonts.base() ?: return Typography()
+    val family = FontFamily(AppFonts.WEIGHTS.map { FaceFont(FontWeight(it), Typeface.create(base, it, false)) })
+    val t = Typography()
+    return t.copy(
+        displayLarge = t.displayLarge.copy(fontFamily = family),
+        displayMedium = t.displayMedium.copy(fontFamily = family),
+        displaySmall = t.displaySmall.copy(fontFamily = family),
+        headlineLarge = t.headlineLarge.copy(fontFamily = family),
+        headlineMedium = t.headlineMedium.copy(fontFamily = family),
+        headlineSmall = t.headlineSmall.copy(fontFamily = family),
+        titleLarge = t.titleLarge.copy(fontFamily = family),
+        titleMedium = t.titleMedium.copy(fontFamily = family),
+        titleSmall = t.titleSmall.copy(fontFamily = family),
+        bodyLarge = t.bodyLarge.copy(fontFamily = family),
+        bodyMedium = t.bodyMedium.copy(fontFamily = family),
+        bodySmall = t.bodySmall.copy(fontFamily = family),
+        labelLarge = t.labelLarge.copy(fontFamily = family),
+        labelMedium = t.labelMedium.copy(fontFamily = family),
+        labelSmall = t.labelSmall.copy(fontFamily = family)
     )
 }
 

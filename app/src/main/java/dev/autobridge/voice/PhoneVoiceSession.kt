@@ -20,6 +20,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import dev.autobridge.ui.AppFonts
 
 /**
  * The Home microphone with offline Whisper: listen, show what was heard, then run it.
@@ -305,7 +306,7 @@ class PhoneVoiceSession(private val activity: Activity, private val actions: Act
         heard = TextView(activity).apply {
             textSize = 19f
             setTextColor(AutoBridgeDesign.TEXT)
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            typeface = AppFonts.medium()
             setPadding(0, activity.dp(10), 0, 0)
         }
         content.addView(status)

@@ -136,7 +136,7 @@ object AutoBridgeDesign {
             this.text = title
             textSize = 26f
             setTextColor(TEXT)
-            typeface = Typeface.create("sans-serif", Typeface.BOLD)
+            typeface = AppFonts.bold()
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
         })
@@ -206,7 +206,7 @@ object AutoBridgeDesign {
             text = label
             textSize = 12f
             setTextColor(TEXT)
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            typeface = AppFonts.medium()
             letterSpacing = ScriptTracking.letterSpacing(label, 0.06f)
         })
     }
@@ -251,7 +251,7 @@ object AutoBridgeDesign {
         textSize = 11f
         setTextColor(TEXT_MUTED)
         letterSpacing = ScriptTracking.letterSpacing(text, 0.14f)
-        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        typeface = AppFonts.medium()
         setPadding(context.dp(6), context.dp(18), context.dp(6), context.dp(8))
     }
 
@@ -290,7 +290,7 @@ object AutoBridgeDesign {
             text = title
             textSize = 16f
             setTextColor(TEXT)
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            typeface = AppFonts.medium()
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
         })
@@ -344,7 +344,7 @@ object AutoBridgeDesign {
             textSize = 17f
             gravity = Gravity.CENTER
             setTextColor(accent)
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            typeface = AppFonts.medium()
         }
         if (badgeIcon != 0) {
             artwork.addView(ImageView(context).apply {
@@ -449,7 +449,7 @@ object AutoBridgeDesign {
             textSize = 26f
             gravity = Gravity.CENTER
             setTextColor(accent)
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            typeface = AppFonts.medium()
         }
         artwork.addView(initial, FrameLayout.LayoutParams(-1, -1))
         if (!artworkUrl.isNullOrBlank()) {
@@ -478,7 +478,7 @@ object AutoBridgeDesign {
             this.text = title
             textSize = 15f
             setTextColor(TEXT)
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            typeface = AppFonts.medium()
             maxLines = 2
             ellipsize = TextUtils.TruncateAt.END
         }, LinearLayout.LayoutParams(0, -2, 1f))
@@ -508,7 +508,7 @@ object AutoBridgeDesign {
         addView(TextView(context).apply {
             id = R.id.autobridge_status_label
             textSize = 12f
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            typeface = AppFonts.medium()
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
             setPadding(0, context.dp(4), 0, 0)
@@ -595,7 +595,7 @@ object AutoBridgeDesign {
         textSize = 13f
         gravity = Gravity.CENTER
         setTextColor(if (primary) INK else TEXT)
-        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        typeface = AppFonts.medium()
         isClickable = true
         isFocusable = true
         setPadding(context.dp(14), context.dp(10), context.dp(14), context.dp(10))
@@ -648,7 +648,7 @@ object AutoBridgeDesign {
             textSize = 17f
             setTextColor(TEXT)
             gravity = Gravity.CENTER
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            typeface = AppFonts.medium()
         })
         addView(TextView(context).apply {
             this.text = message

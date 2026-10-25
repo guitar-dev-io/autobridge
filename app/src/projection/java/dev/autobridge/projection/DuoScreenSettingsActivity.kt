@@ -36,6 +36,7 @@ import dev.autobridge.settings.ScreenAppearance
 import dev.autobridge.shizuku.ShizukuGrant
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.stack
+import dev.autobridge.ui.AppFonts
 
 /**
  * Phone-side setup for Duo Screen: which app each pane runs, how many panes there are, and whether
@@ -197,7 +198,7 @@ class DuoScreenSettingsActivity : Activity() {
         contentDescription = if (active) "$label, selected" else label
         isSelected = active
         setTextColor(if (active) ThemeHolder.palette.onAccent else AutoBridgeDesign.TEXT_MUTED)
-        if (active) typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+        if (active) typeface = AppFonts.bold()
         background = if (active) {
             AutoBridgeDesign.surface(this@DuoScreenSettingsActivity, AutoBridgeDesign.ACCENT, radius, AutoBridgeDesign.ACCENT)
         } else {
@@ -313,7 +314,7 @@ class DuoScreenSettingsActivity : Activity() {
                     textSize = 18f
                     gravity = Gravity.CENTER
                     setTextColor(bannerAccent)
-                    typeface = Typeface.create("sans-serif", Typeface.BOLD)
+                    typeface = AppFonts.bold()
                 }, FrameLayout.LayoutParams(-1, -1))
             }, LinearLayout.LayoutParams(dp(40), dp(40)))
 
@@ -326,7 +327,7 @@ class DuoScreenSettingsActivity : Activity() {
                 this.text = getString(if (ready) readyTitle else missingTitle)
                 textSize = 14f
                 setTextColor(AutoBridgeDesign.TEXT)
-                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                typeface = AppFonts.medium()
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
             })
@@ -347,7 +348,7 @@ class DuoScreenSettingsActivity : Activity() {
                     textSize = 13f
                     gravity = Gravity.CENTER
                     setTextColor(ThemeHolder.palette.onAccent)
-                    typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+                    typeface = AppFonts.bold()
                     isClickable = true
                     isFocusable = true
                     minHeight = dp(44)
@@ -439,7 +440,7 @@ class DuoScreenSettingsActivity : Activity() {
                 textSize = 14f
                 gravity = Gravity.CENTER
                 setTextColor(AutoBridgeDesign.TEXT)
-                typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+                typeface = AppFonts.bold()
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
             })
@@ -502,7 +503,7 @@ class DuoScreenSettingsActivity : Activity() {
                     text = getString(R.string.duo_screen_pane_count)
                     textSize = 15f
                     setTextColor(AutoBridgeDesign.TEXT)
-                    typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                    typeface = AppFonts.medium()
                 }, LinearLayout.LayoutParams(0, -2, 1f))
                 addView(paneCountSegments(paneCount), LinearLayout.LayoutParams(-2, -2))
             }, LinearLayout.LayoutParams(-1, -2))
@@ -519,7 +520,7 @@ class DuoScreenSettingsActivity : Activity() {
                 text = getString(R.string.duo_screen_preset)
                 textSize = 15f
                 setTextColor(AutoBridgeDesign.TEXT)
-                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                typeface = AppFonts.medium()
             }, LinearLayout.LayoutParams(-1, -2))
 
             // 5 preset mini-diagram chips in a row
@@ -540,7 +541,7 @@ class DuoScreenSettingsActivity : Activity() {
                 text = getString(R.string.duo_screen_content_scale)
                 textSize = 15f
                 setTextColor(AutoBridgeDesign.TEXT)
-                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                typeface = AppFonts.medium()
             }, LinearLayout.LayoutParams(-1, -2))
 
             addView(TextView(this@DuoScreenSettingsActivity).apply {
@@ -707,7 +708,7 @@ class DuoScreenSettingsActivity : Activity() {
                 text = getString(R.string.duo_screen_reset_layout)
                 textSize = 15f
                 setTextColor(AutoBridgeDesign.TEXT)
-                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                typeface = AppFonts.medium()
             })
             addView(TextView(this@DuoScreenSettingsActivity).apply {
                 text = getString(R.string.duo_screen_reset_layout_hint)
@@ -748,7 +749,7 @@ class DuoScreenSettingsActivity : Activity() {
                 text = title
                 textSize = 16f
                 setTextColor(AutoBridgeDesign.DANGER)
-                typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+                typeface = AppFonts.bold()
             })
             addView(TextView(this@DuoScreenSettingsActivity).apply {
                 text = caption

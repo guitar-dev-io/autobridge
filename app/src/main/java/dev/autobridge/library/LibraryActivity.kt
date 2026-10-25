@@ -64,6 +64,7 @@ import dev.autobridge.ui.AutoBridgeDesign.stack
 import dev.autobridge.ui.MiniPlayer
 import dev.autobridge.ui.ImageLoader
 import dev.autobridge.ui.SystemBack
+import dev.autobridge.ui.AppFonts
 
 /**
  * Phone host for the home grid's content sections: TV, Radio, Folders, Playlists, Gallery and
@@ -822,7 +823,7 @@ class LibraryActivity : Activity() {
             textSize = 26f
             gravity = Gravity.CENTER
             setTextColor(AutoBridgeDesign.ACCENT_RADIO)
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            typeface = AppFonts.medium()
             background = AutoBridgeDesign.surface(
                 this@LibraryActivity,
                 AutoBridgeDesign.tint(AutoBridgeDesign.ACCENT_RADIO, 0.14f),
@@ -1284,7 +1285,7 @@ class LibraryActivity : Activity() {
                 text = getString(if (ascending) R.string.library_sort_az else R.string.library_sort_za)
                 textSize = 12f
                 setTextColor(AutoBridgeDesign.ACCENT)
-                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                typeface = AppFonts.medium()
                 setPadding(dp(10), dp(6), dp(6), dp(6))
                 isClickable = true
                 isFocusable = true
@@ -1309,7 +1310,7 @@ class LibraryActivity : Activity() {
                 text = getString(R.string.library_edit_pinned)
                 textSize = 12f
                 setTextColor(AutoBridgeDesign.ACCENT)
-                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                typeface = AppFonts.medium()
                 setPadding(dp(10), dp(6), dp(6), dp(6))
                 isClickable = true
                 isFocusable = true
@@ -1399,7 +1400,7 @@ class LibraryActivity : Activity() {
         text = label
         textSize = 13f
         setTextColor(color)
-        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        typeface = AppFonts.medium()
         setPadding(dp(14), dp(10), dp(14), dp(10))
         background = AutoBridgeDesign.surface(
             this@LibraryActivity, AutoBridgeDesign.tint(color, 0.16f), 18, AutoBridgeDesign.tint(color, 0.32f)
@@ -1421,7 +1422,7 @@ class LibraryActivity : Activity() {
                     textSize = 11f
                     gravity = Gravity.CENTER
                     setTextColor(AutoBridgeDesign.ACCENT)
-                    typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                    typeface = AppFonts.medium()
                     isClickable = true
                     isFocusable = true
                     setPadding(dp(6), dp(1), dp(6), dp(1))

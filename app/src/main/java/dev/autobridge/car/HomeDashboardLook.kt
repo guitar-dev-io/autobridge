@@ -5,8 +5,10 @@ import dev.autobridge.design.AppearanceSpec
 import dev.autobridge.design.CardStyle
 import dev.autobridge.design.Corners
 import dev.autobridge.design.HomeLayout
+import dev.autobridge.design.FontChoice
 import dev.autobridge.design.IconStyle
 import dev.autobridge.design.TextScaleCurve
+import dev.autobridge.design.ThaiStyle
 import dev.autobridge.design.ThemeHolder
 import dev.autobridge.design.ThemePalette
 import dev.autobridge.design.ThemeResolver
@@ -38,7 +40,10 @@ internal data class HomeDashboardLook(
     /** 0..70, the share of black (white in light mode) laid over the wallpaper. */
     val wallpaperDim: Int,
     /** The font scale car text is drawn at, already capped. */
-    val textScale: Float
+    val textScale: Float,
+    /** The chosen families. Text widths depend on them, so a change lays the screen out again. */
+    val font: FontChoice = FontChoice.INTER,
+    val thai: ThaiStyle = ThaiStyle.SYSTEM
 ) {
     private val light: Boolean get() = palette.isLight
 
@@ -170,7 +175,9 @@ internal data class HomeDashboardLook(
                 showTileLabels = car.showTileLabels,
                 wallpaper = if (wallpaperShown) car.wallpaper else Wallpaper.NONE,
                 wallpaperDim = car.wallpaperDim.coerceIn(0, AppearanceSpec.MAX_DIM),
-                textScale = TextScaleCurve.carScale(spec, systemFontScale)
+                textScale = TextScaleCurve.carScale(spec, systemFontScale),
+                font = car.font,
+                thai = car.thai
             )
         }
 

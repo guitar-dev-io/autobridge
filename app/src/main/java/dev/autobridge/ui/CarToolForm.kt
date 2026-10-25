@@ -55,7 +55,7 @@ class CarToolForm(
             text = title
             textSize = 20f
             setTextColor(AutoBridgeDesign.TEXT)
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            typeface = AppFonts.medium()
         })
         if (!subtitle.isNullOrBlank()) addView(TextView(activity).apply {
             text = subtitle
@@ -359,7 +359,7 @@ class CarToolForm(
                 text = label
                 textSize = 13f
                 setTextColor(AutoBridgeDesign.TEXT_MUTED)
-                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                typeface = AppFonts.medium()
                 setPadding(activity.dp(2), 0, 0, activity.dp(6))
             })
             addView(view, LinearLayout.LayoutParams(-1, -2))

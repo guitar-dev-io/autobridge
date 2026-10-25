@@ -15,6 +15,7 @@ import androidx.core.view.WindowCompat
 import dev.autobridge.design.ThemeHolder
 import dev.autobridge.mycar.MyCarFacts
 import dev.autobridge.ui.AutoBridgeDesign
+import dev.autobridge.ui.AppFonts
 
 /**
  * The parts of Settings > Appearance a phone screen applies to its own window, for the screens
@@ -114,7 +115,7 @@ object ScreenAppearance {
                 text = label
                 textSize = 16f
                 gravity = Gravity.CENTER
-                typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+                typeface = AppFonts.bold()
                 setTextColor(ink)
             })
             contentDescription = label

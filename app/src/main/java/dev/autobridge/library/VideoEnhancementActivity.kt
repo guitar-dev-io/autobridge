@@ -16,6 +16,7 @@ import dev.autobridge.settings.VideoSettings
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.dp
 import dev.autobridge.ui.AutoBridgeDesign.stack
+import dev.autobridge.ui.AppFonts
 
 /**
  * Brightness, contrast and saturation for the decoded picture.
@@ -150,7 +151,7 @@ class VideoEnhancementActivity : Activity() {
             textSize = 13f
             setTextColor(if (dimmed) AutoBridgeDesign.TEXT_MUTED else accent)
             gravity = Gravity.END
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            typeface = AppFonts.medium()
         }
         val heading = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL

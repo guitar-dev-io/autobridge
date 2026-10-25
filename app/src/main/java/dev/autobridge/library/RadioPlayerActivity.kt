@@ -33,6 +33,7 @@ import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.dp
 import dev.autobridge.ui.ImageLoader
 import dev.autobridge.ui.SystemBack
+import dev.autobridge.ui.AppFonts
 
 /**
  * The radio player on the phone: the station's logo large, "Live", the song and artist when the
@@ -144,7 +145,7 @@ class RadioPlayerActivity : Activity() {
             textSize = 64f
             gravity = Gravity.CENTER
             setTextColor(Color.WHITE)
-            typeface = Typeface.create("sans-serif", Typeface.BOLD)
+            typeface = AppFonts.bold()
         }
         logo = ImageView(this).apply {
             scaleType = ImageView.ScaleType.CENTER_CROP
@@ -175,7 +176,7 @@ class RadioPlayerActivity : Activity() {
             textSize = 13f
             // The section badge: radio amber (the palette's warn role, so it reads in Light too).
             setTextColor(MediaTheme.palette.warn)
-            typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+            typeface = AppFonts.bold()
             background = AutoBridgeDesign.surface(this@RadioPlayerActivity, AutoBridgeDesign.tint(AutoBridgeDesign.ACCENT_RADIO, 0.16f), 12, Color.TRANSPARENT)
             setPadding(dp(12), dp(4), dp(12), dp(4))
         }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(18) })
@@ -271,7 +272,7 @@ class RadioPlayerActivity : Activity() {
             textSize = 13f
             gravity = Gravity.CENTER
             setTextColor(MediaTheme.palette.onAccent)
-            typeface = Typeface.create("sans-serif", Typeface.BOLD)
+            typeface = AppFonts.bold()
             background = AutoBridgeDesign.surface(this@RadioPlayerActivity, AutoBridgeDesign.ACCENT, 22, Color.TRANSPARENT)
             isClickable = true
             isFocusable = true
@@ -305,7 +306,7 @@ class RadioPlayerActivity : Activity() {
         textSize = size
         gravity = Gravity.CENTER
         setTextColor(color)
-        if (bold) typeface = Typeface.create("sans-serif", Typeface.BOLD)
+        if (bold) typeface = AppFonts.bold()
         maxLines = lines
         ellipsize = TextUtils.TruncateAt.END
     }
@@ -322,7 +323,7 @@ class RadioPlayerActivity : Activity() {
             textSize = 13f
             gravity = Gravity.CENTER
             setTextColor(AutoBridgeDesign.TEXT)
-            typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+            typeface = AppFonts.bold()
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
         }
@@ -466,7 +467,7 @@ class RadioPlayerActivity : Activity() {
         favorite.label.text = getString(if (isFavorite) R.string.radio_favorite_on else R.string.radio_favorite_add)
         // Selected = accent outline, accentSoft fill, accent label at weight 600.
         favorite.label.setTextColor(if (isFavorite) AutoBridgeDesign.ACCENT else AutoBridgeDesign.TEXT)
-        favorite.label.typeface = if (isFavorite) MediaTheme.SEMIBOLD else Typeface.create("sans-serif-medium", Typeface.BOLD)
+        favorite.label.typeface = if (isFavorite) MediaTheme.SEMIBOLD else AppFonts.bold()
         favorite.icon.setImageResource(if (isFavorite) R.drawable.ic_radio_star_filled else R.drawable.ic_radio_star)
         favorite.icon.setColorFilter(if (isFavorite) AutoBridgeDesign.ACCENT else AutoBridgeDesign.TEXT)
         favorite.view.isSelected = isFavorite

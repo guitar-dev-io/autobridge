@@ -10,6 +10,7 @@ import android.text.TextPaint
 import android.text.TextUtils
 import dev.autobridge.design.HomeLayout
 import dev.autobridge.library.HomeSection
+import dev.autobridge.ui.AppFonts
 
 /** The glyph drawn inside a card's icon tile. One entry per home menu feature. */
 internal enum class HomeMenuGlyph { TV, RADIO, GLOBE, YOUTUBE, YOUTUBE_MUSIC, STREAMING, SPLIT, DESKTOP }
@@ -68,7 +69,7 @@ internal class HomeMenuCard {
         strokeJoin = Paint.Join.ROUND
     }
     val label = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = Typeface.create("sans-serif", Typeface.BOLD)
+        typeface = AppFonts.bold()
         textAlign = Paint.Align.LEFT
     }
     private val rect = RectF()

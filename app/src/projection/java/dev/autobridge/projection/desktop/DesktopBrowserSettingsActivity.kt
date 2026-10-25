@@ -40,6 +40,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
+import dev.autobridge.ui.AppFonts
 
 /**
  * Settings › Desktop Browser Engine: choose which browser the Desktop Browser entries open,
@@ -507,7 +508,7 @@ class DesktopBrowserSettingsActivity : Activity() {
         this.text = text
         textSize = 17f
         setTextColor(AutoBridgeDesign.TEXT)
-        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        typeface = AppFonts.medium()
     }
 
     private fun caption(text: String) = TextView(this).apply {

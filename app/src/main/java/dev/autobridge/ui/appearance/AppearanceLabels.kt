@@ -9,6 +9,7 @@ import dev.autobridge.design.FontChoice
 import dev.autobridge.design.HomeLayout
 import dev.autobridge.design.IconStyle
 import dev.autobridge.design.TextStep
+import dev.autobridge.design.ThaiStyle
 import dev.autobridge.design.ThemeMode
 import dev.autobridge.design.ThemePreset
 import dev.autobridge.design.Wallpaper
@@ -103,6 +104,22 @@ object AppearanceLabels {
             FontChoice.IBM_PLEX -> R.string.appearance_font_plex_desc
             FontChoice.NOTO -> R.string.appearance_font_noto_desc
             FontChoice.SYSTEM -> R.string.appearance_font_system_desc
+        }
+    )
+
+    fun thai(context: Context, style: ThaiStyle): String = context.getString(
+        when (style) {
+            ThaiStyle.SYSTEM -> R.string.appearance_thai_system
+            ThaiStyle.LOOPED -> R.string.appearance_thai_looped
+            ThaiStyle.LOOPLESS -> R.string.appearance_thai_loopless
+        }
+    )
+
+    fun thaiDescription(context: Context, style: ThaiStyle): String = context.getString(
+        when (style) {
+            ThaiStyle.SYSTEM -> R.string.appearance_thai_system_desc
+            ThaiStyle.LOOPED -> R.string.appearance_thai_looped_desc
+            ThaiStyle.LOOPLESS -> R.string.appearance_thai_loopless_desc
         }
     )
 

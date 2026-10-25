@@ -51,6 +51,7 @@ import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.dp
 import dev.autobridge.ui.ImageLoader
 import kotlin.math.abs
+import dev.autobridge.ui.AppFonts
 
 /**
  * The phone playback screen for everything the library and IPTV sections open.
@@ -526,7 +527,7 @@ class PlayerActivity : Activity() {
             gravity = Gravity.CENTER
             setTextColor(AutoBridgeDesign.DANGER)
             letterSpacing = dev.autobridge.design.ScriptTracking.letterSpacing(text, 0.12f)
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            typeface = AppFonts.medium()
             background = AutoBridgeDesign.surface(
                 this@PlayerActivity,
                 AutoBridgeDesign.tint(AutoBridgeDesign.DANGER, 0.16f),
@@ -589,7 +590,7 @@ class PlayerActivity : Activity() {
             textSize = scaledText(11f)
             letterSpacing = dev.autobridge.design.ScriptTracking.letterSpacing(text, 0.14f)
             setTextColor(AutoBridgeDesign.TEXT_MUTED)
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            typeface = AppFonts.medium()
             setPadding(dp(4), dp(2), dp(4), dp(6))
         })
         val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }

@@ -111,7 +111,7 @@ object SettingsUi {
                 text = title
                 textSize = 15f
                 setTextColor(AutoBridgeDesign.TEXT)
-                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                typeface = AppFonts.medium()
             },
             LinearLayout.LayoutParams(-2, -2)
         )
@@ -186,7 +186,7 @@ object SettingsUi {
                 text = title
                 textSize = 15f
                 setTextColor(AutoBridgeDesign.TEXT)
-                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                typeface = AppFonts.medium()
             },
             LinearLayout.LayoutParams(0, -2, 1f)
         )
@@ -218,7 +218,7 @@ object SettingsUi {
                     ellipsize = TextUtils.TruncateAt.END
                     contentDescription = if (active) "$label, selected" else label
                     setTextColor(if (active) Color.WHITE else AutoBridgeDesign.TEXT_MUTED)
-                    if (active) typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+                    if (active) typeface = AppFonts.bold()
                     background =
                         if (active) AutoBridgeDesign.surface(
                             context, AutoBridgeDesign.ACCENT, 11, AutoBridgeDesign.ACCENT
@@ -252,7 +252,7 @@ object SettingsUi {
             text = valueText(progress)
             textSize = 15f
             setTextColor(AutoBridgeDesign.ACCENT)
-            typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+            typeface = AppFonts.bold()
         }
         addView(LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -261,7 +261,7 @@ object SettingsUi {
                 text = title
                 textSize = 15f
                 setTextColor(AutoBridgeDesign.TEXT)
-                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                typeface = AppFonts.medium()
             }, LinearLayout.LayoutParams(0, -2, 1f))
             addView(value, LinearLayout.LayoutParams(-2, -2))
         }, LinearLayout.LayoutParams(-1, -2))
@@ -319,7 +319,7 @@ object SettingsUi {
             text = title
             textSize = 16f
             setTextColor(accent)
-            typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+            typeface = AppFonts.bold()
         })
         addView(TextView(context).apply {
             text = caption
@@ -361,7 +361,7 @@ object SettingsUi {
                 text = title
                 textSize = 15f
                 setTextColor(AutoBridgeDesign.TEXT)
-                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                typeface = AppFonts.medium()
             })
             if (caption.isNotBlank()) addView(TextView(context).apply {
                 text = caption

@@ -85,6 +85,7 @@ import dev.autobridge.settings.SettingsStore
 import dev.autobridge.ui.PhoneNav
 import dev.autobridge.update.UpdateChecker
 import rikka.shizuku.Shizuku
+import dev.autobridge.ui.AppFonts
 
 /** Phone destinations are defined (and unit-tested) in [PhoneNav]. */
 private typealias PhoneScreen = PhoneNav.Route
@@ -2416,7 +2417,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
         this.text = text
         textSize = 11f
         setTextColor(COLOR_MUTED)
-        typeface = Typeface.DEFAULT_BOLD
+        typeface = AppFonts.bold()
         setPadding(0, dp(16), 0, dp(6))
     }
 
@@ -2424,7 +2425,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
         this.text = text
         textSize = size
         setTextColor(COLOR_TEXT)
-        typeface = Typeface.DEFAULT_BOLD
+        typeface = AppFonts.bold()
     }
 
     private fun mutedText(text: String) = TextView(this).apply {
@@ -2442,7 +2443,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
             text = title
             gravity = Gravity.CENTER
             textSize = 14f
-            typeface = Typeface.DEFAULT_BOLD
+            typeface = AppFonts.bold()
             val bg = when {
                 primary -> COLOR_ACCENT
                 destructive -> DesignTokens.Phone.DESTRUCTIVE
@@ -2476,7 +2477,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
                 text = value
                 textSize = 13f
                 setTextColor(COLOR_ACCENT)
-                typeface = Typeface.DEFAULT_BOLD
+                typeface = AppFonts.bold()
             })
 
             if (onClick != null) {
@@ -2907,7 +2908,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
                 gravity = Gravity.CENTER
                 textSize = 12f
                 setTextColor(if (mode == active) COLOR_TEXT else COLOR_MUTED)
-                typeface = Typeface.DEFAULT_BOLD
+                typeface = AppFonts.bold()
                 background = roundedBackground(
                     if (mode == active) COLOR_SURFACE_ALT else COLOR_SURFACE,
                     COLOR_BORDER

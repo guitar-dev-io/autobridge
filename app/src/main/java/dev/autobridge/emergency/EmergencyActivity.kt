@@ -22,6 +22,7 @@ import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.stack
 import dev.autobridge.ui.CarToolForm
 import dev.autobridge.ui.CarToolViews
+import dev.autobridge.ui.AppFonts
 
 /**
  * The emergency card: numbers to ring and facts to quote (the insurance hotline, the policy number,
@@ -155,7 +156,7 @@ class EmergencyActivity : Activity() {
                     text = entry.label
                     textSize = 17f
                     setTextColor(AutoBridgeDesign.TEXT)
-                    typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                    typeface = AppFonts.medium()
                     maxLines = 2
                     ellipsize = TextUtils.TruncateAt.END
                 })

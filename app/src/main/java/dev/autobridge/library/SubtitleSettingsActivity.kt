@@ -26,6 +26,7 @@ import dev.autobridge.ui.AutoBridgeDesign.dp
 import dev.autobridge.ui.AutoBridgeDesign.stack
 import java.io.FileNotFoundException
 import kotlin.concurrent.thread
+import dev.autobridge.ui.AppFonts
 
 /**
  * The Subtitles section of settings: whether a track is translated, by which engine, between
@@ -375,7 +376,7 @@ class SubtitleSettingsActivity : Activity() {
             setTextColor(accent)
             gravity = Gravity.END
             maxLines = 1
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            typeface = AppFonts.medium()
             setPadding(dp(8), 0, dp(6), 0)
         }, LinearLayout.LayoutParams(-2, -2))
         addView(TextView(this@SubtitleSettingsActivity).apply {

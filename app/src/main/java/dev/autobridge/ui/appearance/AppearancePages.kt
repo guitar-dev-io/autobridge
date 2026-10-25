@@ -22,11 +22,13 @@ import dev.autobridge.design.FontChoice
 import dev.autobridge.design.HomeLayout
 import dev.autobridge.design.IconStyle
 import dev.autobridge.design.TextStep
+import dev.autobridge.design.ThaiStyle
 import dev.autobridge.design.ThemeMode
 import dev.autobridge.design.ThemePreset
 import dev.autobridge.design.ThemeResolver
 import dev.autobridge.design.Wallpaper
 import dev.autobridge.design.WallpaperTarget
+import dev.autobridge.ui.AppFonts
 import dev.autobridge.ui.AutoBridgeDesign.dp
 import dev.autobridge.ui.appearance.AppearanceModel.Category
 import dev.autobridge.ui.appearance.AppearanceModel.Page
@@ -373,9 +375,10 @@ internal object AppearancePages {
         body.add(AppearanceUi.label(context, context.getString(R.string.appearance_font_family), first = true))
         body.add(AppearanceUi.card(context, FontChoice.entries.map { font ->
             val on = font == spec.font
-            // Each row names its font; drawing it in that face waits for the bundled fonts (piece D).
+            // Each row draws its sample in its own family.
             val sample = AppearanceUi.text(context, "Aa", 22f, if (on) p.accent else p.text, bold = true, lines = 1).apply {
                 setTextSize(TypedValue.COMPLEX_UNIT_DIP, 22f)
+                typeface = AppFonts.sample(font, 600)
                 layoutParams = LinearLayout.LayoutParams(context.dp(40), -2)
                 importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
             }
@@ -383,6 +386,22 @@ internal object AppearancePages {
                 context, sample, AppearanceLabels.font(context, font), AppearanceLabels.fontDescription(context, font),
                 AppearanceUi.radioDot(context, on), selected = on
             ) { if (!on) actions.change { it.copy(font = font) } }
+        }))
+
+        // Inter, Manrope and Plex have no Thai; this picks the letterforms that fill in.
+        body.add(AppearanceUi.label(context, context.getString(R.string.appearance_thai_style)))
+        body.add(AppearanceUi.card(context, ThaiStyle.entries.map { style ->
+            val on = style == spec.thai
+            val sample = AppearanceUi.text(context, context.getString(R.string.appearance_thai_letters), 20f, if (on) p.accent else p.text, bold = true, lines = 1).apply {
+                setTextSize(TypedValue.COMPLEX_UNIT_DIP, 20f)
+                typeface = AppFonts.thaiSample(style, 600)
+                layoutParams = LinearLayout.LayoutParams(context.dp(76), -2)
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }
+            AppearanceUi.listRow(
+                context, sample, AppearanceLabels.thai(context, style), AppearanceLabels.thaiDescription(context, style),
+                AppearanceUi.radioDot(context, on), selected = on
+            ) { if (!on) actions.change { it.copy(thai = style) } }
         }))
 
         body.add(AppearanceUi.label(context, context.getString(R.string.appearance_text_size)))
