@@ -52,7 +52,10 @@ internal class CarLookWatch(private val onChange: () -> Unit) {
 
     fun start() {
         if (scope != null) return
-        scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate).also { s ->
+        // Dispatched, not immediate: AppearanceStore.update sets the flow before it re-resolves
+        // the palette (ThemeHolder), so a collector run inside that assignment would repaint with
+        // the old palette, one change behind. Posting lets update() finish first.
+        scope = CoroutineScope(SupervisorJob() + Dispatchers.Main).also { s ->
             // The flow replays the current value on collect; only later changes repaint.
             s.launch { AppearanceStore.spec.drop(1).collect { onChange() } }
         }
