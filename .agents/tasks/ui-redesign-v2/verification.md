@@ -210,3 +210,24 @@ submodule in this worktree from the main checkout) and installed on YXEMRCGYAI49
 the phone sat on its lock screen with a fingerprint prompt, so no screen was opened and no
 screenshots were taken. Appearance was not changed; lock released. The device checks listed above
 are all still open.
+
+## Merged build: device pass (2026-10-25, real phone YXEMRCGYAI49S4SS + DHU 800x480)
+
+All six pieces merged into `claude/ui-redesign-foundation` (only conflicts: this file). `:app:compilePersonalDebugKotlin` + `:app:compileSafeDebugKotlin`, `:common:testDebugUnitTest`, `:app:testPersonalDebugUnitTest` (all) pass; check-i18n OK. personalDebug installed with `install -r`.
+
+Checked on the phone (screenshots/merged-*.png):
+- Appearance page (A): live preview, 5 modes, accents, layout cards, rows, car toggle, reset dialog + reset back to defaults.
+- Home (B): Classic grid, Dashboard, Compact; dark and light; 150% text (cards grow, status chip wraps).
+- Light mode across: Radio/Library (E1), browser chrome (E2), My Car page, Maintenance (E3).
+- Text sub-page: 6 steps, 150% note, Follow Android row.
+
+Checked on the DHU (C):
+- Car home follows the phone: Compact + light + 130% cap (scroll buttons), Dashboard + dark after a cycle.
+- Live: accent Rose on the phone repaints the car (wordmark, glow, chip, focus ring) within seconds; Reset returns Sky and 100%.
+
+Found, not fixed yet:
+1. `LibraryActivity` (Radio) in light mode: status bar icons stay white on the light background (A's system-bar fix covers MainActivity only).
+2. Appearance live preview at 150%: the mini phone sits lower than the mini car.
+3. DHU 800x480, Dashboard: the Now Playing card fills the height and the feature cards start below the fold (scroll), at 100% and at the 130% cap.
+4. Font rows (Inter, Manrope, Plex, Noto, Roboto) all draw in the same face: real fonts are piece D.
+- Environment, not a bug: force-stopping the app while the DHU runs freezes the car surface on its last frame; a full force-stop + head unit server + DHU cycle recovers it (memory: dhu-needs-force-stop-first).
