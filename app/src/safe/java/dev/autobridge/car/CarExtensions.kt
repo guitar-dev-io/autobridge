@@ -32,6 +32,10 @@ internal object CarExtensions {
     @Suppress("UNUSED_PARAMETER")
     fun canInstallChrome(carContext: CarContext): Boolean = false
 
+    /** False: nothing to send, there is no Chrome setup in this build. */
+    @Suppress("UNUSED_PARAMETER")
+    fun sendChromeSetupToPhone(carContext: CarContext, siteTitle: String): Boolean = false
+
     /** Nothing to watch: Chrome cannot be installed in this build. Returns a no-op canceller. */
     @Suppress("UNUSED_PARAMETER")
     fun watchChromeInstall(carContext: CarContext, onReady: () -> Unit): () -> Unit = {}

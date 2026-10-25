@@ -1824,8 +1824,7 @@
     <string name="maint_compulsory_insurance">Compulsory insurance (Por.Ror.Bor.)</string>
     <string name="car_saved_title">Saved</string>
     <string name="car_chrome_needed_title">Chrome needed</string>
-    <string name="car_chrome_needed_message">%1$s needs Google Chrome for Linux, which is not installed yet. On your phone, open AutoBridge \u203a Settings \u203a Desktop Browser Engine \u203a Guided Chrome setup (about 1 GB, Wi-Fi recommended). Do this while parked. When it finishes, %1$s opens here by itself.</string>
-    <string name="car_chrome_needed_ok">OK</string>
+    <string name="car_chrome_needed_message">%1$s needs Google Chrome for Linux, which is not installed yet. Tap Send to phone, then tap the notification there to set it up (about 1 GB, Wi-Fi recommended). Do this while parked. When it finishes, %1$s opens here by itself.</string>
     <string name="car_chrome_needed_open_anyway">Open anyway</string>
     <string name="streaming_group_premium">Streaming services</string>
     <string name="streaming_chrome_badge">Chrome</string>
@@ -1834,6 +1833,9 @@
     <string name="streaming_chrome_install">Set up Chrome</string>
     <string name="streaming_chrome_needed_message">%1$s needs Google Chrome for Linux, which is not installed yet. Set it up now? It is about 1 GB, so Wi-Fi is best.</string>
     <string name="car_streaming_needs_chrome">Needs Chrome</string>
+    <string name="car_chrome_needed_send">Send to phone</string>
+    <string name="car_chrome_needed_sent">Open the notification on your phone</string>
+    <string name="car_chrome_needed_not_sent">Phone notifications are off. Open AutoBridge on the phone instead.</string>
     <string name="car_my_car_title">My Car</string>
     <string name="fuel_edit">Edit</string>
     <string name="fuel_edit_title">Edit fill-up</string>

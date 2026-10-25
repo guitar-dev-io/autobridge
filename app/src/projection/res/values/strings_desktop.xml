@@ -104,4 +104,6 @@
     <string name="chrome_setup_car_hint">If the car is showing the Chrome-needed screen, it opens your site by itself now.</string>
     <string name="chrome_setup_entry">Guided Chrome setup</string>
     <string name="chrome_setup_entry_caption">Three steps to watch Netflix and other protected video on the car</string>
+    <string name="chrome_setup_channel">Chrome setup</string>
+    <string name="chrome_setup_notification_text">Tap to set up Chrome so %1$s can play on the car</string>
 </resources>

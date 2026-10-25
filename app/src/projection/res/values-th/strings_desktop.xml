@@ -104,4 +104,6 @@
     <string name="chrome_setup_car_hint">ถ้าจอรถกำลังแสดงหน้า "ต้องติดตั้ง Chrome" รถจะเปิดไซต์ที่คุณแตะให้เองตอนนี้</string>
     <string name="chrome_setup_entry">ติดตั้ง Chrome แบบพาทำ</string>
     <string name="chrome_setup_entry_caption">3 ขั้นตอนเพื่อดู Netflix และวิดีโอที่มี DRM บนรถ</string>
+    <string name="chrome_setup_channel">การติดตั้ง Chrome</string>
+    <string name="chrome_setup_notification_text">แตะเพื่อติดตั้ง Chrome ให้ %1$s เล่นบนรถได้</string>
 </resources>

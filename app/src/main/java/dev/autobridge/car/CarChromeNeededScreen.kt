@@ -1,6 +1,7 @@
 package dev.autobridge.car
 
 import androidx.car.app.CarContext
+import androidx.car.app.CarToast
 import androidx.car.app.Screen
 import androidx.car.app.model.Action
 import androidx.car.app.model.CarColor
@@ -17,7 +18,8 @@ import dev.autobridge.R
  * the other protected-video services) was tapped, but Chrome is not installed.
  *
  * The install is a ~1 GB download plus Google's terms, so it cannot be done from the head unit;
- * this screen says where to do it on the phone, and opens [url] by itself once Chrome is installed
+ * this screen sends a notification to the phone that opens the guided setup (the text names the
+ * way there as well, for a phone with notifications off), and opens [url] by itself once Chrome is installed
  * ([CarExtensions.watchChromeInstall]). [onOpenAnyway] is the old behaviour, offered as a
  * second choice because a site marked "may not play" sometimes still does in the built-in browser.
  */
@@ -44,16 +46,27 @@ class CarChromeNeededScreen(
         })
     }
 
+    private fun sendToPhone() {
+        val sent = CarExtensions.sendChromeSetupToPhone(carContext, siteTitle)
+        CarToast.makeText(
+            carContext,
+            carContext.getString(if (sent) R.string.car_chrome_needed_sent else R.string.car_chrome_needed_not_sent),
+            CarToast.LENGTH_LONG
+        ).show()
+    }
+
     override fun onGetTemplate(): Template {
         val title = carContext.getString(R.string.car_chrome_needed_title)
         val message = MessageTemplate.Builder(
             carContext.getString(R.string.car_chrome_needed_message, siteTitle)
         )
+            // Two actions at most on a message: send the user to the guide, or keep the old behaviour.
+            // Back (the header) is the way out without either.
             .addAction(
                 Action.Builder()
-                    .setTitle(carContext.getString(R.string.car_chrome_needed_ok))
+                    .setTitle(carContext.getString(R.string.car_chrome_needed_send))
                     .setBackgroundColor(CarColor.PRIMARY)
-                    .setOnClickListener { screenManager.pop() }
+                    .setOnClickListener { sendToPhone() }
                     .build()
             )
             .addAction(

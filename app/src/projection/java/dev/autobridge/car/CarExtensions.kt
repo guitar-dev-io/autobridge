@@ -149,6 +149,10 @@ internal object CarExtensions {
     fun canInstallChrome(carContext: CarContext): Boolean =
         desktopSupported(carContext) && DesktopEngine.installedChrome() == null
 
+    /** Posts the "set up Chrome" notification on the phone; false when notifications are off. */
+    fun sendChromeSetupToPhone(carContext: CarContext, siteTitle: String): Boolean =
+        dev.autobridge.projection.desktop.DesktopSetupNotification.post(carContext, siteTitle)
+
     /**
      * Calls [onReady] on the main thread once Chrome for Linux is installed (the guided setup on the
      * phone finishing), so a car screen that sent the user there can carry on by itself. The
@@ -159,6 +163,7 @@ internal object CarExtensions {
         val scope = kotlinx.coroutines.MainScope()
         scope.launch {
             DesktopEngine.browserStates.first { DesktopEngine.installedChrome() != null }
+            dev.autobridge.projection.desktop.DesktopSetupNotification.cancel(carContext)
             onReady()
         }
         return { scope.cancel() }
