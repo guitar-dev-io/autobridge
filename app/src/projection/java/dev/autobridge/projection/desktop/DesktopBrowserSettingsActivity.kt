@@ -353,6 +353,17 @@ class DesktopBrowserSettingsActivity : Activity() {
             refresh()
         })
 
+        section(getString(R.string.desktop_prefs_managed), getString(R.string.desktop_prefs_managed_caption))
+        card.addView(choice(listOf(
+            getString(R.string.desktop_prefs_on) to store.managedMode,
+            getString(R.string.desktop_prefs_off) to !store.managedMode,
+        )) { i ->
+            store.managedMode = i == 0
+            // Takes effect when the browser next starts.
+            Thread { DesktopEngine.stopSession() }.start()
+            refresh()
+        })
+
         section(getString(R.string.desktop_prefs_sensitivity), getString(R.string.desktop_prefs_sensitivity_caption))
         val sens = store.touchSensitivity
         card.addView(stepper("${Math.round(sens * 100)}%",

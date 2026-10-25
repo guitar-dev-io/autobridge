@@ -64,7 +64,7 @@ enum class DrawerAction {
     /** Phone only: pulls whatever the car surface is showing back onto the phone. */
     RECEIVE_FROM_CAR,
 
-    /** Opens the Buy Me a Coffee support page in an external browser. */
+    /** Opens the Ko-fi support page in an external browser. */
     SUPPORT,
 
     /** Opens the generated open-source licenses screen (falls back to the GitHub LICENSE). */

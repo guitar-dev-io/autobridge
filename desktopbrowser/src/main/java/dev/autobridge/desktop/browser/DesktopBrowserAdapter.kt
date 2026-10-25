@@ -19,6 +19,8 @@ data class LaunchSpec(
     val height: Int,
     val scale: Float,
     val startUrl: String?,
+    /** Managed mode: hide the --no-sandbox warning bar (--test-type) and apply the managed policy. */
+    val managed: Boolean = true,
 )
 
 /**
@@ -101,7 +103,7 @@ interface DesktopBrowserAdapter {
         add("--no-default-browser-check")
         add("--password-store=basic")
         add("--no-sandbox")
-        add("--test-type")
+        if (spec.managed) add("--test-type")
         add("--disable-dev-shm-usage")
         add("--disable-gpu")
         add("--touch-events=enabled")

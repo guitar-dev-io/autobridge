@@ -34,6 +34,14 @@ internal object CarExtensions {
     fun install(context: android.content.Context) {
         val app = context.applicationContext
         DesktopEngine.startPages = { dev.autobridge.browser.CarStartPage.desktopPages(app) }
+        // Thai pages follow the Thai letterforms chosen in Appearance (looped or not).
+        DesktopEngine.thaiFontFamily = {
+            if (dev.autobridge.settings.AppearanceStore.current().thai == dev.autobridge.design.ThaiStyle.LOOPED) {
+                dev.autobridge.desktop.runtime.GuestFontConfig.LOOPED_THAI
+            } else {
+                dev.autobridge.desktop.runtime.GuestFontConfig.DEFAULT_THAI
+            }
+        }
         // The phone's Streaming page sends the sites that may not play in the WebView here.
         dev.autobridge.library.DesktopLinks.opener = { ctx, url ->
             // Google Chrome for Linux, not whichever browser is chosen for the Web card: these sites

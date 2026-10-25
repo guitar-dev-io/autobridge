@@ -479,9 +479,12 @@ object AutoBridgeDesign {
             textSize = 15f
             setTextColor(TEXT)
             typeface = AppFonts.medium()
+            // Always two lines tall: a weighted width is measured twice in a grid row, and a title
+            // sized for the first pass had its second line cut off by the subtitle under it.
+            minLines = 2
             maxLines = 2
             ellipsize = TextUtils.TruncateAt.END
-        }, LinearLayout.LayoutParams(0, -2, 1f))
+        }, LinearLayout.LayoutParams(0, context.dp(46), 1f))
         if (corner != null) titleRow.addView(
             glyphButton(context, corner.first, 16f, tint = if (corner.first == "★") ACCENT_FAVORITE else null, onClick = corner.second),
             LinearLayout.LayoutParams(context.dp(36), context.dp(36)).apply {

@@ -167,8 +167,10 @@ class RadioPlayerActivity : Activity() {
         art.addView(badge, FrameLayout.LayoutParams(dp(72), dp(72), Gravity.END or Gravity.BOTTOM))
         body.addView(art, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(8) })
 
-        // "● Live": the red dot says on air, the pill says radio.
-        body.addView(TextView(this).apply {
+        // "● Live": the red dot says on air, the pill says radio; beside it, bars that bounce while
+        // sound is actually playing and rest while paused or still loading.
+        val liveRow = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+        liveRow.addView(TextView(this).apply {
             text = android.text.SpannableString("●  " + getString(R.string.radio_live)).apply {
                 setSpan(android.text.style.ForegroundColorSpan(LIVE_RED), 0, 1, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                 setSpan(android.text.style.RelativeSizeSpan(0.8f), 0, 1, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
@@ -179,7 +181,12 @@ class RadioPlayerActivity : Activity() {
             typeface = AppFonts.bold()
             background = AutoBridgeDesign.surface(this@RadioPlayerActivity, AutoBridgeDesign.tint(AutoBridgeDesign.ACCENT_RADIO, 0.16f), 12, Color.TRANSPARENT)
             setPadding(dp(12), dp(4), dp(12), dp(4))
-        }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(18) })
+        }, LinearLayout.LayoutParams(-2, -2))
+        liveRow.addView(
+            dev.autobridge.ui.EqBarsView(this, AutoBridgeDesign.ACCENT_RADIO, barCount = 4) { playback.isPlaying },
+            LinearLayout.LayoutParams(dp(26), dp(18)).apply { marginStart = dp(12) }
+        )
+        body.addView(liveRow, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(18) })
 
         song = centred(26f, AutoBridgeDesign.TEXT, bold = true, lines = 2)
         artist = centred(16f, SOFT_TEXT, bold = false, lines = 1)

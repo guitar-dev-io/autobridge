@@ -133,8 +133,11 @@ class LibraryActivity : Activity() {
         /** Radio: the online station search waits for this pause in typing and this many characters. */
         private const val RADIO_ONLINE_DEBOUNCE_MS = 600L
         private const val RADIO_ONLINE_MIN_CHARS = 2
-        /** Station logos across the Radio grid: four, like a radio app's, so a screenful is a dozen. */
-        private const val RADIO_GRID_COLUMNS = 4
+        /** Station logos across the Radio grid: three, so a logo is big enough to read and a name fits on two lines. */
+        private const val RADIO_GRID_COLUMNS = 3
+
+        /** Channel and film tiles across the TV grid. */
+        private const val CHANNEL_GRID_COLUMNS = 3
 
         // The radio page's palette roles, read from Settings > Appearance: controls take the user's
         // accent, and amber stays on the section's own badge only.
@@ -862,7 +865,7 @@ class LibraryActivity : Activity() {
             isClickable = true
             isFocusable = true
             contentDescription = entry.title
-            val playing = radioOnAir(entry.url, entry.title)
+            val playing = radioOnAir(entry.url, entry.title, categoryEntries.map { it.url })
             isSelected = playing
             setPadding(dp(5), dp(5), dp(5), dp(6))
             background = radioCellBackground(playing)
@@ -870,14 +873,28 @@ class LibraryActivity : Activity() {
             // The grid gives every cell an equal width; squaring the logo means tying its height to
             // that measured width, which is only known after layout — so post the width as height.
             val square = radioLogoSquare(entry.title, entry.logo)
+            if (playing) {
+                // The on-air station's logo carries bouncing bars, like a radio app's.
+                val eq = dev.autobridge.ui.EqBarsView(this@LibraryActivity, AutoBridgeDesign.ACCENT_RADIO) { playback.isPlaying }
+                val chip = FrameLayout(this@LibraryActivity).apply {
+                    background = AutoBridgeDesign.surface(this@LibraryActivity, android.graphics.Color.argb(170, 0, 0, 0), 10)
+                    setPadding(dp(6), dp(5), dp(6), dp(5))
+                    addView(eq, FrameLayout.LayoutParams(dp(16), dp(14)))
+                }
+                square.addView(chip, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.START).apply {
+                    setMargins(dp(6), 0, 0, dp(6))
+                })
+            }
             addView(square, LinearLayout.LayoutParams(-1, -2))
             square.post { square.layoutParams = square.layoutParams.apply { height = square.width } }
             addView(TextView(this@LibraryActivity).apply {
                 text = entry.title
-                textSize = 12f
+                textSize = 13f
                 setTextColor(RADIO_STATION_TEXT)
                 typeface = MediaTheme.SEMIBOLD
-                maxLines = 1
+                // Two lines, so "101.5 Chulalongkorn" is not cut to "101.5 Chul..."; the minimum keeps cells level.
+                minLines = 2
+                maxLines = 2
                 ellipsize = TextUtils.TruncateAt.END
                 setPadding(dp(2), dp(6), dp(2), 0)
             }, LinearLayout.LayoutParams(-1, -2))
@@ -887,9 +904,12 @@ class LibraryActivity : Activity() {
      * The station on the air, matched by its stream address or, when the session reports the
      * address differently (a redirect, a resolved playlist), by its name.
      */
-    private fun radioOnAir(url: String, title: String): Boolean {
+    private fun radioOnAir(url: String, title: String, shownUrls: List<String> = emptyList()): Boolean {
         val current = playback.currentUri
         if (url.isNotBlank() && current == url) return true
+        // Two stations can share a name (two "Cool fahrenheit"): when the playing address is one of
+        // the cells on screen, that cell alone is on air, and the name never lights up another.
+        if (current != null && current in shownUrls) return false
         val name = playback.currentItemTitle?.trim() ?: return false
         return name.isNotEmpty() && name.equals(title.trim(), ignoreCase = true)
     }
@@ -908,7 +928,7 @@ class LibraryActivity : Activity() {
             isClickable = true
             isFocusable = true
             contentDescription = item.title
-            val playing = radioOnAir(item.url, item.title)
+            val playing = radioOnAir(item.url, item.title, favorites.map { it.url })
             isSelected = playing
             setPadding(dp(5), dp(5), dp(5), dp(6))
             background = radioCellBackground(playing)
@@ -1505,9 +1525,10 @@ class LibraryActivity : Activity() {
                 }
             )
             rows += if (gridView) {
-                // Channels and films carry a logo worth seeing, so the grid is the default; two
-                // columns is what fits a phone at a glance. List trades the logo for density.
-                AutoBridgeDesign.grid(this, shown.map { entryTile(source, it, shown) }, columns = 2, gap = 10)
+                // Channels and films carry a logo worth seeing, so the grid is the default; three
+                // columns keeps a tile from towering over its logo, like the Radio grid. List
+                // trades the logo for density.
+                AutoBridgeDesign.grid(this, shown.map { entryTile(source, it, shown) }, columns = CHANNEL_GRID_COLUMNS, gap = 10)
             } else {
                 shown.map { entryRow(source, it, shown) }
             }

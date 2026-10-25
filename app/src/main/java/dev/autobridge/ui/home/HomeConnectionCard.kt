@@ -37,7 +37,7 @@ import dev.autobridge.ui.ConnectionStatusText
 /**
  * Home's Android Auto card, drawn from the palette so it follows light mode and the card style:
  * the connection in words ([ConnectionStatusText], the same wording as Control and My Car), a
- * status pill, and Home's Mirror / Multi-app buttons. Tapping the card opens Car & Connection.
+ * status pill, and Home's Mirror / Multi-app buttons. Tapping the card opens Car setup.
  *
  * At large text the pill moves under the status line, so "Android Auto" keeps one line.
  */

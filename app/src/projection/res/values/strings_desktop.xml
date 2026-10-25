@@ -59,6 +59,8 @@
     <string name="desktop_prefs_section">Preferences</string>
     <string name="desktop_prefs_on">On</string>
     <string name="desktop_prefs_off">Off</string>
+    <string name="desktop_prefs_managed">Managed mode</string>
+    <string name="desktop_prefs_managed_caption">Hides the --no-sandbox warning with a managed policy. Turn off to run unmanaged; the browser restarts.</string>
     <string name="desktop_prefs_start_on_launch">Start on launch</string>
     <string name="desktop_prefs_start_on_launch_caption">Start the chosen browser in the background when AutoBridge starts, so it opens instantly in the car</string>
     <string name="desktop_prefs_sensitivity">Touch sensitivity</string>
