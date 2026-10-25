@@ -78,3 +78,16 @@ Use the 1280x720 profile first, then the 800x480 one.
 12. 800x480 profile: Dashboard keeps its compact profile as before; Classic fits without
     scrolling; Compact fits with six features, and where it cannot (eight, or large text) it
     scrolls with the scroll buttons and the strip follows the last row.
+
+### Piece C: real-phone attempt, 2026-10-25
+
+- `:app:assemblePersonalDebug` builds (this worktree first needed the whisper.cpp submodule; it was
+  cloned locally from the main checkout at the pinned v1.9.5 commit, nothing committed).
+- Installed on YXEMRCGYAI49S4SS under the phone lock: `Success` (no MIUI gate this time).
+- Blocked: the phone was on its secure lock screen (fingerprint/PIN, `deviceLocked=1`). Starting the
+  head unit server needs Android Auto's settings open on an unlocked phone, so no DHU run and no
+  screenshots. Appearance prefs reset to defaults, lock released.
+- To finish: unlock the phone, then follow the DHU steps above. A helper that writes appearance prefs
+  without the piece A UI: `adb shell run-as dev.autobridge` writing
+  `shared_prefs/autobridge_appearance.xml` (keys from `AppearanceCodec`, e.g. `home_layout=CLASSIC`),
+  then force-stop `dev.autobridge` and reopen AutoBridge on the DHU.
