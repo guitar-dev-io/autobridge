@@ -1836,7 +1836,7 @@
     <string name="car_chrome_needed_send">Send to phone</string>
     <string name="car_chrome_needed_sent">Open the notification on your phone</string>
     <string name="car_chrome_needed_not_sent">Phone notifications are off. Open AutoBridge on the phone instead.</string>
-    <string name="home_v2_caption_streaming">Netflix, YouTube and more</string>
+    <string name="home_v2_caption_streaming">Netflix, YouTube, more</string>
     <string name="car_my_car_title">My Car</string>
     <string name="fuel_edit">Edit</string>
     <string name="fuel_edit_title">Edit fill-up</string>
