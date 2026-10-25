@@ -79,6 +79,9 @@ object BrowserStartPage {
     /** The built page and the hook that brings its history and toolbar up to date on each show. */
     class Built(val view: View, val refresh: () -> Unit)
 
+    private const val NAV_HEIGHT_DP = 56f
+    private const val NAV_MARGIN_DP = 12f
+
     /** How much of the page's bottom the toolbar covers, for anything floating above it (the FAB). */
     const val NAV_BAR_RESERVE_DP = NAV_HEIGHT_DP + NAV_MARGIN_DP * 2
 
@@ -645,8 +648,6 @@ object BrowserStartPage {
     private const val TILE_CORNER_DP = 16f
     private const val CARD_CORNER_DP = 20f
     private const val ROW_MIN_HEIGHT_DP = 60f
-    private const val NAV_HEIGHT_DP = 56f
-    private const val NAV_MARGIN_DP = 12f
     private const val NAV_BUTTON_DP = 48f
     private const val BODY_TEXT_DP = 15f
     private const val SMALL_TEXT_DP = 12f
