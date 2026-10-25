@@ -17,7 +17,6 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import dev.autobridge.R
-import dev.autobridge.design.DesignTokens
 import dev.autobridge.i18n.AppLocale
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.stack
@@ -46,14 +45,17 @@ class EmergencyActivity : Activity() {
         )
     }
 
-    private val accent = AutoBridgeDesign.ACCENT
+    private val accent: Int get() = AutoBridgeDesign.ACCENT
 
     override fun attachBaseContext(newBase: Context) {
-        super.attachBaseContext(AppLocale.rebase(newBase))
+        super.attachBaseContext(dev.autobridge.ui.AppearanceContext.wrap(AppLocale.rebase(newBase)))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // System and Auto modes depend on night mode and the clock, which may have moved on.
+        dev.autobridge.settings.AppearanceStore.refreshPalette(this)
+        dev.autobridge.settings.ScreenAppearance.applyWindow(this)
         render()
     }
 
@@ -116,15 +118,19 @@ class EmergencyActivity : Activity() {
         )
     }
 
-    /** Each public line in a colour of its own, so the right one is found at a glance. */
+    /**
+     * Each public line in a colour of its own, so the right one is found at a glance. The colours
+     * stay the same in every theme (police is always this blue); a light page only darkens them so
+     * the call button keeps its contrast.
+     */
     private fun lineColor(number: String): Int = when (number) {
-        "191" -> DesignTokens.Phone.ACCENT_TV  // police
-        "1669" -> DesignTokens.Phone.ACCENT_VIDEO // medical
-        "1193" -> DesignTokens.Phone.SIGNAL_GOOD // highway police
-        "199" -> DesignTokens.Phone.ACCENT_RADIO  // fire
-        "1155" -> DesignTokens.Phone.ACCENT_SYSTEM // tourist police
-        else -> accent
-    }
+        "191" -> AutoBridgeDesign.ACCENT_TV  // police
+        "1669" -> AutoBridgeDesign.ACCENT_VIDEO // medical
+        "1193" -> AutoBridgeDesign.SIGNAL_GOOD // highway police
+        "199" -> AutoBridgeDesign.ACCENT_RADIO  // fire
+        "1155" -> AutoBridgeDesign.ACCENT_SYSTEM // tourist police
+        else -> return accent
+    }.let(dev.autobridge.settings.ScreenAppearance::readable)
 
     /**
      * One line of the card, as in the design: the name, and under it the number or the text with

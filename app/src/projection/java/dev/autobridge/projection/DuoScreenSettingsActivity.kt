@@ -19,7 +19,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
-import dev.autobridge.design.DesignTokens
+import dev.autobridge.design.ThemeHolder
 import dev.autobridge.duoscreen.DuoScreenHost
 import dev.autobridge.duoscreen.R
 import dev.autobridge.duoscreen.layout.DuoScreenLayout
@@ -32,6 +32,7 @@ import dev.autobridge.duoscreen.system.DuoScreenRootOps
 import dev.autobridge.duoscreen.system.DuoScreenSelfPane
 import dev.autobridge.i18n.AppLocale
 import dev.autobridge.input.ShizukuInputBackend
+import dev.autobridge.settings.ScreenAppearance
 import dev.autobridge.shizuku.ShizukuGrant
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.stack
@@ -63,7 +64,14 @@ class DuoScreenSettingsActivity : Activity() {
     }
 
     override fun attachBaseContext(newBase: Context) {
-        super.attachBaseContext(AppLocale.rebase(newBase))
+        super.attachBaseContext(dev.autobridge.ui.AppearanceContext.wrap(AppLocale.rebase(newBase)))
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        // System and Auto modes depend on night mode and the clock, which may have moved on.
+        dev.autobridge.settings.AppearanceStore.refreshPalette(this)
+        dev.autobridge.settings.ScreenAppearance.applyWindow(this)
     }
 
     override fun onResume() {
@@ -160,24 +168,45 @@ class DuoScreenSettingsActivity : Activity() {
                 }
             )
             addView(
-                TextView(this@DuoScreenSettingsActivity).apply {
-                    text = label
-                    textSize = 14f
-                    gravity = Gravity.CENTER
-                    contentDescription = if (active) "$label, selected" else label
-                    setTextColor(if (active) android.graphics.Color.WHITE else AutoBridgeDesign.TEXT_MUTED)
-                    if (active) typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
-                    background = if (active) AutoBridgeDesign.surface(
-                        this@DuoScreenSettingsActivity, AutoBridgeDesign.ACCENT, 11, AutoBridgeDesign.ACCENT
-                    ) else null
-                    setPadding(dp(12), dp(8), dp(12), dp(8))
-                    setOnClickListener {
-                        if (backend != current) chooseBackend(backend)
-                    }
+                segment(label, active, radius = 11, textSize = 14f) {
+                    if (backend != current) chooseBackend(backend)
                 },
                 LinearLayout.LayoutParams(0, -2, 1f)
             )
         }
+    }
+
+    /**
+     * One option of a segmented control: the selected one filled with the accent (its text on the
+     * accent's own ink, so it reads in light mode too), the others quiet with a ripple. At least
+     * 44 dp tall, the smallest target the design allows.
+     */
+    private fun segment(
+        label: String,
+        active: Boolean,
+        radius: Int,
+        textSize: Float,
+        idleFill: Int = android.graphics.Color.TRANSPARENT,
+        onClick: () -> Unit,
+    ): TextView = TextView(this).apply {
+        text = label
+        this.textSize = textSize
+        gravity = Gravity.CENTER
+        maxLines = 1
+        minHeight = dp(44)
+        contentDescription = if (active) "$label, selected" else label
+        isSelected = active
+        setTextColor(if (active) ThemeHolder.palette.onAccent else AutoBridgeDesign.TEXT_MUTED)
+        if (active) typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+        background = if (active) {
+            AutoBridgeDesign.surface(this@DuoScreenSettingsActivity, AutoBridgeDesign.ACCENT, radius, AutoBridgeDesign.ACCENT)
+        } else {
+            AutoBridgeDesign.tappable(this@DuoScreenSettingsActivity, idleFill, radius, AutoBridgeDesign.ACCENT, android.graphics.Color.TRANSPARENT)
+        }
+        setPadding(dp(12), dp(8), dp(12), dp(8))
+        isClickable = true
+        isFocusable = true
+        setOnClickListener { onClick() }
     }
 
     private fun chooseBackend(backend: DuoScreenBackend) {
@@ -261,7 +290,7 @@ class DuoScreenSettingsActivity : Activity() {
         action: Int = R.string.duo_screen_shizuku_grant,
         onGrant: () -> Unit,
     ): View {
-        val bannerAccent = if (ready) AutoBridgeDesign.ACCENT_ONLINE else AutoBridgeDesign.SIGNAL_SLOW
+        val bannerAccent = if (ready) ThemeHolder.palette.good else ThemeHolder.palette.warn
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -317,10 +346,11 @@ class DuoScreenSettingsActivity : Activity() {
                     this.text = getString(action)
                     textSize = 13f
                     gravity = Gravity.CENTER
-                    setTextColor(android.graphics.Color.WHITE)
+                    setTextColor(ThemeHolder.palette.onAccent)
                     typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
                     isClickable = true
                     isFocusable = true
+                    minHeight = dp(44)
                     setPadding(dp(16), dp(8), dp(16), dp(8))
                     background = AutoBridgeDesign.tappable(
                         this@DuoScreenSettingsActivity,
@@ -336,10 +366,13 @@ class DuoScreenSettingsActivity : Activity() {
 
     // ── Pane row ──────────────────────────────────────────────────────────────
 
-    /** The accent each pane's badge carries (design 08: green, red, blue), by pane index. */
+    /**
+     * The accent each pane's badge carries (design 08: green, red, blue), by pane index, darkened on
+     * a light page so the tile's hint stays readable.
+     */
     private fun paneAccent(index: Int): Int = when (index) {
-        0 -> AutoBridgeDesign.ACCENT_ONLINE
-        1 -> AutoBridgeDesign.ACCENT_FAVORITE
+        0 -> ScreenAppearance.readable(AutoBridgeDesign.ACCENT_ONLINE)
+        1 -> ScreenAppearance.readable(AutoBridgeDesign.ACCENT_FAVORITE)
         else -> AutoBridgeDesign.ACCENT
     }
 
@@ -353,7 +386,7 @@ class DuoScreenSettingsActivity : Activity() {
     private fun layoutPreview(preset: DuoScreenPreset, paneCount: Int, packages: List<String?>): View {
         val frame = FrameLayout(this).apply {
             background = AutoBridgeDesign.surface(
-                this@DuoScreenSettingsActivity, DesignTokens.MultiApp.SURFACE, 20, AutoBridgeDesign.HAIRLINE
+                this@DuoScreenSettingsActivity, AutoBridgeDesign.SURFACE_RAISED, 20, AutoBridgeDesign.HAIRLINE
             )
             setPadding(dp(6), dp(6), dp(6), dp(6))
         }
@@ -417,7 +450,7 @@ class DuoScreenSettingsActivity : Activity() {
                 else getString(R.string.duo_screen_preview_tap_hint, paneTitle)
                 textSize = 11.5f
                 gravity = Gravity.CENTER
-                setTextColor(if (blocked) AutoBridgeDesign.SIGNAL_SLOW else accent)
+                setTextColor(if (blocked) ThemeHolder.palette.warn else accent)
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
             })
@@ -436,26 +469,13 @@ class DuoScreenSettingsActivity : Activity() {
         for (count in DuoScreenStore.MIN_PANES..DuoScreenStore.MAX_PANES) {
             val active = count == current
             addView(
-                TextView(this@DuoScreenSettingsActivity).apply {
-                    text = count.toString()
-                    textSize = 14f
-                    gravity = Gravity.CENTER
-                    contentDescription = if (active) "$count, selected" else "$count"
-                    setTextColor(if (active) android.graphics.Color.WHITE else AutoBridgeDesign.TEXT_MUTED)
-                    if (active) typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
-                    background = if (active) AutoBridgeDesign.surface(
-                        this@DuoScreenSettingsActivity, AutoBridgeDesign.ACCENT, 11, AutoBridgeDesign.ACCENT
-                    ) else null
-                    minWidth = dp(52)
-                    setPadding(dp(12), dp(8), dp(12), dp(8))
-                    setOnClickListener {
-                        if (count != current) {
-                            DuoScreenStore.setPaneCount(this@DuoScreenSettingsActivity, count)
-                            applied()
-                            render()
-                        }
+                segment(count.toString(), active, radius = 11, textSize = 14f) {
+                    if (count != current) {
+                        DuoScreenStore.setPaneCount(this@DuoScreenSettingsActivity, count)
+                        applied()
+                        render()
                     }
-                },
+                }.apply { minWidth = dp(52) },
                 LinearLayout.LayoutParams(-2, -2)
             )
         }
@@ -560,9 +580,10 @@ class DuoScreenSettingsActivity : Activity() {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            background = AutoBridgeDesign.surface(this@DuoScreenSettingsActivity, bgFill, 14, chipAccent)
+            background = AutoBridgeDesign.tappable(this@DuoScreenSettingsActivity, bgFill, 14, AutoBridgeDesign.ACCENT, chipAccent)
             isClickable = true
             isFocusable = true
+            isSelected = active
             contentDescription = preset.label(this@DuoScreenSettingsActivity)
             setPadding(dp(6), dp(8), dp(6), dp(6))
             setOnClickListener {
@@ -645,27 +666,13 @@ class DuoScreenSettingsActivity : Activity() {
         DuoScreenStore.CONTENT_SCALES.forEachIndexed { index, scale ->
             val active = scale == selected
             addView(
-                TextView(this@DuoScreenSettingsActivity).apply {
-                    text = getString(R.string.duo_screen_content_scale_value, scale)
-                    textSize = 13f
-                    gravity = Gravity.CENTER
-                    maxLines = 1
-                    contentDescription = if (active) "${getString(R.string.duo_screen_content_scale_value, scale)}, selected" else getString(R.string.duo_screen_content_scale_value, scale)
-                    setTextColor(if (active) android.graphics.Color.WHITE else AutoBridgeDesign.TEXT_MUTED)
-                    if (active) typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
-                    background = if (active) AutoBridgeDesign.surface(
-                        this@DuoScreenSettingsActivity, AutoBridgeDesign.ACCENT, 14, AutoBridgeDesign.ACCENT
-                    ) else AutoBridgeDesign.surface(
-                        this@DuoScreenSettingsActivity, AutoBridgeDesign.SURFACE_RAISED, 14
-                    )
-                    setPadding(dp(14), dp(8), dp(14), dp(8))
-                    isClickable = true
-                    isFocusable = true
-                    setOnClickListener {
-                        DuoScreenStore.setContentScale(this@DuoScreenSettingsActivity, scale)
-                        applied()
-                        render()
-                    }
+                segment(
+                    getString(R.string.duo_screen_content_scale_value, scale), active,
+                    radius = 14, textSize = 13f, idleFill = AutoBridgeDesign.SURFACE_RAISED
+                ) {
+                    DuoScreenStore.setContentScale(this@DuoScreenSettingsActivity, scale)
+                    applied()
+                    render()
                 },
                 LinearLayout.LayoutParams(0, -2, 1f).apply {
                     if (index > 0) marginStart = dp(6)
@@ -756,7 +763,7 @@ class DuoScreenSettingsActivity : Activity() {
      * pane and the apps running in them), so the dialog reuses it rather than writing it twice.
      */
     private fun confirmEndSession() {
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, ScreenAppearance.dialogTheme())
             .setTitle(R.string.duo_screen_end_session_confirm_title)
             .setMessage(R.string.duo_screen_end_session_hint)
             .setNegativeButton(R.string.duo_screen_cancel, null)
@@ -824,7 +831,7 @@ class DuoScreenSettingsActivity : Activity() {
      */
     private fun pickAppFor(paneId: Int) {
         val items = pickerItems()
-        val builder = AlertDialog.Builder(this)
+        val builder = AlertDialog.Builder(this, ScreenAppearance.dialogTheme())
         val grid = GridView(builder.context).apply {
             // AUTO_FIT with a cell width rather than a fixed column count: the same dialog opens on
             // a phone in portrait and on a 11" tablet, and the cell is the size that has to stay
@@ -871,7 +878,7 @@ class DuoScreenSettingsActivity : Activity() {
      * them black. Said before they go in, with the choice to pick something else.
      */
     private fun confirmProtectedApp(paneId: Int, packageName: String, label: String) {
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, ScreenAppearance.dialogTheme())
             .setTitle(getString(R.string.duo_protected_title, label))
             .setMessage(getString(R.string.duo_protected_message, label))
             .setPositiveButton(R.string.duo_protected_use_anyway) { _, _ -> choosePaneApp(paneId, packageName) }

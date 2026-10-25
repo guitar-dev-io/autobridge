@@ -11,6 +11,7 @@ import android.widget.TextView
 import dev.autobridge.R
 import dev.autobridge.fuel.FuelLogStore
 import dev.autobridge.i18n.AppLocale
+import dev.autobridge.settings.ScreenAppearance
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.stack
 import dev.autobridge.ui.CarToolForm
@@ -43,14 +44,17 @@ class CostsActivity : Activity() {
             NumberFormat.getNumberInstance().apply { maximumFractionDigits = 0 }.format(Math.round(value))
     }
 
-    private val accent = AutoBridgeDesign.ACCENT
+    private val accent: Int get() = AutoBridgeDesign.ACCENT
 
     override fun attachBaseContext(newBase: Context) {
-        super.attachBaseContext(AppLocale.rebase(newBase))
+        super.attachBaseContext(dev.autobridge.ui.AppearanceContext.wrap(AppLocale.rebase(newBase)))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // System and Auto modes depend on night mode and the clock, which may have moved on.
+        dev.autobridge.settings.AppearanceStore.refreshPalette(this)
+        dev.autobridge.settings.ScreenAppearance.applyWindow(this)
         render()
     }
 
@@ -123,10 +127,10 @@ class CostsActivity : Activity() {
     private fun summaryCard(thisMonth: MonthCost, average: MonthCost?) = CarToolViews.card(this) {
         addView(CarToolViews.text(context, getString(R.string.money_baht, money(thisMonth.totalBaht)), 32f, bold = true))
         if (thisMonth.totalBaht > 0) {
-            addView(CarToolViews.splitBar(context, thisMonth.fuelBaht, thisMonth.otherBaht, AutoBridgeDesign.ACCENT_FILES, AutoBridgeDesign.ACCENT_SYSTEM))
+            addView(CarToolViews.splitBar(context, thisMonth.fuelBaht, thisMonth.otherBaht, ScreenAppearance.readable(AutoBridgeDesign.ACCENT_FILES), ScreenAppearance.readable(AutoBridgeDesign.ACCENT_SYSTEM)))
             addView(CarToolViews.legend(context, listOf(
-                AutoBridgeDesign.ACCENT_FILES to getString(R.string.costs_legend_fuel, money(thisMonth.fuelBaht)),
-                AutoBridgeDesign.ACCENT_SYSTEM to getString(R.string.costs_legend_other, money(thisMonth.otherBaht))
+                ScreenAppearance.readable(AutoBridgeDesign.ACCENT_FILES) to getString(R.string.costs_legend_fuel, money(thisMonth.fuelBaht)),
+                ScreenAppearance.readable(AutoBridgeDesign.ACCENT_SYSTEM) to getString(R.string.costs_legend_other, money(thisMonth.otherBaht))
             )))
         }
         average?.let { addView(CarToolViews.text(context, getString(R.string.costs_average_short, money(it.totalBaht)), 13f, AutoBridgeDesign.TEXT_MUTED, top = 8)) }
@@ -158,7 +162,7 @@ class CostsActivity : Activity() {
     }
 
     private fun confirmDelete(expense: Expense) {
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(getString(R.string.costs_delete_title))
             .setMessage("${expense.label} · ${getString(R.string.costs_baht, money(expense.baht))}")
             .setNegativeButton(android.R.string.cancel, null)

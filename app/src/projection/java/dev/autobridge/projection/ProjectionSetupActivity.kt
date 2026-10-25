@@ -17,6 +17,7 @@ import dev.autobridge.browser.BrowserActivity
 import dev.autobridge.projection.desktop.DesktopCarEntry
 import dev.autobridge.i18n.AppLocale
 import dev.autobridge.input.ShizukuInputBackend
+import dev.autobridge.settings.ScreenAppearance
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.stack
 import dev.autobridge.ui.SettingsUi
@@ -47,11 +48,14 @@ class ProjectionSetupActivity : Activity() {
     private val permissionListener = Shizuku.OnRequestPermissionResultListener { _, _ -> render() }
 
     override fun attachBaseContext(newBase: Context) {
-        super.attachBaseContext(AppLocale.rebase(newBase))
+        super.attachBaseContext(dev.autobridge.ui.AppearanceContext.wrap(AppLocale.rebase(newBase)))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // System and Auto modes depend on night mode and the clock, which may have moved on.
+        dev.autobridge.settings.AppearanceStore.refreshPalette(this)
+        dev.autobridge.settings.ScreenAppearance.applyWindow(this)
         runCatching { Shizuku.addRequestPermissionResultListener(permissionListener) }
         render()
     }
@@ -100,7 +104,13 @@ class ProjectionSetupActivity : Activity() {
                 shizukuRunning -> getString(R.string.projection_setup_grant_shizuku)
                 else -> getString(R.string.projection_setup_enable)
             }
-            body.stack(primaryButton(label, enabled = !working) { onAction() }, gap = 14)
+            body.stack(
+                ScreenAppearance.primaryButton(
+                    this, label,
+                    if (working) ScreenAppearance.ButtonState.LOADING else ScreenAppearance.ButtonState.ENABLED
+                ) { onAction() },
+                gap = 14
+            )
         }
 
         // Bridge Web is unlisted by default (AutoBridge is the one Android Auto entry); this lists it
@@ -182,24 +192,6 @@ class ProjectionSetupActivity : Activity() {
                 body = body
             )
         )
-    }
-
-    /** The page's one action: a full-width accent button. */
-    private fun primaryButton(label: String, enabled: Boolean, onClick: () -> Unit): View = TextView(this).apply {
-        text = label
-        textSize = 16f
-        gravity = Gravity.CENTER
-        typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
-        setTextColor(AutoBridgeDesign.INK)
-        minHeight = dp(52)
-        background = AutoBridgeDesign.tappable(
-            this@ProjectionSetupActivity, AutoBridgeDesign.ACCENT, 16, AutoBridgeDesign.INK, stroke = AutoBridgeDesign.ACCENT
-        )
-        alpha = if (enabled) 1f else 0.5f
-        isEnabled = enabled
-        isClickable = true
-        isFocusable = true
-        setOnClickListener { onClick() }
     }
 
     /** A numbered step: an accent-tinted number badge beside the instruction. */
