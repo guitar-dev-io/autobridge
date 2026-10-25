@@ -22,6 +22,8 @@ import android.widget.ScrollView
 import android.widget.TextView
 import dev.autobridge.R
 import dev.autobridge.design.DesignTokens
+import dev.autobridge.design.ScriptTracking
+import dev.autobridge.design.ThemeHolder
 
 /**
  * AutoBridge's own phone design language, used by every screen the app draws itself.
@@ -39,16 +41,18 @@ object AutoBridgeDesign {
 
     // ----- Tokens -----
 
-    // Matches the car dashboard palette (docs/UI_REDESIGN_TASKS.md "Design tokens").
-    const val INK = DesignTokens.Phone.INK
-    const val SURFACE = DesignTokens.Phone.SURFACE
-    const val SURFACE_RAISED = DesignTokens.Phone.SURFACE_RAISED
-    const val HAIRLINE = DesignTokens.Phone.HAIRLINE
-    const val TEXT = DesignTokens.Phone.TEXT
-    const val TEXT_MUTED = DesignTokens.Phone.TEXT_MUTED
-    const val ACCENT = DesignTokens.Phone.ACCENT
+    // The surface, text and accent roles follow Settings > Appearance: they read the palette
+    // ThemeHolder resolved from the user's choices (dev.autobridge.design.ThemeResolver), so they
+    // are getters, not constants. Section accents below stay fixed identity colours.
+    val INK: Int get() = ThemeHolder.palette.background
+    val SURFACE: Int get() = ThemeHolder.palette.surface
+    val SURFACE_RAISED: Int get() = ThemeHolder.palette.raised
+    val HAIRLINE: Int get() = ThemeHolder.palette.hairline
+    val TEXT: Int get() = ThemeHolder.palette.text
+    val TEXT_MUTED: Int get() = ThemeHolder.palette.textSecondary
+    val ACCENT: Int get() = ThemeHolder.palette.accent
     const val ACCENT_SOFT = DesignTokens.Phone.ACCENT_SOFT
-    const val DANGER = DesignTokens.Phone.DANGER
+    val DANGER: Int get() = ThemeHolder.palette.danger
 
     /** "Parked" / "connected" status colour, shared by Home, Control, Car & Connection and Duo Screen. */
     const val ACCENT_ONLINE = DesignTokens.Phone.ACCENT_ONLINE
@@ -132,7 +136,7 @@ object AutoBridgeDesign {
             this.text = title
             textSize = 26f
             setTextColor(TEXT)
-            typeface = Typeface.create("sans-serif", Typeface.BOLD)
+            typeface = AppFonts.bold()
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
         })
@@ -202,8 +206,8 @@ object AutoBridgeDesign {
             text = label
             textSize = 12f
             setTextColor(TEXT)
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-            letterSpacing = 0.06f
+            typeface = AppFonts.medium()
+            letterSpacing = ScriptTracking.letterSpacing(label, 0.06f)
         })
     }
 
@@ -238,13 +242,16 @@ object AutoBridgeDesign {
         setOnClickListener { onClick() }
     }
 
-    /** Quiet uppercase divider label between groups of content. */
+    /**
+     * Quiet uppercase divider label between groups of content. Tracked out in Latin only: Thai
+     * gets no letter spacing, which would split its vowels from their consonants ([ScriptTracking]).
+     */
     fun sectionLabel(context: Context, text: String): TextView = TextView(context).apply {
         this.text = text.uppercase()
         textSize = 11f
         setTextColor(TEXT_MUTED)
-        letterSpacing = 0.14f
-        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        letterSpacing = ScriptTracking.letterSpacing(text, 0.14f)
+        typeface = AppFonts.medium()
         setPadding(context.dp(6), context.dp(18), context.dp(6), context.dp(8))
     }
 
@@ -283,7 +290,7 @@ object AutoBridgeDesign {
             text = title
             textSize = 16f
             setTextColor(TEXT)
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            typeface = AppFonts.medium()
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
         })
@@ -337,7 +344,7 @@ object AutoBridgeDesign {
             textSize = 17f
             gravity = Gravity.CENTER
             setTextColor(accent)
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            typeface = AppFonts.medium()
         }
         if (badgeIcon != 0) {
             artwork.addView(ImageView(context).apply {
@@ -442,7 +449,7 @@ object AutoBridgeDesign {
             textSize = 26f
             gravity = Gravity.CENTER
             setTextColor(accent)
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            typeface = AppFonts.medium()
         }
         artwork.addView(initial, FrameLayout.LayoutParams(-1, -1))
         if (!artworkUrl.isNullOrBlank()) {
@@ -471,7 +478,7 @@ object AutoBridgeDesign {
             this.text = title
             textSize = 15f
             setTextColor(TEXT)
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            typeface = AppFonts.medium()
             maxLines = 2
             ellipsize = TextUtils.TruncateAt.END
         }, LinearLayout.LayoutParams(0, -2, 1f))
@@ -501,7 +508,7 @@ object AutoBridgeDesign {
         addView(TextView(context).apply {
             id = R.id.autobridge_status_label
             textSize = 12f
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            typeface = AppFonts.medium()
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
             setPadding(0, context.dp(4), 0, 0)
@@ -588,7 +595,7 @@ object AutoBridgeDesign {
         textSize = 13f
         gravity = Gravity.CENTER
         setTextColor(if (primary) INK else TEXT)
-        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        typeface = AppFonts.medium()
         isClickable = true
         isFocusable = true
         setPadding(context.dp(14), context.dp(10), context.dp(14), context.dp(10))
@@ -641,7 +648,7 @@ object AutoBridgeDesign {
             textSize = 17f
             setTextColor(TEXT)
             gravity = Gravity.CENTER
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            typeface = AppFonts.medium()
         })
         addView(TextView(context).apply {
             this.text = message

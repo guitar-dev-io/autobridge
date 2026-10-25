@@ -40,6 +40,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
+import dev.autobridge.ui.AppFonts
 
 /**
  * Settings › Desktop Browser Engine: choose which browser the Desktop Browser entries open,
@@ -55,11 +56,14 @@ class DesktopBrowserSettingsActivity : Activity() {
     private var storage: DesktopEngine.Storage? = null
 
     override fun attachBaseContext(newBase: Context) {
-        super.attachBaseContext(AppLocale.rebase(newBase))
+        super.attachBaseContext(dev.autobridge.ui.AppearanceContext.wrap(AppLocale.rebase(newBase)))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // System and Auto modes depend on night mode and the clock, which may have moved on.
+        dev.autobridge.settings.AppearanceStore.refreshPalette(this)
+        dev.autobridge.settings.ScreenAppearance.applyWindow(this)
         DesktopEngine.init(this)
     }
 
@@ -135,7 +139,7 @@ class DesktopBrowserSettingsActivity : Activity() {
         progressViews.clear()
         val body = pageBody?.apply { removeAllViews() } ?: AutoBridgeDesign.body(this)
         if (!DesktopEngine.supported) {
-            body.stack(notice(getString(R.string.desktop_settings_unsupported), AutoBridgeDesign.SIGNAL_SLOW))
+            body.stack(notice(getString(R.string.desktop_settings_unsupported), dev.autobridge.design.ThemeHolder.palette.warn))
         }
 
         childProcessNotice()?.let { body.stack(it, gap = 10) }
@@ -185,7 +189,7 @@ class DesktopBrowserSettingsActivity : Activity() {
             context = this,
             title = title,
             subtitle = caption,
-            accent = if (selected) AutoBridgeDesign.ACCENT_ONLINE else AutoBridgeDesign.ACCENT_WEB,
+            accent = if (selected) dev.autobridge.design.ThemeHolder.palette.good else dev.autobridge.settings.ScreenAppearance.readable(AutoBridgeDesign.ACCENT_WEB),
             // The row's fallback badge is the title's first character, which in Thai is a lone
             // leading vowel ("เ"); the browser's Latin initial reads right in both languages.
             badgeText = if (selected) "✓" else when (choice) {
@@ -414,7 +418,7 @@ class DesktopBrowserSettingsActivity : Activity() {
             Toast.makeText(this, R.string.desktop_settings_copied, Toast.LENGTH_SHORT).show()
         }
         card.addView(buttons(actions, false))
-        card.background = AutoBridgeDesign.surface(this, AutoBridgeDesign.tint(AutoBridgeDesign.SIGNAL_SLOW, 0.08f), 20, AutoBridgeDesign.tint(AutoBridgeDesign.SIGNAL_SLOW, 0.3f))
+        card.background = AutoBridgeDesign.surface(this, AutoBridgeDesign.tint(dev.autobridge.design.ThemeHolder.palette.warn, 0.08f), 20, AutoBridgeDesign.tint(dev.autobridge.design.ThemeHolder.palette.warn, 0.3f))
         return card
     }
 
@@ -422,7 +426,7 @@ class DesktopBrowserSettingsActivity : Activity() {
 
     private fun install(a: DesktopBrowserAdapter) {
         if (a.id == DesktopBrowserId.CHROME && DesktopEngine.store.chromeTermsAcceptedAt == 0L) {
-            AlertDialog.Builder(this)
+            AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
                 .setTitle(R.string.desktop_settings_chrome_terms_title)
                 .setMessage(R.string.desktop_settings_chrome_terms_message)
                 .setPositiveButton(R.string.desktop_settings_chrome_terms_accept) { _, _ ->
@@ -435,7 +439,7 @@ class DesktopBrowserSettingsActivity : Activity() {
                 .setNegativeButton(android.R.string.cancel, null)
                 .show()
         } else {
-            AlertDialog.Builder(this)
+            AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
                 .setTitle(getString(R.string.desktop_settings_install_title, a.displayName))
                 .setMessage(getString(R.string.desktop_settings_install_message, a.displayName,
                     Formatter.formatShortFileSize(this, a.estimatedDownloadBytes + if (DesktopEngine.runtimeState.value.state.installed) 0 else RuntimeSource.LAYER_SIZE_BYTES + 200L * 1024 * 1024)))
@@ -450,7 +454,7 @@ class DesktopBrowserSettingsActivity : Activity() {
     }
 
     private fun confirmUninstall(a: DesktopBrowserAdapter) {
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(getString(R.string.desktop_settings_uninstall_title, a.displayName))
             .setMessage(R.string.desktop_settings_uninstall_message)
             .setPositiveButton(R.string.desktop_settings_uninstall_keep_profile) { _, _ -> DesktopEngine.removeBrowser(a.id, keepProfile = true); refreshStorageSoon() }
@@ -460,7 +464,7 @@ class DesktopBrowserSettingsActivity : Activity() {
     }
 
     private fun confirmRemoveRuntime() {
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(R.string.desktop_settings_remove_runtime)
             .setMessage(R.string.desktop_settings_remove_runtime_message)
             .setPositiveButton(R.string.desktop_settings_remove_runtime) { _, _ -> DesktopEngine.removeRuntime(); refreshStorageSoon() }
@@ -469,7 +473,7 @@ class DesktopBrowserSettingsActivity : Activity() {
     }
 
     private fun confirm(message: Int, a: DesktopBrowserAdapter, action: () -> Unit) {
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(a.displayName)
             .setMessage(message)
             .setPositiveButton(android.R.string.ok) { _, _ -> action() }
@@ -504,7 +508,7 @@ class DesktopBrowserSettingsActivity : Activity() {
         this.text = text
         textSize = 17f
         setTextColor(AutoBridgeDesign.TEXT)
-        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        typeface = AppFonts.medium()
     }
 
     private fun caption(text: String) = TextView(this).apply {
@@ -594,9 +598,9 @@ class DesktopBrowserSettingsActivity : Activity() {
     )
 
     private fun stateColor(s: ComponentState): Int = when (s.state) {
-        InstallState.READY, InstallState.RUNNING -> AutoBridgeDesign.ACCENT_ONLINE
+        InstallState.READY, InstallState.RUNNING -> dev.autobridge.design.ThemeHolder.palette.good
         InstallState.FAILED -> AutoBridgeDesign.DANGER
-        InstallState.UPDATE_AVAILABLE -> AutoBridgeDesign.SIGNAL_SLOW
+        InstallState.UPDATE_AVAILABLE -> dev.autobridge.design.ThemeHolder.palette.warn
         InstallState.NOT_INSTALLED -> AutoBridgeDesign.TEXT_MUTED
         else -> AutoBridgeDesign.ACCENT
     }

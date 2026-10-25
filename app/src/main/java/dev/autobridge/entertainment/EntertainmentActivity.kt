@@ -5,7 +5,6 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
-import android.graphics.Color
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
@@ -30,7 +29,8 @@ import dev.autobridge.browser.BrowserDefaults
 import dev.autobridge.browser.BrowserGeolocation
 import dev.autobridge.browser.FullscreenVideoController
 import dev.autobridge.core.policy.FeaturePolicy
-import dev.autobridge.design.DesignTokens
+import dev.autobridge.design.ThemeHolder
+import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.i18n.AppLocale
 import dev.autobridge.media.MediaPlaybackClient
 import dev.autobridge.safety.ParkingStateStore
@@ -86,10 +86,11 @@ class EntertainmentActivity : Activity() {
 
     /** Applies the Settings &gt; Language choice; see [AppLocale.rebase]. */
     override fun attachBaseContext(newBase: Context) {
-        super.attachBaseContext(AppLocale.rebase(newBase))
+        super.attachBaseContext(dev.autobridge.ui.AppearanceContext.wrap(AppLocale.rebase(newBase)))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        dev.autobridge.settings.AppearanceStore.refreshPalette(this)
         super.onCreate(savedInstanceState)
         releaseBack = dev.autobridge.ui.SystemBack.register(this) { goBack() }
         if (browserMode) {
@@ -104,7 +105,7 @@ class EntertainmentActivity : Activity() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(16, 16, 16, 8)
-            setBackgroundColor(DesignTokens.Phone.ENTERTAINMENT_BACKGROUND)
+            setBackgroundColor(AutoBridgeDesign.INK)
         }
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
             val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
@@ -121,13 +122,15 @@ class EntertainmentActivity : Activity() {
             contentContainer?.setPadding(0, 0, 0, ime.bottom)
             insets
         }
-        status = TextView(this).apply { setTextColor(Color.WHITE); textSize = 15f }
+        status = TextView(this).apply { setTextColor(AutoBridgeDesign.TEXT); textSize = 15f }
         root.addView(status)
         address = EditText(this).apply {
             hint = getString(
                 if (browserMode) R.string.ent_hint_web else R.string.ent_hint_youtube
             )
-            setTextColor(Color.WHITE); setHintTextColor(Color.LTGRAY)
+            setTextColor(AutoBridgeDesign.TEXT); setHintTextColor(ThemeHolder.palette.textTertiary)
+            backgroundTintList = android.content.res.ColorStateList.valueOf(AutoBridgeDesign.HAIRLINE)
+            minHeight = 48.dp()
             setSingleLine()
         }
         root.addView(address)
@@ -137,8 +140,11 @@ class EntertainmentActivity : Activity() {
                 buttons.addView(Button(this).apply {
                     text = title; isAllCaps = false; textSize = 13f
                     setSingleLine(); setPadding(4.dp(), 0, 4.dp(), 0)
+                    setTextColor(AutoBridgeDesign.TEXT)
+                    background = AutoBridgeDesign.tappable(this@EntertainmentActivity, AutoBridgeDesign.SURFACE, 12)
+                    stateListAnimator = null
                     setOnClickListener { action() }
-                }, LinearLayout.LayoutParams(0, 48.dp(), 1f))
+                }, LinearLayout.LayoutParams(0, 48.dp(), 1f).apply { setMargins(2.dp(), 2.dp(), 2.dp(), 2.dp()) })
             }
             root.addView(buttons)
         }
@@ -178,7 +184,12 @@ class EntertainmentActivity : Activity() {
         )
         root.addView(CheckBox(this).apply {
             text = getString(R.string.ent_auto_resume)
-            setTextColor(Color.WHITE)
+            setTextColor(AutoBridgeDesign.TEXT)
+            buttonTintList = android.content.res.ColorStateList(
+                arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                intArrayOf(AutoBridgeDesign.ACCENT, ThemeHolder.palette.textTertiary)
+            )
+            minHeight = 48.dp()
             isChecked = prefs.getBoolean("autoResume", false)
             setOnCheckedChangeListener { _, checked -> prefs.edit().putBoolean("autoResume", checked).apply() }
         })
@@ -258,7 +269,7 @@ YouTube · TV · Web
             }
             textSize = 18f
             gravity = android.view.Gravity.CENTER
-            setTextColor(DesignTokens.Phone.ENTERTAINMENT_CAPTION)
+            setTextColor(AutoBridgeDesign.TEXT_MUTED)
         }
         val content = FrameLayout(this).apply {
             addView(emptyState, FrameLayout.LayoutParams(-1, -1))
@@ -463,7 +474,7 @@ YouTube · TV · Web
     private fun favorites() {
         val items = prefs.getStringSet("favorites", emptySet()).orEmpty().sorted()
         if (items.isEmpty()) return message(getString(R.string.ent_no_favorites))
-        AlertDialog.Builder(this).setTitle(R.string.ent_favorites_title)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme()).setTitle(R.string.ent_favorites_title)
             .setItems(items.toTypedArray()) { _, index ->
                 val item = items[index]
                 val separator = item.indexOf('|')

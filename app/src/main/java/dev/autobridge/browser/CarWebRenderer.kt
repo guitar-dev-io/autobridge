@@ -45,6 +45,7 @@ import dev.autobridge.entertainment.ContentAddress
 import dev.autobridge.entertainment.WebHistoryStore
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import dev.autobridge.ui.AppFonts
 
 /**
  * AA-Browser-style native web surface for Android Auto.
@@ -614,7 +615,7 @@ class CarWebRenderer(context: Context) {
     private val toolbarPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val addressPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        typeface = AppFonts.bold()
     }
     private val detailPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val glyphPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {

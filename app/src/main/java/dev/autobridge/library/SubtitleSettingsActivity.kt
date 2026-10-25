@@ -26,6 +26,7 @@ import dev.autobridge.ui.AutoBridgeDesign.dp
 import dev.autobridge.ui.AutoBridgeDesign.stack
 import java.io.FileNotFoundException
 import kotlin.concurrent.thread
+import dev.autobridge.ui.AppFonts
 
 /**
  * The Subtitles section of settings: whether a track is translated, by which engine, between
@@ -46,7 +47,9 @@ class SubtitleSettingsActivity : Activity() {
         fun intent(context: Context): Intent = Intent(context, SubtitleSettingsActivity::class.java)
     }
 
-    private val accent = AutoBridgeDesign.ACCENT_VIDEO
+    // Every accent use here is a control or its state (ON badges, values, pills), so it takes
+    // the user's accent from Settings > Appearance rather than the video section hue.
+    private val accent get() = AutoBridgeDesign.ACCENT
 
     /** Set while a download is in flight, so a second tap does not start a parallel fetch. */
     @Volatile
@@ -54,11 +57,14 @@ class SubtitleSettingsActivity : Activity() {
 
     /** Applies the Settings &gt; Language choice; see [AppLocale.rebase]. */
     override fun attachBaseContext(newBase: Context) {
-        super.attachBaseContext(AppLocale.rebase(newBase))
+        super.attachBaseContext(dev.autobridge.ui.AppearanceContext.wrap(AppLocale.rebase(newBase)))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        dev.autobridge.settings.AppearanceStore.refreshPalette(this)
         super.onCreate(savedInstanceState)
+        // Status and navigation bar colours and icons follow the page (light pages need dark icons).
+        dev.autobridge.settings.ScreenAppearance.applyWindow(this)
     }
 
     override fun onResume() {
@@ -258,7 +264,7 @@ class SubtitleSettingsActivity : Activity() {
     }
 
     private fun confirmDelete(id: String, label: String) {
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle("Remove $label?")
             .setMessage("The model is deleted from this device and has to be downloaded again to use.")
             .setNegativeButton("Cancel", null)
@@ -370,7 +376,7 @@ class SubtitleSettingsActivity : Activity() {
             setTextColor(accent)
             gravity = Gravity.END
             maxLines = 1
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            typeface = AppFonts.medium()
             setPadding(dp(8), 0, dp(6), 0)
         }, LinearLayout.LayoutParams(-2, -2))
         addView(TextView(this@SubtitleSettingsActivity).apply {
@@ -394,7 +400,7 @@ class SubtitleSettingsActivity : Activity() {
         val labels = options.map { option ->
             if (option == current) "● " + label(option) else "   " + label(option)
         }
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(title)
             .setItems(labels.toTypedArray()) { _, index ->
                 onPick(options[index])

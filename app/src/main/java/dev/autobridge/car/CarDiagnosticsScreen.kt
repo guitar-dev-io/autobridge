@@ -14,6 +14,8 @@ import dev.autobridge.display.MirrorDiagnostics
 import dev.autobridge.display.PerformanceMode
 import dev.autobridge.display.PerformancePolicy
 import dev.autobridge.mirror.MirrorCoordinator
+import dev.autobridge.display.SystemReading
+import dev.autobridge.display.SystemStats
 
 /**
  * Car-native live diagnostics for the mirror pipeline. All values are read from the same
@@ -24,6 +26,7 @@ import dev.autobridge.mirror.MirrorCoordinator
 class CarDiagnosticsScreen(carContext: CarContext) : Screen(carContext) {
     override fun onGetTemplate(): Template {
         val stats = MirrorDiagnostics.frameStats()
+        val system = SystemStats.read(carContext)
         val selfDrawn = MirrorCoordinator.activePipelineMode ==
             dev.autobridge.display.ScreenOffController.PipelineMode.SELF_DRAWN
 
@@ -59,6 +62,9 @@ class CarDiagnosticsScreen(carContext: CarContext) : Screen(carContext) {
                 )
             )
             .addItem(statusRow(carContext.getString(R.string.car_diag_performance), performanceLabel()))
+            .addItem(statusRow(carContext.getString(R.string.car_diag_cpu), cpuLabel(system)))
+            .addItem(statusRow(carContext.getString(R.string.car_diag_ram), ramLabel(system)))
+            .addItem(statusRow(carContext.getString(R.string.car_diag_temperature), temperatureLabel(system)))
             .addItem(
                 statusRow(
                     carContext.getString(R.string.car_diag_frame_rate),
@@ -133,6 +139,25 @@ class CarDiagnosticsScreen(carContext: CarContext) : Screen(carContext) {
             .addText(value)
             .setEnabled(false)
             .build()
+
+    private fun cpuLabel(reading: SystemReading): String =
+        reading.cpuPercent?.let { carContext.getString(R.string.car_diag_cpu_value, it) }
+            ?: carContext.getString(R.string.car_diag_unavailable)
+
+    private fun ramLabel(reading: SystemReading): String =
+        carContext.getString(R.string.car_diag_ram_value, reading.ramPercent, reading.ramUsedMb, reading.ramTotalMb)
+
+    private fun temperatureLabel(reading: SystemReading): String {
+        val temp = reading.tempC ?: return carContext.getString(R.string.car_diag_unavailable)
+        val heat = carContext.getString(
+            when (reading.heat) {
+                SystemStats.Heat.OK -> R.string.car_diag_heat_ok
+                SystemStats.Heat.WARM -> R.string.car_diag_heat_warm
+                SystemStats.Heat.HOT -> R.string.car_diag_heat_hot
+            }
+        )
+        return carContext.getString(R.string.car_diag_temperature_value, "%.1f\u00B0C".format(java.util.Locale.US, temp)) + " · " + heat
+    }
 
     private fun fpsLabel(stats: MirrorDiagnostics.FrameStats): String =
         if (stats.rendered > 0) "%.1f FPS".format(stats.measuredFps)

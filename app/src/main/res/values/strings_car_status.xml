@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- CPU, memory and temperature on the car (header line and diagnostics rows). -->
+<resources>
+    <string name="car_diag_cpu">CPU (this app)</string>
+    <string name="car_diag_cpu_value">%1$d%% of all cores</string>
+    <string name="car_diag_ram">Memory</string>
+    <string name="car_diag_ram_value">%1$d%% used · %2$d of %3$d MB</string>
+    <string name="car_diag_temperature">Temperature</string>
+    <string name="car_diag_temperature_value">%1$s · battery</string>
+    <string name="car_diag_heat_ok">Normal</string>
+    <string name="car_diag_heat_warm">Warm</string>
+    <string name="car_diag_heat_hot">Hot, the phone may slow down</string>
+    <string name="car_diag_unavailable">Not available</string>
+</resources>

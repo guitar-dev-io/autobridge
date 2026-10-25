@@ -13,6 +13,7 @@ import android.text.TextUtils
 import androidx.annotation.DrawableRes
 import androidx.core.content.ContextCompat
 import dev.autobridge.design.DesignTokens
+import dev.autobridge.ui.AppFonts
 
 /**
  * Paints the car radio grid ([CarRadioHomeScreen]) after the radio design's car screen: dark
@@ -47,8 +48,8 @@ internal class CarRadioGridRenderer(private val context: Context) {
         fun bitmap(url: String?): Bitmap?
     }
 
-    private val bold = Typeface.create("sans-serif", Typeface.BOLD)
-    private val medium = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+    private val bold = AppFonts.bold()
+    private val medium = AppFonts.medium()
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
     private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val text = TextPaint(Paint.ANTI_ALIAS_FLAG)

@@ -12,7 +12,6 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
-import dev.autobridge.design.DesignTokens
 import dev.autobridge.media.MediaPlaybackClient
 import dev.autobridge.ui.AutoBridgeDesign.dp
 
@@ -36,7 +35,7 @@ class MiniPlayer(
         gravity = Gravity.CENTER_VERTICAL
         visibility = View.GONE
         background = AutoBridgeDesign.surface(
-            context, AutoBridgeDesign.SURFACE_RAISED, 18, AutoBridgeDesign.HAIRLINE
+            context, AutoBridgeDesign.SURFACE_RAISED, dev.autobridge.design.ThemeHolder.palette.corners.card, AutoBridgeDesign.HAIRLINE
         )
         isClickable = true
         isFocusable = true
@@ -65,7 +64,7 @@ class MiniPlayer(
     private val title = TextView(context).apply {
         textSize = 14f
         setTextColor(AutoBridgeDesign.TEXT)
-        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        typeface = AppFonts.medium()
         maxLines = 1
         ellipsize = TextUtils.TruncateAt.END
     }
@@ -79,7 +78,7 @@ class MiniPlayer(
     private val stationName = TextView(context).apply {
         textSize = 13f
         setTextColor(WARM_TEXT)
-        typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+        typeface = AppFonts.bold()
         maxLines = 1
         ellipsize = TextUtils.TruncateAt.END
     }
@@ -94,7 +93,7 @@ class MiniPlayer(
         addView(bars, LinearLayout.LayoutParams(-2, context.dp(12)).apply { marginEnd = context.dp(4) })
         addView(stationName, LinearLayout.LayoutParams(0, -2, 1f))
     }
-    private val favorite = AutoBridgeDesign.glyphButton(context, "☆", 22f, tint = AMBER) {
+    private val favorite = AutoBridgeDesign.glyphButton(context, "☆", 22f, tint = WARM_TEXT) {
         currentStation()?.let { dev.autobridge.radio.RadioRepository.RadioHistory.toggleFavorite(context, it) }
         render()
     }.apply {
@@ -139,7 +138,7 @@ class MiniPlayer(
         val row = view as LinearLayout
         artworkFrame.addView(glyph, FrameLayout.LayoutParams(-1, -1))
         artworkFrame.addView(artwork, FrameLayout.LayoutParams(-1, -1))
-        row.addView(artworkFrame, LinearLayout.LayoutParams(context.dp(40), context.dp(40)))
+        row.addView(artworkFrame, LinearLayout.LayoutParams(context.dp(44), context.dp(44)))
 
         val text = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
@@ -161,6 +160,7 @@ class MiniPlayer(
             }.apply { contentDescription = context.getString(dev.autobridge.R.string.player_close) },
             LinearLayout.LayoutParams(context.dp(38), context.dp(38))
         )
+        applyStyle()
     }
 
     /** Switches between the shared bar and the radio design's warm one. */
@@ -174,39 +174,40 @@ class MiniPlayer(
             artworkFrame.clipToOutline = true
             glyph.setTextColor(AMBER)
             title.textSize = 16f
-            title.typeface = Typeface.create("sans-serif", Typeface.BOLD)
+            title.typeface = AppFonts.bold()
             subtitle.textSize = 13f
             subtitle.setTextColor(SOFT_TEXT)
             stationLine.visibility = View.VISIBLE
             nextButton.visibility = View.GONE
             favorite.visibility = View.VISIBLE
             toggle.layoutParams = LinearLayout.LayoutParams(context.dp(56), context.dp(56))
-            toggle.background = AutoBridgeDesign.surface(context, AMBER, 28, android.graphics.Color.TRANSPARENT)
+            toggle.background = AutoBridgeDesign.surface(context, WARM_TEXT, 28, android.graphics.Color.TRANSPARENT)
             toggle.setTextColor(ON_AMBER)
         } else {
-            row.background = AutoBridgeDesign.surface(context, AutoBridgeDesign.SURFACE_RAISED, 18, AutoBridgeDesign.HAIRLINE)
-            row.setPadding(context.dp(10), context.dp(10), context.dp(8), context.dp(10))
-            artworkFrame.layoutParams = LinearLayout.LayoutParams(context.dp(40), context.dp(40))
+            row.background = AutoBridgeDesign.surface(context, AutoBridgeDesign.SURFACE_RAISED, cardRadius(), AutoBridgeDesign.HAIRLINE)
+            row.setPadding(context.dp(10), context.dp(8), context.dp(8), context.dp(8))
+            artworkFrame.layoutParams = LinearLayout.LayoutParams(context.dp(44), context.dp(44))
             artworkFrame.background = AutoBridgeDesign.surface(
                 context, AutoBridgeDesign.tint(AutoBridgeDesign.ACCENT_SOFT, 0.16f), 12,
                 AutoBridgeDesign.tint(AutoBridgeDesign.ACCENT_SOFT, 0.3f)
             )
             glyph.setTextColor(AutoBridgeDesign.ACCENT_SOFT)
             title.textSize = 14f
-            title.typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            title.typeface = AppFonts.medium()
             subtitle.textSize = 12f
             subtitle.setTextColor(AutoBridgeDesign.TEXT_MUTED)
             stationLine.visibility = View.GONE
             nextButton.visibility = View.VISIBLE
             favorite.visibility = View.GONE
-            toggle.layoutParams = LinearLayout.LayoutParams(context.dp(40), context.dp(40))
-            toggle.background = defaultToggleBackground
-            toggle.setTextColor(defaultToggleInk)
+            toggle.layoutParams = LinearLayout.LayoutParams(context.dp(48), context.dp(48))
+            toggle.background = AutoBridgeDesign.surface(context, palette.accent, 24, android.graphics.Color.TRANSPARENT)
+            toggle.setTextColor(palette.onAccent)
         }
     }
 
-    private val defaultToggleBackground = toggle.background
-    private val defaultToggleInk = toggle.currentTextColor
+    private val palette get() = dev.autobridge.design.ThemeHolder.palette
+
+    private fun cardRadius(): Int = palette.corners.card
 
     /** The station playing now as the radio store knows stations, for the favourite star. */
     private fun currentStation(): dev.autobridge.radio.RadioStation? {
@@ -232,12 +233,19 @@ class MiniPlayer(
      */
     var hideWhen: (() -> Boolean)? = null
 
+    /**
+     * Home only (the one screen that sets [hideWhen]): the Dashboard layout's hero card is the
+     * player there, so the bar would say the same thing twice.
+     */
+    private fun hiddenByHomeLayout(): Boolean =
+        hideWhen != null && !PhoneHomeLayout.showsMiniPlayer(dev.autobridge.settings.AppearanceStore.current().homeLayout)
+
     /** Called on every one-second tick, so a screen can refresh its own now-playing view with it. */
     var onTick: (() -> Unit)? = null
 
     private fun render() {
         val name = playback.currentTitle
-        if (!playback.isConnected || name.isNullOrBlank() || hideWhen?.invoke() == true) {
+        if (!playback.isConnected || name.isNullOrBlank() || hideWhen?.invoke() == true || hiddenByHomeLayout()) {
             view.visibility = View.GONE
             return
         }
@@ -306,13 +314,16 @@ class MiniPlayer(
     private var loadedArtwork: String? = null
 
     private companion object {
+        /** The radio section's hue, as Home's icon chips carry it. */
+        val AMBER: Int get() = PhoneHomeLayout.Item.RADIO.hue(dev.autobridge.design.ThemeHolder.palette.isLight)
         const val PLAY = "▶"
         const val PAUSE = "❚❚"
-        const val AMBER = DesignTokens.Phone.ACCENT_RADIO
-        const val ON_AMBER = DesignTokens.Radio.ON_AMBER
-        const val WARM_CARD = DesignTokens.Radio.WARM_CARD
-        const val WARM_EDGE = DesignTokens.Radio.WARM_EDGE
-        const val WARM_TEXT = DesignTokens.Radio.WARM_TEXT
-        const val SOFT_TEXT = DesignTokens.Radio.SOFT_TEXT
+        // The radio bar's controls follow the theme's accent; only the bars and the artwork chip keep
+        // the radio section's hue (AMBER). The names stay from the old warm design.
+        val ON_AMBER: Int get() = dev.autobridge.design.ThemeHolder.palette.onAccent
+        val WARM_CARD: Int get() = dev.autobridge.design.ThemeHolder.palette.raised
+        val WARM_EDGE: Int get() = dev.autobridge.design.ThemeHolder.palette.hairline
+        val WARM_TEXT: Int get() = dev.autobridge.design.ThemeHolder.palette.accent
+        val SOFT_TEXT: Int get() = dev.autobridge.design.ThemeHolder.palette.textSecondary
     }
 }

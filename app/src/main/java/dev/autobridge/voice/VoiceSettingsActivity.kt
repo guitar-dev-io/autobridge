@@ -29,6 +29,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import dev.autobridge.ui.AppFonts
 
 /**
  * Settings &gt; Voice Recognition: the switches for voice commands, and the Whisper models -
@@ -45,7 +46,7 @@ class VoiceSettingsActivity : Activity() {
         private const val REQUEST_IMPORT = 4101
     }
 
-    private val accent = AutoBridgeDesign.ACCENT_SYSTEM
+    private val accent: Int get() = dev.autobridge.settings.ScreenAppearance.readable(AutoBridgeDesign.ACCENT_SYSTEM)
     private val scope = MainScope()
     private lateinit var store: WhisperModelStore
 
@@ -55,11 +56,14 @@ class VoiceSettingsActivity : Activity() {
     private var page: View? = null
 
     override fun attachBaseContext(newBase: Context) {
-        super.attachBaseContext(AppLocale.rebase(newBase))
+        super.attachBaseContext(dev.autobridge.ui.AppearanceContext.wrap(AppLocale.rebase(newBase)))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // System and Auto modes depend on night mode and the clock, which may have moved on.
+        dev.autobridge.settings.AppearanceStore.refreshPalette(this)
+        dev.autobridge.settings.ScreenAppearance.applyWindow(this)
         store = VoiceRuntime.modelStore(this)
         scope.launch {
             combine(store.downloads, store.revision) { downloads, _ -> downloads }.collect { downloads ->
@@ -281,12 +285,12 @@ class VoiceSettingsActivity : Activity() {
                 if (state is DownloadState.Running) button(R.string.voice_action_cancel) { store.cancelDownload(info.id) }
             }
             active -> {
-                addView(text(getString(R.string.voice_state_active), 13.5f, AutoBridgeDesign.ACCENT_ONLINE, bold = true).apply {
+                addView(text(getString(R.string.voice_state_active), 13.5f, dev.autobridge.design.ThemeHolder.palette.good, bold = true).apply {
                     setPadding(0, dp(6), 0, 0)
                 })
             }
             installed -> {
-                addView(text(getString(R.string.voice_state_installed), 13.5f, AutoBridgeDesign.ACCENT_ONLINE).apply {
+                addView(text(getString(R.string.voice_state_installed), 13.5f, dev.autobridge.design.ThemeHolder.palette.good).apply {
                     setPadding(0, dp(6), 0, 0)
                 })
                 button(R.string.voice_action_delete) { confirmDelete(info) }
@@ -344,7 +348,7 @@ class VoiceSettingsActivity : Activity() {
     }
 
     private fun confirmRemove(shortcut: VoiceShortcut) {
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle("“${shortcut.phrase}”")
             .setMessage(destination(shortcut))
             .setPositiveButton(R.string.voice_shortcut_delete) { _, _ ->
@@ -361,7 +365,7 @@ class VoiceSettingsActivity : Activity() {
             hint = getString(R.string.voice_shortcut_phrase_hint)
             setSingleLine()
         }
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(R.string.voice_shortcut_phrase_title)
             .setView(padded(phrase))
             .setNegativeButton(android.R.string.cancel, null)
@@ -376,7 +380,7 @@ class VoiceSettingsActivity : Activity() {
         val kinds = listOf(VoiceShortcut.Kind.SCREEN, VoiceShortcut.Kind.URL, VoiceShortcut.Kind.COMMAND)
         val labels = listOf(R.string.voice_shortcut_kind_screen, R.string.voice_shortcut_kind_url, R.string.voice_shortcut_kind_command)
             .map { getString(it) }
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(getString(R.string.voice_shortcut_kind_title, words))
             .setItems(labels.toTypedArray()) { _, index ->
                 when (kinds[index]) {
@@ -390,7 +394,7 @@ class VoiceSettingsActivity : Activity() {
 
     private fun chooseScreen(words: String) {
         val screens = VoiceScreen.entries
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(getString(R.string.voice_shortcut_kind_title, words))
             .setItems(screens.map { getString(it.section.titleRes) }.toTypedArray()) { _, index ->
                 save(VoiceShortcut(words, VoiceShortcut.Kind.SCREEN, screens[index].name))
@@ -404,7 +408,7 @@ class VoiceSettingsActivity : Activity() {
             setSingleLine()
             if (kind == VoiceShortcut.Kind.URL) inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
         }
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(getString(R.string.voice_shortcut_kind_title, words))
             .setView(padded(field))
             .setNegativeButton(android.R.string.cancel, null)
@@ -474,7 +478,7 @@ class VoiceSettingsActivity : Activity() {
         store.clearFailure(info.id)
         when (networkKind()) {
             NetworkKind.NONE -> toast(getString(R.string.voice_download_no_network))
-            NetworkKind.METERED -> AlertDialog.Builder(this)
+            NetworkKind.METERED -> AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
                 .setTitle(R.string.voice_download_metered_title)
                 .setMessage(getString(R.string.voice_download_metered_body, info.displayName, VoiceFormat.size(info.sizeBytes)))
                 .setNegativeButton(R.string.voice_action_cancel, null)
@@ -503,7 +507,7 @@ class VoiceSettingsActivity : Activity() {
             toast(getString(R.string.voice_delete_active_blocked))
             return
         }
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(getString(R.string.voice_delete_confirm_title, info.displayName))
             .setMessage(R.string.voice_delete_confirm_body)
             .setNegativeButton(R.string.voice_action_cancel, null)
@@ -616,7 +620,7 @@ class VoiceSettingsActivity : Activity() {
         text = value
         textSize = size
         setTextColor(color)
-        if (bold) typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        if (bold) typeface = AppFonts.medium()
     }
 
     private fun hint(value: String) = text(value, 13f, AutoBridgeDesign.DANGER).apply {
@@ -626,7 +630,7 @@ class VoiceSettingsActivity : Activity() {
     private fun toast(message: String) = Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
 
     private fun <T> choose(title: String, options: List<T>, current: T, label: (T) -> String, onPick: (T) -> Unit) {
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(title)
             .setSingleChoiceItems(options.map(label).toTypedArray(), options.indexOf(current)) { dialog, index ->
                 onPick(options[index])

@@ -16,6 +16,7 @@ import dev.autobridge.settings.VideoSettings
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.dp
 import dev.autobridge.ui.AutoBridgeDesign.stack
+import dev.autobridge.ui.AppFonts
 
 /**
  * Brightness, contrast and saturation for the decoded picture.
@@ -35,15 +36,20 @@ class VideoEnhancementActivity : Activity() {
         fun intent(context: Context): Intent = Intent(context, VideoEnhancementActivity::class.java)
     }
 
-    private val accent = AutoBridgeDesign.ACCENT_VIDEO
+    // Every accent use here is a control or its state (ON badges, values, pills), so it takes
+    // the user's accent from Settings > Appearance rather than the video section hue.
+    private val accent get() = AutoBridgeDesign.ACCENT
 
     /** Applies the Settings &gt; Language choice; see [AppLocale.rebase]. */
     override fun attachBaseContext(newBase: Context) {
-        super.attachBaseContext(AppLocale.rebase(newBase))
+        super.attachBaseContext(dev.autobridge.ui.AppearanceContext.wrap(AppLocale.rebase(newBase)))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        dev.autobridge.settings.AppearanceStore.refreshPalette(this)
         super.onCreate(savedInstanceState)
+        // Status and navigation bar colours and icons follow the page (light pages need dark icons).
+        dev.autobridge.settings.ScreenAppearance.applyWindow(this)
         render()
     }
 
@@ -145,7 +151,7 @@ class VideoEnhancementActivity : Activity() {
             textSize = 13f
             setTextColor(if (dimmed) AutoBridgeDesign.TEXT_MUTED else accent)
             gravity = Gravity.END
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            typeface = AppFonts.medium()
         }
         val heading = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL

@@ -1,0 +1,36 @@
+<resources>
+    <!--
+        Alert dialogs for the tool screens (My Car, Mirror, Dual Display), one per page brightness;
+        ScreenAppearance.dialogTheme picks one. The colours are the default appearance's
+        (ThemeResolver: surface, text, accent), since a style cannot follow the chosen accent.
+    -->
+    <style name="ToolDialogDark" parent="android:style/Theme.Material.Dialog.Alert">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorBackground">#1A202B</item>
+        <item name="android:textColorPrimary">#F5F7FB</item>
+        <item name="android:textColorSecondary">#A4B1C3</item>
+        <item name="android:colorAccent">#67A9FF</item>
+    </style>
+
+    <style name="ToolDialogLight" parent="android:style/Theme.Material.Light.Dialog.Alert">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorBackground">#FFFFFF</item>
+        <item name="android:textColorPrimary">#10141B</item>
+        <item name="android:textColorSecondary">#475265</item>
+        <item name="android:colorAccent">#1F67C7</item>
+    </style>
+
+    <!-- The same dialogs with the accent the user picked (Settings > Appearance): ScreenAppearance.dialogTheme. -->
+    <style name="ToolDialogDark.Sky" parent="ToolDialogDark"><item name="android:colorAccent">#67A9FF</item></style>
+    <style name="ToolDialogLight.Sky" parent="ToolDialogLight"><item name="android:colorAccent">#1F67C7</item></style>
+    <style name="ToolDialogDark.Teal" parent="ToolDialogDark"><item name="android:colorAccent">#5FD0C4</item></style>
+    <style name="ToolDialogLight.Teal" parent="ToolDialogLight"><item name="android:colorAccent">#0B7A70</item></style>
+    <style name="ToolDialogDark.Amber" parent="ToolDialogDark"><item name="android:colorAccent">#FFB35C</item></style>
+    <style name="ToolDialogLight.Amber" parent="ToolDialogLight"><item name="android:colorAccent">#955800</item></style>
+    <style name="ToolDialogDark.Violet" parent="ToolDialogDark"><item name="android:colorAccent">#A99BF2</item></style>
+    <style name="ToolDialogLight.Violet" parent="ToolDialogLight"><item name="android:colorAccent">#5A46C8</item></style>
+    <style name="ToolDialogDark.Rose" parent="ToolDialogDark"><item name="android:colorAccent">#FF8FA3</item></style>
+    <style name="ToolDialogLight.Rose" parent="ToolDialogLight"><item name="android:colorAccent">#B02E4A</item></style>
+    <style name="ToolDialogDark.Lime" parent="ToolDialogDark"><item name="android:colorAccent">#9BE08A</item></style>
+    <style name="ToolDialogLight.Lime" parent="ToolDialogLight"><item name="android:colorAccent">#3B7629</item></style>
+</resources>

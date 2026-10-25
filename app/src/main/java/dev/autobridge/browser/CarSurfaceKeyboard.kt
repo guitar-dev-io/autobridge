@@ -6,6 +6,7 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
 import dev.autobridge.R
+import dev.autobridge.ui.AppFonts
 
 /**
  * The browser keyboard as the Android Auto browser draws it: straight onto the car surface, over
@@ -100,7 +101,7 @@ internal class CarSurfaceKeyboard(
 
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
     // Roboto Medium for Latin, the system Thai fallback for ไทย; created once.
-    private val keyFace = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+    private val keyFace = AppFonts.medium()
     private val label = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
         typeface = keyFace

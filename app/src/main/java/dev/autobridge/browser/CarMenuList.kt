@@ -13,6 +13,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import dev.autobridge.R
+import dev.autobridge.ui.AppFonts
 
 /**
  * The car browser menu as ordinary views, for the two car browsers that are real view trees:
@@ -493,7 +494,7 @@ object CarMenuList {
                         text = context.getString(R.string.browser_zoom_percent, percent)
                         setTextColor(style.text)
                         textSize = 15f
-                        typeface = Typeface.DEFAULT_BOLD
+                        typeface = AppFonts.bold()
                         gravity = Gravity.CENTER
                     }, LinearLayout.LayoutParams(context.dp(64), context.dp(44)))
                 }

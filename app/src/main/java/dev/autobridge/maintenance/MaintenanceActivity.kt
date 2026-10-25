@@ -32,14 +32,17 @@ class MaintenanceActivity : Activity() {
         private const val REQUEST_NOTIFICATIONS = 4103
     }
 
-    private val accent = AutoBridgeDesign.ACCENT
+    private val accent: Int get() = AutoBridgeDesign.ACCENT
 
     override fun attachBaseContext(newBase: Context) {
-        super.attachBaseContext(AppLocale.rebase(newBase))
+        super.attachBaseContext(dev.autobridge.ui.AppearanceContext.wrap(AppLocale.rebase(newBase)))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // System and Auto modes depend on night mode and the clock, which may have moved on.
+        dev.autobridge.settings.AppearanceStore.refreshPalette(this)
+        dev.autobridge.settings.ScreenAppearance.applyWindow(this)
         render()
     }
 
@@ -91,11 +94,7 @@ class MaintenanceActivity : Activity() {
 
     /** Name, where it stands in the due colour, the bar when there is a scale, then the due date and interval. */
     private fun itemCard(status: MaintenanceStatus, odometer: Double?) = CarToolViews.card(this) {
-        val tone = when (MyCarFacts.maintenanceTone(status)) {
-            MyCarFacts.Tone.ALERT -> AutoBridgeDesign.DANGER
-            MyCarFacts.Tone.WARN -> AutoBridgeDesign.ACCENT_RADIO
-            else -> AutoBridgeDesign.ACCENT_FILES
-        }
+        val tone = dev.autobridge.settings.ScreenAppearance.tone(MyCarFacts.maintenanceTone(status))
         val measured = status.kmLeft != null || status.daysLeft != null
         addView(LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL

@@ -50,6 +50,8 @@ import dev.autobridge.entertainment.WebBookmarkStore
 import dev.autobridge.entertainment.WebHistoryEntry
 import dev.autobridge.entertainment.WebHistoryStore
 import dev.autobridge.i18n.AppLocale
+import dev.autobridge.settings.AppearanceStore
+import dev.autobridge.ui.AppearanceContext
 import dev.autobridge.remote.CarScreenController
 import dev.autobridge.safety.ParkingStateStore
 
@@ -98,6 +100,7 @@ class BrowserActivity : Activity() {
     private lateinit var errorMessage: TextView
     private lateinit var swipeRefresh: SwipeRefreshLayout
     private lateinit var startPage: View
+    private lateinit var startPageBuilt: BrowserStartPage.Built
     private var showingStartPage = false
     private lateinit var content: FrameLayout
 
@@ -160,8 +163,14 @@ class BrowserActivity : Activity() {
         // built from this context reports the matching prefers-color-scheme, and the locale one
         // applies the Settings > Language choice on API 29-32. Order does not matter: each
         // overrides a different Configuration field.
+        // The fourth wrap is Settings > Appearance > Text size, as on every phone screen. The palette
+        // is refreshed first, against the real system configuration, because the appearance re-base
+        // resolves the browser's night mode from it.
+        AppearanceStore.refreshPalette(newBase)
         super.attachBaseContext(
-            AppLocale.rebase(BrowserAppearanceStore.rebase(CarDisplayScaling.rebase(newBase)))
+            AppearanceContext.wrap(
+                AppLocale.rebase(BrowserAppearanceStore.rebase(CarDisplayScaling.rebase(newBase)))
+            )
         )
     }
 
@@ -192,6 +201,11 @@ class BrowserActivity : Activity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // The app palette first (System and Auto themes move with the system and the clock), read
+        // from the application context: this activity's own configuration carries the night mode
+        // BrowserAppearanceStore.rebase pinned, and resolving against that would leak the browser's
+        // choice into every other screen's palette.
+        AppearanceStore.refreshPalette(applicationContext)
         // Both before anything is built: the chrome below reads BrowserTheme as it constructs its
         // views and drawables, and the window theme has to be set before the first view exists.
         BrowserAppearanceStore.syncChrome(this)
@@ -238,8 +252,19 @@ class BrowserActivity : Activity() {
         content.addView(swipeRefresh, FrameLayout.LayoutParams(-1, -1))
         content.addView(blocked, FrameLayout.LayoutParams(-1, -1))
         content.addView(loadError, FrameLayout.LayoutParams(-1, -1))
-        startPage = BrowserStartPage.build(this, sizes, onSupport = { showSupport() }) { navigate(it) }
-            .apply { visibility = View.GONE }
+        startPageBuilt = BrowserStartPage.build(
+            this, sizes,
+            nav = StartPageNav(
+                canGoBack = { web.canGoBack() },
+                canForward = { !web.url.isNullOrBlank() },
+                onBack = { if (allowed() && web.canGoBack()) { hideStartPage(); web.goBack() } },
+                // Forward from the start page returns to the page it was opened over.
+                onForward = { if (!web.url.isNullOrBlank()) { hideStartPage(); updateNavigation() } },
+                onMenu = { if (allowed()) showMenu() },
+            ),
+            onSupport = { showSupport() },
+        ) { navigate(it) }
+        startPage = startPageBuilt.view.apply { visibility = View.GONE }
         content.addView(startPage, FrameLayout.LayoutParams(-1, -1))
 
         menuButton = ImageView(this).apply {
@@ -251,9 +276,9 @@ class BrowserActivity : Activity() {
             contentDescription = getString(R.string.browser_fab_description)
             isFocusable = true
             background = GradientDrawable().apply {
-                setColor(DesignTokens.BrowserDark.FAB_FILL)
+                setColor(BrowserTheme.fabFill)
                 cornerRadius = sizes.fabSize / 2f
-                setStroke(1.dp(), DesignTokens.BrowserDark.FAB_EDGE)
+                setStroke(1.dp(), BrowserTheme.fabEdge)
             }
             setOnClickListener { runFloatingButtonAction() }
         }
@@ -435,7 +460,17 @@ class BrowserActivity : Activity() {
         // action strip for the same reason.
         toolbarHomeButton = control(BrowserIcon.APP_HOME, "Home") { runMenuAction(DrawerAction.APP_HOME) }
 
-        progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal)
+        // The design system's loading state for the address bar: an indeterminate accent line along
+        // the toolbar's bottom edge while the page loads, rather than a percentage. WebView's
+        // progress figures jump (10, 70, 100) and say little about how long is left.
+        progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+            isIndeterminate = true
+            indeterminateTintList = android.content.res.ColorStateList.valueOf(BrowserTheme.accent)
+            progressBackgroundTintList = android.content.res.ColorStateList.valueOf(Color.TRANSPARENT)
+            visibility = View.GONE
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }
+        val line = PROGRESS_LINE_DP.dp()
         return FrameLayout(this).apply {
             addView(
                 toolbar,
@@ -443,8 +478,8 @@ class BrowserActivity : Activity() {
             )
             addView(
                 progress,
-                FrameLayout.LayoutParams(-1, 2.dp(), Gravity.TOP).apply {
-                    topMargin = sizes.dpInt(AutoUiSizes.TOOLBAR_HEIGHT_DP) - 2.dp()
+                FrameLayout.LayoutParams(-1, line, Gravity.TOP).apply {
+                    topMargin = sizes.dpInt(AutoUiSizes.TOOLBAR_HEIGHT_DP) - line
                 }
             )
         }
@@ -611,9 +646,18 @@ class BrowserActivity : Activity() {
         collapseAddressEditing(hideKeyboard = true)
     }
 
+    /**
+     * [BrowserDefaults.configure], then the phone's own page darkening on top: configure applies the
+     * car's resolution of Appearance (system night mode), and the phone follows the app palette.
+     */
+    private fun configureWebView(view: WebView) {
+        BrowserDefaults.configure(this, view)
+        BrowserAppearanceStore.applyPhone(this, view)
+    }
+
     @android.annotation.SuppressLint("ClickableViewAccessibility")
     private fun createWebView(): WebView = WebView(this).apply {
-        BrowserDefaults.configure(this@BrowserActivity, this)
+        configureWebView(this)
         // On a car display a tap on one of the page's text fields gets the car keyboard when the
         // system one does not come up there. Never consumes: the page still gets every touch.
         setOnTouchListener { _, event ->
@@ -669,7 +713,7 @@ class BrowserActivity : Activity() {
                 if (!isUserGesture) return false
                 val transport = resultMsg.obj as? WebView.WebViewTransport ?: return false
                 val popup = WebView(this@BrowserActivity).apply {
-                    BrowserDefaults.configure(this@BrowserActivity, this)
+                    configureWebView(this)
                     webViewClient = object : WebViewClient() {
                         override fun shouldOverrideUrlLoading(
                             popupView: WebView,
@@ -833,8 +877,18 @@ class BrowserActivity : Activity() {
     /** Shows the native start page in place of the page; see [BrowserStartupStore.START_PAGE]. */
     private fun showStartPage() {
         showingStartPage = true
+        startPageBuilt.refresh()
         startPage.visibility = View.VISIBLE
+        liftMenuButton(true)
         updateNavigation()
+    }
+
+    /** Keeps the floating button above the start page's bottom toolbar while that page shows. */
+    private fun liftMenuButton(lift: Boolean) {
+        val lp = menuButton.layoutParams as? FrameLayout.LayoutParams ?: return
+        lp.bottomMargin = sizes.dpInt(AutoUiSizes.FAB_MARGIN_DP) +
+            if (lift) sizes.dpInt(BrowserStartPage.NAV_BAR_RESERVE_DP) else 0
+        menuButton.layoutParams = lp
     }
 
     /** Leaves the start page. A no-op once it is already hidden. */
@@ -842,6 +896,7 @@ class BrowserActivity : Activity() {
         if (!showingStartPage) return
         showingStartPage = false
         startPage.visibility = View.GONE
+        liftMenuButton(false)
     }
 
     private fun updateNavigation() {
@@ -1485,7 +1540,7 @@ class BrowserActivity : Activity() {
                     this,
                     if (desktop) BrowserUserAgentMode.MOBILE else BrowserUserAgentMode.DESKTOP
                 )
-                BrowserDefaults.configure(this, web)
+                configureWebView(web)
                 applyDesktopViewport()
                 web.reload()
             }
@@ -1598,7 +1653,7 @@ class BrowserActivity : Activity() {
                 // scheme is baked into the WebView's own context, so neither can be re-tinted in
                 // place: the activity is rebuilt instead. onSaveInstanceState carries the page
                 // and its history across, the same path a rotation already takes.
-                BrowserAppearanceStore.apply(this, web)
+                BrowserAppearanceStore.applyPhone(this, web)
                 recreate()
             },
             onDisplayScaleChanged = { BrowserDisplayScaleStore.apply(this, web) },
@@ -1774,7 +1829,7 @@ class BrowserActivity : Activity() {
 
     /** Pushes the stored identity onto this WebView and the car browser, then reloads. */
     private fun applyUserAgentChange() {
-        BrowserDefaults.configure(this, web)
+        configureWebView(web)
         applyDesktopViewport()
         web.reload()
         // The car browser picks the new identity up from the shared store the next time its
@@ -1800,11 +1855,14 @@ class BrowserActivity : Activity() {
         const val CAR_ENTRY = "dev.autobridge.browser.CarBrowserEntry"
 
         /**
-         * Height of the compact address pill, in dp. Deliberately shorter than the toolbar's
-         * [AutoUiSizes.TOUCH_TARGET_DP] buttons so the field reads as a slim chip, not a boxed text
-         * field, while still clearing the minimum a finger can hit.
+         * Height of the address pill, in dp: the design system's 44dp minimum touch target, a little
+         * under the toolbar's [AutoUiSizes.TOUCH_TARGET_DP] buttons so it still reads as a pill
+         * sitting in the bar rather than a box filling it.
          */
-        const val ADDRESS_PILL_HEIGHT_DP = 34f
+        const val ADDRESS_PILL_HEIGHT_DP = 44f
+
+        /** Thickness of the loading line under the toolbar. */
+        const val PROGRESS_LINE_DP = 3
 
         /** Opacity of a `‹`/`›` button when the page has nothing to go back/forward to. */
         const val DISABLED_NAV_ALPHA = 0.35f
@@ -2082,8 +2140,8 @@ class BrowserActivity : Activity() {
      */
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        // Appearance "Auto" means the system's night mode, and the system just changed it.
-        if (BrowserAppearanceStore.needsRestart(this, newConfig)) {
+        // Appearance "Auto" follows the app theme, which may follow the system's night mode.
+        if (BrowserAppearanceStore.needsRestart(this)) {
             recreate()
             return
         }
@@ -2139,15 +2197,21 @@ class BrowserActivity : Activity() {
 
     override fun onResume() {
         super.onResume(); resumed = true
+
         web.removeCallbacks(queueWatch)
         web.postDelayed(queueWatch, QUEUE_WATCH_MS)
         // Timers are process-wide; the car browser may have paused them while it was hidden.
         WebViewTimerGate.hold(TIMER_GATE_OWNER, web)
         val previousAgent = web.settings.userAgentString
-        BrowserDefaults.configure(this, web)
+        configureWebView(web)
         enforcePolicy()
         if (allowed() && previousAgent != web.settings.userAgentString) web.reload()
         refreshAudioHold()
+        // Settings > Appearance may have changed while the browser sat in the back stack. The chrome
+        // is baked into views, so a different palette means a rebuild (the page survives it, the
+        // same way a rotation does).
+        AppearanceStore.refreshPalette(applicationContext)
+        if (BrowserAppearanceStore.chromeIsStale(this)) recreate()
     }
 
     /** Set once the user lets this browser's sound through over the car's music. */

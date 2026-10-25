@@ -49,7 +49,7 @@ class FuelLogActivity : Activity() {
         )
     }
 
-    private val accent = AutoBridgeDesign.ACCENT
+    private val accent: Int get() = AutoBridgeDesign.ACCENT
 
     /** An EV counts kWh charged where a petrol or diesel car counts litres; read on each render. */
     private var ev = false
@@ -57,11 +57,14 @@ class FuelLogActivity : Activity() {
     private fun unit(fuel: Int, electric: Int): String = getString(if (ev) electric else fuel)
 
     override fun attachBaseContext(newBase: Context) {
-        super.attachBaseContext(AppLocale.rebase(newBase))
+        super.attachBaseContext(dev.autobridge.ui.AppearanceContext.wrap(AppLocale.rebase(newBase)))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // System and Auto modes depend on night mode and the clock, which may have moved on.
+        dev.autobridge.settings.AppearanceStore.refreshPalette(this)
+        dev.autobridge.settings.ScreenAppearance.applyWindow(this)
         render()
     }
 
@@ -264,7 +267,7 @@ class FuelLogActivity : Activity() {
 
     /** Tapping a row: edit it (including its date) or delete it. */
     private fun showEntryActions(entry: FuelEntry) {
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(getString(rowTitleRes(), decimal(entry.liters), money(entry.totalBaht)))
             .setItems(arrayOf(getString(R.string.fuel_edit), getString(R.string.fuel_delete))) { _, which ->
                 if (which == 0) showAddDialog(entry) else confirmDelete(entry)
@@ -273,7 +276,7 @@ class FuelLogActivity : Activity() {
     }
 
     private fun confirmDelete(entry: FuelEntry) {
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(unit(R.string.fuel_delete_title, R.string.fuel_delete_title_ev))
             .setMessage(getString(rowTitleRes(), decimal(entry.liters), money(entry.totalBaht)))
             .setNegativeButton(android.R.string.cancel, null)

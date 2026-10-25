@@ -67,7 +67,7 @@ class PhoneMaintenance(
         val message = notes.joinToString("\n\n") { release ->
             "v${release.versionName}\n" + activity.getString(release.notes)
         }
-        AlertDialog.Builder(activity)
+        AlertDialog.Builder(activity, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(activity.getString(R.string.whats_new_title, current))
             .setMessage(message)
             .setPositiveButton(android.R.string.ok, null)
@@ -82,7 +82,7 @@ class PhoneMaintenance(
         if (InstallerSource.isTrusted(installer())) return
         if (prefs.getInt(KEY_AA_WARNED_VERSION, -1) == BuildConfig.VERSION_CODE) return
         prefs.edit().putInt(KEY_AA_WARNED_VERSION, BuildConfig.VERSION_CODE).apply()
-        AlertDialog.Builder(activity)
+        AlertDialog.Builder(activity, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(activity.getString(R.string.aa_hidden_title))
             .setMessage(activity.getString(R.string.aa_hidden_message))
             .setPositiveButton(activity.getString(R.string.aa_hidden_fix)) { _, _ -> activity.startActivity(setup) }
@@ -112,7 +112,7 @@ class PhoneMaintenance(
         val appContext = activity.applicationContext
         val progress = DownloadProgress(activity)
         val cancelled = AtomicBoolean(false)
-        val dialog = AlertDialog.Builder(activity)
+        val dialog = AlertDialog.Builder(activity, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(activity.getString(R.string.about_update_downloading))
             .setView(progress.view)
             .setNegativeButton(android.R.string.cancel) { _, _ -> cancelled.set(true) }

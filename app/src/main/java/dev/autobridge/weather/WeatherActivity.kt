@@ -20,7 +20,7 @@ class WeatherActivity : Activity() {
         fun intent(context: Context): Intent = Intent(context, WeatherActivity::class.java)
     }
 
-    private val accent = dev.autobridge.library.HomeSection.WEATHER.accent
+    private val accent: Int get() = dev.autobridge.settings.ScreenAppearance.readable(dev.autobridge.library.HomeSection.WEATHER.accent)
 
     private var searchQuery = ""
     private var searchResults: List<WeatherPlace> = emptyList()
@@ -28,11 +28,14 @@ class WeatherActivity : Activity() {
 
     /** Applies the Settings &gt; Language choice; see [AppLocale.rebase]. */
     override fun attachBaseContext(newBase: Context) {
-        super.attachBaseContext(AppLocale.rebase(newBase))
+        super.attachBaseContext(dev.autobridge.ui.AppearanceContext.wrap(AppLocale.rebase(newBase)))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // System and Auto modes depend on night mode and the clock, which may have moved on.
+        dev.autobridge.settings.AppearanceStore.refreshPalette(this)
+        dev.autobridge.settings.ScreenAppearance.applyWindow(this)
         render()
         refresh(forceRefresh = false)
     }

@@ -20,6 +20,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import dev.autobridge.ui.AppFonts
 
 /**
  * The Home microphone with offline Whisper: listen, show what was heard, then run it.
@@ -57,7 +58,7 @@ class PhoneVoiceSession(private val activity: Activity, private val actions: Act
     fun start() {
         val store = VoiceRuntime.modelStore(activity)
         if (store.getSelectedModel() == null) {
-            AlertDialog.Builder(activity)
+            AlertDialog.Builder(activity, dev.autobridge.settings.ScreenAppearance.dialogTheme())
                 .setTitle(R.string.voice_model_required_title)
                 .setMessage(R.string.voice_model_required_body)
                 .setNegativeButton(R.string.voice_action_cancel, null)
@@ -305,12 +306,12 @@ class PhoneVoiceSession(private val activity: Activity, private val actions: Act
         heard = TextView(activity).apply {
             textSize = 19f
             setTextColor(AutoBridgeDesign.TEXT)
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            typeface = AppFonts.medium()
             setPadding(0, activity.dp(10), 0, 0)
         }
         content.addView(status)
         content.addView(heard)
-        val built = AlertDialog.Builder(activity)
+        val built = AlertDialog.Builder(activity, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(R.string.voice_test_listening)
             .setView(content)
             .setNegativeButton(R.string.voice_action_cancel) { _, _ -> recognizer.cancel() }

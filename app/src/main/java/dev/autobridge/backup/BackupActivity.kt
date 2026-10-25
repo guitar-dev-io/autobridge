@@ -27,14 +27,17 @@ class BackupActivity : Activity() {
         private const val REQUEST_PICK = 4101
     }
 
-    private val accent = AutoBridgeDesign.ACCENT
+    private val accent: Int get() = AutoBridgeDesign.ACCENT
 
     override fun attachBaseContext(newBase: Context) {
-        super.attachBaseContext(AppLocale.rebase(newBase))
+        super.attachBaseContext(dev.autobridge.ui.AppearanceContext.wrap(AppLocale.rebase(newBase)))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // System and Auto modes depend on night mode and the clock, which may have moved on.
+        dev.autobridge.settings.AppearanceStore.refreshPalette(this)
+        dev.autobridge.settings.ScreenAppearance.applyWindow(this)
         val body = AutoBridgeDesign.body(this)
         body.stack(
             AutoBridgeDesign.contentRow(
@@ -109,7 +112,7 @@ class BackupActivity : Activity() {
             Toast.makeText(this, getString(R.string.backup_invalid), Toast.LENGTH_LONG).show()
             return
         }
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(getString(R.string.backup_import))
             .setMessage(getString(R.string.backup_confirm))
             .setNegativeButton(android.R.string.cancel, null)

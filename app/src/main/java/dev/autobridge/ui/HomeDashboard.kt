@@ -1,52 +1,58 @@
 package dev.autobridge.ui
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import android.view.View
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.autobridge.R
-import dev.autobridge.design.DesignTokens
-import dev.autobridge.remote.AutoBridgeCommand
-import dev.autobridge.remote.AutoBridgeCommandBus
+import dev.autobridge.design.HomeLayout
+import dev.autobridge.design.ThemeResolver
+import dev.autobridge.design.Wallpaper
 import dev.autobridge.remote.CommandHistoryStore
-import dev.autobridge.remote.CommandSource
+import dev.autobridge.settings.AppearanceStore
+import dev.autobridge.ui.home.ClassicGrid
+import dev.autobridge.ui.home.CompactList
+import dev.autobridge.ui.home.DashboardCards
+import dev.autobridge.ui.home.HomeConnectionCard
+import dev.autobridge.ui.home.HomeEntry
+import dev.autobridge.ui.home.HomeLook
+import dev.autobridge.ui.home.HomeNowPlayingHero
+import dev.autobridge.ui.home.HomeRadioCard
+import dev.autobridge.ui.home.HomeRecentRow
+import dev.autobridge.ui.home.HomeResultBanner
+import dev.autobridge.ui.home.HomeSectionHeader
+import dev.autobridge.ui.home.HomeSendField
+import dev.autobridge.ui.home.HomeWallpaper
+import dev.autobridge.ui.home.QuickLaunchRow
+import dev.autobridge.ui.home.WallpaperDrawable
+import dev.autobridge.ui.home.homeCard
+import dev.autobridge.ui.home.rememberHomeLook
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** One Quick Launch tile as the view layer needs it. */
 data class HomeTileUi(val title: String, val icon: Int, val accent: Int, val onClick: () -> Unit)
@@ -64,14 +70,21 @@ data class ResumeRadioUi(
 )
 
 /**
- * Body of the phone Home (below the AutoBridge header, above the mini player):
- * Android Auto status, Send to Car with its recent sends, then Quick Launch.
+ * Body of the phone Home (below the AutoBridge header, above the mini player), in the layout
+ * chosen under Settings > Appearance > Home layout:
  *
- * Send to Car is the same [CommandField] as the Control tab, so a URL, a search query or plain
- * text all go through the one [dev.autobridge.remote.CommandParser] / command bus. Recent is read
- * from [CommandHistoryStore], the single command history.
+ * - Dashboard: a now-playing hero, 2x2 cards (Radio, TV, My Car, Displays) and a quick-launch row;
+ * - Classic grid: every place as a tile, three columns (two at 130% text and up);
+ * - Compact: one card of rows, with the bottom mini player.
+ *
+ * Every layout keeps the Android Auto card on top, then Send to Car with its result and Recent
+ * sends. [tiles] are MainActivity's six Quick Launch tiles in [PhoneHomeLayout.Tile] order; Mirror,
+ * My Car and Displays come from [onMirror], [onOpenConnection] and [onBridgeDuo].
+ *
+ * Send to Car is the one command path ([submitCommand]), and Recent is read from
+ * [CommandHistoryStore], the single command history. The chosen wallpaper is painted behind the
+ * whole Home page, header included.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun HomeDashboard(
     tiles: List<HomeTileUi>,
@@ -91,302 +104,163 @@ fun HomeDashboard(
     /** The card's round button: pause/resume what is on, or play the last station. */
     onToggleRadio: () -> Unit = {}
 ) {
+    val look = rememberHomeLook()
     val history by CommandHistoryStore.entries.collectAsState()
     val lastResult = rememberLastCommandResult()
     var lastSubmittedText by remember { mutableStateOf("") }
     val recents = PhoneHomeLayout.recentSends(history)
+    val entries = homeEntries(tiles, resumeRadio, onOpenConnection, onMirror, onBridgeDuo)
+    val displays = onBridgeDuo != null
+    val layout = look.spec.homeLayout
+
+    HomeWallpaperBehindPage(look)
 
     Column(
-        Modifier.fillMaxWidth().background(ComposeTokens.Ink).padding(bottom = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        if (updateVersion != null) UpdateCard(updateVersion, onOpenUpdate, onDismissUpdate)
+        if (updateVersion != null) UpdateCard(look, updateVersion, onOpenUpdate, onDismissUpdate)
 
-        AndroidAutoStatusCard(
-            title = stringResource(R.string.control_android_auto),
-            onClick = onOpenConnection,
-            showPill = true,
-            homeStyle = true,
-            actions = {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    CardActionButton(
-                        stringResource(R.string.home_mirror_action),
-                        icon = R.drawable.ic_tile_mirror,
-                        primary = true,
-                        onClick = onMirror,
-                        modifier = Modifier.weight(1f)
-                    )
-                    if (onBridgeDuo != null) {
-                        CardActionButton(
-                            stringResource(R.string.home_bridge_duo_action),
-                            icon = R.drawable.ic_browser_split,
-                            primary = false,
-                            onClick = onBridgeDuo,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
+        HomeConnectionCard(look, onOpen = onOpenConnection, onMirror = onMirror, onBridgeDuo = onBridgeDuo)
+
+        val quickLaunchLabel = stringResource(R.string.home_quick_launch)
+        val editLabel = stringResource(R.string.home_quick_launch_edit)
+        when (layout) {
+            HomeLayout.DASHBOARD -> {
+                HomeNowPlayingHero(
+                    look,
+                    radio = resumeRadio,
+                    onOpenRadio = onOpenRadio,
+                    onToggleRadio = onToggleRadio,
+                    onOpenMusic = entries.getValue(PhoneHomeLayout.Item.MUSIC).onClick
+                )
+                DashboardCards(look, PhoneHomeLayout.dashboardCards(displays).map { entries.getValue(it) })
+                HomeSectionHeader(look, quickLaunchLabel, editLabel, onEditQuickLaunch)
+                QuickLaunchRow(look, PhoneHomeLayout.dashboardQuickLaunch(displays).map { entries.getValue(it) })
             }
-        )
-
-        // The station listened to last, right under the connection: back on the radio in one tap.
-        if (resumeRadio != null) ResumeRadioCard(resumeRadio, onOpenRadio, onToggleRadio)
-
-        // Send to Car comes before Quick Launch: sending something to the car is what Home is
-        // opened for most, so the field sits right under the connection card.
-        Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            SectionLabel(stringResource(R.string.home_send_to_car), Modifier.weight(1f))
-            // The full controller: queue, recents, favorites and the transport bar. The field
-            // below stays because one-shot sending is the common case and should not need a
-            // navigation step; this is the way in when the driver wants to manage what is queued.
-            TextButton(onClick = onOpenController) {
-                Text(stringResource(R.string.home_open_controller), color = ComposeTokens.Accent, fontSize = 13.sp)
+            HomeLayout.CLASSIC -> {
+                // The station on the air: the mini player leaves radio to this card.
+                if (resumeRadio != null) HomeRadioCard(look, resumeRadio, onOpenRadio, onToggleRadio)
+                HomeSectionHeader(look, quickLaunchLabel, editLabel, onEditQuickLaunch)
+                ClassicGrid(look, PhoneHomeLayout.allItems(displays).map { entries.getValue(it) })
+            }
+            HomeLayout.COMPACT -> {
+                if (resumeRadio != null) HomeRadioCard(look, resumeRadio, onOpenRadio, onToggleRadio)
+                HomeSectionHeader(look, quickLaunchLabel, editLabel, onEditQuickLaunch)
+                CompactList(look, PhoneHomeLayout.allItems(displays).map { entries.getValue(it) })
             }
         }
-        CommandField(
-            placeholder = stringResource(R.string.home_send_placeholder),
-            filled = true,
-            onSubmitted = { lastSubmittedText = it }
-        )
+
+        // The full controller (queue, recents, favorites, transport) is one tap away; the field
+        // stays because one-shot sending is the common case and should not need a navigation step.
+        HomeSectionHeader(look, stringResource(R.string.home_send_to_car), stringResource(R.string.home_open_controller), onOpenController)
+        HomeSendField(look, stringResource(R.string.home_send_placeholder)) { lastSubmittedText = it }
         lastResult.value?.let {
-            ResultBanner(
-                it,
-                onRetry = { submitCommand(lastSubmittedText) },
-                onOpenConnection = onOpenConnection
-            )
+            HomeResultBanner(look, it, onRetry = { submitCommand(lastSubmittedText) }, onOpenConnection = onOpenConnection)
         }
         if (recents.isNotEmpty()) {
-            // Recent sends as chips right under the field, so sending the same page again is one
-            // tap from where it was typed.
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                recents.forEach { recent -> RecentChip(recent) }
-            }
-        }
-
-        Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            SectionLabel(stringResource(R.string.home_quick_launch), Modifier.weight(1f))
-            TextButton(onClick = onEditQuickLaunch) {
-                Text(stringResource(R.string.home_quick_launch_edit), color = ComposeTokens.Accent, fontSize = 13.sp)
-            }
-        }
-        tiles.chunked(3).forEach { row ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                row.forEach { tile -> QuickLaunchTile(tile, Modifier.weight(1f)) }
-                repeat(3 - row.size) { Box(Modifier.weight(1f)) }
-            }
+            HomeSectionHeader(look, stringResource(R.string.home_recent))
+            HomeRecentRow(look, recents)
         }
     }
 }
 
 /**
- * The radio card: the station's logo (its initials until the logo loads), what it is, and a round
- * play/pause button. While the station is on the air it is the player itself, so Home shows no
- * second now-playing bar for radio.
+ * Every [PhoneHomeLayout.Item] with its title, caption, icon and action. MainActivity builds
+ * [tiles] from [PhoneHomeLayout.Tile.entries], so they pair up by position.
  */
 @Composable
-private fun ResumeRadioCard(resume: ResumeRadioUi, onOpen: () -> Unit, onToggle: () -> Unit) {
-    val accent = Color(DesignTokens.Phone.ACCENT_RADIO)
-    val warm = Color(DesignTokens.Radio.WARM_CARD)
-    val edge = Color(DesignTokens.Radio.WARM_EDGE)
-    val toggleDescription = stringResource(if (resume.playing) R.string.radio_pause else R.string.radio_play)
-    Surface(
-        onClick = onOpen,
-        shape = RoundedCornerShape(20.dp),
-        color = warm,
-        modifier = Modifier.fillMaxWidth().border(1.dp, edge, RoundedCornerShape(20.dp))
-    ) {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier.size(52.dp).clip(RoundedCornerShape(12.dp))
-                    .background(Color(dev.autobridge.car.CarStationTile.colorFor(resume.station))),
-                contentAlignment = Alignment.Center
-            ) {
-                if (resume.logo != null) {
-                    androidx.compose.foundation.Image(
-                        bitmap = resume.logo.asImageBitmap(),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                } else {
-                    Text(
-                        dev.autobridge.car.CarStationTile.label(resume.station),
-                        color = Color.White,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1
-                    )
-                }
-            }
-            Column(Modifier.padding(start = 12.dp).weight(1f)) {
-                Text(
-                    stringResource(if (resume.live) R.string.home_radio_live else R.string.home_resume_radio),
-                    color = Color(DesignTokens.Radio.WARM_TEXT),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    resume.station,
-                    color = ComposeTokens.Text,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    resume.song ?: stringResource(if (resume.live) R.string.home_radio_open else R.string.home_resume_tap),
-                    color = Color(DesignTokens.Radio.SOFT_TEXT),
-                    fontSize = 13.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            Surface(
-                onClick = onToggle,
-                shape = CircleShape,
-                color = accent,
-                modifier = Modifier.size(48.dp).semantics { contentDescription = toggleDescription }
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        if (resume.playing) "❚❚" else "▶",
-                        color = Color(DesignTokens.Radio.ON_AMBER),
-                        fontSize = if (resume.playing) 16.sp else 20.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-        }
+private fun homeEntries(
+    tiles: List<HomeTileUi>,
+    radio: ResumeRadioUi?,
+    onOpenConnection: () -> Unit,
+    onMirror: () -> Unit,
+    onBridgeDuo: (() -> Unit)?
+): Map<PhoneHomeLayout.Item, HomeEntry> {
+    val captions = mapOf(
+        PhoneHomeLayout.Item.BROWSER to stringResource(R.string.home_v2_caption_browser),
+        PhoneHomeLayout.Item.MUSIC to stringResource(R.string.home_v2_caption_music),
+        PhoneHomeLayout.Item.RADIO to (radio?.station ?: stringResource(R.string.home_v2_caption_radio)),
+        PhoneHomeLayout.Item.TV to stringResource(R.string.home_v2_caption_tv),
+        PhoneHomeLayout.Item.YOUTUBE to stringResource(R.string.home_v2_caption_youtube),
+        PhoneHomeLayout.Item.MIRROR to stringResource(R.string.home_v2_caption_mirror),
+        PhoneHomeLayout.Item.MY_CAR to stringResource(R.string.home_v2_caption_my_car),
+        PhoneHomeLayout.Item.DISPLAYS to stringResource(R.string.home_v2_caption_displays),
+        PhoneHomeLayout.Item.MORE to stringResource(R.string.home_v2_caption_more)
+    )
+    val map = LinkedHashMap<PhoneHomeLayout.Item, HomeEntry>()
+    PhoneHomeLayout.Tile.entries.zip(tiles).forEach { (tile, ui) ->
+        val item = PhoneHomeLayout.itemFor(tile)
+        map[item] = HomeEntry(item, ui.title, captions.getValue(item), ui.icon, ui.onClick)
     }
+    fun extra(item: PhoneHomeLayout.Item, title: String, icon: Int, onClick: () -> Unit) {
+        map[item] = HomeEntry(item, title, captions.getValue(item), icon, onClick)
+    }
+    extra(PhoneHomeLayout.Item.MIRROR, stringResource(R.string.home_mirror_action), R.drawable.ic_tile_mirror, onMirror)
+    extra(PhoneHomeLayout.Item.MY_CAR, stringResource(R.string.settings_car_connection), R.drawable.ic_tile_car, onOpenConnection)
+    extra(PhoneHomeLayout.Item.DISPLAYS, stringResource(R.string.home_v2_tile_displays), R.drawable.ic_browser_split, onBridgeDuo ?: onMirror)
+    return map
+}
+
+/**
+ * Paints the wallpaper (Settings > Appearance > Wallpaper, with its dim) on the Home page's root
+ * view, so it sits behind the header and the mini player too. The page is rebuilt for every
+ * screen, so no other screen inherits it. "Your photo" is read off the main thread and falls back
+ * to the plain background when the file is missing or unreadable.
+ */
+@Composable
+private fun HomeWallpaperBehindPage(look: HomeLook) {
+    val view = LocalView.current
+    val context = LocalContext.current
+    LaunchedEffect(look.spec, look.palette) {
+        val file = AppearanceStore.customWallpaperFile(context)
+        var wallpaper = HomeWallpaper.forPhone(look.spec, customExists = file.isFile)
+        val photo = if (wallpaper == Wallpaper.CUSTOM) {
+            withContext(Dispatchers.IO) { WallpaperDrawable.decodePhoto(file, view.resources.displayMetrics.widthPixels) }
+        } else null
+        if (wallpaper == Wallpaper.CUSTOM && photo == null) wallpaper = Wallpaper.NONE
+        pageRoot(view)?.background = WallpaperDrawable(
+            wallpaper,
+            look.palette,
+            HomeWallpaper.dimColor(wallpaper, look.spec.wallpaperDim, look.palette.isLight),
+            view.resources.displayMetrics.density,
+            photo
+        )
+    }
+}
+
+private fun pageRoot(view: View): View? {
+    var current: View? = view
+    while (current != null) {
+        if (current.getTag(R.id.autobridge_page_root) != null) return current
+        current = current.parent as? View
+    }
+    return null
 }
 
 /** "Version X is available": opens the update dialog; ✕ hides it for that release. */
 @Composable
-private fun UpdateCard(version: String, onOpen: () -> Unit, onDismiss: () -> Unit) {
+private fun UpdateCard(look: HomeLook, version: String, onOpen: () -> Unit, onDismiss: () -> Unit) {
     val dismissDescription = stringResource(R.string.home_update_dismiss)
+    val soft = ThemeResolver.withAlpha(look.palette.accent, 0x24)
     Surface(
         onClick = onOpen,
-        shape = RoundedCornerShape(18.dp),
-        color = ComposeTokens.Accent.copy(alpha = 0.14f),
-        modifier = Modifier.fillMaxWidth().border(1.dp, ComposeTokens.Accent.copy(alpha = 0.4f), RoundedCornerShape(18.dp))
+        shape = look.cardShape,
+        color = androidx.compose.ui.graphics.Color(soft),
+        modifier = Modifier.fillMaxWidth()
     ) {
         Row(Modifier.padding(start = 14.dp, top = 10.dp, bottom = 10.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                Modifier.size(36.dp).background(ComposeTokens.Accent, RoundedCornerShape(12.dp)),
+                Modifier.size(36.dp).homeCard(look, look.chipShape),
                 contentAlignment = Alignment.Center
-            ) { Text("⬇", color = ComposeTokens.Ink, fontSize = 18.sp, fontWeight = FontWeight.Bold) }
+            ) { Text("⬇", color = look.accent, fontSize = 18.sp, fontWeight = FontWeight.Bold) }
             Column(Modifier.padding(start = 12.dp).weight(1f)) {
-                Text(
-                    stringResource(R.string.home_update_title, version),
-                    color = ComposeTokens.Text,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(stringResource(R.string.home_update_caption), color = ComposeTokens.TextMuted, fontSize = 12.5.sp)
+                Text(stringResource(R.string.home_update_title, version), color = look.text, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.home_update_caption), color = look.textSecondary, fontSize = 12.5.sp)
             }
             TextButton(onClick = onDismiss, modifier = Modifier.semantics { contentDescription = dismissDescription }) {
-                Text("✕", color = ComposeTokens.TextMuted, fontSize = 16.sp)
+                Text("✕", color = look.textSecondary, fontSize = 16.sp)
             }
-        }
-    }
-}
-
-/** One recent send under the field: outlined pill, tap sends the same command again. */
-@Composable
-private fun RecentChip(recent: PhoneHomeLayout.RecentSend) {
-    val sendAgainDescription = stringResource(R.string.home_recent_send_again, recent.label)
-    Surface(
-        onClick = {
-            AutoBridgeCommandBus.send(
-                AutoBridgeCommand(type = recent.type, payload = recent.payload, source = CommandSource.MOBILE)
-            )
-        },
-        shape = RoundedCornerShape(18.dp),
-        color = Color.Transparent,
-        modifier = Modifier.height(36.dp)
-            .border(1.dp, ComposeTokens.Hairline, RoundedCornerShape(18.dp))
-            .semantics { contentDescription = sendAgainDescription }
-    ) {
-        Box(Modifier.padding(horizontal = 14.dp), contentAlignment = Alignment.Center) {
-            Text(
-                recent.label,
-                color = RecentChipText,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
-}
-
-private val RecentChipText = Color(DesignTokens.Phone.CHIP_TEXT)
-private val DuoButtonColor = Color(DesignTokens.Phone.SELECTED_FILL)
-private val DuoButtonText = Color(DesignTokens.Phone.ON_SELECTED_FILL)
-
-/** Mirror / Bridge Duo button on the Home Android Auto card. [primary] fills with the accent. */
-@Composable
-private fun CardActionButton(label: String, icon: Int, primary: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val tint = if (primary) ComposeTokens.Ink else DuoButtonText
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(16.dp),
-        color = if (primary) ComposeTokens.Accent else DuoButtonColor,
-        modifier = modifier.height(48.dp)
-    ) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(painterResource(icon), contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    label,
-                    color = tint,
-                    fontSize = 15.sp,
-                    fontWeight = if (primary) FontWeight.ExtraBold else FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun QuickLaunchTile(tile: HomeTileUi, modifier: Modifier) {
-    // The design's tile: the icon in a tinted, edged box over a regular-weight label, centred.
-    val accent = Color(tile.accent)
-    Surface(
-        onClick = tile.onClick,
-        shape = RoundedCornerShape(20.dp),
-        color = ComposeTokens.Surface,
-        modifier = modifier.height(108.dp).semantics { contentDescription = tile.title }
-    ) {
-        Column(
-            Modifier.fillMaxSize().padding(horizontal = 8.dp, vertical = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Box(
-                Modifier
-                    .size(48.dp)
-                    .background(accent.copy(alpha = 0.14f), RoundedCornerShape(14.dp))
-                    .border(1.dp, accent.copy(alpha = 0.28f), RoundedCornerShape(14.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(painterResource(tile.icon), contentDescription = null, tint = accent, modifier = Modifier.size(24.dp))
-            }
-            Spacer(Modifier.height(10.dp))
-            Text(
-                tile.title,
-                color = ComposeTokens.Text,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Normal,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
         }
     }
 }

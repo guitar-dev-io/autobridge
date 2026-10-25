@@ -2,7 +2,9 @@ package dev.autobridge.library
 
 /** How the Streaming list is grouped, in display order. */
 enum class StreamingGroup(val title: String) {
+    /** The big-name video services, shown as large cards. */
     VIDEO("Video"),
+    SOCIAL("Short and social video"),
     CHINESE("Chinese video"),
     MOVIES("Movies"),
     MUSIC("Music"),
@@ -18,13 +20,15 @@ data class StreamingLink(val title: String, val group: StreamingGroup, val url: 
  *
  * Every entry is a plain website loaded by the existing browser stack (`CarWebRenderer` in the car,
  * `BrowserActivity` on the phone); there is no per-site player. The main list keeps to services
- * that play without DRM: the WebView has no dependable Widevine path, so Netflix, Disney+, Prime
- * Video, HBO Max, Viu, AIS PLAY and Spotify (whose web player also needs Widevine) would open a
- * page that cannot play. TrueVisions NOW has no web player at all.
+ * that play without DRM: the WebView has no dependable Widevine path, so AIS PLAY and Spotify
+ * (whose web player also needs Widevine) would open a page that cannot play. TrueVisions NOW has
+ * no web player at all.
  *
- * The [StreamingGroup.CHINESE] group is the exception, added at the driver's request: those sites
- * serve free and protected video alike and some are limited by region, so some of what they show
- * may not play here. The screens say so beside them rather than leaving a black video unexplained.
+ * Two groups are the exception, added at the driver's request: the main [StreamingGroup.VIDEO]
+ * grid (Netflix, Disney+, Prime Video, HBO Max, Viu, WeTV, iQIYI beside YouTube) and
+ * [StreamingGroup.CHINESE]. Those sites serve protected video and some are limited by region, so
+ * some of what they show may not play here. The screens say so beside them ([mayNotPlay]) rather
+ * than leaving a black video unexplained.
  *
  * Movies is deliberately just the Internet Archive for now: it is public-domain and plays from a
  * plain `<video>` tag, so it is the one "watch a movie" site that is both unambiguously legal and
@@ -34,14 +38,20 @@ data class StreamingLink(val title: String, val group: StreamingGroup, val url: 
  */
 object StreamingLinks {
     val all: List<StreamingLink> = listOf(
+        // The main grid, in the order a driver expects it: the big subscription services and YouTube.
+        StreamingLink("Netflix", StreamingGroup.VIDEO, "https://www.netflix.com"),
         StreamingLink("YouTube", StreamingGroup.VIDEO, "https://m.youtube.com"),
-        StreamingLink("TikTok", StreamingGroup.VIDEO, "https://www.tiktok.com"),
-        StreamingLink("Facebook Watch", StreamingGroup.VIDEO, "https://m.facebook.com/watch"),
-        StreamingLink("Dailymotion", StreamingGroup.VIDEO, "https://www.dailymotion.com"),
-        StreamingLink("Vimeo", StreamingGroup.VIDEO, "https://vimeo.com"),
+        StreamingLink("Disney+", StreamingGroup.VIDEO, "https://www.disneyplus.com"),
+        StreamingLink("Prime Video", StreamingGroup.VIDEO, "https://www.primevideo.com"),
+        StreamingLink("HBO Max", StreamingGroup.VIDEO, "https://www.hbomax.com"),
+        StreamingLink("Viu", StreamingGroup.VIDEO, "https://www.viu.com"),
+        StreamingLink("WeTV", StreamingGroup.VIDEO, "https://wetv.vip"),
+        StreamingLink("iQIYI", StreamingGroup.VIDEO, "https://www.iq.com"),
+        StreamingLink("TikTok", StreamingGroup.SOCIAL, "https://www.tiktok.com"),
+        StreamingLink("Facebook Watch", StreamingGroup.SOCIAL, "https://m.facebook.com/watch"),
+        StreamingLink("Dailymotion", StreamingGroup.SOCIAL, "https://www.dailymotion.com"),
+        StreamingLink("Vimeo", StreamingGroup.SOCIAL, "https://vimeo.com"),
         StreamingLink("Tencent Video", StreamingGroup.CHINESE, "https://v.qq.com"),
-        StreamingLink("WeTV", StreamingGroup.CHINESE, "https://wetv.vip"),
-        StreamingLink("iQIYI", StreamingGroup.CHINESE, "https://www.iq.com"),
         StreamingLink("Youku", StreamingGroup.CHINESE, "https://www.youku.com"),
         StreamingLink("Mango TV", StreamingGroup.CHINESE, "https://www.mgtv.com"),
         StreamingLink("CCTV", StreamingGroup.CHINESE, "https://tv.cctv.com"),
@@ -63,8 +73,15 @@ object StreamingLinks {
         StreamingLink("Ani-One Asia", StreamingGroup.ANIME, "https://m.youtube.com/@AniOneAsia")
     )
 
-    /** True for the group whose sites may not play here (protected video, or limited by region). */
-    fun mayNotPlay(link: StreamingLink): Boolean = link.group == StreamingGroup.CHINESE
+    /**
+     * The services in the main grid that stream protected video (Widevine DRM) or are limited by
+     * region, so what they show may not play in this WebView. Listed at the driver's request, with
+     * the warning beside them, the way the Chinese group is.
+     */
+    private val PROTECTED = setOf("Netflix", "Disney+", "Prime Video", "HBO Max", "Viu", "WeTV", "iQIYI")
+
+    /** True for a site that may not play here (protected video, or limited by region). */
+    fun mayNotPlay(link: StreamingLink): Boolean = link.group == StreamingGroup.CHINESE || link.title in PROTECTED
 
     /** [all] split by group, in [StreamingGroup] order, skipping empty groups. */
     fun grouped(): List<Pair<StreamingGroup, List<StreamingLink>>> =

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="browser_v2_continue_reading">อ่านต่อ</string>
+    <string name="browser_v2_visited">%1$s · %2$s</string>
+    <string name="browser_v2_remove_recent">ลบ %1$s ออกจากประวัติ</string>
+    <string name="browser_v2_forward">ไปข้างหน้า</string>
+    <string name="browser_v2_start_page">หน้าเริ่มต้น</string>
+    <string name="browser_v2_menu">เมนูเบราว์เซอร์</string>
+</resources>

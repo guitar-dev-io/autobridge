@@ -57,6 +57,7 @@ import dev.autobridge.core.model.VehicleState
 import dev.autobridge.core.policy.FeaturePolicy
 import dev.autobridge.core.state.RuntimeContextStore
 import dev.autobridge.design.DesignTokens
+import dev.autobridge.design.ThemeHolder
 import dev.autobridge.i18n.AppLocale
 import dev.autobridge.ui.AutoBridgePhoneTheme
 import dev.autobridge.remote.RemoteRuntime
@@ -84,6 +85,7 @@ import dev.autobridge.settings.SettingsStore
 import dev.autobridge.ui.PhoneNav
 import dev.autobridge.update.UpdateChecker
 import rikka.shizuku.Shizuku
+import dev.autobridge.ui.AppFonts
 
 /** Phone destinations are defined (and unit-tested) in [PhoneNav]. */
 private typealias PhoneScreen = PhoneNav.Route
@@ -130,17 +132,19 @@ class MainActivity : androidx.activity.ComponentActivity() {
         const val STATE_APPS_FAVORITES = "apps_favorites_only"
         const val STATE_APPS_QUERY = "apps_query"
 
-        // Matches AutoBridgeDesign / ComposeTokens (docs/UI_REDESIGN_TASKS.md "Design tokens").
-        const val COLOR_BACKGROUND = DesignTokens.Phone.INK
-        const val COLOR_SURFACE = DesignTokens.Phone.SURFACE
-        const val COLOR_SURFACE_ALT = DesignTokens.Phone.SURFACE_RAISED
-        const val COLOR_BORDER = DesignTokens.Phone.HAIRLINE
-        const val COLOR_ACCENT = DesignTokens.Phone.ACCENT
+        // Follow Settings > Appearance, like AutoBridgeDesign / ComposeTokens: getters on the palette
+        // ThemeHolder resolved, not compile-time constants, so the pages built from them (Mirror,
+        // Input & touch, Debug, Developer...) change with the theme.
+        val COLOR_BACKGROUND: Int get() = ThemeHolder.palette.background
+        val COLOR_SURFACE: Int get() = ThemeHolder.palette.surface
+        val COLOR_SURFACE_ALT: Int get() = ThemeHolder.palette.raised
+        val COLOR_BORDER: Int get() = ThemeHolder.palette.hairline
+        val COLOR_ACCENT: Int get() = ThemeHolder.palette.accent
         const val COLOR_ACCENT_DARK = DesignTokens.Phone.ACCENT_DARK
-        const val COLOR_TEXT = DesignTokens.Phone.TEXT
-        const val COLOR_MUTED = DesignTokens.Phone.TEXT_MUTED
-        const val COLOR_SUCCESS = DesignTokens.Phone.SUCCESS
-        const val COLOR_WARNING = DesignTokens.Phone.WARNING
+        val COLOR_TEXT: Int get() = ThemeHolder.palette.text
+        val COLOR_MUTED: Int get() = ThemeHolder.palette.textSecondary
+        val COLOR_SUCCESS: Int get() = ThemeHolder.palette.good
+        val COLOR_WARNING: Int get() = ThemeHolder.palette.warn
     }
 
     /** Back stack of the phone shell; see [PhoneNav.BackStack]. */
@@ -201,15 +205,18 @@ class MainActivity : androidx.activity.ComponentActivity() {
     }
 
     /**
-     * Applies the Settings &gt; Language choice before any view or string is resolved. A no-op on
-     * API 33+, where the platform has already picked the locale; see [AppLocale.rebase].
+     * Applies the Settings &gt; Language choice before any view or string is resolved (a no-op on
+     * API 33+, where the platform has already picked the locale; see [AppLocale.rebase]), then the
+     * Appearance text size ([dev.autobridge.ui.AppearanceContext]).
      */
     override fun attachBaseContext(newBase: Context) {
-        super.attachBaseContext(AppLocale.rebase(newBase))
+        super.attachBaseContext(dev.autobridge.ui.AppearanceContext.wrap(AppLocale.rebase(newBase)))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // System and Auto modes depend on night mode and the clock, which may have moved on.
+        dev.autobridge.settings.AppearanceStore.refreshPalette(this)
         SettingsStore.restore(this)
         // What maintenance is due, as a notification (once a day at most; nothing without items).
         runCatching { dev.autobridge.maintenance.MaintenanceReminder.check(this) }
@@ -250,6 +257,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
         appsFavoritesOnly = savedInstanceState?.getBoolean(STATE_APPS_FAVORITES, true) ?: true
         appSearchQuery = savedInstanceState?.getString(STATE_APPS_QUERY).orEmpty()
         setContentView(buildUi(restoredScreen))
+        applySystemBarColors()
         onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (!goBack()) { isEnabled = false; onBackPressedDispatcher.onBackPressed(); isEnabled = true }
@@ -346,10 +354,29 @@ class MainActivity : androidx.activity.ComponentActivity() {
         super.onDestroy()
     }
 
+    /**
+     * The system bars follow the Appearance palette: dark icons over a light theme, light over a
+     * dark one. On Android 15+ the window is edge to edge and the shell's root shows through the
+     * bars, which is why [buildUi] paints it with the palette's background; older versions take
+     * the bar colours here.
+     */
+    @Suppress("DEPRECATION")
+    private fun applySystemBarColors() {
+        val palette = dev.autobridge.design.ThemeHolder.palette
+        androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).apply {
+            isAppearanceLightStatusBars = palette.isLight
+            isAppearanceLightNavigationBars = palette.isLight
+        }
+        if (android.os.Build.VERSION.SDK_INT < 35) {
+            window.statusBarColor = palette.background
+            window.navigationBarColor = palette.background
+        }
+    }
+
     private fun buildUi(initial: PhoneScreen = PhoneScreen.HOME): View {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(COLOR_BACKGROUND)
+            setBackgroundColor(dev.autobridge.ui.AutoBridgeDesign.INK)
         }
 
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
@@ -360,7 +387,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
         // No bottom tab bar: Home is the hub and every other destination is a child reached from
         // it, directly or through Settings (see PhoneNav).
         screenContainer = FrameLayout(this).apply {
-            setBackgroundColor(COLOR_BACKGROUND)
+            setBackgroundColor(dev.autobridge.ui.AutoBridgeDesign.INK)
         }
         root.addView(
             screenContainer,
@@ -398,6 +425,9 @@ class MainActivity : androidx.activity.ComponentActivity() {
         val screen = when (target) {
             PhoneScreen.HOME -> buildHomeScreen()
             PhoneScreen.SETTINGS -> buildSettingsMenu()
+            // Any change recreates the activity: tokens, Compose schemes and the font scale are all
+            // read while a screen is built, and the saved route brings the user back here.
+            PhoneScreen.APPEARANCE -> dev.autobridge.ui.AppearanceScreen.build(this, onBack = { goBack() }) { recreate() }
             PhoneScreen.CONTROL -> buildControlScreen()
             PhoneScreen.CONTROL_HISTORY -> buildCommandHistoryScreen()
             PhoneScreen.APPS -> buildAppsScreen()
@@ -580,7 +610,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
             setPadding(dp(8), dp(8), dp(8), dp(8))
             addView(supportCard(framed = true))
         }
-        android.app.AlertDialog.Builder(this)
+        android.app.AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setView(content)
             .setPositiveButton(getString(R.string.about_promptpay_close), null)
             .show()
@@ -1017,7 +1047,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
             onToggle = {
                 if (!dev.autobridge.safety.BypassPolicyStore.enabled) {
                     // Turning ON: show the same confirmation dialog as before.
-                    android.app.AlertDialog.Builder(this@MainActivity)
+                    android.app.AlertDialog.Builder(this@MainActivity, dev.autobridge.settings.ScreenAppearance.dialogTheme())
                         .setTitle(R.string.bypass_confirm_title)
                         .setMessage(R.string.bypass_confirm_message)
                         .setNegativeButton(R.string.action_cancel) { _, _ ->
@@ -1132,6 +1162,10 @@ class MainActivity : androidx.activity.ComponentActivity() {
                     ) {
                         startActivity(dev.autobridge.voice.VoiceSettingsActivity.intent(this))
                     },
+                    settingsValueEntry(
+                        getString(R.string.appearance_title),
+                        dev.autobridge.ui.AppearanceScreen.summary(this)
+                    ) { showPhoneScreen(PhoneScreen.APPEARANCE) },
                     settingsValueEntry(
                         getString(R.string.settings_language),
                         getString(AppLocale.selectedOption(this).labelRes)
@@ -1341,7 +1375,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
 
     /** Settings &gt; About: full attribution for the open-source and third-party sources. */
     private fun showCreditsDialog() {
-        android.app.AlertDialog.Builder(this)
+        android.app.AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(getString(R.string.about_credits_title))
             .setMessage(getString(R.string.about_credits_body))
             .setPositiveButton(getString(R.string.about_credits_close), null)
@@ -1439,7 +1473,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
                 setPadding(dp(16), 0, 0, 0)
             })
         }
-        return android.app.AlertDialog.Builder(this).setView(row).setCancelable(true).show()
+        return android.app.AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme()).setView(row).setCancelable(true).show()
     }
 
     /**
@@ -1490,7 +1524,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
             append(getString(R.string.about_update_message, release.versionName, update.currentVersion))
             if (notes.isNotEmpty()) append("\n\n").append(notes)
         }
-        android.app.AlertDialog.Builder(this)
+        android.app.AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(getString(R.string.about_update_title))
             .setMessage(message)
             .setNeutralButton(getString(R.string.about_update_release_page)) { _, _ ->
@@ -2383,7 +2417,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
         this.text = text
         textSize = 11f
         setTextColor(COLOR_MUTED)
-        typeface = Typeface.DEFAULT_BOLD
+        typeface = AppFonts.bold()
         setPadding(0, dp(16), 0, dp(6))
     }
 
@@ -2391,7 +2425,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
         this.text = text
         textSize = size
         setTextColor(COLOR_TEXT)
-        typeface = Typeface.DEFAULT_BOLD
+        typeface = AppFonts.bold()
     }
 
     private fun mutedText(text: String) = TextView(this).apply {
@@ -2409,13 +2443,17 @@ class MainActivity : androidx.activity.ComponentActivity() {
             text = title
             gravity = Gravity.CENTER
             textSize = 14f
-            typeface = Typeface.DEFAULT_BOLD
+            typeface = AppFonts.bold()
             val bg = when {
                 primary -> COLOR_ACCENT
                 destructive -> DesignTokens.Phone.DESTRUCTIVE
                 else -> COLOR_SURFACE
             }
-            val txtColor = if (primary || destructive) Color.WHITE else COLOR_TEXT
+            val txtColor = when {
+                primary -> ThemeHolder.palette.onAccent
+                destructive -> Color.WHITE
+                else -> COLOR_TEXT
+            }
             setTextColor(txtColor)
             setPadding(dp(16), dp(14), dp(16), dp(14))
             background = roundedBackground(bg, if (primary || destructive) bg else COLOR_BORDER)
@@ -2439,7 +2477,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
                 text = value
                 textSize = 13f
                 setTextColor(COLOR_ACCENT)
-                typeface = Typeface.DEFAULT_BOLD
+                typeface = AppFonts.bold()
             })
 
             if (onClick != null) {
@@ -2870,7 +2908,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
                 gravity = Gravity.CENTER
                 textSize = 12f
                 setTextColor(if (mode == active) COLOR_TEXT else COLOR_MUTED)
-                typeface = Typeface.DEFAULT_BOLD
+                typeface = AppFonts.bold()
                 background = roundedBackground(
                     if (mode == active) COLOR_SURFACE_ALT else COLOR_SURFACE,
                     COLOR_BORDER

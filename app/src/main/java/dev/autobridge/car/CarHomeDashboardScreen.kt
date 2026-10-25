@@ -30,6 +30,7 @@ import dev.autobridge.media.WebMediaHub
 import dev.autobridge.bridge.EngineKind
 import dev.autobridge.core.state.VehicleStateSession
 import dev.autobridge.logging.StructuredLog
+import dev.autobridge.settings.AppearanceStore
 import dev.autobridge.library.HomeSection
 import dev.autobridge.mirror.MirrorSurfaceOwnership
 import dev.autobridge.mirror.ProjectionService
@@ -37,6 +38,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import dev.autobridge.display.SystemStats
+import dev.autobridge.design.AppearanceSpec
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 
 /**
  * AutoBridge Home Dashboard.
@@ -135,6 +140,9 @@ class CarHomeDashboardScreen(
     /** Repaints the Now Playing card as the live session plays, pauses and moves on. */
     private val scope = MainScope()
     private var sessionWatch: Job? = null
+    private var appearanceWatch: Job? = null
+    /** Redraws the header's CPU / RAM / temperature line while the home is on screen. */
+    private var statusWatch: Job? = null
 
     /**
      * Thumbnails for the hero and the rows.
@@ -162,6 +170,15 @@ class CarHomeDashboardScreen(
                 MirrorSurfaceOwnership.claim(this@CarHomeDashboardScreen)
                 appManager.setSurfaceCallback(this@CarHomeDashboardScreen)
                 sessionWatch = scope.launch { AutoBridgeSessionManager.state.collect { renderMenu() } }
+                // Settings > Appearance can change while the car runs; renderMenu lays out again
+                // when the look it reads differs from the one the layout was built for.
+                appearanceWatch = scope.launch { AppearanceStore.spec.collect { renderMenu() } }
+                statusWatch = scope.launch {
+                    while (isActive) {
+                        delay(STATUS_REFRESH_MS)
+                        if (AppearanceStore.current().let { if (it.carSameLook) it else AppearanceSpec.DEFAULT }.carSystemStatus) renderMenu()
+                    }
+                }
                 WebMediaHub.addStatusListener(webStatusListener)
                 readWeb()
                 watchSession()
@@ -174,6 +191,10 @@ class CarHomeDashboardScreen(
                 active = false
                 sessionWatch?.cancel()
                 sessionWatch = null
+                appearanceWatch?.cancel()
+                appearanceWatch = null
+                statusWatch?.cancel()
+                statusWatch = null
                 WebMediaHub.removeStatusListener(webStatusListener)
                 unwatchSession()
                 handler.removeCallbacksAndMessages(null)
@@ -655,11 +676,14 @@ class CarHomeDashboardScreen(
         // The head unit's dpi, never the phone's: it decides every dp on this screen.
         val density = (if (surfaceDpi > 0) surfaceDpi else BASELINE_DPI) / BASELINE_DPI.toFloat()
         val shown = shownContent()
+        val look = HomeDashboardLook.current()
+        if (dashboardLayout?.look != look) dashboardLayout = null
         val layout = dashboardLayout ?: HomeDashboardLayout.compute(
             safeArea(), density, menuItems.map { it.title(carContext) }, shown,
             dashboardRenderer::measureLabel,
             recentTitle = carContext.getString(R.string.car_home_recent_from_phone),
-            queueLabel = dashboardRenderer.queueLink(content.queueTotal)
+            queueLabel = dashboardRenderer.queueLink(content.queueTotal),
+            look = look
         ).also {
             dashboardLayout = it
             scroll = scroll.coerceIn(0f, it.maxScroll)
@@ -667,7 +691,8 @@ class CarHomeDashboardScreen(
                 TAG,
                 "layout card=${it.cards.first().width.toInt()}x${it.cards.first().height.toInt()}" +
                     " hero=${it.continueCard != null} recent=${it.recentRows.size}" +
-                    " queue=${content.queueTotal} scroll=${it.scrollable}"
+                    " queue=${content.queueTotal} scroll=${it.scrollable}" +
+                    " home=${look.homeLayout} text=${look.textScale}"
             )
         }
         // Not lockHardwareCanvas directly: on some devices it takes the process down a frame
@@ -692,7 +717,10 @@ class CarHomeDashboardScreen(
             val nextEnabled = if (session) mediaPlayback.hasNext else content.hasQueue
             dashboardRenderer.draw(
                 canvas, layout, menuItems, shown,
-                HomeDashboardRenderer.State(focused, pressed, scroll, playing, paused, nextEnabled = nextEnabled),
+                HomeDashboardRenderer.State(
+                    focused, pressed, scroll, playing, paused, nextEnabled = nextEnabled,
+                    status = if (look.systemStatus) SystemStats.read(carContext) else null
+                ),
                 thumbnails
             )
         }
@@ -849,6 +877,9 @@ class CarHomeDashboardScreen(
     }
 
     private companion object {
+        /** How often the header's system line redraws; the readings themselves are cached for 1.5 s. */
+        private const val STATUS_REFRESH_MS = 2_000L
+
         const val RESUME_MAX_AGE_MS = 60L * 60L * 1000L // 1 hour freshness window
         @Volatile
         var resumedThisLaunch = false

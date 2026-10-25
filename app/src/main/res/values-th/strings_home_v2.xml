@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Phone Home in the redesign's three layouts (Settings > Appearance > Home layout). -->
+<resources>
+    <string name="home_v2_tile_displays">หน้าจอ</string>
+    <string name="home_v2_caption_browser">เปิดเว็บบนจอรถ</string>
+    <string name="home_v2_caption_music">เพลงและเพลย์ลิสต์</string>
+    <string name="home_v2_caption_radio">สถานีสด</string>
+    <string name="home_v2_caption_tv">ช่องสด</string>
+    <string name="home_v2_caption_youtube">วิดีโอบนจอรถ</string>
+    <string name="home_v2_caption_mirror">แสดงจอโทรศัพท์บนจอรถ</string>
+    <string name="home_v2_caption_my_car">ที่จอด น้ำมัน และการดูแลรถ</string>
+    <string name="home_v2_caption_displays">จอหน้าและจอหลัง</string>
+    <string name="home_v2_caption_more">โฟลเดอร์ สภาพอากาศ และอื่นๆ</string>
+    <string name="home_v2_now_playing">กำลังเล่น</string>
+    <string name="home_v2_now_playing_phone">กำลังเล่น · โทรศัพท์</string>
+    <string name="home_v2_nothing_playing">ยังไม่มีอะไรเล่นอยู่</string>
+    <string name="home_v2_nothing_playing_caption">แตะเพื่อเลือกเพลง</string>
+    <string name="home_v2_previous">ก่อนหน้า</string>
+    <string name="home_v2_next">ถัดไป</string>
+    <string name="home_v2_send">ส่ง</string>
+</resources>

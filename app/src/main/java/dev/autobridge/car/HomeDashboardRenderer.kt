@@ -2,11 +2,13 @@ package dev.autobridge.car
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.DashPathEffect
 import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.RadialGradient
 import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Shader
@@ -18,8 +20,17 @@ import android.text.TextPaint
 import android.text.TextUtils
 import androidx.core.content.ContextCompat
 import dev.autobridge.R
+import dev.autobridge.design.HomeLayout
+import dev.autobridge.design.ThemeHolder
+import dev.autobridge.design.AppearanceSpec
+import dev.autobridge.design.Wallpaper
+import dev.autobridge.settings.AppearanceStore
 import kotlin.math.min
 import kotlin.math.roundToInt
+import dev.autobridge.ui.AppFonts
+import dev.autobridge.display.SystemReading
+import dev.autobridge.display.SystemStats
+import java.util.Locale
 
 /**
  * Paints the whole AutoBridge home onto the car surface: background, header, the Now Playing card
@@ -51,7 +62,9 @@ internal class HomeDashboardRenderer(private val context: Context) {
         val scroll: Float = 0f,
         val playing: Boolean = false,
         val paused: Boolean = false,
-        val nextEnabled: Boolean = false
+        val nextEnabled: Boolean = false,
+        /** CPU, memory and temperature for the header; null hides the line. */
+        val status: SystemReading? = null
     )
 
     /** Resolves a thumbnail URL to a decoded bitmap, or null while there is none to draw. */
@@ -62,32 +75,44 @@ internal class HomeDashboardRenderer(private val context: Context) {
     private val logo: Drawable? = ContextCompat.getDrawable(context, R.drawable.ic_autobridge_launcher)
     private val card = HomeMenuCard()
 
-    private val bold = Typeface.create("sans-serif", Typeface.BOLD)
-    private val medium = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-    private val regular = Typeface.create("sans-serif", Typeface.NORMAL)
+    private val wordmark = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val sectionTitle = TextPaint(Paint.ANTI_ALIAS_FLAG)
+    private val pillText = TextPaint(Paint.ANTI_ALIAS_FLAG)
+    private val emptyTitle = TextPaint(Paint.ANTI_ALIAS_FLAG)
+    private val heroTitle = TextPaint(Paint.ANTI_ALIAS_FLAG)
+    private val caption = TextPaint(Paint.ANTI_ALIAS_FLAG)
+    private val title = TextPaint(Paint.ANTI_ALIAS_FLAG)
+    private val meta = TextPaint(Paint.ANTI_ALIAS_FLAG)
+    /** The header's system line: figures keep their width as they change, so the line does not shake. */
+    private val statusPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { fontFeatureSettings = "tnum" }
 
-    private val wordmark = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = bold }
-    private val sectionTitle = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = bold
-        color = HomeDashboardTheme.TEXT_SECTION
+    /** The family the paints above were last given; see [syncFonts]. */
+    private var fontFace: Typeface? = null
+
+    init {
+        syncFonts()
     }
-    private val pillText = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { typeface = bold }
-    private val emptyTitle = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = bold
-        color = HomeDashboardTheme.TEXT_PRIMARY
-    }
-    private val heroTitle = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = bold
-        color = HomeDashboardTheme.TEXT_PRIMARY
-    }
-    private val caption = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { typeface = regular }
-    private val title = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = medium
-        color = HomeDashboardTheme.TEXT_PRIMARY
-    }
-    private val meta = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = regular
-        color = HomeDashboardTheme.TEXT_SECONDARY
+
+    /**
+     * Gives the text paints the car's font: the Appearance family and Thai style, or the defaults
+     * when "Use this look on Android Auto" is off. Cheap when nothing changed (one lookup), so it
+     * runs before every measure and draw, and a font picked on the phone shows on the next frame.
+     */
+    private fun syncFonts() {
+        val spec = ThemeHolder.spec
+        val car = if (spec.carSameLook) spec else AppearanceSpec.DEFAULT
+        val face = AppFonts.forChoice(car.font, car.thai)
+        if (face === fontFace && face != null) return
+        fontFace = face
+        val bold = Typeface.create(face, 700, false)
+        val medium = Typeface.create(face, 500, false)
+        val regular = Typeface.create(face, 400, false)
+        listOf(wordmark, sectionTitle, pillText, emptyTitle, heroTitle, card.label).forEach { it.typeface = bold }
+        title.typeface = medium
+        statusPaint.typeface = medium
+        listOf(caption, meta).forEach { it.typeface = regular }
+        heroTitleLayout = null
+        heroTitleKey = null
     }
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
     private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -108,6 +133,15 @@ internal class HomeDashboardRenderer(private val context: Context) {
 
     /** Fallback-artwork ramps, keyed by accent and rounded height; see [artworkShader]. */
     private val shaders = HashMap<Long, LinearGradient>()
+    /** The card colour [shaders] were mixed with; a new one empties the cache. */
+    private var shaderSurface = 0
+
+    /** The look's wallpaper with its dim, drawn once per look and surface size; see [wallpaper]. */
+    private var wallpaperBitmap: Bitmap? = null
+    private var wallpaperKey: String? = null
+
+    /** The look this frame paints with; set at the top of [draw]. */
+    private var look = HomeDashboardLook.DEFAULT
 
     /** The hero title wrapped to two lines, kept until its text, width or size changes. */
     private var heroTitleLayout: StaticLayout? = null
@@ -115,6 +149,7 @@ internal class HomeDashboardRenderer(private val context: Context) {
 
     /** Card label width at a text size, measured with the exact paint the cards draw with. */
     fun measureLabel(text: String, size: Float): Float {
+        syncFonts()
         card.label.textSize = size
         return card.label.measureText(text)
     }
@@ -127,8 +162,11 @@ internal class HomeDashboardRenderer(private val context: Context) {
         state: State,
         thumbnails: Thumbnails
     ) {
-        canvas.drawColor(HomeDashboardTheme.BACKGROUND)
+        syncFonts()
+        applyLook(layout.look)
+        drawBackground(canvas)
         drawHeader(canvas, layout)
+        state.status?.let { drawStatus(canvas, layout, it) }
 
         canvas.save()
         val viewport = layout.viewport
@@ -141,6 +179,9 @@ internal class HomeDashboardRenderer(private val context: Context) {
         val item = content.continueWatching
         if (hero != null && item != null) drawHero(canvas, hero, layout, item, state, thumbnails)
         layout.emptyHero?.let { drawEmptyHero(canvas, it, layout) }
+        val strip = layout.strip
+        if (strip != null && item != null) drawStrip(canvas, strip, layout, item, state, thumbnails)
+        layout.emptyStrip?.let { drawEmptyStrip(canvas, it, layout) }
 
         items.forEachIndexed { index, menuItem ->
             val bounds = layout.cards.getOrNull(index) ?: return@forEachIndexed
@@ -153,7 +194,7 @@ internal class HomeDashboardRenderer(private val context: Context) {
             card.draw(canvas, bounds, menuItem, menuItem.title(context), layout, cardState)
         }
 
-        drawRecent(canvas, layout, content, state, thumbnails)
+        if (layout.kind == HomeLayout.DASHBOARD) drawRecent(canvas, layout, content, state, thumbnails)
 
         canvas.restore()
 
@@ -162,6 +203,134 @@ internal class HomeDashboardRenderer(private val context: Context) {
             drawScrollButton(canvas, it, layout, up = false, enabled = state.scroll < layout.maxScroll)
         }
     }
+
+    // --------------------------------------------------------------------------- background
+
+    /** Text colours that only change with the look; sizes are set where each text is drawn. */
+    private fun applyLook(next: HomeDashboardLook) {
+        look = next
+        sectionTitle.color = next.textSection
+        emptyTitle.color = next.textPrimary
+        heroTitle.color = next.textPrimary
+        title.color = next.textPrimary
+        meta.color = next.textSecondary
+    }
+
+    /** The theme background, then the wallpaper and its dim when the look shows one on the car. */
+    private fun drawBackground(canvas: Canvas) {
+        canvas.drawColor(look.background)
+        if (look.wallpaper == Wallpaper.NONE) return
+        wallpaper(canvas.width, canvas.height)?.let { canvas.drawBitmap(it, 0f, 0f, null) }
+    }
+
+    /**
+     * The wallpaper at the surface's size, dim included, painted once and kept until the look or
+     * the size changes: the dashboard repaints on every scroll pixel and must not build gradients
+     * or decode a photo inside a frame. "Your photo" is also redrawn when the file changes.
+     */
+    private fun wallpaper(width: Int, height: Int): Bitmap? {
+        if (width <= 0 || height <= 0) return null
+        val photo = if (look.wallpaper == Wallpaper.CUSTOM) AppearanceStore.customWallpaperFile(context) else null
+        val key = "${look.wallpaper}|${look.wallpaperDim}|${look.palette}|$width|$height|${photo?.lastModified()}"
+        if (key == wallpaperKey) return wallpaperBitmap
+        wallpaperKey = key
+        wallpaperBitmap?.recycle()
+        wallpaperBitmap = runCatching { paintWallpaper(width, height, photo) }
+            .onFailure { android.util.Log.w(TAG, "wallpaper failed: ${it.message}") }
+            .getOrNull()
+        return wallpaperBitmap
+    }
+
+    private fun paintWallpaper(width: Int, height: Int, photo: java.io.File?): Bitmap {
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val w = width.toFloat()
+        val h = height.toFloat()
+        val light = look.palette.isLight
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+        canvas.drawColor(look.background)
+        when (look.wallpaper) {
+            Wallpaper.NONE -> Unit
+            Wallpaper.GLOW -> {
+                // An accent glow from the top-right corner: an ellipse 90% wide and 45% tall,
+                // fading out by 70% of its radius, as the design's radial gradient draws it.
+                val rx = w * 0.9f
+                val ry = h * 0.45f
+                paint.shader = RadialGradient(
+                    0f, 0f, rx,
+                    intArrayOf(HomeDashboardTheme.withAlpha(look.accent, 0x30 / 255f), look.accent and 0x00FFFFFF),
+                    floatArrayOf(0f, 0.7f), Shader.TileMode.CLAMP
+                ).also {
+                    val m = android.graphics.Matrix()
+                    m.setScale(1f, ry / rx)
+                    m.postTranslate(w * 0.9f, 0f)
+                    it.setLocalMatrix(m)
+                }
+                canvas.drawRect(0f, 0f, w, h, paint)
+            }
+            Wallpaper.LINES -> {
+                // Hairlines at 135 degrees, 16dp apart.
+                val d = context.resources.displayMetrics.density.coerceAtLeast(1f)
+                val step = 16f * d
+                paint.color = HomeDashboardTheme.withAlpha(look.palette.hairline, 0.5f)
+                paint.strokeWidth = d
+                var x = -h
+                while (x < w) {
+                    canvas.drawLine(x, 0f, x + h, h, paint)
+                    x += step
+                }
+            }
+            Wallpaper.NIGHT_ROAD -> {
+                paint.shader = LinearGradient(
+                    0f, 0f, 0f, h,
+                    if (light) HomeDashboardLook.NIGHT_ROAD_LIGHT else HomeDashboardLook.NIGHT_ROAD_DARK,
+                    if (light) HomeDashboardLook.NIGHT_ROAD_LIGHT_STOPS else HomeDashboardLook.NIGHT_ROAD_DARK_STOPS,
+                    Shader.TileMode.CLAMP
+                )
+                canvas.drawRect(0f, 0f, w, h, paint)
+            }
+            Wallpaper.SOLID -> canvas.drawColor(if (light) HomeDashboardLook.SOLID_LIGHT else HomeDashboardLook.SOLID_DARK)
+            Wallpaper.CUSTOM -> {
+                val image = photo?.takeIf { it.isFile }?.let { decodeCovering(it, width, height) }
+                if (image != null) {
+                    val scale = maxOf(w / image.width, h / image.height)
+                    val cw = w / scale
+                    val ch = h / scale
+                    source.set(
+                        ((image.width - cw) / 2f).roundToInt(), ((image.height - ch) / 2f).roundToInt(),
+                        ((image.width + cw) / 2f).roundToInt(), ((image.height + ch) / 2f).roundToInt()
+                    )
+                    canvas.drawBitmap(image, source, RectF(0f, 0f, w, h), paint)
+                    image.recycle()
+                } else {
+                    // The diagonal ramp "Your photo" shows in the design until a photo is picked.
+                    paint.shader = LinearGradient(
+                        0f, 0f, w * 0.34f, h,
+                        HomeDashboardLook.CUSTOM_FALLBACK, HomeDashboardLook.CUSTOM_FALLBACK_STOPS, Shader.TileMode.CLAMP
+                    )
+                    canvas.drawRect(0f, 0f, w, h, paint)
+                }
+            }
+        }
+        if (look.wallpaperDim > 0) {
+            val veil = if (light) 0xFFFFFFFF.toInt() else 0xFF000000.toInt()
+            canvas.drawColor(HomeDashboardTheme.withAlpha(veil, look.wallpaperDim / 100f))
+        }
+        return bitmap
+    }
+
+    /** The photo decoded at no more than twice the size it has to cover, so a camera image fits. */
+    private fun decodeCovering(file: java.io.File, width: Int, height: Int): Bitmap? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(file.path, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        var sample = 1
+        while (bounds.outWidth / (sample * 2) >= width && bounds.outHeight / (sample * 2) >= height) sample *= 2
+        return BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply { inSampleSize = sample })
+    }
+
+    /** Recently Sent rows: a step rounder than the look's buttons, as the design draws them. */
+    private fun rowRadius(layout: HomeDashboardLayout) = layout.dp(look.buttonRadius + 4f)
 
     // ------------------------------------------------------------------------------- header
 
@@ -174,10 +343,54 @@ internal class HomeDashboardRenderer(private val context: Context) {
         val metrics = wordmark.fontMetrics
         // Centre the cap-height block on the logo, not the full ascent/descent box.
         val baseline = box.centerY - (metrics.ascent + metrics.descent) / 2f
-        wordmark.color = HomeDashboardTheme.TEXT_PRIMARY
+        wordmark.color = look.textPrimary
         canvas.drawText(WORD_AUTO, layout.titleX, baseline, wordmark)
-        wordmark.color = HomeDashboardTheme.ACCENT_WORDMARK
+        wordmark.color = look.accent
         canvas.drawText(WORD_BRIDGE, layout.titleX + wordmark.measureText(WORD_AUTO), baseline, wordmark)
+    }
+
+    /**
+     * "CPU 12% · RAM 61% · 38°C", right-aligned on the header line. The temperature turns warm or
+     * hot with the system's thermal status; when the line would run into the wordmark, CPU then
+     * RAM are dropped so the temperature, the figure that matters on a hot dashboard, stays.
+     */
+    private fun drawStatus(canvas: Canvas, layout: HomeDashboardLayout, reading: SystemReading) {
+        statusPaint.textSize = layout.sp(HomeDashboardTheme.Dp.EMPTY_HINT)
+        val heat = when (reading.heat) {
+            SystemStats.Heat.OK -> look.textSecondary
+            SystemStats.Heat.WARM -> look.palette.warn
+            SystemStats.Heat.HOT -> look.palette.danger
+        }
+        val parts = ArrayList<Pair<String, Int>>(3)
+        reading.cpuPercent?.let { parts += "CPU $it%" to look.textSecondary }
+        parts += "RAM ${reading.ramPercent}%" to look.textSecondary
+        reading.tempC?.let { parts += String.format(Locale.US, "%.0f\u00B0C", it) to heat }
+
+        val separator = "  \u00B7  "
+        val separatorWidth = statusPaint.measureText(separator)
+        fun width(list: List<Pair<String, Int>>) =
+            list.sumOf { statusPaint.measureText(it.first).toDouble() }.toFloat() + separatorWidth * (list.size - 1).coerceAtLeast(0)
+
+        wordmark.textSize = layout.titleSize
+        val titleEnd = layout.titleX + wordmark.measureText(WORD_AUTO + WORD_BRIDGE)
+        val right = layout.viewport.right
+        val room = right - titleEnd - layout.dp(16f)
+        while (parts.size > 1 && width(parts) > room) parts.removeAt(0)
+        if (width(parts) > room) return
+
+        val metrics = statusPaint.fontMetrics
+        val baseline = layout.logo.centerY - (metrics.ascent + metrics.descent) / 2f
+        var x = right - width(parts)
+        parts.forEachIndexed { i, (text, color) ->
+            if (i > 0) {
+                statusPaint.color = look.textSecondary
+                canvas.drawText(separator, x, baseline, statusPaint)
+                x += separatorWidth
+            }
+            statusPaint.color = color
+            canvas.drawText(text, x, baseline, statusPaint)
+            x += statusPaint.measureText(text)
+        }
     }
 
     // ------------------------------------------------------------------------- Now Playing
@@ -191,25 +404,18 @@ internal class HomeDashboardRenderer(private val context: Context) {
         thumbnails: Thumbnails
     ) {
         val cardPressed = state.pressed?.region == HomeRegion.CONTINUE
-        rect.set(hero.card.left, hero.card.top, hero.card.right, hero.card.bottom)
-        fill.color = if (cardPressed) HomeDashboardTheme.CARD_PRESSED else HomeDashboardTheme.CARD
-        val radius = layout.dp(HERO_RADIUS)
-        canvas.drawRoundRect(rect, radius, radius, fill)
+        card.drawBody(
+            canvas, hero.card, heroRadius(layout), look,
+            if (cardPressed) HomeMenuCard.State.PRESSED else HomeMenuCard.State.NORMAL, layout.density
+        )
 
-        drawThumbnail(canvas, hero.art, layout.dp(HomeDashboardTheme.Dp.HERO_ART_RADIUS), item.artwork, thumbnails)
+        drawThumbnail(canvas, hero.art, layout.dp(look.artRadius), item.artwork, thumbnails)
 
         // Caption ("YouTube · Now playing") in the source's accent, then the title on up to two lines.
-        caption.textSize = layout.dp(HomeDashboardTheme.Dp.HERO_CAPTION)
-        caption.color = item.artwork.accent
-        heroTitle.textSize = layout.dp(layout.profile.heroTitle)
-        val status = context.getString(
-            when {
-                state.playing -> R.string.car_home_now_playing
-                state.paused -> R.string.car_home_paused
-                else -> R.string.car_home_continue_watching
-            }
-        )
-        val captionText = listOf(item.sourceLabel, status).filter { it.isNotBlank() }.joinToString(" · ")
+        caption.textSize = layout.sp(HomeDashboardTheme.Dp.HERO_CAPTION)
+        caption.color = look.hue(item.artwork.accent)
+        heroTitle.textSize = layout.sp(layout.profile.heroTitle)
+        val captionText = captionText(item, state)
         val captionLine = lineHeight(caption)
         val wrapped = heroTitleLayout(item.title, hero.text.width.toInt())
         val block = captionLine + wrapped.height
@@ -224,15 +430,15 @@ internal class HomeDashboardRenderer(private val context: Context) {
         // Progress bar and the two times under it. No bar when nobody reported a duration.
         val bar = hero.progress
         val barRadius = bar.height / 2f
-        fill.color = HomeDashboardTheme.PROGRESS_TRACK
+        fill.color = look.progressTrack
         rect.set(bar.left, bar.top, bar.right, bar.bottom)
         canvas.drawRoundRect(rect, barRadius, barRadius, fill)
         item.progress?.let { progress ->
-            fill.color = HomeDashboardTheme.ACCENT
+            fill.color = look.accent
             rect.set(bar.left, bar.top, bar.left + bar.width * progress, bar.bottom)
             canvas.drawRoundRect(rect, barRadius, barRadius, fill)
         }
-        meta.textSize = layout.dp(HomeDashboardTheme.Dp.HERO_TIME)
+        meta.textSize = layout.sp(HomeDashboardTheme.Dp.HERO_TIME)
         val timesBaseline = baselineIn(meta, hero.times)
         canvas.drawText(HomeDashboardClock.clock(item.positionMs), hero.times.left, timesBaseline, meta)
         HomeDashboardClock.duration(item.durationMs)?.let {
@@ -248,6 +454,69 @@ internal class HomeDashboardRenderer(private val context: Context) {
             pressed = pressed == HomeRegion.CONTROL_NEXT)
     }
 
+    /** "YouTube · Now playing": the source, then whether it plays, is paused or can be resumed. */
+    private fun captionText(item: ContinueItem, state: State): String {
+        val status = context.getString(
+            when {
+                state.playing -> R.string.car_home_now_playing
+                state.paused -> R.string.car_home_paused
+                else -> R.string.car_home_continue_watching
+            }
+        )
+        return listOf(item.sourceLabel, status).filter { it.isNotBlank() }.joinToString(" · ")
+    }
+
+    /** The Now Playing card and its empty state are a step rounder than the grid's cards. */
+    private fun heroRadius(layout: HomeDashboardLayout) = layout.dp(look.cardRadius + HERO_EXTRA_RADIUS)
+
+    // ------------------------------------------------------------- Compact now-playing strip
+
+    private fun drawStrip(
+        canvas: Canvas,
+        strip: StripBoxes,
+        layout: HomeDashboardLayout,
+        item: ContinueItem,
+        state: State,
+        thumbnails: Thumbnails
+    ) {
+        val pressed = state.pressed?.region
+        rect.set(strip.card.left, strip.card.top, strip.card.right, strip.card.bottom)
+        fill.color = if (pressed == HomeRegion.CONTINUE) look.controlPressed else look.control
+        val radius = layout.dp(look.buttonRadius)
+        canvas.drawRoundRect(rect, radius, radius, fill)
+
+        drawThumbnail(canvas, strip.art, layout.dp(look.chipRadius(HomeDashboardTheme.Dp.COMPACT_STRIP_ART)), item.artwork, thumbnails)
+
+        title.textSize = layout.sp(HomeDashboardTheme.Dp.COMPACT_TITLE)
+        meta.textSize = layout.sp(HomeDashboardTheme.Dp.COMPACT_META)
+        val titleLine = lineHeight(title)
+        val metaLine = lineHeight(meta)
+        var y = strip.text.centerY - (titleLine + metaLine) / 2f
+        drawEllipsized(canvas, item.title, title, strip.text.left, strip.text.right, y, titleLine)
+        y += titleLine
+        drawEllipsized(canvas, captionText(item, state), meta, strip.text.left, strip.text.right, y, metaLine)
+
+        drawControl(canvas, strip.play, layout, if (state.playing) Glyph.PAUSE else Glyph.PLAY, primary = true,
+            enabled = true, pressed = pressed == HomeRegion.CONTROL_PLAY)
+    }
+
+    /** The strip's place with nothing to play: an outline that says so, not a button. */
+    private fun drawEmptyStrip(canvas: Canvas, box: MenuBox, layout: HomeDashboardLayout) {
+        dashedRoundRect(canvas, box, layout.dp(look.buttonRadius), look.emptyOutline, layout)
+        val iconSize = layout.dp(24f)
+        val start = box.left + layout.dp(24f)
+        stroke.color = look.textDisabled
+        stroke.strokeWidth = 2f * iconSize / 24f
+        icon(canvas, Icon.PHONE, start, box.centerY - iconSize / 2f, iconSize)
+        meta.textSize = layout.sp(HomeDashboardTheme.Dp.COMPACT_META)
+        meta.color = look.textDisabled
+        drawEllipsized(
+            canvas, context.getString(R.string.car_home_nothing_playing), meta,
+            start + iconSize + layout.dp(16f), box.right - layout.dp(20f), box.top, box.height
+        )
+        meta.color = look.textSecondary
+    }
+
     private enum class Glyph { PREVIOUS, PLAY, PAUSE, NEXT }
 
     private fun drawControl(
@@ -261,17 +530,17 @@ internal class HomeDashboardRenderer(private val context: Context) {
     ) {
         val radius = box.width / 2f
         fill.color = when {
-            primary && pressed -> HomeDashboardTheme.mix(HomeDashboardTheme.ACCENT, HomeDashboardTheme.TEXT_PRIMARY, 0.35f)
-            primary -> HomeDashboardTheme.ACCENT
-            pressed -> HomeDashboardTheme.CONTROL_PRESSED
-            else -> HomeDashboardTheme.CONTROL
+            primary && pressed -> HomeDashboardTheme.mix(look.accent, look.textPrimary, 0.35f)
+            primary -> look.accent
+            pressed -> look.controlPressed
+            else -> look.control
         }
         canvas.drawCircle(box.centerX, box.centerY, radius, fill)
 
         val color = when {
-            primary -> HomeDashboardTheme.ON_ACCENT
-            enabled -> HomeDashboardTheme.TEXT_CONTROL
-            else -> HomeDashboardTheme.CONTROL_DISABLED_GLYPH
+            primary -> look.onAccent
+            enabled -> look.textPrimary
+            else -> look.controlDisabledGlyph
         }
         fill.color = color
         // Glyphs on a 24-unit grid, the same shapes the design uses.
@@ -337,12 +606,12 @@ internal class HomeDashboardRenderer(private val context: Context) {
         // Section title, with a chevron when it opens the full list.
         val title = layout.sectionTitle
         val headerPressed = pressed?.region == HomeRegion.RECENT_HEADER
-        sectionTitle.textSize = layout.dp(HomeDashboardTheme.Dp.SECTION_TITLE)
-        sectionTitle.color = if (headerPressed) HomeDashboardTheme.ACCENT else HomeDashboardTheme.TEXT_SECTION
-        canvas.drawText(context.getString(R.string.car_home_recent_from_phone), title.left, baselineIn(sectionTitle, title), sectionTitle)
+        sectionTitle.textSize = layout.sp(HomeDashboardTheme.Dp.SECTION_TITLE)
+        sectionTitle.color = if (headerPressed) look.accent else look.textSection
+        if (title != null) canvas.drawText(context.getString(R.string.car_home_recent_from_phone), title.left, baselineIn(sectionTitle, title), sectionTitle)
         layout.recentHeader?.let { box ->
             val size = layout.dp(HomeDashboardTheme.Dp.SECTION_CHEVRON)
-            stroke.color = if (headerPressed) HomeDashboardTheme.ACCENT else HomeDashboardTheme.TEXT_SECONDARY
+            stroke.color = if (headerPressed) look.accent else look.textSecondary
             stroke.strokeWidth = 2f * size / 24f
             icon(canvas, Icon.CHEVRON, box.right - size, box.centerY - size / 2f, size)
         }
@@ -358,13 +627,13 @@ internal class HomeDashboardRenderer(private val context: Context) {
             drawRow(canvas, box, layout, item, rowPressed, thumbnails)
         }
         layout.emptyRecent?.let { box ->
-            dashedRoundRect(canvas, box, layout.dp(HomeDashboardTheme.Dp.ROW_RADIUS), HomeDashboardTheme.EMPTY_OUTLINE, layout)
+            dashedRoundRect(canvas, box, rowRadius(layout), look.emptyOutline, layout)
             val iconSize = layout.dp(24f)
             val start = box.left + layout.dp(20f)
-            stroke.color = HomeDashboardTheme.TEXT_DISABLED
+            stroke.color = look.textDisabled
             stroke.strokeWidth = 2f * iconSize / 24f
             icon(canvas, Icon.SEND, start, box.centerY - iconSize / 2f, iconSize)
-            meta.textSize = layout.dp(HomeDashboardTheme.Dp.ROW_TITLE)
+            meta.textSize = layout.sp(HomeDashboardTheme.Dp.ROW_TITLE)
             val textLeft = start + iconSize + layout.dp(14f)
             drawEllipsized(
                 canvas, context.getString(R.string.car_home_nothing_sent), meta,
@@ -380,23 +649,23 @@ internal class HomeDashboardRenderer(private val context: Context) {
 
     private fun drawQueuePill(canvas: Canvas, box: MenuBox, layout: HomeDashboardLayout, label: String, pressed: Boolean) {
         rect.set(box.left, box.top, box.right, box.bottom)
-        fill.color = if (pressed) HomeDashboardTheme.QUEUE_PILL_PRESSED else HomeDashboardTheme.QUEUE_PILL
+        fill.color = if (pressed) look.queuePillPressed else look.queuePill
         canvas.drawRoundRect(rect, box.height / 2f, box.height / 2f, fill)
 
         var x = box.left + layout.dp(HomeDashboardTheme.Dp.QUEUE_PILL_PADDING_START)
         val iconSize = layout.dp(HomeDashboardTheme.Dp.QUEUE_PILL_ICON)
-        stroke.color = HomeDashboardTheme.QUEUE_PILL_TEXT
-        fill.color = HomeDashboardTheme.QUEUE_PILL_TEXT
+        stroke.color = look.queuePillText
+        fill.color = look.queuePillText
         stroke.strokeWidth = 2f * iconSize / 24f
         icon(canvas, Icon.QUEUE, x, box.centerY - iconSize / 2f, iconSize)
         x += iconSize + layout.dp(HomeDashboardTheme.Dp.QUEUE_PILL_GAP)
 
-        pillText.textSize = layout.dp(HomeDashboardTheme.Dp.SECTION_LINK)
-        pillText.color = HomeDashboardTheme.QUEUE_PILL_TEXT
+        pillText.textSize = layout.sp(HomeDashboardTheme.Dp.SECTION_LINK)
+        pillText.color = look.queuePillText
         canvas.drawText(label, x, baselineIn(pillText, box), pillText)
 
         val chevron = layout.dp(HomeDashboardTheme.Dp.QUEUE_PILL_CHEVRON)
-        stroke.color = HomeDashboardTheme.QUEUE_PILL_CHEVRON
+        stroke.color = look.queuePillText
         stroke.strokeWidth = 2f * chevron / 24f
         icon(canvas, Icon.CHEVRON, box.right - layout.dp(HomeDashboardTheme.Dp.QUEUE_PILL_PADDING_END) - chevron,
             box.centerY - chevron / 2f, chevron)
@@ -404,28 +673,28 @@ internal class HomeDashboardRenderer(private val context: Context) {
 
     /** The queue button's place when the queue is empty: an outline that says so, not a button. */
     private fun drawQueueEmpty(canvas: Canvas, box: MenuBox, layout: HomeDashboardLayout) {
-        dashedRoundRect(canvas, box, box.height / 2f, HomeDashboardTheme.EMPTY_PILL_OUTLINE, layout, width = 1f)
+        dashedRoundRect(canvas, box, box.height / 2f, look.emptyPillOutline, layout, width = 1f)
         var x = box.left + layout.dp(HomeDashboardTheme.Dp.QUEUE_PILL_PADDING_START)
         val iconSize = layout.dp(HomeDashboardTheme.Dp.QUEUE_PILL_ICON)
-        stroke.color = HomeDashboardTheme.TEXT_DISABLED
-        fill.color = HomeDashboardTheme.TEXT_DISABLED
+        stroke.color = look.textDisabled
+        fill.color = look.textDisabled
         stroke.strokeWidth = 2f * iconSize / 24f
         icon(canvas, Icon.QUEUE, x, box.centerY - iconSize / 2f, iconSize)
         x += iconSize + layout.dp(HomeDashboardTheme.Dp.QUEUE_PILL_GAP)
-        pillText.textSize = layout.dp(HomeDashboardTheme.Dp.SECTION_LINK)
-        pillText.color = HomeDashboardTheme.TEXT_DISABLED
+        pillText.textSize = layout.sp(HomeDashboardTheme.Dp.SECTION_LINK)
+        pillText.color = look.textDisabled
         canvas.drawText(queueLink(0), x, baselineIn(pillText, box), pillText)
     }
 
     /** "Nothing playing yet" in the Now Playing slot, so the grid beside it never moves. */
     private fun drawEmptyHero(canvas: Canvas, box: MenuBox, layout: HomeDashboardLayout) {
-        dashedRoundRect(canvas, box, layout.dp(HERO_RADIUS), HomeDashboardTheme.EMPTY_OUTLINE, layout)
+        dashedRoundRect(canvas, box, heroRadius(layout), look.emptyOutline, layout)
 
         val pad = layout.dp(HomeDashboardTheme.Dp.EMPTY_PADDING)
         val gap = layout.dp(HomeDashboardTheme.Dp.EMPTY_GAP)
         val tile = layout.dp(HomeDashboardTheme.Dp.EMPTY_ICON)
-        emptyTitle.textSize = layout.dp(HomeDashboardTheme.Dp.EMPTY_TITLE)
-        meta.textSize = layout.dp(HomeDashboardTheme.Dp.EMPTY_HINT)
+        emptyTitle.textSize = layout.sp(HomeDashboardTheme.Dp.EMPTY_TITLE)
+        meta.textSize = layout.sp(HomeDashboardTheme.Dp.EMPTY_HINT)
         val titleLine = lineHeight(emptyTitle)
         val hintLines = context.getString(R.string.car_home_nothing_playing_hint).split('\n')
         val hintLine = meta.textSize * 1.5f
@@ -435,11 +704,11 @@ internal class HomeDashboardRenderer(private val context: Context) {
         var y = box.centerY - block / 2f
 
         rect.set(left, y, left + tile, y + tile)
-        fill.color = HomeDashboardTheme.CARD
-        val tileRadius = layout.dp(HomeDashboardTheme.Dp.EMPTY_ICON_RADIUS)
+        fill.color = look.accentSoft
+        val tileRadius = layout.dp(look.chipRadius(HomeDashboardTheme.Dp.EMPTY_ICON))
         canvas.drawRoundRect(rect, tileRadius, tileRadius, fill)
         val glyph = tile * 34f / 72f
-        stroke.color = HomeDashboardTheme.ACCENT_WORDMARK
+        stroke.color = look.accent
         stroke.strokeWidth = 2f * glyph / 24f
         icon(canvas, Icon.PHONE, left + (tile - glyph) / 2f, y + (tile - glyph) / 2f, glyph)
         y += tile + gap
@@ -517,22 +786,22 @@ internal class HomeDashboardRenderer(private val context: Context) {
         pressed: Boolean,
         thumbnails: Thumbnails
     ) {
-        rect.set(box.left, box.top, box.right, box.bottom)
-        fill.color = if (pressed) HomeDashboardTheme.CARD_PRESSED else HomeDashboardTheme.CARD
-        val radius = layout.dp(HomeDashboardTheme.Dp.ROW_RADIUS)
-        canvas.drawRoundRect(rect, radius, radius, fill)
+        card.drawBody(
+            canvas, box, rowRadius(layout), look,
+            if (pressed) HomeMenuCard.State.PRESSED else HomeMenuCard.State.NORMAL, layout.density
+        )
 
         val icon = layout.dp(HomeDashboardTheme.Dp.ROW_ICON)
         val start = box.left + layout.dp(HomeDashboardTheme.Dp.ROW_PADDING_START)
         val tile = MenuBox(start, box.centerY - icon / 2f, start + icon, box.centerY + icon / 2f)
-        val iconRadius = layout.dp(HomeDashboardTheme.Dp.ROW_ICON_RADIUS)
+        val iconRadius = layout.dp(look.chipRadius(HomeDashboardTheme.Dp.ROW_ICON))
         // A real still when the source has one; the source's tinted glyph tile otherwise.
         val bitmap = thumbnails.bitmap(item.artwork.thumbnailUrl)
         if (bitmap != null) drawThumbnail(canvas, tile, iconRadius, item.artwork, thumbnails)
-        else card.drawIconTile(canvas, tile, item.artwork.glyph, item.artwork.accent, iconRadius, layout.density)
+        else card.drawIconTile(canvas, tile, item.artwork.glyph, look.chip(item.artwork.accent), iconRadius, layout.density)
 
-        title.textSize = layout.dp(HomeDashboardTheme.Dp.ROW_TITLE)
-        meta.textSize = layout.dp(HomeDashboardTheme.Dp.ROW_META)
+        title.textSize = layout.sp(HomeDashboardTheme.Dp.ROW_TITLE)
+        meta.textSize = layout.sp(HomeDashboardTheme.Dp.ROW_META)
         val textLeft = tile.right + layout.dp(HomeDashboardTheme.Dp.ROW_TEXT_GAP)
         val textRight = box.right - layout.dp(HomeDashboardTheme.Dp.ROW_PADDING_END)
         if (textRight - textLeft < layout.dp(8f)) return
@@ -568,7 +837,8 @@ internal class HomeDashboardRenderer(private val context: Context) {
                 canvas,
                 MenuBox(box.centerX - glyph / 2f, box.centerY - glyph / 2f, box.centerX + glyph / 2f, box.centerY + glyph / 2f),
                 artwork.glyph,
-                artwork.accent
+                look.hue(artwork.accent),
+                WHITE
             )
             return
         }
@@ -593,7 +863,7 @@ internal class HomeDashboardRenderer(private val context: Context) {
     private fun drawScrollButton(canvas: Canvas, box: MenuBox, layout: HomeDashboardLayout, up: Boolean, enabled: Boolean) {
         val d = layout.density
         val radius = box.width / 2f
-        fill.color = HomeDashboardTheme.CONTROL
+        fill.color = look.control
         canvas.drawCircle(box.centerX, box.centerY, radius, fill)
 
         val half = radius * 0.30f
@@ -602,8 +872,8 @@ internal class HomeDashboardRenderer(private val context: Context) {
         chevron.moveTo(box.centerX - half, box.centerY + rise)
         chevron.lineTo(box.centerX, box.centerY - rise)
         chevron.lineTo(box.centerX + half, box.centerY + rise)
-        stroke.color = if (enabled) HomeDashboardTheme.TEXT_PRIMARY
-        else HomeDashboardTheme.withAlpha(HomeDashboardTheme.TEXT_SECONDARY, 0.35f)
+        stroke.color = if (enabled) look.textPrimary
+        else HomeDashboardTheme.withAlpha(look.textSecondary, 0.35f)
         stroke.strokeWidth = 3f * d
         canvas.drawPath(chevron, stroke)
     }
@@ -641,12 +911,17 @@ internal class HomeDashboardRenderer(private val context: Context) {
      * bounded by the number of accents times the two or three thumbnail sizes a layout uses.
      */
     private fun artworkShader(accent: Int, box: MenuBox): LinearGradient {
-        val key = (accent.toLong() shl 20) or box.height.roundToInt().toLong()
+        if (shaderSurface != look.surface) {
+            shaders.clear()
+            shaderSurface = look.surface
+        }
+        val hue = look.hue(accent)
+        val key = ((hue.toLong() and 0xFFFFFFFFL) shl 20) or box.height.roundToInt().toLong()
         return shaders.getOrPut(key) {
             LinearGradient(
                 0f, 0f, 0f, box.height,
-                HomeDashboardTheme.mix(HomeDashboardTheme.CARD, accent, HomeDashboardTheme.ARTWORK_TINT_TOP),
-                HomeDashboardTheme.mix(HomeDashboardTheme.CARD, accent, HomeDashboardTheme.ARTWORK_TINT_BOTTOM),
+                HomeDashboardTheme.mix(look.surface, hue, HomeDashboardTheme.ARTWORK_TINT_TOP),
+                HomeDashboardTheme.mix(look.surface, hue, HomeDashboardTheme.ARTWORK_TINT_BOTTOM),
                 Shader.TileMode.CLAMP
             )
         }.also {
@@ -662,7 +937,9 @@ internal class HomeDashboardRenderer(private val context: Context) {
         const val WORD_AUTO = "Auto"
         const val WORD_BRIDGE = "Bridge"
 
-        /** The Now Playing card and its empty state are a step rounder than the grid's cards. */
-        const val HERO_RADIUS = 24f
+        /** How much rounder the Now Playing card is than the look's card radius. */
+        const val HERO_EXTRA_RADIUS = 2f
+        const val WHITE = 0xFFFFFFFF.toInt()
+        const val TAG = "HomeDashboard"
     }
 }

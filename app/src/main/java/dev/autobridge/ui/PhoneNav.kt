@@ -26,6 +26,7 @@ object PhoneNav {
         PROFILE,
 
         // Children of SETTINGS
+        APPEARANCE,
         MIRROR_SETTINGS,
         INPUT_TOUCH,
         CAR_CONNECTION,
@@ -52,6 +53,7 @@ object PhoneNav {
         Route.APPS -> Route.SETTINGS
         Route.PROFILE -> Route.APPS
         Route.SETTINGS -> Route.HOME
+        Route.APPEARANCE,
         Route.MIRROR_SETTINGS,
         Route.INPUT_TOUCH,
         Route.CAR_CONNECTION,

@@ -5,7 +5,41 @@
         <item name="android:statusBarColor">#0B0E14</item>
         <item name="android:navigationBarColor">#0B0E14</item>
         <item name="android:colorAccent">#4C7DF0</item>
+        <!-- Menus, popups and dialogs in the AutoBridge surface, not Material's grey. -->
+        <item name="android:colorBackgroundFloating">#1A202B</item>
+        <item name="android:alertDialogTheme">@style/ToolDialogDark</item>
     </style>
+
+    <!--
+        The app theme on a light page (Appearance: Light, or System/Auto at day). Picked at runtime
+        by AppTheming; its light parent is what gives menus, pickers, spinners and dialogs light
+        faces. Colours are the default light palette (ThemeResolver); the accent is applied on top.
+    -->
+    <style name="AppThemeLight" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:statusBarColor">#F2F4F8</item>
+        <item name="android:navigationBarColor">#F2F4F8</item>
+        <item name="android:windowBackground">#F2F4F8</item>
+        <item name="android:colorAccent">#1F67C7</item>
+        <item name="android:colorBackgroundFloating">#FFFFFF</item>
+        <item name="android:alertDialogTheme">@style/ToolDialogLight</item>
+    </style>
+
+    <!-- The user's accent on an activity's theme (AppTheming): switches, text fields, pickers, progress. -->
+    <style name="AccentOverlay.Sky.Dark" parent=""><item name="android:colorAccent">#67A9FF</item></style>
+    <style name="AccentOverlay.Sky.Light" parent=""><item name="android:colorAccent">#1F67C7</item></style>
+    <style name="AccentOverlay.Teal.Dark" parent=""><item name="android:colorAccent">#5FD0C4</item></style>
+    <style name="AccentOverlay.Teal.Light" parent=""><item name="android:colorAccent">#0B7A70</item></style>
+    <style name="AccentOverlay.Amber.Dark" parent=""><item name="android:colorAccent">#FFB35C</item></style>
+    <style name="AccentOverlay.Amber.Light" parent=""><item name="android:colorAccent">#955800</item></style>
+    <style name="AccentOverlay.Violet.Dark" parent=""><item name="android:colorAccent">#A99BF2</item></style>
+    <style name="AccentOverlay.Violet.Light" parent=""><item name="android:colorAccent">#5A46C8</item></style>
+    <style name="AccentOverlay.Rose.Dark" parent=""><item name="android:colorAccent">#FF8FA3</item></style>
+    <style name="AccentOverlay.Rose.Light" parent=""><item name="android:colorAccent">#B02E4A</item></style>
+    <style name="AccentOverlay.Lime.Dark" parent=""><item name="android:colorAccent">#9BE08A</item></style>
+    <style name="AccentOverlay.Lime.Light" parent=""><item name="android:colorAccent">#3B7629</item></style>
 
     <!--
         The browser window's two faces, picked at runtime from the Appearance setting

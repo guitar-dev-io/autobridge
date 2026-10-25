@@ -2,6 +2,10 @@ package dev.autobridge.ui
 
 import androidx.annotation.StringRes
 import dev.autobridge.R
+import dev.autobridge.design.HomeLayout
+import dev.autobridge.design.IconStyle
+import dev.autobridge.design.ThemePalette
+import dev.autobridge.design.ThemeResolver
 import dev.autobridge.library.HomeSection
 import dev.autobridge.remote.CommandHistoryStore
 import dev.autobridge.remote.CommandType
@@ -83,5 +87,81 @@ object PhoneHomeLayout {
             if (host != null) return host.removePrefix("www.").removePrefix("m.")
         }
         return if (payload.length > 24) payload.take(23) + "…" else payload
+    }
+
+    /**
+     * Every place Home's three layouts (Settings > Appearance > Home layout) can show, in the
+     * design's order. The six [Tile]s plus the three the redesign puts on Home: Mirror, My Car and
+     * Displays (the Duo / Multi-app screen, only when that build has it). [hueDark] / [hueLight] are
+     * the section colour an icon chip carries in the Tinted icon style.
+     */
+    enum class Item(val hueDark: Int, val hueLight: Int) {
+        BROWSER(0xFF70ACFF.toInt(), 0xFF1F63C2.toInt()),
+        MUSIC(0xFFAF80F8.toInt(), 0xFF6A3FC0.toInt()),
+        RADIO(0xFFFFC46B.toInt(), 0xFF8F5800.toInt()),
+        TV(0xFFFF7A7A.toInt(), 0xFFB3282E.toInt()),
+        YOUTUBE(0xFFF0848F.toInt(), 0xFFA8304A.toInt()),
+        MIRROR(0xFF7CE1CB.toInt(), 0xFF0D7563.toInt()),
+        MY_CAR(0xFF86E3AF.toInt(), 0xFF1E7A45.toInt()),
+        DISPLAYS(0xFF9DC3F7.toInt(), 0xFF2F62A8.toInt()),
+        MORE(0xFFD8E3F7.toInt(), 0xFF4A5566.toInt());
+
+        fun hue(light: Boolean): Int = if (light) hueLight else hueDark
+    }
+
+    fun itemFor(tile: Tile): Item = when (tile) {
+        Tile.BROWSER -> Item.BROWSER
+        Tile.YOUTUBE -> Item.YOUTUBE
+        Tile.MUSIC -> Item.MUSIC
+        Tile.RADIO -> Item.RADIO
+        Tile.TV -> Item.TV
+        Tile.MORE -> Item.MORE
+    }
+
+    /** Classic grid and Compact: every item, Displays only when the build has the Duo screen. */
+    fun allItems(displaysAvailable: Boolean): List<Item> =
+        Item.entries.filter { it != Item.DISPLAYS || displaysAvailable }
+
+    /**
+     * Dashboard's 2x2 cards. Without the Duo screen, Mirror takes the Displays card so the grid
+     * stays square; it then leaves [dashboardQuickLaunch].
+     */
+    fun dashboardCards(displaysAvailable: Boolean): List<Item> =
+        listOf(Item.RADIO, Item.TV, Item.MY_CAR, if (displaysAvailable) Item.DISPLAYS else Item.MIRROR)
+
+    /** Dashboard's quick-launch row under the cards: what the cards do not already open. */
+    fun dashboardQuickLaunch(displaysAvailable: Boolean): List<Item> {
+        val row = listOf(Item.BROWSER, Item.YOUTUBE, Item.MIRROR, Item.MUSIC, Item.MORE)
+        return row.filterNot { it in dashboardCards(displaysAvailable) }
+    }
+
+    /** The Android font scale from which the grid drops to two columns and labels truncate. */
+    const val LARGE_TEXT_SCALE = 1.3f
+
+    /** Large text: [scale] is the effective font scale ([android.content.res.Configuration.fontScale]). */
+    fun isLargeText(scale: Float): Boolean = scale >= LARGE_TEXT_SCALE - 0.005f
+
+    fun gridColumns(scale: Float): Int = if (isLargeText(scale)) 2 else 3
+
+    /** Classic tile height in dp: a little shorter when two columns make each tile wider. */
+    fun tileHeightDp(scale: Float): Int = if (isLargeText(scale)) 96 else 108
+
+    /** Whether [layout] shows the bottom mini player; Dashboard's hero card is the player there. */
+    fun showsMiniPlayer(layout: HomeLayout): Boolean = layout != HomeLayout.DASHBOARD
+
+    /** An icon chip's fill and glyph colour, as ARGB. */
+    data class ChipColors(val fill: Int, val glyph: Int)
+
+    /**
+     * Settings > Appearance > Icon style: Tinted keeps each section's hue (a soft fill of it under
+     * the hue itself), Accent fills every chip with the accent, Mono uses the raised surface.
+     */
+    fun chipColors(item: Item, style: IconStyle, palette: ThemePalette): ChipColors = when (style) {
+        IconStyle.TINTED -> {
+            val hue = item.hue(palette.isLight)
+            ChipColors(ThemeResolver.withAlpha(hue, if (palette.isLight) 0x1F else 0x29), hue)
+        }
+        IconStyle.ACCENT -> ChipColors(palette.accent, palette.onAccent)
+        IconStyle.MONO -> ChipColors(palette.raised, palette.text)
     }
 }

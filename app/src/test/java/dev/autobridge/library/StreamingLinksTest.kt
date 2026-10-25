@@ -8,7 +8,18 @@ import org.junit.Test
 class StreamingLinksTest {
     @Test fun theChineseSitesAreThere() {
         val titles = StreamingLinks.all.filter { it.group == StreamingGroup.CHINESE }.map { it.title }
-        assertTrue(titles.containsAll(listOf("Tencent Video", "iQIYI", "Youku", "Mango TV", "CCTV", "Douyin", "Xiaohongshu")))
+        assertTrue(titles.containsAll(listOf("Tencent Video", "Youku", "Mango TV", "CCTV", "Douyin", "Xiaohongshu")))
+    }
+
+    @Test fun theVideoGroupIsTheMainGridInItsOwnOrder() {
+        val titles = StreamingLinks.all.filter { it.group == StreamingGroup.VIDEO }.map { it.title }
+        assertEquals(listOf("Netflix", "YouTube", "Disney+", "Prime Video", "HBO Max", "Viu", "WeTV", "iQIYI"), titles)
+        assertEquals(StreamingGroup.VIDEO, StreamingLinks.grouped().first().first)
+    }
+
+    @Test fun theShortAndSocialSitesAreTheirOwnGroup() {
+        val titles = StreamingLinks.all.filter { it.group == StreamingGroup.SOCIAL }.map { it.title }
+        assertEquals(listOf("TikTok", "Facebook Watch", "Dailymotion", "Vimeo"), titles)
     }
 
     @Test fun theGlobalSitesAreThere() {
@@ -32,13 +43,25 @@ class StreamingLinksTest {
         assertTrue(StreamingLinks.grouped().all { it.second.isNotEmpty() })
     }
 
-    @Test fun onlyTheChineseGroupIsWarnedAbout() {
-        assertTrue(StreamingLinks.all.filter { StreamingLinks.mayNotPlay(it) }.all { it.group == StreamingGroup.CHINESE })
-        assertFalse(StreamingLinks.mayNotPlay(StreamingLinks.all.first { it.title == "YouTube" }))
+    @Test fun theProtectedAndRegionalSitesAreWarnedAbout() {
+        val warned = StreamingLinks.all.filter { StreamingLinks.mayNotPlay(it) }.map { it.title }.toSet()
+        assertTrue(warned.containsAll(listOf("Netflix", "Disney+", "Prime Video", "HBO Max", "Viu", "WeTV", "iQIYI")))
+        assertTrue(StreamingLinks.all.filter { it.group == StreamingGroup.CHINESE }.all { it.title in warned })
+        // What plays without DRM carries no warning.
+        listOf("YouTube", "TikTok", "Vimeo", "SoundCloud", "Twitch").forEach { name ->
+            assertFalse("$name should not be warned about", StreamingLinks.mayNotPlay(StreamingLinks.all.first { it.title == name }))
+        }
     }
 }
 
 class StreamingIconsTest {
+    @Test fun theMainGridServicesHaveTheirOwnColours() {
+        listOf("Netflix", "Disney+", "Prime Video", "HBO Max", "Viu").forEach { name ->
+            val link = StreamingLinks.all.first { it.title == name }
+            assertTrue("$name has no icon of its own", StreamingIcons.hasOwnStyle(link))
+        }
+    }
+
     @Test fun everyCatalogSiteHasItsOwnMark() {
         // A catalog site never falls back to the generic initial-on-a-palette-colour.
         StreamingLinks.all.forEach { link -> assertTrue("${link.title} has no icon of its own", StreamingIcons.hasOwnStyle(link)) }

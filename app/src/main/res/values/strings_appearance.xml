@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Settings > Appearance (UI redesign v2). Owned by the appearance screens; see .agents/tasks/ui-redesign-v2/plan.md. -->
+<resources>
+    <string name="appearance_title">Appearance</string>
+    <string name="appearance_subtitle">Theme, colors, text size and home layout</string>
+
+    <!-- Live preview -->
+    <string name="appearance_live_preview">Live preview</string>
+    <!-- Mixed on purpose: the preview shows Latin and Thai text in the chosen look. -->
+    <string name="appearance_preview_line">Drive home tonight · ขับกลับบ้าน</string>
+    <string name="appearance_preview_track">Night Drive</string>
+    <string name="appearance_preview_primary">Primary</string>
+    <string name="appearance_preview_secondary">Secondary</string>
+
+    <!-- Main page -->
+    <string name="appearance_group_theme">Theme</string>
+    <string name="appearance_accent">Accent color</string>
+    <string name="appearance_home_layout">Home layout</string>
+    <string name="appearance_group_personalize">Personalize</string>
+    <string name="appearance_row_theme">Theme presets &amp; colors</string>
+    <string name="appearance_row_text">Text</string>
+    <string name="appearance_row_wallpaper">Wallpaper</string>
+    <string name="appearance_row_icons">Icons &amp; cards</string>
+    <string name="appearance_text_follow_summary">Android %1$d%%</string>
+    <string name="appearance_wallpaper_summary">%1$s · dim %2$d%%</string>
+    <string name="appearance_icons_summary">%1$s icons · %2$s cards · %3$s</string>
+    <string name="appearance_car_same_look">Use this look on Android Auto</string>
+    <string name="appearance_car_same_look_caption">Off keeps the car on the default theme</string>
+    <string name="appearance_reset">Reset appearance to defaults</string>
+    <string name="appearance_reset_title">Reset appearance?</string>
+    <string name="appearance_reset_body">Theme, accent, font, wallpaper, icons and cards go back to the AutoBridge defaults.</string>
+    <string name="appearance_reset_confirm">Reset</string>
+
+    <!-- Modes -->
+    <string name="appearance_mode">Mode</string>
+    <string name="appearance_mode_short_system">System</string>
+    <string name="appearance_mode_short_light">Light</string>
+    <string name="appearance_mode_short_dark">Dark</string>
+    <string name="appearance_mode_short_amoled">AMOLED</string>
+    <string name="appearance_mode_short_auto">Auto</string>
+    <string name="appearance_mode_system">System default</string>
+    <string name="appearance_mode_light">Light</string>
+    <string name="appearance_mode_dark">Dark</string>
+    <string name="appearance_mode_amoled">AMOLED black</string>
+    <string name="appearance_mode_auto">Auto schedule</string>
+    <string name="appearance_mode_system_desc_dark">Follows Android · currently dark</string>
+    <string name="appearance_mode_system_desc_light">Follows Android · currently light</string>
+    <string name="appearance_mode_light_desc">Bright surfaces for daytime</string>
+    <string name="appearance_mode_dark_desc">The AutoBridge default</string>
+    <string name="appearance_mode_amoled_desc">True black, saves power on OLED</string>
+    <string name="appearance_mode_auto_desc">Switches by time of day</string>
+
+    <!-- Auto schedule -->
+    <string name="appearance_schedule">Schedule</string>
+    <string name="appearance_schedule_dark_from">Dark from</string>
+    <string name="appearance_schedule_light_from">Light from</string>
+    <string name="appearance_schedule_to">to</string>
+    <string name="appearance_schedule_now_dark">now dark</string>
+    <string name="appearance_schedule_now_light">now light</string>
+
+    <!-- Presets and accents -->
+    <string name="appearance_presets">Theme presets</string>
+    <string name="appearance_presets_light_note">Presets color the dark modes. Light mode keeps its own surfaces and uses the preset\'s accent.</string>
+    <string name="appearance_preset_autobridge">AutoBridge</string>
+    <string name="appearance_preset_graphite">Graphite</string>
+    <string name="appearance_preset_ocean">Ocean</string>
+    <string name="appearance_preset_ember">Ember</string>
+    <string name="appearance_preset_dusk">Dusk</string>
+    <string name="appearance_accent_sky">Sky</string>
+    <string name="appearance_accent_teal">Teal</string>
+    <string name="appearance_accent_amber">Amber</string>
+    <string name="appearance_accent_violet">Violet</string>
+    <string name="appearance_accent_rose">Rose</string>
+    <string name="appearance_accent_lime">Lime</string>
+    <string name="appearance_selected">%1$s, selected</string>
+
+    <!-- Home layouts -->
+    <string name="appearance_home_classic">Classic grid</string>
+    <string name="appearance_home_dashboard">Dashboard</string>
+    <string name="appearance_home_compact">Compact</string>
+
+    <!-- Text page -->
+    <string name="appearance_car_system_status">System status on Android Auto</string>
+    <string name="appearance_car_system_status_caption">CPU, memory and temperature in the car home header</string>
+    <string name="appearance_font_family">Font family</string>
+    <string name="appearance_thai_letters" translatable="false">กขดย</string>
+    <string name="appearance_thai_style">Thai letterforms</string>
+    <string name="appearance_thai_system">Phone\'s Thai font</string>
+    <string name="appearance_thai_system_desc">Whatever your phone draws Thai in</string>
+    <string name="appearance_thai_looped">With loops</string>
+    <string name="appearance_thai_looped_desc">Traditional heads, easier in long text</string>
+    <string name="appearance_thai_loopless">Loopless</string>
+    <string name="appearance_thai_loopless_desc">Modern open shapes, clean at a glance</string>
+    <string name="appearance_font_system">Roboto (system)</string>
+    <string name="appearance_font_inter_desc">Neutral and compact · default</string>
+    <string name="appearance_font_manrope_desc">Rounded, friendly geometry</string>
+    <string name="appearance_font_plex_desc">Technical, with matching Thai</string>
+    <string name="appearance_font_noto_desc">Widest language coverage</string>
+    <string name="appearance_font_system_desc">Matches Android</string>
+    <string name="appearance_text_size">Text size</string>
+    <string name="appearance_follow_system_text">Follow Android font size</string>
+    <string name="appearance_follow_system_text_now">Android is set to %1$d%% on this phone</string>
+    <string name="appearance_text_small">Small</string>
+    <string name="appearance_text_default">Default</string>
+    <string name="appearance_text_large">Large</string>
+    <string name="appearance_text_larger">Larger</string>
+    <string name="appearance_text_huge">Huge</string>
+    <string name="appearance_text_max">Max</string>
+    <string name="appearance_text_note" formatted="false">Large sizes switch Home to two columns and let titles wrap to two lines. Car text stops growing at 130% so controls stay on screen.</string>
+    <string name="appearance_sample">Sample</string>
+    <string name="appearance_sample_title">Night Drive · Mock Artist</string>
+    <!-- Kept in Thai in every language: it shows how Thai vowels and tone marks render at this size. -->
+    <string name="appearance_sample_thai">กำลังเล่นเพลงจากโทรศัพท์ ปรับเสียงได้จากพวงมาลัย สระและวรรณยุกต์ต้องไม่ชนกันทุกขนาด</string>
+    <string name="appearance_sample_numbers">93.0 FM · 1:24 / 3:42 · 410 km</string>
+    <string name="appearance_sizes">Resulting sizes</string>
+    <string name="appearance_sizes_style">Style</string>
+    <string name="appearance_sizes_phone">Phone</string>
+    <string name="appearance_sizes_car">Car</string>
+    <string name="appearance_sizes_display">Display</string>
+    <string name="appearance_sizes_title">Title</string>
+    <string name="appearance_sizes_heading">Heading</string>
+    <string name="appearance_sizes_body">Body</string>
+    <string name="appearance_sizes_caption">Caption</string>
+    <string name="appearance_sizes_overline">Overline</string>
+    <string name="appearance_sizes_note">Non-linear, like Android 14: body text grows fully, display text grows half as much.</string>
+
+    <!-- Wallpaper page -->
+    <string name="appearance_background">Background</string>
+    <string name="appearance_wallpaper_none">None</string>
+    <string name="appearance_wallpaper_glow">Glow</string>
+    <string name="appearance_wallpaper_lines">Lines</string>
+    <string name="appearance_wallpaper_night_road">Night road</string>
+    <string name="appearance_wallpaper_solid">Solid</string>
+    <string name="appearance_wallpaper_custom">Your photo</string>
+    <string name="appearance_wallpaper_choose">Choose photo</string>
+    <string name="appearance_wallpaper_change">Choose another photo</string>
+    <string name="appearance_wallpaper_failed">Could not read that photo</string>
+    <string name="appearance_dim">Dim wallpaper</string>
+    <string name="appearance_blur">Blur behind cards</string>
+    <string name="appearance_blur_caption">Applies to the Glass card style</string>
+    <string name="appearance_show_on">Show on</string>
+    <string name="appearance_target_phone">Phone</string>
+    <string name="appearance_target_car">Car</string>
+    <string name="appearance_target_both">Both</string>
+
+    <!-- Icons and cards page -->
+    <string name="appearance_icon_style">Icon style</string>
+    <string name="appearance_icon_tinted">Tinted</string>
+    <string name="appearance_icon_accent">Accent</string>
+    <string name="appearance_icon_mono">Mono</string>
+    <string name="appearance_card_style">Card style</string>
+    <string name="appearance_card_elevated">Elevated</string>
+    <string name="appearance_card_outlined">Outlined</string>
+    <string name="appearance_card_glass">Glass</string>
+    <string name="appearance_corners">Corners</string>
+    <string name="appearance_corners_soft">Soft</string>
+    <string name="appearance_corners_standard">Standard</string>
+    <string name="appearance_corners_sharp">Sharp</string>
+    <string name="appearance_tile_labels">Show tile labels</string>
+    <string name="appearance_tile_labels_caption">Classic grid only</string>
+</resources>

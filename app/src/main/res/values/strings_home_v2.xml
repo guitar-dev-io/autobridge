@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Phone Home in the redesign's three layouts (Settings > Appearance > Home layout). -->
+<resources>
+    <string name="home_v2_tile_displays">Displays</string>
+    <string name="home_v2_caption_browser">Open a page on the car</string>
+    <string name="home_v2_caption_music">Songs and playlists</string>
+    <string name="home_v2_caption_radio">Live stations</string>
+    <string name="home_v2_caption_tv">Live channels</string>
+    <string name="home_v2_caption_youtube">Videos on the car screen</string>
+    <string name="home_v2_caption_mirror">Show the phone on the car</string>
+    <string name="home_v2_caption_my_car">Parking, fuel and service</string>
+    <string name="home_v2_caption_displays">Front and rear screens</string>
+    <string name="home_v2_caption_more">Folders, weather and more</string>
+    <string name="home_v2_now_playing">Now playing</string>
+    <string name="home_v2_now_playing_phone">Now playing · Phone</string>
+    <string name="home_v2_nothing_playing">Nothing playing</string>
+    <string name="home_v2_nothing_playing_caption">Tap to pick some music</string>
+    <string name="home_v2_previous">Previous</string>
+    <string name="home_v2_next">Next</string>
+    <string name="home_v2_send">Send</string>
+</resources>
