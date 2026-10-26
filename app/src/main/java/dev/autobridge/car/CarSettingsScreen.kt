@@ -29,7 +29,13 @@ import dev.autobridge.mirror.ProjectionService
 import dev.autobridge.settings.MirrorSettings
 import dev.autobridge.settings.SettingsStore
 
-/** Car-native settings summary; invasive phone permissions remain phone-side actions. */
+/**
+ * Car-native settings summary; invasive phone permissions remain phone-side actions.
+ *
+ * Rows that open something carry an accent-tinted icon ([CarIcons]). The toggle rows have none:
+ * the client library accepts a row with both a toggle and an image, but the head unit's host does
+ * the real validation and has rejected template shapes the library allowed before.
+ */
 class CarSettingsScreen(
     carContext: CarContext,
     private val onSafetyRequested: () -> Unit
@@ -114,6 +120,7 @@ class CarSettingsScreen(
             .addItem(
                 Row.Builder()
                     .setTitle(carContext.getString(R.string.car_settings_display_profile))
+                    .setImage(CarIcons.of(carContext, R.drawable.ic_browser_desktop))
                     .addText(dev.autobridge.profile.ActiveCarProfile.label)
                     .setOnClickListener {
                         SurfaceProfile.active = if (SurfaceProfile.active == SurfaceProfile.DEFAULT) {
@@ -138,6 +145,7 @@ class CarSettingsScreen(
             .addItem(
                 Row.Builder()
                     .setTitle(carContext.getString(R.string.car_settings_renderer))
+                    .setImage(CarIcons.of(carContext, R.drawable.ic_browser_code))
                     .addText(pipelineSubtitle())
                     .setOnClickListener { cyclePipeline() }
                     .build()
@@ -145,6 +153,7 @@ class CarSettingsScreen(
             .addItem(
                 Row.Builder()
                     .setTitle(carContext.getString(R.string.car_settings_rotation))
+                    .setImage(CarIcons.of(carContext, R.drawable.ic_browser_reload))
                     .addText(rotationSubtitle())
                     .setOnClickListener { cycleRotation() }
                     .build()
@@ -152,6 +161,7 @@ class CarSettingsScreen(
             .addItem(
                 Row.Builder()
                     .setTitle(carContext.getString(R.string.car_settings_scale))
+                    .setImage(CarIcons.of(carContext, R.drawable.ic_browser_split))
                     .addText(scaleSubtitle())
                     .setOnClickListener { cycleScale() }
                     .build()
@@ -159,6 +169,7 @@ class CarSettingsScreen(
             .addItem(
                 Row.Builder()
                     .setTitle(carContext.getString(R.string.car_settings_landscape_global))
+                    .setImage(CarIcons.of(carContext, R.drawable.ic_browser_car))
                     .addText(
                         carContext.getString(
                             if (MirrorOrientationController.isEnabled) R.string.car_settings_landscape_on
@@ -171,6 +182,7 @@ class CarSettingsScreen(
             .addItem(
                 Row.Builder()
                     .setTitle(carContext.getString(R.string.car_settings_touch))
+                    .setImage(CarIcons.of(carContext, R.drawable.ic_action_controls))
                     .addText(
                         when {
                             !FeaturePolicy.app.isAvailable(Feature.TOUCH) ->
@@ -184,6 +196,7 @@ class CarSettingsScreen(
             .addItem(
                 Row.Builder()
                     .setTitle(carContext.getString(R.string.car_settings_screen_off))
+                    .setImage(CarIcons.of(carContext, R.drawable.ic_browser_lock))
                     .addText(
                         when {
                             MirrorSettings.screenOffOnAutoDim && ScreenOffController.panelOffAvailable() ->
@@ -201,6 +214,7 @@ class CarSettingsScreen(
             .addItem(
                 Row.Builder()
                     .setTitle(carContext.getString(R.string.car_settings_diagnostics))
+                    .setImage(CarIcons.of(carContext, R.drawable.ic_action_signal))
                     .addText(carContext.getString(R.string.car_settings_diagnostics_caption))
                     .setOnClickListener { CarNavigation.open(screenManager, "CarDiagnosticsScreen") { CarDiagnosticsScreen(carContext) } }
                     .build()
@@ -208,6 +222,7 @@ class CarSettingsScreen(
             .addItem(
                 Row.Builder()
                     .setTitle(carContext.getString(R.string.car_settings_log))
+                    .setImage(CarIcons.of(carContext, R.drawable.ic_browser_copy))
                     .addText(carContext.getString(R.string.car_settings_log_caption))
                     .setOnClickListener { CarNavigation.open(screenManager, "CarLogScreen") { CarLogScreen(carContext) } }
                     .build()
@@ -215,6 +230,7 @@ class CarSettingsScreen(
             .addItem(
                 Row.Builder()
                     .setTitle(carContext.getString(R.string.car_settings_speed_safety))
+                    .setImage(CarIcons.of(carContext, R.drawable.ic_browser_warning))
                     .addText(vehicleLabel())
                     .setOnClickListener { onSafetyRequested() }
                     .build()
@@ -222,6 +238,7 @@ class CarSettingsScreen(
             .addItem(
                 Row.Builder()
                     .setTitle(carContext.getString(R.string.car_settings_stop_mirroring))
+                    .setImage(CarIcons.of(carContext, R.drawable.ic_car_stop))
                     .addText(carContext.getString(R.string.car_settings_stop_mirroring_caption))
                     .setOnClickListener {
                         ProjectionService.stop(carContext)
@@ -235,6 +252,7 @@ class CarSettingsScreen(
             .addItem(
                 Row.Builder()
                     .setTitle(carContext.getString(R.string.support_card_title))
+                    .setImage(CarIcons.of(carContext, R.drawable.ic_browser_support))
                     .addText(carContext.getString(R.string.support_car_row_caption))
                     .setOnClickListener { CarNavigation.open(screenManager, "CarSupportScreen") { CarSupportScreen(carContext) } }
                     .build()
