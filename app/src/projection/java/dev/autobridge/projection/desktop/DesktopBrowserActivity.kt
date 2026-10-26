@@ -188,7 +188,11 @@ class DesktopBrowserActivity : Activity() {
     }
 
     private fun allowed(): Boolean = !carEntry ||
-        DesktopCarEntry.allowed(SafetyEnforcement.gateParked(ParkingStateStore.isParked), FeaturePolicy.app.isAvailable(Feature.BROWSER))
+        DesktopCarEntry.allowed(
+            SafetyEnforcement.gateParked(ParkingStateStore.isParked) &&
+                (DesktopEngine.store.allowWhileMoving || ParkingStateStore.isParked || BypassPolicyStore.overridesParked),
+            FeaturePolicy.app.isAvailable(Feature.BROWSER)
+        )
 
     /** Car entry only: a notice instead of the page, no rail and no keyboard unless parked. */
     private fun applyGate() {

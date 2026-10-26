@@ -25,6 +25,7 @@ import dev.autobridge.desktop.browser.DesktopBrowsers
 import dev.autobridge.desktop.install.ComponentState
 import dev.autobridge.desktop.install.EngineChoice
 import dev.autobridge.desktop.install.InstallState
+import dev.autobridge.desktop.input.ControlRail
 import dev.autobridge.desktop.install.RuntimeSource
 import dev.autobridge.desktop.runtime.ChildProcessLimit
 import dev.autobridge.desktop.session.DesktopSession
@@ -344,7 +345,7 @@ class DesktopBrowserSettingsActivity : Activity() {
         }.trimEnd()
     }
 
-    /** Start on launch, touch sensitivity and each browser's zoom. */
+    /** Resume, full screen, moving, controls auto-hide, start on launch, touch sensitivity and each browser's zoom. */
     private fun preferencesCard(): View {
         val store = DesktopEngine.store
         val card = card()
@@ -361,6 +362,44 @@ class DesktopBrowserSettingsActivity : Activity() {
         )) { i ->
             store.startOnLaunch = i == 0
             if (i == 0) Thread { DesktopEngine.prestartIfEnabled() }.start()
+            refresh()
+        })
+
+        section(getString(R.string.desktop_prefs_resume), getString(R.string.desktop_prefs_resume_caption))
+        card.addView(choice(listOf(
+            getString(R.string.desktop_prefs_on) to store.resumeLastPage,
+            getString(R.string.desktop_prefs_off) to !store.resumeLastPage,
+        )) { i ->
+            store.resumeLastPage = i == 0
+            refresh()
+        })
+
+        section(getString(R.string.desktop_prefs_fullscreen), getString(R.string.desktop_prefs_fullscreen_caption))
+        card.addView(choice(listOf(
+            getString(R.string.desktop_prefs_on) to store.startFullscreen,
+            getString(R.string.desktop_prefs_off) to !store.startFullscreen,
+        )) { i ->
+            store.startFullscreen = i == 0
+            refresh()
+        })
+
+        section(getString(R.string.desktop_prefs_moving), getString(R.string.desktop_prefs_moving_caption))
+        card.addView(choice(listOf(
+            getString(R.string.desktop_prefs_on) to store.allowWhileMoving,
+            getString(R.string.desktop_prefs_off) to !store.allowWhileMoving,
+        )) { i ->
+            store.allowWhileMoving = i == 0
+            refresh()
+        })
+
+        section(getString(R.string.desktop_prefs_menu_hide), getString(R.string.desktop_prefs_menu_hide_caption))
+        val hideNow = ControlRail.hideDelay(this)
+        card.addView(choice(listOf(
+            getString(dev.autobridge.desktop.R.string.desktop_rail_hide_2s) to (hideNow == 2_000L),
+            getString(dev.autobridge.desktop.R.string.desktop_rail_hide_4s) to (hideNow == 4_000L),
+            getString(dev.autobridge.desktop.R.string.desktop_rail_hide_never) to (hideNow == 0L),
+        )) { i ->
+            ControlRail.setHideDelay(this, longArrayOf(2_000L, 4_000L, 0L)[i])
             refresh()
         })
 

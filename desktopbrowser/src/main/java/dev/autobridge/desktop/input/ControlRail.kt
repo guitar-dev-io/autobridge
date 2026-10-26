@@ -31,8 +31,8 @@ import kotlin.math.min
  *    collapses after any action (Drag included, so its pan reaches the page), or [hideDelayMs]
  *    after the last touch; a scroll while it is open keeps it up instead of moving the page under it.
  *  - **More**: a second sheet beside the panel for what is used less: forward, reload, new tab,
- *    zoom, the Text row (Tab, Esc, select all, copy, paste), the keyboard choice (car only), how
- *    soon the panel collapses, and close (phone only).
+ *    zoom, the Text row (Tab, Esc, select all, copy, paste), the keyboard choice (car only) and
+ *    close (phone only). How soon the panel collapses is a Settings preference, not a row here.
  *    It never collapses by itself: it closes on a choice that leaves it or a tap outside.
  *
  * The host only reports taps, so every control is a tap target sized for a car, and the whole
@@ -42,7 +42,12 @@ import kotlin.math.min
  * Sizes follow the target's density, so the controls are the same physical size on a 720p car
  * screen, a 1080p one and a phone.
  */
-class ControlRail(private val context: Context, @Volatile var density: Float) : FrameRenderer.Overlay {
+class ControlRail(
+    private val context: Context,
+    @Volatile var density: Float,
+    /** Where the last touch ⇄ mouse choice is kept; the car and the phone viewer each remember their own. */
+    private val modeKey: String = KEY_MODE,
+) : FrameRenderer.Overlay {
     enum class State { COLLAPSED, OPEN, MORE }
 
     /** What a tap asked for. Mode switches and the collapse delay are handled inside the rail. */
@@ -65,7 +70,14 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
         data class Perform(val action: Action) : Tap()
     }
 
-    @Volatile var mode: PointerMode = PointerMode.TOUCH
+    private val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+    /** Remembered: the rail comes back in the mode it was last left in, not always touch. */
+    @Volatile var mode: PointerMode = PointerMode.fromName(prefs.getString(modeKey, null))
+        set(value) {
+            field = value
+            prefs.edit { putString(modeKey, value.name) }
+        }
 
     /** Mouse mode with the left button held: a pan drags. Set by the Drag button, cleared by the owner. */
     @Volatile var dragHeld = false
@@ -129,14 +141,8 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
     @Volatile var state = State.COLLAPSED
         private set
 
-    private val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-
-    /** How long an open panel stays without a touch; 0 = until closed by hand. */
-    var hideDelayMs: Long = prefs.getLong(KEY_HIDE_MS, DEFAULT_HIDE_MS)
-        private set(value) {
-            field = value
-            prefs.edit { putLong(KEY_HIDE_MS, value) }
-        }
+    /** How long an open panel stays without a touch; 0 = until closed by hand. Set in Settings. */
+    private val hideDelayMs: Long get() = hideDelay(context)
 
     private val handler = Handler(Looper.getMainLooper())
     private val collapse = Runnable {
@@ -201,7 +207,6 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
         var h = SHEET_PAD * 2 + HEADER + GAP + CONTROL_H + GAP + CONTROL_H
         h += GAP + HEADER + GAP + CONTROL_H // Text row
         if (showKeyboardChoice) h += GAP + HEADER + GAP + CONTROL_H
-        h += GAP + HEADER + GAP + CONTROL_H
         if (showClose) h += GAP + CONTROL_H
         return h
     }
@@ -333,7 +338,7 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
             items += Item(r) { done(action) }
             draws += { c ->
                 roundRect(c, r, s(RADIUS_CONTROL, sc), BUTTON_FILL)
-                drawCenteredText(c, label, r, s(TEXT_LABEL, sc), INK)
+                drawCenteredText(c, label, r, s(TEXT_LABEL, sc), INK, margin = 0.5f)
             }
         }
         y += s(CONTROL_H, sc) + gap
@@ -349,7 +354,7 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
                 items += Item(r) { onPick(i) }
                 draws += { c ->
                     if (selected) roundRect(c, r, s(RADIUS_INNER, sc), SELECTED)
-                    drawCenteredText(c, label, r, s(TEXT_LABEL, sc), if (selected) ON_SELECTED else INK_SECONDARY)
+                    drawCenteredText(c, label, r, s(TEXT_LABEL, sc), if (selected) ON_SELECTED else INK_SECONDARY, margin = 0.5f)
                 }
             }
             y = row.bottom + gap
@@ -375,20 +380,6 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
                     }
                 )
             }
-        }
-
-        header(context.getString(R.string.desktop_rail_menu))
-        val delays = listOf(2_000L, 4_000L, 0L)
-        segments(
-            listOf(
-                context.getString(R.string.desktop_rail_hide_2s) to (hideDelayMs == 2_000L),
-                context.getString(R.string.desktop_rail_hide_4s) to (hideDelayMs == 4_000L),
-                context.getString(R.string.desktop_rail_hide_never) to (hideDelayMs == 0L),
-            )
-        ) { i ->
-            hideDelayMs = delays[i]
-            touched()
-            Tap.Consumed
         }
 
         if (showClose) {
@@ -523,9 +514,10 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
         d.draw(c)
     }
 
-    private fun drawCenteredText(c: Canvas, value: String, r: RectF, size: Float, color: Int) {
+    /** [margin] is the free space kept at the sides, in text sizes in total (1 = one full size). */
+    private fun drawCenteredText(c: Canvas, value: String, r: RectF, size: Float, color: Int, margin: Float = 1f) {
         text.color = color
-        val shown = if (value.length > 1) fitText(text, value, r.width() - size, size) else value.also { text.textSize = size }
+        val shown = if (value.length > 1) fitText(text, value, r.width() - size * margin, size) else value.also { text.textSize = size }
         c.drawText(shown, r.centerX(), r.centerY() - (text.descent() + text.ascent()) / 2f, text)
     }
 
@@ -555,7 +547,16 @@ class ControlRail(private val context: Context, @Volatile var density: Float) : 
     companion object {
         private const val PREFS = "desktop_rail"
         private const val KEY_HIDE_MS = "hide_ms"
+        private const val KEY_MODE = "pointer_mode"
         const val DEFAULT_HIDE_MS = 4_000L
+
+        /** How long an open panel stays without a touch, in ms; 0 = until closed by hand. */
+        fun hideDelay(context: Context): Long =
+            context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getLong(KEY_HIDE_MS, DEFAULT_HIDE_MS)
+
+        fun setHideDelay(context: Context, ms: Long) {
+            context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putLong(KEY_HIDE_MS, ms) }
+        }
 
         // Geometry in dp, from the approved design (Desktop Browser Car Rail).
         private const val HANDLE_W = 22f
@@ -590,7 +591,11 @@ enum class PointerMode {
     /** The finger is the pointer: tap clicks there, drag scrolls the page. */
     TOUCH,
     /** Trackpad: drag moves the cursor, tap clicks where the cursor is. For small targets. */
-    MOUSE,
+    MOUSE;
+
+    companion object {
+        fun fromName(name: String?): PointerMode = entries.firstOrNull { it.name == name } ?: TOUCH
+    }
 }
 
 /** Text size that fits [maxWidth]: [size] if it already does, else scaled down but not below 80%. */

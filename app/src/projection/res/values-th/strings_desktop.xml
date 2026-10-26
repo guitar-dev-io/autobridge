@@ -63,6 +63,14 @@
     <string name="desktop_prefs_managed_caption">ซ่อนคำเตือน --no-sandbox ด้วยนโยบายที่จัดการไว้ ปิดเพื่อรันแบบไม่มีนโยบาย เบราว์เซอร์จะเริ่มใหม่</string>
     <string name="desktop_prefs_start_on_launch">เริ่มเมื่อเปิดแอป</string>
     <string name="desktop_prefs_start_on_launch_caption">เปิดเบราว์เซอร์ที่เลือกไว้เบื้องหลังเมื่อ AutoBridge เริ่มทำงาน เพื่อให้เปิดบนรถได้ทันที</string>
+    <string name="desktop_prefs_resume">จำหน้าล่าสุด</string>
+    <string name="desktop_prefs_resume_caption">เปิดแท็บที่ค้างไว้ตอนปิดเบราว์เซอร์ครั้งก่อน แทนหน้าเริ่มต้น และเว็บที่เปิดจากการ์ดเว็บอยู่แล้วจะไม่เปิดซ้ำเป็นแท็บใหม่</string>
+    <string name="desktop_prefs_fullscreen">เริ่มแบบเต็มจอ</string>
+    <string name="desktop_prefs_fullscreen_caption">หน้าเว็บเต็มหน้าต่าง ไม่มีแถบแท็บและแถบที่อยู่ ใช้ปุ่มที่อยู่ในแผงควบคุมเพื่อพิมพ์ลิงก์ มีผลเมื่อเปิดเบราว์เซอร์ครั้งถัดไป</string>
+    <string name="desktop_prefs_moving">แสดงผลขณะรถเคลื่อนที่</string>
+    <string name="desktop_prefs_moving_caption">เปิด: ใช้เบราว์เซอร์ได้ต่อเมื่อรถรายงานว่ากำลังเคลื่อนที่ ปิด: จอรถจะขึ้นให้จอดก่อน เว้นแต่รถรายงานว่าจอดอยู่</string>
+    <string name="desktop_prefs_menu_hide">ซ่อนแผงควบคุมอัตโนมัติ</string>
+    <string name="desktop_prefs_menu_hide_caption">แผงควบคุมพับเก็บเร็วแค่ไหนหลังแตะครั้งสุดท้าย</string>
     <string name="desktop_prefs_sensitivity">ความไวการสัมผัส</string>
     <string name="desktop_prefs_sensitivity_caption">ระยะที่หน้าเว็บเลื่อนและเคอร์เซอร์เมาส์ขยับต่อการลากนิ้ว</string>
     <string name="desktop_prefs_zoom">ขนาดการแสดงผล: %1$s</string>

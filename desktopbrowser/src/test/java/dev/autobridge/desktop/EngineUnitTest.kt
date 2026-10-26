@@ -94,6 +94,13 @@ class EngineUnitTest {
         assertFalse(args.contains("--test-type"))
     }
 
+    @Test fun fullscreenIsOptInAndKeepsTheUrlLast() {
+        assertFalse(ChromeAdapter.launchArgs(LaunchSpec(1280, 720, 1f, null)).contains("--start-fullscreen"))
+        val args = ChromeAdapter.launchArgs(LaunchSpec(1280, 720, 1f, "https://example.com", fullscreen = true))
+        assertTrue(args.contains("--start-fullscreen"))
+        assertEquals("https://example.com", args.last())
+    }
+
     @Test fun launchArgsUseVerifiedFlagsAndSeparateProfiles() {
         val spec = LaunchSpec(1280, 720, 1.5f, "https://example.com")
         val chrome = ChromeAdapter.launchArgs(spec)

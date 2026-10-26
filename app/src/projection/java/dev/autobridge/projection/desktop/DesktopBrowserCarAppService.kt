@@ -116,7 +116,7 @@ class DesktopBrowserCarScreen(
     private var surfaceHeight = 0
     private var surfaceDpi = 160
     private var stableArea: Rect? = null
-    private val rail = ControlRail(carContext, 1f).apply {
+    private val rail = ControlRail(carContext, 1f, modeKey = "pointer_mode_car").apply {
         // The car's Appearance; the phone's desktop browser keeps the fixed rail.
         followCarLook = true
         showKeyboardChoice = true
@@ -190,8 +190,14 @@ class DesktopBrowserCarScreen(
         keyboard?.draw(canvas, keyboardArea(), rail.density, SystemClock.uptimeMillis(), drawIcon = ::drawIcon)
     }
 
+    /**
+     * Browsing is allowed while parked, or while moving when "Allow while the car is moving" is on
+     * (Settings › Desktop Browser Engine, default on). Off, only a car that reports parked qualifies.
+     */
     private fun allowed(): Boolean =
-        SafetyEnforcement.gateParked(ParkingStateStore.isParked) && FeaturePolicy.app.isAvailable(Feature.BROWSER)
+        SafetyEnforcement.gateParked(ParkingStateStore.isParked) &&
+            (DesktopEngine.store.allowWhileMoving || ParkingStateStore.isParked || BypassPolicyStore.overridesParked) &&
+            FeaturePolicy.app.isAvailable(Feature.BROWSER)
 
     private val parkingListener: (ParkingStateStore.State) -> Unit = {
         applyGate()
