@@ -415,6 +415,6 @@ class CarVideoScreen(
     /** [tint]: the play/pause glyph takes the car's accent; the host draws the strip itself. */
     private fun control(icon: Int, description: String, enabled: Boolean = true, mapAction: Boolean = false, iconOnly: Boolean = false, tint: CarColor? = null, action: () -> Unit): Action =
         Action.Builder().setIcon(CarIcon.Builder(IconCompat.createWithResource(carContext, icon))
-            .apply { if (tint != null) setTint(tint) }.build()).setEnabled(enabled).apply { if (!mapAction && !iconOnly) setTitle(description) }
+            .setTint(tint ?: CarColor.DEFAULT).build()).setEnabled(enabled).apply { if (!mapAction && !iconOnly) setTitle(description) }
             .setOnClickListener { action(); invalidate() }.build()
 }

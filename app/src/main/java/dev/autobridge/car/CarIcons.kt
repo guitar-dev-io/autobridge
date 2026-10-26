@@ -2,6 +2,7 @@ package dev.autobridge.car
 
 import androidx.annotation.DrawableRes
 import androidx.car.app.CarContext
+import androidx.car.app.model.CarColor
 import androidx.car.app.model.CarIcon
 import androidx.core.graphics.drawable.IconCompat
 import dev.autobridge.R
@@ -30,10 +31,14 @@ import dev.autobridge.R
  *
  * [androidx.car.app.model.Action.Builder] in 1.7.0 has no `setContentDescription`, so an icon-only
  * action carries no text label at all - the glyph has to stand on its own.
+ *
+ * Every resource icon goes through [of], which tints it [CarColor.DEFAULT]: the glyphs are white
+ * masks, and an untinted one is drawn white on a light host theme. DEFAULT lets the host colour
+ * it for its own theme, so the icons follow the car's light or dark look.
  */
 object CarIcons {
     fun of(context: CarContext, @DrawableRes resourceId: Int): CarIcon =
-        CarIcon.Builder(IconCompat.createWithResource(context, resourceId)).build()
+        CarIcon.Builder(IconCompat.createWithResource(context, resourceId)).setTint(CarColor.DEFAULT).build()
 
     @DrawableRes val CLEAR = R.drawable.ic_action_clear
     @DrawableRes val MANAGE = R.drawable.ic_action_manage

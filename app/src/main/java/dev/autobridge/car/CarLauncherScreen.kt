@@ -114,7 +114,7 @@ class CarLauncherScreen(carContext: CarContext) : Screen(carContext) {
     }.getOrNull()
 
     private fun iconFromResource(resId: Int): CarIcon =
-        CarIcon.Builder(IconCompat.createWithResource(carContext, resId)).build()
+        CarIcons.of(carContext, resId)
 
     private fun Drawable.toBitmap(width: Int, height: Int): Bitmap? {
         if (this is BitmapDrawable && bitmap != null) {
