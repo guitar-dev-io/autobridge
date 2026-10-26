@@ -12,6 +12,7 @@ import dev.autobridge.desktop.install.DesktopEngineInstallService
 import dev.autobridge.desktop.install.EngineChoice
 import dev.autobridge.desktop.install.EngineStore
 import dev.autobridge.desktop.install.InstallState
+import dev.autobridge.desktop.install.PackageNames
 import dev.autobridge.desktop.install.RuntimeInstaller
 import dev.autobridge.desktop.install.RuntimeSource
 import dev.autobridge.desktop.install.SafeFiles
@@ -55,6 +56,9 @@ object DesktopEngine {
     val runtimeState: StateFlow<ComponentState> = _runtimeState
     private val _browserStates = MutableStateFlow<Map<DesktopBrowserId, ComponentState>>(emptyMap())
     val browserStates: StateFlow<Map<DesktopBrowserId, ComponentState>> = _browserStates
+    private val _packageState = MutableStateFlow(ComponentState(InstallState.READY))
+    /** The last "install packages" run: idle (READY), working, or FAILED with its error. */
+    val packageState: StateFlow<ComponentState> = _packageState
     private val _busy = MutableStateFlow(false)
     val busy: StateFlow<Boolean> = _busy
     private val _session = MutableStateFlow<DesktopSession?>(null)
@@ -134,6 +138,33 @@ object DesktopEngine {
         } catch (e: Exception) {
             failBrowser(id, e)
         }
+    }
+
+    /** apt-installs [names] (see [PackageNames.parse]) into the runtime, the way a terminal's `apt install` would. */
+    fun installPackages(names: List<String>) = submit("packages") { installPackagesBlocking(names) }
+
+    private fun installPackagesBlocking(names: List<String>) {
+        if (!runtime.rootfsReady()) {
+            _packageState.value = ComponentState(InstallState.FAILED, lastError = "Linux runtime is not installed")
+            return
+        }
+        _packageState.value = ComponentState(InstallState.CONFIGURING, 0f, names.joinToString(" "))
+        try {
+            packages.installPackages(names, { _packageState.value = it }, ::cancelled)
+            _packageState.value = ComponentState(InstallState.READY, detail = names.joinToString(" "))
+        } catch (e: Exception) {
+            DesktopLog.w("package install failed", e)
+            _packageState.value = ComponentState(InstallState.FAILED, lastError = DesktopLog.describe(e))
+        }
+    }
+
+    /** Fonts the runtime should have (emoji, Noto) but does not; installing them fixes pages drawn with boxes. */
+    fun missingFontPackages(): List<String> = if (initialized && runtime.rootfsReady()) packages.missingFontPackages() else emptyList()
+
+    /** Reinstalls the font packages and refreshes fontconfig; the browser restarts to pick them up. */
+    fun repairFonts() = submit("fonts") {
+        stopSession()
+        installPackagesBlocking(listOf("fonts-noto-core", "fonts-noto-cjk", "fonts-noto-color-emoji"))
     }
 
     fun checkForUpdates(id: DesktopBrowserId) = submit("check-${id.key}") {

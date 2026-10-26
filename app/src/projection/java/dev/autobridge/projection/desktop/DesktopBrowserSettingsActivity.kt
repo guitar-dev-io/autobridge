@@ -6,6 +6,8 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.res.ColorStateList
+import android.graphics.Color
 import android.graphics.Typeface
 import android.net.Uri
 import android.os.Bundle
@@ -15,6 +17,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.ProgressBar
+import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import dev.autobridge.R
@@ -25,6 +28,7 @@ import dev.autobridge.desktop.browser.DesktopBrowsers
 import dev.autobridge.desktop.install.ComponentState
 import dev.autobridge.desktop.install.EngineChoice
 import dev.autobridge.desktop.install.InstallState
+import dev.autobridge.desktop.install.PackageNames
 import dev.autobridge.desktop.input.ControlRail
 import dev.autobridge.desktop.install.RuntimeSource
 import dev.autobridge.desktop.runtime.ChildProcessLimit
@@ -72,8 +76,8 @@ class DesktopBrowserSettingsActivity : Activity() {
         super.onResume()
         structureKey = null
         collectJob = scope.launch {
-            combine(DesktopEngine.runtimeState, DesktopEngine.browserStates, DesktopEngine.busy, DesktopEngine.session) { r, b, busy, s ->
-                Snapshot(r, b, busy, s)
+            combine(DesktopEngine.runtimeState, DesktopEngine.browserStates, DesktopEngine.busy, DesktopEngine.session, DesktopEngine.packageState) { r, b, busy, s, pkg ->
+                Snapshot(r, b, busy, s, pkg)
             }.collect { render(it) }
         }
         refreshStorage()
@@ -101,6 +105,7 @@ class DesktopBrowserSettingsActivity : Activity() {
         val browsers: Map<DesktopBrowserId, ComponentState>,
         val busy: Boolean,
         val session: DesktopSession?,
+        val packages: ComponentState,
     )
 
     private var currentSnapshot: Snapshot? = null
@@ -118,6 +123,7 @@ class DesktopBrowserSettingsActivity : Activity() {
                 append(a.id).append(b?.state).append(b?.version).append(b?.candidateVersion).append(b?.lastError)
             }
             append(s.session?.adapter?.id)
+            append(s.packages.state).append(s.packages.lastError)
             append(storage?.runtimeTotal)
         }
         if (key != structureKey) {
@@ -125,6 +131,7 @@ class DesktopBrowserSettingsActivity : Activity() {
             build(s)
         } else {
             updateProgress("runtime", s.runtime)
+            updateProgress("packages", s.packages)
             DesktopBrowsers.all.forEach { a -> s.browsers[a.id]?.let { updateProgress(a.id.key, it) } }
         }
     }
@@ -165,14 +172,16 @@ class DesktopBrowserSettingsActivity : Activity() {
                 if (installed) getString(R.string.desktop_settings_choice_installed) else getString(R.string.desktop_settings_choice_not_installed), installed))
         }
 
-        body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.desktop_prefs_section)), gap = 2)
-        body.stack(preferencesCard())
+        preferenceGroups(body)
 
         body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.desktop_settings_runtime_section)), gap = 2)
         body.stack(runtimeCard(s))
 
         body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.desktop_settings_browsers_section)), gap = 2)
         DesktopBrowsers.all.forEach { a -> body.stack(browserCard(a, s), gap = 10) }
+
+        body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.desktop_packages_section)), gap = 2)
+        body.stack(packagesCard(s))
 
         body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.desktop_settings_diagnostics_section)), gap = 2)
         body.stack(diagnosticsCard(s))
@@ -345,94 +354,159 @@ class DesktopBrowserSettingsActivity : Activity() {
         }.trimEnd()
     }
 
-    /** Resume, full screen, moving, controls auto-hide, start on launch, touch sensitivity and each browser's zoom. */
-    private fun preferencesCard(): View {
+    // ── Preferences ─────────────────────────────────────────────────────────
+
+    /** Settings in three themed groups; each row is a title, its caption and one control. */
+    private fun preferenceGroups(body: LinearLayout) {
         val store = DesktopEngine.store
-        val card = card()
         fun refresh() { structureKey = null; currentSnapshot?.let(::render) }
-        fun section(titleText: String, captionText: String) {
-            card.addView(title(titleText).apply { setPadding(0, dp(10), 0, 0); textSize = 15f })
-            card.addView(caption(captionText))
-        }
 
-        section(getString(R.string.desktop_prefs_start_on_launch), getString(R.string.desktop_prefs_start_on_launch_caption))
-        card.addView(choice(listOf(
-            getString(R.string.desktop_prefs_on) to store.startOnLaunch,
-            getString(R.string.desktop_prefs_off) to !store.startOnLaunch,
-        )) { i ->
-            store.startOnLaunch = i == 0
-            if (i == 0) Thread { DesktopEngine.prestartIfEnabled() }.start()
-            refresh()
-        })
+        body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.desktop_prefs_group_startup)), gap = 2)
+        body.stack(group(
+            toggleRow(getString(R.string.desktop_prefs_start_on_launch), getString(R.string.desktop_prefs_start_on_launch_caption), store.startOnLaunch) { on ->
+                store.startOnLaunch = on
+                if (on) Thread { DesktopEngine.prestartIfEnabled() }.start()
+            },
+            toggleRow(getString(R.string.desktop_prefs_resume), getString(R.string.desktop_prefs_resume_caption), store.resumeLastPage) { store.resumeLastPage = it },
+            toggleRow(getString(R.string.desktop_prefs_fullscreen), getString(R.string.desktop_prefs_fullscreen_caption), store.startFullscreen) { store.startFullscreen = it },
+        ))
 
-        section(getString(R.string.desktop_prefs_resume), getString(R.string.desktop_prefs_resume_caption))
-        card.addView(choice(listOf(
-            getString(R.string.desktop_prefs_on) to store.resumeLastPage,
-            getString(R.string.desktop_prefs_off) to !store.resumeLastPage,
-        )) { i ->
-            store.resumeLastPage = i == 0
-            refresh()
-        })
-
-        section(getString(R.string.desktop_prefs_fullscreen), getString(R.string.desktop_prefs_fullscreen_caption))
-        card.addView(choice(listOf(
-            getString(R.string.desktop_prefs_on) to store.startFullscreen,
-            getString(R.string.desktop_prefs_off) to !store.startFullscreen,
-        )) { i ->
-            store.startFullscreen = i == 0
-            refresh()
-        })
-
-        section(getString(R.string.desktop_prefs_moving), getString(R.string.desktop_prefs_moving_caption))
-        card.addView(choice(listOf(
-            getString(R.string.desktop_prefs_on) to store.allowWhileMoving,
-            getString(R.string.desktop_prefs_off) to !store.allowWhileMoving,
-        )) { i ->
-            store.allowWhileMoving = i == 0
-            refresh()
-        })
-
-        section(getString(R.string.desktop_prefs_menu_hide), getString(R.string.desktop_prefs_menu_hide_caption))
-        val hideNow = ControlRail.hideDelay(this)
-        card.addView(choice(listOf(
-            getString(dev.autobridge.desktop.R.string.desktop_rail_hide_2s) to (hideNow == 2_000L),
-            getString(dev.autobridge.desktop.R.string.desktop_rail_hide_4s) to (hideNow == 4_000L),
-            getString(dev.autobridge.desktop.R.string.desktop_rail_hide_never) to (hideNow == 0L),
-        )) { i ->
-            ControlRail.setHideDelay(this, longArrayOf(2_000L, 4_000L, 0L)[i])
-            refresh()
-        })
-
-        section(getString(R.string.desktop_prefs_managed), getString(R.string.desktop_prefs_managed_caption))
-        card.addView(choice(listOf(
-            getString(R.string.desktop_prefs_on) to store.managedMode,
-            getString(R.string.desktop_prefs_off) to !store.managedMode,
-        )) { i ->
-            store.managedMode = i == 0
-            // Takes effect when the browser next starts.
-            Thread { DesktopEngine.stopSession() }.start()
-            refresh()
-        })
-
-        section(getString(R.string.desktop_prefs_sensitivity), getString(R.string.desktop_prefs_sensitivity_caption))
+        body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.desktop_prefs_group_display)), gap = 2)
         val sens = store.touchSensitivity
-        card.addView(stepper("${Math.round(sens * 100)}%",
-            canDown = sens > DesktopEngine.SENSITIVITY_MIN + 0.01f,
-            canUp = sens < DesktopEngine.SENSITIVITY_MAX - 0.01f,
-        ) { delta ->
-            DesktopEngine.setTouchSensitivity(sens + delta * 0.25f)
-            refresh()
-        })
-
-        for (adapter in DesktopBrowsers.all) {
-            section(getString(R.string.desktop_prefs_zoom, adapter.displayName), getString(R.string.desktop_prefs_zoom_caption))
-            val zoom = store.zoom(adapter.id)
-            card.addView(stepper("$zoom%", zoom > DesktopEngine.ZOOM_MIN, zoom < DesktopEngine.ZOOM_MAX) { delta ->
-                DesktopEngine.setZoom(adapter.id, zoom + delta * 10)
+        val rows = mutableListOf(
+            toggleRow(getString(R.string.desktop_prefs_moving), getString(R.string.desktop_prefs_moving_caption), store.allowWhileMoving) { store.allowWhileMoving = it },
+            stackedRow(getString(R.string.desktop_prefs_sensitivity), getString(R.string.desktop_prefs_sensitivity_caption),
+                stepper("${Math.round(sens * 100)}%",
+                    canDown = sens > DesktopEngine.SENSITIVITY_MIN + 0.01f,
+                    canUp = sens < DesktopEngine.SENSITIVITY_MAX - 0.01f,
+                ) { delta ->
+                    DesktopEngine.setTouchSensitivity(sens + delta * 0.25f)
+                    refresh()
+                }),
+        )
+        val hideNow = ControlRail.hideDelay(this)
+        rows += stackedRow(getString(R.string.desktop_prefs_menu_hide), getString(R.string.desktop_prefs_menu_hide_caption),
+            choice(listOf(
+                getString(dev.autobridge.desktop.R.string.desktop_rail_hide_2s) to (hideNow == 2_000L),
+                getString(dev.autobridge.desktop.R.string.desktop_rail_hide_4s) to (hideNow == 4_000L),
+                getString(dev.autobridge.desktop.R.string.desktop_rail_hide_never) to (hideNow == 0L),
+            )) { i ->
+                ControlRail.setHideDelay(this, longArrayOf(2_000L, 4_000L, 0L)[i])
                 refresh()
             })
+        for (adapter in DesktopBrowsers.all) {
+            val zoom = store.zoom(adapter.id)
+            rows += stackedRow(getString(R.string.desktop_prefs_zoom, adapter.displayName), getString(R.string.desktop_prefs_zoom_caption),
+                stepper("$zoom%", zoom > DesktopEngine.ZOOM_MIN, zoom < DesktopEngine.ZOOM_MAX) { delta ->
+                    DesktopEngine.setZoom(adapter.id, zoom + delta * 10)
+                    refresh()
+                })
         }
+        body.stack(group(*rows.toTypedArray()))
+
+        body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.desktop_prefs_group_advanced)), gap = 2)
+        body.stack(group(
+            toggleRow(getString(R.string.desktop_prefs_managed), getString(R.string.desktop_prefs_managed_caption), store.managedMode) { on ->
+                store.managedMode = on
+                // Takes effect when the browser next starts.
+                Thread { DesktopEngine.stopSession() }.start()
+            },
+        ))
+    }
+
+    /** Linux packages: apt install by name, and a repair for the fonts that draw emoji as boxes. */
+    private var packageInput = ""
+
+    private fun packagesCard(s: Snapshot): View {
+        val card = card()
+        val ready = s.runtime.state.installed
+        val working = s.packages.state.busy
+        card.addView(title(getString(R.string.desktop_packages_title)))
+        card.addView(caption(getString(R.string.desktop_packages_caption)))
+        card.addView(AutoBridgeDesign.searchField(this, getString(R.string.desktop_packages_hint), packageInput) { packageInput = it }
+            .apply { setSingleLine(); inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS },
+            LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10) })
+        val missing = DesktopEngine.missingFontPackages()
+        if (missing.isNotEmpty()) {
+            card.addView(caption(getString(R.string.desktop_packages_fonts_missing, missing.joinToString(", "))).apply {
+                setTextColor(dev.autobridge.design.ThemeHolder.palette.warn)
+                setPadding(0, dp(10), 0, 0)
+            })
+        }
+        s.packages.lastError?.let { card.addView(error(it)) }
+        addProgress(card, "packages", s.packages)
+        card.addView(buttons(listOf(
+            getString(R.string.desktop_packages_install) to { installTyped() },
+            getString(R.string.desktop_packages_repair_fonts) to { confirmRepairFonts() },
+        ), !ready || working))
         return card
+    }
+
+    private fun installTyped() {
+        val names = PackageNames.parse(packageInput)
+        if (names == null) {
+            Toast.makeText(this, R.string.desktop_packages_invalid, Toast.LENGTH_LONG).show()
+            return
+        }
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
+            .setTitle(R.string.desktop_packages_title)
+            .setMessage(getString(R.string.desktop_packages_confirm, names.joinToString(" ")))
+            .setPositiveButton(R.string.desktop_settings_install) { _, _ -> DesktopEngine.installPackages(names) }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun confirmRepairFonts() {
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
+            .setTitle(R.string.desktop_packages_repair_fonts)
+            .setMessage(R.string.desktop_packages_repair_fonts_message)
+            .setPositiveButton(android.R.string.ok) { _, _ -> DesktopEngine.repairFonts() }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    // ── Themed rows ─────────────────────────────────────────────────────────
+
+    /** One card holding [rows], hairlines between them. */
+    private fun group(vararg rows: View): LinearLayout = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        background = AutoBridgeDesign.surface(this@DesktopBrowserSettingsActivity, AutoBridgeDesign.SURFACE, 20)
+        rows.forEachIndexed { i, row ->
+            if (i > 0) addView(View(context).apply { setBackgroundColor(AutoBridgeDesign.HAIRLINE) }, LinearLayout.LayoutParams(-1, 1).apply { setMargins(dp(16), 0, dp(16), 0) })
+            addView(row)
+        }
+    }
+
+    /** Title and caption on the left, a switch on the right. */
+    private fun toggleRow(titleText: String, captionText: String, checked: Boolean, onChange: (Boolean) -> Unit): View =
+        LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(16), dp(12), dp(14), dp(12))
+            val text = LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(title(titleText).apply { textSize = 15f })
+                addView(caption(captionText))
+            }
+            addView(text, LinearLayout.LayoutParams(0, -2, 1f))
+            val accent = AutoBridgeDesign.ACCENT
+            addView(Switch(context).apply {
+                isChecked = checked
+                contentDescription = titleText
+                val states = arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf())
+                thumbTintList = ColorStateList(states, intArrayOf(Color.WHITE, AutoBridgeDesign.TEXT_MUTED))
+                trackTintList = ColorStateList(states, intArrayOf(accent, AutoBridgeDesign.tint(AutoBridgeDesign.TEXT_MUTED, 0.3f)))
+                setOnCheckedChangeListener { _, on -> onChange(on) }
+            }, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(12) })
+            setOnClickListener { (getChildAt(1) as Switch).toggle() }
+        }
+
+    /** Title and caption with [control] (choice pills, a stepper) under them. */
+    private fun stackedRow(titleText: String, captionText: String, control: View): View = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(dp(16), dp(12), dp(16), dp(14))
+        addView(title(titleText).apply { textSize = 15f })
+        addView(caption(captionText))
+        addView(control)
     }
 
     /** Pills where exactly one is selected (filled). */
