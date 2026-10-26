@@ -241,7 +241,7 @@ class CarBridgePlayerScreen(carContext: CarContext) : Screen(carContext), Surfac
     private fun control(icon: Int, enabled: Boolean = true, tint: CarColor? = null, action: () -> Unit): Action =
         Action.Builder()
             // [tint]: play/pause takes the car's accent; the host draws the strip itself.
-            .setIcon(CarIcon.Builder(IconCompat.createWithResource(carContext, icon)).apply { if (tint != null) setTint(tint) }.build())
+            .setIcon(CarIcon.Builder(IconCompat.createWithResource(carContext, icon)).setTint(tint ?: CarColor.DEFAULT).build())
             .setEnabled(enabled)
             .setOnClickListener { action(); invalidate() }
             .build()

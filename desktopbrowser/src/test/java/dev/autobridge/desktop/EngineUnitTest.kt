@@ -88,10 +88,30 @@ class EngineUnitTest {
         assertTrue(dev.autobridge.desktop.runtime.GuestFontConfig.render("Noto Looped Thai").contains("<string>Noto Looped Thai</string>"))
     }
 
+    @Test fun fontRuleFallsBackToEmojiForEveryGenericFamily() {
+        val rule = dev.autobridge.desktop.runtime.GuestFontConfig.render()
+        assertEquals(3, Regex("<string>Noto Color Emoji</string>").findAll(rule).count())
+    }
+
+    @Test fun packageNamesAcceptDebianNamesAndRefuseOptions() {
+        assertEquals(listOf("htop", "libx11-6", "g++"), dev.autobridge.desktop.install.PackageNames.parse("htop, libx11-6\ng++ htop"))
+        assertEquals(null, dev.autobridge.desktop.install.PackageNames.parse("--allow-unauthenticated htop"))
+        assertEquals(null, dev.autobridge.desktop.install.PackageNames.parse("htop; rm -rf /"))
+        assertEquals(null, dev.autobridge.desktop.install.PackageNames.parse("  "))
+        assertEquals(null, dev.autobridge.desktop.install.PackageNames.parse("Htop"))
+    }
+
     @Test fun unmanagedLaunchDropsTheWarningSuppression() {
         val args = ChromeAdapter.launchArgs(LaunchSpec(1280, 720, 1.5f, null, managed = false))
         assertTrue(args.contains("--no-sandbox"))
         assertFalse(args.contains("--test-type"))
+    }
+
+    @Test fun fullscreenIsOptInAndKeepsTheUrlLast() {
+        assertFalse(ChromeAdapter.launchArgs(LaunchSpec(1280, 720, 1f, null)).contains("--start-fullscreen"))
+        val args = ChromeAdapter.launchArgs(LaunchSpec(1280, 720, 1f, "https://example.com", fullscreen = true))
+        assertTrue(args.contains("--start-fullscreen"))
+        assertEquals("https://example.com", args.last())
     }
 
     @Test fun launchArgsUseVerifiedFlagsAndSeparateProfiles() {

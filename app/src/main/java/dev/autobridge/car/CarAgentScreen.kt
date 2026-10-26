@@ -5,10 +5,8 @@ import androidx.car.app.CarToast
 import androidx.car.app.Screen
 import androidx.car.app.model.Action
 import androidx.car.app.model.ActionStrip
-import androidx.car.app.model.CarIcon
 import androidx.car.app.model.SearchTemplate
 import androidx.car.app.model.Template
-import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import dev.autobridge.R
@@ -132,9 +130,7 @@ class CarAgentScreen(carContext: CarContext) : Screen(carContext) {
     private fun micAction(): Action =
         Action.Builder()
             .setIcon(
-                CarIcon.Builder(
-                    IconCompat.createWithResource(carContext, R.drawable.ic_car_mic)
-                ).build()
+                CarIcons.of(carContext, R.drawable.ic_car_mic)
             )
             // Icon only: the SearchTemplate strip allows one titled action, and "resume" has it.
             .setOnClickListener {

@@ -21,6 +21,8 @@ data class LaunchSpec(
     val startUrl: String?,
     /** Managed mode: hide the --no-sandbox warning bar (--test-type) and apply the managed policy. */
     val managed: Boolean = true,
+    /** The browser's own full-screen mode: no tab strip or address bar, the page gets the whole window. */
+    val fullscreen: Boolean = false,
 )
 
 /**
@@ -109,6 +111,7 @@ interface DesktopBrowserAdapter {
         add("--touch-events=enabled")
         add("--window-position=0,0")
         add("--window-size=${spec.width},${spec.height}")
+        if (spec.fullscreen) add("--start-fullscreen")
         add("--force-device-scale-factor=${"%.2f".format(java.util.Locale.US, spec.scale)}")
         addAll(extraArgs())
         spec.startUrl?.let(::add)

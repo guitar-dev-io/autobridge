@@ -15,4 +15,14 @@ class ControlRailLayoutTest {
     @Test fun neverShrinksBelowEightyPercent() {
         assertEquals(12.8f, fittedTextSize(100f, 50f, 16f), 0.001f)
     }
+
+    @Test fun pointerModeComesBackFromItsStoredName() {
+        assertEquals(PointerMode.MOUSE, PointerMode.fromName("MOUSE"))
+        assertEquals(PointerMode.TOUCH, PointerMode.fromName("TOUCH"))
+    }
+
+    @Test fun pointerModeDefaultsToTouchWhenNothingValidIsStored() {
+        assertEquals(PointerMode.TOUCH, PointerMode.fromName(null))
+        assertEquals(PointerMode.TOUCH, PointerMode.fromName("trackpad"))
+    }
 }

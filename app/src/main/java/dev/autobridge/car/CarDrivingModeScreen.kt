@@ -9,7 +9,6 @@ import androidx.car.app.model.GridTemplate
 import androidx.car.app.model.Header
 import androidx.car.app.model.ItemList
 import androidx.car.app.model.Template
-import androidx.core.graphics.drawable.IconCompat
 import dev.autobridge.R
 import dev.autobridge.agent.AgentCommandRouter
 import dev.autobridge.core.state.UiModeStore
@@ -85,5 +84,5 @@ class CarDrivingModeScreen(carContext: CarContext) : Screen(carContext) {
     }
 
     private fun icon(resId: Int): CarIcon =
-        CarIcon.Builder(IconCompat.createWithResource(carContext, resId)).build()
+        CarIcons.of(carContext, resId)
 }

@@ -27,8 +27,8 @@
     <string name="desktop_rail_mouse">เมาส์</string>
     <string name="desktop_rail_more">เพิ่มเติม</string>
     <string name="desktop_rail_this_page">หน้านี้</string>
-    <string name="desktop_rail_forward">ไปข้างหน้า</string>
-    <string name="desktop_rail_reload">โหลดใหม่</string>
+    <string name="desktop_rail_forward">ถัดไป</string>
+    <string name="desktop_rail_reload">รีโหลด</string>
     <string name="desktop_rail_new_tab">แท็บใหม่</string>
     <string name="desktop_rail_zoom">ซูมหน้าเว็บ</string>
     <string name="desktop_rail_zoom_reset">รีเซ็ต</string>

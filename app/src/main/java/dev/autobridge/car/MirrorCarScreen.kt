@@ -197,7 +197,7 @@ class MirrorCarScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
     }
 
     private fun carIcon(@DrawableRes resourceId: Int): CarIcon =
-        CarIcon.Builder(IconCompat.createWithResource(carContext, resourceId)).build()
+        CarIcons.of(carContext, resourceId)
 
     /**
      * A parked-only system navigation button. FeaturePolicy is the entry-point decision and the

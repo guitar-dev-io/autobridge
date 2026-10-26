@@ -89,6 +89,7 @@ class DesktopSession internal constructor(
         width = clampSize(initialWidth)
         height = clampSize(initialHeight)
         renderer.setViewport(width, height)
+        lastOpenedUrl = startUrl
         Thread({ startBlocking(startUrl) }, "desktop-session-start").start()
     }
 
@@ -192,11 +193,15 @@ class DesktopSession internal constructor(
     }
 
     /** Starts the browser on this session's display; the process is the PRoot tree's root. */
-    private fun launchBrowser(startUrl: String?, restore: Boolean): Process {
-        // A fresh window opens on the start page; a restored one keeps the tabs it had.
-        val url = startUrl ?: RuntimeLayout.START_URL.takeIf { hasStartPage && !restore }
-        val args = adapter.launchArgs(LaunchSpec(width, height, scale, url, managed = DesktopEngine.store.managedMode)) +
-            if (restore) listOf("--restore-last-session") else emptyList()
+    private fun launchBrowser(startUrl: String?, restore: Boolean, resume: Boolean = true): Process {
+        // A fresh window opens on the start page; a restored one keeps the tabs it had. The
+        // tabs also come back after the browser was stopped (idle stop, leaving the app) when
+        // "resume last page" is on and the profile has a session to restore.
+        val store = DesktopEngine.store
+        val reopen = restore || (resume && store.resumeLastPage && hasSavedSession())
+        val url = startUrl ?: RuntimeLayout.START_URL.takeIf { hasStartPage && !reopen }
+        val spec = LaunchSpec(width, height, scale, url, managed = store.managedMode, fullscreen = store.startFullscreen)
+        val args = adapter.launchArgs(spec) + if (reopen) listOf("--restore-last-session") else emptyList()
         val pidFile = "${RuntimeLayout.GUEST_RUN_DIR}/${adapter.id.key}.pid"
         return runtime.start(
             listOf("/bin/sh", "-c", "echo \$\$ > $pidFile; exec \"\$0\" \"\$@\"", adapter.launcher) + args,
@@ -217,10 +222,22 @@ class DesktopSession internal constructor(
      */
     fun openInNewTab(url: String) {
         val input = input ?: return
+        // The same page asked for again (the Web card's Netflix, after leaving and coming back)
+        // is already one of the tabs: stay on it instead of stacking a duplicate.
+        if (url == lastOpenedUrl) return
+        lastOpenedUrl = url
         input.newTab()
         input.typeText(url)
         input.key(Keysym.RETURN)
     }
+
+    /** The last page [openInNewTab] opened, so asking for it again does not open another tab. */
+    @Volatile private var lastOpenedUrl: String? = null
+
+    /** True when the profile holds a session Chromium can restore (it writes one as tabs change). */
+    private fun hasSavedSession(): Boolean = runCatching {
+        File(layout.host(adapter.profileDir()), "Default/Sessions").list().orEmpty().isNotEmpty()
+    }.getOrDefault(false)
 
     fun detachSurface() = renderer.detach()
 
@@ -267,12 +284,14 @@ class DesktopSession internal constructor(
             }
             DesktopLog.i("${adapter.id.key} closed its last window; starting it again")
             try {
-                val next = launchBrowser(startUrl = null, restore = false)
+                // The user closed the last tab on purpose: a clean window, not the tabs just closed.
+                val next = launchBrowser(startUrl = null, restore = false, resume = false)
                 if (stopping) {
                     runtime.kill(next)
                     return@watcher
                 }
                 browser = next
+                lastOpenedUrl = null
                 renderer.requestFrame()
                 watch(next)
             } catch (e: Exception) {

@@ -88,6 +88,27 @@ class EngineStore(context: Context) {
         get() = prefs.getBoolean("start_on_launch", false)
         set(value) { prefs.edit().putBoolean("start_on_launch", value).apply() }
 
+    /**
+     * Reopen the tabs the browser had when it was last stopped (the idle stop, a restart, leaving
+     * the app) instead of the start page. A tab the user closed on purpose stays closed.
+     */
+    var resumeLastPage: Boolean
+        get() = prefs.getBoolean("resume_last_page", true)
+        set(value) { prefs.edit().putBoolean("resume_last_page", value).apply() }
+
+    /** Start the browser in its own full-screen mode (no tab strip or address bar); takes effect on the next start. */
+    var startFullscreen: Boolean
+        get() = prefs.getBoolean("start_fullscreen", false)
+        set(value) { prefs.edit().putBoolean("start_fullscreen", value).apply() }
+
+    /**
+     * Keep the browser usable while the car reports it is moving (default on, as the rest of
+     * AutoBridge). Off: the car screen shows the park-to-browse notice unless the car says parked.
+     */
+    var allowWhileMoving: Boolean
+        get() = prefs.getBoolean("allow_while_moving", true)
+        set(value) { prefs.edit().putBoolean("allow_while_moving", value).apply() }
+
     /** Page and toolbar zoom for one browser, in percent (multiplies Chromium's device scale). */
     fun zoom(id: DesktopBrowserId): Int = prefs.getInt("zoom_${id.key}", 100)
     fun setZoom(id: DesktopBrowserId, percent: Int) { prefs.edit().putInt("zoom_${id.key}", percent).apply() }

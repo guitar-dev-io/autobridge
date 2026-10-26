@@ -51,6 +51,23 @@ class BrowserPackages(private val runtime: LinuxRuntime, private val downloader:
         return version
     }
 
+    /** apt-installs [names] (already checked by [PackageNames]) into the shared runtime. */
+    fun installPackages(names: List<String>, report: (ComponentState) -> Unit, isCancelled: () -> Boolean) {
+        val required = FREE_MARGIN + 100L * MB
+        val free = android.os.StatFs(layout.base.path).availableBytes
+        if (free < required) throw IOException("Not enough storage: ${required / MB} MB needed, ${free / MB} MB free")
+        report(ComponentState(InstallState.CONFIGURING, 0.02f, "apt-get update"))
+        apt.recover(isCancelled)
+        apt.update(isCancelled)
+        apt.install(names, isCancelled) { status -> report(stateFor(status)) }
+        report(ComponentState(InstallState.CONFIGURING, 0.97f, "fc-cache"))
+        // New fonts are only seen by the browser once fontconfig has re-read its directories.
+        runtime.run(listOf("fc-cache", "-f"), emptyMap(), layout.logFile("apt"), isCancelled = isCancelled)
+    }
+
+    /** The fonts that stop emoji and other scripts showing as boxes, when the runtime lacks them. */
+    fun missingFontPackages(): List<String> = FONT_FILES.filterValues { !layout.host(it).isFile }.keys.toList()
+
     /** Refreshes the repository and returns (installed, candidate). */
     fun checkUpdate(adapter: DesktopBrowserAdapter, isCancelled: () -> Boolean): Pair<String?, String?> {
         apt.update(isCancelled)
@@ -117,6 +134,11 @@ class BrowserPackages(private val runtime: LinuxRuntime, private val downloader:
 
     private companion object {
         const val MB = 1024 * 1024
+        /** Debian package to the file that proves it is installed. */
+        val FONT_FILES = mapOf(
+            "fonts-noto-color-emoji" to "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf",
+            "fonts-noto-core" to "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+        )
         /** Android keeps a low-storage reserve and refuses app updates inside it. */
         const val FREE_MARGIN = 300L * 1024 * 1024
     }
