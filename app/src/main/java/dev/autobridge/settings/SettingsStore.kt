@@ -54,7 +54,7 @@ object SettingsStore {
         if (normalizedPipeline != restoredPipeline) {
             prefs.edit { putString(KEY_SCREEN_OFF_MODE, normalizedPipeline.name) }
         }
-        MirrorSettings.preventScreenSleep = prefs.getBoolean(KEY_PREVENT_SCREEN_SLEEP, false)
+        MirrorSettings.preventScreenSleep = prefs.getBoolean(KEY_PREVENT_SCREEN_SLEEP, true)
         MirrorSettings.autoDimDelay =
             AutoDimDelay.fromSeconds(prefs.getInt(KEY_AUTO_DIM_DELAY_SECONDS, 0))
         MirrorSettings.screenOffOnAutoDim =

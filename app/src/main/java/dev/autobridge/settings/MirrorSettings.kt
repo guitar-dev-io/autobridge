@@ -22,7 +22,7 @@ enum class AutoDimDelay(val seconds: Int, val label: String) {
  */
 object MirrorSettings {
     @Volatile
-    var preventScreenSleep: Boolean = false
+    var preventScreenSleep: Boolean = true
 
     @Volatile
     var autoDimDelay: AutoDimDelay = AutoDimDelay.OFF
