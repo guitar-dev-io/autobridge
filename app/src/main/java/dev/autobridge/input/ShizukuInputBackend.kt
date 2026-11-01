@@ -8,6 +8,7 @@ import android.os.IBinder
 import android.util.Log
 import dev.autobridge.core.model.Feature
 import dev.autobridge.core.policy.FeaturePolicy
+import dev.autobridge.display.ScreenPowerController
 import dev.autobridge.shizuku.ShizukuGrant
 import rikka.shizuku.Shizuku
 
@@ -30,6 +31,8 @@ object ShizukuInputBackend : InputBackend {
         remote = null
         remoteBinder = null
         Log.w(TAG, "Shizuku touch service binder died")
+        // A panel this service turned off stays off when it dies; get the display back.
+        ScreenPowerController.onPrivilegedServiceLost()
     }
 
     private val basicCapabilities = setOf(
@@ -72,10 +75,12 @@ object ShizukuInputBackend : InputBackend {
             remoteBinder = binder
             remote = IShizukuTouchService.Stub.asInterface(binder)
             Log.i(TAG, "Shizuku privileged service connected: ${remote != null}")
+            ScreenPowerController.onPrivilegedServiceConnected()
         }
 
         override fun onServiceDisconnected(name: ComponentName) {
             clearRemote("service disconnected")
+            ScreenPowerController.onPrivilegedServiceLost()
         }
     }
 

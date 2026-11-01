@@ -24,6 +24,7 @@ import dev.autobridge.settings.MirrorSettings
 object ScreenPowerController {
     private const val TAG = "AutoBridgeScreenPower"
     private const val WAKE_LOCK_TAG = "AutoBridge:MirrorScreen"
+    private const val RECOVER_WAKE_MS = 5_000L
 
     private val handler = Handler(Looper.getMainLooper())
     private var powerManager: PowerManager? = null
@@ -66,9 +67,13 @@ object ScreenPowerController {
     @Synchronized
     fun start(context: Context, preventScreenSleep: Boolean, autoDimDelay: AutoDimDelay) {
         stop()
-        if (panel.restoreFailed) return
         SessionHeatLog.start(context)
         powerManager = context.applicationContext.getSystemService(PowerManager::class.java)
+        // A panel restore that failed earlier (Shizuku died while the panel was off) used to end the
+        // start here, so the session ran with no wake lock and the phone slept: a black car screen
+        // until someone turned the phone on by hand. The session goes on; the panel is woken with
+        // a public wake instead, and the lease keeps retrying the privileged restore.
+        if (panel.restoreFailed) wakeDisplayPublicly()
         this.preventScreenSleep = preventScreenSleep
         this.autoDimDelay = autoDimDelay
 
@@ -176,6 +181,42 @@ object ScreenPowerController {
             scheduleDim()
         }
         return true
+    }
+
+    /**
+     * The privileged service died. If it had turned the panel off, the panel is still off and the
+     * restore it needs is gone: try it (which records the failure for a retry), and wake the
+     * display through PowerManager so the car stops showing black.
+     */
+    @Synchronized
+    fun onPrivilegedServiceLost() {
+        if (!panel.isOff || powerManager == null) return
+        StructuredLog.w(TAG, "Privileged service lost while the panel was off; waking the display")
+        panel.restore()
+        wakeDisplayPublicly()
+    }
+
+    /** The privileged service is back: finish a panel restore that could not run before. */
+    @Synchronized
+    fun onPrivilegedServiceConnected() {
+        if (!panel.restoreFailed) return
+        StructuredLog.i(TAG, "Privileged service reconnected; retrying the panel restore")
+        restorePhoneScreen()
+    }
+
+    /** A short bright wake that also turns the screen on. It does not hold the screen afterwards. */
+    @Suppress("DEPRECATION", "Wakelock")
+    private fun wakeDisplayPublicly() {
+        val manager = powerManager ?: return
+        runCatching {
+            manager.newWakeLock(
+                PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
+                "$WAKE_LOCK_TAG:recover"
+            ).apply {
+                setReferenceCounted(false)
+                acquire(RECOVER_WAKE_MS)
+            }
+        }.onFailure { Log.w(TAG, "Public display wake failed", it) }
     }
 
     private fun scheduleDim() {
