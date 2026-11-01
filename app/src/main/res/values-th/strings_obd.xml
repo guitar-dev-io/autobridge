@@ -53,4 +53,10 @@
     <string name="car_gauges_pick_on_phone">เลือกอะแดปเตอร์ OBD2 บนมือถือ: AutoBridge › ตั้งค่า › เกจวัด</string>
     <string name="car_gauges_allow_bluetooth">อนุญาต Bluetooth ให้ AutoBridge บนมือถือ</string>
     <string name="car_gauges_next_page">หน้าถัดไป</string>
+    <string name="obd_diag">การวินิจฉัย</string>
+    <string name="obd_diag_caption">สิ่งที่ถามอะแดปเตอร์และคำตอบที่ได้</string>
+    <string name="obd_diag_enhanced">PID เฉพาะ Ford (22xx):</string>
+    <string name="obd_diag_recent">คำขอล่าสุด:</string>
+    <string name="obd_diag_copy">คัดลอก</string>
+    <string name="obd_diag_close">ปิด</string>
 </resources>

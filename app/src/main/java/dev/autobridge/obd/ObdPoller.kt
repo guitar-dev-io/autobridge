@@ -130,7 +130,9 @@ class ObdPoller(
         private const val PASS_PAUSE_MS = 20L
         private const val MISSES_BEFORE_NEXT = 3
         private const val IDLE_PASSES = 300
-        private val SETUP = listOf("ATE0", "ATL0", "ATS0", "ATH0", "ATAT1")
+        // ATST64 is a 400 ms wait for an answer: the transmission module is slower than the engine
+        // module, and the adapter's default of 200 ms can read its silence as "no data".
+        private val SETUP = listOf("ATE0", "ATL0", "ATS0", "ATH0", "ATAT1", "ATST64")
         private val PLAUSIBLE: Map<Gauge, ClosedFloatingPointRange<Float>> = mapOf(
             Gauge.RPM to 0f..9_000f,
             Gauge.SPEED to 0f..255f,

@@ -54,4 +54,10 @@
     <string name="car_gauges_pick_on_phone">Choose an OBD2 adapter on the phone: AutoBridge › Settings › Gauges</string>
     <string name="car_gauges_allow_bluetooth">Allow Bluetooth for AutoBridge on the phone</string>
     <string name="car_gauges_next_page">Next page</string>
+    <string name="obd_diag">Diagnostics</string>
+    <string name="obd_diag_caption">What the adapter was asked and what it answered</string>
+    <string name="obd_diag_enhanced">Ford PIDs (22xx):</string>
+    <string name="obd_diag_recent">Latest requests:</string>
+    <string name="obd_diag_copy">Copy</string>
+    <string name="obd_diag_close">Close</string>
 </resources>

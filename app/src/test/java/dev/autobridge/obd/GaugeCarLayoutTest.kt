@@ -49,6 +49,13 @@ class GaugeCarLayoutTest {
         assertEquals(4, wide.map { it.left }.distinct().size)
     }
 
+    @Test fun aSquarishScreenKeepsTheEngineTilesWiderThanTall() {
+        // The head unit in the car: roughly 1050 by 770 inside the host's insets.
+        val cells = GaugeCarLayout.compute(0f, 0f, 1050f, 770f, 1.5f, 1).cells
+        assertEquals(2, cells.map { it.left }.distinct().size)
+        assertTrue(cells.all { it.width > it.height })
+    }
+
     @Test fun pagesWrapAround() {
         assertEquals(
             GaugeCarLayout.compute(0f, 0f, 900f, 500f, 1f, 0).cells,

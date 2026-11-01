@@ -39,7 +39,7 @@ object GaugeCarLayout {
 
     fun compute(left: Float, top: Float, right: Float, bottom: Float, density: Float, page: Int): GaugeCarPage {
         val gap = 10f * density
-        val headerHeight = 30f * density
+        val headerHeight = 38f * density
         val width = right - left
         val height = bottom - top
         val portrait = height > width * 1.1f
@@ -52,7 +52,11 @@ object GaugeCarLayout {
             grid(cells, DRIVE_DIALS, CellKind.DIAL, left, bodyTop, right, bodyTop + dialHeight, 2, gap)
             grid(cells, DRIVE_TILES, CellKind.TILE, left, bodyTop + dialHeight + gap, right, bottom, 3, gap)
         } else {
-            grid(cells, ENGINE_TILES, CellKind.TILE, left, bodyTop, right, bottom, if (portrait) 2 else 4, gap)
+            // Four columns only on a screen wide enough that the tiles stay wider than tall; a
+            // squarer one (a head unit that is 1050 by 770, say) gets two columns of four rows,
+            // because a tile taller than it is wide has no room for a name and a number side by side.
+            val columns = if (width / bodyHeight >= 2f) 4 else 2
+            grid(cells, ENGINE_TILES, CellKind.TILE, left, bodyTop, right, bottom, columns, gap)
         }
         return GaugeCarPage(headerHeight, cells)
     }

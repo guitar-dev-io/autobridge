@@ -180,6 +180,17 @@ class ObdGaugesActivity : Activity() {
             )
         )
 
+        body.stack(
+            AutoBridgeDesign.contentRow(
+                context = this,
+                title = getString(R.string.obd_diag),
+                subtitle = getString(R.string.obd_diag_caption),
+                accent = AutoBridgeDesign.TEXT_MUTED,
+                badgeText = "i",
+                onClick = { showDiagnostics() }
+            )
+        )
+
         AutoBridgeDesign.showPage(
             this,
             AutoBridgeDesign.page(
@@ -334,6 +345,28 @@ class ObdGaugesActivity : Activity() {
         if (action != null && grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
             action()
         }
+    }
+
+    /** The adapter's recent conversation, so a missing reading can be explained (and copied to share). */
+    private fun showDiagnostics() {
+        val text = ObdLog.snapshot(getString(R.string.obd_diag_enhanced), getString(R.string.obd_diag_recent))
+        val view = TextView(this).apply {
+            this.text = text
+            textSize = 12f
+            typeface = Typeface.MONOSPACE
+            setTextIsSelectable(true)
+            setPadding(dp(16), dp(8), dp(16), dp(8))
+        }
+        val scroll = android.widget.ScrollView(this).apply { addView(view) }
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
+            .setTitle(R.string.obd_diag)
+            .setView(scroll)
+            .setPositiveButton(R.string.obd_diag_copy) { _, _ ->
+                val clipboard = getSystemService(android.content.ClipboardManager::class.java)
+                clipboard?.setPrimaryClip(android.content.ClipData.newPlainText("OBD", text))
+            }
+            .setNegativeButton(R.string.obd_diag_close, null)
+            .show()
     }
 
     private fun chooseTransmission(current: Transmission) {

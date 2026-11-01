@@ -68,7 +68,7 @@ class GaugeCarRenderer(private val labelOf: (Gauge) -> String) {
     }
 
     private fun drawHeader(canvas: Canvas, area: RectF, height: Float, frame: Frame) {
-        label.textSize = height * 0.55f
+        label.textSize = height * 0.62f
         val baseline = area.top + height * 0.72f
         label.color = text
         label.typeface = Typeface.DEFAULT_BOLD
@@ -152,32 +152,37 @@ class GaugeCarRenderer(private val labelOf: (Gauge) -> String) {
         val zone = zoneOf(cell.gauge, reading)
         val color = if (zone == null) muted else ZoneColors.of(zone)
         drawCard(canvas, cell, 14f * frame.density, if (zone == Zone.DANGER) color else null, frame.density)
-        val pad = min(cell.width, cell.height) * 0.12f
+        val pad = min(cell.width, cell.height) * 0.1f
+        // Text is sized from this, not from the height alone: a tile taller than it is wide would
+        // otherwise get a name too big for its width and a number with no width left at all.
+        val base = min(cell.height, cell.width * 0.6f)
+        val inner = cell.width - pad * 2f
 
-        label.textSize = cell.height * 0.17f
+        val name = labelOf(cell.gauge)
         label.color = muted
         label.textAlign = Paint.Align.LEFT
-        canvas.drawText(labelOf(cell.gauge), cell.left + pad, cell.top + pad + label.textSize * 0.85f, label)
+        fit(label, name, inner, base * 0.2f)
+        canvas.drawText(name, cell.left + pad, cell.top + pad + label.textSize * 0.85f, label)
 
         val shown = if (reading == null) "—" else GaugeFormat.text(cell.gauge, reading, frame.imperial)
         val unit = GaugeFormat.unit(cell.gauge, frame.imperial)
-        fit(value, shown, cell.width - pad * 2f - cell.height * 0.45f, cell.height * 0.42f)
+        label.textSize = base * 0.14f
+        val unitWidth = label.measureText(unit)
+        fit(value, shown, (inner - unitWidth - pad * 0.4f).coerceAtLeast(base * 0.3f), base * 0.46f)
         value.color = if (reading == null) muted else color
         value.textAlign = Paint.Align.LEFT
-        val baseline = cell.bottom - pad - cell.height * 0.1f
+        val baseline = cell.bottom - pad - base * 0.12f
         canvas.drawText(shown, cell.left + pad, baseline, value)
-        label.textSize = cell.height * 0.13f
         canvas.drawText(unit, cell.left + pad + value.measureText(shown) + pad * 0.4f, baseline, label)
 
         // A thin bar along the bottom: how far along the gauge's own range the value is.
         if (reading != null) {
             val barHeight = cell.height * 0.05f
             val barTop = cell.bottom - pad * 0.55f - barHeight
-            val full = cell.width - pad * 2f
-            box.set(cell.left + pad, barTop, cell.left + pad + full, barTop + barHeight)
+            box.set(cell.left + pad, barTop, cell.left + pad + inner, barTop + barHeight)
             fill.color = 0xFF2A333C.toInt()
             canvas.drawRoundRect(box, barHeight, barHeight, fill)
-            box.right = cell.left + pad + full * GaugeSpec.of(cell.gauge).fraction(reading)
+            box.right = cell.left + pad + inner * GaugeSpec.of(cell.gauge).fraction(reading)
             fill.color = color
             canvas.drawRoundRect(box, barHeight, barHeight, fill)
         }
