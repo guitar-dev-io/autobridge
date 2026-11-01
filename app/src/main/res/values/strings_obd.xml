@@ -35,8 +35,8 @@
     <string name="obd_g_throttle">Throttle</string>
     <string name="obd_g_fuel">Fuel level</string>
     <string name="obd_g_ambient">Outside</string>
-    <string name="obd_transmission">Gearbox</string>
-    <string name="obd_transmission_caption">Decides how the gearbox oil temperature is read</string>
+    <string name="obd_transmission">Vehicle</string>
+    <string name="obd_transmission_caption">Sets how the gearbox oil temperature is read and what counts as normal</string>
     <string name="obd_transmission_t5">Ranger PJ/PK (T5)</string>
     <string name="obd_transmission_t6">Ranger PX (T6)</string>
     <string name="obd_imperial">Units</string>
@@ -60,4 +60,5 @@
     <string name="obd_diag_recent">Latest requests:</string>
     <string name="obd_diag_copy">Copy</string>
     <string name="obd_diag_close">Close</string>
+    <string name="obd_transmission_nextgen">Ranger Next-Gen (2022+)</string>
 </resources>

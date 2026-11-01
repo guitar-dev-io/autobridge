@@ -110,6 +110,7 @@ class CarGaugesScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
     }
 
     private fun startConnection() {
+        ObdSettings.applyProfile(carContext)
         if (ObdConnection.isRunning) return
         val adapter = ObdSettings.adapter(carContext) ?: return
         if (ObdPermissions.missing(carContext).isNotEmpty()) return

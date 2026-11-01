@@ -34,8 +34,8 @@
     <string name="obd_g_throttle">คันเร่ง</string>
     <string name="obd_g_fuel">ระดับน้ำมัน</string>
     <string name="obd_g_ambient">อุณหภูมิภายนอก</string>
-    <string name="obd_transmission">เกียร์</string>
-    <string name="obd_transmission_caption">กำหนดวิธีอ่านอุณหภูมิน้ำมันเกียร์</string>
+    <string name="obd_transmission">รุ่นรถ</string>
+    <string name="obd_transmission_caption">กำหนดวิธีอ่านอุณหภูมิน้ำมันเกียร์และช่วงค่าที่ถือว่าปกติ</string>
     <string name="obd_transmission_t5">Ranger PJ/PK (T5)</string>
     <string name="obd_transmission_t6">Ranger PX (T6)</string>
     <string name="obd_imperial">หน่วย</string>
@@ -59,4 +59,5 @@
     <string name="obd_diag_recent">คำขอล่าสุด:</string>
     <string name="obd_diag_copy">คัดลอก</string>
     <string name="obd_diag_close">ปิด</string>
+    <string name="obd_transmission_nextgen">Ranger Next-Gen (2022 ขึ้นไป)</string>
 </resources>

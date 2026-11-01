@@ -108,6 +108,7 @@ class ObdGaugesActivity : Activity() {
     // ---- Page ---------------------------------------------------------------------------------
 
     private fun render() {
+        ObdSettings.applyProfile(this)
         imperial = ObdSettings.imperial(this)
         dials.clear()
         tiles.clear()
@@ -148,7 +149,7 @@ class ObdGaugesActivity : Activity() {
                 title = getString(R.string.obd_transmission),
                 subtitle = getString(R.string.obd_transmission_caption),
                 accent = accent,
-                badgeText = transmission.name,
+                badgeText = transmission.badge,
                 onClick = { chooseTransmission(transmission) }
             )
         )
@@ -373,6 +374,7 @@ class ObdGaugesActivity : Activity() {
         val options = listOf(
             Transmission.T5 to getString(R.string.obd_transmission_t5),
             Transmission.T6 to getString(R.string.obd_transmission_t6),
+            Transmission.NEXT_GEN to getString(R.string.obd_transmission_nextgen),
         )
         val labels = options.map { (value, label) -> (if (value == current) "● " else "   ") + label }
         AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())

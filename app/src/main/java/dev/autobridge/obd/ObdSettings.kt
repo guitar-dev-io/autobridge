@@ -27,8 +27,15 @@ object ObdSettings {
         runCatching { Transmission.valueOf(prefs(context).getString("transmission", null) ?: "") }
             .getOrDefault(Transmission.T5)
 
-    fun setTransmission(context: Context, value: Transmission) =
+    fun setTransmission(context: Context, value: Transmission) {
         prefs(context).edit { putString("transmission", value.name) }
+        GaugeSpec.profile = value
+    }
+
+    /** Makes the zones follow the saved vehicle; call before drawing gauges. */
+    fun applyProfile(context: Context) {
+        GaugeSpec.profile = transmission(context)
+    }
 
     /** Reconnect on its own the next time the gauges screen opens. */
     fun autoConnect(context: Context): Boolean = prefs(context).getBoolean("auto_connect", false)

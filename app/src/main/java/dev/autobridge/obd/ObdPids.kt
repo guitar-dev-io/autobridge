@@ -14,8 +14,14 @@ class Pid(
     val decode: (IntArray) -> Float,
 )
 
-/** Which Ranger gearbox the vehicle has; the automatic-transmission temperature PID differs. */
-enum class Transmission { T5, T6 }
+/**
+ * Which Ranger this is. It decides the automatic-transmission temperature PID and the normal
+ * ranges ([GaugeSpec]): [T5] is the PJ/PK (2009-2011), [T6] the PX (2011-2018), and [NEXT_GEN] the
+ * 2022 and later Ranger, which reads gearbox oil like the T6 but runs hotter and boosts harder.
+ */
+enum class Transmission(val badge: String) {
+    T5("T5"), T6("T6"), NEXT_GEN("NG")
+}
 
 object ObdPids {
     private fun word(d: IntArray) = d[0] * 256 + d[1]
@@ -47,7 +53,7 @@ object ObdPids {
                 request = "221674"; reply = "621674"
                 decode = { word(it) * 5f / 72f - 18f }
             }
-            Transmission.T6 -> {
+            Transmission.T6, Transmission.NEXT_GEN -> {
                 request = "221E1C"; reply = "621E1C"
                 decode = { word(it) / 16f }
             }

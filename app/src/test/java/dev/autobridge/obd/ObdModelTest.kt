@@ -5,6 +5,8 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class ObdModelTest {
+    @org.junit.After fun resetProfile() { GaugeSpec.profile = Transmission.T5 }
+
     private fun zone(gauge: Gauge, value: Float) = GaugeSpec.of(gauge).zone(value)
 
     @Test fun coolantWarmsUpThroughColdAndNormalToDanger() {
@@ -16,6 +18,18 @@ class ObdModelTest {
         assertEquals(Zone.DANGER, zone(Gauge.COOLANT, 106f))
         assertEquals(Zone.CAUTION, zone(Gauge.ATF, 95f))
         assertEquals(Zone.DANGER, zone(Gauge.ATF, 101f))
+    }
+
+    @Test fun theNextGenRangerRunsHotterBeforeItWarns() {
+        GaugeSpec.profile = Transmission.NEXT_GEN
+        assertEquals(Zone.NORMAL, zone(Gauge.COOLANT, 100f))
+        assertEquals(Zone.CAUTION, zone(Gauge.COOLANT, 110f))
+        assertEquals(Zone.DANGER, zone(Gauge.COOLANT, 116f))
+        assertEquals(Zone.NORMAL, zone(Gauge.BOOST, 20f))
+        assertEquals(Zone.CAUTION, zone(Gauge.ATF, 110f))
+        GaugeSpec.profile = Transmission.T5
+        assertEquals(Zone.CAUTION, zone(Gauge.COOLANT, 100f))
+        assertEquals(Zone.CAUTION, zone(Gauge.BOOST, 15f))
     }
 
     @Test fun batteryIsBadWhenLowOrWhenTooHigh() {
