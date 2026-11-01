@@ -27,8 +27,15 @@ object ObdSettings {
         runCatching { Transmission.valueOf(prefs(context).getString("transmission", null) ?: "") }
             .getOrDefault(Transmission.T5)
 
-    fun setTransmission(context: Context, value: Transmission) =
+    fun setTransmission(context: Context, value: Transmission) {
         prefs(context).edit { putString("transmission", value.name) }
+        GaugeSpec.profile = value
+    }
+
+    /** Makes the zones follow the saved vehicle; call before drawing gauges. */
+    fun applyProfile(context: Context) {
+        GaugeSpec.profile = transmission(context)
+    }
 
     /** Reconnect on its own the next time the gauges screen opens. */
     fun autoConnect(context: Context): Boolean = prefs(context).getBoolean("auto_connect", false)
@@ -41,4 +48,11 @@ object ObdSettings {
 
     fun setImperial(context: Context, value: Boolean) =
         prefs(context).edit { putBoolean("imperial", value) }
+
+    /** The pages the car shows, arranged on the phone. */
+    fun pages(context: Context): List<GaugePage> =
+        GaugePages.decode(prefs(context).getString("pages", null))
+
+    fun setPages(context: Context, pages: List<GaugePage>) =
+        prefs(context).edit { putString("pages", GaugePages.encode(pages)) }
 }

@@ -22,7 +22,6 @@ import dev.autobridge.display.CarSurfaceCanvas
 import dev.autobridge.logging.StructuredLog
 import dev.autobridge.mirror.MirrorSurfaceOwnership
 import dev.autobridge.obd.Gauge
-import dev.autobridge.obd.GaugeCarLayout
 import dev.autobridge.obd.GaugeFormat
 import dev.autobridge.obd.GaugeLabels
 import dev.autobridge.obd.GaugeSpec
@@ -105,11 +104,12 @@ class CarGaugesScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
             .build()
 
     private fun nextPage() {
-        page = (page + 1) % GaugeCarLayout.PAGES
+        page = (page + 1) % ObdSettings.pages(carContext).size
         draw()
     }
 
     private fun startConnection() {
+        ObdSettings.applyProfile(carContext)
         if (ObdConnection.isRunning) return
         val adapter = ObdSettings.adapter(carContext) ?: return
         if (ObdPermissions.missing(carContext).isNotEmpty()) return
@@ -177,17 +177,20 @@ class CarGaugesScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
         val telemetry = ObdConnection.telemetry.value
         val imperial = ObdSettings.imperial(carContext)
         val state = ObdConnection.state.value
+        // Read each frame: the pages are arranged on the phone while the car is showing them.
+        val pages = ObdSettings.pages(carContext)
+        val index = page.coerceIn(0, pages.size - 1)
         val shown = GaugeCarRenderer.Frame(
             telemetry = telemetry,
             nowMs = now,
             imperial = imperial,
-            page = page,
-            pageTitle = carContext.getString(
-                if (page % GaugeCarLayout.PAGES == 0) R.string.car_gauges_page_drive else R.string.car_gauges_page_engine
-            ),
+            page = pages[index],
+            pageIndex = index,
+            pageCount = pages.size,
+            pageTitle = carContext.getString(R.string.car_gauges_page_n, (index + 1).toString(), pages.size.toString()),
             status = statusText(state),
             notice = notice(),
-            alert = worstAlert(telemetry, now, imperial),
+            alert = worstAlert(telemetry, now, imperial, pages),
             density = density,
         )
         CarSurfaceCanvas.draw(carContext, target) { canvas ->
@@ -211,9 +214,15 @@ class CarGaugesScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
     }
 
     /** The first reading in the danger zone, written like "Coolant 108 °C", or null. */
-    private fun worstAlert(telemetry: dev.autobridge.obd.Telemetry, now: Long, imperial: Boolean): String? {
-        // Speed is left out: a speed limit is the driver's business, not an engine warning.
-        val gauges: List<Gauge> = listOf(Gauge.RPM) + GaugeCarLayout.DRIVE_TILES + GaugeCarLayout.ENGINE_TILES
+    private fun worstAlert(
+        telemetry: dev.autobridge.obd.Telemetry,
+        now: Long,
+        imperial: Boolean,
+        pages: List<dev.autobridge.obd.GaugePage>,
+    ): String? {
+        // Only what some page shows, so a warning is never about a gauge the driver cannot see. Speed
+        // is left out: a speed limit is the driver's business, not an engine warning.
+        val gauges: List<Gauge> = pages.flatMap { it.gauges }.distinct().filter { it != Gauge.SPEED }
         for (gauge in gauges) {
             val value = telemetry.value(gauge, now) ?: continue
             if (GaugeSpec.of(gauge).zone(value) != Zone.DANGER) continue

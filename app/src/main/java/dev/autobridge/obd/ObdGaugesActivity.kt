@@ -108,6 +108,7 @@ class ObdGaugesActivity : Activity() {
     // ---- Page ---------------------------------------------------------------------------------
 
     private fun render() {
+        ObdSettings.applyProfile(this)
         imperial = ObdSettings.imperial(this)
         dials.clear()
         tiles.clear()
@@ -148,7 +149,7 @@ class ObdGaugesActivity : Activity() {
                 title = getString(R.string.obd_transmission),
                 subtitle = getString(R.string.obd_transmission_caption),
                 accent = accent,
-                badgeText = transmission.name,
+                badgeText = transmission.badge,
                 onClick = { chooseTransmission(transmission) }
             )
         )
@@ -177,6 +178,27 @@ class ObdGaugesActivity : Activity() {
                     ObdSettings.setAutoConnect(this, !auto)
                     render()
                 }
+            )
+        )
+
+        body.stack(
+            AutoBridgeDesign.contentRow(
+                context = this,
+                title = getString(R.string.obd_layout_row),
+                subtitle = getString(R.string.obd_layout_row_caption),
+                accent = accent,
+                badgeText = "▦",
+                onClick = { startActivity(ObdLayoutActivity.intent(this)) }
+            )
+        )
+        body.stack(
+            AutoBridgeDesign.contentRow(
+                context = this,
+                title = getString(R.string.obd_diag),
+                subtitle = getString(R.string.obd_diag_caption),
+                accent = AutoBridgeDesign.TEXT_MUTED,
+                badgeText = "i",
+                onClick = { showDiagnostics() }
             )
         )
 
@@ -336,10 +358,33 @@ class ObdGaugesActivity : Activity() {
         }
     }
 
+    /** The adapter's recent conversation, so a missing reading can be explained (and copied to share). */
+    private fun showDiagnostics() {
+        val text = ObdLog.snapshot(getString(R.string.obd_diag_enhanced), getString(R.string.obd_diag_recent))
+        val view = TextView(this).apply {
+            this.text = text
+            textSize = 12f
+            typeface = Typeface.MONOSPACE
+            setTextIsSelectable(true)
+            setPadding(dp(16), dp(8), dp(16), dp(8))
+        }
+        val scroll = android.widget.ScrollView(this).apply { addView(view) }
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
+            .setTitle(R.string.obd_diag)
+            .setView(scroll)
+            .setPositiveButton(R.string.obd_diag_copy) { _, _ ->
+                val clipboard = getSystemService(android.content.ClipboardManager::class.java)
+                clipboard?.setPrimaryClip(android.content.ClipData.newPlainText("OBD", text))
+            }
+            .setNegativeButton(R.string.obd_diag_close, null)
+            .show()
+    }
+
     private fun chooseTransmission(current: Transmission) {
         val options = listOf(
             Transmission.T5 to getString(R.string.obd_transmission_t5),
             Transmission.T6 to getString(R.string.obd_transmission_t6),
+            Transmission.NEXT_GEN to getString(R.string.obd_transmission_nextgen),
         )
         val labels = options.map { (value, label) -> (if (value == current) "● " else "   ") + label }
         AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())

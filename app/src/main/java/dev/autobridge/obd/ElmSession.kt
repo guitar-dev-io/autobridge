@@ -44,8 +44,13 @@ class ElmSession(private val transport: ObdTransport) {
             }
             true
         }
-        if (done == null) throw ObdTimeoutException(command)
-        answer.toString().substringBefore('>')
+        if (done == null) {
+            ObdLog.add(command, "(timed out) " + answer.toString())
+            throw ObdTimeoutException(command)
+        }
+        val text = answer.toString().substringBefore('>')
+        ObdLog.add(command, text)
+        text
     }
 
     /** Reads one PID. [Reply.Failure] means the adapter or the bus is in trouble, not just this PID. */

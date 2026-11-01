@@ -47,6 +47,12 @@ class ObdParserTest {
         assertEquals(90f, value("621E1C05A0", atf), 0.01f)
     }
 
+    @Test fun theNextGenRangerReadsGearboxOilLikeTheT6() {
+        val atf = ObdPids.atf(Transmission.NEXT_GEN)
+        assertEquals("221E1C", atf.first().request)
+        assertEquals(90f, value("621E1C05A0", atf.first()), 0.01f)
+    }
+
     @Test fun atfIsAskedOfTheTransmissionFirstThenTheEngine() {
         assertEquals(listOf("7E1", "7E0"), ObdPids.atf(Transmission.T5).map { it.header })
     }
