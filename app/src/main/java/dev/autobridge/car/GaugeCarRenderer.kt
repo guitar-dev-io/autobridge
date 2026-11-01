@@ -29,7 +29,9 @@ class GaugeCarRenderer(private val labelOf: (Gauge) -> String) {
         val telemetry: Telemetry,
         val nowMs: Long,
         val imperial: Boolean,
-        val page: Int,
+        val page: dev.autobridge.obd.GaugePage,
+        val pageIndex: Int,
+        val pageCount: Int,
         val pageTitle: String,
         val status: String,
         /** Shown over the gauges when there is nothing to show yet, e.g. "choose an adapter". */
@@ -90,10 +92,10 @@ class GaugeCarRenderer(private val labelOf: (Gauge) -> String) {
 
         // Page dots, centred.
         val dot = height * 0.12f
-        val total = GaugeCarLayout.PAGES
+        val total = frame.pageCount
         var x = (area.left + area.right) / 2f - (total - 1) * dot * 2.2f
         for (i in 0 until total) {
-            fill.color = if (i == frame.page % total) text else muted
+            fill.color = if (i == frame.pageIndex) text else muted
             canvas.drawCircle(x, area.top + height * 0.5f, dot, fill)
             x += dot * 4.4f
         }

@@ -184,6 +184,16 @@ class ObdGaugesActivity : Activity() {
         body.stack(
             AutoBridgeDesign.contentRow(
                 context = this,
+                title = getString(R.string.obd_layout_row),
+                subtitle = getString(R.string.obd_layout_row_caption),
+                accent = accent,
+                badgeText = "▦",
+                onClick = { startActivity(ObdLayoutActivity.intent(this)) }
+            )
+        )
+        body.stack(
+            AutoBridgeDesign.contentRow(
+                context = this,
                 title = getString(R.string.obd_diag),
                 subtitle = getString(R.string.obd_diag_caption),
                 accent = AutoBridgeDesign.TEXT_MUTED,

@@ -227,9 +227,24 @@ class CarHomeDashboardScreen(
                             .setOnClickListener { openMore() }
                             .build()
                     )
+                    // The gauges are glanced at while driving, so they sit beside the menu button
+                    // instead of two taps deep in it (they are still listed under More).
+                    .addAction(
+                        Action.Builder()
+                            .setIcon(CarIcons.of(carContext, R.drawable.ic_tile_gauge))
+                            .setOnClickListener { openGauges() }
+                            .build()
+                    )
                     .build()
             )
             .build()
+
+    private fun openGauges() {
+        // A surface screen takes the surface over, so this one lets go of it first, like the
+        // browser and video actions do.
+        releaseSurface()
+        CarNavigation.open(screenManager, "CarGaugesScreen") { CarGaugesScreen(carContext) }
+    }
 
     private fun openMore() {
         screenManager.push(CarHomeMoreScreen(carContext, ::requestSafety))

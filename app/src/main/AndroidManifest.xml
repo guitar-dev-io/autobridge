@@ -226,6 +226,7 @@
         <!-- Video settings for the player above, and its enhancement sub-screen. -->
         <activity android:name=".library.VideoSettingsActivity" android:exported="false" />
         <activity android:name=".obd.ObdGaugesActivity" android:exported="false" />
+        <activity android:name=".obd.ObdLayoutActivity" android:exported="false" />
         <activity android:name=".library.VideoEnhancementActivity" android:exported="false" />
         <!-- On-device subtitle translation settings and Opus-MT model management. -->
         <activity android:name=".library.SubtitleSettingsActivity" android:exported="false" />

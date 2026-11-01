@@ -48,4 +48,11 @@ object ObdSettings {
 
     fun setImperial(context: Context, value: Boolean) =
         prefs(context).edit { putBoolean("imperial", value) }
+
+    /** The pages the car shows, arranged on the phone. */
+    fun pages(context: Context): List<GaugePage> =
+        GaugePages.decode(prefs(context).getString("pages", null))
+
+    fun setPages(context: Context, pages: List<GaugePage>) =
+        prefs(context).edit { putString("pages", GaugePages.encode(pages)) }
 }
