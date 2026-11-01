@@ -50,7 +50,7 @@ class ObdLayoutActivity : Activity() {
             body.stack(
                 AutoBridgeDesign.contentRow(
                     context = this,
-                    title = getString(R.string.obd_layout_page, index + 1),
+                    title = getString(R.string.obd_layout_page, (index + 1).toString()),
                     subtitle = getString(layoutName(page.layout)) + " • " +
                         page.gauges.joinToString(", ") { getString(GaugeLabels.of(it)) },
                     accent = accent,
@@ -65,7 +65,7 @@ class ObdLayoutActivity : Activity() {
                 AutoBridgeDesign.contentRow(
                     context = this,
                     title = getString(R.string.obd_layout_add),
-                    subtitle = getString(R.string.obd_layout_add_caption, GaugePages.MAX_PAGES),
+                    subtitle = getString(R.string.obd_layout_add_caption, GaugePages.MAX_PAGES.toString()),
                     accent = AutoBridgeDesign.TEXT_MUTED,
                     badgeText = "+",
                     onClick = {
@@ -122,8 +122,8 @@ class ObdLayoutActivity : Activity() {
         page.gauges.forEachIndexed { slot, gauge ->
             val name = getString(GaugeLabels.of(gauge))
             val label = when (page.layout.slots[slot]) {
-                CellKind.DIAL -> getString(R.string.obd_layout_slot_dial, slot + 1, name)
-                CellKind.TILE -> getString(R.string.obd_layout_slot_tile, slot + 1, name)
+                CellKind.DIAL -> getString(R.string.obd_layout_slot_dial, (slot + 1).toString(), name)
+                CellKind.TILE -> getString(R.string.obd_layout_slot_tile, (slot + 1).toString(), name)
             }
             actions += label to { chooseGauge(index, page, slot) }
         }
@@ -138,7 +138,7 @@ class ObdLayoutActivity : Activity() {
         }
 
         AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
-            .setTitle(getString(R.string.obd_layout_page, index + 1))
+            .setTitle(getString(R.string.obd_layout_page, (index + 1).toString()))
             .setItems(actions.map { it.first }.toTypedArray()) { _, which -> actions[which].second() }
             .show()
     }

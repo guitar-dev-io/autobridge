@@ -187,7 +187,7 @@ class CarGaugesScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
             page = pages[index],
             pageIndex = index,
             pageCount = pages.size,
-            pageTitle = carContext.getString(R.string.car_gauges_page_n, index + 1, pages.size),
+            pageTitle = carContext.getString(R.string.car_gauges_page_n, (index + 1).toString(), pages.size.toString()),
             status = statusText(state),
             notice = notice(),
             alert = worstAlert(telemetry, now, imperial, pages),
