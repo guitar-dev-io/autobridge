@@ -40,6 +40,7 @@ object ObdConnection {
     private val mutableTelemetry = MutableStateFlow(Telemetry())
     private var job: Job? = null
     private var appContext: Context? = null
+    @Volatile private var activePoller: ObdPoller? = null
 
     val state: StateFlow<ObdState> = mutableState.asStateFlow()
     val telemetry: StateFlow<Telemetry> = mutableTelemetry.asStateFlow()
@@ -97,6 +98,7 @@ object ObdConnection {
                             mutableTelemetry.update { it.with(gauge, value, SystemClock.elapsedRealtime()) }
                         }
                         poller.initialize()
+                        activePoller = poller
                         mutableState.update {
                             it.copy(status = ObdState.Status.LIVE, protocol = poller.protocol, message = null)
                         }
@@ -123,8 +125,37 @@ object ObdConnection {
                 }
             }
         } finally {
+            activePoller = null
             transport.close()
         }
         return reason
+    }
+
+    /** What a trouble-code read found. */
+    data class DtcReport(val stored: List<String>, val pending: List<String>)
+
+    /**
+     * Asks every control unit for its stored (03) and pending (07) codes. Null when the adapter is
+     * not live, so a caller can say "connect first" instead of waiting on nothing.
+     */
+    suspend fun readDtcs(): DtcReport? {
+        val poller = activePoller ?: return null
+        return poller.exclusively { session ->
+            val can = poller.isCan
+            val stored = DtcParser.parse(session.request("03", 4_000), 0x43, can)
+            val pending = DtcParser.parse(session.request("07", 4_000), 0x47, can)
+            DtcReport(stored, pending)
+        }
+    }
+
+    /**
+     * Clears the stored codes, the freeze frame and the readiness monitors (service 04). True when
+     * the car confirmed with 44. The caller is expected to have asked the person first.
+     */
+    suspend fun clearDtcs(): Boolean? {
+        val poller = activePoller ?: return null
+        return poller.exclusively { session ->
+            session.request("04", 5_000).uppercase().replace(" ", "").contains("44")
+        }
     }
 }

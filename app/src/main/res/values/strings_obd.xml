@@ -86,4 +86,26 @@
     <string name="obd_pl_tiles4">4 tiles</string>
     <string name="obd_pl_tiles6">6 tiles</string>
     <string name="obd_pl_tiles8">8 tiles</string>
+    <string name="obd_dtc_title">Fault codes</string>
+    <string name="obd_dtc_subtitle">What the car has stored</string>
+    <string name="obd_dtc_row_caption">Read stored and pending codes; clear them after a repair</string>
+    <string name="obd_dtc_read">Read codes</string>
+    <string name="obd_dtc_reading">Reading…</string>
+    <string name="obd_dtc_clear">Clear codes</string>
+    <string name="obd_dtc_stored">Stored codes</string>
+    <string name="obd_dtc_pending">Pending codes</string>
+    <string name="obd_dtc_none">No codes</string>
+    <string name="obd_dtc_connect_first">Connect to the car first, on the Gauges screen</string>
+    <string name="obd_dtc_read_failed">The car did not answer</string>
+    <string name="obd_dtc_clear_title">Clear fault codes?</string>
+    <string name="obd_dtc_clear_body">This erases the stored codes and the freeze-frame data and resets the readiness monitors, so the car may need a drive cycle before an inspection. It does not repair anything: a code comes back if the fault is still there. Do it only while parked, with the ignition on.</string>
+    <string name="obd_dtc_cleared">Codes cleared</string>
+    <string name="obd_dtc_clear_failed">The car did not confirm</string>
+    <string name="obd_dtc_system_powertrain">Powertrain</string>
+    <string name="obd_dtc_system_chassis">Chassis</string>
+    <string name="obd_dtc_system_body">Body</string>
+    <string name="obd_dtc_system_network">Network</string>
+    <string name="obd_dtc_generic">Generic code</string>
+    <string name="obd_dtc_ford">Ford-specific code</string>
+    <string name="obd_dtc_lookup">The meaning is not built in yet. Search the code with your truck\'s model.</string>
 </resources>

@@ -85,4 +85,26 @@
     <string name="obd_pl_tiles4">4 ช่อง</string>
     <string name="obd_pl_tiles6">6 ช่อง</string>
     <string name="obd_pl_tiles8">8 ช่อง</string>
+    <string name="obd_dtc_title">รหัสปัญหา (DTC)</string>
+    <string name="obd_dtc_subtitle">สิ่งที่รถบันทึกไว้</string>
+    <string name="obd_dtc_row_caption">อ่านรหัสที่บันทึกและรอยืนยัน ล้างหลังซ่อมเสร็จ</string>
+    <string name="obd_dtc_read">อ่านรหัส</string>
+    <string name="obd_dtc_reading">กำลังอ่าน…</string>
+    <string name="obd_dtc_clear">ล้างรหัส</string>
+    <string name="obd_dtc_stored">รหัสที่บันทึกไว้</string>
+    <string name="obd_dtc_pending">รหัสที่รอยืนยัน</string>
+    <string name="obd_dtc_none">ไม่พบรหัส</string>
+    <string name="obd_dtc_connect_first">เชื่อมต่อรถก่อนที่หน้าเกจวัด</string>
+    <string name="obd_dtc_read_failed">รถไม่ตอบกลับ</string>
+    <string name="obd_dtc_clear_title">ล้างรหัสปัญหา?</string>
+    <string name="obd_dtc_clear_body">การล้างจะลบรหัสที่บันทึกไว้และข้อมูล freeze frame และรีเซ็ตตัวตรวจความพร้อมของรถ รถอาจต้องขับรอบใหม่ก่อนตรวจสภาพ การล้างไม่ได้ซ่อมอะไร ถ้าอาการยังอยู่รหัสจะกลับมา ทำเฉพาะตอนจอดและเปิดสวิตช์กุญแจเท่านั้น</string>
+    <string name="obd_dtc_cleared">ล้างรหัสแล้ว</string>
+    <string name="obd_dtc_clear_failed">รถไม่ยืนยันการล้าง</string>
+    <string name="obd_dtc_system_powertrain">ระบบขับเคลื่อน</string>
+    <string name="obd_dtc_system_chassis">แชสซี</string>
+    <string name="obd_dtc_system_body">ตัวถัง</string>
+    <string name="obd_dtc_system_network">เครือข่าย</string>
+    <string name="obd_dtc_generic">รหัสมาตรฐาน</string>
+    <string name="obd_dtc_ford">รหัสเฉพาะของ Ford</string>
+    <string name="obd_dtc_lookup">ยังไม่มีคำอธิบายในแอป ให้ค้นรหัสพร้อมรุ่นรถของคุณ</string>
 </resources>
