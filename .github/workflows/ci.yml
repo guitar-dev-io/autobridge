@@ -47,9 +47,12 @@ jobs:
           # Explicit, because the action's own default is "tools platform-tools" and the obsolete
           # "tools" package is gone from the SDK repository: sdkmanager answers "Failed to find
           # package 'tools'" and exits 1, failing this step before a single Gradle task runs.
-          # Nothing else is listed because AGP downloads the platform and build-tools it wants, and
-          # the action has accepted the licenses by this point.
-          packages: platform-tools
+          # AGP downloads the platform, build-tools and NDK it wants, and the action has accepted
+          # the licenses by this point. CMake is listed because that stopped working: from
+          # 2026-11-01 AGP installed the NDK and then failed ":whisper:configureCMakeRelease" with
+          # "[CXX1300] CMake '3.31.6' was not found in SDK" on a runner that no longer ships it.
+          # Keep this version equal to externalNativeBuild.cmake.version in whisper/build.gradle.kts.
+          packages: platform-tools cmake;3.31.6
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -137,9 +140,12 @@ jobs:
           # Explicit, because the action's own default is "tools platform-tools" and the obsolete
           # "tools" package is gone from the SDK repository: sdkmanager answers "Failed to find
           # package 'tools'" and exits 1, failing this step before a single Gradle task runs.
-          # Nothing else is listed because AGP downloads the platform and build-tools it wants, and
-          # the action has accepted the licenses by this point.
-          packages: platform-tools
+          # AGP downloads the platform, build-tools and NDK it wants, and the action has accepted
+          # the licenses by this point. CMake is listed because that stopped working: from
+          # 2026-11-01 AGP installed the NDK and then failed ":whisper:configureCMakeRelease" with
+          # "[CXX1300] CMake '3.31.6' was not found in SDK" on a runner that no longer ships it.
+          # Keep this version equal to externalNativeBuild.cmake.version in whisper/build.gradle.kts.
+          packages: platform-tools cmake;3.31.6
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
