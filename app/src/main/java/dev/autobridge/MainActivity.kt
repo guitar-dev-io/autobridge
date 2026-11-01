@@ -1133,7 +1133,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
                     settingsEntry(
                         getString(R.string.settings_sound_effects),
                         getString(R.string.settings_sound_effects_caption),
-                        R.drawable.ic_tile_radio,
+                        R.drawable.ic_tile_sound,
                         accent = design.ACCENT_RADIO
                     ) {
                         dev.autobridge.library.AudioEffectsSheet(this).show()
