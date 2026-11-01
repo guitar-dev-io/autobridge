@@ -49,6 +49,8 @@ class BrowserAudioBridge(private val context: Context, private val socket: File)
     }
 
     private fun loop() {
+        // Audio threads get the scheduler's attention first, so a busy browser does not starve it.
+        runCatching { android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_URGENT_AUDIO) }
         while (running) {
             val local = LocalSocket()
             var track: AudioTrack? = null
@@ -59,9 +61,17 @@ class BrowserAudioBridge(private val context: Context, private val socket: File)
                 val buffer = ByteArray(BUFFER_BYTES)
                 val input = local.inputStream
                 var silentFor = 0L
+                var filled = 0
+                var framesWritten = 0L
                 while (running) {
-                    val read = input.read(buffer)
-                    if (read < 0) break
+                    val got = input.read(buffer, filled, buffer.size - filled)
+                    if (got < 0) break
+                    filled += got
+                    // A stream read can end mid-frame. Playing a half frame shifts every later
+                    // sample by two bytes, which swaps left and right (or turns into noise), so
+                    // only whole frames go out and the rest waits for the next read.
+                    val read = usableBytes(filled)
+                    if (read == 0) continue
                     val audible = !isSilent(buffer, read)
                     if (audible) {
                         silentFor = 0
@@ -77,9 +87,20 @@ class BrowserAudioBridge(private val context: Context, private val socket: File)
                         }
                     }
                     if (hasFocus && !muted) {
-                        track.write(buffer, 0, read)
-                        bytesPlayed += read
+                        // The page's clock and the speaker's clock drift apart, and a backlog
+                        // after a stall plays late for as long as the page runs. When more than
+                        // MAX_QUEUE_FRAMES are waiting, drop this chunk instead of queueing it:
+                        // a 20 ms gap now, instead of sound that stays a fraction of a second behind.
+                        val queued = framesWritten - (track.playbackHeadPosition.toLong() and 0xFFFFFFFFL)
+                        if (queued <= MAX_QUEUE_FRAMES) {
+                            val written = track.write(buffer, 0, read)
+                            if (written < 0) throw IllegalStateException("AudioTrack write failed: $written")
+                            framesWritten += written / FRAME_BYTES
+                            bytesPlayed += written
+                        }
                     }
+                    filled -= read
+                    if (filled > 0) System.arraycopy(buffer, read, buffer, 0, filled)
                 }
             } catch (e: Exception) {
                 if (running) DesktopLog.w("audio bridge reconnecting", e)
@@ -102,7 +123,11 @@ class BrowserAudioBridge(private val context: Context, private val socket: File)
                     .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
                     .build()
             )
-            .setBufferSizeInBytes(maxOf(min * 2, BUFFER_BYTES * 2))
+            // PulseAudio hands over its monitor in bursts of about 50 ms, so the buffer must hold a
+            // few of them or write() blocks and the burst arrives late; its fullness, not its
+            // size, sets the delay, and MAX_QUEUE_FRAMES caps that.
+            .setBufferSizeInBytes(maxOf(min * 2, MAX_QUEUE_FRAMES * FRAME_BYTES * 2))
+            .setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
             .setTransferMode(AudioTrack.MODE_STREAM)
             .build()
     }
@@ -143,8 +168,13 @@ class BrowserAudioBridge(private val context: Context, private val socket: File)
     companion object {
         private const val SAMPLE_RATE = 48_000
         private const val FRAME_BYTES = 4
-        private const val BUFFER_BYTES = SAMPLE_RATE * FRAME_BYTES / 25 // 40 ms
+        private const val BUFFER_BYTES = SAMPLE_RATE * FRAME_BYTES / 25 // 40 ms per read
+        /** Longest wait allowed in the AudioTrack: 150 ms, above PulseAudio's 50 ms bursts. */
+        private const val MAX_QUEUE_FRAMES = SAMPLE_RATE * 150 / 1000
         private const val SILENCE = 8
+
+        /** How many of [filled] bytes are whole stereo 16-bit frames. */
+        internal fun usableBytes(filled: Int): Int = filled - filled % FRAME_BYTES
         private val ATTRIBUTES = AudioAttributes.Builder()
             .setUsage(AudioAttributes.USAGE_MEDIA)
             .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
