@@ -7,6 +7,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- The radio equalizer: android.media.audiofx effects on the player's own audio session. -->
@@ -23,6 +24,12 @@
          protected, and the media auto-start option would otherwise be a switch that does nothing.
          No device is read and nothing is scanned for. -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!-- OBD2 gauges: finding and talking to the car's Bluetooth LE adapter (vLinker and similar).
+         BLUETOOTH_SCAN is declared never to derive location, so no location prompt on Android 12+.
+         Before Android 12 a scan needs the legacy pair plus the location permission above. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
     <!-- Special permission: granted via ACTION_MANAGE_WRITE_SETTINGS, used only for the
          per-app force-landscape profile (QuickAppLauncher). -->
     <uses-permission android:name="android.permission.WRITE_SETTINGS" />
@@ -218,6 +225,7 @@
 
         <!-- Video settings for the player above, and its enhancement sub-screen. -->
         <activity android:name=".library.VideoSettingsActivity" android:exported="false" />
+        <activity android:name=".obd.ObdGaugesActivity" android:exported="false" />
         <activity android:name=".library.VideoEnhancementActivity" android:exported="false" />
         <!-- On-device subtitle translation settings and Opus-MT model management. -->
         <activity android:name=".library.SubtitleSettingsActivity" android:exported="false" />
@@ -280,6 +288,7 @@
         </activity>
 
         <service android:name=".mirror.ProjectionService" android:exported="false" android:foregroundServiceType="mediaProjection" />
+        <service android:name=".obd.ObdService" android:exported="false" android:foregroundServiceType="connectedDevice" />
 
         <!-- Exported so Android Auto / system media controllers can bind, per Media3's own
              MediaSessionService pattern. Access control is enforced per-controller inside

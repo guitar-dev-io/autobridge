@@ -90,7 +90,10 @@ class CarHomeMoreScreen(
             entry(R.string.car_more_quick_launch) {
                 CarHomeNavigator.open(carContext, screenManager, HomeSection.APPS, requestSafety)
             },
-            section(HomeSection.MIRROR)
+            section(HomeSection.MIRROR),
+            entry(R.string.car_gauges_title) {
+                CarNavigation.open(screenManager, "CarGaugesScreen") { CarGaugesScreen(carContext) }
+            }
         ) + extensions(CarExtensionEntry.Placement.FREQUENT) + listOf(
             entry(R.string.car_saved_title) {
                 CarNavigation.open(screenManager, "CarSavedScreen") { CarSavedScreen(carContext, requestSafety) }

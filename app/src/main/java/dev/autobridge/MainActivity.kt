@@ -1090,6 +1090,14 @@ class MainActivity : androidx.activity.ComponentActivity() {
                     })
                     addAll(projectionSetupEntry())
                     add(settingsEntry(
+                        getString(R.string.obd_title),
+                        getString(R.string.obd_settings_caption),
+                        R.drawable.ic_tile_gauge,
+                        accent = design.ACCENT
+                    ) {
+                        startActivity(dev.autobridge.obd.ObdGaugesActivity.intent(this@MainActivity))
+                    })
+                    add(settingsEntry(
                         getString(R.string.settings_app_profiles),
                         getString(R.string.settings_app_profiles_caption_full),
                         R.drawable.ic_tile_apps,
