@@ -43,4 +43,14 @@
     <string name="obd_imperial_off">°C และ km/h</string>
     <string name="obd_auto">เชื่อมต่อใหม่อัตโนมัติ</string>
     <string name="obd_auto_caption">เชื่อมต่อทันทีที่เปิดหน้านี้</string>
+    <string name="obd_notification_channel">ข้อมูลรถ (OBD2)</string>
+    <string name="obd_notification_title">กำลังอ่านข้อมูลรถ</string>
+    <string name="obd_notification_text">เชื่อมต่อกับอะแดปเตอร์ OBD2</string>
+    <string name="obd_notification_stop">หยุด</string>
+    <string name="car_gauges_title">เกจวัด</string>
+    <string name="car_gauges_page_drive">ขับขี่</string>
+    <string name="car_gauges_page_engine">เครื่องยนต์</string>
+    <string name="car_gauges_pick_on_phone">เลือกอะแดปเตอร์ OBD2 บนมือถือ: AutoBridge › ตั้งค่า › เกจวัด</string>
+    <string name="car_gauges_allow_bluetooth">อนุญาต Bluetooth ให้ AutoBridge บนมือถือ</string>
+    <string name="car_gauges_next_page">หน้าถัดไป</string>
 </resources>

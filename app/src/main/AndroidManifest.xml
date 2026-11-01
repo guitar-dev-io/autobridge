@@ -7,6 +7,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- The radio equalizer: android.media.audiofx effects on the player's own audio session. -->
@@ -287,6 +288,7 @@
         </activity>
 
         <service android:name=".mirror.ProjectionService" android:exported="false" android:foregroundServiceType="mediaProjection" />
+        <service android:name=".obd.ObdService" android:exported="false" android:foregroundServiceType="connectedDevice" />
 
         <!-- Exported so Android Auto / system media controllers can bind, per Media3's own
              MediaSessionService pattern. Access control is enforced per-controller inside

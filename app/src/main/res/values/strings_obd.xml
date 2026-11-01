@@ -44,4 +44,14 @@
     <string name="obd_imperial_off">°C and km/h</string>
     <string name="obd_auto">Reconnect automatically</string>
     <string name="obd_auto_caption">Connects as soon as this screen opens</string>
+    <string name="obd_notification_channel">Car data (OBD2)</string>
+    <string name="obd_notification_title">Reading car data</string>
+    <string name="obd_notification_text">Connected to the OBD2 adapter</string>
+    <string name="obd_notification_stop">Stop</string>
+    <string name="car_gauges_title">Gauges</string>
+    <string name="car_gauges_page_drive">Drive</string>
+    <string name="car_gauges_page_engine">Engine</string>
+    <string name="car_gauges_pick_on_phone">Choose an OBD2 adapter on the phone: AutoBridge › Settings › Gauges</string>
+    <string name="car_gauges_allow_bluetooth">Allow Bluetooth for AutoBridge on the phone</string>
+    <string name="car_gauges_next_page">Next page</string>
 </resources>

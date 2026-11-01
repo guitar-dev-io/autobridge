@@ -52,22 +52,6 @@ class ObdGaugesActivity : Activity() {
             Gauge.COOLANT, Gauge.ATF, Gauge.BOOST, Gauge.BATTERY, Gauge.LOAD, Gauge.INTAKE,
             Gauge.THROTTLE, Gauge.FUEL_LEVEL, Gauge.AMBIENT, Gauge.MAP, Gauge.BARO,
         )
-
-        private fun title(gauge: Gauge): Int = when (gauge) {
-            Gauge.RPM -> R.string.obd_g_rpm
-            Gauge.SPEED -> R.string.obd_g_speed
-            Gauge.COOLANT -> R.string.obd_g_coolant
-            Gauge.ATF -> R.string.obd_g_atf
-            Gauge.BOOST -> R.string.obd_g_boost
-            Gauge.BATTERY -> R.string.obd_g_battery
-            Gauge.LOAD -> R.string.obd_g_load
-            Gauge.INTAKE -> R.string.obd_g_intake
-            Gauge.MAP -> R.string.obd_g_map
-            Gauge.BARO -> R.string.obd_g_baro
-            Gauge.THROTTLE -> R.string.obd_g_throttle
-            Gauge.FUEL_LEVEL -> R.string.obd_g_fuel
-            Gauge.AMBIENT -> R.string.obd_g_ambient
-        }
     }
 
     private val handler = Handler(Looper.getMainLooper())
@@ -135,7 +119,7 @@ class ObdGaugesActivity : Activity() {
         body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.obd_title)), gap = 2)
         val dialRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         for ((index, gauge) in DIALS.withIndex()) {
-            val dial = DialView(this, getString(title(gauge)))
+            val dial = DialView(this, getString(GaugeLabels.of(gauge)))
             dials[gauge] = dial
             dialRow.addView(dial, LinearLayout.LayoutParams(0, dp(170), 1f).apply {
                 if (index == 0) marginEnd = dp(8)
@@ -146,7 +130,7 @@ class ObdGaugesActivity : Activity() {
         for (pair in TILES.chunked(2)) {
             val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
             for ((index, gauge) in pair.withIndex()) {
-                val tile = Tile(this, getString(title(gauge)))
+                val tile = Tile(this, getString(GaugeLabels.of(gauge)))
                 tiles[gauge] = tile
                 row.addView(tile.view, LinearLayout.LayoutParams(0, -2, 1f).apply {
                     if (index == 0) marginEnd = dp(8)
@@ -302,12 +286,7 @@ class ObdGaugesActivity : Activity() {
         ObdState.Status.RETRYING -> getString(R.string.obd_status_retry, state.message.orEmpty())
     }
 
-    private fun zoneColor(zone: Zone): Int = when (zone) {
-        Zone.COLD -> 0xFF00AAFF.toInt()
-        Zone.NORMAL -> 0xFF00D977.toInt()
-        Zone.CAUTION -> 0xFFFFAA00.toInt()
-        Zone.DANGER -> 0xFFFF3B30.toInt()
-    }
+    private fun zoneColor(zone: Zone): Int = ZoneColors.of(zone)
 
     // ---- Connecting ---------------------------------------------------------------------------
 

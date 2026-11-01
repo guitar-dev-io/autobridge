@@ -39,6 +39,7 @@ object ObdConnection {
     private val mutableState = MutableStateFlow(ObdState())
     private val mutableTelemetry = MutableStateFlow(Telemetry())
     private var job: Job? = null
+    private var appContext: Context? = null
 
     val state: StateFlow<ObdState> = mutableState.asStateFlow()
     val telemetry: StateFlow<Telemetry> = mutableTelemetry.asStateFlow()
@@ -49,6 +50,8 @@ object ObdConnection {
     fun start(context: Context, adapter: ObdSettings.Adapter, transmission: Transmission) {
         if (isRunning) return
         val app = context.applicationContext
+        appContext = app
+        ObdService.start(app)
         mutableTelemetry.value = Telemetry()
         mutableState.value = ObdState(ObdState.Status.CONNECTING, adapterName = adapter.name)
         job = scope.launch {
@@ -69,6 +72,7 @@ object ObdConnection {
     fun stop() {
         job?.cancel()
         job = null
+        appContext?.let { ObdService.stop(it) }
         mutableState.value = ObdState()
         mutableTelemetry.value = Telemetry()
     }
