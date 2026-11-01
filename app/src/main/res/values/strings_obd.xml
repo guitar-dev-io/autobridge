@@ -107,5 +107,5 @@
     <string name="obd_dtc_system_network">Network</string>
     <string name="obd_dtc_generic">Generic code</string>
     <string name="obd_dtc_ford">Ford-specific code</string>
-    <string name="obd_dtc_lookup">The meaning is not built in yet. Search the code with your truck\'s model.</string>
+    <string name="obd_dtc_lookup">This code is not in the built-in list. Search it with your truck\'s model.</string>
 </resources>

@@ -73,15 +73,6 @@ class ObdDtcActivity : Activity() {
         val container = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         results = container
         body.stack(container)
-        body.stack(
-            TextView(this).apply {
-                text = getString(R.string.obd_dtc_lookup)
-                textSize = 12f
-                setTextColor(AutoBridgeDesign.TEXT_MUTED)
-                setPadding(dp(6), dp(4), dp(6), 0)
-            }
-        )
-
         AutoBridgeDesign.showPage(
             this,
             AutoBridgeDesign.page(
@@ -149,9 +140,23 @@ class ObdDtcActivity : Activity() {
         val box = results ?: return
         box.removeAllViews()
         hasCodes = report.stored.isNotEmpty() || report.pending.isNotEmpty()
+        unknown = false
         section(box, R.string.obd_dtc_stored, report.stored, pending = false)
         section(box, R.string.obd_dtc_pending, report.pending, pending = true)
+        if (unknown) {
+            box.stack(
+                TextView(this).apply {
+                    text = getString(R.string.obd_dtc_lookup)
+                    textSize = 12f
+                    setTextColor(AutoBridgeDesign.TEXT_MUTED)
+                    setPadding(dp(6), dp(4), dp(6), 0)
+                }
+            )
+        }
     }
+
+    /** Set while drawing when some code has no description, so the hint about looking it up shows. */
+    private var unknown = false
 
     private fun section(box: LinearLayout, title: Int, codes: List<String>, pending: Boolean) {
         box.stack(AutoBridgeDesign.sectionLabel(this, getString(title)), gap = 2)
@@ -179,13 +184,16 @@ class ObdDtcActivity : Activity() {
                 }
             )
             val kind = getString(if (dtc.generic) R.string.obd_dtc_generic else R.string.obd_dtc_ford)
+            val description = DtcDatabase.describe(this, code)
+            if (description == null) unknown = true
             box.stack(
                 AutoBridgeDesign.contentRow(
                     context = this,
                     title = code,
-                    subtitle = "$system • $kind",
+                    subtitle = if (description != null) "$description\n$system • $kind" else "$system • $kind",
                     accent = if (pending) AutoBridgeDesign.TEXT_MUTED else ZoneColors.CAUTION,
                     badgeText = code.first().toString(),
+                    subtitleMaxLines = 3,
                     onClick = {}
                 )
             )
