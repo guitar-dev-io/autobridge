@@ -11,8 +11,11 @@ class ObdModelTest {
         assertEquals(Zone.COLD, zone(Gauge.COOLANT, 60f))
         assertEquals(Zone.NORMAL, zone(Gauge.COOLANT, 75f))
         assertEquals(Zone.NORMAL, zone(Gauge.COOLANT, 85f))
-        assertEquals(Zone.CAUTION, zone(Gauge.COOLANT, 95f))
-        assertEquals(Zone.DANGER, zone(Gauge.COOLANT, 105f))
+        assertEquals(Zone.NORMAL, zone(Gauge.COOLANT, 92f))
+        assertEquals(Zone.CAUTION, zone(Gauge.COOLANT, 100f))
+        assertEquals(Zone.DANGER, zone(Gauge.COOLANT, 106f))
+        assertEquals(Zone.CAUTION, zone(Gauge.ATF, 95f))
+        assertEquals(Zone.DANGER, zone(Gauge.ATF, 101f))
     }
 
     @Test fun batteryIsBadWhenLowOrWhenTooHigh() {

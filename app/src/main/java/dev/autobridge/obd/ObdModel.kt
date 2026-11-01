@@ -86,13 +86,17 @@ data class GaugeSpec(
     fun fraction(value: Float): Float = ((value - min) / (max - min)).coerceIn(0f, 1f)
 
     companion object {
-        /** Ranges for a Ford Ranger PJ/PK diesel, from the Ford OBD2 Smart Gauge project's tuning. */
+        /**
+         * Ranges for a Ford Ranger PJ/PK diesel, from the Ford OBD2 Smart Gauge project's tuning.
+         * Coolant and gearbox oil follow its README table (normal up to 95 / 90, caution up to 105 / 100):
+         * a Ranger at 92 degrees is simply warm, and its gradient code's tighter 90 degree edge made it orange.
+         */
         private val SPECS: Map<Gauge, GaugeSpec> = listOf(
             GaugeSpec(Gauge.RPM, 0f, 5000f, 600f, 4500f, 300f, 5500f, lowIsBad = true, highIsBad = true),
             GaugeSpec(Gauge.SPEED, 0f, 200f, 0f, 120f, 0f, 140f, lowIsBad = false, highIsBad = true),
             GaugeSpec(Gauge.BOOST, -15f, 25f, -5f, 12f, -10f, 18f, lowIsBad = false, highIsBad = true),
-            GaugeSpec(Gauge.COOLANT, 40f, 120f, 80f, 90f, 70f, 98f, lowIsBad = false, highIsBad = true, coldBelow = 70f),
-            GaugeSpec(Gauge.ATF, 40f, 120f, 80f, 90f, 70f, 98f, lowIsBad = false, highIsBad = true, coldBelow = 70f),
+            GaugeSpec(Gauge.COOLANT, 40f, 120f, 80f, 95f, 70f, 105f, lowIsBad = false, highIsBad = true, coldBelow = 70f),
+            GaugeSpec(Gauge.ATF, 40f, 120f, 70f, 90f, 65f, 100f, lowIsBad = false, highIsBad = true, coldBelow = 70f),
             GaugeSpec(Gauge.BATTERY, 10f, 16f, 13.8f, 14.4f, 12.5f, 15f, lowIsBad = true, highIsBad = true),
             GaugeSpec(Gauge.FUEL_LEVEL, 0f, 100f, 25f, 100f, 15f, 100f, lowIsBad = true, highIsBad = false),
             GaugeSpec(Gauge.LOAD, 0f, 100f, 15f, 85f, 10f, 95f, lowIsBad = false, highIsBad = true),
