@@ -1,4 +1,4 @@
-**Version:** `0.4.60-rc7` &nbsp;·&nbsp; **Build (versionCode):** `103`
+**Version:** `0.4.60-rc8` &nbsp;·&nbsp; **Build (versionCode):** `104`
 
 AutoBridge is a personal/development Android project for experimenting with a parked-only phone-to-Android-Auto surface bridge. It is an independent codebase, not a merge of the reference projects tracked in the project's internal `docs/` notes.
 
@@ -268,7 +268,7 @@ Upload this file in Play Console:
 app/build/outputs/bundle/personalRelease/app-personal-release.aab
 ```
 
-The bundle is signed with the AutoBridge release keystore and contains `dev.autobridge`, version `0.4.60-rc7`, and `versionCode 103`. Increment `versionCode` for every later upload with `./scripts/set-version.sh` (see [Setting the version](#setting-the-version)); keep the same keystore for updates. Start with Internal testing/App Sharing before attempting production release. The current Android Auto surface is a development/personal-use POC using a `NavigationTemplate` for mirroring, so Play/Android Auto policy approval is not guaranteed.
+The bundle is signed with the AutoBridge release keystore and contains `dev.autobridge`, version `0.4.60-rc8`, and `versionCode 104`. Increment `versionCode` for every later upload with `./scripts/set-version.sh` (see [Setting the version](#setting-the-version)); keep the same keystore for updates. Start with Internal testing/App Sharing before attempting production release. The current Android Auto surface is a development/personal-use POC using a `NavigationTemplate` for mirroring, so Play/Android Auto policy approval is not guaranteed.
 
 ### Deobfuscation (R8 mapping) files
 
@@ -778,6 +778,7 @@ AutoBridge เป็น implementation อิสระภายใต้แพ�
 - **[MirrorMobile](https://github.com/chenxiaolong/MirrorMobile)** (GPL-3.0) — Android Auto surface lifecycle, authoritative `CAR_SPEED`, and fail-closed parked behaviour. No GPL source was copied into this MIT tree. / วงจรชีวิตเซอร์เฟซบน Android Auto, `CAR_SPEED` ที่เชื่อถือได้ และพฤติกรรม fail-closed ตอนจอด (ไม่มีการคัดลอกซอร์ส GPL เข้ามาในทรี MIT นี้)
 - **[ScreenOnAuto](https://github.com/slzn/ScreenOnAuto-releases)** — touch UX, Quick Apps, force-landscape, optional privileged input, MediaSession, and screen-off ideas, credited as a behavioural/documentation reference. / แนวคิดเรื่อง touch UX, Quick Apps, บังคับแนวนอน, อินพุตแบบ privileged (ทางเลือก), MediaSession และ screen-off โดยอ้างเป็นแหล่งอ้างอิงเชิงพฤติกรรม/เอกสาร
 - **[Fermata-Xtream](https://github.com/malebuffy/Fermata-Xtream)** (GPL-3.0) — the home section set and ordering (TV, Radio, Web, YouTube family, Folders, Favorites, Playlists, Gallery) and the Xtream Codes account flow. No upstream source or assets were copied into this MIT tree. / ชุดและลำดับ section หน้าหลัก (TV, Radio, เว็บ, กลุ่ม YouTube, โฟลเดอร์, Favorites, เพลย์ลิสต์, แกลเลอรี) และ flow บัญชี Xtream Codes (ไม่มีการคัดลอกซอร์สหรือ asset เข้ามาในทรี MIT นี้)
+- **[Ford OBD2 Smart Gauge](https://github.com/kotchasaan/Ford_OBD2_Smart_Gauge)** (Kotchasaan) — the Ranger gauge ranges and colour zones, the Ford PID formulas (gearbox oil, battery, fuel rail) and the list of about 700 trouble-code descriptions shipped as `app/src/main/assets/dtc/ford_dtc_codes.csv`. The repository carries no licence file; the list and the ranges are used with the maintainer's permission, given to the AutoBridge maintainer, which is why this entry exists and why it is the one asset here that was copied rather than informed by. / ช่วงค่าและโซนสีของเกจ สูตร PID เฉพาะ Ford (น้ำมันเกียร์ แบตเตอรี่ รางหัวฉีด) และรายการคำอธิบายรหัสปัญหากว่า 700 รหัสที่อยู่ใน `app/src/main/assets/dtc/ford_dtc_codes.csv` repository นั้นไม่มีไฟล์ license ผู้ดูแล AutoBridge แจ้งว่าได้รับอนุญาตจากเจ้าของให้ใช้รายการและช่วงค่าเหล่านี้ จึงมีรายการนี้ไว้ระบุที่มา
 
 ## License
 

@@ -106,5 +106,5 @@
     <string name="obd_dtc_system_network">เครือข่าย</string>
     <string name="obd_dtc_generic">รหัสมาตรฐาน</string>
     <string name="obd_dtc_ford">รหัสเฉพาะของ Ford</string>
-    <string name="obd_dtc_lookup">ยังไม่มีคำอธิบายในแอป ให้ค้นรหัสพร้อมรุ่นรถของคุณ</string>
+    <string name="obd_dtc_lookup">รหัสนี้ไม่อยู่ในรายการของแอป ให้ค้นรหัสพร้อมรุ่นรถของคุณ</string>
 </resources>

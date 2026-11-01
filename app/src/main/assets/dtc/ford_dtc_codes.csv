@@ -1,0 +1,705 @@
+CODE,DESCRIPTION
+P0000,No Fault
+P0001,Fuel Volume Regulator Control Circuit/Open
+P0002,Fuel Volume Regulator Control Circuit Range/Performance
+P0003,Fuel Volume Regulator Control Circuit Low
+P0004,Fuel Volume Regulator Control Circuit High
+P0005,Fuel Shutoff Valve A Control Circuit/Open
+P0006,Fuel Shutoff Valve A Control Circuit Low
+P0007,Fuel Shutoff Valve A Control Circuit High
+P0008,Engine Position System Performance Bank 1
+P0009,Engine Position System Performance Bank 2
+P0010,A Camshaft Position Actuator Circuit Bank 1
+P0011,A Camshaft Position - Timing Over-Advanced or System Performance Bank 1
+P0012,A Camshaft Position - Timing Over-Retarded Bank 1
+P0013,B Camshaft Position Actuator Circuit Bank 1
+P0014,B Camshaft Position - Timing Over-Advanced or System Performance Bank 1
+P0015,B Camshaft Position - Timing Over-Retarded Bank 1
+P0016,Crankshaft Position - Camshaft Position Correlation Bank 1 Sensor A
+P0017,Crankshaft Position - Camshaft Position Correlation Bank 1 Sensor B
+P0018,Crankshaft Position - Camshaft Position Correlation Bank 2 Sensor A
+P0019,Crankshaft Position - Camshaft Position Correlation Bank 2 Sensor B
+P0020,A Camshaft Position Actuator Circuit Bank 2
+P0021,A Camshaft Position - Timing Over-Advanced or System Performance Bank 2
+P0022,A Camshaft Position - Timing Over-Retarded Bank 2
+P0100,Mass Air Flow (MAF) Circuit Malfunction
+P0101,Mass Air Flow (MAF) Circuit Range/Performance
+P0102,Mass Air Flow (MAF) Circuit Low Input
+P0103,Mass Air Flow (MAF) Circuit High Input
+P0104,Mass Air Flow (MAF) Circuit Intermittent
+P0105,Manifold Absolute Pressure Circuit Malfunction
+P0106,Manifold Absolute Pressure Range/Performance
+P0107,Manifold Absolute Pressure Circuit Low Input
+P0108,Manifold Absolute Pressure Circuit High Input
+P0109,Manifold Absolute Pressure Circuit Intermittent
+P0110,Intake Air Temperature Circuit Malfunction
+P0111,Intake Air Temperature Circuit Range/Performance
+P0112,Intake Air Temperature Circuit Low Input
+P0113,Intake Air Temperature Circuit High Input
+P0114,Intake Air Temperature Circuit Intermittent
+P0115,Engine Coolant Temperature Circuit Malfunction
+P0116,Engine Coolant Temperature Circuit Range/Performance
+P0117,Engine Coolant Temperature Circuit Low Input
+P0118,Engine Coolant Temperature Circuit High Input
+P0119,Engine Coolant Temperature Circuit Intermittent
+P0120,Throttle Position Sensor Circuit Malfunction
+P0121,Throttle Position Sensor Circuit Range/Performance
+P0122,Throttle Position Sensor Circuit Low Input
+P0123,Throttle Position Sensor Circuit High Input
+P0124,Throttle Position Sensor Circuit Intermittent
+P0125,Insufficient Coolant Temperature for Closed Loop Fuel Control
+P0126,Insufficient Coolant Temperature for Stable Operation
+P0128,Coolant Thermostat - Coolant Temperature Below Thermostat Regulating Temperature
+P0130,O2 Sensor Circuit Malfunction Bank 1 Sensor 1
+P0131,O2 Sensor Circuit Low Voltage Bank 1 Sensor 1
+P0132,O2 Sensor Circuit High Voltage Bank 1 Sensor 1
+P0133,O2 Sensor Circuit Slow Response Bank 1 Sensor 1
+P0134,O2 Sensor Circuit No Activity Detected Bank 1 Sensor 1
+P0135,O2 Sensor Heater Circuit Malfunction Bank 1 Sensor 1
+P0136,O2 Sensor Circuit Malfunction Bank 1 Sensor 2
+P0137,O2 Sensor Circuit Low Voltage Bank 1 Sensor 2
+P0138,O2 Sensor Circuit High Voltage Bank 1 Sensor 2
+P0139,O2 Sensor Circuit Slow Response Bank 1 Sensor 2
+P0140,O2 Sensor Circuit No Activity Detected Bank 1 Sensor 2
+P0141,O2 Sensor Heater Circuit Malfunction Bank 1 Sensor 2
+P0150,O2 Sensor Circuit Malfunction Bank 2 Sensor 1
+P0151,O2 Sensor Circuit Low Voltage Bank 2 Sensor 1
+P0152,O2 Sensor Circuit High Voltage Bank 2 Sensor 1
+P0153,O2 Sensor Circuit Slow Response Bank 2 Sensor 1
+P0154,O2 Sensor Circuit No Activity Detected Bank 2 Sensor 1
+P0155,O2 Sensor Heater Circuit Malfunction Bank 2 Sensor 1
+P0156,O2 Sensor Circuit Malfunction Bank 2 Sensor 2
+P0157,O2 Sensor Circuit Low Voltage Bank 2 Sensor 2
+P0158,O2 Sensor Circuit High Voltage Bank 2 Sensor 2
+P0159,O2 Sensor Circuit Slow Response Bank 2 Sensor 2
+P0160,O2 Sensor Circuit No Activity Detected Bank 2 Sensor 2
+P0161,O2 Sensor Heater Circuit Malfunction Bank 2 Sensor 2
+P0171,System Too Lean Bank 1
+P0172,System Too Rich Bank 1
+P0174,System Too Lean Bank 2
+P0175,System Too Rich Bank 2
+P0300,Random/Multiple Cylinder Misfire Detected
+P0301,Cylinder 1 Misfire Detected
+P0302,Cylinder 2 Misfire Detected
+P0303,Cylinder 3 Misfire Detected
+P0304,Cylinder 4 Misfire Detected
+P0305,Cylinder 5 Misfire Detected
+P0306,Cylinder 6 Misfire Detected
+P0307,Cylinder 7 Misfire Detected
+P0308,Cylinder 8 Misfire Detected
+P0316,Misfire Detected on Startup - First 1000 Revolutions
+P0320,Ignition/Distributor Engine Speed Input Circuit
+P0325,Knock Sensor 1 Circuit Bank 1
+P0326,Knock Sensor 1 Circuit Range/Performance Bank 1
+P0327,Knock Sensor 1 Circuit Low Bank 1
+P0328,Knock Sensor 1 Circuit High Bank 1
+P0330,Knock Sensor 2 Circuit Bank 2
+P0331,Knock Sensor 2 Circuit Range/Performance Bank 2
+P0332,Knock Sensor 2 Circuit Low Bank 2
+P0333,Knock Sensor 2 Circuit High Bank 2
+P0400,Exhaust Gas Recirculation Flow Malfunction
+P0401,Exhaust Gas Recirculation Flow Insufficient Detected
+P0402,Exhaust Gas Recirculation Flow Excessive Detected
+P0403,Exhaust Gas Recirculation Circuit Malfunction
+P0404,Exhaust Gas Recirculation Circuit Range/Performance
+P0405,Exhaust Gas Recirculation Sensor A Circuit Low
+P0406,Exhaust Gas Recirculation Sensor A Circuit High
+P0410,Secondary Air Injection System Malfunction
+P0411,Secondary Air Injection System Incorrect Flow Detected
+P0412,Secondary Air Injection System Switching Valve A Circuit
+P0420,Catalyst System Efficiency Below Threshold Bank 1
+P0430,Catalyst System Efficiency Below Threshold Bank 2
+P0440,Evaporative Emission Control System Malfunction
+P0441,Evaporative Emission Control System Incorrect Purge Flow
+P0442,Evaporative Emission Control System Leak Detected (small leak)
+P0443,Evaporative Emission Control System Purge Control Valve Circuit
+P0446,Evaporative Emission Control System Vent Control Circuit
+P0451,Evaporative Emission Control System Pressure Sensor Range/Performance
+P0452,Evaporative Emission Control System Pressure Sensor Low Input
+P0453,Evaporative Emission Control System Pressure Sensor High Input
+P0455,Evaporative Emission Control System Leak Detected (large leak)
+P0456,Evaporative Emission Control System Leak Detected (very small leak)
+P0457,Evaporative Emission Control System Leak Detected (fuel cap loose/off)
+P0500,Vehicle Speed Sensor A Malfunction
+P0501,Vehicle Speed Sensor A Range/Performance
+P0502,Vehicle Speed Sensor A Circuit Low Input
+P0503,Vehicle Speed Sensor A Circuit High Input
+P0505,Idle Air Control System Malfunction
+P0506,Idle Air Control System RPM Lower Than Expected
+P0507,Idle Air Control System RPM Higher Than Expected
+P0560,System Voltage Malfunction
+P0561,System Voltage Unstable
+P0562,System Voltage Low
+P0563,System Voltage High
+P0571,Brake Switch A Circuit Malfunction
+P0572,Brake Switch A Circuit Low
+P0573,Brake Switch A Circuit High
+P0600,Serial Communication Link Malfunction
+P0601,Internal Control Module Memory Check Sum Error
+P0602,Control Module Programming Error
+P0603,Internal Control Module Keep Alive Memory (KAM) Error
+P0604,Internal Control Module Random Access Memory (RAM) Error
+P0605,Internal Control Module Read Only Memory (ROM) Error
+P0606,PCM Processor Fault
+P0607,Control Module Performance
+P0608,Control Module VSS Output A Malfunction
+P0609,Control Module VSS Output B Malfunction
+P0610,Control Module Vehicle Options Error
+P0620,Generator Control Circuit Malfunction
+P0622,Generator Field F Terminal Circuit Malfunction
+P0625,Generator Field Terminal Circuit Low
+P0626,Generator Field Terminal Circuit High
+P0628,Fuel Pump A Control Circuit Low
+P0629,Fuel Pump A Control Circuit High
+P0700,Transmission Control System Malfunction
+P0701,Transmission Control System Range/Performance
+P0702,Transmission Control System Electrical
+P0703,Torque Converter/Brake Switch B Circuit
+P0704,Clutch Switch Input Circuit Malfunction
+P0705,Transmission Range Sensor Circuit Malfunction (PRNDL Input)
+P0706,Transmission Range Sensor Circuit Range/Performance
+P0707,Transmission Range Sensor Circuit Low Input
+P0708,Transmission Range Sensor Circuit High Input
+P0709,Transmission Range Sensor Circuit Intermittent
+P0710,Transmission Fluid Temperature Sensor Circuit
+P0711,Transmission Fluid Temperature Sensor Circuit Range/Performance
+P0712,Transmission Fluid Temperature Sensor Circuit Low Input
+P0713,Transmission Fluid Temperature Sensor Circuit High Input
+P0714,Transmission Fluid Temperature Sensor Circuit Intermittent
+P0715,Input/Turbine Speed Sensor Circuit
+P0716,Input/Turbine Speed Sensor Circuit Range/Performance
+P0717,Input/Turbine Speed Sensor Circuit No Signal
+P0718,Input/Turbine Speed Sensor Circuit Intermittent
+P0720,Output Speed Sensor Circuit
+P0721,Output Speed Sensor Circuit Range/Performance
+P0722,Output Speed Sensor Circuit No Signal
+P0723,Output Speed Sensor Circuit Intermittent
+P0730,Incorrect Gear Ratio
+P0731,Gear 1 Incorrect Ratio
+P0732,Gear 2 Incorrect Ratio
+P0733,Gear 3 Incorrect Ratio
+P0734,Gear 4 Incorrect Ratio
+P0735,Gear 5 Incorrect Ratio
+P0740,Torque Converter Clutch Circuit Malfunction
+P0741,Torque Converter Clutch Circuit Performance or Stuck Off
+P0742,Torque Converter Clutch Circuit Stuck On
+P0743,Torque Converter Clutch Circuit Electrical
+P0744,Torque Converter Clutch Circuit Intermittent
+P0745,Pressure Control Solenoid A
+P0746,Pressure Control Solenoid A Performance or Stuck Off
+P0747,Pressure Control Solenoid A Stuck On
+P0748,Pressure Control Solenoid A Electrical
+P0749,Pressure Control Solenoid A Intermittent
+P0750,Shift Solenoid A
+P0751,Shift Solenoid A Performance or Stuck Off
+P0752,Shift Solenoid A Stuck On
+P0753,Shift Solenoid A Electrical
+P0754,Shift Solenoid A Intermittent
+P0755,Shift Solenoid B
+P0756,Shift Solenoid B Performance or Stuck Off
+P0757,Shift Solenoid B Stuck On
+P0758,Shift Solenoid B Electrical
+P0759,Shift Solenoid B Intermittent
+P0760,Shift Solenoid C
+P0761,Shift Solenoid C Performance or Stuck Off
+P0762,Shift Solenoid C Stuck On
+P0763,Shift Solenoid C Electrical
+P0764,Shift Solenoid C Intermittent
+P0765,Shift Solenoid D
+P0766,Shift Solenoid D Performance or Stuck Off
+P0767,Shift Solenoid D Stuck On
+P0768,Shift Solenoid D Electrical
+P0769,Shift Solenoid D Intermittent
+P0770,Shift Solenoid E
+P0771,Shift Solenoid E Performance or Stuck Off
+P0772,Shift Solenoid E Stuck On
+P0773,Shift Solenoid E Electrical
+P0774,Shift Solenoid E Intermittent
+P0775,Pressure Control Solenoid B
+P0776,Pressure Control Solenoid B Performance or Stuck Off
+P0777,Pressure Control Solenoid B Stuck On
+P0778,Pressure Control Solenoid B Electrical
+P0779,Pressure Control Solenoid B Intermittent
+P1000,OBD Systems Readiness Test Not Complete
+P1001,Key On Engine Running (KOER) Self Test Not Able To Complete
+P1100,Mass Air Flow Sensor Intermittent
+P1101,Mass Air Flow Sensor Out Of Self Test Range
+P1112,Intake Air Temperature Sensor Intermittent
+P1113,Intake Air Temperature Sensor Open/Short
+P1114,Intake Air Temperature Sensor Out Of Self Test Range
+P1115,Engine Coolant Temperature Sensor Out Of Self Test Range
+P1116,Engine Coolant Temperature Sensor Out Of Range
+P1117,Engine Coolant Temperature Sensor Intermittent
+P1118,Manifold Absolute Temperature Sensor Circuit Low Input
+P1119,Manifold Absolute Temperature Sensor Circuit High Input
+P1120,Throttle Position Sensor Out Of Range
+P1121,Throttle Position Sensor Inconsistent With MAF Sensor
+P1124,Throttle Position Sensor Out Of Self Test Range
+P1125,Throttle Position Sensor Intermittent
+P1127,Exhaust Not Warm Enough Downstream O2 Sensor Not Tested
+P1128,Upstream O2 Sensors Swapped
+P1129,Downstream O2 Sensors Swapped
+P1130,Lack Of HO2S Switch - Adaptive Fuel At Limit
+P1131,Lack Of HO2S Switch - Sensor Indicates Lean Bank 1
+P1132,Lack Of HO2S Switch - Sensor Indicates Rich Bank 1
+P1137,Lack Of HO2S Switch - Sensor Indicates Lean Bank 2
+P1138,Lack Of HO2S Switch - Sensor Indicates Rich Bank 2
+P1150,Lack Of HO2S Switch - Adaptive Fuel At Limit Bank 1
+P1151,Lack Of HO2S Switch - Sensor Indicates Lean Bank 1
+P1152,Lack Of HO2S Switch - Sensor Indicates Rich Bank 1
+P1157,Lack Of HO2S Switch - Sensor Indicates Lean Bank 2
+P1158,Lack Of HO2S Switch - Sensor Indicates Rich Bank 2
+P1200,Injector Control Circuit
+P1201,Injector Circuit Open / Shorted - Cylinder #1
+P1202,Injector Circuit Open / Shorted - Cylinder #2
+P1203,Injector Circuit Open / Shorted - Cylinder #3
+P1204,Injector Circuit Open / Shorted - Cylinder #4
+P1205,Injector Circuit Open / Shorted - Cylinder #5
+P1206,Injector Circuit Open / Shorted - Cylinder #6
+P1207,Injector Circuit Open / Shorted - Cylinder #7
+P1208,Injector Circuit Open / Shorted - Cylinder #8
+P1209,Injection Control Pressure System Fault
+P1210,Injection Control Pressure Above Expected Level
+P1211,Injection Control Pressure Sensor Above / Below Desired
+P1212,Injection Control Pressure Not Detected During Crank
+P1213,Start Injector Circuit Malfunction
+P1214,Injection Pump Timing Offset
+P1215,Pedal Position Sensor Ground Malfunction
+P1216,Pedal Position Sensor Circuit Malfunction
+P1217,Pedal Position Sensor Circuit Low Input
+P1218,Cylinder Identification (CID) Stuck High
+P1219,Cylinder Identification (CID) Stuck Low
+P1220,Series Throttle Control System Malfunction
+P1221,Traction Control System Malfunction
+P1222,Traction Control Output Circuit Malfunction
+P1223,Pedal Demand Sensor B Circuit High Input
+P1224,Throttle Position Sensor B Out Of Self Test Range
+P1225,Needle Lift Sensor Malfunction
+P1226,Control Sleeve Sensor Malfunction
+P1227,Wastegate Failed Closed (Over Pressure)
+P1228,Wastegate Failed Open (Under Pressure)
+P1229,Intercooler Pump Driver Fault
+P1230,Fuel Pump Low Speed Circuit Malfunction
+P1231,Fuel Pump Secondary Circuit Low High Speed
+P1232,Fuel Pump Speed Primary Circuit Malfunction
+P1233,Fuel Pump Driver Module Off Line
+P1234,Fuel Pump Driver Module Off Line
+P1235,Fuel Pump Control Out Of Range
+P1236,Fuel Pump Control Out Of Range
+P1237,Fuel Pump Secondary Circuit
+P1238,Fuel Pump Secondary Circuit
+P1239,Speed Fuel Pump Positive Feed Fault
+P1240,Sensor Power Supply Malfunction
+P1241,Sensor Power Supply Low Input
+P1242,Sensor Power Supply High Input
+P1243,Second Fuel Pump Fault
+P1244,Alternator Load Input Failed
+P1245,Alternator Load Input Failed
+P1246,Alternator Load Input Failed
+P1247,Turbo Boost Pressure Low
+P1248,Turbo Boost Pressure Not Detected
+P1249,Wastegate Control Valve Performance
+P1250,Pressure Regulator Control Malfunction
+P1251,Injection Pump Fuel Valve Feedback Circuit
+P1252,Pedal Correlation PDS1 and LPDS High
+P1253,Pedal Correlation PDS1 and LPDS Low
+P1254,Pedal Correlation PDS2 and LPDS High
+P1255,Pedal Correlation PDS2 and LPDS Low
+P1256,Pedal Correlation PDS1 and HPDS
+P1257,Pedal Correlation PDS2 and HPDS
+P1258,Pedal Correlation PDS1 and PDS2
+P1260,Engine Disabled By PATS
+P1261,Cylinder #1 High To Low Side Short
+P1262,Cylinder #2 High To Low Side Short
+P1263,Cylinder #3 High To Low Side Short
+P1264,Cylinder #4 High To Low Side Short
+P1265,Cylinder #5 High To Low Side Short
+P1266,Cylinder #6 High To Low Side Short
+P1267,Cylinder #7 High To Low Side Short
+P1268,Cylinder #8 High To Low Side Short
+P1269,Immobilizer Code Not Programmed
+P1270,Engine Speed / Vehicle Speed Limiter Fault
+P1271,Cylinder #1 High To Low Side Open
+P1272,Cylinder #2 High To Low Side Open
+P1273,Cylinder #3 High To Low Side Open
+P1274,Cylinder #4 High To Low Side Open
+P1275,Cylinder #5 High To Low Side Open
+P1276,Cylinder #6 High To Low Side Open
+P1277,Cylinder #7 High To Low Side Open
+P1278,Cylinder #8 High To Low Side Open
+P1279,Cylinder #1 Low Side Short
+P1280,Injection Control Pressure Out Of Range Low
+P1281,Injection Control Pressure Out Of Range High
+P1282,Injection Control Pressure Excessive
+P1283,Injection Pressure Regulator Circuit Malfunction
+P1284,Injection Control Pressure Failure
+P1285,Cylinder Head Over Temperature Protection Active
+P1286,Fuel Pulse Width Too Small
+P1287,Fuel Pulse Width Too Small
+P1288,Cylinder Head Temperature Sensor Out Of Self Test Range
+P1289,Cylinder Head Temperature Sensor Circuit High Input
+P1290,Cylinder Head Temperature Sensor Circuit Low Input
+P1291,Injector High Side Short To GND Or VBATT - Bank 1
+P1292,Injector High Side Short To GND Or VBATT - Bank 2
+P1293,Injector High Side Open - Bank 1
+P1294,Injector High Side Open - Bank 2
+P1295,Multi-faults - Bank 1 To 3V
+P1296,Multi-faults - Bank 2 To 3V
+P1297,Injector High Sides Shorted Together
+P1298,IDM Failure
+P1299,Cylinder Head Temperature Sensor Detected Engine Overheating
+P1700,Transmission Control System Malfunction
+P1701,Reverse Engagement Error
+P1702,Transmission Range Sensor Circuit Intermittent
+P1703,Brake Switch Out Of Self Test Range
+P1704,Transmission Range Sensor Circuit Out Of Self Test Range
+P1705,Transmission Range Sensor Out Of Self Test Range
+P1706,High Vehicle Speed Observed In Park
+P1709,Park Neutral Position Switch Out Of Self Test Range
+P1710,Transmission Fluid Temperature Sensor Out Of Self Test Range
+P1711,Transmission Fluid Temperature Sensor Out Of Self Test Range
+P1712,Trans Torque Reduction Request Signal Malfunction
+P1713,Transmission Fluid Temperature Sensor In Range Circuit Failure
+P1714,Shift Solenoid A Stuck Off
+P1715,Shift Solenoid B Stuck Off
+P1716,Shift Solenoid C Stuck Off
+P1717,Shift Solenoid D Stuck Off
+P1718,Transmission Fluid Temperature Sensor Circuit Failure
+P1719,Shift Solenoid E Stuck Off
+P1720,Vehicle Speed Sensor Circuit Malfunction
+P1721,Gear 1 Incorrect Ratio
+P1722,Gear 2 Incorrect Ratio
+P1723,Gear 3 Incorrect Ratio
+P1724,Gear 4 Incorrect Ratio
+P1725,Insufficient Engine Speed Increase During Self Test
+P1726,Insufficient Engine Speed Decrease During Self Test
+P1727,Coast Clutch Solenoid Circuit Malfunction
+P1728,Transmission Slip Error
+P1729,4x4 Low Switch Error
+P1730,Gear Control Malfunction 2 3 5
+P1731,Incorrect 1-2 Shift
+P1732,Incorrect 2-3 Shift
+P1733,Incorrect 3-4 Shift
+P1734,Gear Control Malfunction
+P1735,First Gear Switch Circuit Malfunction
+P1736,Second Gear Switch Circuit Malfunction
+P1737,Lockup Solenoid System
+P1738,Shift Time Error
+P1739,Slip Solenoid System
+P1740,Torque Converter Clutch Solenoid Mechanical Failure
+P1741,Torque Converter Clutch Engagement Error
+P1742,Torque Converter Clutch Solenoid Failed On
+P1743,Torque Converter Clutch Solenoid Failed Off
+P1744,Torque Converter Clutch System Performance
+P1745,Line Pressure Solenoid System
+P1746,Electronic Pressure Control Solenoid A - Open Circuit
+P1747,Electronic Pressure Control Solenoid A - Short Circuit
+P1748,Electronic Pressure Control Solenoid A - Failed
+P1749,Electronic Pressure Control Solenoid A - Failed Low
+P1750,Shift Solenoid A Malfunction
+P1751,Shift Solenoid A Performance
+P1752,Shift Solenoid A Stuck On
+P1753,Shift Solenoid A Electrical
+P1754,Coast Clutch Solenoid Circuit Malfunction
+P1755,Intermediate Speed Sensor Malfunction
+P1756,Shift Solenoid B Performance
+P1757,Shift Solenoid B Stuck On
+P1758,Shift Solenoid B Electrical
+P1759,Shift Solenoid B Intermittent
+P1760,Electronic Pressure Control Solenoid C - Open Circuit
+P1761,Shift Solenoid C Performance
+P1762,Overdrive Band Failed Off
+P1763,Shift Solenoid C Electrical
+P1764,Shift Solenoid C Intermittent
+P1765,Timing Solenoid Circuit Malfunction
+P1766,Shift Solenoid D Performance
+P1767,Torque Converter Clutch Circuit Malfunction
+P1768,Shift Solenoid D Electrical
+P1769,Shift Solenoid D Intermittent
+P1770,Clutch Solenoid Circuit Malfunction
+P1775,Transmission System MIL Fault
+P1776,Ignition Retard Request Duration Fault
+P1777,Ignition Retard Request Circuit Fault
+P1778,Transmission Reverse I/P Circuit Malfunction
+P1779,TCIL Circuit Malfunction
+P1780,Transmission Control Switch Out Of Self Test Range
+P1781,4X4 Switch Out Of Self Test Range
+P1782,P/ES Circuit Out Of Self Test Range
+P1783,Transmission Fluid Temperature Too High
+P1784,Transmission Mechanical Failure - First And Reverse
+P1785,Transmission Mechanical Failure - First And Second
+P1786,3-2 Downshift Error
+P1787,2-1 Downshift Error
+P1788,Pressure Control Solenoid B Open Circuit
+P1789,Pressure Control Solenoid B Short Circuit
+P1790,TP (Mechanical) Circuit Malfunction
+P1791,TP (Electric) Circuit Malfunction
+P1792,Barometric Pressure Circuit Malfunction
+P1793,Intake Air Volume Circuit Malfunction
+P1794,Battery Voltage Circuit Malfunction
+P1795,Idle Switch Circuit Malfunction
+P1796,Kick Down Switch Circuit Malfunction
+P1797,Neutral Switch Circuit Malfunction
+P1798,Coolant Temperature Circuit Malfunction
+P1799,Hold Switch Circuit Malfunction
+B0001,Driver Frontal Stage 1 Deployment Control
+B0002,Driver Frontal Stage 2 Deployment Control
+B0003,Driver Frontal Stage 3 Deployment Control
+B0004,Driver Knee Bolster Deployment Control
+B0005,Collapsible Steering Column Deployment Control
+B0010,Passenger Frontal Stage 1 Deployment Control
+B0011,Passenger Frontal Stage 2 Deployment Control
+B0012,Passenger Knee Bolster Deployment Control
+B0013,Passenger Frontal Stage 3 Deployment Control
+B0020,Left Side Airbag Deployment Control
+B0021,Left Side Airbag Deployment Control 2
+B0022,Left Curtain Deployment Control
+B0023,Left Curtain Deployment Control 2
+B0024,Left Curtain Deployment Control 3
+B0028,Right Side Airbag Deployment Control
+B0029,Right Side Airbag Deployment Control 2
+B0030,Right Curtain Deployment Control
+B0031,Right Curtain Deployment Control 2
+B0032,Right Curtain Deployment Control 3
+B0040,Driver Seatbelt Pretensioner Deployment Control
+B0041,Driver Seatbelt Pretensioner Deployment Control 2
+B0042,Driver Seatbelt Load Limiter Deployment Control
+B0045,Passenger Seatbelt Pretensioner Deployment Control
+B0046,Passenger Seatbelt Pretensioner Deployment Control 2
+B0047,Passenger Seatbelt Load Limiter Deployment Control
+B0050,Command Timed Out
+B0051,Deployment Commanded
+B0052,Deployment Command Threshold Exceeded
+B0053,Deployment Commanded Due to Other Impact Event
+B0054,Incorrect Deployment Command Received
+B0057,No Deployment Command Received
+B0059,To Deploy Time Expired
+B0060,To Deploy Time Extended
+B0061,Crash Sensor Internal
+B0071,Left Frontal Crash Sensor
+B0072,Right Frontal Crash Sensor
+B0080,Left Side/Pressure Crash Sensor
+B0081,Left Center Side Impact Sensor
+B0082,Left Rear Side Impact Sensor
+B0085,Right Side/Pressure Crash Sensor
+B0086,Right Center Side Impact Sensor
+B0087,Right Rear Side Impact Sensor
+B0090,Left Side Restraints Sensor
+B0091,Left Side Restraints Sensor 2
+B0092,Right Side Restraints Sensor
+B0093,Right Side Restraints Sensor 2
+B0095,Center/Right Frontal Restraints Sensor
+B0096,Center/Left Frontal Restraints Sensor
+B0097,Lateral Restraints Sensor
+B0098,Lateral Restraints Sensor 2
+B0099,Rollover Sensor
+B0100,Battery Voltage
+B0101,Battery Voltage Low
+B0102,Battery Voltage High
+B0103,Battery Voltage Circuit
+C0000,Vehicle Speed Information Circuit Malfunction
+C0035,Left Front Wheel Speed Circuit Malfunction
+C0036,Left Front Wheel Speed Range/Performance
+C0037,Left Front Wheel Speed Signal Missing
+C0040,Right Front Wheel Speed Circuit Malfunction
+C0041,Right Front Wheel Speed Range/Performance
+C0042,Right Front Wheel Speed Signal Missing
+C0045,Left Rear Wheel Speed Circuit Malfunction
+C0046,Left Rear Wheel Speed Range/Performance
+C0047,Left Rear Wheel Speed Signal Missing
+C0050,Right Rear Wheel Speed Circuit Malfunction
+C0051,Right Rear Wheel Speed Range/Performance
+C0052,Right Rear Wheel Speed Signal Missing
+C0060,Left Front ABS Solenoid Circuit Malfunction
+C0061,Left Front ABS Solenoid Performance
+C0062,Left Front ABS Solenoid Circuit Open
+C0063,Left Front ABS Solenoid Circuit Short
+C0065,Right Front ABS Solenoid Circuit Malfunction
+C0066,Right Front ABS Solenoid Performance
+C0067,Right Front ABS Solenoid Circuit Open
+C0068,Right Front ABS Solenoid Circuit Short
+C0070,Left Rear ABS Solenoid Circuit Malfunction
+C0071,Left Rear ABS Solenoid Performance
+C0072,Left Rear ABS Solenoid Circuit Open
+C0073,Left Rear ABS Solenoid Circuit Short
+C0075,Right Rear ABS Solenoid Circuit Malfunction
+C0076,Right Rear ABS Solenoid Performance
+C0077,Right Rear ABS Solenoid Circuit Open
+C0078,Right Rear ABS Solenoid Circuit Short
+C0080,ABS Pump Motor Circuit Malfunction
+C0085,ABS ECU Internal Malfunction
+C0087,ABS ECU Internal Malfunction
+C0088,ABS ECU Internal Malfunction
+C0089,ABS ECU Internal Malfunction
+C0090,ABS ECU Internal Malfunction
+C0095,ABS Hydraulic Pump Motor Circuit
+C0096,ABS Hydraulic Pump Motor Circuit Open
+C0097,ABS Hydraulic Pump Motor Circuit Short
+C0098,ABS Hydraulic Pump Motor Control
+C0099,ABS Hydraulic Pump Motor Control Open
+C0100,ABS Hydraulic Pump Motor Control Short
+C0110,Pump Motor Circuit Malfunction
+C0121,Valve Relay Circuit
+C0122,Valve Relay Circuit Open
+C0123,Valve Relay Circuit Short to Ground
+C0124,Valve Relay Circuit Short to Battery
+U0001,High Speed CAN Communication Bus
+U0002,High Speed CAN Communication Bus Performance
+U0003,High Speed CAN Communication Bus Open
+U0004,High Speed CAN Communication Bus Low
+U0005,High Speed CAN Communication Bus High
+U0006,High Speed CAN Communication Bus Shorted to Ground
+U0007,High Speed CAN Communication Bus Shorted to Battery
+U0008,High Speed CAN Communication Bus Shorted Together
+U0009,High Speed CAN Communication Bus Shorted to Bus
+U0010,Medium Speed CAN Communication Bus
+U0011,Medium Speed CAN Communication Bus Performance
+U0012,Medium Speed CAN Communication Bus Open
+U0013,Medium Speed CAN Communication Bus Low
+U0014,Medium Speed CAN Communication Bus High
+U0015,Medium Speed CAN Communication Bus Shorted to Ground
+U0016,Medium Speed CAN Communication Bus Shorted to Battery
+U0017,Medium Speed CAN Communication Bus Shorted Together
+U0018,Medium Speed CAN Communication Bus Shorted to Bus
+U0019,Low Speed CAN Communication Bus
+U0020,Low Speed CAN Communication Bus Performance
+U0021,Low Speed CAN Communication Bus Open
+U0022,Low Speed CAN Communication Bus Low
+U0023,Low Speed CAN Communication Bus High
+U0024,Low Speed CAN Communication Bus Shorted to Ground
+U0025,Low Speed CAN Communication Bus Shorted to Battery
+U0026,Low Speed CAN Communication Bus Shorted Together
+U0027,Low Speed CAN Communication Bus Shorted to Bus
+U0028,Vehicle Communication Bus A
+U0029,Vehicle Communication Bus A Performance
+U0030,Vehicle Communication Bus A Open
+U0031,Vehicle Communication Bus A Low
+U0032,Vehicle Communication Bus A High
+U0033,Vehicle Communication Bus A Shorted to Ground
+U0034,Vehicle Communication Bus A Shorted to Battery
+U0035,Vehicle Communication Bus A Shorted Together
+U0036,Vehicle Communication Bus A Shorted to Bus
+U0100,Lost Communication With ECM/PCM A
+U0101,Lost Communication With TCM
+U0102,Lost Communication With Transfer Case Control Module
+U0103,Lost Communication With Gear Shift Module
+U0104,Lost Communication With Cruise Control Module
+U0105,Lost Communication With Fuel Injector Control Module
+U0106,Lost Communication With Glow Plug Control Module
+U0107,Lost Communication With Throttle Actuator Control Module
+U0108,Lost Communication With Alternative Fuel Control Module
+U0109,Lost Communication With Fuel Pump Control Module
+U0110,Lost Communication With Drive Motor Control Module
+U0111,Lost Communication With Battery Energy Control Module A
+U0112,Lost Communication With Battery Energy Control Module B
+U0113,Lost Communication With Emissions Critical Control Information
+U0114,Lost Communication With Four-Wheel Drive Clutch Control Module
+U0115,Lost Communication With ECM/PCM B
+U0121,Lost Communication With Anti-Lock Brake System (ABS) Control Module
+U0122,Lost Communication With Vehicle Dynamics Control Module
+U0123,Lost Communication With Yaw Rate Sensor Module
+U0124,Lost Communication With Lateral Acceleration Sensor Module
+U0125,Lost Communication With Multi-Axis Acceleration Sensor Module
+U0126,Lost Communication With Steering Angle Sensor Module
+U0127,Lost Communication With Tire Pressure Monitor Module
+U0128,Lost Communication With Park Brake Control Module
+U0129,Lost Communication With Brake System Control Module
+U0130,Lost Communication With Steering Effort Control Module
+U0131,Lost Communication With Power Steering Control Module
+U0132,Lost Communication With Ride Level Control Module
+U0140,Lost Communication With Body Control Module
+U0141,Lost Communication With Body Control Module A
+U0142,Lost Communication With Body Control Module B
+U0143,Lost Communication With Body Control Module C
+U0144,Lost Communication With Body Control Module D
+U0145,Lost Communication With Body Control Module E
+U0146,Lost Communication With Gateway A
+U0147,Lost Communication With Gateway B
+U0148,Lost Communication With Gateway C
+U0149,Lost Communication With Gateway D
+U0150,Lost Communication With Gateway E
+U0151,Lost Communication With Restraints Control Module
+U0152,Lost Communication With Side Restraints Control Module - Left
+U0153,Lost Communication With Side Restraints Control Module - Right
+U0154,Lost Communication With Restraints Occupant Classification System Module
+U0155,Lost Communication With Instrument Panel Cluster (IPC) Control Module
+U0156,Lost Communication With Information Center A
+U0157,Lost Communication With Information Center B
+U0158,Lost Communication With Head Up Display
+U0159,Lost Communication With Parking Assist Control Module
+U0160,Lost Communication With Audible Alert Control Module
+U0161,Lost Communication With Compass Module
+U0162,Lost Communication With Navigation Display Module
+U0163,Lost Communication With Navigation Control Module
+U0164,Lost Communication With HVAC Control Module
+U0165,Lost Communication With Rear HVAC Control Module
+U0166,Lost Communication With Auxiliary Heater Control Module
+U0167,Lost Communication With Vehicle Immobilizer Control Module
+U0168,Lost Communication With Vehicle Security Control Module
+U0169,Lost Communication With Sunroof Control Module
+U0170,Lost Communication With Restraints System Sensor A
+U0171,Lost Communication With Restraints System Sensor B
+U0172,Lost Communication With Restraints System Sensor C
+U0173,Lost Communication With Restraints System Sensor D
+U0174,Lost Communication With Restraints System Sensor E
+U0175,Lost Communication With Restraints System Sensor F
+U0176,Lost Communication With Restraints System Sensor G
+U0177,Lost Communication With Restraints System Sensor H
+U0178,Lost Communication With Restraints System Sensor I
+U0179,Lost Communication With Restraints System Sensor J
+U0180,Lost Communication With Automatic Lighting Control Module
+U0181,Lost Communication With Headlamp Leveling Control Module
+U0182,Lost Communication With Lighting Control Module - Front
+U0183,Lost Communication With Lighting Control Module - Rear
+U0184,Lost Communication With Radio
+U0185,Lost Communication With Antenna Control Module
+U0186,Lost Communication With Audio Amplifier
+U0187,Lost Communication With Digital Disc Player/Changer Module A
+U0188,Lost Communication With Digital Disc Player/Changer Module B
+U0189,Lost Communication With Digital Disc Player/Changer Module C
+U0190,Lost Communication With Digital Disc Player/Changer Module D
+U0191,Lost Communication With Television
+U0192,Lost Communication With Personal Computer
+U0193,Lost Communication With Digital Audio Control Module A
+U0194,Lost Communication With Digital Audio Control Module B
+U0195,Lost Communication With Subscription Entertainment Receiver Module
+U0196,Lost Communication With Rear Seat Entertainment Control Module
+U0197,Lost Communication With Telephone Control Module
+U0198,Lost Communication With Telematic Control Module
+U0199,Lost Communication With Door Control Module A
+U0200,Lost Communication With Door Control Module B
+U0201,Lost Communication With Door Control Module C
+U0202,Lost Communication With Door Control Module D
+U0203,Lost Communication With Door Control Module E
+U0204,Lost Communication With Door Control Module F
+U0205,Lost Communication With Door Control Module G
+U0206,Lost Communication With Folding Top Control Module
+U0207,Lost Communication With Movable Roof Control Module
+U0208,Lost Communication With Seat Control Module A
+U0209,Lost Communication With Seat Control Module B
+U0210,Lost Communication With Seat Control Module C
+U0211,Lost Communication With Seat Control Module D
+U0212,Lost Communication With Steering Column Control Module
+U0213,Lost Communication With Mirror Control Module A
+U0214,Lost Communication With Remote Function Actuation
+U0215,Lost Communication With Door Switch A
+U0216,Lost Communication With Door Switch B
+U0217,Lost Communication With Door Switch C
+U0218,Lost Communication With Door Switch D
+U0219,Lost Communication With Door Switch E
+U0220,Lost Communication With Door Switch F
+U0221,Lost Communication With Door Switch G
+U0222,Lost Communication With Door Window Motor A
+U0223,Lost Communication With Door Window Motor B
+U0224,Lost Communication With Door Window Motor C
+U0225,Lost Communication With Door Window Motor D
+U0226,Lost Communication With Door Window Motor E
+U0227,Lost Communication With Door Window Motor F
+U0228,Lost Communication With Door Window Motor G
+U0229,Lost Communication With Heated Steering Wheel Module
+U0230,Lost Communication With Rear Gate Module
+U0231,Lost Communication With Rain Sensing Module
+U0232,Lost Communication With Side Obstacle Detection Control Module - Left
+U0233,Lost Communication With Side Obstacle Detection Control Module - Right
+U0234,Lost Communication With Convenience Recall Module
+U0235,Lost Communication With Cruise Control - Front Distance Range Sensor
