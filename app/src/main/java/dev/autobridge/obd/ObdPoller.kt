@@ -1,6 +1,8 @@
 package dev.autobridge.obd
 
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /** The adapter or the bus failed in a way that needs a fresh connection. */
 class ObdFailure(message: String) : Exception(message)
@@ -69,15 +71,34 @@ class ObdPoller(
     suspend fun poll() {
         var pass = 0
         while (true) {
-            var answered = 0
-            answered += readAll(fast, pass)
-            if (pass % 3 == 0) answered += readAll(medium, pass)
-            if (pass % 15 == 0) answered += readAll(slow, pass)
+            // One pass at a time under the gate, so a trouble-code request can slip in between
+            // passes and never in the middle of one (the header it sets would be changed under it).
+            val answered = gate.withLock {
+                var count = 0
+                count += readAll(fast, pass)
+                if (pass % 3 == 0) count += readAll(medium, pass)
+                if (pass % 15 == 0) count += readAll(slow, pass)
+                count
+            }
             pass++
             // A car that answers nothing (ignition just went off) must not spin the adapter.
             delay(if (answered == 0) 500L else PASS_PAUSE_MS)
         }
     }
+
+    private val gate = Mutex()
+
+    /**
+     * Runs [block] with the adapter to itself and set to talk to every control unit (the broadcast
+     * header), then lets the gauges carry on. Used for the requests that are not gauge readings.
+     */
+    suspend fun <T> exclusively(block: suspend (ElmSession) -> T): T = gate.withLock {
+        selectHeader(STANDARD_HEADER)
+        block(session)
+    }
+
+    /** True when the adapter is on CAN, where an answer to a trouble-code request starts with a count. */
+    val isCan: Boolean get() = canHeaders
 
     private suspend fun readAll(slots: List<Slot>, pass: Int): Int {
         var answered = 0
