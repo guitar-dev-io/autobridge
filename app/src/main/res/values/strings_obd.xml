@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- OBD2 gauges: adapter, live readings and vehicle choices. -->
+<resources>
+    <string name="obd_title">Gauges</string>
+    <string name="obd_subtitle">Live data from the car</string>
+    <string name="obd_settings_caption">Live engine gauges from an OBD2 adapter</string>
+    <string name="obd_section_adapter">Adapter</string>
+    <string name="obd_section_vehicle">Vehicle</string>
+    <string name="obd_no_adapter">No adapter chosen</string>
+    <string name="obd_choose_adapter">Choose adapter</string>
+    <string name="obd_change_adapter">Change adapter</string>
+    <string name="obd_connect">Connect</string>
+    <string name="obd_disconnect">Disconnect</string>
+    <string name="obd_status_idle">Not connected</string>
+    <string name="obd_status_connecting">Connecting…</string>
+    <string name="obd_status_init">Setting up the adapter…</string>
+    <string name="obd_status_live">Live</string>
+    <string name="obd_status_live_protocol">Live • protocol %1$s</string>
+    <string name="obd_status_retry">Reconnecting: %1$s</string>
+    <string name="obd_permission_needed">Allow Bluetooth so AutoBridge can find the adapter</string>
+    <string name="obd_scanning">Looking for adapters…</string>
+    <string name="obd_show_all">Show all</string>
+    <string name="obd_scan_failed">Scan failed: %1$s</string>
+    <string name="obd_no_data">Waiting for the car…</string>
+    <string name="obd_g_rpm">RPM</string>
+    <string name="obd_g_speed">Speed</string>
+    <string name="obd_g_coolant">Coolant</string>
+    <string name="obd_g_atf">Gearbox oil</string>
+    <string name="obd_g_boost">Boost</string>
+    <string name="obd_g_battery">Battery</string>
+    <string name="obd_g_load">Engine load</string>
+    <string name="obd_g_intake">Intake air</string>
+    <string name="obd_g_map">Manifold pressure</string>
+    <string name="obd_g_baro">Barometer</string>
+    <string name="obd_g_throttle">Throttle</string>
+    <string name="obd_g_fuel">Fuel level</string>
+    <string name="obd_g_ambient">Outside</string>
+    <string name="obd_transmission">Gearbox</string>
+    <string name="obd_transmission_caption">Decides how the gearbox oil temperature is read</string>
+    <string name="obd_transmission_t5">Ranger PJ/PK (T5)</string>
+    <string name="obd_transmission_t6">Ranger PX (T6)</string>
+    <string name="obd_imperial">Units</string>
+    <string name="obd_imperial_on">°F and mph</string>
+    <string name="obd_imperial_off">°C and km/h</string>
+    <string name="obd_auto">Reconnect automatically</string>
+    <string name="obd_auto_caption">Connects as soon as this screen opens</string>
+</resources>

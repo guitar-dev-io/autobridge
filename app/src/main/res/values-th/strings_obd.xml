@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="obd_title">เกจวัด</string>
+    <string name="obd_subtitle">ข้อมูลสดจากรถ</string>
+    <string name="obd_settings_caption">เกจเครื่องยนต์สดจากอะแดปเตอร์ OBD2</string>
+    <string name="obd_section_adapter">อะแดปเตอร์</string>
+    <string name="obd_section_vehicle">รถ</string>
+    <string name="obd_no_adapter">ยังไม่ได้เลือกอะแดปเตอร์</string>
+    <string name="obd_choose_adapter">เลือกอะแดปเตอร์</string>
+    <string name="obd_change_adapter">เปลี่ยนอะแดปเตอร์</string>
+    <string name="obd_connect">เชื่อมต่อ</string>
+    <string name="obd_disconnect">ตัดการเชื่อมต่อ</string>
+    <string name="obd_status_idle">ยังไม่ได้เชื่อมต่อ</string>
+    <string name="obd_status_connecting">กำลังเชื่อมต่อ…</string>
+    <string name="obd_status_init">กำลังตั้งค่าอะแดปเตอร์…</string>
+    <string name="obd_status_live">กำลังอ่านข้อมูล</string>
+    <string name="obd_status_live_protocol">กำลังอ่านข้อมูล • โปรโตคอล %1$s</string>
+    <string name="obd_status_retry">กำลังเชื่อมต่อใหม่: %1$s</string>
+    <string name="obd_permission_needed">อนุญาต Bluetooth เพื่อให้ AutoBridge ค้นหาอะแดปเตอร์ได้</string>
+    <string name="obd_scanning">กำลังค้นหาอะแดปเตอร์…</string>
+    <string name="obd_show_all">แสดงทั้งหมด</string>
+    <string name="obd_scan_failed">ค้นหาไม่สำเร็จ: %1$s</string>
+    <string name="obd_no_data">กำลังรอข้อมูลจากรถ…</string>
+    <string name="obd_g_rpm">รอบเครื่อง</string>
+    <string name="obd_g_speed">ความเร็ว</string>
+    <string name="obd_g_coolant">น้ำหล่อเย็น</string>
+    <string name="obd_g_atf">น้ำมันเกียร์</string>
+    <string name="obd_g_boost">แรงดันบูสต์</string>
+    <string name="obd_g_battery">แบตเตอรี่</string>
+    <string name="obd_g_load">โหลดเครื่อง</string>
+    <string name="obd_g_intake">อากาศเข้า</string>
+    <string name="obd_g_map">แรงดันท่อไอดี</string>
+    <string name="obd_g_baro">ความกดอากาศ</string>
+    <string name="obd_g_throttle">คันเร่ง</string>
+    <string name="obd_g_fuel">ระดับน้ำมัน</string>
+    <string name="obd_g_ambient">อุณหภูมิภายนอก</string>
+    <string name="obd_transmission">เกียร์</string>
+    <string name="obd_transmission_caption">กำหนดวิธีอ่านอุณหภูมิน้ำมันเกียร์</string>
+    <string name="obd_transmission_t5">Ranger PJ/PK (T5)</string>
+    <string name="obd_transmission_t6">Ranger PX (T6)</string>
+    <string name="obd_imperial">หน่วย</string>
+    <string name="obd_imperial_on">°F และ mph</string>
+    <string name="obd_imperial_off">°C และ km/h</string>
+    <string name="obd_auto">เชื่อมต่อใหม่อัตโนมัติ</string>
+    <string name="obd_auto_caption">เชื่อมต่อทันทีที่เปิดหน้านี้</string>
+</resources>
