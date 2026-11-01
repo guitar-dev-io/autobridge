@@ -1095,7 +1095,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
                         R.drawable.ic_tile_gauge,
                         accent = design.ACCENT
                     ) {
-                        startActivity(dev.autobridge.obd.ObdGaugesActivity.intent(this))
+                        startActivity(dev.autobridge.obd.ObdGaugesActivity.intent(this@MainActivity))
                     })
                     add(settingsEntry(
                         getString(R.string.settings_app_profiles),
