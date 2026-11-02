@@ -54,7 +54,21 @@ class ObdParserTest {
     }
 
     @Test fun atfIsAskedOfTheTransmissionFirstThenTheEngine() {
-        assertEquals(listOf("7E1", "7E0"), ObdPids.atf(Transmission.T5).map { it.header })
+        assertEquals(listOf("7E1", "7E0"), ObdPids.atf(Transmission.T5).take(2).map { it.header })
+    }
+
+    @Test fun theOtherFamilysPidIsTheFallback() {
+        assertEquals(
+            listOf("221674", "221674", "221E1C", "221E1C"),
+            ObdPids.atf(Transmission.T5).map { it.request }
+        )
+        assertEquals(
+            listOf("221E1C", "221E1C", "221674", "221674"),
+            ObdPids.atf(Transmission.NEXT_GEN).map { it.request }
+        )
+        // Every candidate decodes its own answer, whichever came first.
+        val fallback = ObdPids.atf(Transmission.T5)[2]
+        assertEquals(90f, value("621E1C05A0", fallback), 0.01f)
     }
 
     @Test fun noDataAndNegativeResponses() {
