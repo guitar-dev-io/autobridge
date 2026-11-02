@@ -5,10 +5,15 @@ import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.view.View
+import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
 import dev.autobridge.R
+import dev.autobridge.car.GaugePreviewView
 import dev.autobridge.i18n.AppLocale
 import dev.autobridge.ui.AutoBridgeDesign
+import dev.autobridge.ui.AutoBridgeDesign.dp
 import dev.autobridge.ui.AutoBridgeDesign.stack
 
 /**
@@ -44,7 +49,10 @@ class ObdLayoutActivity : Activity() {
 
     private fun render() {
         val pages = ObdSettings.pages(this)
+        val style = ObdSettings.style(this)
         val body = AutoBridgeDesign.body(this)
+
+        body.stack(previewCard(pages, style))
 
         pages.forEachIndexed { index, page ->
             body.stack(
@@ -83,6 +91,44 @@ class ObdLayoutActivity : Activity() {
                 badgeText = "↺",
                 onClick = { save(GaugePages.DEFAULT) }
             )
+        )
+
+        body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.obd_look_section)), gap = 2)
+        body.stack(
+            choiceRow(R.string.obd_look_dial, dialName(style.dial)) {
+                choose(R.string.obd_look_dial, DialStyle.entries, style.dial, ::dialName) {
+                    ObdSettings.setStyle(this, style.copy(dial = it))
+                }
+            }
+        )
+        body.stack(
+            choiceRow(R.string.obd_look_tile, tileName(style.tile)) {
+                choose(R.string.obd_look_tile, TileStyle.entries, style.tile, ::tileName) {
+                    ObdSettings.setStyle(this, style.copy(tile = it))
+                }
+            }
+        )
+        body.stack(
+            choiceRow(R.string.obd_look_color, colorName(style.color)) {
+                choose(R.string.obd_look_color, ColorMode.entries, style.color, ::colorName) {
+                    ObdSettings.setStyle(this, style.copy(color = it))
+                }
+            }
+        )
+        body.stack(
+            choiceRow(R.string.obd_look_size, sizeName(style.size)) {
+                choose(R.string.obd_look_size, TextSize.entries, style.size, ::sizeName) {
+                    ObdSettings.setStyle(this, style.copy(size = it))
+                }
+            }
+        )
+        body.stack(
+            TextView(this).apply {
+                setText(R.string.obd_look_caption)
+                textSize = 12f
+                setTextColor(AutoBridgeDesign.TEXT_MUTED)
+                setPadding(dp(6), dp(2), dp(6), 0)
+            }
         )
 
         AutoBridgeDesign.showPage(
@@ -180,6 +226,91 @@ class ObdLayoutActivity : Activity() {
         ObdSettings.setPages(this, pages)
         render()
     }
+
+    /** The car's page as the head unit will draw it; a tap shows the next page. */
+    private var previewIndex = 0
+
+    private fun previewCard(pages: List<GaugePage>, style: GaugeStyle): View {
+        val view = GaugePreviewView(this)
+        val index = previewIndex.coerceIn(0, pages.size - 1)
+        view.page = pages[index]
+        view.pageIndex = index
+        view.pageCount = pages.size
+        view.style = style
+        view.imperial = ObdSettings.imperial(this)
+        view.setOnClickListener {
+            previewIndex = (index + 1) % pages.size
+            render()
+        }
+        view.contentDescription = getString(R.string.obd_preview_hint)
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(view, LinearLayout.LayoutParams(-1, dp(250)))
+            addView(
+                TextView(this@ObdLayoutActivity).apply {
+                    setText(R.string.obd_preview_hint)
+                    textSize = 12f
+                    setTextColor(AutoBridgeDesign.TEXT_MUTED)
+                    setPadding(dp(6), dp(4), dp(6), 0)
+                }
+            )
+        }
+    }
+
+    /** A setting that names its current value on the right and opens a themed list on tap. */
+    private fun choiceRow(title: Int, value: String, onClick: () -> Unit): View =
+        AutoBridgeDesign.contentRow(
+            context = this,
+            title = getString(title),
+            subtitle = value,
+            accent = accent,
+            badgeText = value.take(1),
+            onClick = onClick
+        )
+
+    private fun <T> choose(title: Int, options: List<T>, current: T, name: (T) -> String, onPick: (T) -> Unit) {
+        val labels = options.map { (if (it == current) "● " else "   ") + name(it) }
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
+            .setTitle(title)
+            .setItems(labels.toTypedArray()) { _, which ->
+                onPick(options[which])
+                render()
+            }
+            .show()
+    }
+
+    private fun dialName(style: DialStyle): String = getString(
+        when (style) {
+            DialStyle.ARC -> R.string.obd_dial_arc
+            DialStyle.RING -> R.string.obd_dial_ring
+            DialStyle.NEEDLE -> R.string.obd_dial_needle
+            DialStyle.DIGITAL -> R.string.obd_dial_digital
+        }
+    )
+
+    private fun tileName(style: TileStyle): String = getString(
+        when (style) {
+            TileStyle.BAR -> R.string.obd_tile_bar
+            TileStyle.STRIPE -> R.string.obd_tile_stripe
+            TileStyle.PLAIN -> R.string.obd_tile_plain
+        }
+    )
+
+    private fun colorName(mode: ColorMode): String = getString(
+        when (mode) {
+            ColorMode.ZONES -> R.string.obd_color_zones
+            ColorMode.ACCENT -> R.string.obd_color_accent
+            ColorMode.MONO -> R.string.obd_color_mono
+        }
+    )
+
+    private fun sizeName(size: TextSize): String = getString(
+        when (size) {
+            TextSize.SMALL -> R.string.obd_size_small
+            TextSize.NORMAL -> R.string.obd_size_normal
+            TextSize.LARGE -> R.string.obd_size_large
+        }
+    )
 
     private fun layoutName(layout: PageLayout): Int = when (layout) {
         PageLayout.DIAL1 -> R.string.obd_pl_dial1

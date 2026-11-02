@@ -55,4 +55,10 @@ object ObdSettings {
 
     fun setPages(context: Context, pages: List<GaugePage>) =
         prefs(context).edit { putString("pages", GaugePages.encode(pages)) }
+
+    /** How the gauges are drawn (dial, tile, colours, text size). */
+    fun style(context: Context): GaugeStyle = GaugeStyle.decode(prefs(context).getString("style", null))
+
+    fun setStyle(context: Context, style: GaugeStyle) =
+        prefs(context).edit { putString("style", style.encode()) }
 }

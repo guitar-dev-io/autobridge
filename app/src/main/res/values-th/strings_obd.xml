@@ -107,4 +107,24 @@
     <string name="obd_dtc_generic">รหัสมาตรฐาน</string>
     <string name="obd_dtc_ford">รหัสเฉพาะของ Ford</string>
     <string name="obd_dtc_lookup">รหัสนี้ไม่อยู่ในรายการของแอป ให้ค้นรหัสพร้อมรุ่นรถของคุณ</string>
+    <string name="obd_look_section">รูปแบบการแสดงผล</string>
+    <string name="obd_look_caption">พื้นหลังและตัวอักษรเป็นไปตามธีมของแอป (ตั้งค่า › รูปลักษณ์) สถานะอันตรายเป็นสีแดงเสมอ</string>
+    <string name="obd_look_dial">รูปแบบหน้าปัด</string>
+    <string name="obd_look_tile">รูปแบบช่อง</string>
+    <string name="obd_look_color">สี</string>
+    <string name="obd_look_size">ขนาดตัวอักษร</string>
+    <string name="obd_dial_arc">ครึ่งวงกลม</string>
+    <string name="obd_dial_ring">วงแหวน</string>
+    <string name="obd_dial_needle">เข็ม</string>
+    <string name="obd_dial_digital">ตัวเลข</string>
+    <string name="obd_tile_bar">แถบ</string>
+    <string name="obd_tile_stripe">แถบข้าง</string>
+    <string name="obd_tile_plain">เรียบ</string>
+    <string name="obd_color_zones">ตามสถานะ</string>
+    <string name="obd_color_accent">สีเด่นของธีม</string>
+    <string name="obd_color_mono">สีตัวอักษร</string>
+    <string name="obd_size_small">เล็ก</string>
+    <string name="obd_size_normal">ปกติ</string>
+    <string name="obd_size_large">ใหญ่</string>
+    <string name="obd_preview_hint">แตะตัวอย่างเพื่อดูหน้าถัดไป</string>
 </resources>
