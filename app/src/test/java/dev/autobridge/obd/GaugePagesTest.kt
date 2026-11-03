@@ -34,9 +34,15 @@ class GaugePagesTest {
         assertEquals(listOf(Gauge.RPM), long.gauges)
     }
 
-    @Test fun unknownGaugeNamesAreSkippedAndKnownOnesKept() {
-        val page = GaugePages.decode("DIALS2:NOPE,SPEED,RPM").single()
-        assertEquals(listOf(Gauge.SPEED, Gauge.RPM), page.gauges)
+    @Test fun anIdFromAnotherProfileIsKeptAndOldNamesAreMapped() {
+        // Page text saved by older versions used the enum names; "FUEL_LEVEL" became the id "fuel".
+        val page = GaugePages.decode("DIALS2:NOPE,SPEED").single()
+        assertEquals(listOf(Gauge("nope"), Gauge.SPEED), page.gauges)
+        assertEquals(listOf(Gauge.RPM, Gauge.FUEL_LEVEL, Gauge.COOLANT, Gauge.ATF),
+            GaugePages.decode("TILES4:RPM,FUEL_LEVEL,coolant,atf").single().gauges)
+        assertEquals(listOf(Gauge("bad id")), listOf(Gauge("bad id")))
+        // Something that cannot be an id is dropped and the page is repaired.
+        assertEquals(4, GaugePages.decode("TILES4:A B,\$").single().gauges.size)
     }
 
     @Test fun aBadPageDoesNotTakeTheGoodOnesWithIt() {

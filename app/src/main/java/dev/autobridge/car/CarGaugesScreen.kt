@@ -43,7 +43,7 @@ import dev.autobridge.obd.Zone
 class CarGaugesScreen(carContext: CarContext) : Screen(carContext), SurfaceCallback {
     private val appManager = carContext.getCarService(AppManager::class.java)
     private val handler = Handler(Looper.getMainLooper())
-    private val renderer = GaugeCarRenderer { gauge -> carContext.getString(GaugeLabels.of(gauge)) }
+    private val renderer = GaugeCarRenderer { gauge -> GaugeLabels.text(carContext, gauge) }
 
     private var surface: Surface? = null
     private var surfaceWidth = 0
@@ -113,7 +113,7 @@ class CarGaugesScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
         if (ObdConnection.isRunning) return
         val adapter = ObdSettings.adapter(carContext) ?: return
         if (ObdPermissions.missing(carContext).isNotEmpty()) return
-        ObdConnection.start(carContext, adapter, ObdSettings.transmission(carContext))
+        ObdConnection.start(carContext, adapter, ObdSettings.profile(carContext))
     }
 
     // --- Surface ---
@@ -228,7 +228,7 @@ class CarGaugesScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
         for (gauge in gauges) {
             val value = telemetry.value(gauge, now) ?: continue
             if (GaugeSpec.of(gauge).zone(value) != Zone.DANGER) continue
-            val name = carContext.getString(GaugeLabels.of(gauge))
+            val name = GaugeLabels.text(carContext, gauge)
             return "$name ${GaugeFormat.text(gauge, value, imperial)} ${GaugeFormat.unit(gauge, imperial)}"
         }
         return null

@@ -1,5 +1,6 @@
 package dev.autobridge.obd
 
+import dev.autobridge.obd.profile.BuiltInProfiles
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
@@ -35,7 +36,7 @@ class ObdExclusiveTest {
 
     @Test fun aTroubleCodeRequestRunsBetweenGaugePassesAndOnTheBroadcastHeader() = runTest {
         val adapter = ScriptedAdapter(setup)
-        val poller = ObdPoller(ElmSession(adapter), Transmission.T5) { _, _ -> }
+        val poller = ObdPoller(ElmSession(adapter), BuiltInProfiles.findResolved("ford_ranger_pjpk")!!) { _, _ -> }
         poller.initialize()
         assertTrue(poller.isCan)
         val job = launch { poller.poll() }
@@ -51,7 +52,7 @@ class ObdExclusiveTest {
     }
 
     @Test fun clearingIsConfirmedByTheServiceByteOnTheAnswer() = runTest {
-        val poller = ObdPoller(ElmSession(ScriptedAdapter(setup)), Transmission.T5) { _, _ -> }
+        val poller = ObdPoller(ElmSession(ScriptedAdapter(setup)), BuiltInProfiles.findResolved("ford_ranger_pjpk")!!) { _, _ -> }
         poller.initialize()
         val reply = poller.exclusively { it.request("04") }
         assertTrue(reply.replace(" ", "").contains("44"))

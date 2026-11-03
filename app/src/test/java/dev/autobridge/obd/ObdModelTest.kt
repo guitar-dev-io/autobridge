@@ -1,11 +1,14 @@
 package dev.autobridge.obd
 
 import org.junit.Assert.assertEquals
+import dev.autobridge.obd.profile.BuiltInProfiles
 import org.junit.Assert.assertNull
 import org.junit.Test
 
 class ObdModelTest {
-    @org.junit.After fun resetProfile() { GaugeSpec.profile = Transmission.T5 }
+    @org.junit.After fun resetProfile() { use(BuiltInProfiles.GENERIC_ID) }
+
+    private fun use(id: String) { GaugeCatalog.profile = BuiltInProfiles.findResolved(id)!! }
 
     private fun zone(gauge: Gauge, value: Float) = GaugeSpec.of(gauge).zone(value)
 
@@ -16,18 +19,22 @@ class ObdModelTest {
         assertEquals(Zone.NORMAL, zone(Gauge.COOLANT, 92f))
         assertEquals(Zone.CAUTION, zone(Gauge.COOLANT, 100f))
         assertEquals(Zone.DANGER, zone(Gauge.COOLANT, 106f))
+        // The gearbox oil gauge exists only in a Ford profile.
+        use("ford_ranger_pjpk")
         assertEquals(Zone.CAUTION, zone(Gauge.ATF, 95f))
         assertEquals(Zone.DANGER, zone(Gauge.ATF, 101f))
     }
 
     @Test fun theNextGenRangerRunsHotterBeforeItWarns() {
-        GaugeSpec.profile = Transmission.NEXT_GEN
+        use("ford_ranger_next_gen")
         assertEquals(Zone.NORMAL, zone(Gauge.COOLANT, 100f))
         assertEquals(Zone.CAUTION, zone(Gauge.COOLANT, 110f))
         assertEquals(Zone.DANGER, zone(Gauge.COOLANT, 116f))
         assertEquals(Zone.NORMAL, zone(Gauge.BOOST, 20f))
         assertEquals(Zone.CAUTION, zone(Gauge.ATF, 110f))
-        GaugeSpec.profile = Transmission.T5
+        use("ford_ranger_pjpk")
+        assertEquals(Zone.DANGER, zone(Gauge.ATF, 105f))
+        use(BuiltInProfiles.GENERIC_ID)
         assertEquals(Zone.CAUTION, zone(Gauge.COOLANT, 100f))
         assertEquals(Zone.CAUTION, zone(Gauge.BOOST, 15f))
     }
@@ -52,10 +59,36 @@ class ObdModelTest {
     }
 
     @Test fun boostIsMapMinusBarometricInPsi() {
-        val t = Telemetry().with(Gauge.BARO, 100f, 0).with(Gauge.MAP, 200f, 0)
+        val derived = GaugeCatalog.derived
+        val t = Telemetry().with(Gauge.BARO, 100f, 0).refreshDerived(derived, Gauge.BARO, 0)
+            .with(Gauge.MAP, 200f, 0).refreshDerived(derived, Gauge.MAP, 0)
         assertEquals(14.5038f, t.value(Gauge.BOOST, 0)!!, 0.001f)
-        val vacuum = Telemetry().with(Gauge.BARO, 100f, 0).with(Gauge.MAP, 40f, 0)
+        val vacuum = Telemetry().with(Gauge.BARO, 100f, 0).with(Gauge.MAP, 40f, 0).refreshDerived(derived, Gauge.MAP, 0)
         assertEquals(-8.70228f, vacuum.value(Gauge.BOOST, 0)!!, 0.001f)
+    }
+
+    @Test fun aDerivedGaugeNeedsEverySourceFresh() {
+        val derived = GaugeCatalog.derived
+        // Only one source: nothing to derive yet.
+        val one = Telemetry().with(Gauge.MAP, 200f, 0).refreshDerived(derived, Gauge.MAP, 0)
+        assertNull(one.value(Gauge.BOOST, 0))
+        // An old source does not count.
+        val old = Telemetry().with(Gauge.BARO, 100f, 0).with(Gauge.MAP, 200f, Telemetry.STALE_MS + 10)
+            .refreshDerived(derived, Gauge.MAP, Telemetry.STALE_MS + 10)
+        assertNull(old.value(Gauge.BOOST, Telemetry.STALE_MS + 10))
+        // A gauge that is not a source changes nothing.
+        val other = Telemetry().with(Gauge.RPM, 800f, 0).refreshDerived(derived, Gauge.RPM, 0)
+        assertNull(other.value(Gauge.BOOST, 0))
+    }
+
+    @Test fun theCatalogFollowsTheActiveProfile() {
+        use(BuiltInProfiles.GENERIC_ID)
+        assertNull(GaugeCatalog.info(Gauge.ATF))
+        assertEquals(true, Gauge.BOOST in GaugeCatalog.gauges())
+        use("ford_ranger_pjpk")
+        assertEquals("°C", GaugeCatalog.info(Gauge.ATF)!!.unit)
+        assertEquals("psi", GaugeCatalog.info(Gauge.BOOST)!!.unit)
+        assertEquals(Zone.NORMAL, GaugeSpec.of(Gauge("not_a_gauge")).zone(500f))
     }
 
     @Test fun anOldReadingIsMissing() {

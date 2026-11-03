@@ -120,7 +120,7 @@ class ObdGaugesActivity : Activity() {
         body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.obd_title)), gap = 2)
         val dialRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         for ((index, gauge) in DIALS.withIndex()) {
-            val dial = DialView(this, getString(GaugeLabels.of(gauge)))
+            val dial = DialView(this, GaugeLabels.text(this, gauge))
             dials[gauge] = dial
             dialRow.addView(dial, LinearLayout.LayoutParams(0, dp(170), 1f).apply {
                 if (index == 0) marginEnd = dp(8)
@@ -131,7 +131,7 @@ class ObdGaugesActivity : Activity() {
         for (pair in TILES.chunked(2)) {
             val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
             for ((index, gauge) in pair.withIndex()) {
-                val tile = Tile(this, getString(GaugeLabels.of(gauge)))
+                val tile = Tile(this, GaugeLabels.text(this, gauge))
                 tiles[gauge] = tile
                 row.addView(tile.view, LinearLayout.LayoutParams(0, -2, 1f).apply {
                     if (index == 0) marginEnd = dp(8)
@@ -142,15 +142,15 @@ class ObdGaugesActivity : Activity() {
         }
 
         body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.obd_section_vehicle)), gap = 2)
-        val transmission = ObdSettings.transmission(this)
+        val vehicle = ObdSettings.profile(this)
         body.stack(
             AutoBridgeDesign.contentRow(
                 context = this,
                 title = getString(R.string.obd_transmission),
-                subtitle = getString(R.string.obd_transmission_caption),
+                subtitle = profileName(vehicle),
                 accent = accent,
-                badgeText = transmission.badge,
-                onClick = { chooseTransmission(transmission) }
+                badgeText = vehicle.make.take(1).ifEmpty { "?" },
+                onClick = { chooseProfile(vehicle) }
             )
         )
         body.stack(
@@ -297,7 +297,8 @@ class ObdGaugesActivity : Activity() {
             if (value == null) {
                 tile.show("—", GaugeFormat.unit(gauge, imperial), AutoBridgeDesign.TEXT_MUTED)
             } else {
-                val color = if (gauge in ZONED) zoneColor(GaugeSpec.of(gauge).zone(value)) else AutoBridgeDesign.TEXT
+                val spec = GaugeSpec.of(gauge)
+                val color = if (spec.zones != null) zoneColor(spec.zone(value)) else AutoBridgeDesign.TEXT
                 tile.show(GaugeFormat.text(gauge, value, imperial), GaugeFormat.unit(gauge, imperial), color)
             }
         }
@@ -334,7 +335,7 @@ class ObdGaugesActivity : Activity() {
     private fun connect() {
         val adapter = ObdSettings.adapter(this) ?: return chooseAdapter()
         withBluetooth {
-            ObdConnection.start(this, adapter, ObdSettings.transmission(this))
+            ObdConnection.start(this, adapter, ObdSettings.profile(this))
             refresh()
         }
     }
@@ -343,7 +344,7 @@ class ObdGaugesActivity : Activity() {
         if (!ObdSettings.autoConnect(this) || ObdConnection.isRunning) return
         val adapter = ObdSettings.adapter(this) ?: return
         if (ObdPermissions.missing(this).isNotEmpty()) return
-        ObdConnection.start(this, adapter, ObdSettings.transmission(this))
+        ObdConnection.start(this, adapter, ObdSettings.profile(this))
     }
 
     /** Runs [action] once Bluetooth is allowed, asking first when it is not. */
@@ -390,18 +391,17 @@ class ObdGaugesActivity : Activity() {
             .show()
     }
 
-    private fun chooseTransmission(current: Transmission) {
-        val options = listOf(
-            Transmission.T5 to getString(R.string.obd_transmission_t5),
-            Transmission.T6 to getString(R.string.obd_transmission_t6),
-            Transmission.NEXT_GEN to getString(R.string.obd_transmission_nextgen),
-        )
-        val labels = options.map { (value, label) -> (if (value == current) "● " else "   ") + label }
+    private fun profileName(profile: dev.autobridge.obd.profile.VehicleProfile): String =
+        if (profile.verified) profile.name else profile.name + " • " + getString(R.string.obd_profile_unverified)
+
+    private fun chooseProfile(current: dev.autobridge.obd.profile.VehicleProfile) {
+        val options = dev.autobridge.obd.profile.BuiltInProfiles.all
+        val labels = options.map { (if (it.id == current.id) "● " else "   ") + profileName(it) }
         AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(R.string.obd_transmission)
             .setItems(labels.toTypedArray()) { _, index ->
-                ObdSettings.setTransmission(this, options[index].first)
-                // The running connection chose its ATF request at start; restart it to apply.
+                ObdSettings.setProfileId(this, options[index].id)
+                // The running connection chose what to ask the car at start; restart it to apply.
                 if (ObdConnection.isRunning) {
                     ObdConnection.stop()
                     connect()
@@ -459,11 +459,6 @@ class ObdGaugesActivity : Activity() {
     }
 
     // ---- Views --------------------------------------------------------------------------------
-
-    private val ZONED = setOf(
-        Gauge.COOLANT, Gauge.ATF, Gauge.BOOST, Gauge.BATTERY, Gauge.LOAD, Gauge.INTAKE,
-        Gauge.FUEL_LEVEL, Gauge.AMBIENT, Gauge.MAP, Gauge.BARO,
-    )
 
     /** A small card: the name on top, the value large, the unit beside it. */
     private class Tile(context: Context, name: String) {

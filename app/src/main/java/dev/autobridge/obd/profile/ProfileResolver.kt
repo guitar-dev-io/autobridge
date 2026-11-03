@@ -19,6 +19,7 @@ object ProfileResolver {
             placed += gauge
         }
         for (gauge in profile.gauges) if (gauge !in placed) merged += profile.candidates(gauge)
-        return profile.copy(pids = merged, base = null)
+        val derived = base.derived.filter { b -> profile.derived.none { it.gauge == b.gauge } } + profile.derived
+        return profile.copy(pids = merged, derived = derived, base = null)
     }
 }

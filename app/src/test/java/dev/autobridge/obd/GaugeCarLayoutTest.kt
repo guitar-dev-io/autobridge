@@ -10,7 +10,7 @@ class GaugeCarLayoutTest {
     private fun overlap(a: GaugeCell, b: GaugeCell) =
         a.left < b.right - 0.01f && b.left < a.right - 0.01f && a.top < b.bottom - 0.01f && b.top < a.bottom - 0.01f
 
-    private fun pageOf(layout: PageLayout) = GaugePages.fit(layout, Gauge.entries)
+    private fun pageOf(layout: PageLayout) = GaugePages.fit(layout, GaugeCatalog.gauges())
 
     @Test fun everyLayoutFitsEveryScreenShapeWithoutOverlap() {
         for (layout in PageLayout.entries) for ((width, height) in screens) {

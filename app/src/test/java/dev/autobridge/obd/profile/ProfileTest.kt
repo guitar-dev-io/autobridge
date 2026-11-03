@@ -1,6 +1,7 @@
 package dev.autobridge.obd.profile
 
 import dev.autobridge.obd.Gauge
+import dev.autobridge.obd.ProfileMigration
 import dev.autobridge.obd.ObdPids
 import dev.autobridge.obd.Transmission
 import org.junit.Assert.assertEquals
@@ -146,13 +147,42 @@ class ProfileTest {
         assertEquals(profile, ProfileResolver.resolve(profile, BuiltInProfiles::findResolved))
     }
 
-    @Test fun gaugeEnumStillCoversTheBuiltInIds() {
-        // The wiring to data-driven gauges comes later; until then every built-in id must have a twin.
-        val twins = mapOf(
-            "rpm" to Gauge.RPM, "speed" to Gauge.SPEED, "coolant" to Gauge.COOLANT, "load" to Gauge.LOAD,
-            "intake" to Gauge.INTAKE, "map" to Gauge.MAP, "baro" to Gauge.BARO, "throttle" to Gauge.THROTTLE,
-            "fuel" to Gauge.FUEL_LEVEL, "ambient" to Gauge.AMBIENT, "battery" to Gauge.BATTERY, "atf" to Gauge.ATF,
-        )
-        for (profile in BuiltInProfiles.all) assertTrue(profile.gauges.all { it in twins })
+    @Test fun everyBuiltInGaugeHasAConstantTheScreensKnow() {
+        val known = setOf(
+            Gauge.RPM, Gauge.SPEED, Gauge.COOLANT, Gauge.LOAD, Gauge.INTAKE, Gauge.MAP, Gauge.BARO, Gauge.THROTTLE,
+            Gauge.FUEL_LEVEL, Gauge.AMBIENT, Gauge.BATTERY, Gauge.ATF, Gauge.BOOST,
+        ).map { it.id }.toSet()
+        for (profile in BuiltInProfiles.all) assertTrue(profile.allGauges.all { it in known })
+    }
+
+    @Test fun theBoostIsDerivedFromMapAndBaroInEveryBuiltIn() {
+        for (profile in BuiltInProfiles.all) {
+            val boost = profile.derived.single { it.gauge == "boost" }
+            assertEquals(listOf("map", "baro"), boost.sources)
+            // 200 kPa manifold against 100 kPa ambient is 100 kPa of boost, 14.5 psi.
+            assertEquals(14.5038f, Formula.parse(boost.formula)!!.evaluate(doubleArrayOf(200.0, 100.0))!!, 0.001f)
+        }
+        assertEquals(24f, BuiltInProfiles.all.first { it.id == "ford_ranger_next_gen" }.derived.single().zone!!.safeMax, 0f)
+        assertEquals(12f, BuiltInProfiles.all.first { it.id == "ford_ranger_pjpk" }.derived.single().zone!!.safeMax, 0f)
+    }
+
+    @Test fun derivedLinesAreCheckedToo() {
+        val base = "id: my_car\nname: My car\npid: a | A | 0105 | 1 | - | A | x | 0..1 | - | -\n"
+        assertNotNull(parse(base + "derived: b | B | x | a | A*2 | 0..1 | -").profile)
+        assertTrue(parse(base + "derived: b | B | x | a | A+B | 0..1 | -").issues.any { it.problem.contains("variables") })
+        assertTrue(parse(base + "derived: a | B | x | a | A | 0..1 | -").issues.any { it.problem.contains("already") })
+        assertTrue(parse(base + "derived: b | B | x | b | A | 0..1 | -").issues.any { it.problem.contains("itself") })
+        assertTrue(parse(base + "derived: b | B | x | a | sqrt(A) | 0..1 | -").issues.any { it.problem.contains("formula") })
+        assertTrue(parse(base + "derived: b | B | x | | A | 0..1 | -").profile == null)
+        assertTrue(parse(base + "derived: b | B | x | a | A").issues.any { it.problem.contains("7 fields") })
+    }
+
+    @Test fun legacySettingsMapToProfiles() {
+        assertEquals("ford_ranger_pjpk", ProfileMigration.fromLegacy("T5"))
+        assertEquals("ford_ranger_px", ProfileMigration.fromLegacy("T6"))
+        assertEquals("ford_ranger_next_gen", ProfileMigration.fromLegacy("NEXT_GEN"))
+        assertEquals(BuiltInProfiles.GENERIC_ID, ProfileMigration.fromLegacy(null))
+        assertEquals(BuiltInProfiles.GENERIC_ID, ProfileMigration.fromLegacy("anything"))
+        for (id in listOf("T5", "T6", "NEXT_GEN")) assertNotNull(BuiltInProfiles.findResolved(ProfileMigration.fromLegacy(id)))
     }
 }

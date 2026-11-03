@@ -1,5 +1,6 @@
 package dev.autobridge.obd
 
+import dev.autobridge.obd.profile.PidDef
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -54,7 +55,7 @@ class ElmSession(private val transport: ObdTransport) {
     }
 
     /** Reads one PID. [Reply.Failure] means the adapter or the bus is in trouble, not just this PID. */
-    suspend fun read(pid: Pid, timeoutMs: Long = 1_500): Reply {
+    suspend fun read(pid: PidDef, timeoutMs: Long = 1_500): Reply {
         val raw = request(pid.request, timeoutMs)
         return ObdParser.extract(raw, pid.request, pid.reply, pid.bytes)
     }

@@ -46,6 +46,22 @@ data class PidDef(
 }
 
 /**
+ * A gauge worked out from other gauges rather than asked of the car, such as boost from the manifold
+ * and barometric pressures. [sources] are gauge ids bound to the formula's `A`, `B`...; the value
+ * exists only while every source is fresh.
+ */
+data class DerivedDef(
+    val gauge: String,
+    val label: String,
+    val unit: String,
+    val sources: List<String>,
+    val formula: String,
+    val min: Float,
+    val max: Float,
+    val zone: ZoneRange? = null,
+)
+
+/**
  * What a vehicle can be asked, as data. [base] names a built-in profile whose definitions this one
  * starts from (a gauge defined here replaces the base's for that gauge), so a profile for another
  * model of a family only lists what differs.
@@ -61,9 +77,13 @@ data class VehicleProfile(
     val notes: String,
     val base: String?,
     val pids: List<PidDef>,
+    val derived: List<DerivedDef> = emptyList(),
 ) {
-    /** The gauges this profile can read, in the order they are first listed. */
+    /** The gauges this profile can ask the car for, in the order they are first listed. */
     val gauges: List<String> get() = pids.map { it.gauge }.distinct()
+
+    /** Every gauge it can show: asked of the car, then derived. */
+    val allGauges: List<String> get() = gauges + derived.map { it.gauge }
 
     fun candidates(gauge: String): List<PidDef> = pids.filter { it.gauge == gauge }
 }
