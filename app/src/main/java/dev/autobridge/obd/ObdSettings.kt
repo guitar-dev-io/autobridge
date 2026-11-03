@@ -2,6 +2,8 @@ package dev.autobridge.obd
 
 import android.content.Context
 import androidx.core.content.edit
+import dev.autobridge.obd.profile.BuiltInProfiles
+import dev.autobridge.obd.profile.VehicleProfile
 
 /** The adapter the user picked, and the vehicle choices the gauges depend on. */
 object ObdSettings {
@@ -23,18 +25,29 @@ object ObdSettings {
         else putString("address", adapter.address).putString("name", adapter.name)
     }
 
-    fun transmission(context: Context): Transmission =
-        runCatching { Transmission.valueOf(prefs(context).getString("transmission", null) ?: "") }
-            .getOrDefault(Transmission.T5)
-
-    fun setTransmission(context: Context, value: Transmission) {
-        prefs(context).edit { putString("transmission", value.name) }
-        GaugeSpec.profile = value
+    /**
+     * The vehicle profile in use. A value saved by an older version (the Ranger gearbox choice) is
+     * carried over; with nothing saved the generic OBD-II profile applies, which reads only what
+     * every car answers the same way.
+     */
+    fun profileId(context: Context): String {
+        val p = prefs(context)
+        p.getString("profile", null)?.takeIf { BuiltInProfiles.findResolved(it) != null }?.let { return it }
+        return ProfileMigration.fromLegacy(p.getString("transmission", null))
     }
 
-    /** Makes the zones follow the saved vehicle; call before drawing gauges. */
+    fun profile(context: Context): VehicleProfile =
+        BuiltInProfiles.findResolved(profileId(context))
+            ?: checkNotNull(BuiltInProfiles.findResolved(BuiltInProfiles.GENERIC_ID))
+
+    fun setProfileId(context: Context, id: String) {
+        prefs(context).edit { putString("profile", id) }
+        applyProfile(context)
+    }
+
+    /** Makes the gauges (names, units, zones) follow the saved profile; call before drawing them. */
     fun applyProfile(context: Context) {
-        GaugeSpec.profile = transmission(context)
+        GaugeCatalog.profile = profile(context)
     }
 
     /** Reconnect on its own the next time the gauges screen opens. */

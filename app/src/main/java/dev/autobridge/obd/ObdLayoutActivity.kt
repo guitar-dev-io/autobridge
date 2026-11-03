@@ -60,7 +60,7 @@ class ObdLayoutActivity : Activity() {
                     context = this,
                     title = getString(R.string.obd_layout_page, (index + 1).toString()),
                     subtitle = getString(layoutName(page.layout)) + " • " +
-                        page.gauges.joinToString(", ") { getString(GaugeLabels.of(it)) },
+                        page.gauges.joinToString(", ") { GaugeLabels.text(this, it) },
                     accent = accent,
                     badgeText = (index + 1).toString(),
                     subtitleMaxLines = 2,
@@ -149,7 +149,7 @@ class ObdLayoutActivity : Activity() {
     /** Gauges no page shows yet, so a new page starts with something new. */
     private fun unusedGauges(pages: List<GaugePage>): List<Gauge> {
         val shown = pages.flatMap { it.gauges }.toSet()
-        return Gauge.entries.filter { it !in shown }
+        return GaugeCatalog.gauges().filter { it !in shown }
     }
 
     private fun save(pages: List<GaugePage>) {
@@ -166,7 +166,7 @@ class ObdLayoutActivity : Activity() {
             chooseLayout(index, page)
         }
         page.gauges.forEachIndexed { slot, gauge ->
-            val name = getString(GaugeLabels.of(gauge))
+            val name = GaugeLabels.text(this, gauge)
             val label = when (page.layout.slots[slot]) {
                 CellKind.DIAL -> getString(R.string.obd_layout_slot_dial, (slot + 1).toString(), name)
                 CellKind.TILE -> getString(R.string.obd_layout_slot_tile, (slot + 1).toString(), name)
@@ -207,9 +207,9 @@ class ObdLayoutActivity : Activity() {
     }
 
     private fun chooseGauge(index: Int, page: GaugePage, slot: Int) {
-        val options = Gauge.entries
+        val options = (GaugeCatalog.gauges() + page.gauges).distinct()
         val labels = options.map { gauge ->
-            (if (gauge == page.gauges[slot]) "● " else "   ") + getString(GaugeLabels.of(gauge))
+            (if (gauge == page.gauges[slot]) "● " else "   ") + GaugeLabels.text(this, gauge)
         }
         AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
             .setTitle(R.string.obd_layout_pick_gauge)

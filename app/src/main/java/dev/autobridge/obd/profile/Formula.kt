@@ -11,31 +11,38 @@ package dev.autobridge.obd.profile
  */
 class Formula private constructor(private val root: Node, val source: String, val bytesNeeded: Int) {
 
+    /** How many variables (`A`, `B`...) the formula uses; for bytes this is how many are needed. */
+    val variables: Int get() = bytesNeeded
+
+
     /** The value for [data]; null when the data is too short or the result is not a finite number. */
-    fun evaluate(data: IntArray): Float? {
-        if (data.size < bytesNeeded) return null
-        val v = root.eval(data)
+    fun evaluate(data: IntArray): Float? = evaluate(DoubleArray(data.size) { data[it].toDouble() })
+
+    /** The same over decimal values: how a derived gauge combines the readings of other gauges. */
+    fun evaluate(values: DoubleArray): Float? {
+        if (values.size < bytesNeeded) return null
+        val v = root.eval(values)
         return if (v.isNaN() || v.isInfinite()) null else v.toFloat()
     }
 
     private sealed interface Node {
-        fun eval(data: IntArray): Double
+        fun eval(data: DoubleArray): Double
     }
 
     private class Num(val value: Double) : Node {
-        override fun eval(data: IntArray) = value
+        override fun eval(data: DoubleArray) = value
     }
 
     private class Var(val index: Int) : Node {
-        override fun eval(data: IntArray) = data[index].toDouble()
+        override fun eval(data: DoubleArray) = data[index]
     }
 
     private class Neg(val inner: Node) : Node {
-        override fun eval(data: IntArray) = -inner.eval(data)
+        override fun eval(data: DoubleArray) = -inner.eval(data)
     }
 
     private class Bin(val op: Char, val left: Node, val right: Node) : Node {
-        override fun eval(data: IntArray): Double {
+        override fun eval(data: DoubleArray): Double {
             val a = left.eval(data)
             val b = right.eval(data)
             return when (op) {

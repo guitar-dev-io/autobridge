@@ -7,6 +7,7 @@ import android.os.SystemClock
 import android.view.View
 import dev.autobridge.R
 import dev.autobridge.obd.Gauge
+import dev.autobridge.obd.GaugeCatalog
 import dev.autobridge.obd.GaugeLabels
 import dev.autobridge.obd.GaugePage
 import dev.autobridge.obd.GaugeStyle
@@ -24,7 +25,7 @@ internal class GaugePreviewView(context: Context) : View(context) {
     var style: GaugeStyle = GaugeStyle.DEFAULT
     var imperial = false
 
-    private val renderer = GaugeCarRenderer { gauge -> context.getString(GaugeLabels.of(gauge)) }
+    private val renderer = GaugeCarRenderer { gauge -> GaugeLabels.text(context, gauge) }
     private val area = RectF()
 
     override fun onDraw(canvas: Canvas) {
@@ -58,7 +59,8 @@ internal class GaugePreviewView(context: Context) : View(context) {
             Gauge.BATTERY to 14.1f, Gauge.LOAD to 38f, Gauge.INTAKE to 38f, Gauge.THROTTLE to 22f,
             Gauge.FUEL_LEVEL to 64f, Gauge.AMBIENT to 31f, Gauge.BARO to 101f, Gauge.MAP to 150f,
         )
-        // Boost follows from MAP and the barometer, so it is not set directly.
-        return values.fold(Telemetry()) { telemetry, (gauge, value) -> telemetry.with(gauge, value, now) }
+        // Gauges worked out from others (boost from MAP and the barometer) follow from these.
+        val base = values.fold(Telemetry()) { telemetry, (gauge, value) -> telemetry.with(gauge, value, now) }
+        return values.fold(base) { telemetry, (gauge, _) -> telemetry.refreshDerived(GaugeCatalog.derived, gauge, now) }
     }
 }

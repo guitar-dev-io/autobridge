@@ -1,5 +1,8 @@
 package dev.autobridge.obd
 
+import dev.autobridge.obd.profile.Formula
+import dev.autobridge.obd.profile.PidDef
+import dev.autobridge.obd.profile.VehicleProfile
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -8,18 +11,19 @@ import kotlinx.coroutines.sync.withLock
 class ObdFailure(message: String) : Exception(message)
 
 /**
- * Sets an ELM327 up for a Ford and reads the gauges in a loop.
+ * Sets an ELM327 up and reads the gauges of a [VehicleProfile] in a loop.
  *
  * Reads come in three tiers so the fast gauges are not slowed by the slow ones: RPM and speed on
- * every pass, temperatures and load every third, everything else every fifteenth. A PID the car
- * does not answer is retried a few times, then its next candidate is tried (Ford battery voltage
- * when the standard one is silent, the engine module when the transmission module does not answer
- * for ATF), and a slot with no working candidate is left alone for a while instead of costing a
- * timeout on every pass.
+ * every pass, the temperatures, load and pressures every third, everything else (including any
+ * gauge a profile adds) every fifteenth. A gauge with several candidate PIDs keeps the first the
+ * car answers: one the car does not answer is retried a few times, then the next candidate is
+ * tried (the standard battery voltage before Ford's, the transmission module before the engine
+ * module for gearbox oil), and a gauge with no working candidate is left alone for a while
+ * instead of costing a timeout on every pass.
  */
 class ObdPoller(
     private val session: ElmSession,
-    transmission: Transmission,
+    profile: VehicleProfile,
     private val onValue: (Gauge, Float) -> Unit,
 ) {
     /** The protocol the adapter settled on, as ATDPN reports it ("A6" is auto, CAN 11 bit 500 k). */
@@ -29,26 +33,34 @@ class ObdPoller(
     private var canHeaders = false
     private var currentHeader = STANDARD_HEADER
 
-    private class Slot(val candidates: List<Pid>) {
+    /** A candidate PID with its formula already compiled; a formula that does not compile is left out. */
+    private class Candidate(val pid: PidDef, val formula: Formula)
+
+    private class Slot(val candidates: List<Candidate>) {
         var active = 0
         var misses = 0
         var idleUntilPass = 0
-        val pid get() = candidates[active]
+        val candidate get() = candidates[active]
     }
 
-    private fun slot(vararg pids: Pid) = Slot(pids.toList())
+    private val fast = ArrayList<Slot>()
+    private val medium = ArrayList<Slot>()
+    private val slow = ArrayList<Slot>()
 
-    private val fast = listOf(slot(ObdPids.RPM), slot(ObdPids.SPEED))
-    private val medium = listOf(
-        slot(ObdPids.COOLANT), slot(ObdPids.LOAD), slot(ObdPids.MAP), slot(ObdPids.INTAKE),
-    )
-    private val slow = listOf(
-        slot(ObdPids.BARO),
-        slot(ObdPids.BATTERY_STANDARD, ObdPids.BATTERY_FORD),
-        Slot(ObdPids.atf(transmission)),
-        slot(ObdPids.FUEL_LEVEL),
-        slot(ObdPids.AMBIENT),
-    )
+    init {
+        for (gauge in profile.gauges) {
+            val candidates = profile.candidates(gauge).mapNotNull { pid ->
+                Formula.parse(pid.formula)?.let { Candidate(pid, it) }
+            }
+            if (candidates.isEmpty()) continue
+            val slot = Slot(candidates)
+            when (gauge) {
+                in FAST -> fast += slot
+                in MEDIUM -> medium += slot
+                else -> slow += slot
+            }
+        }
+    }
 
     suspend fun initialize() {
         // The reset can take a few seconds and some adapters answer it with noise; neither matters.
@@ -110,14 +122,15 @@ class ObdPoller(
     }
 
     private suspend fun read(slot: Slot, pass: Int): Boolean {
-        val pid = slot.pid
+        val candidate = slot.candidate
+        val pid = candidate.pid
         selectHeader(pid.header ?: STANDARD_HEADER)
         when (val reply = session.read(pid)) {
             is Reply.Value -> {
-                val value = pid.decode(reply.data)
-                if (isPlausible(pid.gauge, value)) {
+                val value = candidate.formula.evaluate(reply.data)
+                if (value != null && isPlausible(pid, value)) {
                     slot.misses = 0
-                    onValue(pid.gauge, value)
+                    onValue(Gauge(pid.gauge), value)
                     return true
                 }
                 miss(slot, pass)
@@ -143,23 +156,21 @@ class ObdPoller(
         currentHeader = header
     }
 
-    private fun isPlausible(gauge: Gauge, value: Float): Boolean =
-        PLAUSIBLE[gauge]?.contains(value) ?: true
+    private fun isPlausible(pid: PidDef, value: Float): Boolean {
+        val lo = pid.plausibleMin
+        val hi = pid.plausibleMax
+        return (lo == null || value >= lo) && (hi == null || value <= hi)
+    }
 
     companion object {
         const val STANDARD_HEADER = "7DF"
         private const val PASS_PAUSE_MS = 20L
         private const val MISSES_BEFORE_NEXT = 3
         private const val IDLE_PASSES = 300
+        private val FAST = setOf("rpm", "speed")
+        private val MEDIUM = setOf("coolant", "load", "map", "intake", "throttle")
         // ATST64 is a 400 ms wait for an answer: the transmission module is slower than the engine
         // module, and the adapter's default of 200 ms can read its silence as "no data".
         private val SETUP = listOf("ATE0", "ATL0", "ATS0", "ATH0", "ATAT1", "ATST64")
-        private val PLAUSIBLE: Map<Gauge, ClosedFloatingPointRange<Float>> = mapOf(
-            Gauge.RPM to 0f..9_000f,
-            Gauge.SPEED to 0f..255f,
-            Gauge.ATF to -40f..200f,
-            Gauge.BATTERY to 6f..20f,
-            Gauge.COOLANT to -40f..215f,
-        )
     }
 }

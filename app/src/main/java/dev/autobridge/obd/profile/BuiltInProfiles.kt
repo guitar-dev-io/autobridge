@@ -20,6 +20,7 @@ object BuiltInProfiles {
         years: 2008-
         verified: yes
         notes: Standard live data that every compliant car answers the same way.
+        derived: boost | Boost | psi | map,baro | (A-B)*0.145038 | -15..25 | -5,12,-10,18,h
         pid: rpm | RPM | 010C | 2 | - | (A*256+B)/4 | rpm | 0..5000 | 0..9000 | 600,4500,300,5500,lh
         pid: speed | Speed | 010D | 1 | - | A | km/h | 0..200 | 0..255 | 0,120,0,140,h
         pid: coolant | Coolant | 0105 | 1 | - | A-40 | °C | 40..120 | -40..215 | 80,95,70,105,h,70
@@ -75,6 +76,7 @@ object BuiltInProfiles {
         "notes: Runs hotter than the PJ/PK, so the normal ranges are wider; gearbox oil is a guess until checked on a truck.",
         "pid: coolant | Coolant | 0105 | 1 | - | A-40 | °C | 40..130 | -40..215 | 80,106,70,114,h,70",
         "pid: rpm | RPM | 010C | 2 | - | (A*256+B)/4 | rpm | 0..6000 | 0..9000 | 600,5000,300,6000,lh",
+        "derived: boost | Boost | psi | map,baro | (A-B)*0.145038 | -15..35 | -5,24,-10,30,h",
         BATTERY_STANDARD, BATTERY_FORD,
         ATF_T6_7E1 + "70,105,65,118,h,70", ATF_T6_7E0 + "70,105,65,118,h,70",
         ATF_T5_7E1 + "70,105,65,118,h,70", ATF_T5_7E0 + "70,105,65,118,h,70",

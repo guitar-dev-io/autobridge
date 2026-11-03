@@ -3,6 +3,7 @@ package dev.autobridge.obd
 import android.content.Context
 import android.os.SystemClock
 import dev.autobridge.logging.StructuredLog
+import dev.autobridge.obd.profile.VehicleProfile
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -48,7 +49,7 @@ object ObdConnection {
     val isRunning: Boolean get() = job?.isActive == true
 
     @Synchronized
-    fun start(context: Context, adapter: ObdSettings.Adapter, transmission: Transmission) {
+    fun start(context: Context, adapter: ObdSettings.Adapter, profile: VehicleProfile) {
         if (isRunning) return
         val app = context.applicationContext
         appContext = app
@@ -58,7 +59,7 @@ object ObdConnection {
         job = scope.launch {
             var pause = 1_000L
             while (true) {
-                val reason = attempt(app, adapter, transmission)
+                val reason = attempt(app, adapter, profile)
                 StructuredLog.w(TAG, "OBD link ended: $reason")
                 mutableState.update {
                     it.copy(status = ObdState.Status.RETRYING, protocol = null, message = reason)
@@ -82,7 +83,7 @@ object ObdConnection {
     private suspend fun attempt(
         context: Context,
         adapter: ObdSettings.Adapter,
-        transmission: Transmission,
+        profile: VehicleProfile,
     ): String {
         val transport = BleTransport(context, adapter.address)
         var reason = "Connection ended"
@@ -94,8 +95,9 @@ object ObdConnection {
                         mutableState.update { it.copy(status = ObdState.Status.CONNECTING, message = null) }
                         transport.connect()
                         mutableState.update { it.copy(status = ObdState.Status.INITIALIZING) }
-                        val poller = ObdPoller(session, transmission) { gauge, value ->
-                            mutableTelemetry.update { it.with(gauge, value, SystemClock.elapsedRealtime()) }
+                        val poller = ObdPoller(session, profile) { gauge, value ->
+                            val now = SystemClock.elapsedRealtime()
+                            mutableTelemetry.update { it.with(gauge, value, now).refreshDerived(profile.derived, gauge, now) }
                         }
                         poller.initialize()
                         activePoller = poller

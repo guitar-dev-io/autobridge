@@ -32,6 +32,8 @@ data class GaugePage(val layout: PageLayout, val gauges: List<Gauge>)
 object GaugePages {
     const val MAX_PAGES = 6
 
+    private val ID = Regex("[a-z][a-z0-9_]{0,23}")
+
     /** The two pages the car used before pages could be arranged: drive, then engine. */
     val DEFAULT: List<GaugePage> = listOf(
         GaugePage(
@@ -48,7 +50,7 @@ object GaugePages {
     )
 
     fun encode(pages: List<GaugePage>): String =
-        pages.joinToString(";") { page -> page.layout.name + ":" + page.gauges.joinToString(",") { it.name } }
+        pages.joinToString(";") { page -> page.layout.name + ":" + page.gauges.joinToString(",") { it.id } }
 
     fun decode(text: String?): List<GaugePage> {
         if (text.isNullOrBlank()) return DEFAULT
@@ -58,22 +60,21 @@ object GaugePages {
 
     private fun decodePage(part: String): GaugePage? {
         val layout = runCatching { PageLayout.valueOf(part.substringBefore(':').trim()) }.getOrNull() ?: return null
-        val named = part.substringAfter(':', "").split(',').mapNotNull { name ->
-            runCatching { Gauge.valueOf(name.trim()) }.getOrNull()
-        }
+        val named = part.substringAfter(':', "").split(',').map { it.trim() }.filter { ID.matches(it.lowercase()) }.map(Gauge::fromSaved)
         return fit(layout, named)
     }
 
     /** [layout] with exactly one gauge per slot: extras are cut, gaps are filled with gauges not yet used. */
     fun fit(layout: PageLayout, gauges: List<Gauge>): GaugePage {
         val kept = gauges.take(layout.size).toMutableList()
-        for (candidate in Gauge.entries) {
+        val pool = GaugeCatalog.gauges().ifEmpty { listOf(Gauge.RPM) }
+        for (candidate in pool) {
             if (kept.size >= layout.size) break
             if (candidate !in kept) kept += candidate
         }
-        // More slots than gauges exist (never today, but cheap to survive): repeat from the start.
+        // More slots than gauges exist (a small profile): repeat from the start.
         var i = 0
-        while (kept.size < layout.size) kept += Gauge.entries[i++ % Gauge.entries.size]
+        while (kept.size < layout.size) kept += pool[i++ % pool.size]
         return GaugePage(layout, kept)
     }
 

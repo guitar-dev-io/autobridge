@@ -17,6 +17,7 @@ data class ProfileIssue(val where: String, val problem: String) {
  */
 object ProfileValidator {
     const val MAX_PIDS = 80
+    const val MAX_DERIVED = 12
     const val MAX_TEXT = 24_000
 
     private val ID = Regex("[a-z][a-z0-9_]{0,23}")
@@ -56,6 +57,28 @@ object ProfileValidator {
             val hi = pid.plausibleMax
             if (lo != null && hi != null && !(lo < hi)) bad(at, "the plausible range is empty")
             pid.zone?.let { z ->
+                if (!(z.safeMin <= z.safeMax)) bad(at, "the safe range is reversed")
+                if (z.cautionMin > z.safeMin || z.cautionMax < z.safeMax) bad(at, "the caution range must contain the safe range")
+            }
+        }
+        if (profile.derived.size > MAX_DERIVED) bad("profile", "more than $MAX_DERIVED derived lines")
+        val known = profile.pids.map { it.gauge }.toSet()
+        for ((index, d) in profile.derived.withIndex()) {
+            val at = "derived ${index + 1} (${d.gauge})"
+            if (!ID.matches(d.gauge)) bad(at, "the gauge id must be a lowercase word of up to 24 characters")
+            if (d.gauge in known) bad(at, "${d.gauge} is already asked of the car")
+            if (d.label.isBlank() || d.label.length > 40) bad(at, "the label must be 1 to 40 characters")
+            if (d.unit.length > 8) bad(at, "the unit is longer than 8 characters")
+            if (d.sources.isEmpty() || d.sources.size > 8) bad(at, "name 1 to 8 source gauges")
+            if (d.sources.any { !ID.matches(it) }) bad(at, "a source is not a gauge id")
+            if (d.sources.any { it == d.gauge }) bad(at, "a gauge cannot be derived from itself")
+            val formula = Formula.parse(d.formula)
+            when {
+                formula == null -> bad(at, "the formula '${d.formula}' is not arithmetic over A to H")
+                formula.variables > d.sources.size -> bad(at, "the formula uses more variables than there are sources")
+            }
+            if (!(d.min < d.max)) bad(at, "min must be below max")
+            d.zone?.let { z ->
                 if (!(z.safeMin <= z.safeMax)) bad(at, "the safe range is reversed")
                 if (z.cautionMin > z.safeMin || z.cautionMax < z.safeMax) bad(at, "the caution range must contain the safe range")
             }

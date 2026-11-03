@@ -4,6 +4,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class GaugeFormatTest {
+    @org.junit.Before fun fordProfile() { GaugeCatalog.profile = dev.autobridge.obd.profile.BuiltInProfiles.findResolved("ford_ranger_pjpk")!! }
+
+    @org.junit.After fun resetProfile() { GaugeCatalog.profile = dev.autobridge.obd.profile.BuiltInProfiles.findResolved(dev.autobridge.obd.profile.BuiltInProfiles.GENERIC_ID)!! }
+
     @Test fun metricIsUnchanged() {
         assertEquals("85", GaugeFormat.text(Gauge.COOLANT, 85f, imperial = false))
         assertEquals("°C", GaugeFormat.unit(Gauge.COOLANT, imperial = false))

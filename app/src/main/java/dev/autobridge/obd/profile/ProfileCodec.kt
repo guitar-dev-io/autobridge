@@ -20,7 +20,9 @@ class ProfileParse(val profile: VehicleProfile?, val issues: List<ProfileIssue>)
  * ```
  *
  * A `pid` line is `gauge | label | request | bytes | header | formula | unit | min..max | plausible |
- * zones`. `header`, `plausible` and `zones` are `-` when absent. Zones are `safeMin,safeMax,
+ * zones`. `header`, `plausible` and `zones` are `-` when absent. A `derived` line is `gauge | label | unit |
+ * sources | formula | min..max | zones`: a gauge worked out from others, the sources (gauge ids,
+ * comma separated) being the formula's `A`, `B`... Zones are `safeMin,safeMax,
  * cautionMin,cautionMax,flags[,coldBelow]` where flags is `l` (low is bad), `h` (high is bad), both,
  * or `-`. Reading never throws: a bad line becomes an issue with its line number.
  */
@@ -33,6 +35,7 @@ object ProfileCodec {
         val issues = ArrayList<ProfileIssue>()
         val keys = HashMap<String, String>()
         val pids = ArrayList<PidDef>()
+        val derived = ArrayList<DerivedDef>()
 
         text.lineSequence().forEachIndexed { index, raw ->
             val line = raw.trim()
@@ -47,6 +50,7 @@ object ProfileCodec {
             val value = line.substring(colon + 1).trim()
             when (key) {
                 "pid" -> parsePid(value, at, issues)?.let { pids += it }
+                "derived" -> parseDerived(value, at, issues)?.let { derived += it }
                 "id", "name", "make", "model", "years", "verified", "base", "notes" -> {
                     if (key in keys) issues += ProfileIssue(at, "'$key' is given twice") else keys[key] = value
                 }
@@ -69,6 +73,7 @@ object ProfileCodec {
             notes = keys["notes"].orEmpty(),
             base = keys["base"]?.takeIf { it.isNotEmpty() },
             pids = pids,
+            derived = derived,
         )
         // A profile that only names a base and changes nothing is allowed; one with no base needs pids.
         val checked = if (issues.isEmpty()) {
@@ -89,6 +94,12 @@ object ProfileCodec {
         appendLine("verified: ${if (profile.verified) "yes" else "no"}")
         profile.base?.let { appendLine("base: $it") }
         if (profile.notes.isNotEmpty()) appendLine("notes: ${profile.notes}")
+        for (d in profile.derived) {
+            appendLine(
+                "derived: ${d.gauge} | ${d.label} | ${d.unit} | ${d.sources.joinToString(",")} | ${d.formula} | " +
+                    "${num(d.min)}..${num(d.max)} | ${zones(d.zone)}"
+            )
+        }
         for (pid in profile.pids) {
             appendLine(
                 "pid: ${pid.gauge} | ${pid.label} | ${pid.request} | ${pid.bytes} | ${pid.header ?: "-"} | ${pid.formula} | " +
@@ -132,6 +143,22 @@ object ProfileCodec {
             header = f[4].takeIf { it != "-" }?.uppercase(), formula = f[5], unit = f[6],
             min = dial.first, max = dial.second, plausibleMin = plausible?.first, plausibleMax = plausible?.second,
             zone = zone,
+        )
+    }
+
+    private fun parseDerived(value: String, at: String, issues: MutableList<ProfileIssue>): DerivedDef? {
+        val f = value.split('|').map { it.trim() }
+        if (f.size != 7) {
+            issues += ProfileIssue(at, "a derived line has 7 fields separated by |, found ${f.size}")
+            return null
+        }
+        val dial = range(f[5]) ?: run { issues += ProfileIssue(at, "min..max is not a range: '${f[5]}'"); return null }
+        val zone = if (f[6] == "-") null else zone(f[6]) ?: run {
+            issues += ProfileIssue(at, "zones are 'safeMin,safeMax,cautionMin,cautionMax,flags[,coldBelow]': '${f[6]}'"); return null
+        }
+        return DerivedDef(
+            gauge = f[0], label = f[1], unit = f[2], sources = f[3].split(',').map { it.trim() },
+            formula = f[4], min = dial.first, max = dial.second, zone = zone,
         )
     }
 
