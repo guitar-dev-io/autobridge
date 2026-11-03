@@ -108,4 +108,24 @@
     <string name="obd_dtc_generic">Generic code</string>
     <string name="obd_dtc_ford">Ford-specific code</string>
     <string name="obd_dtc_lookup">This code is not in the built-in list. Search it with your truck\'s model.</string>
+    <string name="obd_look_section">Look</string>
+    <string name="obd_look_caption">Surfaces and text follow the app theme (Settings › Appearance). Danger is always red.</string>
+    <string name="obd_look_dial">Dial style</string>
+    <string name="obd_look_tile">Tile style</string>
+    <string name="obd_look_color">Colours</string>
+    <string name="obd_look_size">Text size</string>
+    <string name="obd_dial_arc">Arc</string>
+    <string name="obd_dial_ring">Ring</string>
+    <string name="obd_dial_needle">Needle</string>
+    <string name="obd_dial_digital">Digital</string>
+    <string name="obd_tile_bar">Bar</string>
+    <string name="obd_tile_stripe">Side stripe</string>
+    <string name="obd_tile_plain">Plain</string>
+    <string name="obd_color_zones">By state</string>
+    <string name="obd_color_accent">Theme accent</string>
+    <string name="obd_color_mono">Plain text</string>
+    <string name="obd_size_small">Small</string>
+    <string name="obd_size_normal">Normal</string>
+    <string name="obd_size_large">Large</string>
+    <string name="obd_preview_hint">Tap the preview for the next page</string>
 </resources>

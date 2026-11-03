@@ -43,23 +43,24 @@ object ObdPids {
     /** Ford's own battery voltage, for a PCM that does not answer 0142. */
     val BATTERY_FORD = Pid(Gauge.BATTERY, "221172", "621172", 1, header = "7E0") { it[0] / 16f }
 
-    /** ATF temperature, asked of the transmission module first and the engine module second. */
+    /**
+     * ATF temperature. The PID of the chosen [transmission] goes first, asked of the transmission
+     * module and then the engine module, and the other family's PID follows as a fallback: a truck
+     * that answers `7F 22 31` ("out of range", seen from a 2022 Ranger asked for the PJ/PK PID) is
+     * simply on the other one, and finding it should not depend on the right choice having been
+     * made. A PID the car refuses costs three quick negative answers before the next is tried.
+     */
     fun atf(transmission: Transmission): List<Pid> {
-        val request: String
-        val reply: String
-        val decode: (IntArray) -> Float
-        when (transmission) {
-            Transmission.T5 -> {
-                request = "221674"; reply = "621674"
-                decode = { word(it) * 5f / 72f - 18f }
-            }
-            Transmission.T6, Transmission.NEXT_GEN -> {
-                request = "221E1C"; reply = "621E1C"
-                decode = { word(it) / 16f }
-            }
+        val t5 = atfFamily("221674", "621674") { word(it) * 5f / 72f - 18f }
+        val t6 = atfFamily("221E1C", "621E1C") { word(it) / 16f }
+        return when (transmission) {
+            Transmission.T5 -> t5 + t6
+            Transmission.T6, Transmission.NEXT_GEN -> t6 + t5
         }
-        return listOf("7E1", "7E0").map { Pid(Gauge.ATF, request, reply, 2, header = it, decode = decode) }
     }
+
+    private fun atfFamily(request: String, reply: String, decode: (IntArray) -> Float): List<Pid> =
+        listOf("7E1", "7E0").map { Pid(Gauge.ATF, request, reply, 2, header = it, decode = decode) }
 }
 
 /** What came back for one request. */

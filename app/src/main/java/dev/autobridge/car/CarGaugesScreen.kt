@@ -192,9 +192,11 @@ class CarGaugesScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
             notice = notice(),
             alert = worstAlert(telemetry, now, imperial, pages),
             density = density,
+            style = ObdSettings.style(carContext),
+            look = HomeDashboardLook.current(),
         )
         CarSurfaceCanvas.draw(carContext, target) { canvas ->
-            renderer.draw(canvas, surfaceWidth, surfaceHeight, safeArea(), shown)
+            renderer.draw(canvas, safeArea(), shown)
         }
     }
 
