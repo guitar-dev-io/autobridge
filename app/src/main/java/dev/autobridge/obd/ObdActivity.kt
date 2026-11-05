@@ -32,7 +32,10 @@ import dev.autobridge.obd.obd2.PidValue
 import dev.autobridge.obd.obd2.Pids
 import dev.autobridge.obd.obd2.Readiness
 import dev.autobridge.obd.uds.EcuInfo
+import dev.autobridge.obd.coding.CatalogEntry
+import dev.autobridge.obd.coding.CodingCatalog
 import dev.autobridge.obd.coding.CodingChange
+import dev.autobridge.obd.uds.UdsAnswer
 import dev.autobridge.obd.coding.CodingGuard
 import dev.autobridge.obd.coding.CodingPlan
 import dev.autobridge.obd.coding.CodingRecipe
@@ -81,6 +84,10 @@ class ObdActivity : Activity() {
     private var codingLog: List<String> = emptyList()
     private var codingBusy = false
     private val probes = HashMap<String, AccessProbe>()
+    private val catalog: List<CatalogEntry> by lazy {
+        runCatching { assets.open("obd/ranger6g_2024_catalog.csv").bufferedReader().use { CodingCatalog.parse(it.readText()) } }.getOrDefault(emptyList())
+    }
+    private val catalogReads = HashMap<String, UdsAnswer>()
     private val backups = HashMap<String, List<DidDump>>()
     private var bleScanning = false
     private val bleFound = LinkedHashMap<String, BluetoothDevice>()
@@ -440,6 +447,8 @@ class ObdActivity : Activity() {
         }
         codingLog.forEach { body.stack(CarToolViews.footnote(this, it), gap = 2) }
 
+        buildCatalog(body)
+
         body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.coding_backups)), gap = 0)
         val saved = CodingBackupStore.list(this)
         if (saved.isEmpty()) body.stack(CarToolViews.footnote(this, getString(R.string.coding_no_backups)), gap = 4)
@@ -450,6 +459,53 @@ class ObdActivity : Activity() {
                 accent = accent, badgeText = b.module.take(3), actionLabel = getString(R.string.coding_restore), onTrailing = { confirmRestore(b) }, onClick = {}
             ), gap = 8)
         }
+    }
+
+    /** Read-only reference list: where the community says each setting lives, and what the car holds there now. */
+    private fun buildCatalog(body: LinearLayout) {
+        if (catalog.isEmpty()) return
+        body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.catalog_title)), gap = 0)
+        body.stack(CarToolViews.footnote(this, getString(R.string.catalog_hint)), gap = 6)
+        val th = resources.configuration.locales[0].language == "th"
+        for (e in catalog) {
+            val ecu = modules?.firstOrNull { it.requestId.equals(e.ecu, ignoreCase = true) }
+            body.stack(CarToolViews.card(this) {
+                addView(CarToolViews.text(context, if (th) e.featureTh else e.featureEn, 15f, bold = true))
+                addView(CarToolViews.text(context, "${e.moduleName} ${e.address} · ${e.risk} · ${e.communityTab} · ${e.thaiValidation}", 12f, AutoBridgeDesign.TEXT_MUTED, top = 2))
+                addView(CarToolViews.text(context, listOf(e.guiParameter, e.settingNotes, e.engineeringNotes).filter { it.isNotBlank() }.joinToString("\n"), 12f, AutoBridgeDesign.TEXT_MUTED, top = 4))
+                catalogReads[e.id]?.let { a ->
+                    addView(CarToolViews.text(context, when (a) {
+                        is UdsAnswer.Positive -> catalogValue(e, a.data)
+                        is UdsAnswer.Negative -> getString(R.string.catalog_refused, a.text)
+                        UdsAnswer.Silent -> getString(R.string.catalog_silent)
+                    }, 13f, top = 6).apply { typeface = android.graphics.Typeface.MONOSPACE })
+                }
+                val label = when {
+                    ecu == null -> getString(R.string.catalog_not_scanned)
+                    busyModule == ecu.requestId -> getString(R.string.obd_working)
+                    else -> getString(R.string.catalog_read)
+                }
+                addView(CarToolViews.pillRow(context, listOf(
+                    AutoBridgeDesign.pill(context, label, accent = accent) {
+                        if (ecu != null && busyModule == null) onModule(ecu, { it.readDid(e.did) }) { catalogReads[e.id] = it }
+                    }
+                )), LinearLayout.LayoutParams(-1, -2).apply { topMargin = context.dp(8) })
+            }, gap = 8)
+        }
+    }
+
+    /** DID bytes in groups of four digits; digits the catalog pattern marks are highlighted. */
+    private fun catalogValue(e: CatalogEntry, data: ByteArray): CharSequence {
+        val (hex, marks) = CodingCatalog.marked(e, data)
+        val out = android.text.SpannableStringBuilder("%04X: ".format(e.did))
+        hex.forEachIndexed { i, ch ->
+            val start = out.length
+            out.append(ch)
+            if (i in marks) out.setSpan(android.text.style.BackgroundColorSpan(accent), start, out.length, 0)
+            if (i % 4 == 3) out.append(' ')
+        }
+        if (marks.isEmpty() && e.markedNibbles.isNotEmpty()) out.append("\n").append(getString(R.string.catalog_layout_unknown))
+        return out
     }
 
     /** Runs [work] on the worker, only while the car reports it is stationary. */

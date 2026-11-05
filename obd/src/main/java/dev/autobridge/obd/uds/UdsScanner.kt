@@ -24,7 +24,10 @@ object EcuTargets {
     val ford: List<EcuTarget> = standard + listOf(
         EcuTarget("760", "ABS / ESP"), EcuTarget("720", "Instrument cluster (IPC)"),
         EcuTarget("726", "Body control (BCM)"), EcuTarget("737", "Restraints (RCM)"),
-        EcuTarget("730", "Power steering (PSCM)"), EcuTarget("7D0", "SYNC / APIM")
+        EcuTarget("730", "Power steering (PSCM)"), EcuTarget("7D0", "SYNC / APIM"),
+        // Named in the Ranger 6G community catalog (2024 North America); read-only here.
+        EcuTarget("724", "Steering column (SCCM)"), EcuTarget("706", "Front camera (IPMA)"),
+        EcuTarget("734", "Headlamp control (HCM)")
     )
 }
 

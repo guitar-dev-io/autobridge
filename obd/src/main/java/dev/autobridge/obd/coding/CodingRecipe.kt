@@ -98,8 +98,11 @@ class CodingRecipe(val name: String, val changes: List<CodingChange>) {
  * or steering modules.
  */
 object CodingGuard {
-    /** Airbags/restraints, ABS/ESP, power steering. */
-    val blockedModules = setOf("737", "760", "730")
+    /**
+     * Airbags/restraints, ABS/ESP, power steering, and the driver-assist camera and adaptive
+     * headlamp modules (the catalog rates those "critical": multi-module calibration).
+     */
+    val blockedModules = setOf("737", "760", "730", "706", "734")
 
     /** Engine and transmission: allowed, but the screen says plainly it changes drivetrain behaviour. */
     val highImpactModules = setOf("7E0", "7E1")
@@ -107,7 +110,7 @@ object CodingGuard {
     val allowedDids = 0xDE00..0xDEFF
 
     fun check(module: String, did: Int): String? = when {
-        module.uppercase() in blockedModules -> "module $module (restraints, brakes or steering) is never written"
+        module.uppercase() in blockedModules -> "module $module (restraints, brakes, steering, driver-assist camera or adaptive headlamps) is never written"
         did !in allowedDids -> "block %04X is outside the configuration range DE00-DEFF".format(did)
         else -> null
     }

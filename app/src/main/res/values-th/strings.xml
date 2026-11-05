@@ -2401,4 +2401,11 @@
     <string name="coding_restore">กู้คืน</string>
     <string name="coding_restore_message">ใส่ %1$s กลับใน %2$s?</string>
     <string name="coding_no_backups">ยังไม่มีไฟล์สำรอง</string>
+    <string name="catalog_title">แคตตาล็อก Ranger 6G (อ้างอิง)</string>
+    <string name="catalog_hint">ข้อมูลจากรายงานชุมชนสำหรับ Ranger ปี 2024 ตลาดอเมริกาเหนือ ยังไม่ได้ตรวจกับรถตลาดไทย และไม่ใช่สูตรสำหรับเขียนค่า อ่านอย่างเดียว: แสดงค่าที่โมดูลเก็บไว้ที่บล็อกตามรายงาน การแมปบล็อกเป็น DID (บล็อก NN = DE NN) ยังไม่ยืนยัน อ่านค่าปัจจุบันและสำรองก่อนเสมอ ส่วนนี้ไม่มีการเขียน</string>
+    <string name="catalog_read">อ่านค่าปัจจุบัน</string>
+    <string name="catalog_not_scanned">สแกนโมดูลก่อน</string>
+    <string name="catalog_refused">โมดูลปฏิเสธ: %1$s</string>
+    <string name="catalog_silent">โมดูลไม่ตอบ</string>
+    <string name="catalog_layout_unknown">ยังไม่ยืนยันรูปแบบบรรทัด จึงไม่ไฮไลต์</string>
 </resources>

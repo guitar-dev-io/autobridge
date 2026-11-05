@@ -2436,4 +2436,11 @@
     <string name="coding_restore">Restore</string>
     <string name="coding_restore_message">Put %1$s back in %2$s?</string>
     <string name="coding_no_backups">No backups yet</string>
+    <string name="catalog_title">Ranger 6G catalog (reference)</string>
+    <string name="catalog_hint">Community reports for the 2024 North America Ranger, not checked on a Thai-market car and not a coding recipe. Read only: it shows what the module holds at the reported block. The block-to-DID mapping (block NN as DE NN) is unconfirmed. Read the current values and back them up first; nothing here writes.</string>
+    <string name="catalog_read">Read current value</string>
+    <string name="catalog_not_scanned">Scan modules first</string>
+    <string name="catalog_refused">Module refused: %1$s</string>
+    <string name="catalog_silent">No answer from the module</string>
+    <string name="catalog_layout_unknown">Line layout unconfirmed, nothing highlighted.</string>
 </resources>

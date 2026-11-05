@@ -50,6 +50,8 @@ class CodingTest {
     @Test fun guardBlocksSafetyModulesAndOtherRanges() {
         assertNotNull(CodingGuard.check("737", 0xDE01))
         assertNotNull(CodingGuard.check("760", 0xDE01))
+        assertNotNull(CodingGuard.check("706", 0xDE01))
+        assertNotNull(CodingGuard.check("734", 0xDE01))
         assertNotNull(CodingGuard.check("726", 0xF190))
         assertNull(CodingGuard.check("726", 0xDE01))
     }
@@ -100,5 +102,31 @@ class CodingTest {
         val out = writer(m).restore("726", 0xDE01, byteArrayOf(0x08, 0x04, 0xB0.toByte()))
         assertTrue(out is WriteOutcome.Done)
         assertEquals("0804B0", m.value)
+    }
+}
+
+class CodingCatalogTest {
+    private val csv = "feature_id,feature_en,module,asbuilt_address,source_pattern,risk,engineering_notes\n" +
+        "R1,\"Fog, high beam\",BdyCM,726-39-02,xxx* xxxx xx--,Medium,\"say \"\"hi\"\"\"\n" +
+        "R2,Bad,X,nope,xx,Low,\n" +
+        "R3,Heated,SCCM,724-06-01,*xxx xxxx --,Medium,\n"
+
+    @Test fun parsesRowsQuotesAndSkipsBadAddresses() {
+        val list = CodingCatalog.parse(csv)
+        assertEquals(listOf("R1", "R3"), list.map { it.id })
+        val a = list[0]
+        assertEquals("Fog, high beam", a.featureEn)
+        assertEquals("say \"hi\"", a.engineeringNotes)
+        assertEquals("726", a.ecu)
+        assertEquals(0xDE39, a.did)
+        assertEquals(setOf(3), a.markedNibbles)
+        assertEquals("726-39-01".replace("01", "02"), a.address)
+        assertEquals(setOf(0), list[1].markedNibbles)
+    }
+
+    @Test fun marksOnlyWhenValueIsOneLine() {
+        val e = CodingCatalog.parse(csv)[0]
+        assertEquals("0804B00102" to setOf(3), CodingCatalog.marked(e, byteArrayOf(8, 4, 0xB0.toByte(), 1, 2)))
+        assertTrue(CodingCatalog.marked(e, ByteArray(12)).second.isEmpty())
     }
 }
