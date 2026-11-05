@@ -1344,6 +1344,15 @@ class MainActivity : androidx.activity.ComponentActivity() {
             ),
             SettingsGroup(getString(R.string.about_group_app), listOf(
                 settingsEntry(
+                    getString(R.string.about_build_title),
+                    "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                    R.drawable.ic_tile_folder
+                ) {
+                    dev.autobridge.obd.CodingGate.onBuildTap(this@MainActivity)?.let {
+                        Toast.makeText(this@MainActivity, it, Toast.LENGTH_SHORT).show()
+                    }
+                },
+                settingsEntry(
                     getString(R.string.about_check_update),
                     updateCheckCaption(),
                     R.drawable.ic_tile_remote

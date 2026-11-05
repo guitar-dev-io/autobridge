@@ -32,6 +32,16 @@ import dev.autobridge.obd.obd2.PidValue
 import dev.autobridge.obd.obd2.Pids
 import dev.autobridge.obd.obd2.Readiness
 import dev.autobridge.obd.uds.EcuInfo
+import dev.autobridge.obd.coding.CodingChange
+import dev.autobridge.obd.coding.CodingGuard
+import dev.autobridge.obd.coding.CodingPlan
+import dev.autobridge.obd.coding.CodingRecipe
+import dev.autobridge.obd.coding.PlanResult
+import dev.autobridge.obd.coding.UdsWriter
+import dev.autobridge.obd.coding.WriteOutcome
+import dev.autobridge.obd.obd2.Obd2Client
+import android.widget.EditText
+import android.text.InputType
 import dev.autobridge.obd.uds.Access
 import dev.autobridge.obd.uds.AccessProbe
 import dev.autobridge.obd.uds.DidDump
@@ -53,7 +63,7 @@ class ObdActivity : Activity() {
         private const val REQUEST_BLUETOOTH = 4107
     }
 
-    private enum class Page { HOME, LIVE, CODES, MODULES }
+    private enum class Page { HOME, LIVE, CODES, MODULES, CODING }
 
     private class CodesResult(
         val stored: List<DtcCode>, val pending: List<DtcCode>, val permanent: List<DtcCode>,
@@ -66,6 +76,10 @@ class ObdActivity : Activity() {
     private var modules: List<EcuInfo>? = null
     private var scanning = false
     private var busyModule: String? = null
+    private var recipeText = ""
+    private var plans: List<PlanResult>? = null
+    private var codingLog: List<String> = emptyList()
+    private var codingBusy = false
     private val probes = HashMap<String, AccessProbe>()
     private val backups = HashMap<String, List<DidDump>>()
     private var bleScanning = false
@@ -146,6 +160,7 @@ class ObdActivity : Activity() {
             Page.LIVE -> buildLive(body)
             Page.CODES -> buildCodes(body)
             Page.MODULES -> buildModules(body)
+            Page.CODING -> if (CodingGate.available(this)) buildCoding(body) else page = Page.HOME
         }
         val subtitle = when (status.state) {
             ObdManager.State.CONNECTED -> getString(R.string.obd_status_connected, status.adapterName ?: "")
@@ -163,6 +178,7 @@ class ObdActivity : Activity() {
                         Page.LIVE -> getString(R.string.obd_live)
                         Page.CODES -> getString(R.string.obd_codes)
                         Page.MODULES -> getString(R.string.obd_modules)
+                        Page.CODING -> getString(R.string.coding_title)
                     },
                     subtitle = subtitle,
                     onBack = { if (page != Page.HOME) go(Page.HOME) else finish() }
@@ -189,6 +205,7 @@ class ObdActivity : Activity() {
                     AutoBridgeDesign.pill(this, getString(R.string.obd_live), primary = true, accent = accent) { go(Page.LIVE) },
                     AutoBridgeDesign.pill(this, getString(R.string.obd_codes), accent = accent) { go(Page.CODES) },
                     AutoBridgeDesign.pill(this, getString(R.string.obd_modules), accent = accent) { go(Page.MODULES) },
+                    *(if (CodingGate.available(this)) arrayOf(AutoBridgeDesign.pill(this, getString(R.string.coding_title), accent = accent) { go(Page.CODING) }) else emptyArray()),
                     AutoBridgeDesign.pill(this, getString(R.string.obd_disconnect), accent = accent) { ObdManager.disconnect() }
                 )), gap = 12)
             }
@@ -385,6 +402,146 @@ class ObdActivity : Activity() {
             .putExtra(Intent.EXTRA_SUBJECT, getString(R.string.obd_title))
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         runCatching { startActivity(Intent.createChooser(send, getString(R.string.obd_backup_export))) }
+    }
+
+    // ---- Coding (hidden; see CodingGate) ------------------------------------------------
+
+    private fun buildCoding(body: LinearLayout) {
+        body.stack(CarToolViews.footnote(this, getString(R.string.coding_warning)), gap = 6)
+        body.stack(CarToolViews.footnote(this, getString(R.string.coding_format)), gap = 6)
+        body.stack(EditText(this).apply {
+            hint = getString(R.string.coding_recipe_hint)
+            setText(recipeText)
+            typeface = android.graphics.Typeface.MONOSPACE
+            textSize = 13f
+            setTextColor(AutoBridgeDesign.TEXT)
+            setHintTextColor(AutoBridgeDesign.TEXT_MUTED)
+            minLines = 6
+            gravity = android.view.Gravity.TOP
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
+            background = AutoBridgeDesign.surface(context, AutoBridgeDesign.SURFACE, 12)
+            setPadding(context.dp(12), context.dp(12), context.dp(12), context.dp(12))
+            addTextChangedListener(object : android.text.TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) = Unit
+                override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) = Unit
+                override fun afterTextChanged(s: android.text.Editable?) { recipeText = s?.toString().orEmpty() }
+            })
+        }, gap = 8)
+        val ready = plans?.takeIf { p -> p.isNotEmpty() && p.all { it is PlanResult.Ready } }
+        body.stack(CarToolViews.pillRow(this, listOfNotNull(
+            AutoBridgeDesign.pill(this, getString(if (codingBusy) R.string.obd_working else R.string.coding_preview), primary = ready == null, accent = accent) { if (!codingBusy) previewCoding() },
+            ready?.let { AutoBridgeDesign.pill(this, getString(R.string.coding_apply), primary = true, accent = accent) { if (!codingBusy) confirmApply(it.map { r -> (r as PlanResult.Ready).plan }) } }
+        )), gap = 8)
+        plans?.forEach { r ->
+            body.stack(CarToolViews.footnote(this, when (r) {
+                is PlanResult.Ready -> getString(R.string.coding_plan_ok, r.plan.summary)
+                is PlanResult.Blocked -> getString(R.string.coding_plan_blocked, r.reason)
+            }), gap = 2)
+        }
+        codingLog.forEach { body.stack(CarToolViews.footnote(this, it), gap = 2) }
+
+        body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.coding_backups)), gap = 0)
+        val saved = CodingBackupStore.list(this)
+        if (saved.isEmpty()) body.stack(CarToolViews.footnote(this, getString(R.string.coding_no_backups)), gap = 4)
+        saved.take(20).forEach { b ->
+            val value = CodingChange.hex(b.before)
+            body.stack(AutoBridgeDesign.contentRow(
+                context = this, title = "${b.module} %04X".format(b.did), subtitle = "$value · ${java.text.DateFormat.getDateTimeInstance().format(b.timeMs)}",
+                accent = accent, badgeText = b.module.take(3), actionLabel = getString(R.string.coding_restore), onTrailing = { confirmRestore(b) }, onClick = {}
+            ), gap = 8)
+        }
+    }
+
+    /** Runs [work] on the worker, only while the car reports it is stationary. */
+    private fun <T> stationary(work: (Obd2Client) -> T, done: (T) -> Unit) {
+        codingBusy = true
+        render()
+        ObdManager.submit({ c ->
+            val speed = (c.readPid(Pids.SPEED) as? ObdResult.Ok)?.value?.value ?: 0.0
+            if (speed > 0.0) null else work(c)
+        }) { result ->
+            codingBusy = false
+            val value = result.getOrNull()
+            when {
+                result.isFailure -> toast(getString(R.string.obd_failed, result.exceptionOrNull()?.message ?: ""))
+                value == null -> toast(getString(R.string.obd_stop_first))
+                else -> done(value)
+            }
+            render()
+        }
+    }
+
+    private fun previewCoding() {
+        codingLog = emptyList()
+        when (val parsed = CodingRecipe.parse(recipeText)) {
+            is CodingRecipe.Parsed.Error -> { plans = null; toast(getString(R.string.coding_parse_error, parsed.line, parsed.message)) }
+            is CodingRecipe.Parsed.Ok -> stationary({ c -> val w = UdsWriter(c.session); parsed.recipe.changes.map { w.plan(it) } }) { plans = it }
+        }
+    }
+
+    private fun confirmApply(ready: List<CodingPlan>) {
+        val input = EditText(this).apply { inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS; setSingleLine() }
+        val highImpact = ready.any { it.change.module.uppercase() in CodingGuard.highImpactModules }
+        val message = getString(R.string.coding_confirm_message, ready.size) +
+            (if (highImpact) "\n\n" + getString(R.string.coding_confirm_high_impact) else "") +
+            "\n\n" + ready.joinToString("\n") { it.summary }
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(R.string.coding_confirm_title)
+            .setMessage(message)
+            .setView(input)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.coding_apply) { _, _ ->
+                if (input.text.toString().trim().equals(getString(R.string.coding_confirm_word), ignoreCase = true)) applyCoding(ready)
+            }
+            .create()
+        dialog.show()
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = false
+        input.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) = Unit
+            override fun afterTextChanged(s: android.text.Editable?) {
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = s.toString().trim().equals(getString(R.string.coding_confirm_word), ignoreCase = true)
+            }
+        })
+    }
+
+    private fun describe(outcome: WriteOutcome): String = when (outcome) {
+        is WriteOutcome.Done -> getString(R.string.coding_result_done, outcome.plan.summary)
+        is WriteOutcome.Refused -> getString(R.string.coding_result_refused, outcome.reason)
+        is WriteOutcome.Failed -> getString(R.string.coding_result_failed, outcome.reason, getString(if (outcome.restored) R.string.coding_yes else R.string.coding_no))
+    }
+
+    private fun applyCoding(ready: List<CodingPlan>) {
+        val vin = ObdManager.status.vin
+        stationary({ c ->
+            val writer = UdsWriter(c.session)
+            val lines = ArrayList<String>()
+            for (plan in ready) {
+                // The old value is on disk before anything is sent.
+                CodingBackupStore.save(applicationContext, plan.change.module, plan.change.did, plan.before, plan.after, vin)
+                val outcome = writer.apply(plan)
+                lines.add(describe(outcome))
+                if (outcome !is WriteOutcome.Done) break
+            }
+            lines
+        }) { lines ->
+            plans = null
+            codingLog = lines + getString(R.string.coding_after)
+        }
+    }
+
+    private fun confirmRestore(b: CodingBackup) {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.coding_restore)
+            .setMessage(getString(R.string.coding_restore_message, CodingChange.hex(b.before), "${b.module} %04X".format(b.did)))
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.coding_restore) { _, _ ->
+                stationary({ c -> describe(UdsWriter(c.session).restore(b.module, b.did, b.before)) }) { line ->
+                    plans = null
+                    codingLog = listOf(line, getString(R.string.coding_after))
+                }
+            }
+            .show()
     }
 
     private fun scanModules() {
