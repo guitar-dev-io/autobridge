@@ -2313,7 +2313,7 @@
     <string name="obd_vin">เลขตัวถัง %1$s</string>
     <string name="obd_no_permission">อนุญาตการเข้าถึงบลูทูธเพื่อดูรายการอุปกรณ์ที่จับคู่ไว้</string>
     <string name="obd_grant">อนุญาต</string>
-    <string name="obd_pair_hint">เสียบอะแดปเตอร์ที่ช่อง OBD ของรถ เปิดสวิตช์ไฟ แล้วจับคู่ในตั้งค่าบลูทูธก่อน (PIN มักเป็น 1234 หรือ 0000) รองรับเฉพาะ ELM327 แบบบลูทูธคลาสสิก</string>
+    <string name="obd_pair_hint">เสียบอะแดปเตอร์ที่ช่อง OBD ของรถ เปิดสวิตช์ไฟ แล้วจับคู่ในตั้งค่าบลูทูธก่อน (PIN มักเป็น 1234 หรือ 0000) ถ้าเป็นบลูทูธคลาสสิกให้จับคู่ตามนี้ ส่วนอะแดปเตอร์ BLE (vLinker, OBDLink CX และดองเกิลเล็ก ๆ หลายรุ่น) ให้ใช้ปุ่มสแกนด้านล่าง</string>
     <string name="obd_open_bt_settings">ตั้งค่าบลูทูธ</string>
     <string name="obd_paired_adapters">อุปกรณ์ที่จับคู่แล้ว</string>
     <string name="obd_none_paired">ยังไม่มีอุปกรณ์ที่จับคู่</string>
@@ -2353,7 +2353,11 @@
     <string name="obd_modules">โมดูล</string>
     <string name="obd_scan">สแกนโมดูล</string>
     <string name="obd_scanning">กำลังสแกน…</string>
-    <string name="obd_modules_hint">สอบถามข้อมูลประจำตัวจากโมดูลที่แอดเดรส 7E0–7E7 (เครื่องยนต์/เกียร์) อ่านอย่างเดียว โมดูลที่อยู่แอดเดรสอื่นหรือโปรโตคอลเก่าจะไม่ปรากฏ</string>
+    <string name="obd_modules_hint">สอบถามข้อมูลประจำตัวจากเครื่องยนต์/เกียร์ (7E0–7E7) และโมดูลช่วงล่าง/ตัวถังของ Ford ที่พบบ่อย (ABS, ชุดมาตรวัด, BCM, ถุงลม, พวงมาลัยไฟฟ้า, SYNC) อ่านอย่างเดียว แอดเดรสของ Ford มาจากเอกสารชุมชนและยังไม่ได้ยืนยันบนรถจริง โมดูลที่อยู่แอดเดรสอื่นหรือบน MS-CAN ของ Ford จะไม่ปรากฏ</string>
     <string name="obd_modules_none">ไม่มีโมดูลตอบกลับ</string>
     <string name="obd_last_used">ใช้ล่าสุด</string>
+    <string name="obd_ble_scan">สแกนอะแดปเตอร์ BLE</string>
+    <string name="obd_ble_scanning">กำลังสแกนอะแดปเตอร์ BLE…</string>
+    <string name="obd_ble_found">อุปกรณ์บลูทูธ LE</string>
+    <string name="obd_ble_none">ยังไม่พบ เสียบอะแดปเตอร์ เปิดสวิตช์ไฟ แล้วสแกนใหม่</string>
 </resources>

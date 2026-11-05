@@ -183,3 +183,28 @@ class UdsScannerTest {
         assertEquals("ABC", dev.autobridge.obd.uds.UdsScanner.render("ABC\u0000\u0000".toByteArray()))
     }
 }
+
+class BleLayoutTest {
+    private fun c(u: String, n: Boolean, w: Boolean, wn: Boolean = false) = dev.autobridge.obd.transport.BleChar(u, n, w, wn)
+    private fun s(u: String, vararg ch: dev.autobridge.obd.transport.BleChar) = dev.autobridge.obd.transport.BleService(u, ch.toList())
+    private val generic = s("00001800-0000-1000-8000-00805f9b34fb", c("00002a00-0000-1000-8000-00805f9b34fb", false, true))
+
+    @Test fun fff0SplitsNotifyAndWrite() {
+        val p = dev.autobridge.obd.transport.BleLayout.pick(listOf(generic, s("0000fff0-0000-1000-8000-00805f9b34fb",
+            c("0000fff1-0000-1000-8000-00805f9b34fb", true, false), c("0000fff2-0000-1000-8000-00805f9b34fb", false, true, true))))!!
+        assertEquals("0000fff1-0000-1000-8000-00805f9b34fb", p.notify)
+        assertEquals("0000fff2-0000-1000-8000-00805f9b34fb", p.write)
+    }
+
+    @Test fun ffe1IsBothDirections() {
+        val p = dev.autobridge.obd.transport.BleLayout.pick(listOf(s("0000ffe0-0000-1000-8000-00805f9b34fb",
+            c("0000ffe1-0000-1000-8000-00805f9b34fb", true, true, true))))!!
+        assertEquals(p.notify, p.write)
+    }
+
+    @Test fun unknownVendorServiceStillWorksAndSystemOnlyDoesNot() {
+        assertNotNull(dev.autobridge.obd.transport.BleLayout.pick(listOf(s("12345678-0000-1000-8000-00805f9b34fb",
+            c("a", true, false), c("b", false, true)))))
+        assertNull(dev.autobridge.obd.transport.BleLayout.pick(listOf(generic)))
+    }
+}

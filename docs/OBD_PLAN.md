@@ -1,6 +1,6 @@
 # OBD / Diagnostics ("FORScan-like") plan
 
-Status (2026-11-05): Phase 0–1 written, compiles on safe+personal, `:obd` unit tests pass. NOT yet tried on a real adapter or car. Also in: foreground ObdService, CSV recording/export, read-only UDS module scan (7E0–7E7, identification DIDs only; no Honda profile yet), last-adapter first. Deferred from the plan: BLE and Wi-Fi transports, CSV logging/export, feeding fuel/trip, car-surface gauges.
+Status (2026-11-05): Phase 0–1 written, compiles on safe+personal, `:obd` unit tests pass. NOT yet tried on a real adapter or car. Target vehicle (user, 2026-11-05): Ford Next Gen 2020 — NOT the Honda BR-V this plan first assumed; Honda profile work is dropped, Ford profile first. Also in: BLE transport (auto-detected serial characteristics) + BLE scan, Ford module targets in the scan (community-documented addresses, unverified), foreground ObdService, CSV recording/export, read-only UDS module scan (7E0–7E7, identification DIDs only; no Honda profile yet), last-adapter first. Deferred from the plan: BLE and Wi-Fi transports, CSV logging/export, feeding fuel/trip, car-surface gauges.
 
 ## 0. Where we start
 
@@ -20,7 +20,7 @@ Status (2026-11-05): Phase 0–1 written, compiles on safe+personal, `:obd` unit
 
 Constraints to tell the user up front:
 - FORScan is Ford/Mazda-specific, built on years of reverse-engineered Ford module data. There is no universal "coding database". Each brand needs its own profile (module addresses, DIDs, seed-key algorithms).
-- The test car is a Honda BR-V (gen 1). Honda has little public coding data; Tier A/B are realistic, Tier D is only possible for brands/cars where we have verified data.
+- The real car is a Ford (Next Gen, 2020 per the user). FORScan's Ford data is the model here, but Ford MS-CAN modules need an adapter with the MS/HS switch (OBDLink EX, vLinker FS), and this project has verified no Ford address or DID yet. Tier D only for profiles verified on that car.
 - Cheap ELM327 v2.1 clones fail on UDS/multi-frame and some cannot switch CAN speed — Tier B+ should require a known-good adapter and show an adapter-capability check.
 - The test car has no Android Auto (see memory), so everything is tested on the phone; car-screen parts only on DHU.
 

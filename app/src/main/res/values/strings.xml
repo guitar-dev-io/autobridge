@@ -2348,7 +2348,7 @@
     <string name="obd_vin">VIN %1$s</string>
     <string name="obd_no_permission">Allow Bluetooth access to see your paired adapters.</string>
     <string name="obd_grant">Allow</string>
-    <string name="obd_pair_hint">Plug the adapter into the car\'s OBD port, switch the ignition on, and pair it in Bluetooth settings first (PIN is usually 1234 or 0000). Classic Bluetooth ELM327 adapters only.</string>
+    <string name="obd_pair_hint">Plug the adapter into the car\'s OBD port, switch the ignition on, and pair it in Bluetooth settings first (PIN is usually 1234 or 0000). Adapters that pair this way use classic Bluetooth; BLE adapters (vLinker, OBDLink CX, many small dongles) are found with the scan below instead.</string>
     <string name="obd_open_bt_settings">Bluetooth settings</string>
     <string name="obd_paired_adapters">Paired devices</string>
     <string name="obd_none_paired">No paired devices yet</string>
@@ -2388,7 +2388,11 @@
     <string name="obd_modules">Modules</string>
     <string name="obd_scan">Scan modules</string>
     <string name="obd_scanning">Scanning…</string>
-    <string name="obd_modules_hint">Asks the engine/transmission-range modules (addresses 7E0–7E7) for their identification. Read-only. Modules on other addresses or older protocols will not appear.</string>
+    <string name="obd_modules_hint">Asks the engine and transmission (7E0–7E7) and the usual Ford chassis modules (ABS, cluster, BCM, restraints, steering, SYNC) for their identification. Read-only. Ford addresses come from community documentation and are not verified here; modules on other addresses or Ford\'s MS-CAN do not appear.</string>
     <string name="obd_modules_none">No module answered.</string>
     <string name="obd_last_used">Last used</string>
+    <string name="obd_ble_scan">Scan for BLE adapters</string>
+    <string name="obd_ble_scanning">Scanning for BLE adapters…</string>
+    <string name="obd_ble_found">Bluetooth LE devices</string>
+    <string name="obd_ble_none">None found yet. Plug the adapter in, ignition on, and scan again.</string>
 </resources>

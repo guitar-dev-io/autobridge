@@ -4,7 +4,29 @@ import dev.autobridge.obd.elm.ElmSession
 import dev.autobridge.obd.elm.ObdReply
 
 /** What one module said about itself. [values] maps a data identifier name to its text. */
-data class EcuInfo(val requestId: String, val replyId: String, val values: Map<String, String>)
+data class EcuInfo(val requestId: String, val replyId: String, val values: Map<String, String>, val name: String? = null)
+
+/** An address to ask. Reply is the request + 8 on every target here. */
+data class EcuTarget(val requestId: String, val name: String?) {
+    val replyId: String get() = "%X".format(requestId.toInt(16) + 8)
+}
+
+object EcuTargets {
+    /** The standard OBD-II 11-bit addresses. */
+    val standard: List<EcuTarget> = (0..7).map { EcuTarget("7E$it", if (it == 0) "Engine (PCM)" else if (it == 1) "Transmission (TCM)" else null) }
+
+    /**
+     * Ford body/chassis modules on the HS-CAN pins (6/14) of the OBD port, as listed in the public
+     * FORScan community documentation. Not verified on a vehicle by this project: a module that is
+     * not there simply does not answer. Modules on Ford's MS-CAN (pins 3/11) need an adapter with
+     * the MS/HS switch and are out of reach of a plain ELM327.
+     */
+    val ford: List<EcuTarget> = standard + listOf(
+        EcuTarget("760", "ABS / ESP"), EcuTarget("720", "Instrument cluster (IPC)"),
+        EcuTarget("726", "Body control (BCM)"), EcuTarget("737", "Restraints (RCM)"),
+        EcuTarget("730", "Power steering (PSCM)"), EcuTarget("7D0", "SYNC / APIM")
+    )
+}
 
 /**
  * Read-only module discovery over UDS (ISO 14229) on the standard 11-bit CAN addresses
@@ -12,21 +34,21 @@ data class EcuInfo(val requestId: String, val replyId: String, val values: Map<S
  * identification DIDs every UDS module is expected to know; it never changes session, unlocks, or
  * writes. Modules on other addresses, or on KWP2000 rather than UDS, are simply not found.
  */
-class UdsScanner(private val session: ElmSession) {
+class UdsScanner(private val session: ElmSession, private val targets: List<EcuTarget> = EcuTargets.standard) {
 
     fun scan(): List<EcuInfo> {
         if (session.info?.isCan == false) return emptyList()
         val found = ArrayList<EcuInfo>()
         try {
-            for (offset in 0..7) {
-                val req = "7E%X".format(offset)
-                val rep = "7E%X".format(offset + 8)
+            for (target in targets) {
+                val req = target.requestId
+                val rep = target.replyId
                 if (!session.addressEcu(req, rep)) continue
                 val values = LinkedHashMap<String, String>()
                 for ((did, name) in IDENTIFIERS) {
                     readDid(did)?.let { values[name] = it }
                 }
-                if (values.isNotEmpty()) found.add(EcuInfo(req, rep, values))
+                if (values.isNotEmpty()) found.add(EcuInfo(req, rep, values, target.name))
             }
         } finally {
             session.resetAddressing()

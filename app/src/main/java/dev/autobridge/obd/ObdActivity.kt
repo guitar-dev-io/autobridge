@@ -4,7 +4,12 @@ import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
+import android.bluetooth.le.ScanCallback
+import android.bluetooth.le.ScanResult
+import android.os.Handler
+import android.os.Looper
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -27,6 +32,7 @@ import dev.autobridge.obd.obd2.PidValue
 import dev.autobridge.obd.obd2.Pids
 import dev.autobridge.obd.obd2.Readiness
 import dev.autobridge.obd.uds.EcuInfo
+import dev.autobridge.obd.uds.EcuTargets
 import dev.autobridge.obd.uds.UdsScanner
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.dp
@@ -55,6 +61,16 @@ class ObdActivity : Activity() {
     private var codesError: String? = null
     private var modules: List<EcuInfo>? = null
     private var scanning = false
+    private var bleScanning = false
+    private val bleFound = LinkedHashMap<String, BluetoothDevice>()
+    private val handler = Handler(Looper.getMainLooper())
+    private val stopBleScan = Runnable { endBleScan() }
+    private val bleCallback = object : ScanCallback() {
+        @Suppress("MissingPermission")
+        override fun onScanResult(callbackType: Int, result: ScanResult) {
+            if (result.device.name != null && bleFound.put(result.device.address, result.device) == null) render()
+        }
+    }
     private val prefs by lazy { getSharedPreferences("obd", Context.MODE_PRIVATE) }
     private val liveViews = HashMap<Int, TextView>()
     private val accent: Int get() = AutoBridgeDesign.ACCENT
@@ -89,6 +105,7 @@ class ObdActivity : Activity() {
     }
 
     override fun onStop() {
+        endBleScan()
         ObdManager.removeListener(listener)
         ObdManager.requestPids(this, emptySet())
         super.onStop()
@@ -173,16 +190,39 @@ class ObdActivity : Activity() {
         }
     }
 
+    /** Connecting needs BLUETOOTH_CONNECT; scanning also BLUETOOTH_SCAN (Android 12+) or location (before). */
+    private fun neededPermissions(): Array<String> =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) arrayOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN)
+        else arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+
     private fun hasBluetoothPermission(): Boolean =
-        Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
-            checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+        neededPermissions().all { checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED }
+
+    @Suppress("MissingPermission")
+    private fun startBleScan() {
+        val scanner = (getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter?.bluetoothLeScanner ?: return
+        bleFound.clear()
+        bleScanning = true
+        runCatching { scanner.startScan(bleCallback) }.onFailure { bleScanning = false }
+        handler.postDelayed(stopBleScan, 10_000)
+        render()
+    }
+
+    @Suppress("MissingPermission")
+    private fun endBleScan() {
+        handler.removeCallbacks(stopBleScan)
+        if (!bleScanning) return
+        bleScanning = false
+        runCatching { (getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter?.bluetoothLeScanner?.stopScan(bleCallback) }
+        render()
+    }
 
     private fun buildAdapterList(body: LinearLayout) {
         body.stack(CarToolViews.footnote(this, getString(R.string.obd_pair_hint)), gap = 4)
         if (!hasBluetoothPermission()) {
             body.stack(CarToolViews.footnote(this, getString(R.string.obd_no_permission)), gap = 8)
             body.stack(AutoBridgeDesign.pill(this, getString(R.string.obd_grant), primary = true, accent = accent) {
-                requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_CONNECT), REQUEST_BLUETOOTH)
+                requestPermissions(neededPermissions(), REQUEST_BLUETOOTH)
             }, gap = 8)
             return
         }
@@ -207,6 +247,23 @@ class ObdActivity : Activity() {
         body.stack(AutoBridgeDesign.pill(this, getString(R.string.obd_open_bt_settings), accent = accent) {
             startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
         }, gap = 12)
+
+        body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.obd_ble_found)), gap = 0)
+        for (device in bleFound.values) {
+            @Suppress("MissingPermission")
+            val name = device.name ?: device.address
+            body.stack(
+                AutoBridgeDesign.contentRow(context = this, title = name, subtitle = device.address, accent = accent, badgeText = "LE") {
+                    endBleScan()
+                    ObdManager.connect(applicationContext, BleTransport(applicationContext, device), name)
+                },
+                gap = 8
+            )
+        }
+        if (!bleScanning && bleFound.isEmpty()) body.stack(CarToolViews.footnote(this, getString(R.string.obd_ble_none)), gap = 4)
+        body.stack(AutoBridgeDesign.pill(this, getString(if (bleScanning) R.string.obd_ble_scanning else R.string.obd_ble_scan), primary = true, accent = accent) {
+            if (!bleScanning) startBleScan()
+        }, gap = 8)
     }
 
     // ---- Live data ---------------------------------------------------------------------
@@ -253,7 +310,7 @@ class ObdActivity : Activity() {
         if (list.isEmpty()) { body.stack(CarToolViews.footnote(this, getString(R.string.obd_modules_none)), gap = 8); return }
         for (ecu in list) {
             body.stack(CarToolViews.card(this) {
-                addView(CarToolViews.text(context, "${ecu.requestId} → ${ecu.replyId}", 16f, bold = true))
+                addView(CarToolViews.text(context, listOfNotNull(ecu.name, "${ecu.requestId} → ${ecu.replyId}").joinToString(" · "), 16f, bold = true))
                 ecu.values.forEach { (k, v) -> addView(CarToolViews.text(context, "$k: $v", 14f, AutoBridgeDesign.TEXT_MUTED, top = 4)) }
             }, gap = 8)
         }
@@ -262,7 +319,7 @@ class ObdActivity : Activity() {
     private fun scanModules() {
         scanning = true
         render()
-        ObdManager.submit({ c -> UdsScanner(c.session).scan() }) { result ->
+        ObdManager.submit({ c -> UdsScanner(c.session, EcuTargets.ford).scan() }) { result ->
             scanning = false
             modules = result.getOrDefault(emptyList())
             render()
