@@ -1,26 +1,43 @@
 package dev.autobridge.speed
 
+import dev.autobridge.obd.ObdManager
+import dev.autobridge.obd.obd2.PidValue
+import dev.autobridge.obd.obd2.Pids
+
 /**
- * Optional OBD-II speed source. Stub for now: no adapter integration is wired, so it reports
- * unavailable and never emits. It exists so [SpeedManager] can include OBD in its fallback order
- * once a real Bluetooth/Wi-Fi ELM327 pipeline is added, without changing the manager or callers.
- *
- * To enable later: connect to the adapter, poll PID 0x0D (vehicle speed, km/h), and call
- * onSample(SpeedSample(kmh, SpeedOrigin.OBD, valid = true)) from the read loop.
+ * OBD-II speed (PID 0x0D, km/h) from the connected adapter. Available only while an adapter is
+ * connected and the car lists the PID as supported; it adds the PID to the poll set while a
+ * subscriber is listening and withdraws it afterwards.
  */
 class ObdSpeedSource : SpeedSource {
     override val origin: SpeedOrigin = SpeedOrigin.OBD
 
-    @Volatile
-    private var connected = false
+    private var listener: ObdManager.Listener? = null
 
-    override fun isAvailable(): Boolean = connected
+    override fun isAvailable(): Boolean {
+        val s = ObdManager.status
+        return s.state == ObdManager.State.CONNECTED && Pids.SPEED in s.supportedPids
+    }
 
     override fun start(onSample: (SpeedSample) -> Unit) {
-        // No-op until an OBD adapter pipeline is implemented.
+        stop()
+        val l = object : ObdManager.Listener {
+            override fun onValues(values: Map<Int, PidValue>) {
+                values[Pids.SPEED]?.let { onSample(SpeedSample(it.value.toFloat(), SpeedOrigin.OBD, valid = true)) }
+            }
+
+            override fun onStatus(status: ObdManager.Status) {
+                if (status.state != ObdManager.State.CONNECTED) onSample(SpeedSample(0f, SpeedOrigin.OBD, valid = false))
+            }
+        }
+        listener = l
+        ObdManager.addListener(l)
+        ObdManager.requestPids(this, setOf(Pids.SPEED))
     }
 
     override fun stop() {
-        // No-op.
+        listener?.let { ObdManager.removeListener(it) }
+        listener = null
+        ObdManager.requestPids(this, emptySet())
     }
 }

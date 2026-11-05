@@ -321,6 +321,9 @@ android.sourceSets {
 
 dependencies {
     implementation(project(":common"))
+    // OBD-II protocol layer (ELM327 session, PID and DTC decoding). Every flavor: Phase 1 is read
+    // and clear-codes only; the write tiers of docs/OBD_PLAN.md stay out of the safe flavor.
+    implementation(project(":obd"))
     // Offline voice recognition: whisper.cpp and its JNI binding (see whisper/build.gradle.kts).
     // Every flavor gets it - it runs on the phone, talks to no server, and the models it reads are
     // downloaded on request rather than shipped in the APK.

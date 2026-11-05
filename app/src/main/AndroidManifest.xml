@@ -7,6 +7,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- The radio equalizer: android.media.audiofx effects on the player's own audio session. -->
@@ -23,6 +24,8 @@
          protected, and the media auto-start option would otherwise be a switch that does nothing.
          No device is read and nothing is scanned for. -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!-- Pre-Android 12 name for the same thing: the OBD adapter screen lists paired devices. -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <!-- Special permission: granted via ACTION_MANAGE_WRITE_SETTINGS, used only for the
          per-app force-landscape profile (QuickAppLauncher). -->
     <uses-permission android:name="android.permission.WRITE_SETTINGS" />
@@ -260,6 +263,9 @@
         <!-- Fuel log on the phone: fill-ups, consumption, CSV export. -->
         <activity android:name=".fuel.FuelLogActivity" android:exported="false" />
         <activity android:name=".maintenance.MaintenanceActivity" android:exported="false" />
+        <!-- OBD-II diagnostics over a paired ELM327 Bluetooth adapter. -->
+        <activity android:name=".obd.ObdActivity" android:exported="false" />
+        <service android:name=".obd.ObdService" android:exported="false" android:foregroundServiceType="connectedDevice" />
         <activity android:name=".trip.TripActivity" android:exported="false" />
         <activity android:name=".backup.BackupActivity" android:exported="false" />
         <activity android:name=".emergency.EmergencyActivity" android:exported="false" />

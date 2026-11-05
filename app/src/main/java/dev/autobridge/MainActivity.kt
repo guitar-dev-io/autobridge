@@ -2304,6 +2304,15 @@ class MainActivity : androidx.activity.ComponentActivity() {
             tone = facts.maintenanceTone(headline)
         ) { startActivity(dev.autobridge.maintenance.MaintenanceActivity.intent(this)) }
 
+        val obdStatus = dev.autobridge.obd.ObdManager.status
+        val obd = dev.autobridge.ui.MyCarTile(
+            R.drawable.ic_car_obd, color(design.ACCENT_FILES), getString(R.string.obd_title),
+            value = if (obdStatus.state == dev.autobridge.obd.ObdManager.State.CONNECTED) getString(R.string.obd_status_connected, obdStatus.adapterName ?: "")
+            else getString(R.string.obd_tile_empty),
+            caption = null,
+            tone = dev.autobridge.mycar.MyCarFacts.Tone.NORMAL
+        ) { startActivity(dev.autobridge.obd.ObdActivity.intent(this)) }
+
         val fuelFact = facts.fuel(dev.autobridge.fuel.FuelStats.summarize(fuelEntries, now))
         val number = java.text.NumberFormat.getNumberInstance().apply { minimumFractionDigits = 1; maximumFractionDigits = 1 }
         val fuel = dev.autobridge.ui.MyCarTile(
@@ -2405,7 +2414,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
             vehicleTitle = dev.autobridge.profile.ActiveCarProfile.custom?.name ?: getString(R.string.car_connection_my_car),
             profileLabel = dev.autobridge.profile.ActiveCarProfile.label,
             stats = stats,
-            tiles = listOf(parking, maintenance, fuel, costs, emergency, breakTile),
+            tiles = listOf(parking, maintenance, fuel, costs, obd, emergency, breakTile),
             battery = batteryText(battery),
             temperature = temperatureText(battery),
             setupCaption = when {
