@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="obdt_title">OBD diagnostics</string>
+    <string name="obdt_title">Module tools</string>
     <string name="obdt_tile_empty">Not connected</string>
     <string name="obdt_status_disconnected">Not connected</string>
     <string name="obdt_status_connecting">Connecting to %1$s…</string>
@@ -49,7 +49,7 @@
     <string name="obdt_modules">Modules</string>
     <string name="obdt_scan">Scan modules</string>
     <string name="obdt_scanning">Scanning…</string>
-    <string name="obdt_modules_hint">Asks the engine and transmission (7E0–7E7) and the usual Ford chassis modules (ABS, cluster, BCM, restraints, steering, SYNC) for their identification. Read-only. Ford addresses come from community documentation and are not verified here; modules on other addresses or Ford\'s MS-CAN do not appear.</string>
+    <string name="obdt_modules_hint">Asks each module who it is. Read only. Ford addresses come from community notes and are not yet confirmed on a car.</string>
     <string name="obdt_modules_none">No module answered.</string>
     <string name="obdt_last_used">Last used</string>
     <string name="obdt_ble_scan">Scan for BLE adapters</string>
@@ -98,7 +98,7 @@
     <string name="coding_restore_message">Put %1$s back in %2$s?</string>
     <string name="coding_no_backups">No backups yet</string>
     <string name="catalog_title">Ranger 6G catalog (reference)</string>
-    <string name="catalog_hint">Community reports for the 2024 North America Ranger, not checked on a Thai-market car and not a coding recipe. Read only: it shows what the module holds at the reported block. The block-to-DID mapping (block NN as DE NN) is unconfirmed. Read the current values and back them up first; nothing here writes.</string>
+    <string name="catalog_hint">Community data for the 2024 North America Ranger, not checked on a Thai car. Reading never writes.</string>
     <string name="catalog_read">Read current value</string>
     <string name="catalog_not_scanned">Scan modules first</string>
     <string name="catalog_refused">Module refused: %1$s</string>
@@ -106,4 +106,34 @@
     <string name="catalog_layout_unknown">Line layout unconfirmed, nothing highlighted.</string>
     <string name="obdt_not_live">Adapter not connected</string>
     <string name="obdt_connect_first">Connect the adapter from the gauges first.</string>
+    <string name="obdt_go_gauges">Open gauges</string>
+    <string name="obdt_modules_found">%1$d modules answered</string>
+    <string name="coding_banner">Writes go into the car. Back up first, car stopped, battery above 12.2 V.</string>
+    <string name="coding_tab_catalog">Catalog</string>
+    <string name="coding_tab_editor">Edit</string>
+    <string name="coding_tab_backups">Backups</string>
+    <string name="coding_backups_hint">The value of every block before it was written. Restore puts it back.</string>
+    <string name="catalog_filter_all">All</string>
+    <string name="catalog_edit">Edit this block</string>
+    <string name="catalog_blocked">Read only: this module is never written.</string>
+    <string name="catalog_needs">Needs: %1$s</string>
+    <string name="editor_empty">Pick a feature in Catalog and tap “Edit this block”, or read any block here.</string>
+    <string name="editor_module_hint">Module (726)</string>
+    <string name="editor_did_hint">Block (DE39)</string>
+    <string name="editor_read">Read block</string>
+    <string name="editor_bad_address">Module is 3 hex digits and block is 4, like 726 and DE39.</string>
+    <string name="editor_hint_tap">Tap a digit to change it. Outlined digits are where the catalog points.</string>
+    <string name="editor_locked">The last byte of a 6-byte line is taken as a checksum and is locked.</string>
+    <string name="editor_before">Before</string>
+    <string name="editor_after">After</string>
+    <string name="editor_byte">byte %1$d</string>
+    <string name="editor_reset">Undo</string>
+    <string name="editor_check">Check</string>
+    <string name="editor_close">Close</string>
+    <string name="editor_no_change">Nothing changed yet.</string>
+    <string name="editor_pick_title">Digit %1$d (byte %2$d): %3$s · %4$s</string>
+    <string name="editor_original_mark">(was)</string>
+    <string name="editor_recipe_toggle">Text recipe (advanced)</string>
+    <string name="editor_to_recipe">Add to recipe</string>
+    <string name="obdt_row_caption">Scan modules, back up blocks</string>
 </resources>

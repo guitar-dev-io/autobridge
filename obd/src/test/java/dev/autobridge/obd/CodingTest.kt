@@ -124,9 +124,42 @@ class CodingCatalogTest {
         assertEquals(setOf(0), list[1].markedNibbles)
     }
 
+    @Test fun byteOrderMarkDoesNotHideTheIdColumn() {
+        assertEquals(listOf("R1", "R3"), CodingCatalog.parse("\uFEFF" + csv).map { it.id })
+    }
+
     @Test fun marksOnlyWhenValueIsOneLine() {
         val e = CodingCatalog.parse(csv)[0]
         assertEquals("0804B00102" to setOf(3), CodingCatalog.marked(e, byteArrayOf(8, 4, 0xB0.toByte(), 1, 2)))
         assertTrue(CodingCatalog.marked(e, ByteArray(12)).second.isEmpty())
+    }
+}
+
+class BlockDraftTest {
+    private fun bytes(hex: String) = ByteArray(hex.length / 2) { hex.substring(it * 2, it * 2 + 2).toInt(16).toByte() }
+
+    @Test fun editsOneDigitAndTracksChanges() {
+        val d = BlockDraft("726", 0xDE39, bytes("0804B00102"))
+        assertNull(d.toChange())
+        assertEquals(0xB, d.nibble(4))
+        assertTrue(d.set(5, 0x1))
+        assertEquals("0804B10102", CodingChange.hex(d.value))
+        assertEquals(setOf(5), d.changed)
+        assertEquals("726 DE39 0804B00102 0804B10102", d.recipeLine())
+        val c = d.toChange()!!
+        assertEquals("0804B10102", CodingChange.hex(c.applyTo(bytes("0804B00102")).getOrThrow()))
+        assertTrue(c.applyTo(bytes("0804B00103")).isFailure)
+        d.reset()
+        assertTrue(d.changed.isEmpty())
+    }
+
+    @Test fun checksumByteOfSixByteLineIsLocked() {
+        val d = BlockDraft("726", 0xDE39, bytes("0804B0010277"))
+        assertFalse(d.set(10, 1))
+        assertFalse(d.set(11, 1))
+        assertFalse(d.set(12, 1))
+        assertFalse(d.set(0, 16))
+        assertTrue(d.set(9, 0xF))
+        assertEquals("0101", BlockDraft.binary(5))
     }
 }

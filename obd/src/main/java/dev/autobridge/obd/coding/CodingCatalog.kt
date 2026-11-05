@@ -32,7 +32,8 @@ data class CatalogEntry(
 object CodingCatalog {
     /** Parses the catalog CSV; rows that do not have a usable address are skipped. */
     fun parse(csv: String): List<CatalogEntry> {
-        val rows = rows(csv)
+        // A spreadsheet export often starts with a byte-order mark, which would hide the first column name.
+        val rows = rows(csv.removePrefix("\uFEFF"))
         if (rows.isEmpty()) return emptyList()
         val col = rows[0].withIndex().associate { it.value.trim() to it.index }
         fun Map<String, Int>.get(r: List<String>, name: String) = this[name]?.let { r.getOrNull(it) }?.trim().orEmpty()

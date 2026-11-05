@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="obdt_title">วินิจฉัย OBD</string>
+    <string name="obdt_title">เครื่องมือโมดูล</string>
     <string name="obdt_tile_empty">ยังไม่เชื่อมต่อ</string>
     <string name="obdt_status_disconnected">ยังไม่เชื่อมต่อ</string>
     <string name="obdt_status_connecting">กำลังเชื่อมต่อ %1$s…</string>
@@ -49,7 +49,7 @@
     <string name="obdt_modules">โมดูล</string>
     <string name="obdt_scan">สแกนโมดูล</string>
     <string name="obdt_scanning">กำลังสแกน…</string>
-    <string name="obdt_modules_hint">สอบถามข้อมูลประจำตัวจากเครื่องยนต์/เกียร์ (7E0–7E7) และโมดูลช่วงล่าง/ตัวถังของ Ford ที่พบบ่อย (ABS, ชุดมาตรวัด, BCM, ถุงลม, พวงมาลัยไฟฟ้า, SYNC) อ่านอย่างเดียว แอดเดรสของ Ford มาจากเอกสารชุมชนและยังไม่ได้ยืนยันบนรถจริง โมดูลที่อยู่แอดเดรสอื่นหรือบน MS-CAN ของ Ford จะไม่ปรากฏ</string>
+    <string name="obdt_modules_hint">ถามข้อมูลประจำตัวของแต่ละโมดูล อ่านอย่างเดียว แอดเดรสของ Ford มาจากข้อมูลชุมชนและยังไม่ได้ยืนยันกับรถจริง</string>
     <string name="obdt_modules_none">ไม่มีโมดูลตอบกลับ</string>
     <string name="obdt_last_used">ใช้ล่าสุด</string>
     <string name="obdt_ble_scan">สแกนอะแดปเตอร์ BLE</string>
@@ -98,7 +98,7 @@
     <string name="coding_restore_message">ใส่ %1$s กลับใน %2$s?</string>
     <string name="coding_no_backups">ยังไม่มีไฟล์สำรอง</string>
     <string name="catalog_title">แคตตาล็อก Ranger 6G (อ้างอิง)</string>
-    <string name="catalog_hint">ข้อมูลจากรายงานชุมชนสำหรับ Ranger ปี 2024 ตลาดอเมริกาเหนือ ยังไม่ได้ตรวจกับรถตลาดไทย และไม่ใช่สูตรสำหรับเขียนค่า อ่านอย่างเดียว: แสดงค่าที่โมดูลเก็บไว้ที่บล็อกตามรายงาน การแมปบล็อกเป็น DID (บล็อก NN = DE NN) ยังไม่ยืนยัน อ่านค่าปัจจุบันและสำรองก่อนเสมอ ส่วนนี้ไม่มีการเขียน</string>
+    <string name="catalog_hint">ข้อมูลชุมชนของ Ranger 2024 ตลาดอเมริกาเหนือ ยังไม่ได้ตรวจกับรถไทย การอ่านไม่เขียนอะไรลงรถ</string>
     <string name="catalog_read">อ่านค่าปัจจุบัน</string>
     <string name="catalog_not_scanned">สแกนโมดูลก่อน</string>
     <string name="catalog_refused">โมดูลปฏิเสธ: %1$s</string>
@@ -106,4 +106,34 @@
     <string name="catalog_layout_unknown">ยังไม่ยืนยันรูปแบบบรรทัด จึงไม่ไฮไลต์</string>
     <string name="obdt_not_live">ยังไม่ได้ต่ออะแดปเตอร์</string>
     <string name="obdt_connect_first">ต่ออะแดปเตอร์จากหน้าเกจก่อน</string>
+    <string name="obdt_go_gauges">ไปหน้าเกจ</string>
+    <string name="obdt_modules_found">มี %1$d โมดูลที่ตอบ</string>
+    <string name="coding_banner">การเขียนค่าจะเข้าไปในรถจริง สำรองก่อน จอดรถนิ่ง และแบตเตอรี่ต้องเกิน 12.2 V</string>
+    <string name="coding_tab_catalog">แคตตาล็อก</string>
+    <string name="coding_tab_editor">แก้ค่า</string>
+    <string name="coding_tab_backups">สำรอง</string>
+    <string name="coding_backups_hint">ค่าของแต่ละบล็อกก่อนถูกเขียน กดคืนค่าเพื่อเขียนค่าเดิมกลับ</string>
+    <string name="catalog_filter_all">ทั้งหมด</string>
+    <string name="catalog_edit">แก้บล็อกนี้</string>
+    <string name="catalog_blocked">อ่านอย่างเดียว: โมดูลนี้ไม่ถูกเขียนเด็ดขาด</string>
+    <string name="catalog_needs">ต้องมี: %1$s</string>
+    <string name="editor_empty">เลือกฟีเจอร์ในแท็บแคตตาล็อกแล้วกด “แก้บล็อกนี้” หรืออ่านบล็อกใดก็ได้ที่นี่</string>
+    <string name="editor_module_hint">โมดูล (726)</string>
+    <string name="editor_did_hint">บล็อก (DE39)</string>
+    <string name="editor_read">อ่านบล็อก</string>
+    <string name="editor_bad_address">โมดูลเป็นเลขฐาน 16 สามหลัก บล็อกสี่หลัก เช่น 726 และ DE39</string>
+    <string name="editor_hint_tap">แตะหลักที่ต้องการเปลี่ยน หลักที่มีกรอบสีคือตำแหน่งที่แคตตาล็อกชี้</string>
+    <string name="editor_locked">ไบต์สุดท้ายของบรรทัด 6 ไบต์ถือเป็น checksum จึงล็อกไว้</string>
+    <string name="editor_before">เดิม</string>
+    <string name="editor_after">ใหม่</string>
+    <string name="editor_byte">ไบต์ %1$d</string>
+    <string name="editor_reset">ยกเลิกแก้</string>
+    <string name="editor_check">ตรวจกับรถ</string>
+    <string name="editor_close">ปิด</string>
+    <string name="editor_no_change">ยังไม่ได้แก้อะไร</string>
+    <string name="editor_pick_title">หลักที่ %1$d (ไบต์ %2$d): %3$s · %4$s</string>
+    <string name="editor_original_mark">(เดิม)</string>
+    <string name="editor_recipe_toggle">Recipe แบบข้อความ (ขั้นสูง)</string>
+    <string name="editor_to_recipe">ใส่ใน recipe</string>
+    <string name="obdt_row_caption">สแกนโมดูล สำรองค่าบล็อก</string>
 </resources>

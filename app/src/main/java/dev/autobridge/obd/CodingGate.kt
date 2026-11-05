@@ -28,7 +28,8 @@ object CodingGate {
 
     /** Whether the Coding page may be opened right now. */
     fun available(context: Context): Boolean =
-        BuildConfig.AUTOBRIDGE_MODE != "SAFE" && unlocked(context) && SurfaceProfile.active == SurfaceProfile.FORD_NEXT_GEN
+        BuildConfig.AUTOBRIDGE_MODE != "SAFE" && unlocked(context) &&
+            (SurfaceProfile.active == SurfaceProfile.FORD_NEXT_GEN || ObdSettings.profileId(context).startsWith("ford"))
 
     /** Counts a tap on the build number; returns a message to show, or null while it is quiet. */
     fun onBuildTap(context: Context): String? {
