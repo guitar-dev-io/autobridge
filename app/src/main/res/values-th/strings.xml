@@ -2350,4 +2350,10 @@
     <string name="obd_log_stop">หยุดบันทึก</string>
     <string name="obd_log_export">ส่งออก CSV</string>
     <string name="obd_log_empty">ยังไม่มีข้อมูลที่บันทึก</string>
+    <string name="obd_modules">โมดูล</string>
+    <string name="obd_scan">สแกนโมดูล</string>
+    <string name="obd_scanning">กำลังสแกน…</string>
+    <string name="obd_modules_hint">สอบถามข้อมูลประจำตัวจากโมดูลที่แอดเดรส 7E0–7E7 (เครื่องยนต์/เกียร์) อ่านอย่างเดียว โมดูลที่อยู่แอดเดรสอื่นหรือโปรโตคอลเก่าจะไม่ปรากฏ</string>
+    <string name="obd_modules_none">ไม่มีโมดูลตอบกลับ</string>
+    <string name="obd_last_used">ใช้ล่าสุด</string>
 </resources>

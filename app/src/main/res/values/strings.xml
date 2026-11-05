@@ -2385,4 +2385,10 @@
     <string name="obd_log_stop">Stop recording</string>
     <string name="obd_log_export">Export CSV</string>
     <string name="obd_log_empty">Nothing recorded yet</string>
+    <string name="obd_modules">Modules</string>
+    <string name="obd_scan">Scan modules</string>
+    <string name="obd_scanning">Scanning…</string>
+    <string name="obd_modules_hint">Asks the engine/transmission-range modules (addresses 7E0–7E7) for their identification. Read-only. Modules on other addresses or older protocols will not appear.</string>
+    <string name="obd_modules_none">No module answered.</string>
+    <string name="obd_last_used">Last used</string>
 </resources>

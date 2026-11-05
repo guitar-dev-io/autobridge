@@ -1,6 +1,6 @@
 # OBD / Diagnostics ("FORScan-like") plan
 
-Status (2026-11-05): Phase 0–1 written, compiles on safe+personal, `:obd` unit tests pass. NOT yet tried on a real adapter or car. Deferred from the plan: foreground `ObdService` (connection lives in the app process), BLE and Wi-Fi transports, CSV logging/export, feeding fuel/trip, car-surface gauges.
+Status (2026-11-05): Phase 0–1 written, compiles on safe+personal, `:obd` unit tests pass. NOT yet tried on a real adapter or car. Also in: foreground ObdService, CSV recording/export, read-only UDS module scan (7E0–7E7, identification DIDs only; no Honda profile yet), last-adapter first. Deferred from the plan: BLE and Wi-Fi transports, CSV logging/export, feeding fuel/trip, car-surface gauges.
 
 ## 0. Where we start
 

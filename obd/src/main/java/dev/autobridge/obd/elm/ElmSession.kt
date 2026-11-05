@@ -80,6 +80,22 @@ class ElmSession(private val transport: ObdTransport) {
         return parse(text)
     }
 
+    /**
+     * Aims requests at one ECU on an 11-bit CAN bus ([requestId] such as "7E0") and listens only to
+     * [replyId] ("7E8"), so a scan can tell who answered. Always pair with [resetAddressing].
+     */
+    fun addressEcu(requestId: String, replyId: String): Boolean =
+        rawCommand("ATSH$requestId", COMMAND_TIMEOUT_MS).contains("OK") &&
+            rawCommand("ATCRA$replyId", COMMAND_TIMEOUT_MS).contains("OK")
+
+    /** Back to the functional broadcast address and no reply filter, which generic OBD-II expects. */
+    fun resetAddressing() {
+        runCatching {
+            rawCommand("ATSH7DF", COMMAND_TIMEOUT_MS)
+            rawCommand("ATAR", COMMAND_TIMEOUT_MS)
+        }
+    }
+
     fun close() = transport.close()
 
     private fun rawCommand(command: String, timeoutMs: Long): String {

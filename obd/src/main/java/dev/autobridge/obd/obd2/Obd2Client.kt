@@ -24,7 +24,7 @@ data class FreezeFrame(val triggeringCode: DtcCode?, val values: List<PidValue>)
  * The generic OBD-II services (SAE J1979) Phase 1 needs: live data, trouble codes, freeze frame,
  * readiness and vehicle identification. Stateless apart from the session it talks through.
  */
-class Obd2Client(private val session: ElmSession) {
+class Obd2Client(val session: ElmSession) {
 
     fun supportedPids(): Set<Int> {
         val supported = HashSet<Int>()

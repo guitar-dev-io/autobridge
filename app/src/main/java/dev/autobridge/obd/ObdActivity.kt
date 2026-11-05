@@ -26,6 +26,8 @@ import dev.autobridge.obd.obd2.ObdResult
 import dev.autobridge.obd.obd2.PidValue
 import dev.autobridge.obd.obd2.Pids
 import dev.autobridge.obd.obd2.Readiness
+import dev.autobridge.obd.uds.EcuInfo
+import dev.autobridge.obd.uds.UdsScanner
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.dp
 import dev.autobridge.ui.AutoBridgeDesign.stack
@@ -41,7 +43,7 @@ class ObdActivity : Activity() {
         private const val REQUEST_BLUETOOTH = 4107
     }
 
-    private enum class Page { HOME, LIVE, CODES }
+    private enum class Page { HOME, LIVE, CODES, MODULES }
 
     private class CodesResult(
         val stored: List<DtcCode>, val pending: List<DtcCode>, val permanent: List<DtcCode>,
@@ -51,6 +53,9 @@ class ObdActivity : Activity() {
     private var page = Page.HOME
     private var codes: CodesResult? = null
     private var codesError: String? = null
+    private var modules: List<EcuInfo>? = null
+    private var scanning = false
+    private val prefs by lazy { getSharedPreferences("obd", Context.MODE_PRIVATE) }
     private val liveViews = HashMap<Int, TextView>()
     private val accent: Int get() = AutoBridgeDesign.ACCENT
     private val thai: Boolean get() = resources.configuration.locales[0].language == "th"
@@ -116,6 +121,7 @@ class ObdActivity : Activity() {
             Page.HOME -> buildHome(body, status)
             Page.LIVE -> buildLive(body)
             Page.CODES -> buildCodes(body)
+            Page.MODULES -> buildModules(body)
         }
         val subtitle = when (status.state) {
             ObdManager.State.CONNECTED -> getString(R.string.obd_status_connected, status.adapterName ?: "")
@@ -132,6 +138,7 @@ class ObdActivity : Activity() {
                         Page.HOME -> getString(R.string.obd_title)
                         Page.LIVE -> getString(R.string.obd_live)
                         Page.CODES -> getString(R.string.obd_codes)
+                        Page.MODULES -> getString(R.string.obd_modules)
                     },
                     subtitle = subtitle,
                     onBack = { if (page != Page.HOME) go(Page.HOME) else finish() }
@@ -157,6 +164,7 @@ class ObdActivity : Activity() {
                 body.stack(CarToolViews.pillRow(this, listOf(
                     AutoBridgeDesign.pill(this, getString(R.string.obd_live), primary = true, accent = accent) { go(Page.LIVE) },
                     AutoBridgeDesign.pill(this, getString(R.string.obd_codes), accent = accent) { go(Page.CODES) },
+                    AutoBridgeDesign.pill(this, getString(R.string.obd_modules), accent = accent) { go(Page.MODULES) },
                     AutoBridgeDesign.pill(this, getString(R.string.obd_disconnect), accent = accent) { ObdManager.disconnect() }
                 )), gap = 12)
             }
@@ -181,13 +189,16 @@ class ObdActivity : Activity() {
         body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.obd_paired_adapters)), gap = 0)
         val adapter: BluetoothAdapter? = (getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter
         @Suppress("MissingPermission")
+        val last = prefs.getString("last_address", null)
         val devices = runCatching { adapter?.bondedDevices?.toList().orEmpty() }.getOrDefault(emptyList())
+            .sortedByDescending { it.address == last }
         if (devices.isEmpty()) body.stack(CarToolViews.footnote(this, getString(R.string.obd_none_paired)), gap = 8)
         for (device in devices) {
             @Suppress("MissingPermission")
             val name = device.name ?: device.address
             body.stack(
-                AutoBridgeDesign.contentRow(context = this, title = name, subtitle = device.address, accent = accent, badgeText = name.take(1).uppercase()) {
+                AutoBridgeDesign.contentRow(context = this, title = name, subtitle = if (device.address == last) "${device.address} · ${getString(R.string.obd_last_used)}" else device.address, accent = accent, badgeText = name.take(1).uppercase()) {
+                    prefs.edit().putString("last_address", device.address).apply()
                     ObdManager.connect(applicationContext, BluetoothSppTransport(device), name)
                 },
                 gap = 8
@@ -229,6 +240,33 @@ class ObdActivity : Activity() {
             AutoBridgeDesign.pill(this, getString(R.string.obd_log_export), accent = accent) { exportLog() }
         )), gap = 12)
         body.stack(CarToolViews.footnote(this, getString(R.string.obd_live_waiting)), gap = 4)
+    }
+
+    // ---- Modules -----------------------------------------------------------------------
+
+    private fun buildModules(body: LinearLayout) {
+        body.stack(CarToolViews.footnote(this, getString(R.string.obd_modules_hint)), gap = 4)
+        body.stack(AutoBridgeDesign.pill(this, getString(if (scanning) R.string.obd_scanning else R.string.obd_scan), primary = true, accent = accent) {
+            if (!scanning) scanModules()
+        }, gap = 8)
+        val list = modules ?: return
+        if (list.isEmpty()) { body.stack(CarToolViews.footnote(this, getString(R.string.obd_modules_none)), gap = 8); return }
+        for (ecu in list) {
+            body.stack(CarToolViews.card(this) {
+                addView(CarToolViews.text(context, "${ecu.requestId} → ${ecu.replyId}", 16f, bold = true))
+                ecu.values.forEach { (k, v) -> addView(CarToolViews.text(context, "$k: $v", 14f, AutoBridgeDesign.TEXT_MUTED, top = 4)) }
+            }, gap = 8)
+        }
+    }
+
+    private fun scanModules() {
+        scanning = true
+        render()
+        ObdManager.submit({ c -> UdsScanner(c.session).scan() }) { result ->
+            scanning = false
+            modules = result.getOrDefault(emptyList())
+            render()
+        }
     }
 
     // ---- Trouble codes -----------------------------------------------------------------

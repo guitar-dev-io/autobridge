@@ -141,3 +141,45 @@ class ObdLogTest {
         assertTrue(log.csv().contains("\n3,3\n4,4"))
     }
 }
+
+class UdsScannerTest {
+    @Test fun findsOnlyModulesThatAnswerAndAlwaysResetsAddressing() {
+        val replies = HashMap<String, String>()
+        for (i in 0..7) {
+            replies["ATSH7E$i"] = "OK\r"
+            replies["ATCRA7E%X".format(i + 8)] = "OK\r"
+        }
+        for (did in listOf("F190", "F187", "F189", "F191", "F18C")) {
+            replies["22$did"] = "NO DATA\r"
+        }
+        replies["ATSH7DF"] = "OK\r"; replies["ATAR"] = "OK\r"
+        val transport = object : dev.autobridge.obd.transport.ObdTransport {
+            private val base = FakeTransport.canCar(replies)
+            private var addressed = ""
+            override fun open() = base.open()
+            override fun write(command: String) { if (command.startsWith("ATSH")) addressed = command.removePrefix("ATSH"); base.write(command) }
+            override fun readUntilPrompt(timeoutMs: Long): String {
+                val last = base.sent.last()
+                // Only the module at 7E0 answers, with a VIN and a part number.
+                if (addressed == "7E0" && last == "22F190") return "62F190315A4741\r"
+                if (addressed == "7E0" && last == "22F187") return "62F1873334313030\r"
+                return base.readUntilPrompt(timeoutMs)
+            }
+            override fun close() = base.close()
+            val sent get() = base.sent
+        }
+        val session = ElmSession(transport)
+        session.connect()
+        val found = dev.autobridge.obd.uds.UdsScanner(session).scan()
+        assertEquals(1, found.size)
+        assertEquals("7E0", found[0].requestId)
+        assertEquals("1ZGA", found[0].values["VIN"])
+        assertEquals("34100", found[0].values["Part number"])
+        assertEquals("ATAR", transport.sent.last())
+    }
+
+    @Test fun renderFallsBackToHex() {
+        assertEquals("01 02 AB", dev.autobridge.obd.uds.UdsScanner.render(byteArrayOf(1, 2, 0xAB.toByte())))
+        assertEquals("ABC", dev.autobridge.obd.uds.UdsScanner.render("ABC\u0000\u0000".toByteArray()))
+    }
+}
