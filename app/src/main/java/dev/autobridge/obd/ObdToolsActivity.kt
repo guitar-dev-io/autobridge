@@ -111,11 +111,6 @@ class ObdToolsActivity : Activity() {
         super.onDestroy()
     }
 
-    @Deprecated("Deprecated in Java")
-    override fun onBackPressed() {
-        super.onBackPressed()
-    }
-
     private fun go(target: Page) { page = target; render() }
 
     private fun render() {
