@@ -2395,4 +2395,18 @@
     <string name="obd_ble_scanning">Scanning for BLE adapters…</string>
     <string name="obd_ble_found">Bluetooth LE devices</string>
     <string name="obd_ble_none">None found yet. Plug the adapter in, ignition on, and scan again.</string>
+    <string name="obd_check_access">Check access</string>
+    <string name="obd_backup">Back up</string>
+    <string name="obd_backup_export">Export backup</string>
+    <string name="obd_working">Working…</string>
+    <string name="obd_stop_first">The car is moving. Stop and keep the ignition on before this.</string>
+    <string name="obd_access_extended">Extended session: %1$s</string>
+    <string name="obd_access_security">Security access: %1$s</string>
+    <string name="obd_access_ok">accepted</string>
+    <string name="obd_access_refused">refused (%1$s)</string>
+    <string name="obd_access_silent">no answer</string>
+    <string name="obd_access_locked">locked, seed %1$d bytes</string>
+    <string name="obd_access_open">already unlocked</string>
+    <string name="obd_backup_result">%1$d values saved (read-only)</string>
+    <string name="obd_failed">Failed: %1$s</string>
 </resources>

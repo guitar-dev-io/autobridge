@@ -208,3 +208,46 @@ class BleLayoutTest {
         assertNull(dev.autobridge.obd.transport.BleLayout.pick(listOf(generic)))
     }
 }
+
+class UdsInspectorTest {
+    private fun inspector(extra: Map<String, String>): dev.autobridge.obd.uds.UdsInspector {
+        val s = ElmSession(FakeTransport.canCar(extra)); s.connect()
+        return dev.autobridge.obd.uds.UdsInspector(s)
+    }
+
+    @Test fun didAnswersAreClassified() {
+        val i = inspector(mapOf("22DE01" to "62DE01AABB\r", "22DE02" to "7F2233\r", "22DE03" to "NO DATA\r"))
+        assertArrayEquals(byteArrayOf(0xAA.toByte(), 0xBB.toByte()), (i.readDid(0xDE01) as dev.autobridge.obd.uds.UdsAnswer.Positive).data)
+        assertEquals(0x33, (i.readDid(0xDE02) as dev.autobridge.obd.uds.UdsAnswer.Negative).code)
+        assertTrue(i.readDid(0xDE03) is dev.autobridge.obd.uds.UdsAnswer.Silent)
+    }
+
+    @Test fun probeSeesLockedModuleAndReturnsToDefaultSession() {
+        val t = FakeTransport.canCar(mapOf("1003" to "5003\r", "2701" to "67011234\r", "1001" to "5001\r"))
+        val s = ElmSession(t); s.connect()
+        val p = dev.autobridge.obd.uds.UdsInspector(s).probe()
+        assertEquals(dev.autobridge.obd.uds.Access.ACCEPTED, p.extendedSession)
+        assertEquals(dev.autobridge.obd.uds.Access.ACCEPTED, p.security)
+        assertEquals(2, p.seedLength)
+        assertFalse(p.alreadyUnlocked)
+        assertEquals("1001", t.sent.last())
+    }
+
+    @Test fun probeReportsRefusalsAndZeroSeed() {
+        val refused = inspector(mapOf("1003" to "7F1022\r", "2701" to "7F2712\r", "1001" to "NO DATA\r")).probe()
+        assertEquals(dev.autobridge.obd.uds.Access.REFUSED, refused.extendedSession)
+        assertEquals("conditions not correct", refused.extendedRefusal)
+        assertEquals("sub-function not supported", refused.securityRefusal)
+        assertTrue(inspector(mapOf("1003" to "5003\r", "2701" to "67010000\r", "1001" to "5001\r")).probe().alreadyUnlocked)
+    }
+
+    @Test fun backupKeepsExistingAndProtectedDidsOnly() {
+        val i = inspector(mapOf("22F180" to "62F18001\r", "22F181" to "7F2231\r", "22F182" to "7F2233\r", "22F183" to "NO DATA\r"))
+        val dump = i.backup(0xF180..0xF183)
+        assertEquals(listOf(0xF180, 0xF182), dump.map { it.did })
+        assertEquals("security access denied", dump[1].refusal)
+        val csv = dev.autobridge.obd.uds.UdsInspector.csv("VIN1", dev.autobridge.obd.uds.EcuInfo("726", "72E", emptyMap(), "BCM"), dump)
+        assertTrue(csv.contains("F180,01,"))
+        assertTrue(csv.contains("F182,,security access denied"))
+    }
+}

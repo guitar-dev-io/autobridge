@@ -2360,4 +2360,18 @@
     <string name="obd_ble_scanning">กำลังสแกนอะแดปเตอร์ BLE…</string>
     <string name="obd_ble_found">อุปกรณ์บลูทูธ LE</string>
     <string name="obd_ble_none">ยังไม่พบ เสียบอะแดปเตอร์ เปิดสวิตช์ไฟ แล้วสแกนใหม่</string>
+    <string name="obd_check_access">ตรวจสิทธิ์เข้าถึง</string>
+    <string name="obd_backup">สำรองข้อมูล</string>
+    <string name="obd_backup_export">ส่งออกไฟล์สำรอง</string>
+    <string name="obd_working">กำลังทำงาน…</string>
+    <string name="obd_stop_first">รถกำลังเคลื่อนที่ โปรดจอดและเปิดสวิตช์ไฟค้างไว้ก่อนทำ</string>
+    <string name="obd_access_extended">Extended session: %1$s</string>
+    <string name="obd_access_security">Security access: %1$s</string>
+    <string name="obd_access_ok">ยอมรับ</string>
+    <string name="obd_access_refused">ปฏิเสธ (%1$s)</string>
+    <string name="obd_access_silent">ไม่ตอบ</string>
+    <string name="obd_access_locked">ล็อกอยู่ seed %1$d ไบต์</string>
+    <string name="obd_access_open">ปลดล็อกอยู่แล้ว</string>
+    <string name="obd_backup_result">บันทึกแล้ว %1$d ค่า (อ่านอย่างเดียว)</string>
+    <string name="obd_failed">ไม่สำเร็จ: %1$s</string>
 </resources>

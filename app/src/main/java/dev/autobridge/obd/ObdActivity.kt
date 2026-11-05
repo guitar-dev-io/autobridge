@@ -32,7 +32,11 @@ import dev.autobridge.obd.obd2.PidValue
 import dev.autobridge.obd.obd2.Pids
 import dev.autobridge.obd.obd2.Readiness
 import dev.autobridge.obd.uds.EcuInfo
+import dev.autobridge.obd.uds.Access
+import dev.autobridge.obd.uds.AccessProbe
+import dev.autobridge.obd.uds.DidDump
 import dev.autobridge.obd.uds.EcuTargets
+import dev.autobridge.obd.uds.UdsInspector
 import dev.autobridge.obd.uds.UdsScanner
 import dev.autobridge.ui.AutoBridgeDesign
 import dev.autobridge.ui.AutoBridgeDesign.dp
@@ -61,6 +65,9 @@ class ObdActivity : Activity() {
     private var codesError: String? = null
     private var modules: List<EcuInfo>? = null
     private var scanning = false
+    private var busyModule: String? = null
+    private val probes = HashMap<String, AccessProbe>()
+    private val backups = HashMap<String, List<DidDump>>()
     private var bleScanning = false
     private val bleFound = LinkedHashMap<String, BluetoothDevice>()
     private val handler = Handler(Looper.getMainLooper())
@@ -312,8 +319,72 @@ class ObdActivity : Activity() {
             body.stack(CarToolViews.card(this) {
                 addView(CarToolViews.text(context, listOfNotNull(ecu.name, "${ecu.requestId} → ${ecu.replyId}").joinToString(" · "), 16f, bold = true))
                 ecu.values.forEach { (k, v) -> addView(CarToolViews.text(context, "$k: $v", 14f, AutoBridgeDesign.TEXT_MUTED, top = 4)) }
+                probes[ecu.requestId]?.let { p ->
+                    addView(CarToolViews.text(context, getString(R.string.obd_access_extended, accessText(p.extendedSession, p.extendedRefusal)), 13f, top = 8))
+                    val security = when {
+                        p.alreadyUnlocked -> getString(R.string.obd_access_open)
+                        p.security == Access.ACCEPTED -> getString(R.string.obd_access_locked, p.seedLength)
+                        else -> accessText(p.security, p.securityRefusal)
+                    }
+                    addView(CarToolViews.text(context, getString(R.string.obd_access_security, security), 13f, top = 2))
+                }
+                backups[ecu.requestId]?.let { addView(CarToolViews.text(context, getString(R.string.obd_backup_result, it.size), 13f, top = 6)) }
+                val busy = busyModule != null
+                addView(CarToolViews.pillRow(context, listOfNotNull(
+                    AutoBridgeDesign.pill(context, getString(if (busyModule == ecu.requestId) R.string.obd_working else R.string.obd_check_access), accent = accent) { if (!busy) checkAccess(ecu) },
+                    AutoBridgeDesign.pill(context, getString(R.string.obd_backup), accent = accent) { if (!busy) backUp(ecu) },
+                    backups[ecu.requestId]?.let { AutoBridgeDesign.pill(context, getString(R.string.obd_backup_export), accent = accent) { exportBackup(ecu) } }
+                )), LinearLayout.LayoutParams(-1, -2).apply { topMargin = context.dp(10) })
             }, gap = 8)
         }
+    }
+
+    private fun accessText(a: Access, refusal: String?) = when (a) {
+        Access.ACCEPTED -> getString(R.string.obd_access_ok)
+        Access.REFUSED -> getString(R.string.obd_access_refused, refusal ?: "")
+        Access.SILENT -> getString(R.string.obd_access_silent)
+    }
+
+    /** Runs [work] against one addressed module, only while the car reports it is stationary. */
+    private fun <T> onModule(ecu: EcuInfo, work: (UdsInspector) -> T, done: (T) -> Unit) {
+        busyModule = ecu.requestId
+        render()
+        ObdManager.submit({ c ->
+            val speed = (c.readPid(Pids.SPEED) as? ObdResult.Ok)?.value?.value ?: 0.0
+            if (speed > 0.0) null
+            else try {
+                check(c.session.addressEcu(ecu.requestId, ecu.replyId)) { "module not reachable" }
+                work(UdsInspector(c.session))
+            } finally {
+                c.session.resetAddressing()
+            }
+        }) { result ->
+            busyModule = null
+            val value = result.getOrNull()
+            when {
+                result.isFailure -> toast(getString(R.string.obd_failed, result.exceptionOrNull()?.message ?: ""))
+                value == null -> toast(getString(R.string.obd_stop_first))
+                else -> done(value)
+            }
+            render()
+        }
+    }
+
+    private fun checkAccess(ecu: EcuInfo) = onModule(ecu, { it.probe() }) { probes[ecu.requestId] = it }
+
+    private fun backUp(ecu: EcuInfo) = onModule(ecu, { i -> i.backup(UdsInspector.DEFAULT_RANGES.flatMap { it.toList() }) }) { backups[ecu.requestId] = it }
+
+    private fun exportBackup(ecu: EcuInfo) {
+        val dumps = backups[ecu.requestId] ?: return
+        val dir = java.io.File(cacheDir, "exports").apply { mkdirs() }
+        val file = java.io.File(dir, "obd-backup-${ecu.requestId}.csv").apply { writeText(UdsInspector.csv(ObdManager.status.vin, ecu, dumps)) }
+        val uri = androidx.core.content.FileProvider.getUriForFile(this, "$packageName.updates", file)
+        val send = Intent(Intent.ACTION_SEND)
+            .setType("text/csv")
+            .putExtra(Intent.EXTRA_STREAM, uri)
+            .putExtra(Intent.EXTRA_SUBJECT, getString(R.string.obd_title))
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        runCatching { startActivity(Intent.createChooser(send, getString(R.string.obd_backup_export))) }
     }
 
     private fun scanModules() {
