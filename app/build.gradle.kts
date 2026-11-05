@@ -325,6 +325,7 @@ dependencies {
     // Every flavor gets it - it runs on the phone, talks to no server, and the models it reads are
     // downloaded on request rather than shipped in the APK.
     implementation(project(":whisper"))
+    implementation(project(":obd"))
     // Unofficial Android Auto SDK (CarActivity/CarActivityService), the same archive Fermata Auto
     // ships as fermata/lib/auto/aauto.aar. Not published by Google and carries no license file.
     // sha256 99337c3b591ac9670c12b508da38886aedba61dd494f39f5f166f02580ec584b

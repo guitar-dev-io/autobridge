@@ -133,6 +133,13 @@ object ObdConnection {
         return reason
     }
 
+    /**
+     * Runs [block] with the gauges paused and the adapter set to the broadcast header, for tools that
+     * talk to single modules. Null when the adapter is not live. [block] must leave the header at the
+     * broadcast address (7DF) when it ends; the poller assumes it is.
+     */
+    suspend fun <T> exclusively(block: suspend (ElmSession) -> T): T? = activePoller?.exclusively(block)
+
     /** What a trouble-code read found. */
     data class DtcReport(val stored: List<String>, val pending: List<String>)
 
