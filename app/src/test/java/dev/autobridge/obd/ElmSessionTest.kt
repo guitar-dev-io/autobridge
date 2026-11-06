@@ -135,4 +135,39 @@ class ProfilePollerTest {
         job.cancel()
         assertEquals(90f, seen[Gauge.ATF]!!, 0.01f)
     }
+
+    @Test fun theLastWorkingProtocolIsTriedFirstAndSkipsTheSearch() = runTest {
+        val adapter = FakeAdapter(setup + mapOf("ATSP6" to "OK\r>", "ATDPN" to "6\r>"))
+        val poller = ObdPoller(ElmSession(adapter), BuiltInProfiles.findResolved("generic_obd2")!!) { _, _ -> }
+        poller.initialize('6')
+        assertTrue(adapter.sent.any { it.trim() == "ATSP6" })
+        assertTrue("no automatic search", adapter.sent.none { it.trim() == "ATSP0" })
+        assertEquals('6', poller.protocolDigit)
+    }
+
+    @Test fun aCarThatIgnoresTheRememberedProtocolFallsBackToTheSearch() = runTest {
+        // Answers 0100 only after ATSP0, like a car whose protocol changed.
+        val sent = mutableListOf<String>()
+        var auto = false
+        val adapter = object : ObdTransport {
+            override var onChunk: ((String) -> Unit)? = null
+            override var onClosed: ((String?) -> Unit)? = null
+            override suspend fun connect() {}
+            override suspend fun write(text: String) {
+                val c = text.trim(); sent += c
+                if (c == "ATSP0") auto = true
+                val answer = when (c) {
+                    "0100" -> if (auto) "41 00 BE 3E B8 11\r>" else "UNABLE TO CONNECT\r>"
+                    "ATDPN" -> "A6\r>"
+                    else -> "OK\r>"
+                }
+                onChunk?.invoke(answer)
+            }
+            override fun close() {}
+        }
+        val poller = ObdPoller(ElmSession(adapter), BuiltInProfiles.findResolved("generic_obd2")!!) { _, _ -> }
+        poller.initialize('7')
+        assertTrue(sent.indexOf("ATSP7") in 0 until sent.indexOf("ATSP0"))
+        assertEquals('6', poller.protocolDigit)
+    }
 }

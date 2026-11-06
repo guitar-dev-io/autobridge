@@ -28,6 +28,8 @@ class ObdPoller(
 ) {
     /** The protocol the adapter settled on, as ATDPN reports it ("A6" is auto, CAN 11 bit 500 k). */
     var protocol: String? = null
+    /** The protocol digit the adapter settled on, to be tried first next time. */
+    var protocolDigit: Char? = null
         private set
 
     private var canHeaders = false
@@ -62,19 +64,31 @@ class ObdPoller(
         }
     }
 
-    suspend fun initialize() {
+    /**
+     * [preferredProtocol] is the protocol digit that worked last time (ATDPN's answer without the
+     * "A"). Trying it first skips the adapter's search, which takes seconds; when the car does not
+     * answer on it, the usual automatic search runs, so a changed car still connects.
+     */
+    suspend fun initialize(preferredProtocol: Char? = null) {
         // The reset can take a few seconds and some adapters answer it with noise; neither matters.
         try { session.request("ATZ", 3_000) } catch (_: ObdTimeoutException) { }
         for (command in SETUP) session.request(command, 1_500)
-        session.request("ATSP0", 1_500)
-        // The first real request makes the adapter search for the car's protocol, which takes seconds.
-        val probe = session.request("0100", 12_000).uppercase()
-        if ("UNABLE TO CONNECT" in probe || "BUS INIT" in probe) {
-            throw ObdFailure("The car did not answer. Is the ignition on?")
+        var probe = ""
+        if (preferredProtocol != null && preferredProtocol.uppercaseChar() in PROTOCOL_DIGITS) {
+            session.request("ATSP${preferredProtocol.uppercaseChar()}", 1_500)
+            probe = session.request("0100", 4_000).uppercase()
+            if (!answered(probe) || "NO DATA" in probe || "ERROR" in probe) probe = ""
+        }
+        if (probe.isEmpty()) {
+            session.request("ATSP0", 1_500)
+            // The first real request makes the adapter search for the car's protocol, which takes seconds.
+            probe = session.request("0100", 12_000).uppercase()
+            if (!answered(probe)) throw ObdFailure("The car did not answer. Is the ignition on?")
         }
         val id = session.request("ATDPN", 1_500).trim().uppercase()
         protocol = id.takeIf { it.isNotEmpty() }
         val digit = id.removePrefix("A").firstOrNull()
+        protocolDigit = digit?.takeIf { it.uppercaseChar() in PROTOCOL_DIGITS }
         canHeaders = digit != null && digit in '6'..'9'
         currentHeader = STANDARD_HEADER
     }
@@ -171,6 +185,8 @@ class ObdPoller(
         private val MEDIUM = setOf("coolant", "load", "map", "intake", "throttle")
         // ATST64 is a 400 ms wait for an answer: the transmission module is slower than the engine
         // module, and the adapter's default of 200 ms can read its silence as "no data".
+        private const val PROTOCOL_DIGITS = "123456789ABC"
+        private fun answered(probe: String) = "UNABLE TO CONNECT" !in probe && "BUS INIT" !in probe
         private val SETUP = listOf("ATE0", "ATL0", "ATS0", "ATH0", "ATAT1", "ATST64")
     }
 }

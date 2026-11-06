@@ -311,7 +311,7 @@ class ObdGaugesActivity : Activity() {
     }
 
     private fun statusText(state: ObdState): String = when (state.status) {
-        ObdState.Status.IDLE -> getString(R.string.obd_status_idle)
+        ObdState.Status.IDLE -> getString(if (state.message == ObdConnection.GAVE_UP) R.string.obd_status_gave_up else R.string.obd_status_idle)
         ObdState.Status.CONNECTING -> getString(R.string.obd_status_connecting)
         ObdState.Status.INITIALIZING -> getString(R.string.obd_status_init)
         ObdState.Status.LIVE -> state.protocol?.let { getString(R.string.obd_status_live_protocol, it) }
@@ -341,10 +341,7 @@ class ObdGaugesActivity : Activity() {
     }
 
     private fun autoConnectIfAsked() {
-        if (!ObdSettings.autoConnect(this) || ObdConnection.isRunning) return
-        val adapter = ObdSettings.adapter(this) ?: return
-        if (ObdPermissions.missing(this).isNotEmpty()) return
-        ObdConnection.start(this, adapter, ObdSettings.profile(this))
+        ObdConnection.startIfWanted(this)
     }
 
     /** Runs [action] once Bluetooth is allowed, asking first when it is not. */
