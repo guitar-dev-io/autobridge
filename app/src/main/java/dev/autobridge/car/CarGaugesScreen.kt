@@ -113,7 +113,7 @@ class CarGaugesScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
         if (ObdConnection.isRunning) return
         val adapter = ObdSettings.adapter(carContext) ?: return
         if (ObdPermissions.missing(carContext).isNotEmpty()) return
-        ObdConnection.start(carContext, adapter, ObdSettings.profile(carContext))
+        ObdConnection.start(carContext, adapter, ObdSettings.profile(carContext), ObdConnection.AUTO_GIVE_UP_MS)
     }
 
     // --- Surface ---
@@ -208,7 +208,7 @@ class CarGaugesScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
     }
 
     private fun statusText(state: ObdState): String = when (state.status) {
-        ObdState.Status.IDLE -> carContext.getString(R.string.obd_status_idle)
+        ObdState.Status.IDLE -> carContext.getString(if (state.message == ObdConnection.GAVE_UP) R.string.obd_status_gave_up else R.string.obd_status_idle)
         ObdState.Status.CONNECTING -> carContext.getString(R.string.obd_status_connecting)
         ObdState.Status.INITIALIZING -> carContext.getString(R.string.obd_status_init)
         ObdState.Status.LIVE -> carContext.getString(R.string.obd_status_live)

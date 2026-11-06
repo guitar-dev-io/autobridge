@@ -14,6 +14,7 @@
     <string name="obd_status_idle">Not connected</string>
     <string name="obd_status_connecting">Connecting…</string>
     <string name="obd_status_init">Setting up the adapter…</string>
+    <string name="obd_status_gave_up">Stopped: the car did not answer for 10 minutes</string>
     <string name="obd_status_live">Live</string>
     <string name="obd_status_live_protocol">Live • protocol %1$s</string>
     <string name="obd_status_retry">Reconnecting: %1$s</string>
@@ -39,8 +40,8 @@
     <string name="obd_imperial">Units</string>
     <string name="obd_imperial_on">°F and mph</string>
     <string name="obd_imperial_off">°C and km/h</string>
-    <string name="obd_auto">Reconnect automatically</string>
-    <string name="obd_auto_caption">Connects as soon as this screen opens</string>
+    <string name="obd_auto">Connect automatically</string>
+    <string name="obd_auto_caption">Connects when the car connects or this screen opens</string>
     <string name="obd_notification_channel">Car data (OBD2)</string>
     <string name="obd_notification_title">Reading car data</string>
     <string name="obd_notification_text">Connected to the OBD2 adapter</string>

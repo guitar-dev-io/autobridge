@@ -28,6 +28,8 @@ class AutoBridgeSession : Session(), CarScreenController.Host {
                 // A new connection may be a different head unit; its screens report their own
                 // geometry as they attach, so nothing from the previous car is carried over.
                 CarDisplayInfo.reset()
+                // Start reading the car's adapter as soon as the car connects, if the person chose one.
+                runCatching { dev.autobridge.obd.ObdConnection.startIfWanted(carContext) }
                 CarScreenController.register(this@AutoBridgeSession)
                 // A live Session IS the Android Auto connection; nothing else observes the host
                 // handshake. Without this the runtime context stayed false for the whole drive, so
