@@ -311,7 +311,7 @@ class ObdGaugesActivity : Activity() {
 
         val adapter = ObdSettings.adapter(this)
         val state = ObdConnection.state.value
-        adapterTitle?.text = adapter?.name ?: getString(R.string.obd_no_adapter)
+        adapterTitle?.text = ObdAdapterMatcher.display(adapter?.name) ?: getString(R.string.obd_no_adapter)
         statusLine?.text = statusText(state)
         connectButton?.text = getString(if (ObdConnection.isRunning) R.string.obd_disconnect else R.string.obd_connect)
     }
@@ -440,7 +440,7 @@ class ObdGaugesActivity : Activity() {
         // Paired adapters first: they are listed even when they are not advertising right now.
         ObdScanner.paired(this).filter { showAll || it.likely }.forEach { hit ->
             found.add(hit)
-            labels.add("${hit.name ?: hit.address}   ${getString(R.string.obd_paired)}")
+            labels.add("${ObdAdapterMatcher.display(hit.name) ?: hit.address}   ${getString(R.string.obd_paired)}")
         }
         list.notifyDataSetChanged()
 
@@ -451,7 +451,7 @@ class ObdGaugesActivity : Activity() {
                     if (!showAll && !hit.likely) return@collect
                     if (found.any { it.address == hit.address }) return@collect
                     found.add(hit)
-                    labels.add("${hit.name ?: hit.address}   ${hit.rssi} dBm")
+                    labels.add("${ObdAdapterMatcher.display(hit.name) ?: hit.address}   ${hit.rssi} dBm")
                     list.notifyDataSetChanged()
                 }
             } catch (e: CancellationException) {

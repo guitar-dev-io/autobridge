@@ -29,6 +29,22 @@ object ObdAdapterMatcher {
         "VLINKER", "V-LINK", "VGATE", "ICAR", "OBD", "ELM", "VEEPEAK", "LELINK", "KONNWEI", "CARISTA",
     )
 
+    /**
+     * The name to show. Adapters like the vLinker FD+ advertise one name per radio, "vLinker FD-IOS"
+     * for Bluetooth LE and "vLinker FD-Android" for Bluetooth Classic; this app uses LE only, so
+     * the suffix reads as a platform restriction it is not. "vLinker FD-IOS" is shown as
+     * "vLinker FD (BLE)"; the stored name and the address are unchanged.
+     */
+    fun display(name: String?): String? {
+        val raw = name?.trim().orEmpty()
+        if (raw.isEmpty()) return name
+        val match = SUFFIX.matchEntire(raw) ?: return raw
+        val base = match.groupValues[1].trim()
+        return if (match.groupValues[2].equals("IOS", ignoreCase = true)) "$base (BLE)" else "$base (Classic)"
+    }
+
+    private val SUFFIX = Regex("(.*?)[\\s_-]+(IOS|Android)", RegexOption.IGNORE_CASE)
+
     fun isLikely(name: String?, services: List<UUID>): Boolean {
         val upper = name?.uppercase().orEmpty()
         if (NAMES.any { upper.contains(it) }) return true
