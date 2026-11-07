@@ -133,13 +133,26 @@ class ElmSession(private val transport: ObdTransport) {
             val framed = Regex("^([0-9A-F]):(.*)$", RegexOption.IGNORE_CASE)
             val numbered = content.mapNotNull { framed.matchEntire(it) }
             val dataLines: List<String> = if (numbered.isNotEmpty()) {
-                // Several ECUs can each answer in frames; frame 0 starts a new message.
-                val messages = ArrayList<StringBuilder>()
-                for (m in numbered) {
-                    if (m.groupValues[1] == "0" || messages.isEmpty()) messages.add(StringBuilder())
-                    messages.last().append(m.groupValues[2])
+                // Several ECUs can each answer in frames; frame 0 starts a new message. The count
+                // line before it is the message length in bytes (hex): the last frame is padded to
+                // eight bytes (Ford pads with CC), and that padding is not part of the answer. Left
+                // in, it would show up in every value and be written back by a coding change.
+                val count = Regex("^[0-9A-F]{3}$", RegexOption.IGNORE_CASE)
+                val messages = ArrayList<Pair<StringBuilder, Int?>>()
+                var pendingCount: Int? = null
+                for (line in content) {
+                    if (count.matches(line)) { pendingCount = line.toInt(16); continue }
+                    val m = framed.matchEntire(line) ?: continue
+                    if (m.groupValues[1] == "0" || messages.isEmpty()) {
+                        messages.add(StringBuilder() to pendingCount)
+                        pendingCount = null
+                    }
+                    messages.last().first.append(m.groupValues[2])
                 }
-                messages.map { it.toString() }
+                messages.map { (text, length) ->
+                    val hex = text.toString().filterNot { it.isWhitespace() }
+                    if (length != null && hex.length > length * 2) hex.substring(0, length * 2) else hex
+                }
             } else content
 
             val payloads = dataLines.mapNotNull { hexToBytes(it) }.filter { it.isNotEmpty() }

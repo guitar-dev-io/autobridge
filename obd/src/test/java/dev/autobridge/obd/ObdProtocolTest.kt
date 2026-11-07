@@ -24,6 +24,13 @@ class ObdProtocolTest {
         assertEquals(ObdFailure.BusError, (ElmSession.parse("CAN ERROR\r") as ObdReply.Failed).failure)
     }
 
+    @Test fun multiFramePaddingPastTheCountIsDropped() {
+        // 0x11 = 17 bytes: 62 F1 8C + 14 serial bytes; the last frame is padded with CC.
+        val reply = ElmSession.parse("011\r0:62F18C31323230\r1:38303330323336\r2:0000000000CCCC\r") as ObdReply.Data
+        assertEquals("62F18C3132323038303330323336000000000000".substring(0, 34), reply.first.joinToString("") { "%02X".format(it) })
+        assertEquals(17, reply.first.size)
+    }
+
     @Test fun parseMultiFrameDropsLengthLine() {
         val r = ElmSession.parse("014\r0:490201574D4A\r1:3333334D4D5A\r2:5A5A5A5A5A5A\r") as ObdReply.Data
         assertEquals(1, r.payloads.size)
