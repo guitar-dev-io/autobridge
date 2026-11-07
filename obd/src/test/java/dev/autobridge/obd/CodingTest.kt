@@ -7,7 +7,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 /** A module that remembers what is written to its DE01 block. */
-private class StatefulModule(var value: String, private val volts: String = "12.6V", private val refuseWrite: String? = null, private val dropWrite: Boolean = false) : ObdTransport {
+private class StatefulModule(var value: String, private val volts: String = "12.6V", private val refuseWrite: String? = null, private val dropWrite: Boolean = false, private val pending: Boolean = false) : ObdTransport {
     private val base = FakeTransport.canCar()
     private var last = ""
     val sent = ArrayList<String>()
@@ -21,6 +21,8 @@ private class StatefulModule(var value: String, private val volts: String = "12.
         last == "1001" -> "5001\r"
         last.startsWith("2EDE01") -> when {
             refuseWrite != null -> "7F2E$refuseWrite\r"
+            // Busy with it: says "response pending" and stores the value anyway.
+            pending -> { value = last.removePrefix("2EDE01"); "7F2E78\r" }
             else -> { if (!dropWrite) value = last.removePrefix("2EDE01"); "6EDE01\r" }
         }
         else -> { base.write(last); base.readUntilPrompt(timeoutMs) }
@@ -54,6 +56,24 @@ class CodingTest {
         assertNotNull(CodingGuard.check("734", 0xDE01))
         assertNotNull(CodingGuard.check("726", 0xF190))
         assertNull(CodingGuard.check("726", 0xDE01))
+        // Engine and transmission stay closed until a write to them is checked on a car.
+        assertNotNull(CodingGuard.check("7E0", 0xDE01))
+        assertNotNull(CodingGuard.check("7E1", 0xDE01))
+    }
+
+    @Test fun aPendingReplyThatStoredTheValueIsReportedAsDone() {
+        val m = StatefulModule("0804B0", pending = true)
+        val w = writer(m)
+        val p = (w.plan(change("726 DE01 1 04 05")) as PlanResult.Ready).plan
+        assertTrue(w.apply(p) is WriteOutcome.Done)
+        assertEquals("0805B0", m.value)
+    }
+
+    @Test fun theChecksumByteOfASixByteBlockIsNeverChanged() {
+        val w = writer(StatefulModule("0102030405AA"))
+        assertTrue(w.plan(change("726 DE01 5 AA AB")) is PlanResult.Blocked)
+        assertTrue(w.plan(change("726 DE01 0102030405AA 0102030406AB")) is PlanResult.Blocked)
+        assertTrue(w.plan(change("726 DE01 4 05 06")) is PlanResult.Ready)
     }
 
     @Test fun writesAndVerifiesReadBack() {
@@ -93,8 +113,10 @@ class CodingTest {
         val m = StatefulModule("0804B0", dropWrite = true)
         val w = writer(m)
         val p = (w.plan(change("726 DE01 1 04 05")) as PlanResult.Ready).plan
-        val out = w.apply(p) as WriteOutcome.Failed
-        assertTrue(out.restored) // value never changed, so the old one is confirmed present
+        // Acknowledged, but the read-back still shows the old value: nothing changed, and it says so.
+        val out = w.apply(p) as WriteOutcome.Refused
+        assertTrue(out.reason.contains("kept the old value"))
+        assertEquals("0804B0", m.value)
     }
 
     @Test fun restorePutsAnOldValueBack() {

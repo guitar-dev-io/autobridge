@@ -264,7 +264,8 @@ class ObdToolsActivity : Activity() {
                 backups[ecu.requestId]?.let { addView(CarToolViews.text(context, getString(R.string.obdt_backup_result, it.size), 13f, top = 6)) }
                 val busy = busyModule != null
                 addView(CarToolViews.pillRow(context, listOfNotNull(
-                    AutoBridgeDesign.pill(context, getString(if (busyModule == ecu.requestId) R.string.obdt_working else R.string.obdt_check_access), accent = accent) { if (!busy) checkAccess(ecu) },
+                    if (ecu.requestId.uppercase() in CodingGuard.noProbeModules) null
+                    else AutoBridgeDesign.pill(context, getString(if (busyModule == ecu.requestId) R.string.obdt_working else R.string.obdt_check_access), accent = accent) { if (!busy) checkAccess(ecu) },
                     AutoBridgeDesign.pill(context, getString(R.string.obdt_backup), accent = accent) { if (!busy) backUp(ecu) },
                     backups[ecu.requestId]?.let { AutoBridgeDesign.pill(context, getString(R.string.obdt_backup_export), accent = accent) { exportBackup(ecu) } }
                 )), LinearLayout.LayoutParams(-1, -2).apply { topMargin = context.dp(10) })
@@ -678,17 +679,37 @@ class ObdToolsActivity : Activity() {
         is WriteOutcome.Failed -> getString(R.string.coding_result_failed, outcome.reason, getString(if (outcome.restored) R.string.coding_yes else R.string.coding_no))
     }
 
+    /**
+     * The car's VIN from the engine module (22 F190), or null. It ties a backup to the car it came
+     * from, so Restore cannot put one car's value into another.
+     */
+    private fun readVin(c: Car): String? = try {
+        if (!c.session.addressEcu("7E0", "7E8")) null
+        else (UdsInspector(c.session).readDid(0xF190) as? UdsAnswer.Positive)?.data
+            ?.let { UdsScanner.render(it) }?.takeIf { it.length == 17 }
+    } finally {
+        c.session.resetAddressing()
+    }
+
     private fun applyCoding(ready: List<CodingPlan>) {
-        val vin: String? = null
         stationary({ c ->
+            val vin = readVin(c)
             val writer = UdsWriter(c.session)
             val lines = ArrayList<String>()
+            val written = ArrayList<CodingPlan>()
             for (plan in ready) {
                 // The old value is on disk before anything is sent.
-                CodingBackupStore.save(applicationContext, plan.change.module, plan.change.did, plan.before, plan.after, vin)
+                val saved = CodingBackupStore.save(applicationContext, plan.change.module, plan.change.did, plan.before, plan.after, vin)
                 val outcome = writer.apply(plan)
                 lines.add(describe(outcome))
-                if (outcome !is WriteOutcome.Done) break
+                if (outcome is WriteOutcome.Done) { written.add(plan); continue }
+                // Nothing reached the module: the backup has nothing to restore.
+                if (outcome is WriteOutcome.Refused) saved.file.delete()
+                // A recipe is all or nothing: put back the blocks already written, newest first.
+                for (done in written.asReversed()) {
+                    lines.add(getString(R.string.coding_undo, describe(writer.restore(done.change.module, done.change.did, done.before))))
+                }
+                break
             }
             lines
         }) { lines ->
@@ -704,7 +725,15 @@ class ObdToolsActivity : Activity() {
             .setMessage(getString(R.string.coding_restore_message, CodingChange.hex(b.before), "${b.module} %04X".format(b.did)))
             .setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(R.string.coding_restore) { _, _ ->
-                stationary({ c -> describe(UdsWriter(c.session).restore(b.module, b.did, b.before)) }) { line ->
+                stationary({ c ->
+                    val vin = readVin(c)
+                    when {
+                        // A backup that names its car is only put back into that car.
+                        b.vin.isNotEmpty() && vin == null -> getString(R.string.coding_vin_unknown)
+                        b.vin.isNotEmpty() && !b.vin.equals(vin, ignoreCase = true) -> getString(R.string.coding_vin_mismatch, b.vin, vin)
+                        else -> describe(UdsWriter(c.session).restore(b.module, b.did, b.before))
+                    }
+                }) { line ->
                     plans = null
                     codingLog = listOf(line, getString(R.string.coding_after))
                 }

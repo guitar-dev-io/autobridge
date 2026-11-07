@@ -17,6 +17,7 @@ fun nrcText(code: Int): String = when (code) {
     0x11 -> "service not supported"
     0x12 -> "sub-function not supported"
     0x13 -> "incorrect message length"
+    0x21 -> "busy, repeat request"
     0x22 -> "conditions not correct"
     0x24 -> "request sequence error"
     0x31 -> "request out of range"
@@ -24,6 +25,7 @@ fun nrcText(code: Int): String = when (code) {
     0x35 -> "invalid key"
     0x36 -> "exceeded number of attempts"
     0x37 -> "required time delay not expired"
+    0x78 -> "response pending"
     0x7E -> "sub-function not supported in active session"
     0x7F -> "service not supported in active session"
     else -> "code 0x%02X".format(code)
@@ -53,8 +55,8 @@ data class DidDump(val did: Int, val value: ByteArray?, val refusal: String?)
 /** Read-only inspection of one addressed module: raw DID reads, an access probe, a configuration backup. */
 class UdsInspector(private val session: ElmSession) {
 
-    fun request(hex: String): UdsAnswer {
-        val reply = session.request(hex, timeoutMs = 1_500L) as? ObdReply.Data ?: return UdsAnswer.Silent
+    fun request(hex: String, timeoutMs: Long = 1_500L): UdsAnswer {
+        val reply = session.request(hex, timeoutMs = timeoutMs) as? ObdReply.Data ?: return UdsAnswer.Silent
         val p = reply.first
         if (p.size >= 3 && p[0] == 0x7F.toByte()) return UdsAnswer.Negative(p[2].toInt() and 0xFF)
         return UdsAnswer.Positive(p)

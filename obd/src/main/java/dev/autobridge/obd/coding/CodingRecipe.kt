@@ -102,16 +102,36 @@ object CodingGuard {
      * Airbags/restraints, ABS/ESP, power steering, and the driver-assist camera and adaptive
      * headlamp modules (the catalog rates those "critical": multi-module calibration).
      */
-    val blockedModules = setOf("737", "760", "730", "706", "734")
+    val blockedModules = setOf("737", "760", "730", "706", "734", "7E0", "7E1")
 
-    /** Engine and transmission: allowed, but the screen says plainly it changes drivetrain behaviour. */
+    /**
+     * Engine and transmission. Blocked above until a write to them has been checked on a car; kept
+     * so the confirmation still warns if they are ever let through.
+     */
     val highImpactModules = setOf("7E0", "7E1")
+
+    /**
+     * Modules not even asked for an extended session or a security seed by the access check: the
+     * safety systems. Reading their identification is still allowed.
+     */
+    val noProbeModules = setOf("737", "760", "730", "706", "734")
 
     val allowedDids = 0xDE00..0xDEFF
 
     fun check(module: String, did: Int): String? = when {
-        module.uppercase() in blockedModules -> "module $module (restraints, brakes, steering, driver-assist camera or adaptive headlamps) is never written"
+        module.uppercase() in blockedModules -> "module $module (restraints, brakes, steering, driver-assist camera, adaptive headlamps, engine or transmission) is never written"
         did !in allowedDids -> "block %04X is outside the configuration range DE00-DEFF".format(did)
+        else -> null
+    }
+
+    /**
+     * Checks a whole new value against the old one. A 6-byte block is taken to end in a checksum
+     * byte (the As-Built line layout); a checksum is never guessed, so that byte must stay as it
+     * is, whether the change came from the digit editor or a typed recipe. The length never changes.
+     */
+    fun checkChange(before: ByteArray, after: ByteArray): String? = when {
+        before.size != after.size -> "new value is ${after.size} bytes, the block is ${before.size}"
+        before.size == 6 && before[5] != after[5] -> "the last byte of a 6-byte block is a checksum and is never changed"
         else -> null
     }
 }

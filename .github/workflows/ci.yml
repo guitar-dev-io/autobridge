@@ -70,6 +70,10 @@ jobs:
       - name: Unit tests (safe debug)
         run: ./gradlew --no-daemon testSafeDebugUnitTest
 
+      # The :obd library has no product flavors, so the task above never reaches it.
+      - name: Unit tests (obd library)
+        run: ./gradlew --no-daemon :obd:testDebugUnitTest
+
       - name: Assemble (safe debug)
         run: ./gradlew --no-daemon assembleSafeDebug
 

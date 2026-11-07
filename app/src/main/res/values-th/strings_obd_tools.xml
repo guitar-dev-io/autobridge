@@ -136,4 +136,7 @@
     <string name="editor_recipe_toggle">Recipe แบบข้อความ (ขั้นสูง)</string>
     <string name="editor_to_recipe">ใส่ใน recipe</string>
     <string name="obdt_row_caption">สแกนโมดูล สำรองค่าบล็อก</string>
+    <string name="coding_undo">ย้อนคืน: %1$s</string>
+    <string name="coding_vin_unknown">หยุดการคืนค่า: อ่านเลขตัวถัง (VIN) ของรถคันนี้ไม่ได้ และไฟล์สำรองนี้เป็นของรถคันใดคันหนึ่ง</string>
+    <string name="coding_vin_mismatch">หยุดการคืนค่า: ไฟล์สำรองเป็นของ VIN %1$s แต่รถคันนี้คือ %2$s</string>
 </resources>

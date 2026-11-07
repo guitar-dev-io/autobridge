@@ -136,4 +136,7 @@
     <string name="editor_recipe_toggle">Text recipe (advanced)</string>
     <string name="editor_to_recipe">Add to recipe</string>
     <string name="obdt_row_caption">Scan modules, back up blocks</string>
+    <string name="coding_undo">Undo: %1$s</string>
+    <string name="coding_vin_unknown">Restore stopped: could not read this car\'s VIN, and the backup belongs to a specific car.</string>
+    <string name="coding_vin_mismatch">Restore stopped: the backup is from VIN %1$s, this car is %2$s.</string>
 </resources>

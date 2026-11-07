@@ -37,7 +37,7 @@ class UdsWriter(private val session: ElmSession) {
             val current = (inspector.readDid(change.did) as? UdsAnswer.Positive)?.data
                 ?: return@withModule PlanResult.Blocked("module did not return block %04X".format(change.did))
             change.applyTo(current).fold(
-                { PlanResult.Ready(CodingPlan(change, current, it)) },
+                { after -> CodingGuard.checkChange(current, after)?.let { PlanResult.Blocked(it) } ?: PlanResult.Ready(CodingPlan(change, current, after)) },
                 { PlanResult.Blocked(it.message ?: "does not match") }
             )
         }
@@ -46,6 +46,7 @@ class UdsWriter(private val session: ElmSession) {
     fun apply(plan: CodingPlan, minVolts: Double = MIN_VOLTS): WriteOutcome {
         val change = plan.change
         CodingGuard.check(change.module, change.did)?.let { return WriteOutcome.Refused(it) }
+        CodingGuard.checkChange(plan.before, plan.after)?.let { return WriteOutcome.Refused(it) }
         val volts = session.voltage()?.removeSuffix("V")?.trim()?.toDoubleOrNull()
             ?: return WriteOutcome.Refused("battery voltage unknown")
         if (volts < minVolts) return WriteOutcome.Refused("battery %.1f V is below %.1f V".format(volts, minVolts))
@@ -55,17 +56,27 @@ class UdsWriter(private val session: ElmSession) {
             if (now == null || !now.contentEquals(plan.before)) return@withModule WriteOutcome.Refused("the module's value changed since the preview")
             try {
                 if (inspector.request("1003") !is UdsAnswer.Positive) return@withModule WriteOutcome.Refused("module refused the extended session")
-                when (val w = write(change.did, plan.after)) {
-                    is UdsAnswer.Negative -> return@withModule WriteOutcome.Refused("module refused the write: ${w.text}")
-                    UdsAnswer.Silent -> return@withModule WriteOutcome.Refused("module did not answer the write")
-                    is UdsAnswer.Positive -> Unit
+                val answer = write(change.did, plan.after)
+                // Whatever the module said, the value it now holds is the truth: a "response pending"
+                // (7F 2E 78) or a lost reply can still end in a stored write, and a refusal is only
+                // reported as "nothing written" once the read-back shows the old value.
+                val back = readBack(change.did)
+                when {
+                    back != null && back.contentEquals(plan.after) -> WriteOutcome.Done(plan)
+                    back != null && back.contentEquals(plan.before) -> WriteOutcome.Refused(
+                        when (answer) {
+                            is UdsAnswer.Negative -> "module refused the write: ${answer.text}"
+                            UdsAnswer.Silent -> "module did not answer the write"
+                            is UdsAnswer.Positive -> "module acknowledged the write but kept the old value"
+                        }
+                    )
+                    else -> {
+                        // Unknown or a third value: put the old value back and check that.
+                        write(change.did, plan.before)
+                        val restored = readBack(change.did)?.contentEquals(plan.before) == true
+                        WriteOutcome.Failed(if (back == null) "the module did not answer the read-back" else "read-back did not match", restored)
+                    }
                 }
-                val back = (inspector.readDid(change.did) as? UdsAnswer.Positive)?.data
-                if (back != null && back.contentEquals(plan.after)) return@withModule WriteOutcome.Done(plan)
-                // The write was acknowledged but did not stick: put the old value back and check that.
-                write(change.did, plan.before)
-                val restored = (inspector.readDid(change.did) as? UdsAnswer.Positive)?.data?.contentEquals(plan.before) == true
-                WriteOutcome.Failed("read-back did not match", restored)
             } finally {
                 inspector.request("1001")
             }
@@ -79,8 +90,21 @@ class UdsWriter(private val session: ElmSession) {
         return apply(CodingPlan(CodingChange(module, did, emptyList(), current, value), current, value), minVolts)
     }
 
+    /** Reads [did], waiting out a module that is still busy with the write (up to [READ_BACK_TRIES] tries). */
+    private fun readBack(did: Int): ByteArray? {
+        repeat(READ_BACK_TRIES) {
+            when (val a = inspector.readDid(did)) {
+                is UdsAnswer.Positive -> return a.data
+                is UdsAnswer.Negative -> if (a.code != RESPONSE_PENDING && a.code != BUSY) return null
+                UdsAnswer.Silent -> Unit
+            }
+            Thread.sleep(READ_BACK_PAUSE_MS)
+        }
+        return null
+    }
+
     private fun write(did: Int, value: ByteArray): UdsAnswer {
-        val answer = inspector.request("2E%04X".format(did) + CodingChange.hex(value))
+        val answer = inspector.request("2E%04X".format(did) + CodingChange.hex(value), timeoutMs = WRITE_TIMEOUT_MS)
         if (answer !is UdsAnswer.Positive) return answer
         val p = answer.data
         return if (p.size >= 3 && p[0] == 0x6E.toByte() && (p[1].toInt() and 0xFF) == (did shr 8) && (p[2].toInt() and 0xFF) == (did and 0xFF)) answer else UdsAnswer.Silent
@@ -98,5 +122,10 @@ class UdsWriter(private val session: ElmSession) {
 
     companion object {
         const val MIN_VOLTS = 12.2
+        private const val RESPONSE_PENDING = 0x78
+        private const val BUSY = 0x21
+        private const val READ_BACK_TRIES = 4
+        private const val READ_BACK_PAUSE_MS = 500L
+        private const val WRITE_TIMEOUT_MS = 5_000L
     }
 }
