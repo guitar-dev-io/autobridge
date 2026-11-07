@@ -15,7 +15,14 @@ import kotlinx.coroutines.flow.callbackFlow
 import java.util.UUID
 
 /** An adapter seen while scanning. [likely] marks one that looks like an OBD adapter. */
-data class AdapterHit(val name: String?, val address: String, val rssi: Int, val likely: Boolean)
+data class AdapterHit(
+    val name: String?,
+    val address: String,
+    val rssi: Int,
+    val likely: Boolean,
+    /** Already paired with the phone: listed even when it is not advertising right now. */
+    val paired: Boolean = false,
+)
 
 object ObdAdapterMatcher {
     private val NAMES = listOf(
@@ -43,6 +50,23 @@ object ObdPermissions {
 }
 
 object ObdScanner {
+    /**
+     * Adapters the phone is already paired with. A scan only sees devices that are advertising, and
+     * an adapter that is on but held by another connection, or just woke up, may not be; the paired
+     * list still shows it. Classic-only devices (speakers, car kits) are left out: this app talks
+     * Bluetooth LE.
+     */
+    @SuppressLint("MissingPermission")
+    fun paired(context: Context): List<AdapterHit> = runCatching {
+        val adapter = context.getSystemService(BluetoothManager::class.java)?.adapter ?: return@runCatching emptyList()
+        adapter.bondedDevices.orEmpty()
+            .filter { it.type != android.bluetooth.BluetoothDevice.DEVICE_TYPE_CLASSIC }
+            .map {
+                val name = runCatching { it.name }.getOrNull()
+                AdapterHit(name, it.address, 0, ObdAdapterMatcher.isLikely(name, emptyList()), paired = true)
+            }
+    }.getOrDefault(emptyList())
+
     /** Adapters in range until the collector stops. Needs [ObdPermissions]. */
     @SuppressLint("MissingPermission")
     fun scan(context: Context): Flow<AdapterHit> = callbackFlow {

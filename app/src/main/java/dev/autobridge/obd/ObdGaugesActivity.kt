@@ -253,6 +253,12 @@ class ObdGaugesActivity : Activity() {
             LinearLayout.LayoutParams(0, dp(44), 1f)
         )
         card.addView(buttons, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
+        // Drops the link and opens it again: for an adapter that stopped answering, or one that was
+        // switched off and on again, without choosing it a second time.
+        card.addView(
+            button(primary = false, label = getString(R.string.obd_reconnect)) { reconnect() },
+            LinearLayout.LayoutParams(-1, dp(44)).apply { topMargin = dp(8) }
+        )
         return card
     }
 
@@ -340,6 +346,12 @@ class ObdGaugesActivity : Activity() {
         }
     }
 
+    private fun reconnect() {
+        if (ObdSettings.adapter(this) == null) return chooseAdapter()
+        ObdConnection.stop()
+        connect()
+    }
+
     private fun autoConnectIfAsked() {
         ObdConnection.startIfWanted(this)
     }
@@ -424,6 +436,13 @@ class ObdGaugesActivity : Activity() {
         val dialog = builder.create()
         dialog.setOnDismissListener { scanJob?.cancel() }
         dialog.show()
+
+        // Paired adapters first: they are listed even when they are not advertising right now.
+        ObdScanner.paired(this).filter { showAll || it.likely }.forEach { hit ->
+            found.add(hit)
+            labels.add("${hit.name ?: hit.address}   ${getString(R.string.obd_paired)}")
+        }
+        list.notifyDataSetChanged()
 
         scanJob?.cancel()
         scanJob = scope.launch {

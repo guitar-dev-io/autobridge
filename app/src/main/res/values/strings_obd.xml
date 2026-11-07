@@ -8,6 +8,8 @@
     <string name="obd_section_vehicle">Vehicle</string>
     <string name="obd_no_adapter">No adapter chosen</string>
     <string name="obd_choose_adapter">Choose adapter</string>
+    <string name="obd_reconnect">Reconnect Bluetooth</string>
+    <string name="obd_paired">Paired</string>
     <string name="obd_change_adapter">Change adapter</string>
     <string name="obd_connect">Connect</string>
     <string name="obd_disconnect">Disconnect</string>
