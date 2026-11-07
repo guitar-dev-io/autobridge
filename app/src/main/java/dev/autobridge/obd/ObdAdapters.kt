@@ -15,12 +15,35 @@ import kotlinx.coroutines.flow.callbackFlow
 import java.util.UUID
 
 /** An adapter seen while scanning. [likely] marks one that looks like an OBD adapter. */
-data class AdapterHit(val name: String?, val address: String, val rssi: Int, val likely: Boolean)
+data class AdapterHit(
+    val name: String?,
+    val address: String,
+    val rssi: Int,
+    val likely: Boolean,
+    /** Already paired with the phone: listed even when it is not advertising right now. */
+    val paired: Boolean = false,
+)
 
 object ObdAdapterMatcher {
     private val NAMES = listOf(
         "VLINKER", "V-LINK", "VGATE", "ICAR", "OBD", "ELM", "VEEPEAK", "LELINK", "KONNWEI", "CARISTA",
     )
+
+    /**
+     * The name to show. Adapters like the vLinker FD+ advertise one name per radio, "vLinker FD-IOS"
+     * for Bluetooth LE and "vLinker FD-Android" for Bluetooth Classic; this app uses LE only, so
+     * the suffix reads as a platform restriction it is not. "vLinker FD-IOS" is shown as
+     * "vLinker FD (BLE)"; the stored name and the address are unchanged.
+     */
+    fun display(name: String?): String? {
+        val raw = name?.trim().orEmpty()
+        if (raw.isEmpty()) return name
+        val match = SUFFIX.matchEntire(raw) ?: return raw
+        val base = match.groupValues[1].trim()
+        return if (match.groupValues[2].equals("IOS", ignoreCase = true)) "$base (BLE)" else "$base (Classic)"
+    }
+
+    private val SUFFIX = Regex("(.*?)[\\s_-]+(IOS|Android)", RegexOption.IGNORE_CASE)
 
     fun isLikely(name: String?, services: List<UUID>): Boolean {
         val upper = name?.uppercase().orEmpty()
@@ -43,6 +66,23 @@ object ObdPermissions {
 }
 
 object ObdScanner {
+    /**
+     * Adapters the phone is already paired with. A scan only sees devices that are advertising, and
+     * an adapter that is on but held by another connection, or just woke up, may not be; the paired
+     * list still shows it. Classic-only devices (speakers, car kits) are left out: this app talks
+     * Bluetooth LE.
+     */
+    @SuppressLint("MissingPermission")
+    fun paired(context: Context): List<AdapterHit> = runCatching {
+        val adapter = context.getSystemService(BluetoothManager::class.java)?.adapter ?: return@runCatching emptyList()
+        adapter.bondedDevices.orEmpty()
+            .filter { it.type != android.bluetooth.BluetoothDevice.DEVICE_TYPE_CLASSIC }
+            .map {
+                val name = runCatching { it.name }.getOrNull()
+                AdapterHit(name, it.address, 0, ObdAdapterMatcher.isLikely(name, emptyList()), paired = true)
+            }
+    }.getOrDefault(emptyList())
+
     /** Adapters in range until the collector stops. Needs [ObdPermissions]. */
     @SuppressLint("MissingPermission")
     fun scan(context: Context): Flow<AdapterHit> = callbackFlow {

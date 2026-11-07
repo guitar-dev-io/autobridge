@@ -81,7 +81,7 @@ object ObdConnection {
         appContext = app
         ObdService.start(app)
         mutableTelemetry.value = Telemetry()
-        mutableState.value = ObdState(ObdState.Status.CONNECTING, adapterName = adapter.name)
+        mutableState.value = ObdState(ObdState.Status.CONNECTING, adapterName = ObdAdapterMatcher.display(adapter.name))
         job = scope.launch {
             var pause = 1_000L
             var waitingSince = SystemClock.elapsedRealtime()

@@ -253,6 +253,12 @@ class ObdGaugesActivity : Activity() {
             LinearLayout.LayoutParams(0, dp(44), 1f)
         )
         card.addView(buttons, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
+        // Drops the link and opens it again: for an adapter that stopped answering, or one that was
+        // switched off and on again, without choosing it a second time.
+        card.addView(
+            button(primary = false, label = getString(R.string.obd_reconnect)) { reconnect() },
+            LinearLayout.LayoutParams(-1, dp(44)).apply { topMargin = dp(8) }
+        )
         return card
     }
 
@@ -305,7 +311,7 @@ class ObdGaugesActivity : Activity() {
 
         val adapter = ObdSettings.adapter(this)
         val state = ObdConnection.state.value
-        adapterTitle?.text = adapter?.name ?: getString(R.string.obd_no_adapter)
+        adapterTitle?.text = ObdAdapterMatcher.display(adapter?.name) ?: getString(R.string.obd_no_adapter)
         statusLine?.text = statusText(state)
         connectButton?.text = getString(if (ObdConnection.isRunning) R.string.obd_disconnect else R.string.obd_connect)
     }
@@ -338,6 +344,12 @@ class ObdGaugesActivity : Activity() {
             ObdConnection.start(this, adapter, ObdSettings.profile(this))
             refresh()
         }
+    }
+
+    private fun reconnect() {
+        if (ObdSettings.adapter(this) == null) return chooseAdapter()
+        ObdConnection.stop()
+        connect()
     }
 
     private fun autoConnectIfAsked() {
@@ -425,6 +437,13 @@ class ObdGaugesActivity : Activity() {
         dialog.setOnDismissListener { scanJob?.cancel() }
         dialog.show()
 
+        // Paired adapters first: they are listed even when they are not advertising right now.
+        ObdScanner.paired(this).filter { showAll || it.likely }.forEach { hit ->
+            found.add(hit)
+            labels.add("${ObdAdapterMatcher.display(hit.name) ?: hit.address}   ${getString(R.string.obd_paired)}")
+        }
+        list.notifyDataSetChanged()
+
         scanJob?.cancel()
         scanJob = scope.launch {
             try {
@@ -432,7 +451,7 @@ class ObdGaugesActivity : Activity() {
                     if (!showAll && !hit.likely) return@collect
                     if (found.any { it.address == hit.address }) return@collect
                     found.add(hit)
-                    labels.add("${hit.name ?: hit.address}   ${hit.rssi} dBm")
+                    labels.add("${ObdAdapterMatcher.display(hit.name) ?: hit.address}   ${hit.rssi} dBm")
                     list.notifyDataSetChanged()
                 }
             } catch (e: CancellationException) {

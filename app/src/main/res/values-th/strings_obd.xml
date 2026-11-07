@@ -7,6 +7,8 @@
     <string name="obd_section_vehicle">รถ</string>
     <string name="obd_no_adapter">ยังไม่ได้เลือกอะแดปเตอร์</string>
     <string name="obd_choose_adapter">เลือกอะแดปเตอร์</string>
+    <string name="obd_reconnect">เชื่อมต่อบลูทูธใหม่</string>
+    <string name="obd_paired">จับคู่แล้ว</string>
     <string name="obd_change_adapter">เปลี่ยนอะแดปเตอร์</string>
     <string name="obd_connect">เชื่อมต่อ</string>
     <string name="obd_disconnect">ตัดการเชื่อมต่อ</string>

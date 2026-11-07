@@ -37,6 +37,11 @@ class ProfileTest {
         }
     }
 
+    @Test fun throttleFallsBackToTheRelativeThrottleAndThePedal() {
+        val generic = BuiltInProfiles.findResolved(BuiltInProfiles.GENERIC_ID)!!
+        assertEquals(listOf("0111", "0145", "0149"), generic.candidates("throttle").map { it.request })
+    }
+
     @Test fun theGenericProfileMatchesTheHardCodedPids() {
         val generic = BuiltInProfiles.find(BuiltInProfiles.GENERIC_ID)!!
         val samples = listOf(intArrayOf(0x13, 0x88), intArrayOf(0x00, 0x00), intArrayOf(0xFF, 0xFF), intArrayOf(0x37, 0x78))
@@ -46,7 +51,8 @@ class ProfileTest {
             "fuel" to ObdPids.FUEL_LEVEL, "ambient" to ObdPids.AMBIENT, "battery" to ObdPids.BATTERY_STANDARD,
         )
         for ((id, pid) in pairs) {
-            val def = generic.candidates(id).single()
+            // The first candidate is the standard PID; throttle has two fallbacks behind it.
+            val def = generic.candidates(id).first()
             assertEquals("$id request", pid.request, def.request)
             assertEquals("$id reply", pid.reply, def.reply)
             assertEquals("$id bytes", pid.bytes, def.bytes)
