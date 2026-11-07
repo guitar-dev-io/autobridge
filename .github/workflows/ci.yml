@@ -159,3 +159,18 @@ jobs:
           shopt -s nullglob
           manifests=(app/build/intermediates/merged_manifests/*/process*Manifest/AndroidManifest.xml)
           python3 scripts/check-car-entries.py "${manifests[@]}"
+
+      # A personal build anyone can try from a PR without a local setup. It is the side-by-side
+      # variant (dev.autobridge.debug, "AutoBridge Debug"): CI signs with its own throwaway debug key,
+      # so a dev.autobridge APK from here could never install over the real app anyway.
+      # Built after the guard so the guard still sees the real applicationId.
+      - name: Assemble personal debug (side by side)
+        run: ./gradlew --no-daemon assemblePersonalDebug -PdebugSuffix=1
+
+      - name: Upload personal debug APK (side by side)
+        uses: actions/upload-artifact@v4
+        with:
+          name: autobridge-personal-debug-sidebyside-apk
+          path: app/build/outputs/apk/personal/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
