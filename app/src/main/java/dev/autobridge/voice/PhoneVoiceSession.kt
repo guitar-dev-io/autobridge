@@ -77,6 +77,17 @@ class PhoneVoiceSession(private val activity: Activity, private val actions: Act
         listen()
     }
 
+    /**
+     * A transcript the phone's own speech service produced, run the way a Whisper one is: the voice
+     * grammar and the driver's own commands first, with Run and Edit when it is not understood.
+     */
+    fun handleTranscript(text: String) {
+        showDialog()
+        dialog?.setTitle(R.string.voice_test_transcript)
+        heard?.text = text
+        handle(text, heardAs = text, allowAuto = true)
+    }
+
     /** Forwarded from the Activity's onRequestPermissionsResult. True when it was ours. */
     fun onPermissionResult(requestCode: Int, granted: Boolean): Boolean {
         if (requestCode != REQUEST_MIC) return false

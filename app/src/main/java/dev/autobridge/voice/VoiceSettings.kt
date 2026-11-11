@@ -41,8 +41,16 @@ object VoiceSettings {
     /** 0 means "pick from the CPU count"; see [effectiveThreads]. */
     val THREAD_OPTIONS = listOf(0, 2, 4, 6)
 
+    /**
+     * Offline Whisper is parked: on the test Redmi a base model never finished a few seconds of
+     * Thai, and its Thai is weak even when it does. While this is false every microphone uses the
+     * phone's own speech service, a phone without one has no voice input, and the Whisper rows of
+     * Settings > Voice Recognition are hidden. The code stays so this can be turned back on.
+     */
+    const val OFFLINE_WHISPER = false
+
     /** Off means the Home microphone uses the phone's own speech service, as it did before. */
-    fun enabled(context: Context): Boolean = prefs(context).getBoolean(KEY_ENABLED, true)
+    fun enabled(context: Context): Boolean = OFFLINE_WHISPER && prefs(context).getBoolean(KEY_ENABLED, true)
     fun setEnabled(context: Context, value: Boolean) = prefs(context).edit { putBoolean(KEY_ENABLED, value) }
 
     fun language(context: Context): VoiceLanguage =
