@@ -50,8 +50,18 @@ object ObdSettings {
         GaugeCatalog.profile = profile(context)
     }
 
-    /** Reconnect on its own the next time the gauges screen opens. */
-    fun autoConnect(context: Context): Boolean = prefs(context).getBoolean("auto_connect", false)
+    /**
+     * Connect on its own when the car connects or the gauges screen opens. On unless switched off:
+     * it only acts once an adapter has been chosen.
+     */
+    fun autoConnect(context: Context): Boolean = prefs(context).getBoolean("auto_connect", true)
+
+    /** The protocol digit that worked last time with [address], so the next start can skip the search. */
+    fun lastProtocol(context: Context, address: String): Char? =
+        prefs(context).getString("protocol_$address", null)?.firstOrNull()
+
+    fun setLastProtocol(context: Context, address: String, digit: Char) =
+        prefs(context).edit { putString("protocol_$address", digit.toString()) }
 
     fun setAutoConnect(context: Context, value: Boolean) =
         prefs(context).edit { putBoolean("auto_connect", value) }

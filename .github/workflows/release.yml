@@ -113,6 +113,8 @@ jobs:
 
       # personal: primary sideload flavor (pulls in libs/aauto.aar, not Play-accepted) -> AAB + APK.
       # lab:      sideload-only flavor, same dependencies -> APK only; nothing consumes a lab .aab.
+      # safe:     the Play flavor (no aauto.aar, no CAR_LAUNCHER alias) -> AAB only, kept as a workflow
+      #           artifact, not attached to the public release. Upload this one to Play, never personal.
       # One build pass; every variant shares the same signing config.
       #   AAB -> app/build/outputs/bundle/<flavor>Release/*.aab
       #   APK -> app/build/outputs/apk/<flavor>/release/*.apk
@@ -121,7 +123,7 @@ jobs:
           set -euo pipefail
           tasks="assemblePersonalRelease"
           if [ "$ALL_FLAVORS" = "true" ]; then
-            tasks="bundlePersonalRelease $tasks assembleLabRelease"
+            tasks="bundlePersonalRelease bundleSafeRelease $tasks assembleLabRelease"
           fi
           echo "Building: $tasks"
           ./gradlew --no-daemon $tasks
@@ -148,6 +150,7 @@ jobs:
           path: |
             app/build/outputs/mapping/personalRelease/mapping.txt
             app/build/outputs/mapping/labRelease/mapping.txt
+            app/build/outputs/mapping/safeRelease/mapping.txt
           if-no-files-found: error
 
       - name: Upload release artifacts
@@ -156,6 +159,7 @@ jobs:
           name: autobridge-release
           path: |
             app/build/outputs/bundle/personalRelease/*.aab
+            app/build/outputs/bundle/safeRelease/*.aab
             app/build/outputs/apk/personal/release/*.apk
             app/build/outputs/apk/lab/release/*.apk
           if-no-files-found: error

@@ -29,6 +29,8 @@ object BuiltInProfiles {
         pid: map | Manifold pressure | 010B | 1 | - | A | kPa | 0..255 | - | 20,105,10,120,lh
         pid: baro | Barometer | 0133 | 1 | - | A | kPa | 70..120 | - | 85,110,70,120,lh
         pid: throttle | Throttle | 0111 | 1 | - | A*100/255 | % | 0..100 | - | -
+        pid: throttle | Throttle | 0145 | 1 | - | A*100/255 | % | 0..100 | - | -
+        pid: throttle | Throttle | 0149 | 1 | - | A*100/255 | % | 0..100 | - | -
         pid: fuel | Fuel level | 012F | 1 | - | A*100/255 | % | 0..100 | - | 25,100,15,100,l
         pid: ambient | Outside | 0146 | 1 | - | A-40 | °C | -10..60 | -40..215 | -10,45,-20,55,lh
         pid: battery | Battery | 0142 | 2 | - | (A*256+B)/1000 | V | 10..16 | 6..20 | 13.8,14.4,12.5,15,lh

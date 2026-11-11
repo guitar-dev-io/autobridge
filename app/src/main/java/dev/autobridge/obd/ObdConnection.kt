@@ -35,6 +35,9 @@ data class ObdState(
  */
 object ObdConnection {
     private const val TAG = "ObdConnection"
+    const val AUTO_GIVE_UP_MS = 10 * 60_000L
+    /** [ObdState.message] when auto-connect stopped trying; screens show their own wording. */
+    const val GAVE_UP = "gave_up"
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val mutableState = MutableStateFlow(ObdState())
@@ -48,19 +51,53 @@ object ObdConnection {
 
     val isRunning: Boolean get() = job?.isActive == true
 
+    /**
+     * Starts the connection when the person has not switched auto-connect off and has chosen an
+     * adapter and allowed Bluetooth. Used when the car connects and when a gauges screen opens.
+     * Gives up after [AUTO_GIVE_UP_MS] without a live link (the car is off or out of range); the
+     * next car connection or screen opening tries again. Returns true when a link is running.
+     */
+    fun startIfWanted(context: Context): Boolean {
+        if (isRunning) return true
+        val app = context.applicationContext
+        if (!ObdSettings.autoConnect(app)) return false
+        val adapter = ObdSettings.adapter(app) ?: return false
+        if (ObdPermissions.missing(app).isNotEmpty()) return false
+        ObdSettings.applyProfile(app)
+        start(app, adapter, ObdSettings.profile(app), giveUpAfterMs = AUTO_GIVE_UP_MS)
+        return true
+    }
+
+    /** [giveUpAfterMs]: stop retrying once this long has passed without a live link; null keeps trying. */
     @Synchronized
-    fun start(context: Context, adapter: ObdSettings.Adapter, profile: VehicleProfile) {
+    fun start(
+        context: Context,
+        adapter: ObdSettings.Adapter,
+        profile: VehicleProfile,
+        giveUpAfterMs: Long? = null,
+    ) {
         if (isRunning) return
         val app = context.applicationContext
         appContext = app
         ObdService.start(app)
         mutableTelemetry.value = Telemetry()
-        mutableState.value = ObdState(ObdState.Status.CONNECTING, adapterName = adapter.name)
+        mutableState.value = ObdState(ObdState.Status.CONNECTING, adapterName = ObdAdapterMatcher.display(adapter.name))
         job = scope.launch {
             var pause = 1_000L
+            var waitingSince = SystemClock.elapsedRealtime()
             while (true) {
-                val reason = attempt(app, adapter, profile)
+                var wasLive = false
+                val reason = attempt(app, adapter, profile) { wasLive = true }
+                // The clock for giving up starts when the link was last good, not when it began.
+                if (wasLive) waitingSince = SystemClock.elapsedRealtime()
                 StructuredLog.w(TAG, "OBD link ended: $reason")
+                if (giveUpAfterMs != null && SystemClock.elapsedRealtime() - waitingSince > giveUpAfterMs) {
+                    StructuredLog.w(TAG, "OBD auto-connect gave up after ${giveUpAfterMs / 1000}s")
+                    ObdService.stop(app)
+                    mutableTelemetry.value = Telemetry()
+                    mutableState.value = ObdState(message = GAVE_UP)
+                    return@launch
+                }
                 mutableState.update {
                     it.copy(status = ObdState.Status.RETRYING, protocol = null, message = reason)
                 }
@@ -84,6 +121,7 @@ object ObdConnection {
         context: Context,
         adapter: ObdSettings.Adapter,
         profile: VehicleProfile,
+        onLive: () -> Unit,
     ): String {
         val transport = BleTransport(context, adapter.address)
         var reason = "Connection ended"
@@ -99,7 +137,9 @@ object ObdConnection {
                             val now = SystemClock.elapsedRealtime()
                             mutableTelemetry.update { it.with(gauge, value, now).refreshDerived(profile.derived, gauge, now) }
                         }
-                        poller.initialize()
+                        poller.initialize(ObdSettings.lastProtocol(context, adapter.address))
+                        poller.protocolDigit?.let { ObdSettings.setLastProtocol(context, adapter.address, it) }
+                        onLive()
                         activePoller = poller
                         mutableState.update {
                             it.copy(status = ObdState.Status.LIVE, protocol = poller.protocol, message = null)

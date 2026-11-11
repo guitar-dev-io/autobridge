@@ -7,12 +7,15 @@
     <string name="obd_section_vehicle">รถ</string>
     <string name="obd_no_adapter">ยังไม่ได้เลือกอะแดปเตอร์</string>
     <string name="obd_choose_adapter">เลือกอะแดปเตอร์</string>
+    <string name="obd_reconnect">เชื่อมต่อบลูทูธใหม่</string>
+    <string name="obd_paired">จับคู่แล้ว</string>
     <string name="obd_change_adapter">เปลี่ยนอะแดปเตอร์</string>
     <string name="obd_connect">เชื่อมต่อ</string>
     <string name="obd_disconnect">ตัดการเชื่อมต่อ</string>
     <string name="obd_status_idle">ยังไม่ได้เชื่อมต่อ</string>
     <string name="obd_status_connecting">กำลังเชื่อมต่อ…</string>
     <string name="obd_status_init">กำลังตั้งค่าอะแดปเตอร์…</string>
+    <string name="obd_status_gave_up">หยุดแล้ว: รถไม่ตอบกลับนาน 10 นาที</string>
     <string name="obd_status_live">กำลังอ่านข้อมูล</string>
     <string name="obd_status_live_protocol">กำลังอ่านข้อมูล • โปรโตคอล %1$s</string>
     <string name="obd_status_retry">กำลังเชื่อมต่อใหม่: %1$s</string>
@@ -38,8 +41,8 @@
     <string name="obd_imperial">หน่วย</string>
     <string name="obd_imperial_on">°F และ mph</string>
     <string name="obd_imperial_off">°C และ km/h</string>
-    <string name="obd_auto">เชื่อมต่อใหม่อัตโนมัติ</string>
-    <string name="obd_auto_caption">เชื่อมต่อทันทีที่เปิดหน้านี้</string>
+    <string name="obd_auto">เชื่อมต่ออัตโนมัติ</string>
+    <string name="obd_auto_caption">เชื่อมต่อเมื่อรถต่อหรือเปิดหน้านี้</string>
     <string name="obd_notification_channel">ข้อมูลรถ (OBD2)</string>
     <string name="obd_notification_title">กำลังอ่านข้อมูลรถ</string>
     <string name="obd_notification_text">เชื่อมต่อกับอะแดปเตอร์ OBD2</string>

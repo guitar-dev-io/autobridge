@@ -263,6 +263,12 @@ class ObdGaugesActivity : Activity() {
             LinearLayout.LayoutParams(0, dp(44), 1f)
         )
         card.addView(buttons, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
+        // Drops the link and opens it again: for an adapter that stopped answering, or one that was
+        // switched off and on again, without choosing it a second time.
+        card.addView(
+            button(primary = false, label = getString(R.string.obd_reconnect)) { reconnect() },
+            LinearLayout.LayoutParams(-1, dp(44)).apply { topMargin = dp(8) }
+        )
         return card
     }
 
@@ -315,13 +321,13 @@ class ObdGaugesActivity : Activity() {
 
         val adapter = ObdSettings.adapter(this)
         val state = ObdConnection.state.value
-        adapterTitle?.text = adapter?.name ?: getString(R.string.obd_no_adapter)
+        adapterTitle?.text = ObdAdapterMatcher.display(adapter?.name) ?: getString(R.string.obd_no_adapter)
         statusLine?.text = statusText(state)
         connectButton?.text = getString(if (ObdConnection.isRunning) R.string.obd_disconnect else R.string.obd_connect)
     }
 
     private fun statusText(state: ObdState): String = when (state.status) {
-        ObdState.Status.IDLE -> getString(R.string.obd_status_idle)
+        ObdState.Status.IDLE -> getString(if (state.message == ObdConnection.GAVE_UP) R.string.obd_status_gave_up else R.string.obd_status_idle)
         ObdState.Status.CONNECTING -> getString(R.string.obd_status_connecting)
         ObdState.Status.INITIALIZING -> getString(R.string.obd_status_init)
         ObdState.Status.LIVE -> state.protocol?.let { getString(R.string.obd_status_live_protocol, it) }
@@ -350,11 +356,14 @@ class ObdGaugesActivity : Activity() {
         }
     }
 
+    private fun reconnect() {
+        if (ObdSettings.adapter(this) == null) return chooseAdapter()
+        ObdConnection.stop()
+        connect()
+    }
+
     private fun autoConnectIfAsked() {
-        if (!ObdSettings.autoConnect(this) || ObdConnection.isRunning) return
-        val adapter = ObdSettings.adapter(this) ?: return
-        if (ObdPermissions.missing(this).isNotEmpty()) return
-        ObdConnection.start(this, adapter, ObdSettings.profile(this))
+        ObdConnection.startIfWanted(this)
     }
 
     /** Runs [action] once Bluetooth is allowed, asking first when it is not. */
@@ -438,6 +447,13 @@ class ObdGaugesActivity : Activity() {
         dialog.setOnDismissListener { scanJob?.cancel() }
         dialog.show()
 
+        // Paired adapters first: they are listed even when they are not advertising right now.
+        ObdScanner.paired(this).filter { showAll || it.likely }.forEach { hit ->
+            found.add(hit)
+            labels.add("${ObdAdapterMatcher.display(hit.name) ?: hit.address}   ${getString(R.string.obd_paired)}")
+        }
+        list.notifyDataSetChanged()
+
         scanJob?.cancel()
         scanJob = scope.launch {
             try {
@@ -445,7 +461,7 @@ class ObdGaugesActivity : Activity() {
                     if (!showAll && !hit.likely) return@collect
                     if (found.any { it.address == hit.address }) return@collect
                     found.add(hit)
-                    labels.add("${hit.name ?: hit.address}   ${hit.rssi} dBm")
+                    labels.add("${ObdAdapterMatcher.display(hit.name) ?: hit.address}   ${hit.rssi} dBm")
                     list.notifyDataSetChanged()
                 }
             } catch (e: CancellationException) {
