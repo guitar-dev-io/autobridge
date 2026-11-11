@@ -42,6 +42,14 @@ object DtcParser {
         return codes.toList()
     }
 
+    /**
+     * True when [raw] holds a real answer to [service] (0x43 or 0x47), with or without codes, or
+     * the adapter's NO DATA, which some buses send for "no codes". False for an error or silence,
+     * so a failed read is not taken for "every code is gone".
+     */
+    fun answered(raw: String, service: Int): Boolean =
+        raw.uppercase().contains("NO DATA") || messages(raw).any { hexBytes(it).firstOrNull() == service }
+
     /** `P0133` from the two bytes 0x01 0x33. */
     fun decode(a: Int, b: Int): String {
         val system = "PCBU"[(a shr 6) and 0x3]

@@ -180,8 +180,15 @@ object ObdConnection {
      */
     suspend fun <T> exclusively(block: suspend (ElmSession) -> T): T? = activePoller?.exclusively(block)
 
-    /** What a trouble-code read found. */
-    data class DtcReport(val stored: List<String>, val pending: List<String>)
+    /**
+     * What a trouble-code read found. [storedAnswered] is false when the stored-codes request got
+     * no real answer, so an empty [stored] then means "unknown", not "none".
+     */
+    data class DtcReport(
+        val stored: List<String>,
+        val pending: List<String>,
+        val storedAnswered: Boolean = true,
+    )
 
     /**
      * Asks every control unit for its stored (03) and pending (07) codes. Null when the adapter is
@@ -191,9 +198,10 @@ object ObdConnection {
         val poller = activePoller ?: return null
         return poller.exclusively { session ->
             val can = poller.isCan
-            val stored = DtcParser.parse(session.request("03", 4_000), 0x43, can)
+            val storedRaw = session.request("03", 4_000)
+            val stored = DtcParser.parse(storedRaw, 0x43, can)
             val pending = DtcParser.parse(session.request("07", 4_000), 0x47, can)
-            DtcReport(stored, pending)
+            DtcReport(stored, pending, storedAnswered = DtcParser.answered(storedRaw, 0x43))
         }
     }
 

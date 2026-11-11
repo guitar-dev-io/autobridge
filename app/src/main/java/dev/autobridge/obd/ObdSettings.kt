@@ -66,6 +66,19 @@ object ObdSettings {
     fun setAutoConnect(context: Context, value: Boolean) =
         prefs(context).edit { putBoolean("auto_connect", value) }
 
+    /** Warn on the car screen when the car stores a new fault code. On unless switched off. */
+    fun dtcAlerts(context: Context): Boolean = prefs(context).getBoolean("dtc_alerts", true)
+
+    fun setDtcAlerts(context: Context, value: Boolean) =
+        prefs(context).edit { putBoolean("dtc_alerts", value) }
+
+    /** The stored codes the last answered check found, so only a new one is announced. */
+    fun lastStoredDtcs(context: Context): Set<String> =
+        prefs(context).getStringSet("dtc_last_stored", null)?.toSet() ?: emptySet()
+
+    fun setLastStoredDtcs(context: Context, codes: Set<String>) =
+        prefs(context).edit { putStringSet("dtc_last_stored", codes) }
+
     /** True for Fahrenheit and miles per hour instead of Celsius and km/h. */
     fun imperial(context: Context): Boolean = prefs(context).getBoolean("imperial", false)
 
