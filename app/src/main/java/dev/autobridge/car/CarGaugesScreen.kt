@@ -99,6 +99,12 @@ class CarGaugesScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
                             .setOnClickListener { nextPage() }
                             .build()
                     )
+                    .addAction(
+                        Action.Builder()
+                            .setIcon(CarIcons.of(carContext, R.drawable.ic_browser_warning))
+                            .setOnClickListener { screenManager.push(CarDtcScreen(carContext)) }
+                            .build()
+                    )
                     .build()
             )
             .build()

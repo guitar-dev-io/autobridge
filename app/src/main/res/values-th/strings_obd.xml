@@ -104,6 +104,16 @@
     <string name="obd_dtc_system_body">ตัวถัง</string>
     <string name="obd_dtc_system_network">เครือข่าย</string>
     <string name="obd_dtc_generic">รหัสมาตรฐาน</string>
+    <string name="obd_dtc_alerts">เตือนเมื่อมีรหัสปัญหาใหม่</string>
+    <string name="obd_dtc_alerts_caption">แจ้งบนจอรถระหว่างที่ต่อตัวอ่าน OBD อยู่ เช็กทุก 5 นาที</string>
+    <string name="obd_dtc_alert_title">พบรหัสปัญหาใหม่</string>
+    <plurals name="obd_dtc_alert_more">
+        <item quantity="other">%1$s และอีก %2$d รายการ</item>
+    </plurals>
+    <string name="obd_dtc_alert_details">รายละเอียด</string>
+    <string name="obd_dtc_alert_channel">รหัสปัญหา OBD</string>
+    <string name="obd_dtc_alert_no_description">รหัส%1$s ไม่มีคำอธิบาย</string>
+    <string name="obd_dtc_car_connect_first">ยังไม่ได้เชื่อมต่อตัวอ่าน OBD</string>
     <string name="obd_dtc_ford">รหัสเฉพาะของ Ford</string>
     <string name="obd_dtc_lookup">รหัสนี้ไม่อยู่ในรายการของแอป ให้ค้นรหัสพร้อมรุ่นรถของคุณ</string>
     <string name="obd_look_section">รูปแบบการแสดงผล</string>
