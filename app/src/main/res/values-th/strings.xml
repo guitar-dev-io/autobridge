@@ -1923,6 +1923,8 @@
     <string name="voice_settings_title">การจดจำเสียง</string>
     <string name="voice_settings_subtitle">แปลงเสียงเป็นข้อความแบบออฟไลน์ด้วย Whisper</string>
     <string name="voice_settings_caption">โมเดล Whisper ภาษา และการทดสอบ</string>
+    <string name="voice_settings_subtitle_system">ใช้บริการแปลงเสียงของโทรศัพท์</string>
+    <string name="voice_settings_caption_system">ทำงานอัตโนมัติ และคำสั่งของคุณเอง</string>
     <string name="voice_group_commands">คำสั่งเสียง</string>
     <string name="voice_enable_title">เปิดใช้คำสั่งเสียง</string>
     <string name="voice_enable_on">ไมโครโฟนในหน้าแรกและ Agent ใช้ Whisper แบบออฟไลน์</string>
