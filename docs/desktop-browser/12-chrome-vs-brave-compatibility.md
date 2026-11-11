@@ -92,7 +92,7 @@ Disk, one browser: ~0.9–1.0 GB. Both: ~1.4–1.5 GB. Two separate runtimes wou
 | GPU | **no** | **no** | SwiftShader/llvmpipe software GL by default. A GPU path (virgl/Turnip) is a later LAB experiment |
 | Audio | ALSA → PulseAudio → bridge | same | `libasound2-plugins` routes ALSA to Pulse |
 | Fullscreen | yes, inside the X window | yes | `--kiosk` for car sessions |
-| Widevine | **bundled** linux_arm64 CDM (reported, Jul 2026) | downloaded by Brave on first DRM page after the user agrees; aarch64 issue [brave/brave-browser#56129](https://github.com/brave/brave-browser/issues/56129) closed Aug 2026 | Linux Widevine is L3 (software): Netflix and similar cap at ~720p/1080p, no HDR/4K. Whether the CDM loads under PRoot is **unknown** (T6) |
+| Widevine | **bundled** linux_arm64 CDM (reported, Jul 2026) | downloaded by Brave on first DRM page after the user agrees; aarch64 issue [brave/brave-browser#56129](https://github.com/brave/brave-browser/issues/56129) closed Aug 2026 | Linux Widevine is L3 (software): Netflix and similar cap at ~720p/1080p, no HDR/4K. Under PRoot, Netflix was reported playing through Chrome/Brave (owner's report, 2026-10-25), so a CDM does load for at least one of them. Which one, and at what quality, is not recorded yet (T6) |
 
 Video stays parked-only. See doc 11 § Safety.
 
