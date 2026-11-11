@@ -60,6 +60,8 @@ class AutoBridgeApplication : Application() {
         dev.autobridge.radio.RadioRepository.init(this)
         // Sideload builds: the desktop browsers open on the car browser's start page.
         dev.autobridge.car.CarExtensions.install(this)
+        // Offline voice is parked: free the space a downloaded Whisper model still takes.
+        dev.autobridge.voice.VoiceRuntime.removeParkedModels(this)
     }
 
     /**
