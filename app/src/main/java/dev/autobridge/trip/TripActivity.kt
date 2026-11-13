@@ -24,11 +24,13 @@ import kotlin.math.roundToLong
 /**
  * Trips: start one with the number of people, end it, and see what it cost per person — fuel (or
  * charging) from the log's cost per km, plus tolls and parking typed in at the end. Distance comes
- * from the odometer, the car's or the last one logged; with neither, it is typed at the end.
+ * from the odometer, the car's or the last one logged; with neither, it is typed at the end, or
+ * measured by the phone's GPS when the user turned that on here ([TripGpsTracker]).
  */
 class TripActivity : Activity() {
     companion object {
         fun intent(context: Context): Intent = Intent(context, TripActivity::class.java)
+        private const val REQUEST_LOCATION = 41
 
         /** Current fuel or charging cost per km, from the log; null until it can be worked out. */
         fun currentBahtPerKm(context: Context): Double? = FuelStats.summarize(FuelLogStore.all(context)).bahtPerKm
@@ -45,7 +47,60 @@ class TripActivity : Activity() {
         // System and Auto modes depend on night mode and the clock, which may have moved on.
         dev.autobridge.settings.AppearanceStore.refreshPalette(this)
         dev.autobridge.settings.ScreenAppearance.applyWindow(this)
+        TripGpsTracker.ensure(this)
         render()
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode != REQUEST_LOCATION) return
+        val granted = TripGpsTracker.hasPermission(this)
+        dev.autobridge.settings.AppPreferences.setTripGps(this, granted)
+        if (!granted) Toast.makeText(this, getString(R.string.trip_gps_denied), Toast.LENGTH_LONG).show()
+        TripGpsTracker.ensure(this)
+        render()
+    }
+
+    private fun gpsRow() = AutoBridgeDesign.contentRow(
+        context = this,
+        title = getString(R.string.trip_gps_toggle),
+        subtitle = getString(
+            when {
+                !dev.autobridge.settings.AppPreferences.tripGps(this) -> R.string.trip_gps_caption_off
+                TripGpsTracker.canTrack(this) -> R.string.trip_gps_caption_on
+                else -> R.string.trip_gps_caption_no_provider
+            }
+        ),
+        accent = accent,
+        badgeText = "📍",
+        subtitleMaxLines = 2,
+        actionLabel = getString(if (dev.autobridge.settings.AppPreferences.tripGps(this)) R.string.trip_gps_on else R.string.trip_gps_off),
+    ) {
+        if (dev.autobridge.settings.AppPreferences.tripGps(this)) {
+            dev.autobridge.settings.AppPreferences.setTripGps(this, false)
+            TripGpsTracker.ensure(this)
+            render()
+        } else {
+            showGpsDisclosure()
+        }
+    }
+
+    /** What GPS is used for comes first; only then the system permission prompt. */
+    private fun showGpsDisclosure() {
+        AlertDialog.Builder(this, dev.autobridge.settings.ScreenAppearance.dialogTheme())
+            .setTitle(getString(R.string.trip_gps_disclosure_title))
+            .setMessage(getString(R.string.trip_gps_disclosure_body))
+            .setNegativeButton(getString(R.string.disclosure_not_now), null)
+            .setPositiveButton(getString(R.string.disclosure_continue)) { _, _ ->
+                if (TripGpsTracker.hasPermission(this)) {
+                    dev.autobridge.settings.AppPreferences.setTripGps(this, true)
+                    TripGpsTracker.ensure(this)
+                    render()
+                } else {
+                    requestPermissions(arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION), REQUEST_LOCATION)
+                }
+            }
+            .show()
     }
 
     private fun render() {
@@ -67,6 +122,8 @@ class TripActivity : Activity() {
                 gap = 20
             )
         }
+
+        body.stack(gpsRow(), gap = 12)
 
         val done = trips.filterNot { it.active }
         if (done.isEmpty() && active == null) {
@@ -169,7 +226,11 @@ class TripActivity : Activity() {
             .setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(getString(R.string.fuel_save)) { _, _ ->
                 val endKm = end.text.toString().trim().toDoubleOrNull()
-                if (trip.startKm != null && (endKm == null || endKm <= trip.startKm)) {
+                val startKm = trip.startKm
+                val backwards = startKm != null && endKm != null && endKm <= startKm
+                // Without an end reading, a GPS distance (if measured) stands in for it.
+                val missing = startKm != null && endKm == null && TripStore.active(this)?.gpsKm == null
+                if (backwards || missing) {
                     Toast.makeText(this, getString(R.string.trip_invalid_end), Toast.LENGTH_LONG).show()
                     return@setPositiveButton
                 }

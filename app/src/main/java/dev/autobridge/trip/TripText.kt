@@ -15,9 +15,11 @@ object TripText {
         else context.getString(R.string.trip_minutes, minutes)
     }
 
-    /** "312 km · 4 h 10 min", whatever of it is known. */
+    /** "312 km · 4 h 10 min" ("≈ 312 km (GPS)" when measured by GPS), whatever of it is known. */
     fun summary(context: Context, trip: Trip, currentKm: Double?, nowMs: Long): String = listOfNotNull(
-        TripStats.distanceKm(trip, currentKm)?.let { context.getString(R.string.trip_km, whole(it)) },
+        TripStats.distanceKm(trip, currentKm)?.let {
+            context.getString(if (TripStats.isGpsDistance(trip, currentKm)) R.string.trip_km_gps else R.string.trip_km, whole(it))
+        },
         duration(context, TripStats.durationMs(trip, nowMs)),
     ).joinToString(" · ")
 

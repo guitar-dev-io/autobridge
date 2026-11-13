@@ -1762,6 +1762,16 @@
     <string name="trip_in_progress">กำลังเดินทาง · %1$d คน</string>
     <string name="trip_last">ทริปล่าสุด · %1$d คน</string>
     <string name="trip_km">%1$s กม.</string>
+    <string name="trip_km_gps">≈ %1$s กม. (GPS)</string>
+    <string name="trip_gps_on">เปิด</string>
+    <string name="trip_gps_off">ปิด</string>
+    <string name="trip_gps_toggle">วัดระยะทางด้วย GPS</string>
+    <string name="trip_gps_caption_off">ปิดอยู่ ใช้กับรถที่ไม่ส่งเลขไมล์มาให้</string>
+    <string name="trip_gps_caption_on">เปิดอยู่ ทริปที่ไม่มีเลขไมล์จะได้ระยะทางจาก GPS</string>
+    <string name="trip_gps_caption_no_provider">เปิดอยู่ แต่บริการตำแหน่งของมือถือปิดอยู่</string>
+    <string name="trip_gps_disclosure_title">ใช้ GPS วัดระยะทางทริป?</string>
+    <string name="trip_gps_disclosure_body">รถหลายรุ่นไม่ส่งเลขไมล์มาให้มือถือ ถ้าเปิดตัวเลือกนี้ GPS ของมือถือจะวัดระยะทางเฉพาะตอนที่มีทริปกำลังเดินทางอยู่ ถ้าไม่มีทริปจะไม่อ่านตำแหน่งเลย\n\nระหว่างทริป แอปจะเก็บระยะทางที่ได้และจุดล่าสุดไว้ในมือถือเครื่องนี้ เพื่อให้นับต่อได้ถ้าแอปถูกปิดไป พอจบทริปจุดนั้นจะถูกลบ เหลือแค่ระยะทางที่บันทึกไว้กับทริป ไม่มีการส่งข้อมูลไปไหน\n\nเมื่อแอปอยู่เบื้องหลังสักพัก Android จะหยุดส่งตำแหน่งให้ ช่วงที่ขับโดยเปิดแอปอื่นบนจอจึงนับเป็นเส้นตรง ระยะทางที่ได้เป็นค่าประมาณ และไม่มีทางมากกว่าที่ขับจริง\n\nขั้นต่อไป Android จะขอสิทธิ์เข้าถึงตำแหน่ง</string>
+    <string name="trip_gps_denied">ไม่ได้รับสิทธิ์ตำแหน่ง จึงไม่วัดระยะทางทริปด้วย GPS</string>
     <string name="trip_minutes">%1$d นาที</string>
     <string name="trip_hours_minutes">%1$d ชม. %2$d นาที</string>
     <string name="trip_cost">รวม %1$s บาท · คนละ %3$s บาท (%2$d คน)</string>
