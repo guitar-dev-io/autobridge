@@ -1792,6 +1792,16 @@
     <string name="trip_in_progress">Trip in progress · %1$d people</string>
     <string name="trip_last">Last trip · %1$d people</string>
     <string name="trip_km">%1$s km</string>
+    <string name="trip_km_gps">≈ %1$s km (GPS)</string>
+    <string name="trip_gps_on">On</string>
+    <string name="trip_gps_off">Off</string>
+    <string name="trip_gps_toggle">Measure distance with GPS</string>
+    <string name="trip_gps_caption_off">Off. For cars that report no odometer.</string>
+    <string name="trip_gps_caption_on">On. Trips without an odometer reading get a GPS distance.</string>
+    <string name="trip_gps_caption_no_provider">On, but location is off on this phone.</string>
+    <string name="trip_gps_disclosure_title">Use GPS to measure trips?</string>
+    <string name="trip_gps_disclosure_body">Many cars never tell the phone their odometer. With this on, the phone\'s GPS measures how far you drive while a trip is in progress, and nothing is read when there is no trip.\n\nWhile the trip runs, the distance so far and the last point are kept on this phone so the count survives a restart. When the trip ends the point is deleted and only the distance stays with the trip. Nothing is sent anywhere.\n\nAndroid stops sending location to apps in the background after a while, so stretches driven with another app on screen are counted as a straight line. The distance is an estimate, never more than you drove.\n\nAndroid will now ask for location permission.</string>
+    <string name="trip_gps_denied">Location permission was not granted, so trips are not measured by GPS.</string>
     <string name="trip_minutes">%1$d min</string>
     <string name="trip_hours_minutes">%1$d h %2$d min</string>
     <string name="trip_cost">%1$s baht in total · %3$s baht each (%2$d people)</string>

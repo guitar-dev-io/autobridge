@@ -7,8 +7,8 @@ import androidx.core.content.edit
  * Small persistent app-level preferences for UI behavior that isn't specific to the mirror engine:
  * the driving-aware UI presentation toggles and the optional "Resume last session" setting.
  *
- * These are presentation/convenience flags only, bar one: [gpsSpeed] is the user's consent to read
- * location for the speed reading, and nothing else enables that.
+ * These are presentation/convenience flags only, bar two: [gpsSpeed] and [tripGps] are the user's
+ * consent to read location, each for its own purpose, and nothing else enables either.
  */
 object AppPreferences {
     private const val PREFS_NAME = "autobridge_app_prefs"
@@ -19,6 +19,7 @@ object AppPreferences {
     private const val KEY_REDUCE_CLUTTER = "driving_reduce_clutter"
     private const val KEY_RESUME_LAST_SESSION = "resume_last_session"
     private const val KEY_GPS_SPEED = "gps_speed"
+    private const val KEY_TRIP_GPS = "trip_gps"
 
     fun drivingAwareUi(context: Context): Boolean = prefs(context).getBoolean(KEY_DRIVING_AWARE_UI, true)
     fun setDrivingAwareUi(context: Context, value: Boolean) = put(context, KEY_DRIVING_AWARE_UI, value)
@@ -46,6 +47,14 @@ object AppPreferences {
      */
     fun gpsSpeed(context: Context): Boolean = prefs(context).getBoolean(KEY_GPS_SPEED, false)
     fun setGpsSpeed(context: Context, value: Boolean) = put(context, KEY_GPS_SPEED, value)
+
+    /**
+     * Whether the phone's GPS may measure the distance of a trip in progress
+     * ([dev.autobridge.trip.TripGpsTracker]). A separate consent from [gpsSpeed]: a different
+     * purpose, and this one stores a point until the trip ends. Off by default.
+     */
+    fun tripGps(context: Context): Boolean = prefs(context).getBoolean(KEY_TRIP_GPS, false)
+    fun setTripGps(context: Context, value: Boolean) = put(context, KEY_TRIP_GPS, value)
 
     private fun put(context: Context, key: String, value: Boolean) {
         prefs(context).edit { putBoolean(key, value) }

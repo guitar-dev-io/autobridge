@@ -10,9 +10,12 @@ object TripStore {
     private const val PREFS = "autobridge_trips"
     private const val KEY_TRIPS = "trips"
 
+    /** Every trip, newest first; the one in progress carries the GPS distance so far. */
     fun all(context: Context): List<Trip> {
         val raw = prefs(context).getString(KEY_TRIPS, null) ?: return emptyList()
-        return parse(raw).sortedByDescending { it.startMs }
+        return parse(raw).sortedByDescending { it.startMs }.map { trip ->
+            if (trip.active) trip.copy(gpsKm = TripGpsTracker.liveKm(context, trip.id) ?: trip.gpsKm) else trip
+        }
     }
 
     fun active(context: Context): Trip? = all(context).firstOrNull { it.active }
@@ -24,15 +27,22 @@ object TripStore {
     fun start(context: Context, startKm: Double?, people: Int, nowMs: Long = System.currentTimeMillis()): Trip {
         val trip = Trip(nowMs, nowMs, 0L, startKm, null, people.coerceAtLeast(1))
         write(context, all(context) + trip)
+        TripGpsTracker.onTripStarted(context, trip.id)
         return trip
     }
 
-    fun finish(context: Context, id: Long, endKm: Double?, otherBaht: Double, bahtPerKm: Double?, nowMs: Long = System.currentTimeMillis()) =
+    /** Ends a trip, keeping the GPS distance measured for it (if any) with it. */
+    fun finish(context: Context, id: Long, endKm: Double?, otherBaht: Double, bahtPerKm: Double?, nowMs: Long = System.currentTimeMillis()) {
+        val gpsKm = TripGpsTracker.onTripEnded(context, id)
         write(context, all(context).map {
-            if (it.id == id) it.copy(endMs = nowMs, endKm = endKm, otherBaht = otherBaht, bahtPerKm = bahtPerKm) else it
+            if (it.id == id) it.copy(endMs = nowMs, endKm = endKm, otherBaht = otherBaht, bahtPerKm = bahtPerKm, gpsKm = gpsKm ?: it.gpsKm) else it
         })
+    }
 
-    fun delete(context: Context, id: Long) = write(context, all(context).filterNot { it.id == id })
+    fun delete(context: Context, id: Long) {
+        if (all(context).firstOrNull { it.id == id }?.active == true) TripGpsTracker.onTripEnded(context, id)
+        write(context, all(context).filterNot { it.id == id })
+    }
 
     /** The stored JSON, for a backup; "[]" when there is none. */
     fun rawJson(context: Context): String = prefs(context).getString(KEY_TRIPS, null) ?: "[]"
@@ -57,6 +67,7 @@ object TripStore {
                 people = item.optInt("people", 1).coerceAtLeast(1),
                 otherBaht = item.optDouble("other", 0.0),
                 bahtPerKm = item.optNullableDouble("baht_per_km"),
+                gpsKm = item.optNullableDouble("gps_km"),
             ).takeIf { it.startMs > 0 }
         }
     }
@@ -77,6 +88,7 @@ object TripStore {
                     .put("people", it.people)
                     .put("other", it.otherBaht)
                     .put("baht_per_km", it.bahtPerKm ?: JSONObject.NULL)
+                    .put("gps_km", it.gpsKm ?: JSONObject.NULL)
             )
         }
         prefs(context).edit { putString(KEY_TRIPS, array.toString()) }
