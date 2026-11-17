@@ -37,6 +37,11 @@ import dev.autobridge.logging.StructuredLog
  * is playing, its media card and steering-wheel buttons keep driving that, and the rear video does
  * not take audio focus, so it never pauses the car's music. One instance at a time
  * (`singleInstance`); a second send replaces what it plays.
+ *
+ * Sent while the front is playing the same video, it starts muted: both screens show the picture,
+ * and the sound comes only from the front, since two copies of one video never run in step and
+ * would echo through the one set of car speakers. The notification's mute button turns its own
+ * sound on, for a rear screen with speakers or once the front has moved on to something else.
  */
 // PlayerView's buffering and controller setters are @UnstableApi in Media3; deliberate, as in PlayerActivity.
 @androidx.annotation.OptIn(UnstableApi::class)
@@ -47,6 +52,8 @@ class RearScreenActivity : Activity() {
         private const val EXTRA_URL = "dev.autobridge.rear.URL"
         private const val EXTRA_TITLE = "dev.autobridge.rear.TITLE"
         private const val EXTRA_POSITION = "dev.autobridge.rear.POSITION"
+        private const val EXTRA_MUTED = "dev.autobridge.rear.MUTED"
+        private const val ACTION_MUTE = "dev.autobridge.rear.MUTE"
         private const val ACTION_TOGGLE = "dev.autobridge.rear.TOGGLE"
         private const val ACTION_STOP = "dev.autobridge.rear.STOP"
         private const val CHANNEL_ID = "rear_screen"
@@ -56,15 +63,16 @@ class RearScreenActivity : Activity() {
         fun isAvailable(context: Context): Boolean = RearDisplays.find(context) != null
 
         /**
-         * Plays [url] on the rear screen. Returns false when no rear screen is connected or Android
-         * refuses to open a window there.
+         * Plays [url] on the rear screen, without sound when [muted]. Returns false when no rear
+         * screen is connected or Android refuses to open a window there.
          */
-        fun send(context: Context, url: String, title: String, positionMs: Long): Boolean {
+        fun send(context: Context, url: String, title: String, positionMs: Long, muted: Boolean = false): Boolean {
             val display = RearDisplays.find(context) ?: return false
             val intent = Intent(context, RearScreenActivity::class.java)
                 .putExtra(EXTRA_URL, url)
                 .putExtra(EXTRA_TITLE, title)
                 .putExtra(EXTRA_POSITION, positionMs)
+                .putExtra(EXTRA_MUTED, muted)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             val options = ActivityOptions.makeBasic().setLaunchDisplayId(display.displayId)
             return runCatching { context.startActivity(intent, options.toBundle()) }
@@ -80,6 +88,11 @@ class RearScreenActivity : Activity() {
         @Volatile
         internal var shown: RearScreenActivity? = null
 
+        /** Turns the rear screen's own sound on or off. */
+        fun toggleMute(context: Context) {
+            context.sendBroadcast(Intent(ACTION_MUTE).setPackage(context.packageName))
+        }
+
         /** Stops the rear screen's video, if one is playing. */
         fun stop(context: Context) {
             context.sendBroadcast(Intent(ACTION_STOP).setPackage(context.packageName))
@@ -91,6 +104,10 @@ class RearScreenActivity : Activity() {
     /** For the on-device test: the display this is on, and whether the video is playing. */
     internal val displayIdForTest: Int get() = shownOn
     internal val isPlayingForTest: Boolean get() = player?.isPlaying == true
+    internal val isMutedForTest: Boolean get() = muted
+
+    /** Without sound, because the front screen is playing the same video. */
+    private var muted = false
     private var title: String = ""
     /** The display this window is on. `Context.getDisplay()` needs API 30, and the app supports 29. */
     @Suppress("DEPRECATION")
@@ -101,6 +118,7 @@ class RearScreenActivity : Activity() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
                 ACTION_TOGGLE -> player?.let { if (it.isPlaying) it.pause() else it.play() }
+                ACTION_MUTE -> setMuted(!muted)
                 ACTION_STOP -> finish()
             }
         }
@@ -147,7 +165,7 @@ class RearScreenActivity : Activity() {
 
         ContextCompat.registerReceiver(
             this, controls,
-            IntentFilter().apply { addAction(ACTION_TOGGLE); addAction(ACTION_STOP) },
+            IntentFilter().apply { addAction(ACTION_TOGGLE); addAction(ACTION_MUTE); addAction(ACTION_STOP) },
             ContextCompat.RECEIVER_NOT_EXPORTED
         )
         getSystemService(DisplayManager::class.java)?.registerDisplayListener(displays, main)
@@ -165,6 +183,7 @@ class RearScreenActivity : Activity() {
         val url = intent.getStringExtra(EXTRA_URL)?.takeIf { it.isNotBlank() } ?: return
         title = intent.getStringExtra(EXTRA_TITLE).orEmpty()
         val position = intent.getLongExtra(EXTRA_POSITION, 0L)
+        setMuted(intent.getBooleanExtra(EXTRA_MUTED, false))
         val item = MediaItem.Builder()
             .setUri(url)
             .setMediaMetadata(MediaMetadata.Builder().setTitle(title).build())
@@ -174,11 +193,17 @@ class RearScreenActivity : Activity() {
             prepare()
             play()
         }
-        StructuredLog.i(TAG, "playing on display $shownOn from ${position}ms")
+        StructuredLog.i(TAG, "playing on display $shownOn from ${position}ms muted=$muted")
         showNotification()
     }
 
-    /** Pause/play and stop on the phone, for a rear screen that has no touch. */
+    private fun setMuted(value: Boolean) {
+        muted = value
+        player?.volume = if (value) 0f else 1f
+        showNotification()
+    }
+
+    /** Pause/play, sound and stop on the phone, for a rear screen that has no touch. */
     private fun showNotification() {
         if (isFinishing) return
         val manager = getSystemService(NotificationManager::class.java) ?: return
@@ -193,12 +218,19 @@ class RearScreenActivity : Activity() {
         val notification = Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_tile_tv)
             .setContentTitle(getString(R.string.rear_notification_title))
-            .setContentText(title)
+            .setContentText(if (muted) getString(R.string.rear_notification_muted, title) else title)
             .addAction(
                 Notification.Action.Builder(
                     null,
                     getString(if (playing) R.string.rear_notification_pause else R.string.rear_notification_play),
                     broadcast(ACTION_TOGGLE, 1)
+                ).build()
+            )
+            .addAction(
+                Notification.Action.Builder(
+                    null,
+                    getString(if (muted) R.string.rear_notification_unmute else R.string.rear_notification_mute),
+                    broadcast(ACTION_MUTE, 3)
                 ).build()
             )
             .addAction(Notification.Action.Builder(null, getString(R.string.rear_notification_stop), broadcast(ACTION_STOP, 2)).build())

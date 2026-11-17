@@ -930,8 +930,9 @@ class PlayerActivity : Activity() {
     }
 
     /**
-     * Moves the video to the rear screen: the passengers' player opens there at the same point, and
-     * this copy pauses so the two are not both playing. See `docs/REAR_SCREEN.md`.
+     * Shows the video on the rear screen too: the passengers' player opens there at the same point
+     * while this one (and the car, which shares it) keeps playing. While this one plays, the rear
+     * starts without sound so the two copies do not echo; see `docs/REAR_SCREEN.md`.
      */
     private fun sendToRear() {
         val player = playback.player
@@ -945,8 +946,8 @@ class PlayerActivity : Activity() {
         val live = player?.isCurrentMediaItemLive == true
         val position = if (live) 0L else player?.currentPosition ?: 0L
         val sendTitle = playback.currentTitle?.takeIf { it.isNotBlank() } ?: title
-        if (dev.autobridge.rear.RearScreenActivity.send(this, target, sendTitle, position)) {
-            player?.pause()
+        val frontPlaying = player?.isPlaying == true
+        if (dev.autobridge.rear.RearScreenActivity.send(this, target, sendTitle, position, muted = frontPlaying)) {
             announce(getString(R.string.player_send_rear_opened))
         } else {
             announce(getString(R.string.player_send_rear_failed))

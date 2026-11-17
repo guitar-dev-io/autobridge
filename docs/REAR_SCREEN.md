@@ -26,9 +26,13 @@ There are two kinds of rear screen, and both are planned:
   video does not pause the car's audio.
 - **Starting it.** The phone player's header gets a rear-screen button while such a display is
   connected. It hands the current video (and its position, for a non-live video) to the rear
-  screen and pauses the phone's own copy.
+  screen. The phone and the car keep playing: both screens show the picture at once.
+- **Sound.** The car has one set of speakers, and two copies of one video never stay in step, so
+  both playing sound would echo. If the front is playing when the video is sent, the rear starts
+  without sound and the sound stays in front. The notification's "Sound on" gives the rear its own
+  sound, for a rear screen with speakers or headphones, or once the front plays something else.
 - **Controlling it.** A rear screen with touch uses the player's own controls. For one without
-  (most HDMI monitors), the phone shows a notification with pause/play and stop.
+  (most HDMI monitors), the phone shows a notification with pause/play, sound on/off and stop.
 - **Ending it.** Stop in the notification, Back on a touch rear screen, or unplugging the screen.
 
 ### Known limits
@@ -36,8 +40,10 @@ There are two kinds of rear screen, and both are planned:
 - **USB port.** A phone that sends HDMI over its USB-C port cannot also run wired Android Auto
   there; it needs wireless Android Auto. Many phones (most Redmi models among them) have no video
   output on USB-C at all.
-- **Sound.** Android chooses where the rear player's sound goes. With HDMI it usually follows the
-  picture to the monitor; with Miracast, to the receiver.
+- **Where the rear sound goes.** Once the rear has sound, Android chooses its output. With HDMI it
+  usually follows the picture to the monitor; with Miracast, to the receiver.
+- **Not frame-locked.** The two screens play separate copies, so they can drift apart by a moment.
+  Locking them together would need one decoder feeding both screens; not planned unless asked.
 - **Lock screen.** The rear player shows over the lock screen, so a locked phone does not cover
   the passengers' video with the keyguard.
 

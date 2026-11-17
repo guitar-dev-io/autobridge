@@ -530,6 +530,9 @@
     <string name="rear_notification_pause">หยุดชั่วคราว</string>
     <string name="rear_notification_play">เล่น</string>
     <string name="rear_notification_stop">ปิด</string>
+    <string name="rear_notification_mute">ปิดเสียง</string>
+    <string name="rear_notification_unmute">เปิดเสียง</string>
+    <string name="rear_notification_muted">%1$s · ไม่มีเสียง (เสียงออกที่จอหน้า)</string>
     <string name="player_exit_fullscreen">ออกจากเต็มจอ</string>
     <string name="player_on_car">กำลังเล่นบนจอรถ</string>
     <string name="ent_hint_web">ค้นหาเว็บบนจอรถ หรือวาง HTTPS URL</string>

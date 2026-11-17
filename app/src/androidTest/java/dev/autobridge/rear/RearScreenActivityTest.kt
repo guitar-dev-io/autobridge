@@ -50,6 +50,21 @@ class RearScreenActivityTest {
         InstrumentationRegistry.getArguments().getString("holdMs")?.toLongOrNull()?.let { SystemClock.sleep(it) }
     }
 
+    @Test fun sentWhileTheFrontPlaysItStartsMutedAndCanTurnItsSoundOn() {
+        assumeTrue(RearDisplays.find(context) != null)
+        val url = InstrumentationRegistry.getArguments().getString("rearUrl")
+        assumeTrue(!url.isNullOrBlank())
+
+        assertTrue(RearScreenActivity.send(context, url!!, "Rear test", 0L, muted = true))
+        assertTrue(waitFor(10_000) { RearScreenActivity.shown != null })
+        val shown = RearScreenActivity.shown!!
+        assertTrue("rear should start without sound", shown.isMutedForTest)
+        assertTrue("muted video should still play", waitFor(20_000) { shown.isPlayingForTest })
+
+        RearScreenActivity.toggleMute(context)
+        assertTrue("sound did not turn on", waitFor(5_000) { !shown.isMutedForTest })
+    }
+
     @Test fun stopClosesTheRearPlayer() {
         assumeTrue(RearDisplays.find(context) != null)
         val url = InstrumentationRegistry.getArguments().getString("rearUrl")
