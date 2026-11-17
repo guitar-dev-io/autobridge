@@ -16,16 +16,6 @@ import android.os.Handler
 import android.os.Looper
 import android.view.WindowManager
 import androidx.core.content.ContextCompat
-import androidx.media3.common.AudioAttributes
-import androidx.media3.common.C
-import androidx.media3.common.MediaItem
-import androidx.media3.common.MediaMetadata
-import androidx.media3.common.Player
-import androidx.media3.common.util.UnstableApi
-import androidx.media3.datasource.DefaultDataSource
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
-import androidx.media3.ui.PlayerView
 import dev.autobridge.R
 import dev.autobridge.display.RearDisplays
 import dev.autobridge.logging.StructuredLog
@@ -43,8 +33,6 @@ import dev.autobridge.logging.StructuredLog
  * would echo through the one set of car speakers. The notification's mute button turns its own
  * sound on, for a rear screen with speakers or once the front has moved on to something else.
  */
-// PlayerView's buffering and controller setters are @UnstableApi in Media3; deliberate, as in PlayerActivity.
-@androidx.annotation.OptIn(UnstableApi::class)
 class RearScreenActivity : Activity() {
 
     companion object {
@@ -99,16 +87,12 @@ class RearScreenActivity : Activity() {
         }
     }
 
-    private var player: ExoPlayer? = null
+    private var rear: RearPlayer? = null
 
     /** For the on-device test: the display this is on, and whether the video is playing. */
     internal val displayIdForTest: Int get() = shownOn
-    internal val isPlayingForTest: Boolean get() = player?.isPlaying == true
-    internal val isMutedForTest: Boolean get() = muted
-
-    /** Without sound, because the front screen is playing the same video. */
-    private var muted = false
-    private var title: String = ""
+    internal val isPlayingForTest: Boolean get() = rear?.isPlaying == true
+    internal val isMutedForTest: Boolean get() = rear?.muted == true
     /** The display this window is on. `Context.getDisplay()` needs API 30, and the app supports 29. */
     @Suppress("DEPRECATION")
     private val shownOn: Int by lazy { windowManager.defaultDisplay.displayId }
@@ -117,8 +101,8 @@ class RearScreenActivity : Activity() {
     private val controls = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
-                ACTION_TOGGLE -> player?.let { if (it.isPlaying) it.pause() else it.play() }
-                ACTION_MUTE -> setMuted(!muted)
+                ACTION_TOGGLE -> rear?.toggle()
+                ACTION_MUTE -> rear?.let { it.setMuted(!it.muted) }
                 ACTION_STOP -> finish()
             }
         }
@@ -139,29 +123,9 @@ class RearScreenActivity : Activity() {
         setShowWhenLocked(true)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        val exo = ExoPlayer.Builder(this)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(DefaultDataSource.Factory(this)))
-            .build()
-            .apply {
-                // No audio focus: the car's own audio keeps playing.
-                setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(C.USAGE_MEDIA)
-                        .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
-                        .build(),
-                    false
-                )
-                addListener(object : Player.Listener {
-                    override fun onIsPlayingChanged(isPlaying: Boolean) = showNotification()
-                })
-            }
-        player = exo
-        setContentView(PlayerView(this).apply {
-            setBackgroundColor(0xFF000000.toInt())
-            this.player = exo
-            useController = true
-            setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
-        })
+        val player = RearPlayer(this) { showNotification() }
+        rear = player
+        setContentView(player.view(this))
 
         ContextCompat.registerReceiver(
             this, controls,
@@ -181,26 +145,10 @@ class RearScreenActivity : Activity() {
 
     private fun play(intent: Intent) {
         val url = intent.getStringExtra(EXTRA_URL)?.takeIf { it.isNotBlank() } ?: return
-        title = intent.getStringExtra(EXTRA_TITLE).orEmpty()
         val position = intent.getLongExtra(EXTRA_POSITION, 0L)
-        setMuted(intent.getBooleanExtra(EXTRA_MUTED, false))
-        val item = MediaItem.Builder()
-            .setUri(url)
-            .setMediaMetadata(MediaMetadata.Builder().setTitle(title).build())
-            .build()
-        player?.apply {
-            if (position > 0) setMediaItem(item, position) else setMediaItem(item)
-            prepare()
-            play()
-        }
+        val muted = intent.getBooleanExtra(EXTRA_MUTED, false)
+        rear?.play(url, intent.getStringExtra(EXTRA_TITLE).orEmpty(), position, muted)
         StructuredLog.i(TAG, "playing on display $shownOn from ${position}ms muted=$muted")
-        showNotification()
-    }
-
-    private fun setMuted(value: Boolean) {
-        muted = value
-        player?.volume = if (value) 0f else 1f
-        showNotification()
     }
 
     /** Pause/play, sound and stop on the phone, for a rear screen that has no touch. */
@@ -214,7 +162,10 @@ class RearScreenActivity : Activity() {
             this, code, Intent(action).setPackage(packageName),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
-        val playing = player?.isPlaying == true
+        val rear = rear ?: return
+        val playing = rear.isPlaying
+        val muted = rear.muted
+        val title = rear.title
         val notification = Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_tile_tv)
             .setContentTitle(getString(R.string.rear_notification_title))
@@ -245,8 +196,8 @@ class RearScreenActivity : Activity() {
         runCatching { unregisterReceiver(controls) }
         getSystemService(DisplayManager::class.java)?.unregisterDisplayListener(displays)
         getSystemService(NotificationManager::class.java)?.cancel(NOTIFICATION_ID)
-        player?.release()
-        player = null
+        rear?.release()
+        rear = null
         StructuredLog.i(TAG, "closed")
         super.onDestroy()
     }

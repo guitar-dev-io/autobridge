@@ -61,3 +61,31 @@ adb shell am instrument -w -e class dev.autobridge.rear.RearScreenActivityTest \
 
 `rearUrl` is any video the device can reach (`10.0.2.2` is the Mac, from an emulator); `holdMs`
 keeps it playing for a look before the test closes it.
+
+## Phase 2: a tablet on the car's Wi-Fi
+
+For a headrest or roof screen that is an Android tablet: AutoBridge is installed on the tablet too,
+and put in **rear screen mode**. The phone sends it what to play over the car's Wi-Fi (usually the
+phone's own hotspot). No second app, no cloud, no internet needed beyond what the video itself needs.
+
+- **Tablet.** Settings › Car & Connection › Rear screen › "Use this device as a rear screen" opens
+  [`RearReceiverActivity`](../app/src/main/java/dev/autobridge/rear/wifi/RearReceiverActivity.kt):
+  full screen, kept on, showing its name, its address and a 4-digit pairing code until a phone
+  sends something. It runs a small HTTP server
+  ([`RearServer`](../app/src/main/java/dev/autobridge/rear/wifi/RearServer.kt)) and announces itself on
+  the network (`_abrear._tcp`, Android's NSD/mDNS) while the screen is open.
+- **Pairing, once.** On the phone, the same Rear screen page lists the tablets it finds. Tapping
+  one asks for the code shown on the tablet; the tablet answers with a token the phone keeps. Every
+  later command carries the token, so another phone on the same Wi-Fi cannot take over the
+  passengers' screen. Five wrong codes lock pairing for a minute. A tablet that is not found (some
+  hotspots block mDNS) can be added by the address it shows.
+- **Sending.** The player's 🖥 button sends to a wired rear display when there is one (phase 1),
+  otherwise to the paired tablet: same position, same mute rule (muted while the front plays), and
+  the same phone notification with pause/play, sound and stop.
+- **Protocol.** JSON over HTTP on port 47820 (the next free port if taken): `GET /info`,
+  `POST /pair {code}` → `{token}`, then with header `X-AutoBridge-Token`: `POST /play
+  {url,title,positionMs,muted}`, `POST /toggle`, `POST /mute`, `POST /stop`, `GET /status`.
+
+Limits: the tablet must reach the video's URL itself (it plays the URL, not a copy of the phone's
+picture), so a video that only the phone can open (a local file, a logged-in page) does not play
+there yet. The server runs only while rear screen mode is open on the tablet.
