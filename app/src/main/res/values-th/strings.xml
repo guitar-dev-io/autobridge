@@ -523,6 +523,13 @@
     <string name="player_send_car_opened">ส่งไปที่รถแล้ว</string>
     <string name="player_send_car_pending">บันทึกไว้ — จะเปิดเมื่อเชื่อมต่อรถ</string>
     <string name="player_send_car_refused">แหล่งนี้ส่งไปรถไม่ได้</string>
+    <string name="player_send_rear_opened">กำลังเล่นที่จอหลัง</string>
+    <string name="player_send_rear_failed">เปิดจอหลังไม่ได้</string>
+    <string name="rear_notification_channel">จอหลัง</string>
+    <string name="rear_notification_title">กำลังเล่นที่จอหลัง</string>
+    <string name="rear_notification_pause">หยุดชั่วคราว</string>
+    <string name="rear_notification_play">เล่น</string>
+    <string name="rear_notification_stop">ปิด</string>
     <string name="player_exit_fullscreen">ออกจากเต็มจอ</string>
     <string name="player_on_car">กำลังเล่นบนจอรถ</string>
     <string name="ent_hint_web">ค้นหาเว็บบนจอรถ หรือวาง HTTPS URL</string>

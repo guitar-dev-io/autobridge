@@ -539,6 +539,13 @@
     <string name="player_send_car_opened">Sent to the car</string>
     <string name="player_send_car_pending">Saved — it will open when the car connects</string>
     <string name="player_send_car_refused">This source cannot be sent to the car</string>
+    <string name="player_send_rear_opened">Playing on the rear screen</string>
+    <string name="player_send_rear_failed">The rear screen could not be opened</string>
+    <string name="rear_notification_channel">Rear screen</string>
+    <string name="rear_notification_title">Playing on the rear screen</string>
+    <string name="rear_notification_pause">Pause</string>
+    <string name="rear_notification_play">Play</string>
+    <string name="rear_notification_stop">Stop</string>
     <string name="player_exit_fullscreen">Exit fullscreen</string>
     <string name="player_on_car">Playing on the car screen</string>
     <string name="ent_hint_web">Search the web on the car screen, or paste an HTTPS URL</string>
