@@ -219,6 +219,17 @@
             android:supportsPictureInPicture="true"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation|density|uiMode|fontScale" />
 
+        <!-- The passengers' player, launched onto a rear screen (HDMI, USB-C video out, Miracast
+             or a head unit's second display); see docs/REAR_SCREEN.md. Its own task, so it stays on
+             that display while the phone is used for anything else. -->
+        <activity android:name=".rear.RearScreenActivity" android:exported="false"
+            android:launchMode="singleInstance"
+            android:taskAffinity="dev.autobridge.rear"
+            android:excludeFromRecents="true"
+            android:resizeableActivity="true"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation|density|uiMode|fontScale" />
+
         <!-- The radio player: station, song, transport and the equalizer sheet. Audio only, so it
              has no surface to keep alive across a rotation and takes the default handling. -->
         <activity android:name=".library.RadioPlayerActivity" android:exported="false" />

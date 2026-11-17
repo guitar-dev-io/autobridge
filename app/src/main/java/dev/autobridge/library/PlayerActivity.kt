@@ -188,7 +188,9 @@ class PlayerActivity : Activity() {
     private data class LayoutSignature(
         val dpi: PlayerDpi,
         val split: SplitLayout,
-        val orientation: Int
+        val orientation: Int,
+        /** A rear screen is connected, which adds its button to the header. */
+        val rear: Boolean
     )
 
     private val ticker = Handler(Looper.getMainLooper())
@@ -276,6 +278,8 @@ class PlayerActivity : Activity() {
         )
         ParkingStateStore.addListener(parkingListener)
         dev.autobridge.media.VideoSurfaceArbiter.registerPhone(phoneOutput)
+        // A rear screen plugged in or out adds or removes its header button.
+        stopWatchingDisplays = dev.autobridge.display.RearDisplays.watch(this) { rebuildIfStale() }
     }
 
     /** Hands the video output to the car and takes it back when the car is done with it. */
@@ -301,7 +305,8 @@ class PlayerActivity : Activity() {
     private fun signature(): LayoutSignature = LayoutSignature(
         dpi = VideoSettings.playerDpi(this),
         split = VideoSettings.splitLayout(this),
-        orientation = resources.configuration.orientation
+        orientation = resources.configuration.orientation,
+        rear = kind == ContentKind.VIDEO && dev.autobridge.rear.RearScreenActivity.isAvailable(this)
     )
 
     private fun buildUi(): View {
@@ -317,6 +322,9 @@ class PlayerActivity : Activity() {
                 // Send-to-car and fullscreen only make sense for the picture, so audio skips both.
                 if (kind == ContentKind.VIDEO) {
                     add(AutoBridgeDesign.HeaderAction("📺", { sendToCar() }))
+                    if (builtFor?.rear == true) {
+                        add(AutoBridgeDesign.HeaderAction("🖥", { sendToRear() }))
+                    }
                     add(AutoBridgeDesign.HeaderAction(if (fullscreen) "🡼" else "⛶", { toggleFullscreen() }))
                 }
                 // The subtitle screen is only translation settings, so a build without the
@@ -922,6 +930,31 @@ class PlayerActivity : Activity() {
     }
 
     /**
+     * Shows the video on the rear screen too: the passengers' player opens there at the same point
+     * while this one (and the car, which shares it) keeps playing. While this one plays, the rear
+     * starts without sound so the two copies do not echo; see `docs/REAR_SCREEN.md`.
+     */
+    private fun sendToRear() {
+        val player = playback.player
+        val target = player?.currentMediaItem?.localConfiguration?.uri?.toString()
+            ?.takeIf { it.isNotBlank() }
+            ?: url.takeIf { it.isNotBlank() }
+            ?: run {
+                announce(getString(R.string.player_send_car_nothing))
+                return
+            }
+        val live = player?.isCurrentMediaItemLive == true
+        val position = if (live) 0L else player?.currentPosition ?: 0L
+        val sendTitle = playback.currentTitle?.takeIf { it.isNotBlank() } ?: title
+        val frontPlaying = player?.isPlaying == true
+        if (dev.autobridge.rear.RearScreenActivity.send(this, target, sendTitle, position, muted = frontPlaying)) {
+            announce(getString(R.string.player_send_rear_opened))
+        } else {
+            announce(getString(R.string.player_send_rear_failed))
+        }
+    }
+
+    /**
      * Video is parked-only, so the surface is attached and detached from policy rather than from
      * the Activity lifecycle alone. Audio keeps playing in either case.
      */
@@ -1204,10 +1237,7 @@ class PlayerActivity : Activity() {
         // take the player's output.
         // Not while fullscreen: the forced landscape changes the signature's orientation, and a
         // rebuild would orphan the stage that is currently sitting in the fullscreen overlay.
-        if (!fullscreen && builtFor != signature()) {
-            detachSurface()
-            setContentView(buildUi())
-        }
+        rebuildIfStale()
         ticker.removeCallbacks(tick)
         ticker.post(tick)
         // Registered here rather than in onCreate because onResume may have just rebuilt the view
@@ -1215,6 +1245,16 @@ class PlayerActivity : Activity() {
         // the fresh view is populated without waiting for the next cue.
         SubtitleHub.addListener(subtitleListener)
     }
+
+    private fun rebuildIfStale() {
+        if (!fullscreen && builtFor != signature()) {
+            detachSurface()
+            setContentView(buildUi())
+        }
+    }
+
+    /** Stops watching for a rear screen being plugged in or out; see [rebuildIfStale]. */
+    private var stopWatchingDisplays: () -> Unit = {}
 
     override fun onPause() {
         super.onPause()
@@ -1269,6 +1309,7 @@ class PlayerActivity : Activity() {
     override fun onDestroy() {
         super.onDestroy()
         releaseBack()
+        stopWatchingDisplays()
         ticker.removeCallbacksAndMessages(null)
         ParkingStateStore.removeListener(parkingListener)
         dev.autobridge.media.VideoSurfaceArbiter.unregisterPhone(phoneOutput)
