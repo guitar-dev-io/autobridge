@@ -230,6 +230,14 @@
             android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation|density|uiMode|fontScale" />
 
+        <!-- Rear screen over Wi-Fi (docs/REAR_SCREEN.md, phase 2): the phone's settings page, the
+             tablet's rear screen mode, and the phone notification's buttons. -->
+        <activity android:name=".rear.wifi.RearScreenSettingsActivity" android:exported="false" />
+        <activity android:name=".rear.wifi.RearReceiverActivity" android:exported="false"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation|density|uiMode|fontScale" />
+        <receiver android:name=".rear.wifi.RearSender$ControlReceiver" android:exported="false" />
+
         <!-- The radio player: station, song, transport and the equalizer sheet. Audio only, so it
              has no surface to keep alive across a rotation and takes the default handling. -->
         <activity android:name=".library.RadioPlayerActivity" android:exported="false" />

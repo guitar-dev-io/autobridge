@@ -2282,6 +2282,11 @@ class MainActivity : androidx.activity.ComponentActivity() {
                     getString(R.string.my_car_diagnostics_caption)
                 ) { showPhoneScreen(PhoneScreen.DEVELOPER) },
                 dev.autobridge.ui.SettingsLink(
+                    R.drawable.ic_tile_tv,
+                    getString(R.string.rear_settings_title),
+                    getString(R.string.rear_settings_caption)
+                ) { startActivity(dev.autobridge.rear.wifi.RearScreenSettingsActivity.intent(this)) },
+                dev.autobridge.ui.SettingsLink(
                     R.drawable.ic_tile_folder,
                     getString(R.string.backup_title),
                     getString(R.string.backup_settings_caption)

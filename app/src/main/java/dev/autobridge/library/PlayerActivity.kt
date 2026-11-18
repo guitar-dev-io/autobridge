@@ -189,7 +189,7 @@ class PlayerActivity : Activity() {
         val dpi: PlayerDpi,
         val split: SplitLayout,
         val orientation: Int,
-        /** A rear screen is connected, which adds its button to the header. */
+        /** A rear screen is connected or a rear tablet is paired, which adds its button to the header. */
         val rear: Boolean
     )
 
@@ -306,7 +306,10 @@ class PlayerActivity : Activity() {
         dpi = VideoSettings.playerDpi(this),
         split = VideoSettings.splitLayout(this),
         orientation = resources.configuration.orientation,
-        rear = kind == ContentKind.VIDEO && dev.autobridge.rear.RearScreenActivity.isAvailable(this)
+        rear = kind == ContentKind.VIDEO && (
+            dev.autobridge.rear.RearScreenActivity.isAvailable(this) ||
+                dev.autobridge.rear.wifi.RearSender.hasTablet(this)
+            )
     )
 
     private fun buildUi(): View {
@@ -947,10 +950,27 @@ class PlayerActivity : Activity() {
         val position = if (live) 0L else player?.currentPosition ?: 0L
         val sendTitle = playback.currentTitle?.takeIf { it.isNotBlank() } ?: title
         val frontPlaying = player?.isPlaying == true
-        if (dev.autobridge.rear.RearScreenActivity.send(this, target, sendTitle, position, muted = frontPlaying)) {
-            announce(getString(R.string.player_send_rear_opened))
-        } else {
-            announce(getString(R.string.player_send_rear_failed))
+        // A screen plugged into the phone first; otherwise the paired tablet on the Wi-Fi.
+        if (dev.autobridge.rear.RearScreenActivity.isAvailable(this)) {
+            val sent = dev.autobridge.rear.RearScreenActivity.send(this, target, sendTitle, position, muted = frontPlaying)
+            announce(getString(if (sent) R.string.player_send_rear_opened else R.string.player_send_rear_failed))
+            return
+        }
+        // The tablet fetches the video itself, so it can't open a file that lives on the phone.
+        if (!dev.autobridge.rear.wifi.RearSender.canReach(target)) {
+            announce(getString(R.string.player_send_rear_local))
+            return
+        }
+        dev.autobridge.rear.wifi.RearSender.send(
+            this, dev.autobridge.rear.wifi.RearProtocol.Play(target, sendTitle, position, frontPlaying)
+        ) { outcome ->
+            if (isFinishing) return@send
+            announce(getString(when (outcome) {
+                dev.autobridge.rear.wifi.RearSender.Outcome.SENT -> R.string.player_send_rear_opened
+                dev.autobridge.rear.wifi.RearSender.Outcome.NOT_PAIRED -> R.string.player_send_rear_not_paired
+                dev.autobridge.rear.wifi.RearSender.Outcome.UNREACHABLE -> R.string.player_send_rear_unreachable
+                dev.autobridge.rear.wifi.RearSender.Outcome.FAILED -> R.string.player_send_rear_failed
+            }))
         }
     }
 
