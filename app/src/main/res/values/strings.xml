@@ -541,6 +541,9 @@
     <string name="player_send_car_refused">This source cannot be sent to the car</string>
     <string name="player_send_rear_opened">Playing on the rear screen</string>
     <string name="player_send_rear_failed">The rear screen could not be opened</string>
+    <string name="player_send_rear_local">Videos saved on this phone can\'t go to the tablet yet. Channels and web videos can.</string>
+    <string name="player_send_rear_not_paired">The tablet no longer knows this phone. Pair again in Settings › Rear screen.</string>
+    <string name="player_send_rear_unreachable">The tablet wasn\'t found. Check it\'s on the same Wi-Fi with rear screen mode open.</string>
     <string name="rear_notification_channel">Rear screen</string>
     <string name="rear_notification_title">Playing on the rear screen</string>
     <string name="rear_notification_pause">Pause</string>

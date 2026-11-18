@@ -956,10 +956,21 @@ class PlayerActivity : Activity() {
             announce(getString(if (sent) R.string.player_send_rear_opened else R.string.player_send_rear_failed))
             return
         }
+        // The tablet fetches the video itself, so it can't open a file that lives on the phone.
+        if (!dev.autobridge.rear.wifi.RearSender.canReach(target)) {
+            announce(getString(R.string.player_send_rear_local))
+            return
+        }
         dev.autobridge.rear.wifi.RearSender.send(
             this, dev.autobridge.rear.wifi.RearProtocol.Play(target, sendTitle, position, frontPlaying)
-        ) { sent ->
-            if (!isFinishing) announce(getString(if (sent) R.string.player_send_rear_opened else R.string.player_send_rear_failed))
+        ) { outcome ->
+            if (isFinishing) return@send
+            announce(getString(when (outcome) {
+                dev.autobridge.rear.wifi.RearSender.Outcome.SENT -> R.string.player_send_rear_opened
+                dev.autobridge.rear.wifi.RearSender.Outcome.NOT_PAIRED -> R.string.player_send_rear_not_paired
+                dev.autobridge.rear.wifi.RearSender.Outcome.UNREACHABLE -> R.string.player_send_rear_unreachable
+                dev.autobridge.rear.wifi.RearSender.Outcome.FAILED -> R.string.player_send_rear_failed
+            }))
         }
     }
 

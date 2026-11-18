@@ -114,6 +114,26 @@ class RearWifiTest {
         assertNull(RearServer.readRequest(ByteArrayInputStream(ByteArray(0))))
     }
 
+    // --- sending ---
+
+    @Test fun onlyAddressesTheTabletCanOpenAreSent() {
+        assertTrue(RearSender.canReach("http://tv.example/ch1.m3u8"))
+        assertTrue(RearSender.canReach("https://192.168.43.1:8080/a.mp4"))
+        assertFalse(RearSender.canReach("content://media/external/video/media/12"))
+        assertFalse(RearSender.canReach("file:///sdcard/Movies/a.mp4"))
+        assertFalse(RearSender.canReach("/sdcard/Movies/a.mp4"))
+        assertFalse(RearSender.canReach("http://127.0.0.1:8080/proxy.m3u8"))
+        assertFalse(RearSender.canReach("http://localhost/a.mp4"))
+        assertFalse(RearSender.canReach("not a url"))
+    }
+
+    @Test fun aRefusalSaysWhetherToPairAgain() {
+        assertEquals(RearSender.Outcome.SENT, RearSender.outcomeOf(RearClient.Reply(200, "{}")))
+        assertEquals(RearSender.Outcome.NOT_PAIRED, RearSender.outcomeOf(RearClient.Reply(401, "{}")))
+        assertEquals(RearSender.Outcome.FAILED, RearSender.outcomeOf(RearClient.Reply(400, "{}")))
+        assertEquals(RearSender.Outcome.UNREACHABLE, RearSender.outcomeOf(null))
+    }
+
     // --- the phone's tablet list ---
 
     @Test fun pairedTabletsSurviveSavingAndBadEntriesAreDropped() {

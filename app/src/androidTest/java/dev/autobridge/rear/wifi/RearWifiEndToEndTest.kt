@@ -58,12 +58,12 @@ class RearWifiEndToEndTest {
         val url = InstrumentationRegistry.getArguments().getString("rearUrl")
         assumeTrue("needs -e rearUrl <video>", !url.isNullOrBlank())
 
-        var sent: Boolean? = null
+        var sent: RearSender.Outcome? = null
         instrumentation.runOnMainSync {
             RearSender.send(context, RearProtocol.Play(url!!, "Rear test", 0L, muted = true)) { sent = it }
         }
         assertTrue("send did not finish", waitFor(10_000) { sent != null })
-        assertEquals(true, sent)
+        assertEquals(RearSender.Outcome.SENT, sent)
         assertTrue("tablet did not play", waitFor(20_000) { receiver.statusForTest.playing })
         assertTrue("tablet should start muted", receiver.statusForTest.muted)
 

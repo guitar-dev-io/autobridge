@@ -525,6 +525,9 @@
     <string name="player_send_car_refused">แหล่งนี้ส่งไปรถไม่ได้</string>
     <string name="player_send_rear_opened">กำลังเล่นที่จอหลัง</string>
     <string name="player_send_rear_failed">เปิดจอหลังไม่ได้</string>
+    <string name="player_send_rear_local">วิดีโอที่อยู่ในเครื่องยังส่งไปแท็บเล็ตไม่ได้ ส่งได้เฉพาะช่องทีวีและวิดีโอจากเว็บ</string>
+    <string name="player_send_rear_not_paired">แท็บเล็ตเลิกจับคู่กับมือถือนี้แล้ว จับคู่ใหม่ที่ตั้งค่า › จอหลัง</string>
+    <string name="player_send_rear_unreachable">หาแท็บเล็ตไม่เจอ ตรวจว่าอยู่ Wi-Fi เดียวกันและเปิดโหมดจอหลังไว้</string>
     <string name="rear_notification_channel">จอหลัง</string>
     <string name="rear_notification_title">กำลังเล่นที่จอหลัง</string>
     <string name="rear_notification_pause">หยุดชั่วคราว</string>

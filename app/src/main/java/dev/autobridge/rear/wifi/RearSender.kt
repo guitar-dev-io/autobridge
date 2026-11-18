@@ -32,30 +32,49 @@ object RearSender {
     private val io = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
 
+    /** How a send ended, so the phone can say what to do about a failure. */
+    enum class Outcome { SENT, NOT_PAIRED, UNREACHABLE, FAILED }
+
+    /** A reply that refused with 401 means the tablet no longer knows this phone. */
+    internal fun outcomeOf(reply: RearClient.Reply?): Outcome = when {
+        reply == null -> Outcome.UNREACHABLE
+        reply.ok -> Outcome.SENT
+        reply.code == 401 -> Outcome.NOT_PAIRED
+        else -> Outcome.FAILED
+    }
+
+    /**
+     * Whether the tablet can open [url] itself: it fetches the video on its own, so a file on the
+     * phone (content://, file://) or an address that only means the phone (localhost) won't play.
+     */
+    fun canReach(url: String): Boolean {
+        val uri = runCatching { java.net.URI(url) }.getOrNull() ?: return false
+        if (uri.scheme?.lowercase() !in setOf("http", "https")) return false
+        val host = uri.host?.lowercase() ?: return false
+        return host != "localhost" && !host.startsWith("127.") && host != "::1" && host != "[::1]"
+    }
+
     /** Whether there is a paired tablet to send to. */
     fun hasTablet(context: Context): Boolean = RearTablets.active(context) != null
 
-    /** Plays [command] on the paired tablet; [done] gets true once the tablet took it. Main thread. */
-    fun send(context: Context, command: RearProtocol.Play, done: (Boolean) -> Unit) {
+    /** Plays [command] on the paired tablet; [done] says how it went. Main thread. */
+    fun send(context: Context, command: RearProtocol.Play, done: (Outcome) -> Unit) {
         val app = context.applicationContext
-        val tablet = RearTablets.active(app) ?: return done(false)
+        val tablet = RearTablets.active(app) ?: return done(Outcome.NOT_PAIRED)
         io.execute {
-            val first = RearClient.play(tablet, command)
-            if (first?.ok == true) {
-                main.post { finished(app, tablet, command, done) }
-                return@execute
+            when (val outcome = outcomeOf(RearClient.play(tablet, command))) {
+                Outcome.SENT -> main.post { finished(app, tablet, command, done) }
+                Outcome.UNREACHABLE -> main.post { lookUpAndRetry(app, tablet, command, done) }
+                else -> {
+                    // It answered but refused, e.g. it forgot this phone ("Unpair all").
+                    StructuredLog.w(TAG, "tablet refused play: $outcome")
+                    main.post { done(outcome) }
+                }
             }
-            if (first != null) {
-                // It answered but refused: not paired any more (the tablet forgot it).
-                StructuredLog.w(TAG, "tablet refused play: ${first.code}")
-                main.post { done(false) }
-                return@execute
-            }
-            main.post { lookUpAndRetry(app, tablet, command, done) }
         }
     }
 
-    private fun lookUpAndRetry(app: Context, tablet: RearTablets.Tablet, command: RearProtocol.Play, done: (Boolean) -> Unit) {
+    private fun lookUpAndRetry(app: Context, tablet: RearTablets.Tablet, command: RearProtocol.Play, done: (Outcome) -> Unit) {
         var settled = false
         lateinit var finder: RearFinder
         val giveUp = Runnable {
@@ -63,7 +82,7 @@ object RearSender {
             settled = true
             finder.stop()
             StructuredLog.w(TAG, "tablet ${tablet.name} not found on the Wi-Fi")
-            done(false)
+            done(Outcome.UNREACHABLE)
         }
         finder = RearFinder(app) { found ->
             if (settled || found.info.id != tablet.id) return@RearFinder
@@ -73,18 +92,18 @@ object RearSender {
             RearTablets.moved(app, tablet.id, found.host, found.port)
             val moved = tablet.copy(host = found.host, port = found.port)
             io.execute {
-                val ok = RearClient.play(moved, command)?.ok == true
-                main.post { if (ok) finished(app, moved, command, done) else done(false) }
+                val outcome = outcomeOf(RearClient.play(moved, command))
+                main.post { if (outcome == Outcome.SENT) finished(app, moved, command, done) else done(outcome) }
             }
         }
         finder.start()
         main.postDelayed(giveUp, LOOKUP_MS)
     }
 
-    private fun finished(app: Context, tablet: RearTablets.Tablet, command: RearProtocol.Play, done: (Boolean) -> Unit) {
+    private fun finished(app: Context, tablet: RearTablets.Tablet, command: RearProtocol.Play, done: (Outcome) -> Unit) {
         StructuredLog.i(TAG, "sent to ${tablet.name} muted=${command.muted}")
         notify(app, tablet, RearProtocol.Status(playing = true, muted = command.muted, title = command.title))
-        done(true)
+        done(Outcome.SENT)
     }
 
     /** Runs a notification button against the tablet, then redraws the notification from its answer. */
