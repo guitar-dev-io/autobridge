@@ -158,7 +158,9 @@ class DuoScreenCompositor {
         var rect: Rect
     ) {
         val transform = FloatArray(16)
-        var hasFrame = false
+
+        /** Written on the GL thread, read by [hasFrame] from the main thread. */
+        @Volatile var hasFrame = false
     }
 
     // A new HandlerThread per session: the host can deliver its Surface again after (or without)
@@ -192,7 +194,8 @@ class DuoScreenCompositor {
     private var solidPositionHandle = 0
     private var solidColorHandle = 0
 
-    private val panes = LinkedHashMap<Int, Pane>()
+    // Synchronized only so [hasFrame] can read it from the main thread; all writes stay on the GL thread.
+    private val panes: MutableMap<Int, Pane> = java.util.Collections.synchronizedMap(LinkedHashMap<Int, Pane>())
     private var outputWidth = 0
     private var outputHeight = 0
 
@@ -361,6 +364,13 @@ class DuoScreenCompositor {
             )
         }
     }
+
+    /**
+     * Whether the pane's display has delivered at least one frame since its texture was made. A
+     * pane with an app launched into it that still has none is a black square: the app was never
+     * started on it, or was started while the phone could not run it (locked, Shizuku not yet up).
+     */
+    fun hasFrame(paneId: Int): Boolean = panes[paneId]?.hasFrame ?: false
 
     fun removePane(paneId: Int) {
         val threadHandler = handler ?: return

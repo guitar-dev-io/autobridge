@@ -103,6 +103,16 @@ class DuoScreenController(
 
         /** App icons on the Arrange cards are decoded once at this size and kept. */
         const val ICON_PX = 128
+
+        /**
+         * When, after a session starts or comes back, each pane is checked for an app that is not
+         * showing (see [settleCheck]). Spread out because the phone is often still locked, or
+         * Shizuku still starting, in the first seconds after the car is switched on.
+         */
+        val SETTLE_CHECK_MS = longArrayOf(2_500L, 6_000L, 12_000L, 25_000L)
+
+        /** A pane is relaunched by [settleCheck] at most this many times per round. */
+        const val SETTLE_MAX_RELAUNCHES = 3
     }
 
     /** What the car screen has to do for the drawn controls that it alone can: toasts and screens. */
@@ -211,6 +221,7 @@ class DuoScreenController(
             CarScreenPower.sessionStarted(context)
             DuoSessionState.sessionStarted()
             recallVacatedPanes()
+            scheduleSettleChecks("resume")
             return true
         }
         stop()
@@ -261,6 +272,8 @@ class DuoScreenController(
         // the phone untouched.
         CarScreenPower.sessionStarted(context)
         DuoSessionState.sessionStarted()
+        registerWakeReceiver()
+        scheduleSettleChecks("start")
         StructuredLog.i(
             TAG,
             "Session started: ${paneSet.panes.size} panes on ${width}x$height" +
@@ -412,6 +425,7 @@ class DuoScreenController(
         mainHandler.removeCallbacks(dropPoll)
         mainHandler.removeCallbacks(backendPoll)
         mainHandler.removeCallbacks(lookPoll)
+        mainHandler.removeCallbacks(settleCheck)
         drawnLook = null
         // Kept alive, unlike in stop(): the session is only detached and resume() carries on with it.
         onInputThread {
@@ -571,6 +585,103 @@ class DuoScreenController(
         }
     }
 
+    /** Which of [SETTLE_CHECK_MS] the next [settleCheck] is, and how often each pane was relaunched. */
+    private var settleStep = 0
+    private val settleRelaunches = HashMap<Int, Int>()
+
+    /**
+     * Starts a round of [settleCheck]s. The black car screen after switching the car off and on is
+     * a pane app launched before the phone could show it — still locked, its screen off, Shizuku
+     * not yet back — which the reload button fixed by hand. The check does the same on its own.
+     */
+    private fun scheduleSettleChecks(reason: String) {
+        if (!running) return
+        mainHandler.removeCallbacks(settleCheck)
+        settleStep = 0
+        settleRelaunches.clear()
+        mainHandler.postDelayed(settleCheck, SETTLE_CHECK_MS[0])
+        StructuredLog.i(TAG, "Pane check scheduled ($reason)")
+    }
+
+    /**
+     * Relaunches the app of every pane that should be showing one and is not: its display has no
+     * task, or it has never drawn a frame. Our own app is relaunched only when its display is known
+     * to be empty, since its pane launch always opens a new instance (see [recallVacatedPanes]).
+     * Picture-blocking apps are left alone: their pane is meant to be covered by a note.
+     */
+    private val settleCheck: Runnable = Runnable {
+        if (!running || !ops.isAvailable || !compositor.hasContext) {
+            nextSettleCheck()
+            return@Runnable
+        }
+        var relaunched = 0
+        panes.forEach { pane ->
+            val packageName = pane.packageName ?: return@forEach
+            if (DuoScreenProtectedApps.isProtected(packageName)) return@forEach
+            val displayId = DuoScreenDisplays.displayId(pane.id)
+            if (displayId < 0) return@forEach
+            val occupied = ops.hasTaskOnDisplay(displayId)
+            val drawn = compositor.hasFrame(pane.id)
+            val isSelf = DuoScreenSelfPane.isSelf(packageName, context.packageName)
+            // Relaunching a third-party app already on its display only brings it to the front.
+            val missing = occupied == false || (!drawn && !isSelf)
+            if (!missing) return@forEach
+            val count = settleRelaunches[pane.id] ?: 0
+            if (count >= SETTLE_MAX_RELAUNCHES) return@forEach
+            settleRelaunches[pane.id] = count + 1
+            val ok = reload(pane.id)
+            if (ok) relaunched++
+            StructuredLog.i(
+                TAG,
+                "Pane ${pane.id}: $packageName not showing (task=$occupied frame=$drawn); relaunched=$ok"
+            )
+        }
+        if (relaunched > 0) refreshChrome()
+        nextSettleCheck()
+    }
+
+    private fun nextSettleCheck() {
+        settleStep++
+        if (!running || settleStep >= SETTLE_CHECK_MS.size) return
+        val wait = SETTLE_CHECK_MS[settleStep] - SETTLE_CHECK_MS[settleStep - 1]
+        mainHandler.postDelayed(settleCheck, wait)
+    }
+
+    /**
+     * The phone's screen coming on or being unlocked while a session runs. Pane apps launched while
+     * it was locked may never have started; they are looked at again now.
+     */
+    private var wakeReceiver: android.content.BroadcastReceiver? = null
+
+    private fun registerWakeReceiver() {
+        if (wakeReceiver != null) return
+        val receiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(c: Context, intent: Intent) {
+                if (!running) return
+                recallVacatedPanes()
+                scheduleSettleChecks(intent.action?.substringAfterLast('.') ?: "wake")
+            }
+        }
+        val filter = android.content.IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_ON)
+            addAction(Intent.ACTION_USER_PRESENT)
+        }
+        runCatching {
+            if (Build.VERSION.SDK_INT >= 33) {
+                context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                context.registerReceiver(receiver, filter)
+            }
+            wakeReceiver = receiver
+        }.onFailure { StructuredLog.w(TAG, "Could not listen for the phone waking: ${it.message}") }
+    }
+
+    private fun unregisterWakeReceiver() {
+        val receiver = wakeReceiver ?: return
+        wakeReceiver = null
+        runCatching { context.unregisterReceiver(receiver) }
+    }
+
     /**
      * A privileged backend came up after the session started — the root helper, whose `su`
      * prompt the driver may only just have answered. The panes opened without it are empty, so
@@ -579,6 +690,7 @@ class DuoScreenController(
     fun onBackendReady() {
         if (!running) return
         recallVacatedPanes()
+        scheduleSettleChecks("backend ready")
         // Takes the setup card down.
         refreshChrome()
     }
@@ -1106,6 +1218,7 @@ class DuoScreenController(
         debouncer.cancelAll()
         pendingSizes.clear()
         releaseInputThread()
+        unregisterWakeReceiver()
         router?.panes?.panes?.forEach { pane ->
             compositor.removePane(pane.id)
             DuoScreenDisplays.release(pane.id)
