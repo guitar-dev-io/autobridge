@@ -74,15 +74,60 @@ class DirectProjectionActivity : Activity() {
     private val logChanged: () -> Unit = { runOnUiThread { logView?.text = tail() } }
     private var logView: TextView? = null
 
+    private enum class StepState { DONE, TODO, WARN, WAITING }
+
     private fun render() {
         val body = AutoBridgeDesign.body(this)
         val status = DirectProjectionService.status
+        val credentials = DirectStore.loadCredentials(this)
+        val androidAuto = androidAutoState()
+        val connected = status.state != AapSession.State.CLOSED
 
-        body.stack(card(statusText(status)), gap = 10)
-        body.stack(card(getString(R.string.aa_direct_certificate_notice), muted = true), gap = 14)
+        // ── Where things stand, in one sentence ──────────────────────────────
+        body.stack(card(headline(status, credentials != null), strong = true), gap = 14)
 
-        // ── Car screen ───────────────────────────────────────────────────────
-        body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.aa_direct_section_screen)), gap = 2)
+        // ── Steps ────────────────────────────────────────────────────────────
+        body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.aa_direct_section_steps)), gap = 2)
+
+        // 1. Certificate
+        if (credentials == null) {
+            body.stack(step(1, StepState.TODO, getString(R.string.aa_direct_step_cert),
+                getString(R.string.aa_direct_step_cert_missing), getString(R.string.aa_direct_action_upload)) { pickCertificate() })
+        } else {
+            val expiry = credentials.notAfter?.let { DateFormat.getDateInstance().format(it) }.orEmpty()
+            body.stack(step(1, StepState.DONE, getString(R.string.aa_direct_step_cert),
+                getString(R.string.aa_direct_step_cert_done, DirectStore.certificateName(this) ?: credentials.subject, expiry),
+                getString(R.string.aa_direct_action_change)) { pickCertificate() })
+        }
+
+        // 2. Google's Android Auto must not take the car first
+        when (androidAuto) {
+            AndroidAutoState.ENABLED -> body.stack(step(2, StepState.WARN, getString(R.string.aa_direct_step_gearhead),
+                getString(R.string.aa_direct_step_gearhead_enabled), getString(R.string.aa_direct_action_open)) { openAndroidAutoInfo() })
+            AndroidAutoState.DISABLED -> body.stack(step(2, StepState.DONE, getString(R.string.aa_direct_step_gearhead),
+                getString(R.string.aa_direct_step_gearhead_disabled), null) { openAndroidAutoInfo() })
+            AndroidAutoState.MISSING -> body.stack(step(2, StepState.DONE, getString(R.string.aa_direct_step_gearhead),
+                getString(R.string.aa_direct_step_gearhead_missing), null) {})
+        }
+
+        // 3. Connect
+        when {
+            connected -> body.stack(step(3, StepState.DONE, getString(R.string.aa_direct_step_connect),
+                connectionDetail(status), getString(R.string.aa_direct_stop)) { DirectProjectionService.stop(this) })
+            status.listening -> body.stack(step(3, StepState.WAITING, getString(R.string.aa_direct_step_connect),
+                getString(R.string.aa_direct_step_connect_listening), getString(R.string.aa_direct_stop_listening)) {
+                DirectProjectionService.stopListening(this)
+            })
+            else -> body.stack(step(3, if (credentials == null) StepState.WAITING else StepState.TODO, getString(R.string.aa_direct_step_connect),
+                getString(R.string.aa_direct_step_connect_how), getString(R.string.aa_direct_action_wireless)) { listenWireless() })
+        }
+        if (status.soundReady && !status.soundOn) {
+            body.stack(step(4, StepState.TODO, getString(R.string.aa_direct_sound_allow),
+                getString(R.string.aa_direct_sound_allow_caption), getString(R.string.aa_direct_action_allow)) { allowSound() })
+        }
+
+        // ── Options ──────────────────────────────────────────────────────────
+        body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.aa_direct_section_options)), gap = 14)
         val dpi = DirectStore.dpi(this)
         body.stack(TextView(this).apply {
             text = if (dpi > 0) getString(R.string.aa_direct_dpi, dpi) else getString(R.string.aa_direct_dpi_auto)
@@ -97,47 +142,43 @@ class DirectProjectionActivity : Activity() {
             addView(View(this@DirectProjectionActivity), LinearLayout.LayoutParams(dp(8), 1))
             addView(AutoBridgeDesign.pill(this@DirectProjectionActivity, getString(R.string.aa_direct_larger)) { stepDpi(1) },
                 LinearLayout.LayoutParams(0, -2, 1f))
-        }, gap = 14)
-
-        // ── Certificate ──────────────────────────────────────────────────────
-        body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.aa_direct_section_certificate)), gap = 2)
-        body.stack(row(getString(R.string.aa_direct_upload), getString(R.string.aa_direct_upload_caption)) { pickCertificate() })
-        if (DirectStore.hasCredentials(this)) {
-            body.stack(row(getString(R.string.aa_direct_clear), getString(R.string.aa_direct_clear_caption), AutoBridgeDesign.DANGER) {
-                DirectStore.clearCredentials(this)
-                render()
-            })
-        }
-
-        // ── Connection ───────────────────────────────────────────────────────
-        body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.aa_direct_section_connection)), gap = 2)
-        if (status.listening) {
-            body.stack(row(getString(R.string.aa_direct_stop_listening), getString(R.string.aa_direct_stop_listening_caption)) {
-                DirectProjectionService.stopListening(this)
-            })
-        } else if (status.state == AapSession.State.CLOSED) {
-            body.stack(row(getString(R.string.aa_direct_listen), getString(R.string.aa_direct_listen_caption)) { listenWireless() })
-        }
+        }, gap = 10)
         val soundOn = DirectStore.sendAudio(this)
-        body.stack(row(
-            getString(if (soundOn) R.string.aa_direct_sound_on else R.string.aa_direct_sound_off),
-            getString(R.string.aa_direct_sound_caption),
-        ) {
-            DirectStore.setSendAudio(this, !soundOn)
-            render()
-        })
-        if (status.soundReady && !status.soundOn) {
-            body.stack(row(getString(R.string.aa_direct_sound_allow), getString(R.string.aa_direct_sound_allow_caption)) { allowSound() })
-        }
-        body.stack(row(getString(R.string.aa_direct_android_auto), getString(R.string.aa_direct_android_auto_caption)) { openAndroidAutoInfo() })
-        body.stack(row(getString(R.string.aa_direct_copy_log), getString(R.string.aa_direct_copy_log_caption)) { copyLog() })
-        if (DirectProjectionService.running) {
-            body.stack(row(getString(R.string.aa_direct_stop), getString(R.string.aa_direct_stop_caption), AutoBridgeDesign.DANGER) {
-                DirectProjectionService.stop(this)
-            })
+        body.stack(AutoBridgeDesign.contentRow(
+            context = this,
+            title = getString(R.string.aa_direct_sound_title),
+            subtitle = getString(R.string.aa_direct_sound_caption),
+            accent = if (soundOn) AutoBridgeDesign.ACCENT else AutoBridgeDesign.TEXT_MUTED,
+            badgeText = if (soundOn) "ON" else "OFF",
+            subtitleMaxLines = 3,
+            onClick = {
+                DirectStore.setSendAudio(this, !soundOn)
+                render()
+            },
+        ))
+        if (credentials != null) {
+            body.stack(AutoBridgeDesign.contentRow(
+                context = this,
+                title = getString(R.string.aa_direct_clear),
+                subtitle = getString(R.string.aa_direct_clear_caption),
+                accent = AutoBridgeDesign.DANGER,
+                badgeText = "✕",
+                subtitleMaxLines = 2,
+                onClick = {
+                    DirectStore.clearCredentials(this)
+                    render()
+                },
+            ))
         }
 
-        body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.aa_direct_section_log)), gap = 2)
+        // ── Log ──────────────────────────────────────────────────────────────
+        body.stack(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            addView(AutoBridgeDesign.sectionLabel(this@DirectProjectionActivity, getString(R.string.aa_direct_section_log)),
+                LinearLayout.LayoutParams(0, -2, 1f))
+            addView(AutoBridgeDesign.pill(this@DirectProjectionActivity, getString(R.string.aa_direct_copy_log)) { copyLog() })
+        }, gap = 6)
         val log = TextView(this).apply {
             text = tail()
             textSize = 11f
@@ -148,7 +189,8 @@ class DirectProjectionActivity : Activity() {
             setPadding(dp(12), dp(10), dp(12), dp(10))
         }
         logView = log
-        body.stack(log, gap = 24)
+        body.stack(log, gap = 10)
+        body.stack(card(getString(R.string.aa_direct_certificate_notice)), gap = 24)
 
         AutoBridgeDesign.showPage(
             this,
@@ -157,7 +199,7 @@ class DirectProjectionActivity : Activity() {
                 header = AutoBridgeDesign.header(
                     context = this,
                     title = getString(R.string.aa_direct_title),
-                    subtitle = getString(R.string.aa_direct_subtitle),
+                    subtitle = getString(R.string.aa_direct_subtitle_short),
                     onBack = { finish() },
                 ),
                 body = body,
@@ -165,29 +207,61 @@ class DirectProjectionActivity : Activity() {
         )
     }
 
-    private fun statusText(status: DirectProjectionService.Status): String {
+    /** One line that says what is happening and, when nothing is, what to do next. */
+    private fun headline(status: DirectProjectionService.Status, hasCertificate: Boolean): String {
+        val main = when {
+            status.state == AapSession.State.STREAMING -> getString(R.string.aa_direct_state_streaming)
+            status.state == AapSession.State.WAITING_FOR_CAR || status.state == AapSession.State.HANDSHAKE ->
+                getString(R.string.aa_direct_state_handshake)
+            status.state != AapSession.State.CLOSED -> getString(R.string.aa_direct_state_connecting)
+            !hasCertificate -> getString(R.string.aa_direct_next_cert)
+            status.listening -> getString(R.string.aa_direct_state_listening)
+            else -> getString(R.string.aa_direct_next_connect)
+        }
+        val ended = status.endReason?.takeIf { status.state == AapSession.State.CLOSED && !status.listening }
+        return if (ended != null) main + "\n" + getString(R.string.aa_direct_last_end, ended) else main
+    }
+
+    private fun connectionDetail(status: DirectProjectionService.Status): String {
         val lines = ArrayList<String>()
-        lines += when (status.state) {
-            AapSession.State.CLOSED -> getString(R.string.aa_direct_state_idle)
-            AapSession.State.WAITING_FOR_CAR, AapSession.State.HANDSHAKE -> getString(R.string.aa_direct_state_handshake)
-            AapSession.State.AUTHENTICATED, AapSession.State.CHANNELS_OPEN -> getString(R.string.aa_direct_state_connecting)
-            AapSession.State.STREAMING -> getString(R.string.aa_direct_state_streaming)
-        }
-        status.headUnit?.let { lines += getString(R.string.aa_direct_car, it.label) }
+        lines += status.headUnit?.let { getString(R.string.aa_direct_car, it.label) } ?: getString(R.string.aa_direct_state_handshake)
         status.video?.let { lines += getString(R.string.aa_direct_video, it.width, it.height, it.framesPerSecond) }
-        if (status.listening) lines += getString(R.string.aa_direct_state_listening)
         if (status.soundOn) lines += getString(R.string.aa_direct_state_sound)
-        if (status.state == AapSession.State.CLOSED && status.endReason != null) {
-            lines += getString(R.string.aa_direct_last_end, status.endReason)
-        }
-        val credentials = DirectStore.loadCredentials(this)
-        lines += if (credentials == null) {
-            getString(R.string.aa_direct_no_certificate)
-        } else {
-            val expiry = credentials.notAfter?.let { DateFormat.getDateInstance().format(it) }.orEmpty()
-            getString(R.string.aa_direct_certificate, DirectStore.certificateName(this) ?: credentials.subject, expiry)
-        }
         return lines.joinToString("\n")
+    }
+
+    private enum class AndroidAutoState { ENABLED, DISABLED, MISSING }
+
+    private fun androidAutoState(): AndroidAutoState = try {
+        if (packageManager.getApplicationInfo(GEARHEAD, 0).enabled) AndroidAutoState.ENABLED else AndroidAutoState.DISABLED
+    } catch (e: PackageManager.NameNotFoundException) {
+        AndroidAutoState.MISSING
+    }
+
+    /** A numbered step: ✓ when done, its number when it is the thing to do, ! for a warning, … while waiting. */
+    private fun step(number: Int, state: StepState, title: String, subtitle: String, action: String?, onAction: () -> Unit): View {
+        val palette = dev.autobridge.design.ThemeHolder.palette
+        return AutoBridgeDesign.contentRow(
+            context = this,
+            title = "$number. $title",
+            subtitle = subtitle,
+            accent = when (state) {
+                StepState.DONE -> palette.good
+                StepState.TODO -> AutoBridgeDesign.ACCENT
+                StepState.WARN -> palette.warn
+                StepState.WAITING -> AutoBridgeDesign.TEXT_MUTED
+            },
+            badgeText = when (state) {
+                StepState.DONE -> "✓"
+                StepState.TODO -> "$number"
+                StepState.WARN -> "!"
+                StepState.WAITING -> "…"
+            },
+            subtitleMaxLines = 4,
+            actionLabel = action,
+            onTrailing = action?.let { { onAction() } },
+            onClick = onAction,
+        )
     }
 
     private fun stepDpi(direction: Int) {
@@ -305,25 +379,14 @@ class DirectProjectionActivity : Activity() {
     private fun tail(): String = DirectLog.text().lines().takeLast(14).joinToString("\n")
         .ifBlank { getString(R.string.aa_direct_log_empty) }
 
-    private fun card(text: String, muted: Boolean = false): View = TextView(this).apply {
+    private fun card(text: String, strong: Boolean = false): View = TextView(this).apply {
         this.text = text
-        textSize = if (muted) 13f else 15f
-        setTextColor(if (muted) AutoBridgeDesign.TEXT_MUTED else AutoBridgeDesign.TEXT)
-        if (!muted) typeface = AppFonts.medium()
+        textSize = if (strong) 16f else 13f
+        setTextColor(if (strong) AutoBridgeDesign.TEXT else AutoBridgeDesign.TEXT_MUTED)
+        if (strong) typeface = AppFonts.medium()
         background = AutoBridgeDesign.surface(this@DirectProjectionActivity, AutoBridgeDesign.SURFACE, 16)
         setPadding(dp(16), dp(14), dp(16), dp(14))
     }
-
-    private fun row(title: String, subtitle: String, accent: Int = AutoBridgeDesign.ACCENT, onClick: () -> Unit): View =
-        AutoBridgeDesign.contentRow(
-            context = this,
-            title = title,
-            subtitle = subtitle,
-            accent = accent,
-            badgeText = title.take(1),
-            subtitleMaxLines = 2,
-            onClick = onClick,
-        )
 
     private fun toast(text: String) = Toast.makeText(this, text, Toast.LENGTH_LONG).show()
 }
