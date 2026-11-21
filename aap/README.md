@@ -4,8 +4,9 @@ AutoBridge speaks the phone side of the Android Auto protocol to the car itself,
 Android Auto app. The car shows AutoBridge's own screens. Sideload flavors (`personal`, `lab`)
 only.
 
-Status: **phase 1, USB.** The protocol layer is covered by JVM tests against a scripted head unit.
-The Android side compiles but has **not been run against a real car yet**.
+Status: **phase 2: USB, wireless, sound, margin crop.** JVM tests cover the protocol layer
+against a scripted head unit. The Android side compiles but has **not been run against a real car
+yet**.
 
 ## The certificate
 
@@ -20,8 +21,8 @@ target.
 
 | Where | What |
 |---|---|
-| `:aap` (`dev.autobridge.aap`) | Protocol only, no Android types. `AapFrames` (framing), `Proto` (hand-written protobuf), `AapTls` (SSLEngine as server, PEM loading), `AapProtocol` (message ids and bodies), `AapSession` (the state machine). |
-| `app/src/projection/.../aapdirect` | `UsbAccessoryActivity` (receives the accessory attach), `DirectProjectionService` (owns a session), `UsbAccessoryTransport`, `CarVideoEncoder` (H.264 baseline from a Surface), `CarDisplay` (private virtual display + touch routing), `CarHomeActivity` (the car's first screen), `DirectProjectionActivity` (phone screen). |
+| `:aap` (`dev.autobridge.aap`) | Protocol only, no Android types. `AapFrames` (framing), `Proto` (hand-written protobuf), `AapTls` (SSLEngine as server, PEM loading), `AapProtocol` (message ids and bodies), `AapSession` (the state machine), `AapWireless` (the Bluetooth start-up exchange). |
+| `app/src/projection/.../aapdirect` | `UsbAccessoryActivity` (receives the accessory attach), `DirectProjectionService` (owns a session), `UsbAccessoryTransport`, `CarVideoEncoder` (H.264 baseline from a Surface), `CarDisplay` (private virtual display + touch routing), `CarHomeActivity` (the car's first screen), `DirectProjectionActivity` (phone screen), `WirelessLink` (RFCOMM + `WifiJoin` + `TcpTransport`), `CarAudioCapture` (playback capture to PCM), `MarginCompositor` (GL: draws the display into the visible part of the stream). |
 
 ## Session flow
 
@@ -38,6 +39,31 @@ Every message after `AUTH_COMPLETE` is encrypted. Each frame's TLS records decry
 Messages of 16 kB or more are split into FIRST/MIDDLE/LAST frames. The FIRST frame carries the
 total size.
 
+## Wireless
+
+The car is reached over Bluetooth RFCOMM on the service UUID `4de17a00-52cb-11e6-bdf4-0800200c9a66`.
+Cars differ in which side opens that link, so the phone listens on it and also calls the paired
+devices that advertise it. The car sends `WifiStartRequest` (its address and port). The phone asks
+`WifiInfoRequest`, and the car answers `WifiInfoResponse` (SSID, key, BSSID). The phone then joins
+that Wi-Fi with a `WifiNetworkSpecifier`. Android shows a prompt the first time and remembers the
+choice after that. The phone opens TCP to the car, and the same Android Auto session as over USB
+runs on that socket. The RFCOMM link stays open for the length of the session. When a session
+ends, the service goes back to listening.
+
+## Sound
+
+Off by default ("Send sound to the car"). When it is on, the phone opens the car's media audio
+channel (16-bit PCM in the car's format) and asks for audio focus. Android lets an app copy other
+apps' sound only through playback capture. That needs the screen-capture consent and the
+microphone permission, so the phone screen asks for both once the car's channel is ready. Media,
+game and unknown usages are captured. The phone also keeps playing the sound itself.
+
+## Margins
+
+When the car crops a margin off the stream, the virtual display is made the size of the visible
+area. `MarginCompositor` draws it centred into the full-size encoder surface, with the margin
+black. Touch is scaled from the car's touch size to the visible size.
+
 ## What the car shows
 
 `CarDisplay` is a private virtual display rendering into the encoder's input surface.
@@ -45,12 +71,17 @@ total size.
 Weather), which the sideload manifest marks `allowEmbedded` so they can open on an untrusted
 display. Touches are dispatched in-process to the activity in front on that display.
 
+Android does not normally let a background service start an activity. The service therefore puts
+a splash window (a `Presentation`) on the car display first. That gives the app a visible window,
+which allows the launch. If Android still refuses, the log says so, and opening the phone screen
+launches the car home again.
+
 ## Known gaps (next phases)
 
-- **Wireless** (Bluetooth RFCOMM + the car's Wi-Fi). The "Listen for wireless" path is not built.
-- **Audio channels** are not opened, so sound plays on the phone or its Bluetooth link.
-- **Margins**: when the car crops a margin off the stream, the display is not inset yet. A line in
-  the log says so.
+- Navigation-prompt and voice audio channels, and the car's microphone (only the music channel is
+  opened).
+- Wireless details that vary by car: some want the phone to host the Wi-Fi instead, or need a
+  `WifiVersionResponse` with content.
 - Dialogs and popups over a car-display activity do not get touches. Only the activity window does.
 - Phone mirroring (MediaProjection) as an alternative to the app display.
 - Using the car's speed and driving status in `VehicleState`.
