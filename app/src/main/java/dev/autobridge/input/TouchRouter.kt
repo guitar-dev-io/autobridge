@@ -176,6 +176,29 @@ object TouchRouter {
     fun home() = systemAction(InputBackend.SystemAction.HOME)
     fun recents() = systemAction(InputBackend.SystemAction.RECENTS)
 
+    /**
+     * A swipe between two points on the car screen, for hosts that report where a drag started
+     * and ended (Android Auto direct mirroring the phone).
+     */
+    fun swipe(
+        context: Context,
+        carFromX: Float,
+        carFromY: Float,
+        carToX: Float,
+        carToY: Float,
+        carWidth: Int,
+        carHeight: Int,
+        durationMs: Long
+    ): Boolean {
+        if (!FeaturePolicy.app.isAvailable(Feature.TOUCH)) return false
+        val from = mapPoint(context, carFromX, carFromY, carWidth, carHeight) ?: return false
+        val to = mapPoint(context, carToX, carToY, carWidth, carHeight) ?: return false
+        return withAvailableBackend { backend ->
+            if (InputCapability.SWIPE !in backend.capabilities) return@withAvailableBackend false
+            backend.swipe(from.x, from.y, to.x, to.y, durationMs.coerceIn(50L, 2000L))
+        }
+    }
+
     fun scroll(context: Context, distanceX: Float, distanceY: Float): Boolean {
         if (!FeaturePolicy.app.isAvailable(Feature.TOUCH)) return false
         val (width, height) = phoneDisplaySize(context)

@@ -76,15 +76,30 @@ a splash window (a `Presentation`) on the car display first. That gives the app 
 which allows the launch. If Android still refuses, the log says so, and opening the phone screen
 launches the car home again.
 
-## Known gaps (next phases)
+## Phone screen (mirror) and DHU test mode
 
-- Navigation-prompt and voice audio channels, and the car's microphone (only the music channel is
-  opened).
-- Wireless details that vary by car: some want the phone to host the Wi-Fi instead, or need a
+"Car shows: the phone screen" mirrors the whole phone onto the car with the screen-capture
+consent (an `AUTO_MIRROR` virtual display from the MediaProjection), so any app can be used. Touch
+from the car goes through `TouchRouter` to the Shizuku or accessibility backend. With Shizuku's
+real-touch stream, every pointer goes through. Otherwise each touch becomes a tap, long press or
+swipe when the finger lifts. A projection allows only one virtual display, so the mirror display
+is kept for the whole session and only loses its surface between video starts.
+
+"Test with Desktop Head Unit" listens on loopback port 5277. On the computer, run
+`adb forward tcp:5277 tcp:5277` and then start `desktop-head-unit`. DHU may check the phone
+certificate the way a real car does.
+
+## Known gaps
+
+- Navigation-prompt and voice audio: Android's playback capture allows only media, game and
+  unknown usages, so the car's guidance channel is not opened.
+- The car's microphone.
+- Wireless setups where the phone must host the Wi-Fi, or where the car wants a
   `WifiVersionResponse` with content.
-- Dialogs and popups over a car-display activity do not get touches. Only the activity window does.
-- Phone mirroring (MediaProjection) as an alternative to the app display.
-- Using the car's speed and driving status in `VehicleState`.
+- On AutoBridge screens, dialogs and popups over a car-display activity do not get touches. Only
+  the activity window does. Mirror mode does not have this limit.
+- The car's speed and parking brake are shown on the phone screen. They are not fed into
+  `VehicleState`, which `RuntimeContextStore` pins to PARKED.
 
 ## Trying it
 
