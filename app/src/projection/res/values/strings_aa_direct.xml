@@ -59,7 +59,7 @@
     <string name="aa_direct_next_connect">Ready. Plug the phone into the car (step 3).</string>
     <string name="aa_direct_sound_title">Send sound to the car</string>
     <string name="aa_direct_capture_allow">Allow screen capture</string>
-    <string name="aa_direct_capture_allow_caption">Needed to show the phone screen on the car or send its sound. Android asks once per connection.</string>
+    <string name="aa_direct_capture_allow_caption">Needed to show the phone screen on the car or send its sound. Allow it now, while waiting for the car, so the car shows the phone screen the moment it connects.</string>
     <string name="aa_direct_shows_app">Car shows: AutoBridge screens</string>
     <string name="aa_direct_shows_app_caption">TV, radio, browser and files, made for the car. Tap to show the whole phone screen instead.</string>
     <string name="aa_direct_shows_phone">Car shows: the phone screen</string>
@@ -72,4 +72,5 @@
     <string name="aa_direct_state_mirroring">Car shows the phone screen</string>
     <string name="aa_direct_car_moving">Car moving: %1$d km/h</string>
     <string name="aa_direct_car_parked">Car parked</string>
+    <string name="aa_direct_capture_ready">Allowed. The car will show the phone screen as soon as it connects.</string>
 </resources>

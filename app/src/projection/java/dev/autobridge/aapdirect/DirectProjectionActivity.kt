@@ -124,6 +124,9 @@ class DirectProjectionActivity : Activity() {
         if (status.needsCapture) {
             body.stack(step(4, StepState.TODO, getString(R.string.aa_direct_capture_allow),
                 getString(R.string.aa_direct_capture_allow_caption), getString(R.string.aa_direct_action_allow)) { allowSound() })
+        } else if (status.captureHeld && DirectStore.showPhoneScreen(this) && !status.mirroring) {
+            body.stack(step(4, StepState.DONE, getString(R.string.aa_direct_capture_allow),
+                getString(R.string.aa_direct_capture_ready), null) {})
         }
 
         // ── Options ──────────────────────────────────────────────────────────
