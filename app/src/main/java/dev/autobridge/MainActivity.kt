@@ -812,10 +812,10 @@ class MainActivity : androidx.activity.ComponentActivity() {
     }
 
     /**
-     * Header microphone: dictate a command or search. With Settings > Voice Recognition on (the
-     * default) and a 64-bit phone, speech is transcribed offline by Whisper and parsed by
-     * [dev.autobridge.voice.VoiceCommandParser]; otherwise the phone's own speech service is used and
-     * the phrase goes through [runPhoneVoiceCommand], as before. Falls back to the browser's own
+     * Header microphone: dictate a command or search. The phone's own speech service listens and
+     * the phrase goes to [voiceSession], which parses it with
+     * [dev.autobridge.voice.VoiceCommandParser]. Offline Whisper takes over only while
+     * [dev.autobridge.voice.VoiceSettings.OFFLINE_WHISPER] is on. Falls back to the browser's own
      * search entry when the device has no speech recognizer.
      */
     private fun homeVoiceSearch() {
@@ -1176,7 +1176,10 @@ class MainActivity : androidx.activity.ComponentActivity() {
                     },
                     settingsEntry(
                         getString(R.string.voice_settings_title),
-                        getString(R.string.voice_settings_caption),
+                        getString(
+                            if (dev.autobridge.voice.VoiceSettings.OFFLINE_WHISPER) R.string.voice_settings_caption
+                            else R.string.voice_settings_caption_system
+                        ),
                         R.drawable.ic_car_mic
                     ) {
                         startActivity(dev.autobridge.voice.VoiceSettingsActivity.intent(this))
@@ -2745,7 +2748,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
                 android.speech.RecognizerIntent.EXTRA_RESULTS
             )?.firstOrNull()?.trim().orEmpty()
             if (resultCode == Activity.RESULT_OK && spoken.isNotEmpty()) {
-                runPhoneVoiceCommand(spoken)
+                voiceSession.handleTranscript(spoken)
             }
             return
         }

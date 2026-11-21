@@ -1955,6 +1955,8 @@
     <string name="voice_settings_title">Voice Recognition</string>
     <string name="voice_settings_subtitle">Offline speech-to-text with Whisper</string>
     <string name="voice_settings_caption">Whisper model, language, test</string>
+    <string name="voice_settings_subtitle_system">Uses the phone\'s own speech service</string>
+    <string name="voice_settings_caption_system">Auto execute, your own commands</string>
     <string name="voice_group_commands">Voice commands</string>
     <string name="voice_enable_title">Enable voice commands</string>
     <string name="voice_enable_on">The Home and Agent microphones use offline Whisper</string>

@@ -107,6 +107,41 @@ class VoiceSettingsActivity : Activity() {
         progressViews.clear()
 
         val body = AutoBridgeDesign.body(this)
+        if (VoiceSettings.OFFLINE_WHISPER) whisperRows(body, downloads) else {
+            body.stack(systemRecognizerGroup(), gap = 14)
+            body.stack(shortcutsGroup(), gap = 14)
+        }
+
+        val built = AutoBridgeDesign.page(
+            context = this,
+            header = AutoBridgeDesign.header(
+                context = this,
+                title = getString(R.string.voice_settings_title),
+                subtitle = getString(
+                    if (VoiceSettings.OFFLINE_WHISPER) R.string.voice_settings_subtitle
+                    else R.string.voice_settings_subtitle_system
+                ),
+                onBack = { finish() }
+            ),
+            body = body
+        )
+        page = built
+        AutoBridgeDesign.showPage(this, built)
+    }
+
+    /** What still applies while every microphone uses the phone's own speech service. */
+    private fun systemRecognizerGroup(): View {
+        val autoExecute = VoiceSettings.autoExecute(this)
+        return SettingsUi.group(this, getString(R.string.voice_group_commands), listOf(
+            SettingsUi.switchRow(
+                this, getString(R.string.voice_auto_execute_title),
+                getString(if (autoExecute) R.string.voice_auto_execute_on else R.string.voice_auto_execute_off),
+                R.drawable.ic_browser_play, accent, autoExecute
+            ) { VoiceSettings.setAutoExecute(this, !autoExecute); render() }
+        ))
+    }
+
+    private fun whisperRows(body: LinearLayout, downloads: Map<String, DownloadState>) {
         val supported = VoiceRuntime.isSupported(this)
         val installed = store.getInstalledModels()
         val selected = store.getSelectedModel()
@@ -139,19 +174,6 @@ class VoiceSettingsActivity : Activity() {
         )
 
         body.stack(advancedGroup(), gap = 14)
-
-        val built = AutoBridgeDesign.page(
-            context = this,
-            header = AutoBridgeDesign.header(
-                context = this,
-                title = getString(R.string.voice_settings_title),
-                subtitle = getString(R.string.voice_settings_subtitle),
-                onBack = { finish() }
-            ),
-            body = body
-        )
-        page = built
-        AutoBridgeDesign.showPage(this, built)
     }
 
     private fun settingsGroup(selected: WhisperModelInfo?, installed: List<WhisperModelInfo>): View {

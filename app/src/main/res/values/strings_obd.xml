@@ -105,6 +105,17 @@
     <string name="obd_dtc_system_body">Body</string>
     <string name="obd_dtc_system_network">Network</string>
     <string name="obd_dtc_generic">Generic code</string>
+    <string name="obd_dtc_alerts">Warn about new fault codes</string>
+    <string name="obd_dtc_alerts_caption">On the car screen while the adapter is connected, checked every 5 minutes</string>
+    <string name="obd_dtc_alert_title">New fault code</string>
+    <plurals name="obd_dtc_alert_more">
+        <item quantity="one">%1$s and %2$d more</item>
+        <item quantity="other">%1$s and %2$d more</item>
+    </plurals>
+    <string name="obd_dtc_alert_details">Details</string>
+    <string name="obd_dtc_alert_channel">OBD fault codes</string>
+    <string name="obd_dtc_alert_no_description">%1$s code, no description</string>
+    <string name="obd_dtc_car_connect_first">The OBD adapter is not connected</string>
     <string name="obd_dtc_ford">Ford-specific code</string>
     <string name="obd_dtc_lookup">This code is not in the built-in list. Search it with your truck\'s model.</string>
     <string name="obd_look_section">Look</string>

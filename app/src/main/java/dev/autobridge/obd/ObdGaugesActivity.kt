@@ -180,6 +180,20 @@ class ObdGaugesActivity : Activity() {
                 }
             )
         )
+        val dtcAlerts = ObdSettings.dtcAlerts(this)
+        body.stack(
+            AutoBridgeDesign.contentRow(
+                context = this,
+                title = getString(R.string.obd_dtc_alerts),
+                subtitle = getString(R.string.obd_dtc_alerts_caption),
+                accent = if (dtcAlerts) accent else AutoBridgeDesign.TEXT_MUTED,
+                badgeText = if (dtcAlerts) "ON" else "OFF",
+                onClick = {
+                    ObdSettings.setDtcAlerts(this, !dtcAlerts)
+                    render()
+                }
+            )
+        )
 
         body.stack(
             AutoBridgeDesign.contentRow(

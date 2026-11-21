@@ -111,5 +111,8 @@ those.
   of 32, and a browser needs 15–25. Settings detects the limit and offers Developer options
   (Android 14+) or the adb command. AutoBridge never changes it itself.
 - No hardware video decode or GPU inside the runtime, so 1080p VP9/AV1 is likely too heavy.
-- Widevine (Netflix etc.) inside PRoot: not tested. DRM is not worked around.
+- Widevine (Netflix etc.) inside PRoot: Netflix and other streaming sites were reported playing
+  on the car through the desktop Chrome/Brave engine (owner's report, 2026-10-25). Which browser,
+  which screen and what quality were not recorded, so T6 in TEST-RESULTS.md is still open. The
+  built-in AutoBridge browser (WebView) does not play them. DRM is not worked around.
 - Google may show a CAPTCHA to unfamiliar traffic. AutoBridge never interacts with CAPTCHAs.

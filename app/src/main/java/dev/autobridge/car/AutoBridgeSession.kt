@@ -43,6 +43,8 @@ class AutoBridgeSession : Session(), CarScreenController.Host {
                 runCatching { dev.autobridge.maintenance.MaintenanceReminder.check(carContext) }
                 // "Time for a break" every N hours of this connection, when the driver turned it on.
                 runCatching { dev.autobridge.breakreminder.BreakReminder.start(carContext) }
+                // A new stored fault code is announced on the car screen while the adapter is live.
+                runCatching { CarDtcAlerts.start(carContext) }
                 dev.autobridge.logging.StructuredLog.i(TAG, "car session connected")
                 ConnectionTimeline.record(ConnectionTimeline.Kind.SESSION_STARTED)
                 CarSessionHistory.markStarted(carContext)
@@ -55,6 +57,7 @@ class AutoBridgeSession : Session(), CarScreenController.Host {
 
             override fun onDestroy(owner: LifecycleOwner) {
                 dev.autobridge.breakreminder.BreakReminder.stop()
+                CarDtcAlerts.stop(carContext)
                 dev.autobridge.fuel.CarVehicleData.stop()
                 CarScreenController.unregister(this@AutoBridgeSession)
                 // A replacement session can be created before the outgoing one is destroyed, so the

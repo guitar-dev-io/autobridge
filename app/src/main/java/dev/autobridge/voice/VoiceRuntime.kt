@@ -43,6 +43,30 @@ object VoiceRuntime {
         engine ?: WhisperEngine(NativeWhisperBackend(context.applicationContext)).also { engine = it }
     }
 
+    /**
+     * While [VoiceSettings.OFFLINE_WHISPER] is off nothing can use a downloaded model, and with the
+     * model list hidden nothing in the app can delete one either, so the models directory goes
+     * (finished, partial and imported files alike) and the selection is cleared. Called on every
+     * process start; with no directory it is one stat on a background thread.
+     */
+    fun removeParkedModels(context: Context) {
+        if (VoiceSettings.OFFLINE_WHISPER) return
+        val app = context.applicationContext
+        scope.launch {
+            val freed = deleteModelsDirectory(File(app.filesDir, MODELS_DIRECTORY)) ?: return@launch
+            VoiceSettings.selection(app).selectedModelId = null
+            StructuredLog.i(TAG, "offline voice is parked: removed $freed bytes of whisper models")
+        }
+    }
+
+    /** Deletes [dir] and returns the bytes its files held, or null when there was nothing there. */
+    internal fun deleteModelsDirectory(dir: File): Long? {
+        if (!dir.exists()) return null
+        val bytes = dir.walkBottomUp().filter { it.isFile }.sumOf { it.length() }
+        dir.deleteRecursively()
+        return bytes
+    }
+
     /** True when this device has the native library (an arm64 phone). Loads it on first call. */
     fun isSupported(context: Context): Boolean =
         WhisperNative.load(context.applicationContext.applicationInfo.nativeLibraryDir)
