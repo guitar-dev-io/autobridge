@@ -18,6 +18,7 @@ object DirectStore {
     private const val KEY_CERT_NAME = "cert_name"
     private const val KEY_SEND_AUDIO = "send_audio"
     private const val KEY_SHOW_PHONE = "show_phone"
+    private const val KEY_DEVICE_ID = "device_id"
     const val DPI_MIN = 100
     const val DPI_MAX = 480
     const val DPI_STEP = 20
@@ -49,6 +50,15 @@ object DirectStore {
 
     fun setShowPhoneScreen(context: Context, on: Boolean) {
         prefs(context).edit().putBoolean(KEY_SHOW_PHONE, on).apply()
+    }
+
+    /** A random id for this phone, kept so a car recognises it from one drive to the next. */
+    fun deviceId(context: Context): String {
+        val prefs = prefs(context)
+        prefs.getString(KEY_DEVICE_ID, null)?.let { return it }
+        val id = java.util.UUID.randomUUID().toString()
+        prefs.edit().putString(KEY_DEVICE_ID, id).apply()
+        return id
     }
 
     fun hasCredentials(context: Context): Boolean = credentialsFile(context).isFile
