@@ -121,9 +121,9 @@ class DirectProjectionActivity : Activity() {
             else -> body.stack(step(3, if (credentials == null) StepState.WAITING else StepState.TODO, getString(R.string.aa_direct_step_connect),
                 getString(R.string.aa_direct_step_connect_how), getString(R.string.aa_direct_action_wireless)) { listenWireless() })
         }
-        if (status.soundReady && !status.soundOn) {
-            body.stack(step(4, StepState.TODO, getString(R.string.aa_direct_sound_allow),
-                getString(R.string.aa_direct_sound_allow_caption), getString(R.string.aa_direct_action_allow)) { allowSound() })
+        if (status.needsCapture) {
+            body.stack(step(4, StepState.TODO, getString(R.string.aa_direct_capture_allow),
+                getString(R.string.aa_direct_capture_allow_caption), getString(R.string.aa_direct_action_allow)) { allowSound() })
         }
 
         // ── Options ──────────────────────────────────────────────────────────
@@ -143,6 +143,32 @@ class DirectProjectionActivity : Activity() {
             addView(AutoBridgeDesign.pill(this@DirectProjectionActivity, getString(R.string.aa_direct_larger)) { stepDpi(1) },
                 LinearLayout.LayoutParams(0, -2, 1f))
         }, gap = 10)
+        val phoneScreen = DirectStore.showPhoneScreen(this)
+        body.stack(AutoBridgeDesign.contentRow(
+            context = this,
+            title = getString(if (phoneScreen) R.string.aa_direct_shows_phone else R.string.aa_direct_shows_app),
+            subtitle = getString(if (phoneScreen) R.string.aa_direct_shows_phone_caption else R.string.aa_direct_shows_app_caption),
+            accent = AutoBridgeDesign.ACCENT,
+            badgeText = if (phoneScreen) "📱" else "AB",
+            subtitleMaxLines = 3,
+            onClick = {
+                DirectStore.setShowPhoneScreen(this, !phoneScreen)
+                render()
+            },
+        ))
+        if (phoneScreen && dev.autobridge.input.TouchRouter.availableCapabilities().isEmpty()) {
+            body.stack(AutoBridgeDesign.contentRow(
+                context = this,
+                title = getString(R.string.aa_direct_touch_missing),
+                subtitle = getString(R.string.aa_direct_touch_missing_caption),
+                accent = dev.autobridge.design.ThemeHolder.palette.warn,
+                badgeText = "!",
+                subtitleMaxLines = 3,
+                actionLabel = getString(R.string.aa_direct_action_open),
+                onTrailing = { startActivity(dev.autobridge.mirror.MirrorSetupActivity.intent(this)) },
+                onClick = { startActivity(dev.autobridge.mirror.MirrorSetupActivity.intent(this)) },
+            ))
+        }
         val soundOn = DirectStore.sendAudio(this)
         body.stack(AutoBridgeDesign.contentRow(
             context = this,
@@ -170,6 +196,16 @@ class DirectProjectionActivity : Activity() {
                 },
             ))
         }
+
+        body.stack(AutoBridgeDesign.contentRow(
+            context = this,
+            title = getString(R.string.aa_direct_dhu_title),
+            subtitle = getString(if (status.dhu) R.string.aa_direct_dhu_on_caption else R.string.aa_direct_dhu_off_caption),
+            accent = if (status.dhu) AutoBridgeDesign.ACCENT else AutoBridgeDesign.TEXT_MUTED,
+            badgeText = if (status.dhu) "ON" else "OFF",
+            subtitleMaxLines = 4,
+            onClick = { DirectProjectionService.dhu(this, !status.dhu) },
+        ))
 
         // ── Log ──────────────────────────────────────────────────────────────
         body.stack(LinearLayout(this).apply {
@@ -226,7 +262,12 @@ class DirectProjectionActivity : Activity() {
         val lines = ArrayList<String>()
         lines += status.headUnit?.let { getString(R.string.aa_direct_car, it.label) } ?: getString(R.string.aa_direct_state_handshake)
         status.video?.let { lines += getString(R.string.aa_direct_video, it.width, it.height, it.framesPerSecond) }
+        if (status.mirroring) lines += getString(R.string.aa_direct_state_mirroring)
         if (status.soundOn) lines += getString(R.string.aa_direct_state_sound)
+        when {
+            status.speedKmh != null && status.speedKmh > 0 -> lines += getString(R.string.aa_direct_car_moving, status.speedKmh)
+            status.parkingBrake == true || status.speedKmh == 0 -> lines += getString(R.string.aa_direct_car_parked)
+        }
         return lines.joinToString("\n")
     }
 

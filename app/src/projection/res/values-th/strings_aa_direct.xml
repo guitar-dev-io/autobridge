@@ -33,8 +33,6 @@
     <string name="aa_direct_car_starting">กำลังเปิด AutoBridge…</string>
     <string name="aa_direct_stop_listening">หยุดรอ</string>
     <string name="aa_direct_sound_caption">เสียงสื่อจะออกลำโพงรถ มีผลตอนเชื่อมต่อครั้งถัดไป</string>
-    <string name="aa_direct_sound_allow">อนุญาตเสียงบนรถ</string>
-    <string name="aa_direct_sound_allow_caption">Android จะขอสิทธิ์จับภาพหน้าจอ ซึ่งเป็นวิธีเดียวที่แอปคัดลอกเสียงจากแอปอื่นได้</string>
     <string name="aa_direct_state_listening">กำลังรอรถแบบไร้สาย</string>
     <string name="aa_direct_state_sound">กำลังส่งเสียงไปที่รถ</string>
     <string name="aa_direct_permission_needed">ต้องให้สิทธิ์ก่อนจึงจะใช้ได้</string>
@@ -59,4 +57,18 @@
     <string name="aa_direct_next_cert">เริ่มที่ขั้นที่ 1: อัปโหลดใบรับรอง</string>
     <string name="aa_direct_next_connect">พร้อมแล้ว เสียบมือถือเข้ารถ (ขั้นที่ 3)</string>
     <string name="aa_direct_sound_title">ส่งเสียงไปที่รถ</string>
+    <string name="aa_direct_capture_allow">อนุญาตจับภาพหน้าจอ</string>
+    <string name="aa_direct_capture_allow_caption">ต้องใช้เพื่อแสดงหน้าจอมือถือบนรถ หรือส่งเสียงไปที่รถ Android จะถามครั้งเดียวต่อการเชื่อมต่อ</string>
+    <string name="aa_direct_shows_app">จอรถแสดง: หน้าจอ AutoBridge</string>
+    <string name="aa_direct_shows_app_caption">ทีวี วิทยุ เบราว์เซอร์ และไฟล์ ที่ทำมาสำหรับรถ แตะเพื่อเปลี่ยนเป็นแสดงหน้าจอมือถือทั้งหมด</string>
+    <string name="aa_direct_shows_phone">จอรถแสดง: หน้าจอมือถือ</string>
+    <string name="aa_direct_shows_phone_caption">ใช้แอปไหนบนมือถือก็ได้ แสดงบนรถเหมือนกระจก ต้องอนุญาตจับภาพหน้าจอทุกครั้งที่เชื่อมต่อ แตะเพื่อกลับเป็นหน้าจอ AutoBridge</string>
+    <string name="aa_direct_touch_missing">ยังแตะจากจอรถไม่ได้</string>
+    <string name="aa_direct_touch_missing_caption">ถ้าจะแตะแอปอื่นจากจอรถ ต้องเปิด Shizuku หรือ Accessibility ก่อน</string>
+    <string name="aa_direct_dhu_title">ทดสอบกับ Desktop Head Unit (DHU)</string>
+    <string name="aa_direct_dhu_off_caption">สำหรับลองบนคอมแทนรถ แตะเพื่อเปิด แล้วบนคอมพิมพ์ adb forward tcp:5277 tcp:5277 และเปิด desktop-head-unit</string>
+    <string name="aa_direct_dhu_on_caption">รออยู่ที่พอร์ต 5277 บนคอมพิมพ์ adb forward tcp:5277 tcp:5277 แล้วเปิด desktop-head-unit แตะเพื่อปิด</string>
+    <string name="aa_direct_state_mirroring">จอรถแสดงหน้าจอมือถือ</string>
+    <string name="aa_direct_car_moving">รถกำลังวิ่ง: %1$d กม./ชม.</string>
+    <string name="aa_direct_car_parked">รถจอดอยู่</string>
 </resources>

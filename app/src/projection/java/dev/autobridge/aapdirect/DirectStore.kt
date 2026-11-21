@@ -17,6 +17,7 @@ object DirectStore {
     private const val KEY_DPI = "dpi"
     private const val KEY_CERT_NAME = "cert_name"
     private const val KEY_SEND_AUDIO = "send_audio"
+    private const val KEY_SHOW_PHONE = "show_phone"
     const val DPI_MIN = 100
     const val DPI_MAX = 480
     const val DPI_STEP = 20
@@ -37,6 +38,17 @@ object DirectStore {
 
     fun setSendAudio(context: Context, on: Boolean) {
         prefs(context).edit().putBoolean(KEY_SEND_AUDIO, on).apply()
+    }
+
+    /**
+     * What the car shows: false = AutoBridge's own screens on a display of their own; true = the
+     * whole phone screen, mirrored, so any app can be used (touch then needs Shizuku or the
+     * accessibility service).
+     */
+    fun showPhoneScreen(context: Context): Boolean = prefs(context).getBoolean(KEY_SHOW_PHONE, false)
+
+    fun setShowPhoneScreen(context: Context, on: Boolean) {
+        prefs(context).edit().putBoolean(KEY_SHOW_PHONE, on).apply()
     }
 
     fun hasCredentials(context: Context): Boolean = credentialsFile(context).isFile

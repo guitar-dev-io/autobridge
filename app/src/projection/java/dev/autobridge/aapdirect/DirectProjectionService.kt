@@ -10,6 +10,8 @@ import android.bluetooth.BluetoothSocket
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.hardware.display.DisplayManager
+import android.hardware.display.VirtualDisplay
 import android.hardware.usb.UsbAccessory
 import android.hardware.usb.UsbManager
 import android.media.projection.MediaProjection
@@ -18,6 +20,9 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.view.Surface
+import java.net.InetAddress
+import java.net.ServerSocket
 import dev.autobridge.R
 import dev.autobridge.aap.AapChannel
 import dev.autobridge.aap.AapHeadUnit
@@ -50,6 +55,18 @@ class DirectProjectionService : Service() {
     private var audio: CarAudioCapture? = null
     private var lastNight: Boolean? = null
     private var lastDriving: Int? = null
+    private var speedKmh: Int? = null
+    private var parkingBrake: Boolean? = null
+
+    // Video target kept so the car can switch between AutoBridge screens and the mirrored phone.
+    private var videoConfig: AapVideoConfig? = null
+    private var videoTarget: Surface? = null
+    private var videoDpi = 160
+    /** One per screen-capture consent: Android allows a projection a single virtual display. */
+    private var mirrorDisplay: VirtualDisplay? = null
+    @Volatile private var mirrorTouch: MirrorTouch? = null
+
+    @Volatile private var dhuServer: ServerSocket? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -60,12 +77,19 @@ class DirectProjectionService : Service() {
                 listening = false
                 wireless?.stop()
                 wireless = null
+                stopDhu()
                 session?.stop() ?: stopSelf()
                 publishCurrent()
                 return START_NOT_STICKY
             }
             ACTION_DENSITY -> { applyDensity(); return START_NOT_STICKY }
             ACTION_SHOW_CAR -> { display?.let { if (!it.hasFront) it.launch(CarHomeActivity.intent(this)) }; return START_NOT_STICKY }
+            ACTION_DHU_OFF -> {
+                stopDhu()
+                if (session == null && !listening) stopSelf()
+                publishCurrent()
+                return START_NOT_STICKY
+            }
             ACTION_STOP_LISTEN -> {
                 listening = false
                 wireless?.stop()
@@ -86,7 +110,8 @@ class DirectProjectionService : Service() {
                 if (session == null) startListening()
                 publishCurrent()
             }
-            ACTION_AUDIO -> startSound(intent)
+            ACTION_AUDIO -> onCaptureConsent(intent)
+            ACTION_DHU_ON -> startDhu()
             else -> {
                 if (session != null) return START_NOT_STICKY
                 val accessory = accessoryFrom(intent)
@@ -112,8 +137,10 @@ class DirectProjectionService : Service() {
     override fun onDestroy() {
         listening = false
         wireless?.stop()
+        stopDhu()
         session?.stop()
         tearDown()
+        releaseMirror()
         projection?.stop()
         projection = null
         publish(Status(AapSession.State.CLOSED, null, null))
@@ -151,6 +178,41 @@ class DirectProjectionService : Service() {
             wireless = null
             listening = false
         }
+    }
+
+    /**
+     * Test mode for Google's Desktop Head Unit on a computer: `adb forward tcp:5277 tcp:5277`, then
+     * start desktop-head-unit, which connects to this port as the car would. Loopback only, so
+     * nothing on the Wi-Fi can reach it; adb's forward arrives on loopback.
+     */
+    private fun startDhu() {
+        if (dhuServer != null) return
+        val server = runCatching {
+            ServerSocket().apply {
+                reuseAddress = true
+                bind(java.net.InetSocketAddress(InetAddress.getLoopbackAddress(), DHU_PORT), 1)
+            }
+        }.onFailure { DirectLog.add("DHU: could not open port $DHU_PORT: ${it.message}") }.getOrNull() ?: return
+        dhuServer = server
+        DirectLog.add("DHU: waiting on port $DHU_PORT. On the computer: adb forward tcp:$DHU_PORT tcp:$DHU_PORT, then run desktop-head-unit")
+        Thread({
+            while (dhuServer === server) {
+                val socket = runCatching { server.accept() }.getOrNull() ?: break
+                DirectLog.add("DHU: head unit connected")
+                main.post {
+                    if (session != null) runCatching { socket.close() }
+                    else connect(TcpTransport(socket, null, this))
+                }
+            }
+        }, "aa-direct-dhu").start()
+        publishCurrent()
+    }
+
+    private fun stopDhu() {
+        val server = dhuServer ?: return
+        dhuServer = null
+        runCatching { server.close() }
+        DirectLog.add("DHU: stopped")
     }
 
     private fun connect(transport: AapTransport) {
@@ -211,22 +273,29 @@ class DirectProjectionService : Service() {
         }
 
         override fun onTouch(touch: AapTouch, touchWidth: Int, touchHeight: Int) {
-            display?.touch(touch, touchWidth, touchHeight)
+            mirrorTouch?.touch(touch, touchWidth, touchHeight) ?: display?.touch(touch, touchWidth, touchHeight)
         }
 
         override fun onKey(key: AapKey) {
-            display?.key(key)
+            mirrorTouch?.key(key) ?: display?.key(key)
         }
 
         override fun onSensor(event: AapSensorEvent) {
             event.night?.let { if (it != lastNight) { lastNight = it; DirectLog.add("car: night mode ${if (it) "on" else "off"}") } }
             event.drivingStatus?.let { if (it != lastDriving) { lastDriving = it; DirectLog.add("car: driving status $it") } }
+            var changed = false
+            event.speedMps?.let { val kmh = (it * 3.6).toInt(); if (kmh != speedKmh) { speedKmh = kmh; changed = true } }
+            event.parkingBrake?.let { if (it != parkingBrake) { parkingBrake = it; changed = true } }
+            if (changed) main.post { publishCurrent() }
         }
 
         override fun onClosed(reason: String) {
             main.post {
                 tearDown()
+                releaseMirror()
                 session = null
+                speedKmh = null
+                parkingBrake = null
                 runCatching { rfcomm?.close() }
                 rfcomm = null
                 lastEnd = reason
@@ -235,7 +304,7 @@ class DirectProjectionService : Service() {
                     startListening()
                 }
                 publishCurrent()
-                if (!listening) stopSelf()
+                if (!listening && dhuServer == null) stopSelf()
             }
         }
     }
@@ -262,16 +331,10 @@ class DirectProjectionService : Service() {
             } else {
                 enc.inputSurface
             }
-            val car = CarDisplay(this, config.visibleWidth, config.visibleHeight, dpi, target)
-            display = car
-            DirectLog.add("car display ${config.visibleWidth}x${config.visibleHeight} at $dpi dpi")
-            car.showSplash(getString(R.string.aa_direct_car_starting))
-            car.launch(CarHomeActivity.intent(this))
-            main.postDelayed({
-                if (display === car && !car.hasFront) {
-                    DirectLog.add("Android did not open the car screen from the background; open AutoBridge on the phone once")
-                }
-            }, 4000)
+            videoConfig = config
+            videoTarget = target
+            videoDpi = dpi
+            if (DirectStore.showPhoneScreen(this) && projection != null) startMirror() else startAppDisplay()
             publishCurrent()
         } catch (e: Exception) {
             DirectLog.add("could not start video: ${e.message}")
@@ -279,10 +342,72 @@ class DirectProjectionService : Service() {
         }
     }
 
+    /** AutoBridge's own screens on a private display of their own. */
+    private fun startAppDisplay() {
+        val config = videoConfig ?: return
+        val target = videoTarget ?: return
+        if (DirectStore.showPhoneScreen(this)) {
+            DirectLog.add("car shows AutoBridge until screen capture is allowed on the phone (needed to show the phone screen)")
+        }
+        val car = CarDisplay(this, config.visibleWidth, config.visibleHeight, videoDpi, target)
+        display = car
+        DirectLog.add("car display ${config.visibleWidth}x${config.visibleHeight} at $videoDpi dpi")
+        car.showSplash(getString(R.string.aa_direct_car_starting))
+        car.launch(CarHomeActivity.intent(this))
+        main.postDelayed({
+            if (display === car && !car.hasFront) {
+                DirectLog.add("Android did not open the car screen from the background; open AutoBridge on the phone once")
+            }
+        }, 4000)
+    }
+
+    /** The whole phone screen, mirrored onto the car. */
+    private fun startMirror() {
+        val config = videoConfig ?: return
+        val target = videoTarget ?: return
+        val p = projection ?: return
+        display?.release()
+        display = null
+        val w = config.visibleWidth
+        val h = config.visibleHeight
+        val existing = mirrorDisplay
+        if (existing != null) {
+            existing.resize(w, h, videoDpi)
+            existing.surface = target
+        } else {
+            mirrorDisplay = runCatching {
+                p.createVirtualDisplay(
+                    "AutoBridge car mirror", w, h, videoDpi,
+                    DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR, target, null, main,
+                )
+            }.onFailure { DirectLog.add("could not mirror the phone: ${it.message}") }.getOrNull()
+        }
+        if (mirrorDisplay == null) {
+            startAppDisplay()
+            return
+        }
+        val touch = MirrorTouch(this, w, h)
+        mirrorTouch = touch
+        DirectLog.add("car shows the phone screen ${w}x$h")
+        if (!touch.available) {
+            DirectLog.add("touch from the car needs Shizuku or the accessibility service (Settings › Car connection)")
+        }
+    }
+
+    private fun releaseMirror() {
+        mirrorTouch?.release()
+        mirrorTouch = null
+        runCatching { mirrorDisplay?.release() }
+        mirrorDisplay = null
+    }
+
     // ── Sound ────────────────────────────────────────────────────────────────
 
-    /** The phone screen got the screen-capture consent; it arrives here as result code + data. */
-    private fun startSound(intent: Intent) {
+    /**
+     * The phone screen got the screen-capture consent; it arrives here as result code + data. One
+     * consent covers both uses: the phone's sound and, when chosen, the phone screen on the car.
+     */
+    private fun onCaptureConsent(intent: Intent) {
         @Suppress("DEPRECATION")
         val data: Intent? = if (Build.VERSION.SDK_INT >= 33) {
             intent.getParcelableExtra(EXTRA_DATA, Intent::class.java)
@@ -303,14 +428,19 @@ class DirectProjectionService : Service() {
             override fun onStop() {
                 main.post {
                     stopCapture()
+                    val wasMirroring = mirrorDisplay != null
+                    releaseMirror()
                     projection = null
+                    if (wasMirroring && videoTarget != null) startAppDisplay()
                     publishCurrent()
                 }
             }
         }, main)
+        releaseMirror()
         projection?.stop()
         projection = created
         if (audioChannel != null) startCapture()
+        if (DirectStore.showPhoneScreen(this) && videoTarget != null) startMirror()
         publishCurrent()
     }
 
@@ -341,6 +471,11 @@ class DirectProjectionService : Service() {
     private fun tearDownVideo() {
         display?.release()
         display = null
+        mirrorTouch?.release()
+        mirrorTouch = null
+        // The mirror display stays (a projection gets only one); it just loses its surface.
+        runCatching { mirrorDisplay?.surface = null }
+        videoTarget = null
         compositor?.release()
         compositor = null
         encoder?.release()
@@ -390,6 +525,11 @@ class DirectProjectionService : Service() {
                 listening = listening && s == null,
                 soundReady = audioChannel != null,
                 soundOn = audio != null,
+                needsCapture = s != null && projection == null && (audioChannel != null || DirectStore.showPhoneScreen(this)),
+                mirroring = mirrorDisplay != null && mirrorTouch != null,
+                dhu = dhuServer != null,
+                speedKmh = speedKmh,
+                parkingBrake = parkingBrake,
             )
         )
     }
@@ -403,6 +543,11 @@ class DirectProjectionService : Service() {
         val listening: Boolean = false,
         val soundReady: Boolean = false,
         val soundOn: Boolean = false,
+        val needsCapture: Boolean = false,
+        val mirroring: Boolean = false,
+        val dhu: Boolean = false,
+        val speedKmh: Int? = null,
+        val parkingBrake: Boolean? = null,
     )
 
     companion object {
@@ -414,6 +559,9 @@ class DirectProjectionService : Service() {
         private const val ACTION_STOP_LISTEN = "dev.autobridge.aapdirect.STOP_LISTEN"
         private const val ACTION_AUDIO = "dev.autobridge.aapdirect.AUDIO"
         private const val ACTION_SHOW_CAR = "dev.autobridge.aapdirect.SHOW_CAR"
+        private const val ACTION_DHU_ON = "dev.autobridge.aapdirect.DHU_ON"
+        private const val ACTION_DHU_OFF = "dev.autobridge.aapdirect.DHU_OFF"
+        private const val DHU_PORT = 5277
         private const val EXTRA_CODE = "code"
         private const val EXTRA_DATA = "data"
 
@@ -443,6 +591,11 @@ class DirectProjectionService : Service() {
 
         fun stopListening(context: Context) = plain(context, ACTION_STOP_LISTEN)
 
+        fun dhu(context: Context, on: Boolean) {
+            if (on) foreground(context, Intent(context, DirectProjectionService::class.java).setAction(ACTION_DHU_ON))
+            else plain(context, ACTION_DHU_OFF)
+        }
+
         fun stop(context: Context) = plain(context, ACTION_STOP)
 
         fun densityChanged(context: Context) {
@@ -454,7 +607,7 @@ class DirectProjectionService : Service() {
             if (status.video != null) plain(context, ACTION_SHOW_CAR)
         }
 
-        /** Hands the screen-capture consent result over, for sending sound to the car. */
+        /** Hands the screen-capture consent over, for sound and for showing the phone screen. */
         fun soundConsent(context: Context, code: Int, data: Intent) = foreground(
             context,
             Intent(context, DirectProjectionService::class.java).setAction(ACTION_AUDIO)
