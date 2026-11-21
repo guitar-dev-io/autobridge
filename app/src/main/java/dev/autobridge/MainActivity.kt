@@ -1089,6 +1089,7 @@ class MainActivity : androidx.activity.ComponentActivity() {
                         showPhoneScreen(PhoneScreen.CAR_CONNECTION)
                     })
                     addAll(projectionSetupEntry())
+                    addAll(androidAutoDirectEntry())
                     add(settingsEntry(
                         getString(R.string.obd_title),
                         getString(R.string.obd_settings_caption),
@@ -1249,6 +1250,23 @@ class MainActivity : androidx.activity.ComponentActivity() {
                 getString(R.string.settings_projection_setup),
                 getString(R.string.settings_projection_setup_caption),
                 R.drawable.ic_tile_settings,
+                accent = dev.autobridge.ui.AutoBridgeDesign.ACCENT_SYSTEM
+            ) { startActivity(intent) }
+        )
+    }
+
+    /**
+     * Android Auto direct: AutoBridge speaking the Android Auto protocol to the car itself.
+     * Resolved by name like [duoScreenIntent]: it exists only in the sideload flavors.
+     */
+    private fun androidAutoDirectEntry(): List<SettingsRow> {
+        val intent = Intent().setClassName(this, "dev.autobridge.aapdirect.DirectProjectionActivity")
+            .takeIf { packageManager.resolveActivity(it, 0) != null } ?: return emptyList()
+        return listOf(
+            settingsEntry(
+                getString(R.string.settings_aa_direct),
+                getString(R.string.settings_aa_direct_caption),
+                R.drawable.ic_tile_car,
                 accent = dev.autobridge.ui.AutoBridgeDesign.ACCENT_SYSTEM
             ) { startActivity(intent) }
         )

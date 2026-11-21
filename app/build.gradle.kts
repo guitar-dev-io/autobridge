@@ -339,6 +339,11 @@ dependencies {
     // the same reason: it downloads a Linux runtime and runs it. Its PRoot binaries are arm64-only.
     "personalImplementation"(project(":desktopbrowser"))
     "labImplementation"(project(":desktopbrowser"))
+    // Android Auto direct: the phone side of the Android Auto protocol, so the car shows AutoBridge
+    // without Google's Android Auto app. Sideload flavors only: it needs a certificate the car
+    // trusts, which the user supplies, and it is not something Play would accept.
+    "personalImplementation"(project(":aap"))
+    "labImplementation"(project(":aap"))
     testImplementation("junit:junit:4.13.2")
     // The subtitle pipeline launches its translation on an injected CoroutineScope; the test
     // drives that scope with a test dispatcher so a line's result lands synchronously and the

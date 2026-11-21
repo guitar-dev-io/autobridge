@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The identity a head unit gives a phone it switches into Android Open Accessory mode. -->
+<resources>
+    <usb-accessory manufacturer="Android" model="Android Auto" />
+</resources>
