@@ -315,6 +315,9 @@ android.sourceSets {
             java.srcDir("src/projection/java")
             manifest.srcFile("src/projection/AndroidManifest.xml")
             res.srcDir("src/projection/res")
+            // The OBD coding page (writes to car modules). src/safe has a stub of the same class.
+            java.srcDir("src/coding/java")
+            assets.srcDir("src/coding/assets")
         }
     }
 }

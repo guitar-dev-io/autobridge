@@ -113,6 +113,8 @@
     <string name="coding_tab_editor">แก้ค่า</string>
     <string name="coding_tab_backups">สำรอง</string>
     <string name="coding_backups_hint">ค่าของแต่ละบล็อกก่อนถูกเขียน กดคืนค่าเพื่อเขียนค่าเดิมกลับ</string>
+    <string name="catalog_check_all">ตรวจทั้งหมดกับรถคันนี้</string>
+    <string name="catalog_check_summary">✓ มี %1$d · ✕ ไม่มีในรถคันนี้ %2$d · ? ไม่ตอบ %3$d · ยังไม่อ่าน %4$d</string>
     <string name="catalog_filter_all">ทั้งหมด</string>
     <string name="catalog_edit">แก้บล็อกนี้</string>
     <string name="catalog_blocked">อ่านอย่างเดียว: โมดูลนี้ไม่ถูกเขียนเด็ดขาด</string>

@@ -113,6 +113,8 @@
     <string name="coding_tab_editor">Edit</string>
     <string name="coding_tab_backups">Backups</string>
     <string name="coding_backups_hint">The value of every block before it was written. Restore puts it back.</string>
+    <string name="catalog_check_all">Check all on this car</string>
+    <string name="catalog_check_summary">✓ present %1$d · ✕ not in this car %2$d · ? no answer %3$d · not read %4$d</string>
     <string name="catalog_filter_all">All</string>
     <string name="catalog_edit">Edit this block</string>
     <string name="catalog_blocked">Read only: this module is never written.</string>
