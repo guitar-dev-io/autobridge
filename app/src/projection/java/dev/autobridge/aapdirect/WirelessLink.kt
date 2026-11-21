@@ -102,7 +102,11 @@ class WirelessLink(
             linked = true
         }
         try {
-            val transport = AapWireless.startUp(socket.inputStream, socket.outputStream, { DirectLog.add("wireless: $it") }) { endpoint, info ->
+            val transport = AapWireless.startUp(
+                socket.inputStream, socket.outputStream, { DirectLog.add("wireless: $it") },
+                serial = android.os.Build.MODEL.orEmpty().ifBlank { "Android" },
+                deviceId = DirectStore.deviceId(context),
+            ) { endpoint, info ->
                 WifiJoin.open(context, endpoint, info)
             }
             runCatching { server?.close() }

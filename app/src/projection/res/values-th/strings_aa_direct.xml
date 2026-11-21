@@ -58,7 +58,7 @@
     <string name="aa_direct_next_connect">พร้อมแล้ว เสียบมือถือเข้ารถ (ขั้นที่ 3)</string>
     <string name="aa_direct_sound_title">ส่งเสียงไปที่รถ</string>
     <string name="aa_direct_capture_allow">อนุญาตจับภาพหน้าจอ</string>
-    <string name="aa_direct_capture_allow_caption">ต้องใช้เพื่อแสดงหน้าจอมือถือบนรถ หรือส่งเสียงไปที่รถ Android จะถามครั้งเดียวต่อการเชื่อมต่อ</string>
+    <string name="aa_direct_capture_allow_caption">ต้องใช้เพื่อแสดงหน้าจอมือถือบนรถ หรือส่งเสียงไปที่รถ กดอนุญาตไว้ตอนนี้ระหว่างรอรถได้เลย พอรถต่อปุ๊บ จอรถจะขึ้นหน้าจอมือถือทันที</string>
     <string name="aa_direct_shows_app">จอรถแสดง: หน้าจอ AutoBridge</string>
     <string name="aa_direct_shows_app_caption">ทีวี วิทยุ เบราว์เซอร์ และไฟล์ ที่ทำมาสำหรับรถ แตะเพื่อเปลี่ยนเป็นแสดงหน้าจอมือถือทั้งหมด</string>
     <string name="aa_direct_shows_phone">จอรถแสดง: หน้าจอมือถือ</string>
@@ -71,4 +71,5 @@
     <string name="aa_direct_state_mirroring">จอรถแสดงหน้าจอมือถือ</string>
     <string name="aa_direct_car_moving">รถกำลังวิ่ง: %1$d กม./ชม.</string>
     <string name="aa_direct_car_parked">รถจอดอยู่</string>
+    <string name="aa_direct_capture_ready">อนุญาตแล้ว พอรถต่อ จอรถจะขึ้นหน้าจอมือถือทันที</string>
 </resources>

@@ -439,6 +439,9 @@ class DirectProjectionService : Service() {
         releaseMirror()
         projection?.stop()
         projection = created
+        if (session == null) {
+            DirectLog.add("screen capture allowed; the car will show the phone screen as soon as it connects")
+        }
         if (audioChannel != null) startCapture()
         if (DirectStore.showPhoneScreen(this) && videoTarget != null) startMirror()
         publishCurrent()
@@ -525,7 +528,13 @@ class DirectProjectionService : Service() {
                 listening = listening && s == null,
                 soundReady = audioChannel != null,
                 soundOn = audio != null,
-                needsCapture = s != null && projection == null && (audioChannel != null || DirectStore.showPhoneScreen(this)),
+                // Capture can be granted ahead of the car: while listening, or once connected. The
+                // held projection then turns into the phone-screen mirror (or sound) the moment the
+                // car's video starts, so nothing has to be tapped while driving up.
+                needsCapture = projection == null &&
+                    (DirectStore.showPhoneScreen(this) || DirectStore.sendAudio(this)) &&
+                    (s != null || listening),
+                captureHeld = projection != null,
                 mirroring = mirrorDisplay != null && mirrorTouch != null,
                 dhu = dhuServer != null,
                 speedKmh = speedKmh,
@@ -544,6 +553,7 @@ class DirectProjectionService : Service() {
         val soundReady: Boolean = false,
         val soundOn: Boolean = false,
         val needsCapture: Boolean = false,
+        val captureHeld: Boolean = false,
         val mirroring: Boolean = false,
         val dhu: Boolean = false,
         val speedKmh: Int? = null,
