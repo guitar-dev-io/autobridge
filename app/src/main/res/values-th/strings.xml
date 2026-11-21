@@ -591,6 +591,8 @@
     <string name="settings_group_car_apps">รถและแอป</string>
     <string name="settings_projection_setup">Bridge Web บน Android Auto</string>
     <string name="settings_projection_setup_caption">ให้แสดงในรถ และเปิด/ปิด Bridge Mirror</string>
+    <string name="settings_aa_direct">Android Auto โดยตรง</string>
+    <string name="settings_aa_direct_caption">จอรถแสดง AutoBridge โดยไม่ต้องใช้แอป Android Auto</string>
     <string name="projection_setup_status_section">สถานะ</string>
     <string name="projection_setup_status_label">บน Android Auto</string>
     <string name="projection_setup_status_visible">แสดงอยู่</string>

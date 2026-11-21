@@ -607,6 +607,8 @@
     <string name="settings_group_car_apps">Car &amp; apps</string>
     <string name="settings_projection_setup">Bridge Web on Android Auto</string>
     <string name="settings_projection_setup_caption">Show on the car, Bridge Mirror on/off</string>
+    <string name="settings_aa_direct">Android Auto direct</string>
+    <string name="settings_aa_direct_caption">Car shows AutoBridge without the Android Auto app</string>
     <string name="projection_setup_status_section">Status</string>
     <string name="projection_setup_status_label">On Android Auto</string>
     <string name="projection_setup_status_visible">Visible</string>

@@ -68,7 +68,7 @@ jobs:
         run: ./gradlew --no-daemon lintSafeDebug
 
       - name: Unit tests (safe debug)
-        run: ./gradlew --no-daemon testSafeDebugUnitTest
+        run: ./gradlew --no-daemon testSafeDebugUnitTest :aap:testDebugUnitTest
 
       - name: Assemble (safe debug)
         run: ./gradlew --no-daemon assembleSafeDebug

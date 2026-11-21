@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android Auto direct (dev.autobridge.aapdirect). Sideload flavors only. -->
+<resources>
+    <string name="aa_direct_title">Android Auto direct</string>
+    <string name="aa_direct_subtitle">The car shows AutoBridge without Google\'s Android Auto app. Connects over USB when the car attaches the phone.</string>
+    <string name="aa_direct_notification_text">Showing AutoBridge on the car screen</string>
+    <string name="aa_direct_certificate_notice">The car only accepts a phone whose certificate it trusts. Upload the certificate and private key (PEM files) you have for this; AutoBridge does not include or obtain one. A car that refuses the certificate shows up in the log as a handshake error.</string>
+    <string name="aa_direct_section_screen">Car screen</string>
+    <string name="aa_direct_section_certificate">Certificate</string>
+    <string name="aa_direct_section_connection">Connection</string>
+    <string name="aa_direct_section_log">Connection log</string>
+    <string name="aa_direct_dpi">Display size: %1$d dpi</string>
+    <string name="aa_direct_dpi_auto">Display size: as the car asks</string>
+    <string name="aa_direct_smaller">Smaller</string>
+    <string name="aa_direct_larger">Larger</string>
+    <string name="aa_direct_upload">Upload certificate files</string>
+    <string name="aa_direct_upload_caption">Pick the certificate and the private key (one file or two)</string>
+    <string name="aa_direct_clear">Clear certificate</string>
+    <string name="aa_direct_clear_caption">Delete the uploaded certificate and key from this phone</string>
+    <string name="aa_direct_android_auto">Android Auto app</string>
+    <string name="aa_direct_android_auto_caption">If the car opens Google\'s Android Auto instead, disable it or clear its defaults here</string>
+    <string name="aa_direct_android_auto_missing">Android Auto is not installed</string>
+    <string name="aa_direct_copy_log">Copy connection log</string>
+    <string name="aa_direct_copy_log_caption">For a bug report</string>
+    <string name="aa_direct_stop">Stop</string>
+    <string name="aa_direct_stop_caption">End the session on the car screen</string>
+    <string name="aa_direct_state_idle">No car connected.</string>
+    <string name="aa_direct_state_handshake">Car attached, checking the certificate…</string>
+    <string name="aa_direct_state_connecting">Connected, opening the car screen…</string>
+    <string name="aa_direct_state_streaming">Showing AutoBridge on the car.</string>
+    <string name="aa_direct_car">Car: %1$s</string>
+    <string name="aa_direct_video">Video: %1$d×%2$d at %3$d fps</string>
+    <string name="aa_direct_last_end">Last session ended: %1$s</string>
+    <string name="aa_direct_no_certificate">Certificate: none uploaded</string>
+    <string name="aa_direct_certificate">Certificate: %1$s (valid until %2$s)</string>
+    <string name="aa_direct_no_picker">No file picker on this phone</string>
+    <string name="aa_direct_upload_failed">Could not read %1$s</string>
+    <string name="aa_direct_upload_ok">Certificate saved</string>
+    <string name="aa_direct_upload_invalid">Not a usable certificate and key: %1$s</string>
+    <string name="aa_direct_log_copied">Connection log copied</string>
+    <string name="aa_direct_log_empty">Nothing yet. Connect the phone to the car with a USB cable.</string>
+</resources>

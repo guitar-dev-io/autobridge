@@ -29,6 +29,10 @@
          this permission. -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
 
+    <!-- Android Auto direct talks to the car as a USB accessory. Not required: a phone without
+         accessory support still installs, it just never sees a car attach. -->
+    <uses-feature android:name="android.hardware.usb.accessory" android:required="false" />
+
     <application>
         <service
             android:name="dev.autobridge.projection.ProjectionCarService"
@@ -182,6 +186,56 @@
                 <category android:name="androidx.car.app.category.NAVIGATION" />
             </intent-filter>
         </service>
+
+        <!-- ── Android Auto direct (dev.autobridge.aapdirect) ─────────────────────────────
+             AutoBridge speaks the Android Auto protocol to the car itself, instead of running
+             inside Google's Android Auto app. Sideload flavors only.
+
+             UsbAccessoryActivity: exported because the system delivers USB_ACCESSORY_ATTACHED to
+             it; it accepts only the Android Auto accessory identity (aa_direct_accessory_filter)
+             and does nothing but start the service. -->
+        <activity
+            android:name="dev.autobridge.aapdirect.UsbAccessoryActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.hardware.usb.action.USB_ACCESSORY_ATTACHED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.hardware.usb.action.USB_ACCESSORY_ATTACHED"
+                android:resource="@xml/aa_direct_accessory_filter" />
+        </activity>
+
+        <activity
+            android:name="dev.autobridge.aapdirect.DirectProjectionActivity"
+            android:exported="false" />
+
+        <!-- Runs on the car's virtual display. allowEmbedded: required to launch onto a display
+             that is not trusted (a private virtual display owned by this app). -->
+        <activity
+            android:name="dev.autobridge.aapdirect.CarHomeActivity"
+            android:exported="false"
+            android:allowEmbedded="true"
+            android:resizeableActivity="true"
+            android:taskAffinity="dev.autobridge.car"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|density|uiMode" />
+
+        <service
+            android:name="dev.autobridge.aapdirect.DirectProjectionService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+
+        <!-- The screens the car home opens, made launchable on the car display as well. Only the
+             allowEmbedded attribute is added; everything else comes from the main manifest. -->
+        <activity android:name="dev.autobridge.library.LibraryActivity" android:allowEmbedded="true" tools:node="merge" />
+        <activity android:name="dev.autobridge.library.PlayerActivity" android:allowEmbedded="true" tools:node="merge" />
+        <activity android:name="dev.autobridge.library.RadioPlayerActivity" android:allowEmbedded="true" tools:node="merge" />
+        <activity android:name="dev.autobridge.browser.BrowserActivity" android:allowEmbedded="true" tools:node="merge" />
+        <activity android:name="dev.autobridge.weather.WeatherActivity" android:allowEmbedded="true" tools:node="merge" />
+        <activity android:name="dev.autobridge.entertainment.EntertainmentActivity" android:allowEmbedded="true" tools:node="merge" />
 
     </application>
 </manifest>
