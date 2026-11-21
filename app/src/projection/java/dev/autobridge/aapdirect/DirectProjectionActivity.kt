@@ -1,6 +1,10 @@
 package dev.autobridge.aapdirect
 
+import android.Manifest
 import android.app.Activity
+import android.content.pm.PackageManager
+import android.media.projection.MediaProjectionManager
+import android.os.Build
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -25,12 +29,15 @@ import java.text.DateFormat
 
 /**
  * Phone screen for Android Auto direct: connection status, the certificate, the car screen's
- * density, and the connection log. The connection itself starts when a car attaches the phone
- * over USB (UsbAccessoryActivity); nothing here has to be open for that.
+ * density, wireless listening, sound, and the connection log. A USB connection starts by itself
+ * when a car attaches the phone (UsbAccessoryActivity); nothing here has to be open for that.
  */
 class DirectProjectionActivity : Activity() {
     companion object {
         private const val REQUEST_CERT = 41
+        private const val REQUEST_CAPTURE = 42
+        private const val REQUEST_BT_PERMISSION = 43
+        private const val REQUEST_MIC_PERMISSION = 44
         private const val GEARHEAD = "com.google.android.projection.gearhead"
 
         fun intent(context: Context): Intent = Intent(context, DirectProjectionActivity::class.java)
@@ -52,6 +59,9 @@ class DirectProjectionActivity : Activity() {
         super.onResume()
         DirectProjectionService.listen(refresh)
         DirectLog.listen(logChanged)
+        // Android may refuse to open the car screen from the background; with this screen in
+        // front it can, so try again here.
+        DirectProjectionService.showCarHome(this)
         render()
     }
 
@@ -101,6 +111,24 @@ class DirectProjectionActivity : Activity() {
 
         // ── Connection ───────────────────────────────────────────────────────
         body.stack(AutoBridgeDesign.sectionLabel(this, getString(R.string.aa_direct_section_connection)), gap = 2)
+        if (status.listening) {
+            body.stack(row(getString(R.string.aa_direct_stop_listening), getString(R.string.aa_direct_stop_listening_caption)) {
+                DirectProjectionService.stopListening(this)
+            })
+        } else if (status.state == AapSession.State.CLOSED) {
+            body.stack(row(getString(R.string.aa_direct_listen), getString(R.string.aa_direct_listen_caption)) { listenWireless() })
+        }
+        val soundOn = DirectStore.sendAudio(this)
+        body.stack(row(
+            getString(if (soundOn) R.string.aa_direct_sound_on else R.string.aa_direct_sound_off),
+            getString(R.string.aa_direct_sound_caption),
+        ) {
+            DirectStore.setSendAudio(this, !soundOn)
+            render()
+        })
+        if (status.soundReady && !status.soundOn) {
+            body.stack(row(getString(R.string.aa_direct_sound_allow), getString(R.string.aa_direct_sound_allow_caption)) { allowSound() })
+        }
         body.stack(row(getString(R.string.aa_direct_android_auto), getString(R.string.aa_direct_android_auto_caption)) { openAndroidAutoInfo() })
         body.stack(row(getString(R.string.aa_direct_copy_log), getString(R.string.aa_direct_copy_log_caption)) { copyLog() })
         if (DirectProjectionService.running) {
@@ -147,6 +175,8 @@ class DirectProjectionActivity : Activity() {
         }
         status.headUnit?.let { lines += getString(R.string.aa_direct_car, it.label) }
         status.video?.let { lines += getString(R.string.aa_direct_video, it.width, it.height, it.framesPerSecond) }
+        if (status.listening) lines += getString(R.string.aa_direct_state_listening)
+        if (status.soundOn) lines += getString(R.string.aa_direct_state_sound)
         if (status.state == AapSession.State.CLOSED && status.endReason != null) {
             lines += getString(R.string.aa_direct_last_end, status.endReason)
         }
@@ -177,9 +207,47 @@ class DirectProjectionActivity : Activity() {
             .onFailure { toast(getString(R.string.aa_direct_no_picker)) }
     }
 
+    private fun listenWireless() {
+        if (Build.VERSION.SDK_INT >= 31 &&
+            checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_CONNECT), REQUEST_BT_PERMISSION)
+            return
+        }
+        DirectProjectionService.listenWireless(this)
+    }
+
+    /** Sound needs the microphone permission (playback capture is a recording) and screen-capture consent. */
+    private fun allowSound() {
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), REQUEST_MIC_PERMISSION)
+            return
+        }
+        val manager = getSystemService(MediaProjectionManager::class.java)
+        runCatching { startActivityForResult(manager.createScreenCaptureIntent(), REQUEST_CAPTURE) }
+            .onFailure { toast(it.message.orEmpty()) }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        val granted = grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }
+        if (!granted) {
+            toast(getString(R.string.aa_direct_permission_needed))
+            return
+        }
+        when (requestCode) {
+            REQUEST_BT_PERMISSION -> DirectProjectionService.listenWireless(this)
+            REQUEST_MIC_PERMISSION -> allowSound()
+        }
+    }
+
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQUEST_CAPTURE) {
+            if (resultCode == RESULT_OK && data != null) DirectProjectionService.soundConsent(this, resultCode, data)
+            return
+        }
         if (requestCode != REQUEST_CERT || resultCode != RESULT_OK || data == null) return
         val uris = buildList {
             data.clipData?.let { clip -> for (i in 0 until clip.itemCount) add(clip.getItemAt(i).uri) }

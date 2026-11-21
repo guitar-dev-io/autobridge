@@ -39,4 +39,18 @@
     <string name="aa_direct_upload_invalid">Not a usable certificate and key: %1$s</string>
     <string name="aa_direct_log_copied">Connection log copied</string>
     <string name="aa_direct_log_empty">Nothing yet. Connect the phone to the car with a USB cable.</string>
+    <string name="aa_direct_notification_listening">Waiting for the car over Bluetooth</string>
+    <string name="aa_direct_car_starting">Starting AutoBridge…</string>
+    <string name="aa_direct_listen">Listen for a wireless car</string>
+    <string name="aa_direct_listen_caption">The paired car connects over Bluetooth and its own Wi-Fi. Keeps listening until you stop it</string>
+    <string name="aa_direct_stop_listening">Stop listening</string>
+    <string name="aa_direct_stop_listening_caption">Wireless connections stop; USB still works</string>
+    <string name="aa_direct_sound_on">Send sound to the car: on</string>
+    <string name="aa_direct_sound_off">Send sound to the car: off</string>
+    <string name="aa_direct_sound_caption">Media sound goes to the car\'s speakers. Takes effect at the next connection</string>
+    <string name="aa_direct_sound_allow">Allow sound on the car</string>
+    <string name="aa_direct_sound_allow_caption">Android asks for screen-capture consent: that is how an app may copy what other apps play</string>
+    <string name="aa_direct_state_listening">Listening for a wireless car.</string>
+    <string name="aa_direct_state_sound">Sending sound to the car.</string>
+    <string name="aa_direct_permission_needed">Permission needed for this</string>
 </resources>

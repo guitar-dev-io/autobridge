@@ -53,13 +53,15 @@ class AapSessionTest {
         }
 
         val videoStarted = CountDownLatch(1)
+        val audioStarted = CountDownLatch(1)
         val touches = LinkedBlockingQueue<AapTouch>()
         val sensors = LinkedBlockingQueue<AapSensorEvent>()
         val log = StringBuffer()
         lateinit var session: AapSession
-        session = AapSession(transport, credentials(), AapSession.Identity("Test phone", "AutoBridge"), object : AapSession.Listener {
+        session = AapSession(transport, credentials(), AapSession.Identity("Test phone", "AutoBridge", sendAudio = true), object : AapSession.Listener {
             override fun onLog(line: String) { log.append(line).append('\n') }
             override fun onVideoStart(config: AapVideoConfig) { videoStarted.countDown() }
+            override fun onAudioStart(channel: AapChannel.Audio) { audioStarted.countDown() }
             override fun onTouch(touch: AapTouch, touchWidth: Int, touchHeight: Int) { touches.add(touch) }
             override fun onSensor(event: AapSensorEvent) { sensors.add(event) }
         })
@@ -82,7 +84,7 @@ class AapSessionTest {
         assertTrue(discovery.encrypted)
         assertEquals("Test phone", ProtoReader.fields(discovery.body).first(4)?.string)
 
-        // Discovery: video (one 720p config), input with touch 1280x720, sensors, and an audio channel the phone should leave closed.
+        // Discovery: video (one 720p config), input with touch 1280x720, sensors, the media audio channel.
         val video = ProtoWriter().uint(1, 3).message(4, ProtoWriter().uint(1, 2).uint(2, 1).uint(3, 0).uint(4, 0).uint(5, 160))
         val input = ProtoWriter().uint(1, 3).uint(1, 4).message(2, ProtoWriter().uint(1, 1280).uint(2, 720))
         val sensor = ProtoWriter().message(1, ProtoWriter().uint(1, AapSensor.DRIVING_STATUS)).message(1, ProtoWriter().uint(1, AapSensor.NIGHT_DATA))
@@ -95,13 +97,14 @@ class AapSessionTest {
             .string(2, "Test HU").string(7, "Maker").string(8, "Model X")
         car.send(0, AapId.SERVICE_DISCOVERY_RESPONSE, response.toByteArray())
 
-        val opens = try { (1..3).map { car.read() } } catch (e: Exception) { throw AssertionError("phone log:\n$log", e) }
+        val opens = try { (1..4).map { car.read() } } catch (e: Exception) { throw AssertionError("phone log:\n$log", e) }
         assertTrue(opens.all { it.id == AapId.CHANNEL_OPEN_REQUEST && it.control })
-        assertEquals(setOf(1, 2, 3), opens.map { it.channel }.toSet())
+        assertEquals(setOf(1, 2, 3, 4), opens.map { it.channel }.toSet())
         opens.forEach { car.send(it.channel, AapId.CHANNEL_OPEN_RESPONSE, ProtoWriter().int(1, 0).toByteArray(), control = true) }
 
         // Follow-ups: binding on input, sensor starts, video setup. Order across channels may vary.
-        val followUps = (1..4).map { car.read() }
+        val followUps = (1..5).map { car.read() }
+        assertEquals(AapId.MEDIA_SETUP_REQUEST, followUps.single { it.channel == 4 }.id)
         val setup = followUps.single { it.channel == 3 }
         assertEquals(AapId.MEDIA_SETUP_REQUEST, setup.id)
         assertEquals(1, followUps.count { it.channel == 1 && it.id == AapId.INPUT_BINDING_REQUEST })
@@ -122,6 +125,18 @@ class AapSessionTest {
         assertArrayEquals(frame, media.body.copyOfRange(8, media.body.size))
         assertTrue("expected the frame to be split", car.lastMessageFrames > 1)
         car.send(3, AapId.MEDIA_ACK, ProtoWriter().int(1, 0).uint(2, 1).toByteArray())
+
+        // Audio: setup, start + focus request, then a block of PCM.
+        car.send(4, AapId.MEDIA_SETUP_RESPONSE, ProtoWriter().uint(1, 2).uint(2, 2).uint(3, 0).toByteArray())
+        val audioFollow = listOf(car.read(), car.read())
+        assertEquals(AapId.MEDIA_START, audioFollow.single { it.channel == 4 }.id)
+        assertEquals(AapId.AUDIO_FOCUS_REQUEST, audioFollow.single { it.channel == 0 }.id)
+        assertTrue(audioStarted.await(5, TimeUnit.SECONDS))
+        val pcm = ByteArray(4096) { it.toByte() }
+        assertTrue(session.sendAudio(1_000L, pcm))
+        val audioMessage = car.read()
+        assertEquals(4, audioMessage.channel)
+        assertArrayEquals(pcm, audioMessage.body.copyOfRange(8, audioMessage.body.size))
 
         // Touch: one finger down at (640, 360).
         val touch = ProtoWriter().uint(1, 99L)

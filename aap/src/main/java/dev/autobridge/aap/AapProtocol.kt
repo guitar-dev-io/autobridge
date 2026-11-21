@@ -80,6 +80,12 @@ object AapSensor {
 /** Codec type the phone announces in its video setup request: H.264 baseline. */
 const val MEDIA_CODEC_VIDEO_H264_BP = 3
 
+/** Codec type for an audio channel: raw 16-bit PCM in the channel's announced format. */
+const val MEDIA_CODEC_AUDIO_PCM = 1
+
+/** AudioType of the car's music channel. */
+const val AUDIO_TYPE_MEDIA = 3
+
 /** One video mode the head unit can show: the stream size, frame rate, the margins it crops, and its density. */
 data class AapVideoConfig(
     val index: Int,
@@ -158,6 +164,7 @@ data class AapHeadUnit(
     val video: AapChannel.Video? get() = channels.filterIsInstance<AapChannel.Video>().firstOrNull()
     val input: AapChannel.Input? get() = channels.filterIsInstance<AapChannel.Input>().firstOrNull()
     val sensor: AapChannel.Sensor? get() = channels.filterIsInstance<AapChannel.Sensor>().firstOrNull()
+    val mediaAudio: AapChannel.Audio? get() = channels.filterIsInstance<AapChannel.Audio>().firstOrNull { it.audioType == AUDIO_TYPE_MEDIA }
 
     val label: String get() = listOf(manufacturer, model).filter { it.isNotBlank() }.joinToString(" ")
         .ifBlank { name.ifBlank { "head unit" } }
@@ -300,6 +307,9 @@ object AapMessages {
     fun mediaStart(session: Int, config: Int): ByteArray = ProtoWriter().int(1, session).uint(2, config).toByteArray()
 
     fun mediaStop(): ByteArray = ByteArray(0)
+
+    /** GAIN = 1, GAIN_TRANSIENT = 2, GAIN_NAVI = 3, RELEASE = 4. */
+    fun audioFocusRequest(type: Int): ByteArray = ProtoWriter().int(1, type).toByteArray()
 
     /** FOCUSED = 1, UNFOCUSED = 2. */
     fun videoFocusRequest(focused: Boolean): ByteArray =

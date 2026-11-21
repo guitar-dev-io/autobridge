@@ -33,6 +33,12 @@
          accessory support still installs, it just never sees a car attach. -->
     <uses-feature android:name="android.hardware.usb.accessory" android:required="false" />
 
+    <!-- Wireless Android Auto direct: join the car's own Wi-Fi for the session
+         (WifiNetworkSpecifier) and hold that network while it runs. -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
+
     <application>
         <service
             android:name="dev.autobridge.projection.ProjectionCarService"
@@ -226,7 +232,7 @@
         <service
             android:name="dev.autobridge.aapdirect.DirectProjectionService"
             android:exported="false"
-            android:foregroundServiceType="connectedDevice" />
+            android:foregroundServiceType="connectedDevice|mediaProjection" />
 
         <!-- The screens the car home opens, made launchable on the car display as well. Only the
              allowEmbedded attribute is added; everything else comes from the main manifest. -->

@@ -3,6 +3,10 @@ package dev.autobridge.aapdirect
 import android.app.Activity
 import android.app.ActivityOptions
 import android.app.Application
+import android.app.Presentation
+import android.graphics.Color
+import android.view.Gravity
+import android.widget.TextView
 import android.content.Context
 import android.content.Intent
 import android.hardware.display.DisplayManager
@@ -41,6 +45,10 @@ class CarDisplay(
     private val width = width
     private val height = height
     private var front: WeakReference<Activity>? = null
+    private var splash: Presentation? = null
+
+    /** True once an AutoBridge activity is showing on the car screen. */
+    val hasFront: Boolean get() = front?.get()?.let { !it.isFinishing } == true
     private var downTime = 0L
     private val app = context.applicationContext as Application
 
@@ -48,7 +56,10 @@ class CarDisplay(
 
     private val tracker = object : Application.ActivityLifecycleCallbacks {
         override fun onActivityResumed(activity: Activity) {
-            if (displayOf(activity) == displayId) front = WeakReference(activity)
+            if (displayOf(activity) == displayId) {
+                front = WeakReference(activity)
+                dismissSplash()
+            }
         }
         override fun onActivityPaused(activity: Activity) = Unit
         override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = Unit
@@ -70,6 +81,32 @@ class CarDisplay(
             DisplayManager.VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY,
         )
         app.registerActivityLifecycleCallbacks(tracker)
+    }
+
+    /**
+     * A plain window on the car screen while the first activity opens. Besides telling the driver
+     * something is happening, it gives this app a visible window, which is what lets Android
+     * start an activity from the background service at all.
+     */
+    fun showSplash(text: String) {
+        dismissSplash()
+        splash = runCatching {
+            Presentation(context, display.display).apply {
+                setContentView(TextView(context).apply {
+                    this.text = text
+                    textSize = 22f
+                    gravity = Gravity.CENTER
+                    setTextColor(Color.WHITE)
+                    setBackgroundColor(Color.BLACK)
+                })
+                show()
+            }
+        }.onFailure { DirectLog.add("car splash failed: ${it.message}") }.getOrNull()
+    }
+
+    private fun dismissSplash() {
+        runCatching { splash?.dismiss() }
+        splash = null
     }
 
     fun setDensity(dpi: Int) {
@@ -107,6 +144,7 @@ class CarDisplay(
 
     fun release() {
         app.unregisterActivityLifecycleCallbacks(tracker)
+        dismissSplash()
         // Close what runs on this display first, so nothing is left on a display that is gone.
         front?.get()?.let { if (!it.isFinishing) it.finishAndRemoveTask() }
         front = null

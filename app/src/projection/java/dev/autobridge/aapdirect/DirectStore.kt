@@ -16,6 +16,7 @@ object DirectStore {
     private const val PREFS = "aa_direct"
     private const val KEY_DPI = "dpi"
     private const val KEY_CERT_NAME = "cert_name"
+    private const val KEY_SEND_AUDIO = "send_audio"
     const val DPI_MIN = 100
     const val DPI_MAX = 480
     const val DPI_STEP = 20
@@ -29,6 +30,13 @@ object DirectStore {
 
     fun setDpi(context: Context, dpi: Int) {
         prefs(context).edit().putInt(KEY_DPI, dpi.coerceIn(DPI_MIN, DPI_MAX)).apply()
+    }
+
+    /** Open the car's music channel and send the phone's media sound to it. Off by default. */
+    fun sendAudio(context: Context): Boolean = prefs(context).getBoolean(KEY_SEND_AUDIO, false)
+
+    fun setSendAudio(context: Context, on: Boolean) {
+        prefs(context).edit().putBoolean(KEY_SEND_AUDIO, on).apply()
     }
 
     fun hasCredentials(context: Context): Boolean = credentialsFile(context).isFile

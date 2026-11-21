@@ -38,4 +38,18 @@
     <string name="aa_direct_upload_invalid">ใบรับรองและ key ใช้ไม่ได้: %1$s</string>
     <string name="aa_direct_log_copied">คัดลอก log การเชื่อมต่อแล้ว</string>
     <string name="aa_direct_log_empty">ยังไม่มีข้อมูล เชื่อมมือถือกับรถด้วยสาย USB</string>
+    <string name="aa_direct_notification_listening">รอรถเชื่อมต่อผ่าน Bluetooth</string>
+    <string name="aa_direct_car_starting">กำลังเปิด AutoBridge…</string>
+    <string name="aa_direct_listen">รอรถแบบไร้สาย</string>
+    <string name="aa_direct_listen_caption">รถที่จับคู่ไว้เชื่อมต่อผ่าน Bluetooth และ Wi-Fi ของรถเอง รอต่อไปจนกว่าจะกดหยุด</string>
+    <string name="aa_direct_stop_listening">หยุดรอ</string>
+    <string name="aa_direct_stop_listening_caption">หยุดการเชื่อมต่อไร้สาย ส่วน USB ยังใช้ได้</string>
+    <string name="aa_direct_sound_on">ส่งเสียงไปที่รถ: เปิด</string>
+    <string name="aa_direct_sound_off">ส่งเสียงไปที่รถ: ปิด</string>
+    <string name="aa_direct_sound_caption">เสียงสื่อจะออกลำโพงรถ มีผลตอนเชื่อมต่อครั้งถัดไป</string>
+    <string name="aa_direct_sound_allow">อนุญาตเสียงบนรถ</string>
+    <string name="aa_direct_sound_allow_caption">Android จะขอสิทธิ์จับภาพหน้าจอ ซึ่งเป็นวิธีเดียวที่แอปคัดลอกเสียงจากแอปอื่นได้</string>
+    <string name="aa_direct_state_listening">กำลังรอรถแบบไร้สาย</string>
+    <string name="aa_direct_state_sound">กำลังส่งเสียงไปที่รถ</string>
+    <string name="aa_direct_permission_needed">ต้องให้สิทธิ์ก่อนจึงจะใช้ได้</string>
 </resources>
