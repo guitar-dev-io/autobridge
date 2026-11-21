@@ -146,8 +146,8 @@ class AapTls(credentials: AapCredentials) {
             val out = ByteArrayOutputStream()
             loop@ while (true) {
                 when (engine.handshakeStatus) {
-                    SSLEngineResult.HandshakeStatus.NEED_UNWRAP,
-                    SSLEngineResult.HandshakeStatus.NEED_UNWRAP_AGAIN -> {
+                    // NEED_UNWRAP_AGAIN (DTLS, Java 9+) does not exist on Android and never occurs for TLS.
+                    SSLEngineResult.HandshakeStatus.NEED_UNWRAP -> {
                         inNet.flip()
                         val result = try {
                             engine.unwrap(inNet, appIn)
