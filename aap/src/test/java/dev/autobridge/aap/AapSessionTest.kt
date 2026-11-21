@@ -156,9 +156,15 @@ class AapSessionTest {
         assertEquals(AapId.PING_RESPONSE, pong.id)
         assertEquals(777L, ProtoReader.fields(pong.body).first(1)?.varint)
 
-        car.send(0, AapId.SHUTDOWN_REQUEST, ProtoWriter().int(1, 1).toByteArray())
-        assertEquals(AapId.SHUTDOWN_RESPONSE, car.read().id)
-        phone.join(5000)
+        // The phone's Stop button: hand the screen back (video focus released) and ask the car to
+        // shut down before the link drops, so the car does not freeze on the last frame. The car's
+        // reply ends the session promptly, well before the force-close timeout.
+        Thread { session.stop() }.start()
+        assertEquals(AapId.VIDEO_FOCUS_REQUEST, car.read().id)
+        val shutdown = car.read()
+        assertEquals(AapId.SHUTDOWN_REQUEST, shutdown.id)
+        car.send(0, AapId.SHUTDOWN_RESPONSE, ByteArray(0))
+        phone.join(3000)
         assertEquals(AapSession.State.CLOSED, session.state)
         assertTrue(log.toString(), log.contains("Maker Model X"))
     }

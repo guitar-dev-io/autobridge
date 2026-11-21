@@ -67,6 +67,7 @@ class AapSession(
         private set
     @Volatile private var videoFocused = true
     @Volatile private var closed = false
+    @Volatile private var stopping = false
     private val video = MediaFlow()
     private val audio = MediaFlow()
     private var inputChannel: AapChannel.Input? = null
@@ -88,14 +89,38 @@ class AapSession(
         return reason
     }
 
-    /** Asks the car to end the session, then drops the link. */
+    /**
+     * Ends the session. Before dropping the link it hands the screen back to the car (video focus
+     * released) and sends a shutdown request, then waits briefly for the car to act on it - return
+     * to its own UI and reply - so the car does not freeze on the last mirrored frame. Runs on its
+     * own thread so the caller (the phone UI) is not blocked; the link is force-closed after
+     * [SHUTDOWN_WAIT_MS] if the car does not answer.
+     */
     fun stop() {
-        if (closed) return
-        runCatching {
-            if (tls.handshakeDone) send(0, AapId.SHUTDOWN_REQUEST, AapMessages.shutdownRequest())
+        if (closed || stopping) return
+        stopping = true
+        if (!tls.handshakeDone) {
+            closed = true
+            runCatching { transport.close() }
+            return
         }
-        closed = true
-        transport.close()
+        Thread({
+            if (video.channel >= 0) {
+                runCatching { send(video.channel, AapId.VIDEO_FOCUS_REQUEST, AapMessages.videoFocusRequest(false)) }
+            }
+            runCatching { send(0, AapId.SHUTDOWN_REQUEST, AapMessages.shutdownRequest()) }
+            var waited = 0
+            while (!closed && waited < SHUTDOWN_WAIT_MS) {
+                try {
+                    Thread.sleep(40)
+                } catch (e: InterruptedException) {
+                    break
+                }
+                waited += 40
+            }
+            closed = true
+            runCatching { transport.close() }
+        }, "aa-direct-shutdown").start()
     }
 
     fun sendVideoConfig(data: ByteArray) {
@@ -400,6 +425,7 @@ class AapSession(
 
     private companion object {
         const val ACK_WAIT_MS = 500L
+        const val SHUTDOWN_WAIT_MS = 1000
         const val AUDIO_FOCUS_GAIN = 1
     }
 }
