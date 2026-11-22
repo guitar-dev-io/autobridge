@@ -41,5 +41,10 @@
             android:exported="true"
             android:label="Duo Screen spike"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|density|uiMode" />
+        <!-- ADB backend pairing: receives the six-digit Wireless debugging code typed into
+             DuoScreenAdbPairing's notification. Not exported: only that notification's own
+             PendingIntent reaches it. -->
+        <receiver android:name="dev.autobridge.duoscreen.system.DuoScreenAdbPairReceiver"
+            android:exported="false" />
     </application>
 </manifest>

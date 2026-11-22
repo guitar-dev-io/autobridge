@@ -96,4 +96,24 @@
     <string name="duo_screen_desktop_pane">เบราว์เซอร์เดสก์ท็อป (AutoBridge)</string>
     <string name="duo_screen_desktop_pane_caption">Chrome หรือ Brave ที่ติดตั้งไว้บนมือถือ</string>
     <string name="duo_pick_current">อยู่ในช่องนี้ตอนนี้</string>
+    <string name="duo_screen_backend_adb">ADB</string>
+    <string name="duo_screen_adb_ready">เชื่อมต่อผ่าน Wireless debugging แล้ว</string>
+    <string name="duo_screen_adb_missing">ยังไม่ได้เชื่อม Wireless debugging</string>
+    <string name="duo_screen_adb_hint">ทดลองใช้ ไม่ต้องใช้ Shizuku หรือ root เปิด Wireless debugging ในตัวเลือกสำหรับนักพัฒนา แล้วกดเชื่อมต่อ ครั้งแรกให้จับคู่ด้วยรหัสที่ขึ้นมา หลังรีสตาร์ทมือถือ ให้เปิด Wireless debugging อีกครั้งแล้วกดเชื่อมต่อ ช่องต่าง ๆ จะหยุดเมื่อมือถือดับจอ เว้นแต่เปิด Shizuku ไว้ด้วย</string>
+    <string name="duo_screen_adb_connect">เชื่อมต่อ</string>
+    <string name="duo_screen_adb_connecting">กำลังเชื่อม Wireless debugging…</string>
+    <string name="duo_screen_adb_needs_pairing">จับคู่ครั้งแรก: ใน Wireless debugging กด “จับคู่อุปกรณ์ด้วยรหัสการจับคู่” แล้วพิมพ์รหัสลงในการแจ้งเตือนของ AutoBridge</string>
+    <string name="duo_screen_adb_off">Wireless debugging ปิดอยู่ หรือมือถือไม่ได้ต่อ Wi-Fi เปิดในตัวเลือกสำหรับนักพัฒนา แล้วกดเชื่อมต่ออีกครั้ง</string>
+    <string name="duo_screen_adb_failed">เชื่อมต่อไม่ได้: %1$s</string>
+    <string name="duo_screen_adb_pair_channel">จับคู่ Wireless debugging</string>
+    <string name="duo_screen_adb_pair_title">จับคู่ AutoBridge กับ Wireless debugging</string>
+    <string name="duo_screen_adb_pair_text">ใน Wireless debugging กด “จับคู่อุปกรณ์ด้วยรหัสการจับคู่” เปิดหน้าต่างนั้นค้างไว้ แล้วพิมพ์รหัส 6 หลักที่นี่</string>
+    <string name="duo_screen_adb_pair_hint">รหัส 6 หลัก</string>
+    <string name="duo_screen_adb_pair_action">ใส่รหัส</string>
+    <string name="duo_screen_adb_pair_working">กำลังจับคู่…</string>
+    <string name="duo_screen_adb_pair_ok">จับคู่แล้ว กำลังเชื่อมต่อ…</string>
+    <string name="duo_screen_adb_pair_failed">จับคู่ไม่สำเร็จ (%1$s) ตรวจรหัสแล้วลองใหม่ ระหว่างที่หน้าต่างจับคู่ยังเปิดอยู่</string>
+    <string name="duo_screen_adb_pair_no_dialog">หาหน้าต่างจับคู่ไม่เจอ เปิด “จับคู่อุปกรณ์ด้วยรหัสการจับคู่” ใน Wireless debugging ค้างไว้ แล้วพิมพ์รหัสอีกครั้ง</string>
+    <string name="duo_screen_card_adb_title">เชื่อม Wireless debugging</string>
+    <string name="duo_screen_card_adb_text">เปิด Wireless debugging แล้วกดเชื่อมต่อใน AutoBridge › Multi-app แอปของคุณจะเปิดที่นี่เอง</string>
 </resources>
