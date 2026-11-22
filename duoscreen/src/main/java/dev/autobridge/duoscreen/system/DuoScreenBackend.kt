@@ -6,6 +6,8 @@ package dev.autobridge.duoscreen.system
  * [SHIZUKU] lends the shell UID and is the only one that can create *trusted* pane displays, which
  * keep composing after the phone's power button. [ROOT] needs no Shizuku at all — a helper started
  * with `su` does the launches, touch and keyboard — but its panes are ordinary app displays, which
- * stop when the phone really sleeps (unless Shizuku also happens to be granted).
+ * stop when the phone really sleeps (unless Shizuku also happens to be granted). [ADB] does what
+ * root does with neither root nor Shizuku, through this phone's own Wireless debugging (see
+ * [DuoScreenAdbOps]); experimental.
  */
-enum class DuoScreenBackend { SHIZUKU, ROOT }
+enum class DuoScreenBackend { SHIZUKU, ROOT, ADB }

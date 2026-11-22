@@ -1136,6 +1136,8 @@ class DuoScreenController(
                 R.string.duo_screen_card_allow_title to R.string.duo_screen_card_allow_text
             DuoScreenOps.SetupStep.ALLOW_ROOT ->
                 R.string.duo_screen_card_root_title to R.string.duo_screen_card_root_text
+            DuoScreenOps.SetupStep.CONNECT_ADB ->
+                R.string.duo_screen_card_adb_title to R.string.duo_screen_card_adb_text
             null -> R.string.duo_screen_banner_title to R.string.duo_screen_banner_text
         }
         return SetupNotice(

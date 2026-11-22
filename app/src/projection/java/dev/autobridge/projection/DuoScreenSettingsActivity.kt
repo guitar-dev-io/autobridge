@@ -166,6 +166,7 @@ class DuoScreenSettingsActivity : Activity() {
                 when (backend) {
                     DuoScreenBackend.SHIZUKU -> R.string.duo_screen_backend_shizuku
                     DuoScreenBackend.ROOT -> R.string.duo_screen_backend_root
+                    DuoScreenBackend.ADB -> R.string.duo_screen_backend_adb
                 }
             )
             addView(
@@ -211,8 +212,53 @@ class DuoScreenSettingsActivity : Activity() {
     }
 
     private fun chooseBackend(backend: DuoScreenBackend) {
+        if (backend == DuoScreenBackend.ADB) {
+            // Stored as the choice, then connected the same way the Connect button does, so a
+            // missing pairing or Wireless debugging is explained rather than just "failed".
+            dev.autobridge.duoscreen.layout.DuoScreenStore.setBackend(this, backend)
+            DuoScreenOps.load(this)
+            dev.autobridge.duoscreen.system.DuoScreenRootOps.stop()
+            connectAdb()
+            render()
+            return
+        }
         DuoScreenOps.choose(this, backend) { ready -> onBackendResult(backend, ready) }
         render()
+    }
+
+    /**
+     * Connects the ADB backend. Not paired yet: starts pairing (notification to type the code in,
+     * and Developer options opened). Wireless debugging off or not on Wi-Fi: says so and opens
+     * Developer options to turn it on.
+     */
+    private fun connectAdb() {
+        Toast.makeText(this, R.string.duo_screen_adb_connecting, Toast.LENGTH_SHORT).show()
+        dev.autobridge.duoscreen.system.DuoScreenAdbOps.startAsync(this) { result ->
+            if (isDestroyed) return@startAsync
+            when (result) {
+                dev.autobridge.duoscreen.system.DuoScreenAdbOps.Result.READY ->
+                    onBackendResult(DuoScreenBackend.ADB, true)
+                dev.autobridge.duoscreen.system.DuoScreenAdbOps.Result.NEEDS_PAIRING -> {
+                    Toast.makeText(this, R.string.duo_screen_adb_needs_pairing, Toast.LENGTH_LONG).show()
+                    dev.autobridge.duoscreen.system.DuoScreenAdbPairing.begin(this)
+                }
+                dev.autobridge.duoscreen.system.DuoScreenAdbOps.Result.WIRELESS_DEBUGGING_OFF -> {
+                    Toast.makeText(this, R.string.duo_screen_adb_off, Toast.LENGTH_LONG).show()
+                    runCatching {
+                        startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS))
+                    }
+                }
+                dev.autobridge.duoscreen.system.DuoScreenAdbOps.Result.FAILED -> Toast.makeText(
+                    this,
+                    getString(
+                        R.string.duo_screen_adb_failed,
+                        dev.autobridge.duoscreen.system.DuoScreenAdbOps.lastError.orEmpty(),
+                    ),
+                    Toast.LENGTH_LONG,
+                ).show()
+            }
+            render()
+        }
     }
 
     /** Fills a running session's empty panes, or says why root did not come up. */
@@ -236,6 +282,13 @@ class DuoScreenSettingsActivity : Activity() {
         ) {
             DuoScreenRootOps.startAsync(this) { ready -> onBackendResult(DuoScreenBackend.ROOT, ready) }
         }
+        DuoScreenBackend.ADB -> statusBanner(
+            ready = dev.autobridge.duoscreen.system.DuoScreenAdbOps.isAvailable,
+            readyTitle = R.string.duo_screen_adb_ready,
+            missingTitle = R.string.duo_screen_adb_missing,
+            hint = R.string.duo_screen_adb_hint,
+            action = R.string.duo_screen_adb_connect,
+        ) { connectAdb() }
     }
 
     /**

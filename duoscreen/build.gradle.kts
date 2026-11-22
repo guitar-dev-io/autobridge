@@ -59,6 +59,17 @@ dependencies {
     // Stub.asInterface methods are hidden-API blocked at targetSdk 36 ("api=blocked" /
     // "max-target-r"), so reflection alone is denied.
     implementation("org.lsposed.hiddenapibypass:hiddenapibypass:6.1")
+    // ADB backend: pair with and connect to this phone's own Wireless debugging, then run the same
+    // helper the root backend runs, as the shell user instead of through su. libadb-android is
+    // GPL-3.0-or-later OR Apache-2.0 (used under Apache-2.0); its SPAKE2 dependency is LGPL-3.0,
+    // linked as a library. Sideload flavors only, like the rest of this module.
+    implementation("com.github.MuntashirAkon:libadb-android:3.1.1")
+    // TLS 1.3 with exported keying material for pairing, without reaching for the platform's
+    // hidden com.android.org.conscrypt; libadb picks this provider up on its own when present.
+    implementation("org.conscrypt:conscrypt-android:2.5.3")
+    // The self-signed certificate that carries the ADB key (adbd checks the key, not the cert).
+    // Same release line as the bcprov libadb brings.
+    implementation("org.bouncycastle:bcpkix-jdk15to18:1.81")
     testImplementation("junit:junit:4.13.2")
     // The android.jar the unit tests link against stubs org.json with methods that throw, and the
     // saved-layout codec is ordinary JSON work worth testing. Not shipped: the platform provides

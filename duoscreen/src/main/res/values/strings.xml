@@ -100,4 +100,24 @@
     <string name="duo_screen_desktop_pane">Desktop browser (AutoBridge)</string>
     <string name="duo_screen_desktop_pane_caption">Chrome or Brave, as installed on the phone</string>
     <string name="duo_pick_current">In this pane now</string>
+    <string name="duo_screen_backend_adb">ADB</string>
+    <string name="duo_screen_adb_ready">Connected through Wireless debugging</string>
+    <string name="duo_screen_adb_missing">Wireless debugging not connected</string>
+    <string name="duo_screen_adb_hint">Experimental. No Shizuku or root needed: turn on Wireless debugging in Developer options and tap Connect. The first time, pair with the code it shows. After a restart, turn Wireless debugging on again and tap Connect. Panes stop when the phone sleeps unless Shizuku is also on</string>
+    <string name="duo_screen_adb_connect">Connect</string>
+    <string name="duo_screen_adb_connecting">Connecting to Wireless debugging…</string>
+    <string name="duo_screen_adb_needs_pairing">Pair once: in Wireless debugging tap “Pair device with pairing code”, then type the code into AutoBridge\'s notification</string>
+    <string name="duo_screen_adb_off">Wireless debugging is off, or the phone is not on Wi-Fi. Turn it on in Developer options and tap Connect again</string>
+    <string name="duo_screen_adb_failed">Could not connect: %1$s</string>
+    <string name="duo_screen_adb_pair_channel">Wireless debugging pairing</string>
+    <string name="duo_screen_adb_pair_title">Pair AutoBridge with Wireless debugging</string>
+    <string name="duo_screen_adb_pair_text">In Wireless debugging, tap “Pair device with pairing code”. Keep that dialog open and type its six-digit code here.</string>
+    <string name="duo_screen_adb_pair_hint">Six-digit code</string>
+    <string name="duo_screen_adb_pair_action">Enter code</string>
+    <string name="duo_screen_adb_pair_working">Pairing…</string>
+    <string name="duo_screen_adb_pair_ok">Paired. Connecting…</string>
+    <string name="duo_screen_adb_pair_failed">Pairing failed (%1$s). Check the code and try again with the dialog still open.</string>
+    <string name="duo_screen_adb_pair_no_dialog">The pairing dialog was not found. Open “Pair device with pairing code” in Wireless debugging, keep it open, and type the code again.</string>
+    <string name="duo_screen_card_adb_title">Connect Wireless debugging</string>
+    <string name="duo_screen_card_adb_text">Turn on Wireless debugging and tap Connect in AutoBridge › Multi-app. Your apps open here by themselves.</string>
 </resources>

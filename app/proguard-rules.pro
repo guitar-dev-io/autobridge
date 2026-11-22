@@ -69,3 +69,16 @@
 -keep class com.google.android.apps.auto.sdk.** { *; }
 -keep class * extends com.google.android.apps.auto.sdk.CarActivity { <init>(...); }
 -keep class * extends com.google.android.apps.auto.sdk.CarActivityService { <init>(...); }
+
+# Duo Screen's ADB backend (libadb-android). libadb finds Conscrypt by reflection
+# (org.conscrypt.OpenSSLProvider, Conscrypt.exportKeyingMaterial) and its SPAKE2 dependency is a
+# JNI library whose native side looks its Java peers up by name; R8 sees neither edge.
+-keep class org.conscrypt.** { *; }
+-keep class io.github.muntashirakon.crypto.spake2.** { *; }
+-keep class io.github.muntashirakon.adb.** { *; }
+# Optional platforms and JDK-only paths these libraries reference but never take on Android.
+-dontwarn org.conscrypt.**
+-dontwarn com.android.org.conscrypt.**
+-dontwarn org.bouncycastle.**
+-dontwarn org.openjsse.**
+-dontwarn javax.naming.**

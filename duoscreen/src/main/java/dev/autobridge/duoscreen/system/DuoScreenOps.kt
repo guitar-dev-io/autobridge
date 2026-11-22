@@ -16,6 +16,8 @@ import dev.autobridge.shizuku.ShizukuGrant
  *   every reboot. Gives trusted pane displays that survive the phone's power button.
  * - **Root** ([DuoScreenRootOps]): no Shizuku needed, on a rooted phone. Launch, touch and keys
  *   work the same; the panes are ordinary app displays.
+ * - **ADB** ([DuoScreenAdbOps], experimental): neither Shizuku nor root; the root backend's helper
+ *   run through this phone's own Wireless debugging. Same reach as root.
  *
  * The trusted-display calls always go to Shizuku: it is the only backend that can make one, and a
  * display has to be resized and released by the backend that created it. Without Shizuku they
@@ -37,10 +39,18 @@ object DuoScreenOps : DuoScreenPrivilegedOps {
         DuoScreenStore.setBackend(context, backend)
         preferred = backend
         when (backend) {
-            DuoScreenBackend.ROOT -> DuoScreenRootOps.startAsync(context, onReady)
+            DuoScreenBackend.ROOT -> {
+                DuoScreenAdbOps.stop()
+                DuoScreenRootOps.startAsync(context, onReady)
+            }
             DuoScreenBackend.SHIZUKU -> {
                 DuoScreenRootOps.stop()
+                DuoScreenAdbOps.stop()
                 onReady(DuoScreenShizukuOps.isAvailable)
+            }
+            DuoScreenBackend.ADB -> {
+                DuoScreenRootOps.stop()
+                DuoScreenAdbOps.startAsync(context) { result -> onReady(result == DuoScreenAdbOps.Result.READY) }
             }
         }
     }
@@ -55,10 +65,13 @@ object DuoScreenOps : DuoScreenPrivilegedOps {
         if (preferred == DuoScreenBackend.ROOT && !DuoScreenRootOps.isAvailable) {
             DuoScreenRootOps.startAsync(context) { started -> if (started) onReady() }
         }
+        if (preferred == DuoScreenBackend.ADB && !DuoScreenAdbOps.isAvailable) {
+            DuoScreenAdbOps.startAsync(context) { result -> if (result == DuoScreenAdbOps.Result.READY) onReady() }
+        }
     }
 
     /** What the driver has to do before the panes can run their apps; see [setupStep]. */
-    enum class SetupStep { INSTALL_SHIZUKU, START_SHIZUKU, ALLOW_SHIZUKU, ALLOW_ROOT }
+    enum class SetupStep { INSTALL_SHIZUKU, START_SHIZUKU, ALLOW_SHIZUKU, ALLOW_ROOT, CONNECT_ADB }
 
     /**
      * The one thing standing between the driver and working panes, or null when a backend is
@@ -69,6 +82,7 @@ object DuoScreenOps : DuoScreenPrivilegedOps {
         if (isAvailable) return null
         return when (preferred) {
             DuoScreenBackend.ROOT -> SetupStep.ALLOW_ROOT
+            DuoScreenBackend.ADB -> SetupStep.CONNECT_ADB
             DuoScreenBackend.SHIZUKU -> when (ShizukuGrant.state(context)) {
                 ShizukuGrant.State.NOT_INSTALLED -> SetupStep.INSTALL_SHIZUKU
                 ShizukuGrant.State.NOT_RUNNING -> SetupStep.START_SHIZUKU
@@ -82,13 +96,15 @@ object DuoScreenOps : DuoScreenPrivilegedOps {
         get() = order().firstOrNull { backendOps(it).isAvailable }
 
     private fun order(): List<DuoScreenBackend> = when (preferred) {
-        DuoScreenBackend.SHIZUKU -> listOf(DuoScreenBackend.SHIZUKU, DuoScreenBackend.ROOT)
-        DuoScreenBackend.ROOT -> listOf(DuoScreenBackend.ROOT, DuoScreenBackend.SHIZUKU)
+        DuoScreenBackend.SHIZUKU -> listOf(DuoScreenBackend.SHIZUKU, DuoScreenBackend.ROOT, DuoScreenBackend.ADB)
+        DuoScreenBackend.ROOT -> listOf(DuoScreenBackend.ROOT, DuoScreenBackend.SHIZUKU, DuoScreenBackend.ADB)
+        DuoScreenBackend.ADB -> listOf(DuoScreenBackend.ADB, DuoScreenBackend.SHIZUKU, DuoScreenBackend.ROOT)
     }
 
     private fun backendOps(backend: DuoScreenBackend): DuoScreenPrivilegedOps = when (backend) {
         DuoScreenBackend.SHIZUKU -> DuoScreenShizukuOps
         DuoScreenBackend.ROOT -> DuoScreenRootOps
+        DuoScreenBackend.ADB -> DuoScreenAdbOps
     }
 
     private val current: DuoScreenPrivilegedOps?
