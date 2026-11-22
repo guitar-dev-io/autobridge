@@ -15,18 +15,32 @@ data class Trip(
     val people: Int,
     val otherBaht: Double = 0.0,
     val bahtPerKm: Double? = null,
+    /** Distance measured by the phone's GPS ([GpsOdometer]); null when it was not tracked. */
+    val gpsKm: Double? = null,
 ) {
     val active: Boolean get() = endMs == 0L
 }
 
 /** The figures for a trip, pure so they are tested on the JVM. Null where there is not enough data. */
 object TripStats {
-    /** Distance driven, or null when a reading is missing or the end is not past the start. */
-    fun distanceKm(trip: Trip, currentKm: Double? = null): Double? {
+    /**
+     * Distance driven: the odometer when both readings are there, otherwise the GPS figure. Null
+     * when neither is known, or the odometer end is not past the start and there is no GPS figure.
+     */
+    fun distanceKm(trip: Trip, currentKm: Double? = null): Double? =
+        odometerKm(trip, currentKm) ?: gpsDistanceKm(trip)
+
+    /** Whether [distanceKm] comes from GPS, so it can be labelled as an estimate. */
+    fun isGpsDistance(trip: Trip, currentKm: Double? = null): Boolean =
+        odometerKm(trip, currentKm) == null && gpsDistanceKm(trip) != null
+
+    private fun odometerKm(trip: Trip, currentKm: Double?): Double? {
         val start = trip.startKm ?: return null
         val end = trip.endKm ?: currentKm ?: return null
         return (end - start).takeIf { it > 0 }
     }
+
+    private fun gpsDistanceKm(trip: Trip): Double? = trip.gpsKm?.takeIf { it > 0 }
 
     /** Fuel or charging for the distance, from the trip's cost per km. */
     fun energyBaht(trip: Trip, currentKm: Double? = null, bahtPerKm: Double? = trip.bahtPerKm): Double? {

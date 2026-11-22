@@ -1,6 +1,7 @@
 package dev.autobridge.trip
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -46,5 +47,25 @@ class TripStatsTest {
     @Test fun durationOfAnActiveTripRunsToNow() {
         assertEquals(9_000L, TripStats.durationMs(trip().copy(endMs = 0), nowMs = 10_000))
         assertEquals(4_000L, TripStats.durationMs(trip(), nowMs = 99_000))
+    }
+
+    @Test fun withoutAnOdometerTheGpsDistanceIsUsed() {
+        val t = trip(start = null, end = null).copy(gpsKm = 42.0)
+        assertEquals(42.0, TripStats.distanceKm(t)!!, 0.001)
+        assertTrue(TripStats.isGpsDistance(t))
+        assertEquals(84.0, TripStats.energyBaht(t)!!, 0.001)
+    }
+
+    @Test fun theOdometerWinsOverGps() {
+        val t = trip().copy(gpsKm = 580.0)
+        assertEquals(600.0, TripStats.distanceKm(t)!!, 0.001)
+        assertFalse(TripStats.isGpsDistance(t))
+    }
+
+    @Test fun aStaleOdometerFallsBackToGps() {
+        // The same last-logged reading at start and end is no distance; GPS fills in.
+        val t = trip(start = 10_000.0, end = 10_000.0).copy(gpsKm = 12.5)
+        assertEquals(12.5, TripStats.distanceKm(t)!!, 0.001)
+        assertTrue(TripStats.isGpsDistance(t))
     }
 }

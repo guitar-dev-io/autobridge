@@ -45,6 +45,8 @@ class AutoBridgeSession : Session(), CarScreenController.Host {
                 runCatching { dev.autobridge.breakreminder.BreakReminder.start(carContext) }
                 // A new stored fault code is announced on the car screen while the adapter is live.
                 runCatching { CarDtcAlerts.start(carContext) }
+                // A trip still in progress (the process may have been restarted) keeps its GPS count.
+                runCatching { dev.autobridge.trip.TripGpsTracker.ensure(carContext) }
                 dev.autobridge.logging.StructuredLog.i(TAG, "car session connected")
                 ConnectionTimeline.record(ConnectionTimeline.Kind.SESSION_STARTED)
                 CarSessionHistory.markStarted(carContext)

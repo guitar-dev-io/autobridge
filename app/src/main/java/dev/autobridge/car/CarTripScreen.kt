@@ -11,11 +11,13 @@ import androidx.car.app.model.Template
 import dev.autobridge.R
 import dev.autobridge.maintenance.MaintenanceStore
 import dev.autobridge.trip.TripActivity
+import dev.autobridge.trip.TripGpsTracker
 import dev.autobridge.trip.TripStore
 import dev.autobridge.trip.TripText
 
 /**
- * The trip so far, or the last one, with one button to start or end it using the car's odometer.
+ * The trip so far, or the last one, with one button to start or end it using the car's odometer,
+ * or the phone's GPS ([TripGpsTracker]) when the car gives no odometer and the user allowed it.
  * The party size is the last trip's and tolls or parking are added on the phone
  * ([TripActivity]) — typing is locked on the car while driving.
  */
@@ -24,6 +26,7 @@ class CarTripScreen(carContext: CarContext) : Screen(carContext) {
         val trips = TripStore.all(carContext)
         val active = trips.firstOrNull { it.active }
         val odometer = MaintenanceStore.currentOdometer(carContext)
+        val gps = TripGpsTracker.canTrack(carContext)
         val now = System.currentTimeMillis()
         val pane = Pane.Builder()
 
@@ -44,8 +47,9 @@ class CarTripScreen(carContext: CarContext) : Screen(carContext) {
             }
         }
 
-        // The car's own reading is what lets the car start a trip; without one, the phone does it.
-        if (active != null || odometer != null) {
+        // An odometer reading or GPS is what lets the car start a trip; without either, the phone
+        // does it (the end reading is typed there).
+        if (active != null || odometer != null || gps) {
             pane.addAction(
                 Action.Builder()
                     .setTitle(carContext.getString(if (active != null) R.string.trip_end else R.string.trip_start))
