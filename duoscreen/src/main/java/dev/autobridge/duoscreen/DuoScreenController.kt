@@ -604,10 +604,17 @@ class DuoScreenController(
     }
 
     /**
-     * Relaunches the app of every pane that should be showing one and is not: its display has no
-     * task, or it has never drawn a frame. Our own app is relaunched only when its display is known
-     * to be empty, since its pane launch always opens a new instance (see [recallVacatedPanes]).
-     * Picture-blocking apps are left alone: their pane is meant to be covered by a note.
+     * Relaunches the app of every pane that has never drawn a frame: an app launched while the
+     * phone could not run it (locked, screen off, Shizuku not yet back), which leaves a black pane.
+     *
+     * A pane that has drawn and then lost its task is left alone. That is the driver opening the
+     * pane's app on the phone - Android moves its one task there - and relaunching it onto the car
+     * would pull the app out from under the driver's hands on the phone. Coming back to Duo Screen
+     * ([resume], [recallVacatedPanes]) or the reload button still brings it back to the car.
+     *
+     * Our own app is relaunched only when its display is known to be empty, since its pane launch
+     * always opens a new instance. Picture-blocking apps are left alone: their pane is meant to be
+     * covered by a note.
      */
     private val settleCheck: Runnable = Runnable {
         if (!running || !ops.isAvailable || !compositor.hasContext) {
@@ -624,7 +631,7 @@ class DuoScreenController(
             val drawn = compositor.hasFrame(pane.id)
             val isSelf = DuoScreenSelfPane.isSelf(packageName, context.packageName)
             // Relaunching a third-party app already on its display only brings it to the front.
-            val missing = occupied == false || (!drawn && !isSelf)
+            val missing = !drawn && (!isSelf || occupied == false)
             if (!missing) return@forEach
             val count = settleRelaunches[pane.id] ?: 0
             if (count >= SETTLE_MAX_RELAUNCHES) return@forEach
@@ -649,7 +656,9 @@ class DuoScreenController(
 
     /**
      * The phone's screen coming on or being unlocked while a session runs. Pane apps launched while
-     * it was locked may never have started; they are looked at again now.
+     * it was locked may never have started; they are looked at again now. Panes whose app the
+     * driver has since opened on the phone are not recalled here: unlocking the phone to use it is
+     * not the driver asking for the car layout, and recalling would take the app off the phone.
      */
     private var wakeReceiver: android.content.BroadcastReceiver? = null
 
@@ -658,7 +667,6 @@ class DuoScreenController(
         val receiver = object : android.content.BroadcastReceiver() {
             override fun onReceive(c: Context, intent: Intent) {
                 if (!running) return
-                recallVacatedPanes()
                 scheduleSettleChecks(intent.action?.substringAfterLast('.') ?: "wake")
             }
         }
