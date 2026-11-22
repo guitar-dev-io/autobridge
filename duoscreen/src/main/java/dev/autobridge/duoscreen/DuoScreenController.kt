@@ -571,8 +571,9 @@ class DuoScreenController(
      * already on its display to the front; our own app is not, because its pane launch always
      * makes a new instance and would stack a second browser on the first.
      */
-    private fun recallVacatedPanes() {
-        if (!ops.isAvailable) return
+    private fun recallVacatedPanes(): List<Int> {
+        if (!ops.isAvailable) return emptyList()
+        val recalled = ArrayList<Int>()
         panes.forEach { pane ->
             val packageName = pane.packageName ?: return@forEach
             val displayId = DuoScreenDisplays.displayId(pane.id)
@@ -581,9 +582,19 @@ class DuoScreenController(
             val isSelf = DuoScreenSelfPane.isSelf(packageName, context.packageName)
             if (occupied == true || (occupied == null && isSelf)) return@forEach
             val relaunched = reload(pane.id)
+            recalled += pane.id
             StructuredLog.i(TAG, "Pane ${pane.id}: $packageName ${if (occupied == false) "had left its display" else "state unknown"}; relaunched=$relaunched")
         }
+        return recalled
     }
+
+    /**
+     * Panes whose app was called back from the phone when its screen went off. A launch while the
+     * phone is locked can fail to start, so [settleCheck] tries these again while their display
+     * is still empty, even though they drew before. Cleared when the driver unlocks the phone:
+     * from then on, an empty pane is again one whose app the driver is using on the phone.
+     */
+    private val recalledAtScreenOff = HashSet<Int>()
 
     /** Which of [SETTLE_CHECK_MS] the next [settleCheck] is, and how often each pane was relaunched. */
     private var settleStep = 0
@@ -630,9 +641,11 @@ class DuoScreenController(
             val occupied = ops.hasTaskOnDisplay(displayId)
             val drawn = compositor.hasFrame(pane.id)
             val isSelf = DuoScreenSelfPane.isSelf(packageName, context.packageName)
+            if (occupied == true) recalledAtScreenOff.remove(pane.id)
             // Relaunching a third-party app already on its display only brings it to the front.
-            val missing = !drawn && (!isSelf || occupied == false)
-            if (!missing) return@forEach
+            val neverShown = !drawn && (!isSelf || occupied == false)
+            val recallPending = pane.id in recalledAtScreenOff && occupied == false
+            if (!neverShown && !recallPending) return@forEach
             val count = settleRelaunches[pane.id] ?: 0
             if (count >= SETTLE_MAX_RELAUNCHES) return@forEach
             settleRelaunches[pane.id] = count + 1
@@ -655,10 +668,14 @@ class DuoScreenController(
     }
 
     /**
-     * The phone's screen coming on or being unlocked while a session runs. Pane apps launched while
-     * it was locked may never have started; they are looked at again now. Panes whose app the
-     * driver has since opened on the phone are not recalled here: unlocking the phone to use it is
-     * not the driver asking for the car layout, and recalling would take the app off the phone.
+     * The phone's screen turning on, off, or being unlocked while a session runs.
+     *
+     * On or unlocked: pane apps launched while it was locked may never have started; they are
+     * looked at again. Apps the driver has opened on the phone are left there: unlocking the phone
+     * to use it is not the driver asking for the car layout.
+     *
+     * Off: the driver is done with the phone, so apps they had moved to it go back to their panes
+     * on the car, and are retried while the phone stays locked (see [recalledAtScreenOff]).
      */
     private var wakeReceiver: android.content.BroadcastReceiver? = null
 
@@ -667,11 +684,22 @@ class DuoScreenController(
         val receiver = object : android.content.BroadcastReceiver() {
             override fun onReceive(c: Context, intent: Intent) {
                 if (!running) return
+                when (intent.action) {
+                    // The driver put the phone down: a pane app they had opened on it goes back
+                    // to its pane on the car by itself, with no reload to press.
+                    Intent.ACTION_SCREEN_OFF -> {
+                        recalledAtScreenOff += recallVacatedPanes()
+                        if (recalledAtScreenOff.isNotEmpty()) refreshChrome()
+                    }
+                    // The driver is using the phone again; stop calling apps back to the car.
+                    Intent.ACTION_USER_PRESENT -> recalledAtScreenOff.clear()
+                }
                 scheduleSettleChecks(intent.action?.substringAfterLast('.') ?: "wake")
             }
         }
         val filter = android.content.IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_ON)
+            addAction(Intent.ACTION_SCREEN_OFF)
             addAction(Intent.ACTION_USER_PRESENT)
         }
         runCatching {
@@ -1227,6 +1255,7 @@ class DuoScreenController(
         pendingSizes.clear()
         releaseInputThread()
         unregisterWakeReceiver()
+        recalledAtScreenOff.clear()
         router?.panes?.panes?.forEach { pane ->
             compositor.removePane(pane.id)
             DuoScreenDisplays.release(pane.id)
